@@ -1,5 +1,5 @@
 jpeg:
-	cd ./docs && bash png_to_jpeg.sh
+	bash png_to_jpeg.sh
 
 deps:
 	pip install -r requirements.txt
