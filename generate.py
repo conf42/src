@@ -85,10 +85,11 @@ for event in events:
     if year not in years:
         years[year] = []
     years[year].append(event)
-context["future_events"] = future_events
-context["past_events"] = past_events
-context["current_event"] = past_events[-1]
 context["years"] = years
+context["future_events"] = future_events
+context["current_event"] = past_events[-1]
+context["past_events"] = past_events[:-1]
+context["past_events"].sort(key=lambda e: e.get("date"), reverse=True)
 
 # read the sponsors metadata
 try:
