@@ -3,8 +3,6 @@ jpeg:
 
 deps:
 	pip install -r requirements.txt
-	# for Ubuntu
-	sudo apt-get install imagemagick || true
 
 generate:
 	python generate.py
