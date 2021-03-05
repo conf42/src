@@ -142,12 +142,12 @@ for event in events:
         talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
 
         # template the talk subpage
-        with open(BASE_FOLDER + "/" + talk.get("short_url").rstrip(".html")  + ".html", "w") as f:
+        with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, talk=talk, **context))
 
     # template the main event page
-    with open(BASE_FOLDER + "/" + event.get("short_url").rstrip(".html") + ".html", "w") as f:
+    with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
         f.write(template.render(event=event, **context))
 
