@@ -48,6 +48,11 @@ def pick_picture_file(base, pic):
         print("Missing picture: %s%s" % (base, pic))
         return pic
 
+def warn_on_missing_file(path):
+    if not os.path.isfile(path):
+        print("Missing file: %s" % path)
+    # else:
+    #     print("OK: %s" % path)
 
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
@@ -131,10 +136,14 @@ for event in events:
         tracks[track].append(talk)
     event["tracks"] = tracks
 
-    # template each talk page for the event
+    # check that all slide files are there
     for talk in talks:
+        slide_file = talk.get("Slides")
+        if slide_file:
+            warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
 
-        # check the headshot
+    # # template each talk page for the event
+    # for talk in talks:        # check the headshot
         talk["Picture"] = pick_picture_file(BASE_FOLDER + "/assets/headshots/", talk["Picture"])
 
         # generate things
