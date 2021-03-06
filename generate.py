@@ -46,7 +46,7 @@ def pick_picture_file(base, pic):
         return pic_jpeg
     elif not os.path.isfile(base + pic):
         print("Missing picture: %s%s" % (base, pic))
-        return pic
+    return pic
 
 def warn_on_missing_file(path):
     if not os.path.isfile(path):
