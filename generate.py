@@ -6,6 +6,7 @@ import csv
 import textwrap
 import re
 import os
+import string
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -29,12 +30,12 @@ def read_csv(path):
     return items
 
 def generate_short_url(event, talk):
-    import string
-    url = "{}_{}_{}_{}".format(
-        event.get("name", "").replace(" ", "_"),
-        event.get("year", "").replace(" ", "_"),
-        talk.get("Name1", "").replace(" ", "_"),
-        talk.get("Title", "").replace(" ", "_")
+    url = "{event}_{year}_{name1}{name2}{keywords}".format(
+        event=event.get("name", "").replace(" ", "_"),
+        year=event.get("year", "").replace(" ", "_"),
+        name1=talk.get("Name1", "").replace(" ", "_"),
+        name2=("_" + talk.get("Name2", "").replace(" ", "_")) if talk.get("Name2") else "",
+        keywords=("_" + talk.get("Keywords", "").replace(",", "_").replace(" ", "_")) if talk.get("Keywords") else "",
     )
     url = ''.join(filter(lambda x: x in string.printable, url))
     url = re.sub('[\W]+', '', url)
