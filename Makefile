@@ -9,8 +9,8 @@ generate:
 
 clean:
 	rm -rf ./docs/*.html
-	rm -rf ./docs/assets/headshots/*.jpeg
-	rm -rf ./docs/assets/splash/*.jpeg
-	rm -rf ./docs/assets/podcasts/*.jpeg
+	rm -rf ./docs/assets/headshots/*.jpg
+	rm -rf ./docs/assets/splash/*.jpg
+	rm -rf ./docs/assets/podcasts/*.jpg
 
 all: deps jpeg generate
