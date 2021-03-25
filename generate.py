@@ -80,7 +80,7 @@ for event in events:
     for sponsor_type in event.get("sponsors", {}).keys():
         event["sponsors"][sponsor_type].sort()
     # divide into past and future events
-    if datetime.date.today() > event.get("date"):
+    if datetime.date.today() >= event.get("date"):
         past_events.append(event)
         current_event = event
     else:
