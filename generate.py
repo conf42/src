@@ -162,7 +162,7 @@ for event in events:
         f.write(template.render(event=event, **context))
 
 # generate the static bits
-for page in ["index.html", "podcast.html", "sponsor.html"]:
+for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
         template = env.get_template(page)
         f.write(template.render(page=page, **context))
