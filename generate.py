@@ -25,7 +25,7 @@ def read_csv(path):
             item = dict(item)
             if "Abstract" in item:
                 item["Abstract_s"] = textwrap.shorten(item.get("Abstract",""), 200-len(item.get("title","")), placeholder="...")
-                item["Abstract_m"] = textwrap.shorten(item.get("Abstract",""), 800-len(item.get("title","")), placeholder="...")
+                item["Abstract_m"] = textwrap.shorten(item.get("Abstract",""), 400-len(item.get("title","")), placeholder="...")
             items.append(item)
     return items
 
