@@ -112,14 +112,14 @@ except Exception as e:
 
 # generate the subpages
 for event in events:
-    print("%s %s /%s" % (event.get("date"), event.get("name"), event.get("short_url")))
-
     # attempt to read the talks CSV
     try:
         talks = read_csv(event.get("db_path"))
     except:
         talks = []
     #talks.sort(key=lambda x: x.get("Title"))
+
+    print("%s %s /%s (%d talks)" % (event.get("date"), event.get("name"), event.get("short_url"), len(talks)))
 
     # check and pick the picture
     event["thumbnail_path"] = pick_picture_file(BASE_FOLDER + "/", event["thumbnail_path"])
