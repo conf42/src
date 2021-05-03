@@ -159,12 +159,13 @@ for event in events:
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, talk=talk, **context))
+        # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
                 template = env.get_template("talk.html")
                 event_copy = event.copy()
                 event_copy["reveal_videos"] = True
-                f.write(template.render(event=event_copy, talk=talk, **context))
+                f.write(template.render(event=event_copy, talk=talk, secret_mode=True, **context))
 
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
@@ -175,7 +176,9 @@ for event in events:
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
             template = env.get_template("event.html")
-            f.write(template.render(event=event, prefix=event.get("secret_url")+"_", **context))
+            event_copy = event.copy()
+            event_copy["reveal_videos"] = True
+            f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
 # generate the static bits
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html"]:
