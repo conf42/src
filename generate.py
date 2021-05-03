@@ -91,6 +91,10 @@ for event in events:
     if year not in years:
         years[year] = []
     years[year].append(event)
+    # mark as revealed or not
+    event["reveal_videos"] = False
+    if datetime.date.today() >= event.get("videos_reveal_date"):
+        event["reveal_videos"] = True
 context["years"] = years
 context["future_events"] = future_events
 context["current_event"] = past_events[-1]
