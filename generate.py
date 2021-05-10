@@ -198,9 +198,9 @@ for podcast in podcasts:
     for chapter in chapters:
         if "Transcribed by" in chapter:
             continue
-        header, body = chapter.split("\n")
-        speaker, timestamp = header.split("  ")[:2]
-        time_m, time_s = timestamp.split(":")
+        header, body = chapter.split("\n", 1)
+        speaker, timestamp = header.split("  ", 1)
+        time_m, time_s = timestamp.split(":")[:2]
         transcript.append(dict(
             speaker=speaker,
             timestamp=timestamp,
