@@ -180,6 +180,40 @@ for event in events:
             event_copy["reveal_videos"] = True
             f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
+# preprocess the podcasts
+podcasts = context.get("podcasts")
+# sort podcasts by date
+# podcasts.sort(key=lambda e: e.get("date"))
+for podcast in podcasts:
+
+    transcript_path = podcast.get("transcript")
+    if not transcript_path:
+        continue
+
+    podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
+
+    with open("./transcripts/" + transcript_path, 'r') as f:
+        chapters = f.read().split("\n\n")
+    transcript = []
+    for chapter in chapters:
+        if "Transcribed by" in chapter:
+            continue
+        header, body = chapter.split("\n")
+        speaker, timestamp = header.split("  ")[:2]
+        time_m, time_s = timestamp.split(":")
+        transcript.append(dict(
+            speaker=speaker,
+            timestamp=timestamp,
+            timestamp_s=(int(time_m)*60 + int(time_s)),
+            body=body,
+        ))
+    podcast["transcript"] = transcript
+
+    # write out the template for the podcast episode
+    with open(BASE_FOLDER + "/" + podcast.get("short_url").replace(".html","") + ".html", "w") as f:
+        template = env.get_template("podcast_episode.html")
+        f.write(template.render(podcast=podcast, **context))
+
 # generate the static bits
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
