@@ -190,6 +190,8 @@ for podcast in podcasts:
     if not transcript_path:
         continue
 
+    print("Processing transcript file: %s" % transcript_path)
+
     podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
 
     with open("./transcripts/" + transcript_path, 'r') as f:
@@ -197,6 +199,8 @@ for podcast in podcasts:
     transcript = []
     for chapter in chapters:
         if "Transcribed by" in chapter:
+            continue
+        if not chapter or not ("\n" in chapter):
             continue
         header, body = chapter.split("\n", 1)
         speaker, timestamp = header.split("  ", 1)
