@@ -10,6 +10,7 @@ import string
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
+from jinja_markdown import MarkdownExtension
 
 BASE_FOLDER = "./docs"
 POSTFIX = ""
@@ -58,6 +59,7 @@ def warn_on_missing_file(path):
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
 env = Environment(loader=file_loader)
+env.add_extension(MarkdownExtension)
 
 # load the context from the metadata file
 context = dict()
