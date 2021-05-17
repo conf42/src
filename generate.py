@@ -153,7 +153,7 @@ for event in events:
         if slide_file:
             present = warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
             if present:
-                urls.append("/assets/slides/" + slide_file)
+                urls.append(("/assets/slides/" + slide_file, 0.5))
 
     # # template each talk page for the event
     # for talk in talks:        # check the headshot
@@ -167,7 +167,7 @@ for event in events:
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, talk=talk, **context))
-            urls.append(talk.get("short_url").replace(".html",""))
+            urls.append((talk.get("short_url").replace(".html",""), 0.7))
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
@@ -180,7 +180,7 @@ for event in events:
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
         f.write(template.render(event=event, **context))
-        urls.append(event.get("short_url").replace(".html",""))
+        urls.append((event.get("short_url").replace(".html",""), 0.8))
 
     # template the secret event page
     if event.get("secret_url"):
@@ -227,7 +227,7 @@ for podcast in podcasts:
     with open(BASE_FOLDER + "/" + podcast.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("podcast_episode.html")
         f.write(template.render(podcast=podcast, **context))
-        urls.append(podcast.get("short_url").replace(".html",""))
+        urls.append((podcast.get("short_url").replace(".html",""), 0.81))
 
 # generate the static bits
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html"]:
@@ -235,7 +235,7 @@ for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html
         template = env.get_template(page)
         f.write(template.render(page=page, **context))
         if page != "index.html":
-            urls.append(page.replace(".html",""))
+            urls.append((page.replace(".html",""), 0.75))
 
 # generate the sitemap.xml file
 print("Generating sitemap.xml with %d items" % len(urls))
