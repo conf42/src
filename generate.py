@@ -53,8 +53,10 @@ def pick_picture_file(base, pic):
 def warn_on_missing_file(path):
     if not os.path.isfile(path):
         print("Missing file: %s" % path)
+        return False
     # else:
     #     print("OK: %s" % path)
+    return True
 
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
@@ -149,7 +151,9 @@ for event in events:
     for talk in talks:
         slide_file = talk.get("Slides")
         if slide_file:
-            warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
+            present = warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
+            if present:
+                urls.append("/assets/slides/" + slide_file)
 
     # # template each talk page for the event
     # for talk in talks:        # check the headshot
@@ -234,6 +238,7 @@ for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html
             urls.append(page.replace(".html",""))
 
 # generate the sitemap.xml file
+print("Generating sitemap.xml with %d items" % len(urls))
 now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
     template = env.get_template("sitemap.xml")
