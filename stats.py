@@ -67,7 +67,7 @@ def process_list(raw_list):
         title = member.get("Job title")
         title = preprocess(title)
         if title in ["", "-", "n/a", "none", "self"]:
-            continue
+            title = "none"
         normalized_title = REVERSED_MAPPING.get(title, title)
         count = counts.get(normalized_title, 0)
         counts[normalized_title] = count + 1
@@ -99,3 +99,16 @@ for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=Tru
     left -= count
     print(f"{title}: {count} ({count/people_total*100}%)")
 print(f"other: {left} ({left/people_total*100}%)")
+
+print("#"*80)
+for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=True):
+    if title == "none":
+        continue
+    print(f"{title}")
+
+print("#"*80)
+for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=True):
+    if title == "none":
+        continue
+    count = counts_filtered.get(title)
+    print(f"{count}")
