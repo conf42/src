@@ -4,12 +4,15 @@ import pprint
 import csv
 
 MAPPING = {
-    "sre": ["site reliability engineer", "devops", "devops engineer", "ops", "system administrator", "system analist", "system and network supervisor", "sysadm", "admin"],
-    "software engineer": ["analyst", "software eng.", "software eng", "developer", "software designer", "web designer", "sde", "consultant", "dev", "sw", "sw eng", "swe", "programmer", "golang dev", "freelancer", "engineer", "qa"],
-    "tech leader": ["architect", "technical lead", "sre lead", "architech", "cto", "c.t.o", "lead", "sa", "cio"],
+    "SRE": ["sre", "site reliability engineer", "devops", "devops engineer", "ops", "system administrator", "system analist", "system and network supervisor", "sysadm", "admin"],
+    "software engineer": ["analyst", "software eng.", "software eng", "developer", "software designer", "web designer", "sde", "consultant", "dev", "sw", "sw eng", "swe", "programmer", "golang dev", "freelancer", "engineer", "qa", "se", "sse", "it", "software"],
+    "tech leader": ["architect", "technical lead", "tech lead", "sre lead", "architech", "cto", "c.t.o", "lead", "sa", "cio"],
     "people leader": ["vp", "vice president", "director", "ceo", "team lead", "head", "founder", "manager"],
     "product": [],
-    "research": ["professor", "student"]
+    "research": ["professor", "student"],
+    "security": ["infosec", "security"],
+    "teacher": ["teacher", "coach"],
+    "data scientist": ["data scientist", "data"]
 }
 REVERSED_MAPPING = {}
 for base, variants in MAPPING.items():
@@ -61,44 +64,50 @@ def preprocess(title):
             return general_form
     return title
 
-def process_list(raw_list):
+def process_list(raw_list, others):
     counts = dict()
     for member in raw_list:
         title = member.get("Job title")
         title = preprocess(title)
-        if title in ["", "-", "n/a", "none", "self"]:
-            title = "none"
-        normalized_title = REVERSED_MAPPING.get(title, title)
+        if title in ["", "-", "n/a", "none", "self", "no", "no job"]:
+            normalized_title = "none"
+        else:
+            normalized_title = REVERSED_MAPPING.get(title, "other")
+            if normalized_title == "other":
+                others.append(title)
         count = counts.get(normalized_title, 0)
         counts[normalized_title] = count + 1
     return counts
 
 community_list = read_csv("./list.csv")
 
-counts = process_list(community_list)
+others = []
+counts = process_list(community_list, others)
 
 # remove the ones with less than 1% of the scale
 counts_filtered = {
     key: value for key, value in counts.items()
     if value >= len(community_list) / 100
 }
+counts_filtered = counts
 
 # pprint.pprint(counts_filtered)
 
 print("#"*80)
-people_total = len(community_list)
-print(f"People: {people_total}")
+print(f"People: {len(community_list)}")
+people_total = 0
+for title in counts_filtered:
+    if title != "none":
+        people_total += counts_filtered.get(title)
+print(f"People with titles: {people_total}")
 print(f"Unique titles: {len(counts)}")
 print(f"Unique titles filtered: {len(counts_filtered)}")
 
 # calculate the percentages
 print("#"*80)
-left = people_total
 for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=True):
     count = counts_filtered.get(title)
-    left -= count
     print(f"{title}: {count} ({count/people_total*100}%)")
-print(f"other: {left} ({left/people_total*100}%)")
 
 print("#"*80)
 for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=True):
@@ -112,3 +121,7 @@ for title in sorted(counts_filtered.keys(), key=counts_filtered.get, reverse=Tru
         continue
     count = counts_filtered.get(title)
     print(f"{count}")
+
+# print("#"*80)
+# for title in sorted(others):
+#     print(title)
