@@ -14,9 +14,6 @@ from jinja_markdown import MarkdownExtension
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
-POSTFIX = ""
-if os.environ.get("LOCAL") == "true":
-    POSTFIX = ".html"
 
 def read_csv(path):
     """ Read the pre-process the CSV """
@@ -41,7 +38,7 @@ def generate_short_url(event, talk):
     )
     url = ''.join(filter(lambda x: x in string.printable, url))
     url = re.sub('[\W]+', '', url)
-    return url[:100] + POSTFIX
+    return url[:100]
 
 def pick_picture_file(base, pic):
     pic_jpeg = pic.replace(".png", ".jpg")
@@ -81,7 +78,7 @@ events = context.get("events")
 events.sort(key=lambda e: e.get("date"))
 print("Loaded %s events" % len(events))
 for event in events:
-    event["short_url"] = event.get("short_url") + POSTFIX
+    event["short_url"] = event.get("short_url")
 
 future_events = []
 past_events = []
@@ -249,7 +246,6 @@ print("Generating blog posts")
 posts = context.get("blog", {}).get("posts",[])
 posts.sort(key=lambda e: e.get("date"), reverse=True)
 print("Loaded %s posts" % len(posts))
-# write the subpages
 for post in posts:
     content_path = "./_posts/" + post.get("source")
     warn_on_missing_file(content_path)
