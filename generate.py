@@ -270,6 +270,7 @@ print(DIVIDER)
 print("Generating static pages")
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html", "terms-and-conditions.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
+        print("Writing out", page)
         template = env.get_template(page)
         f.write(template.render(page=page, **context))
         if page != "index.html":
