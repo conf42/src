@@ -234,7 +234,7 @@ for podcast in podcasts:
 # preprocess the posts
 posts = context.get("blog", {}).get("posts",[])
 # sort posts by date
-posts.sort(key=lambda e: e.get("date"))
+posts.sort(key=lambda e: e.get("date"), reverse=True)
 print("Loaded %s posts" % len(posts))
 # write the subpages
 for post in posts:
