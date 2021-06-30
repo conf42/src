@@ -67,6 +67,8 @@ env.add_extension(MarkdownExtension)
 context = dict()
 with open('metadata.yml') as f:
     context = yaml.load(f, Loader=yaml.FullLoader)
+with open('blog.yml') as f:
+    context["blog"] = yaml.load(f, Loader=yaml.FullLoader)
 # store urls for the sitemap.xml
 urls = []
 
@@ -228,6 +230,27 @@ for podcast in podcasts:
         template = env.get_template("podcast_episode.html")
         f.write(template.render(podcast=podcast, **context))
         urls.append((podcast.get("short_url").replace(".html",""), 0.81))
+
+# preprocess the posts
+posts = context.get("blog", {}).get("posts",[])
+# sort posts by date
+posts.sort(key=lambda e: e.get("date"))
+print("Loaded %s posts" % len(posts))
+# write the subpages
+for post in posts:
+    content_path = "./_posts/" + post.get("source")
+    warn_on_missing_file(content_path)
+    with open(content_path, 'r') as f:
+        post["content"] = f.read()
+    print("Generating blog post subpage for", post.get("short_url"))
+    with open(BASE_FOLDER + "/" + post.get("short_url") + ".html", "w") as f:
+        template = env.get_template("blog_post.html")
+        f.write(template.render(post=post, posts=posts, **context))
+# write the listing
+page = "blog.html"
+with open(BASE_FOLDER + "/" + page, "w") as f:
+    template = env.get_template(page)
+    f.write(template.render(page=page, **context))
 
 # generate the static bits
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html", "terms-and-conditions.html"]:
