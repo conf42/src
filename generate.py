@@ -12,6 +12,7 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
 
+DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
 POSTFIX = ""
 if os.environ.get("LOCAL") == "true":
@@ -72,9 +73,11 @@ with open('blog.yml') as f:
 # store urls for the sitemap.xml
 urls = []
 
-# preprocess the events
+# EVENTS METADATA
+print(DIVIDER)
+print("Loading events metadata")
+
 events = context.get("events")
-# sort events by date
 events.sort(key=lambda e: e.get("date"))
 print("Loaded %s events" % len(events))
 for event in events:
@@ -109,7 +112,10 @@ context["current_event"] = past_events[-1]
 context["past_events"] = past_events[:-1]
 context["past_events"].sort(key=lambda e: e.get("date"), reverse=True)
 
-# read the sponsors metadata
+# SPONSORS
+print(DIVIDER)
+print("Reading sponsor metadata")
+
 try:
     sponsors_list = sorted(read_csv("./_db/sponsors.csv"), key=lambda x: x.get("id"))
     context["sponsors"] = sponsors_list
@@ -122,7 +128,10 @@ except Exception as e:
 
 # pprint.pprint(context)
 
-# generate the subpages
+# EVENT PAGES
+print(DIVIDER)
+print("Generating event pages")
+
 for event in events:
     # attempt to read the talks CSV
     try:
@@ -192,9 +201,11 @@ for event in events:
             event_copy["reveal_videos"] = True
             f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
-# preprocess the podcasts
+# PODCAST
+print(DIVIDER)
+print("Generating podcast pages")
+
 podcasts = context.get("podcasts")
-# sort podcasts by date
 # podcasts.sort(key=lambda e: e.get("date"))
 for podcast in podcasts:
 
@@ -231,9 +242,11 @@ for podcast in podcasts:
         f.write(template.render(podcast=podcast, **context))
         urls.append((podcast.get("short_url").replace(".html",""), 0.81))
 
-# preprocess the posts
+# BLOG
+print(DIVIDER)
+print("Generating blog posts")
+
 posts = context.get("blog", {}).get("posts",[])
-# sort posts by date
 posts.sort(key=lambda e: e.get("date"), reverse=True)
 print("Loaded %s posts" % len(posts))
 # write the subpages
@@ -252,7 +265,9 @@ with open(BASE_FOLDER + "/" + page, "w") as f:
     template = env.get_template(page)
     f.write(template.render(page=page, **context))
 
-# generate the static bits
+# STATIC PAGES
+print(DIVIDER)
+print("Generating static pages")
 for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html", "terms-and-conditions.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
         template = env.get_template(page)
@@ -260,7 +275,8 @@ for page in ["index.html", "podcast.html", "sponsor.html", "code-of-conduct.html
         if page != "index.html":
             urls.append((page.replace(".html",""), 0.75))
 
-# generate the sitemap.xml file
+# SITEMAP
+print(DIVIDER)
 print("Generating sitemap.xml with %d items" % len(urls))
 now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
