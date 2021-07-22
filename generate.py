@@ -7,6 +7,7 @@ import textwrap
 import re
 import os
 import string
+import sys
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -79,6 +80,19 @@ events.sort(key=lambda e: e.get("date"))
 print("Loaded %s events" % len(events))
 for event in events:
     event["short_url"] = event.get("short_url")
+
+# Validate sponsorship levels
+sponsorship_levels = [
+    v.get("id") for v in context.get("sponsorships")
+]
+context["sponsorship_levels"] = sponsorship_levels
+print(DIVIDER)
+print("Sponsorship levels:", sponsorship_levels)
+for event in events:
+    for level in event.get("sponsors", dict()).keys():
+        if level not in sponsorship_levels:
+            print("Event %s has invalid sponsorship level: %s" % (event.get("name"), level))
+            sys.exit(1)
 
 future_events = []
 past_events = []
