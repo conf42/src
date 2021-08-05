@@ -103,6 +103,7 @@ for event in events:
         event["sponsors"][sponsor_type].sort()
     # divide into past and future events
     if datetime.date.today() >= event.get("date"):
+        event["cfp_closed"] = True
         past_events.append(event)
         current_event = event
     else:
