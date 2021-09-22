@@ -138,6 +138,25 @@ try:
 except Exception as e:
     print("Couldn't read sponsors", e)
 
+try:
+    sponsor_subpages = sorted(read_csv("./_db/subpages.csv"), key=lambda x: x.get("Sponsor"))
+    for subpage in sponsor_subpages:
+        subpage["YouTubeId"] = subpage.get("YouTube").split("/")[-1]
+    context["sponsor_subpages"] = sponsor_subpages
+    context["sponsor_subpages_by_id"] = {
+        item.get("Sponsor"): item for item in sponsor_subpages
+    }
+    print("Loaded %d sponsor subpages" % len(context["sponsor_subpages"]))
+except Exception as e:
+    print("Couldn't read sponsors", e)
+
+print(DIVIDER)
+print("Generating sponsor subpages")
+for subpage in context["sponsor_subpages"]:
+    with open(BASE_FOLDER + "/" + subpage.get("Sponsor")  + ".html", "w") as f:
+        template = env.get_template("sponsor_subpage.html")
+        f.write(template.render(sponsor=subpage, secret_mode=True, **context))
+
 # pprint.pprint(context)
 
 # EVENT PAGES
