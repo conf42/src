@@ -12,6 +12,8 @@ import sys
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
+import dateutil.parser
+
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
@@ -66,8 +68,6 @@ env.add_extension(MarkdownExtension)
 context = dict()
 with open('metadata.yml') as f:
     context = yaml.load(f, Loader=yaml.FullLoader)
-with open('blog.yml') as f:
-    context["blog"] = yaml.load(f, Loader=yaml.FullLoader)
 # store urls for the sitemap.xml
 urls = []
 
@@ -282,18 +282,25 @@ for podcast in podcasts:
 print(DIVIDER)
 print("Generating blog posts")
 
-posts = context.get("blog", {}).get("posts",[])
-posts.sort(key=lambda e: e.get("date"), reverse=True)
-print("Loaded %s posts" % len(posts))
+print(DIVIDER)
+print("Reading sponsor metadata")
+
+try:
+    posts = sorted(read_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
+    context["posts"] = posts
+    print("Loaded %s posts" % len(posts))
+except Exception as e:
+    print("Couldn't read blog posts", e)
+
 for post in posts:
-    content_path = "./_posts/" + post.get("source")
-    warn_on_missing_file(content_path)
-    with open(content_path, 'r') as f:
-        post["content"] = f.read()
-    print("Generating blog post subpage for", post.get("short_url"))
-    with open(BASE_FOLDER + "/" + post.get("short_url") + ".html", "w") as f:
+    post["Date"] = dateutil.parser.parse(post["Date"])
+
+for post in posts:
+    # parse date
+    print("Generating blog post subpage for", post.get("ShortURL"))
+    with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, posts=posts, **context))
+        f.write(template.render(post=post, **context))
 
 # MAIN PAGES
 print(DIVIDER)
