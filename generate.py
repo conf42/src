@@ -301,6 +301,7 @@ for post in posts:
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
         f.write(template.render(post=post, **context))
+        urls.append((post.get("ShortURL").replace(".html",""), 0.81))
 
 # MAIN PAGES
 print(DIVIDER)
