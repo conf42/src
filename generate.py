@@ -97,10 +97,14 @@ for event in events:
 future_events = []
 past_events = []
 years = dict()
+featured_sponsors = set()
 for event in events:
     # sort sponsors
     for sponsor_type in event.get("sponsors", {}).keys():
         event["sponsors"][sponsor_type].sort()
+        if sponsor_type == "platinum":
+            for sponsor in event["sponsors"][sponsor_type]:
+                featured_sponsors.add(sponsor)
     # divide into past and future events
     if datetime.date.today() >= event.get("date"):
         event["cfp_closed"] = True
@@ -123,6 +127,7 @@ context["future_events"] = future_events
 context["current_event"] = past_events[-1]
 context["past_events"] = past_events[:-1]
 context["past_events"].sort(key=lambda e: e.get("date"), reverse=True)
+context["featured_sponsors"] = sorted(list(featured_sponsors))
 
 # SPONSORS
 print(DIVIDER)
