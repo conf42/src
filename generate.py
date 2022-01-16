@@ -13,6 +13,7 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
 import dateutil.parser
+from ics import Calendar, Event
 
 
 DIVIDER = "#"*80
@@ -236,6 +237,20 @@ for event in events:
             event_copy = event.copy()
             event_copy["reveal_videos"] = True
             f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
+
+    # create an ics file
+    ics_location = BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics"
+
+    c = Calendar()
+    e = Event()
+    e.name = "Conf42: {}".format(event.get("name"))
+    e.begin = '{} 17:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
+    e.end = '{} 22:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
+    e.url = "https://conf42.com/{}".format(event.get("short_url").replace(".html",""))
+    c.events.add(e)
+    with open(ics_location, 'w') as f:
+        f.write(str(c))
+
 
 # PODCAST
 print(DIVIDER)
