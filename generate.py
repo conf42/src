@@ -8,6 +8,7 @@ import re
 import os
 import string
 import sys
+import urllib.parse
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -203,6 +204,31 @@ for event in events:
             if present:
                 urls.append(("/assets/slides/" + slide_file, 0.5))
 
+    # render the google calendar link
+    name = "Conf42: {}".format(event.get("name"))
+    begin = '{} 17:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
+    end = '{} 22:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
+    url = "https://conf42.com/{}".format(event.get("short_url").replace(".html",""))
+    event["google_calendar_url"] = "https://www.google.com/calendar/render?action=TEMPLATE&text={text}&details={details}&location={location}&dates={begin}%2F{end}".format(
+        text=urllib.parse.quote_plus(name),
+        details=urllib.parse.quote_plus("Online tech conference"),
+        location=urllib.parse.quote_plus(url),
+        begin='{}T170000Z'.format(event.get("date").strftime('%Y%m%d')),
+        end='{}T220000Z'.format(event.get("date").strftime('%Y%m%d')),
+    )
+    # create an ics file
+    event["ics_location"] = event.get("short_url").replace(".html","") + ".ics"
+    c = Calendar()
+    e = Event(
+        name=name,
+        begin=begin,
+        end=end,
+        url=url
+    )
+    c.events.add(e)
+    with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics", 'w') as f:
+        f.write(str(c))
+
     # # template each talk page for the event
     # for talk in talks:        # check the headshot
         talk["Picture"] = pick_picture_file(BASE_FOLDER + "/assets/headshots/", talk["Picture"])
@@ -238,18 +264,6 @@ for event in events:
             event_copy["reveal_videos"] = True
             f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
-    # create an ics file
-    ics_location = BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics"
-
-    c = Calendar()
-    e = Event()
-    e.name = "Conf42: {}".format(event.get("name"))
-    e.begin = '{} 17:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
-    e.end = '{} 22:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
-    e.url = "https://conf42.com/{}".format(event.get("short_url").replace(".html",""))
-    c.events.add(e)
-    with open(ics_location, 'w') as f:
-        f.write(str(c))
 
 
 # PODCAST
