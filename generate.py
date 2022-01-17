@@ -196,14 +196,6 @@ for event in events:
         tracks[track].append(talk)
     event["tracks"] = tracks
 
-    # check that all slide files are there
-    for talk in talks:
-        slide_file = talk.get("Slides")
-        if slide_file:
-            present = warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
-            if present:
-                urls.append(("/assets/slides/" + slide_file, 0.5))
-
     # render the google calendar link
     name = "Conf42: {}".format(event.get("name"))
     begin = '{} 17:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
@@ -228,6 +220,14 @@ for event in events:
     c.events.add(e)
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics", 'w') as f:
         f.write(str(c))
+        
+    # check that all slide files are there
+    for talk in talks:
+        slide_file = talk.get("Slides")
+        if slide_file:
+            present = warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
+            if present:
+                urls.append(("/assets/slides/" + slide_file, 0.5))
 
     # # template each talk page for the event
     # for talk in talks:        # check the headshot
