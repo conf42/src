@@ -230,7 +230,7 @@ for event in events:
                 urls.append(("/assets/slides/" + slide_file, 0.5))
 
     # # template each talk page for the event
-    # for talk in talks:        # check the headshot
+    for talk in talks:        # check the headshot
         talk["Picture"] = pick_picture_file(BASE_FOLDER + "/assets/headshots/", talk["Picture"])
 
         # generate things
