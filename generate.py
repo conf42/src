@@ -276,7 +276,7 @@ for podcast in podcasts:
 
     transcript_path = podcast.get("transcript")
     if not transcript_path:
-        print("No transcript file for: %s" % podcast.get("name"))
+        print("No transcript file for: %s" % podcast.get("title"))
         continue
 
     podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
