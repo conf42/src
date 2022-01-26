@@ -275,13 +275,13 @@ podcasts = context.get("podcasts")
 # podcasts.sort(key=lambda e: e.get("date"))
 for podcast in podcasts:
 
+    podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
+    podcast["picture_path"] = pick_picture_file(BASE_FOLDER + "/", podcast["picture_path"])
+
     transcript_path = podcast.get("transcript")
     if not transcript_path:
         print("No transcript file for: %s" % podcast.get("title"))
         continue
-
-    podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
-    podcast["picture_path"] = pick_picture_file(BASE_FOLDER + "/", podcast["picture_path"])
 
     print("Processing transcript file: %s" % transcript_path)
     with open("./transcripts/" + transcript_path, 'r') as f:
