@@ -46,11 +46,12 @@ def generate_short_url(event, talk):
     return url[:100]
 
 def pick_picture_file(base, pic):
-    pic_jpeg = pic.replace(".png", ".jpg")
+    pic_jpeg = pic.replace(".png", ".jpg").replace(".PNG", ".jpg")
     if os.path.isfile(base + pic_jpeg):
         return pic_jpeg
     elif not os.path.isfile(base + pic):
         print("Missing picture: %s%s" % (base, pic))
+    print("Picking png: ", base + pic)
     return pic
 
 def warn_on_missing_file(path):
