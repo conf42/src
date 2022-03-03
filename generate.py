@@ -105,7 +105,7 @@ for event in events:
     # sort sponsors
     for sponsor_type in event.get("sponsors", {}).keys():
         event["sponsors"][sponsor_type].sort()
-        if sponsor_type == "platinum":
+        if sponsor_type in ["platinum", "diamond"]:
             for sponsor in event["sponsors"][sponsor_type]:
                 featured_sponsors.add(sponsor)
     # divide into past and future events
