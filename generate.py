@@ -66,6 +66,12 @@ def warn_on_missing_file(path):
 file_loader = FileSystemLoader("_templates")
 env = Environment(loader=file_loader)
 env.add_extension(MarkdownExtension)
+def format_sponsors(value, items):
+    if items is not None and len(items) == 1:
+        print("format_sponsors", value, items, "SINGLES")
+        return value.replace("sponsors", "sponsor").replace("partners", "partner")
+    return value
+env.filters["format_sponsors"] = format_sponsors
 
 # load the context from the metadata file
 context = dict()
