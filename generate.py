@@ -129,7 +129,8 @@ for event in events:
     years[year].append(event)
     # mark as revealed or not
     event["reveal_videos"] = False
-    if datetime.date.today() >= event.get("videos_reveal_date"):
+    vrd = event.get("videos_reveal_date")
+    if vrd is not None and datetime.date.today() >= vrd:
         event["reveal_videos"] = True
 context["years"] = years
 context["future_events"] = future_events
@@ -178,6 +179,14 @@ print(DIVIDER)
 print("Generating event pages")
 
 for event in events:
+
+    # for external URLs, just use that as url
+    if "external_url" in event:
+        event["url"] = event["external_url"]
+        continue
+    event["url"] = context.get("base_path") + event["short_url"]
+
+
     # attempt to read the talks CSV
     try:
         talks = read_csv(event.get("db_path"))
