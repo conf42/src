@@ -342,7 +342,8 @@ for post in posts:
     post["Date"] = dateutil.parser.parse(post["Date"])
 
 for post in posts:
-    # parse date
+    if post.get("ExternalURL"):
+        continue
     print("Generating blog post subpage for", post.get("ShortURL"))
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
