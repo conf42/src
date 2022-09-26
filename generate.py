@@ -201,7 +201,12 @@ for event in events:
 
     # split into featured and not
     event["talks_featured"] = [talk for talk in talks if talk.get("Featured","").lower() == "yes"]
-    event["talks"] = [talk for talk in talks if talk.get("Featured","").lower() != "yes"]
+    event["talks_panel"] = [talk for talk in talks if talk.get("Panel","").lower() == "yes"]
+    context["panels"] = context.get("panels", []) + event["talks_panel"]
+    event["talks"] = [
+        talk for talk in talks
+        if talk.get("Featured","").lower() != "yes" and talk.get("Panel","").lower() != "yes"
+    ]
 
     # extract and store the tracks
     tracks = dict()
