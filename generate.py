@@ -208,6 +208,9 @@ for event in events:
         if talk.get("Featured","").lower() != "yes" and talk.get("Panel","").lower() != "yes"
     ]
 
+    #counts
+    print("%d normal %s keynotes %d panels" % (len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
+
     # extract and store the tracks
     tracks = dict()
     for talk in event["talks"]:
