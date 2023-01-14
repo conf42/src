@@ -9,6 +9,7 @@ import os
 import string
 import sys
 import urllib.parse
+import markdown
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -72,6 +73,7 @@ def format_sponsors(value, items):
         return value.replace("sponsors", "sponsor").replace("partners", "partner")
     return value
 env.filters["format_sponsors"] = format_sponsors
+env.filters["markdown"] = lambda x: markdown.markdown(x)
 
 # load the context from the metadata file
 context = dict()
