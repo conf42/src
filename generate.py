@@ -66,7 +66,6 @@ def warn_on_missing_file(path, remote=False):
         if not os.environ.get("CHECK_REMOTE"):
             return True
         res = requests.head(path)
-        print(path, res.elapsed, len(res.text))
         if res.status_code == 404:
             print("Missing remote file: %s (%s)" % (path, unquote(path)))
             WARNINGS.append(path)
