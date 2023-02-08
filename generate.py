@@ -10,16 +10,21 @@ import string
 import sys
 import urllib.parse
 import markdown
+import requests
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
 import dateutil.parser
 from ics import Calendar, Event
-
+from urllib.parse import quote, unquote
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
+BASE_STATIC_URL = "https://conf42.github.io/static"
+
+def make_remote_address(path, name):
+    return BASE_STATIC_URL + "/" + path + "/" + quote(name)
 
 def read_csv(path):
     """ Read the pre-process the CSV """
@@ -49,18 +54,27 @@ def generate_short_url(event, talk):
 def pick_picture_file(base, pic):
     pic_jpeg = pic.replace(".png", ".jpg").replace(".PNG", ".jpg")
     if os.path.isfile(base + pic_jpeg):
-        print("Picking jpg: ", base + pic)
+        print("Picking jpg: ", base + pic_jpeg)
         return pic_jpeg
     elif not os.path.isfile(base + pic):
         print("Missing picture: %s%s" % (base, pic))
     return pic
 
-def warn_on_missing_file(path):
+WARNINGS = []
+def warn_on_missing_file(path, remote=False):
+    if remote:
+        if not os.environ.get("CHECK_REMOTE"):
+            return True
+        res = requests.head(path)
+        print(path, res.elapsed, len(res.text))
+        if res.status_code == 404:
+            print("Missing remote file: %s (%s)" % (path, unquote(path)))
+            WARNINGS.append(path)
+            return False
+        return True
     if not os.path.isfile(path):
         print("Missing file: %s" % path)
         return False
-    # else:
-    #     print("OK: %s" % path)
     return True
 
 # init the jinja stuff
@@ -69,7 +83,7 @@ env = Environment(loader=file_loader)
 env.add_extension(MarkdownExtension)
 def format_sponsors(value, items):
     if items is not None and len(items) == 1:
-        print("format_sponsors", value, items, "SINGLES")
+        # print("format_sponsors", value, items, "SINGLES")
         return value.replace("sponsors", "sponsor").replace("partners", "partner")
     return value
 env.filters["format_sponsors"] = format_sponsors
@@ -248,16 +262,21 @@ for event in events:
         f.write(str(c))
         
     # check that all slide files are there
+    print("Checking slides")
     for talk in talks:
         slide_file = talk.get("Slides")
         if slide_file:
-            present = warn_on_missing_file(BASE_FOLDER + "/assets/slides/" + slide_file)
-            if present:
-                urls.append(("/assets/slides/" + slide_file, 0.5))
+            slide_path = make_remote_address("slides", slide_file)
+            warn_on_missing_file(slide_path, remote=True)
+            talk["Slides"] = slide_path
 
-    # # template each talk page for the event
-    for talk in talks:        # check the headshot
-        talk["Picture"] = pick_picture_file(BASE_FOLDER + "/assets/headshots/", talk["Picture"])
+    # template each talk page for the event
+    print("Generating talk pages")
+    for talk in talks:
+        # check the headshot
+        picture_path = make_remote_address("headshots", talk["Picture"])
+        warn_on_missing_file(picture_path, remote=True)
+        talk["Picture"] = picture_path
 
         # generate things
         talk["short_url"] = generate_short_url(event, talk)
@@ -300,8 +319,11 @@ podcasts = context.get("podcasts")
 # podcasts.sort(key=lambda e: e.get("date"))
 for podcast in podcasts:
 
+    picture_path = make_remote_address("podcasts", podcast["picture_path"])
+    warn_on_missing_file(picture_path, remote=True)
+    podcast["picture_path"] = picture_path
+
     podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
-    podcast["picture_path"] = pick_picture_file(BASE_FOLDER + "/", podcast["picture_path"])
 
     transcript_path = podcast.get("transcript")
     if not transcript_path:
@@ -334,9 +356,6 @@ for podcast in podcasts:
         f.write(template.render(podcast=podcast, **context))
         urls.append((podcast.get("short_url").replace(".html",""), 0.81))
 
-# BLOG
-print(DIVIDER)
-print("Generating blog posts")
 
 print(DIVIDER)
 print("Reading sponsor metadata")
@@ -347,6 +366,11 @@ try:
     print("Loaded %s posts" % len(posts))
 except Exception as e:
     print("Couldn't read blog posts", e)
+
+
+# BLOG
+print(DIVIDER)
+print("Generating blog posts")
 
 for post in posts:
     post["Date"] = dateutil.parser.parse(post["Date"])
@@ -378,3 +402,9 @@ now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat
 with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
     template = env.get_template("sitemap.xml")
     f.write(template.render(urls=urls, now=now))
+
+print(DIVIDER)
+print("Warnings")
+print("Missing %d remote files" % len(WARNINGS))
+for w in WARNINGS:
+    print(w)
