@@ -7,6 +7,9 @@ deps:
 generate:
 	python generate.py
 
+verify:
+	CHECK_REMOTE=true python generate.py
+
 clean:
 	rm -rf ./docs/*.html
 	rm -rf ./docs/assets/headshots/*.jpg
