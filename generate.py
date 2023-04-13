@@ -130,7 +130,7 @@ for event in events:
             for sponsor in event["sponsors"][sponsor_type]:
                 featured_sponsors.add(sponsor)
     # divide into past and future events
-    if datetime.date.today() >= event.get("date"):
+    if datetime.date.today() + datetime.timedelta(days=2) >= event.get("date"):
         event["cfp_closed"] = True
         past_events.append(event)
         current_event = event
