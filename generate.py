@@ -154,6 +154,30 @@ context["past_events"] = past_events[:-1]
 context["past_events"].sort(key=lambda e: e.get("date"), reverse=True)
 context["featured_sponsors"] = sorted(list(featured_sponsors))
 
+# match up with prior years
+for event in events:
+    url = event.get("short_url")
+    others = []
+    event["other_editions"] = others
+    if not url:
+        continue
+    for year in context.get("years").keys():
+        if event.get("year") == year:
+            continue
+        for candidate in context.get("years").get(year):
+            # discard the last 4 chars - the year
+            url_candidate = candidate.get("short_url")
+            if not url_candidate:
+                continue
+            if url_candidate[:-4] == url[:-4]:
+                others.append({
+                    "year": year,
+                    "short_url": url_candidate,
+                })
+    others.sort(key=lambda x: x.get("year"))
+    print(url, others)
+
+
 # SPONSORS
 print(DIVIDER)
 print("Reading sponsor metadata")
