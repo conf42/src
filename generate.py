@@ -290,9 +290,7 @@ for event in events:
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
                 template = env.get_template("talk.html")
-                event_copy = event.copy()
-                event_copy["reveal_videos"] = True
-                f.write(template.render(event=event_copy, talk=talk, secret_mode=True, **context))
+                f.write(template.render(event=event, talk=talk, secret_mode=True, **context))
 
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
@@ -304,9 +302,7 @@ for event in events:
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
             template = env.get_template("event.html")
-            event_copy = event.copy()
-            event_copy["reveal_videos"] = True
-            f.write(template.render(event=event_copy, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
+            f.write(template.render(event=event, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
 
 
