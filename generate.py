@@ -191,7 +191,7 @@ for subpage in context["sponsor_subpages"]:
 
 # EVENT PAGES
 print(DIVIDER)
-print("Generating event pages")
+print("Preprocessing events")
 
 for event in events:
 
@@ -199,14 +199,15 @@ for event in events:
     if "external_url" in event:
         event["url"] = event["external_url"]
         continue
-    event["url"] = context.get("base_path") + event["short_url"]
-
+    else:
+        event["url"] = context.get("base_path") + event["short_url"]
 
     # attempt to read the talks CSV
     try:
         talks = read_csv(event.get("db_path"))
     except:
         talks = []
+    event["talks_raw"] = talks
     #talks.sort(key=lambda x: x.get("Title"))
 
     print("%s %s /%s (%d talks)" % (event.get("date"), event.get("name"), event.get("short_url"), len(talks)))
@@ -259,33 +260,44 @@ for event in events:
     c.events.add(e)
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics", 'w') as f:
         f.write(str(c))
-        
-    # check that all slide files are there
-    print("Checking slides")
+
     for talk in talks:
+        # check the slide file exists
         slide_file = talk.get("Slides")
         if slide_file:
             slide_path = make_remote_address("slides", slide_file)
             warn_on_missing_file(slide_path, remote=True)
             talk["Slides"] = slide_path
 
-    # template each talk page for the event
-    print("Generating talk pages")
-    for talk in talks:
-        # check the headshot
+        # check the headshot exists
         picture_path = make_remote_address("headshots", talk["Picture"])
         warn_on_missing_file(picture_path, remote=True)
         talk["Picture"] = picture_path
-
-        # generate things
         talk["short_url"] = generate_short_url(event, talk)
         talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
+
+
+# EVENT PAGES
+print(DIVIDER)
+
+for event in events:
+
+
+    print(f"Templating out {event.get('name')} {event.get('year')}")
+
+    # for external events, no need to generate pages
+    if "external_url" in event:
+        continue
+
+    # template each talk page for the event
+    for talk in event.get("talks_raw"):
 
         # template the talk subpage
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, talk=talk, **context))
             urls.append((talk.get("short_url").replace(".html",""), 0.7))
+
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
