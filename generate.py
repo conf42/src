@@ -148,6 +148,7 @@ for event in events:
     if vrd is not None and datetime.date.today() >= vrd:
         event["reveal_videos"] = True
 context["years"] = years
+context["years_sorted"] = sorted(years.keys(), reverse=True)
 context["future_events"] = future_events
 context["current_event"] = past_events[-1]
 context["past_events"] = past_events[:-1]
