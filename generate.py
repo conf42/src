@@ -11,8 +11,9 @@ import sys
 import urllib.parse
 import markdown
 import requests
-
 import yaml
+
+from collections import defaultdict
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
 import dateutil.parser
@@ -301,6 +302,75 @@ for event in events:
         talk["short_url"] = generate_short_url(event, talk)
         talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
 
+
+
+# stats for speakers
+print(DIVIDER)
+print("Handling speaker stats")
+speakers = defaultdict(list)
+context["speakers"] = speakers
+for event in events:
+    for talk in event.get("talks_raw", []):
+        for field in ["Name1", "Name2"]:
+            speaker = talk.get(field)
+            speakers[speaker].append(dict(
+                date=event.get("date"),
+                event=event,
+                talk=talk,
+            ))
+for speaker, talks in speakers.items():
+    talks.sort(key=lambda x: x.get("date"), reverse=True)
+print(f"Found {len(speakers)} speakers")
+
+# stats for videos
+print(DIVIDER)
+print("Handling video stats")
+# read
+video_stats = [x for x in read_csv("./_db/video_stats.csv") if x.get("Views")]
+context["video_stats"] = video_stats
+# normalize
+video_stats.sort(key=lambda x: x.get("Views"), reverse=True)
+for stat in video_stats:
+    stat["Minutes"] = float(stat["Watch time (hours)"])*60
+# generate mappings
+video_to_stats = dict()
+video_to_position = dict()
+context["video_to_stats"] = video_to_stats
+context["video_to_position"] = video_to_position
+for index, stat in enumerate(video_stats):
+    video_id = stat.get("Content")
+    video_to_stats[video_id] = stat
+    video_to_position[video_id] = index + 1
+print(f"Found {len(video_to_stats)} stats")
+# match with talks
+counter = 0
+for event in events:
+    for talk in event.get("talks_raw", []):
+        video_id = talk.get("YouTube").split("/")[-1]
+        stats = video_to_stats.get(video_id)
+        talk["stats"] = stats
+        position = video_to_position.get(video_id)
+        talk["position"] = position
+        if stats is not None:
+            counter += 1
+print(f"Matched {counter} talks to stats")
+# match with the premieres
+counter = 0
+premieres = []
+context["premieres"] = premieres
+for event in events:
+    video_id = event.get("premiere_url")
+    stats = video_to_stats.get(video_id)
+    event["stats"] = stats
+    position = video_to_position.get(video_id)
+    event["position"] = position
+    if stats is not None:
+        counter += 1
+        premieres.append(dict(
+            stats=stats,
+            event=event,
+        ))
+print(f"Matched {counter} premieres to stats")
 
 # EVENT PAGES
 print(DIVIDER)
