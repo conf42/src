@@ -330,8 +330,18 @@ video_stats = [x for x in read_csv("./_db/video_stats.csv") if x.get("Views")]
 context["video_stats"] = video_stats
 # normalize
 video_stats.sort(key=lambda x: x.get("Views"), reverse=True)
+video_stats_aggregated = dict(
+    Views=0,
+    Minutes=0,
+    Impressions=0,
+)
+context["video_stats_aggregated"] = video_stats_aggregated
 for stat in video_stats:
     stat["Minutes"] = float(stat["Watch time (hours)"])*60
+    video_stats_aggregated["Minutes"] += int(stat["Minutes"])
+    video_stats_aggregated["Views"] += int(stat["Views"])
+    video_stats_aggregated["Impressions"] += int(stat["Impressions"])
+print(video_stats_aggregated)
 # generate mappings
 video_to_stats = dict()
 video_to_position = dict()
@@ -374,7 +384,6 @@ print(f"Matched {counter} premieres to stats")
 
 # EVENT PAGES
 print(DIVIDER)
-
 for event in events:
 
 
