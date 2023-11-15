@@ -329,7 +329,7 @@ print("Handling video stats")
 video_stats = [x for x in read_csv("./_db/video_stats.csv") if x.get("Views")]
 context["video_stats"] = video_stats
 # normalize
-video_stats.sort(key=lambda x: x.get("Views"), reverse=True)
+video_stats.sort(key=lambda x: int(x.get("Views")), reverse=True)
 video_stats_aggregated = dict(
     Views=0,
     Minutes=0,
@@ -363,6 +363,8 @@ for event in events:
         talk["position"] = position
         if stats is not None:
             counter += 1
+            stats["talk"] = talk
+            talk["event"] = event
 print(f"Matched {counter} talks to stats")
 # match with the premieres
 counter = 0
@@ -380,6 +382,7 @@ for event in events:
             stats=stats,
             event=event,
         ))
+        stats["event"] = event
 print(f"Matched {counter} premieres to stats")
 
 # EVENT PAGES
