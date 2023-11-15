@@ -2869,6 +2869,14 @@ function getCountry() {
     };
 }
 
+function updateCountry() {
+    const destination = document.querySelector('#country-destination');
+    const source = document.querySelector('#country-source');
+    if (source && destination) {
+        destination.value = source.value;
+    }
+}
+
 function suggestCountry(){
     const $country = getCountry();
     document.querySelector(`#tz-country`).value = $country.name;
@@ -2884,3 +2892,4 @@ function suggestCountry(){
 }
 
 suggestCountry();
+updateCountry();
