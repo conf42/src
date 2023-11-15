@@ -2875,7 +2875,7 @@ function suggestCountry(){
     var opts = document.getElementById('country-source').options;
     for(var i = 0; i < opts.length; i++) {
         var a = opts[i].text.toLowerCase();
-        var b = $country.name;
+        var b = $country.name.toLowerCase();
         if (a.includes(b) || b.includes(a)){
             opts[i].selected = true;
             return;
