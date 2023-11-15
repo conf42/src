@@ -326,22 +326,18 @@ print(f"Found {len(speakers)} speakers")
 print(DIVIDER)
 print("Handling video stats")
 # read
-video_stats = [x for x in read_csv("./_db/video_stats.csv") if x.get("Views")]
-context["video_stats"] = video_stats
-# normalize
-video_stats.sort(key=lambda x: int(x.get("Views")), reverse=True)
-video_stats_aggregated = dict(
-    Views=0,
-    Minutes=0,
-    Impressions=0,
-)
-context["video_stats_aggregated"] = video_stats_aggregated
+video_stats = [x for x in read_csv("./_db/video_stats.csv")][:-1]
 for stat in video_stats:
     stat["Minutes"] = float(stat["Watch time (hours)"])*60
-    video_stats_aggregated["Minutes"] += int(stat["Minutes"])
-    video_stats_aggregated["Views"] += int(stat["Views"])
-    video_stats_aggregated["Impressions"] += int(stat["Impressions"])
-print(video_stats_aggregated)
+    stat["Content"] = stat["Content"].strip()
+video_stats_totals = video_stats[0]
+video_stats = video_stats[1:]
+context["video_stats"] = video_stats
+context["video_stats_totals"] = video_stats_totals
+print(video_stats[0])
+print(video_stats_totals)
+# normalize
+video_stats.sort(key=lambda x: int(x.get("Views")), reverse=True)
 # generate mappings
 video_to_stats = dict()
 video_to_position = dict()
