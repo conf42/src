@@ -386,6 +386,9 @@ print(f"Matched {counter} premieres to stats")
 print(DIVIDER)
 for event in events:
 
+    # just for dev experience - 2s vs 12s
+    if "quick" in sys.argv:
+        continue
 
     print(f"Templating out {event.get('name')} {event.get('year')}")
 
@@ -487,6 +490,10 @@ for post in posts:
     post["Date"] = dateutil.parser.parse(post["Date"])
 
 for post in posts:
+    # just for dev experience - 2s vs 12s
+    if "quick" in sys.argv:
+        continue
+
     if post.get("ExternalURL"):
         continue
     print("Generating blog post subpage for", post.get("ShortURL"))
