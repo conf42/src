@@ -383,6 +383,9 @@ for event in events:
     position = video_to_position.get(video_id)
     event["position"] = position
     if stats is not None:
+        # skip events below 200 views
+        if int(stats.get("Views")) < 200:
+            continue
         premieres.append(dict(
             stats=stats,
             event=event,
