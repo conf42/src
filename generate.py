@@ -351,6 +351,12 @@ print(f"Found {len(video_to_stats)} stats")
 # match with talks
 counter = 0
 for event in events:
+    totals = dict(
+        minutes=0,
+        views=0,
+        impressions=0,
+    )
+    event["totals"] = totals
     for talk in event.get("talks_raw", []):
         video_id = talk.get("YouTube").split("/")[-1]
         stats = video_to_stats.get(video_id)
@@ -361,9 +367,13 @@ for event in events:
             counter += 1
             stats["talk"] = talk
             talk["event"] = event
+            # count up the totals
+            totals["minutes"] += int(stats.get("Minutes"))
+            totals["views"] += int(stats.get("Views"))
+            totals["impressions"] += int(stats.get("Impressions"))
 print(f"Matched {counter} talks to stats")
+
 # match with the premieres
-counter = 0
 premieres = []
 context["premieres"] = premieres
 for event in events:
@@ -373,13 +383,13 @@ for event in events:
     position = video_to_position.get(video_id)
     event["position"] = position
     if stats is not None:
-        counter += 1
         premieres.append(dict(
             stats=stats,
             event=event,
         ))
         stats["event"] = event
-print(f"Matched {counter} premieres to stats")
+premieres.sort(key=lambda x:int(x.get("stats").get("Views")), reverse=True)
+print(f"Matched {len(premieres)} premieres to stats")
 
 # EVENT PAGES
 print(DIVIDER)
