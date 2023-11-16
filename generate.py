@@ -49,6 +49,7 @@ def generate_short_url(event, talk):
         keywords=("_" + talk.get("Keywords", "").replace(",", "_").replace(" ", "_")) if talk.get("Keywords") else "",
     )
     url = ''.join(filter(lambda x: x in string.printable, url))
+    url = re.sub('[\W]+', '', url)
     return url[:100]
 
 def generate_speaker_url(name):
