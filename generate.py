@@ -49,8 +49,14 @@ def generate_short_url(event, talk):
         keywords=("_" + talk.get("Keywords", "").replace(",", "_").replace(" ", "_")) if talk.get("Keywords") else "",
     )
     url = ''.join(filter(lambda x: x in string.printable, url))
-    url = re.sub('[\W]+', '', url)
     return url[:100]
+
+def generate_speaker_url(name):
+    url = "speaker-{name}".format(
+        name=name.replace(" ", "-"),
+    )
+    url = ''.join(filter(lambda x: x in string.printable, url))
+    return url
 
 def pick_picture_file(base, pic):
     pic_jpeg = pic.replace(".png", ".jpg").replace(".PNG", ".jpg")
@@ -87,6 +93,7 @@ def format_sponsors(value, items):
         return value.replace("sponsors", "sponsor").replace("partners", "partner")
     return value
 env.filters["format_sponsors"] = format_sponsors
+env.filters["speaker_url"] = generate_speaker_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
 
 # load the context from the metadata file
@@ -313,13 +320,16 @@ for event in events:
     for talk in event.get("talks_raw", []):
         for field in ["Name1", "Name2"]:
             speaker = talk.get(field)
-            speakers[speaker].append(dict(
-                date=event.get("date"),
-                event=event,
-                talk=talk,
-            ))
+            if speaker:
+                speakers[speaker].append(dict(
+                    date=event.get("date"),
+                    event=event,
+                    talk=talk,
+                ))
 for speaker, talks in speakers.items():
     talks.sort(key=lambda x: x.get("date"), reverse=True)
+#context["speakers_list"] = sorted(speakers.keys(), key=lambda x: str(len(speakers.get(x))) + "_" + x, reverse=True)
+context["speakers_list"] = sorted(speakers.keys())
 print(f"Found {len(speakers)} speakers")
 
 # stats for videos
