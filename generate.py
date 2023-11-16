@@ -345,7 +345,6 @@ video_stats_totals = video_stats[0]
 video_stats = video_stats[1:]
 context["video_stats"] = video_stats
 context["video_stats_totals"] = video_stats_totals
-print(video_stats[0])
 print(video_stats_totals)
 # normalize
 video_stats.sort(key=lambda x: int(x.get("Views")), reverse=True)
@@ -446,6 +445,22 @@ for event in events:
             template = env.get_template("event.html")
             f.write(template.render(event=event, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
+# SPEAKER PAGES
+print(DIVIDER)
+for speaker, items in speakers.items():
+
+    # # just for dev experience - 2s vs 12s
+    # if "quick" in sys.argv:
+    #     continue
+
+    print(f"Templating out {speaker}")
+
+    # template the talk subpage
+    url = generate_speaker_url(speaker)
+    with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
+        template = env.get_template("speaker.html")
+        f.write(template.render(speaker=speaker, items=items, **context))
+        urls.append((url, 0.65))
 
 
 # PODCAST
