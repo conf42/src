@@ -102,8 +102,11 @@ env.filters["markdown"] = lambda x: markdown.markdown(x)
 context = dict()
 with open('metadata.yml') as f:
     context = yaml.load(f, Loader=yaml.FullLoader)
+
 # store urls for the sitemap.xml
-urls = []
+SITEMAP_URLS = []
+def register_url(url):
+    SITEMAP_URLS.append(url)
 
 # EVENTS METADATA
 print(DIVIDER)
@@ -426,7 +429,7 @@ for event in events:
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, talk=talk, **context))
-            urls.append((talk.get("short_url").replace(".html",""), 0.7))
+            register_url(talk.get("short_url").replace(".html",""))
 
         # template the secret talk subpage
         if event.get("secret_url"):
@@ -438,7 +441,7 @@ for event in events:
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
         f.write(template.render(event=event, **context))
-        urls.append((event.get("short_url").replace(".html",""), 0.8))
+        register_url(event.get("short_url").replace(".html",""))
 
     # template the secret event page
     if event.get("secret_url"):
@@ -461,7 +464,7 @@ for speaker, items in speakers.items():
     with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
         template = env.get_template("speaker.html")
         f.write(template.render(speaker=speaker, items=items, **context))
-        urls.append((url, 0.65))
+        register_url(url)
 
 
 # PODCAST
@@ -507,7 +510,8 @@ for podcast in podcasts:
     with open(BASE_FOLDER + "/" + podcast.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("podcast_episode.html")
         f.write(template.render(podcast=podcast, **context))
-        urls.append((podcast.get("short_url").replace(".html",""), 0.81))
+        register_url(podcast.get("short_url").replace(".html",""))
+
 
 
 print(DIVIDER)
@@ -539,7 +543,7 @@ for post in posts:
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
         f.write(template.render(post=post, **context))
-        urls.append((post.get("ShortURL").replace(".html",""), 0.81))
+        register_url(post.get("ShortURL").replace(".html",""))
 
 # MAIN PAGES
 print(DIVIDER)
@@ -550,15 +554,15 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
         template = env.get_template(page)
         f.write(template.render(page=page, **context))
         if page != "index.html":
-            urls.append((page.replace(".html",""), 0.75))
+            register_url(page.replace(".html",""))
 
 # SITEMAP
 print(DIVIDER)
-print("Generating sitemap.xml with %d items" % len(urls))
+print("Generating sitemap.xml with %d items" % len(SITEMAP_URLS))
 now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
     template = env.get_template("sitemap.xml")
-    f.write(template.render(urls=urls, now=now))
+    f.write(template.render(urls=SITEMAP_URLS, now=now))
 
 print(DIVIDER)
 print("Warnings")
