@@ -2902,3 +2902,18 @@ function toggleVisiblity(prefix) {
 		elements[i].classList.toggle("hidden");
 	}
 }
+
+function handleIntersection(entries) {
+	entries.map((entry) => {
+	console.log("Handling", entry)
+		entry.target.classList.toggle("is-pinned", !entry.isIntersecting);
+	});
+}
+const observer = new IntersectionObserver(handleIntersection, { threshold: [1] });
+observer.observe(document.querySelector(".sticky"));
+
+
+function resizeVideo(vh){
+	const elem = document.getElementById("video-container");
+	elem.style.height = vh+"vh";
+}
