@@ -2893,3 +2893,12 @@ function suggestCountry(){
 
 suggestCountry();
 updateCountry();
+
+
+function toggleVisiblity(prefix) {
+	elements = document.getElementsByClassName("vis-" + prefix);
+	console.log("Toggling " + elements.length + " elements");
+	for (var i = 0; i < elements.length; i++) {
+		elements[i].classList.toggle("hidden");
+	}
+}
