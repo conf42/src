@@ -69,6 +69,19 @@ def pick_picture_file(base, pic):
         print("Missing picture: %s%s" % (base, pic))
     return pic
 
+def process_transcript(transcript):
+    sentences = [
+        x.strip() + "." for x in transcript.split(".")
+    ]
+    output = []
+    for sentence in sentences:
+        if len(sentence) < 100:
+            output.append(sentence)
+        else:
+            for i, x in enumerate(sentence.split(" so ")):
+                output.append(("" if i == 0 else " so ") + x)
+    return output
+
 WARNINGS = []
 def warn_on_missing_file(path, remote=False):
     if remote:
@@ -319,6 +332,7 @@ for event in events:
             with open(f"./transcripts_talks/{talk['YouTubeId']}.txt", "r") as f:
                 talk["transcript"] = f.read()
             print(f"Found transcript for {talk['short_url']}")
+            talk["transcript_elements"] = process_transcript(talk["transcript"])
         except:
             pass
 
