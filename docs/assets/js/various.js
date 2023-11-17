@@ -2912,8 +2912,16 @@ function handleIntersection(entries) {
 const observer = new IntersectionObserver(handleIntersection, { threshold: [1] });
 observer.observe(document.querySelector(".sticky"));
 
-
+const resizeKey = "video-container-size";
 function resizeVideo(vh){
+	if (!vh) {
+		vh = localStorage.getItem(resizeKey);
+		console.log('Restoring size', vh)
+	} else {
+		vh = vh+"vh";
+	}
 	const elem = document.getElementById("video-container");
-	elem.style.height = vh+"vh";
+	elem.style.height = vh;
+	localStorage.setItem(resizeKey, elem.style.height);
 }
+resizeVideo();
