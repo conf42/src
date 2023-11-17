@@ -314,6 +314,14 @@ for event in events:
         talk["short_url"] = generate_short_url(event, talk)
         talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
 
+        # check if transcript exists
+        try:
+            with open(f"./transcripts_talks/{talk['YouTubeId']}.txt", "r") as f:
+                talk["transcript"] = f.read()
+            print(f"Found transcript for {talk['short_url']}")
+        except:
+            pass
+
 
 
 # stats for speakers
