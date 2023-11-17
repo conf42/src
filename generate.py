@@ -53,10 +53,11 @@ def generate_short_url(event, talk):
     return url[:100]
 
 def generate_speaker_url(name):
-    url = "speaker-{name}".format(
-        name=name.replace(" ", "-"),
+    url = "speaker_{name}".format(
+        name=name.replace(" ", "_"),
     )
     url = ''.join(filter(lambda x: x in string.printable, url))
+    url = re.sub('[\W]+', '', url)
     return url
 
 def pick_picture_file(base, pic):
