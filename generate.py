@@ -304,6 +304,7 @@ for event in events:
     # offset other tracks with that duration
     DEFAULT_DURATION = 30
     start = start_time(event.get("date"))
+    end = start_time(event.get("date"))
     for i, track in enumerate(tracks_ordered):
         current_time = start_time(event.get("date"))
         for talk in event["talks_featured"] + event["talks_panel"]:
@@ -316,8 +317,13 @@ for event in events:
             talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
             talk["offset"] = (current_time - start).total_seconds()/60
             current_time += timedelta(minutes=talk["duration"])
+        if current_time > end:
+            end = current_time
 
     context["talks_by_tracks"] = tracks
+    event["talks_start"] = start
+    event["talks_end"] = end
+    event["talks_end_offset"] = (end - start).total_seconds()/60
     print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
 
 
