@@ -100,13 +100,13 @@ def warn_on_missing_file(path, remote=False):
     return True
 
 # generate times
-def start_time():
+def start_time(event):
     return datetime.datetime(
-        hour=9,
+        hour=17,
         minute=0,
-        year=2023,
-        month=9,
-        day=14,
+        year=event.year,
+        month=event.month,
+        day=event.day,
     )
 
 # init the jinja stuff
@@ -303,17 +303,18 @@ for event in events:
 
     # offset other tracks with that duration
     DEFAULT_DURATION = 30
+    start = start_time(event.get("date"))
     for i, track in enumerate(tracks_ordered):
-        current_time = start_time()
+        current_time = start_time(event.get("date"))
         for talk in event["talks_featured"] + event["talks_panel"]:
             talk["start_time"] = current_time
             talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
-            talk["offset"] = (current_time - start_time()).total_seconds()/60
+            talk["offset"] = (current_time - start).total_seconds()/60
             current_time += timedelta(minutes=talk["duration"])
         for talk in tracks[track]:
             talk["start_time"] = current_time
             talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
-            talk["offset"] = (current_time - start_time()).total_seconds()/60
+            talk["offset"] = (current_time - start).total_seconds()/60
             current_time += timedelta(minutes=talk["duration"])
 
     context["talks_by_tracks"] = tracks
