@@ -19,6 +19,7 @@ from jinja_markdown import MarkdownExtension
 import dateutil.parser
 from ics import Calendar, Event
 from urllib.parse import quote, unquote
+from datetime import timedelta
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
@@ -97,6 +98,16 @@ def warn_on_missing_file(path, remote=False):
         print("Missing file: %s" % path)
         return False
     return True
+
+# generate times
+def start_time():
+    return datetime.datetime(
+        hour=9,
+        minute=0,
+        year=2023,
+        month=9,
+        day=14,
+    )
 
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
@@ -279,13 +290,36 @@ for event in events:
     print("%d normal %s keynotes %d panels" % (len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
 
     # extract and store the tracks
+    tracks_ordered = []
     tracks = dict()
     for talk in event["talks"]:
         track = talk.get("Track", "other")
         if track not in tracks:
             tracks[track] = []
         tracks[track].append(talk)
+        tracks_ordered.append(track)
     event["tracks"] = tracks
+    event["tracks_ordered"] = tracks_ordered
+
+    # offset other tracks with that duration
+    DEFAULT_DURATION = 30
+    for i, track in enumerate(tracks_ordered):
+        current_time = start_time()
+        for talk in event["talks_featured"] + event["talks_panel"]:
+            talk["start_time"] = current_time
+            talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
+            talk["offset"] = (current_time - start_time()).total_seconds()/60
+            current_time += timedelta(minutes=talk["duration"])
+        for talk in tracks[track]:
+            talk["start_time"] = current_time
+            talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
+            talk["offset"] = (current_time - start_time()).total_seconds()/60
+            current_time += timedelta(minutes=talk["duration"])
+
+    context["talks_by_tracks"] = tracks
+    print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
+
+
 
     # render the google calendar link
     name = "Conf42: {}".format(event.get("name"))
