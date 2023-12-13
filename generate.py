@@ -307,6 +307,7 @@ for event in events:
     end = start_time(event.get("date"))
     for i, track in enumerate(tracks_ordered):
         current_time = start_time(event.get("date"))
+        current_time += timedelta(minutes=event.get("premiere_duration", 0))
         for talk in event["talks_featured"] + event["talks_panel"]:
             talk["start_time"] = current_time
             talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
