@@ -16,4 +16,7 @@ clean:
 	rm -rf ./docs/assets/splash/*.jpg
 	rm -rf ./docs/assets/podcasts/*.jpg
 
+env:
+	python3 -m venv env
+
 all: deps jpeg generate
