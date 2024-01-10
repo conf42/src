@@ -70,6 +70,10 @@ def pick_picture_file(base, pic):
         print("Missing picture: %s%s" % (base, pic))
     return pic
 
+def canonical_url(page):
+    canonical = "https://conf42.com/{}".format(page.replace(".html",""))
+    return canonical
+
 def process_transcript(transcript):
     sentences = [
         x.strip() + "." for x in transcript.split(".")
@@ -502,26 +506,26 @@ for event in events:
         # template the talk subpage
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
-            f.write(template.render(event=event, talk=talk, **context))
+            f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), talk=talk, **context))
             register_url(talk.get("short_url").replace(".html",""))
 
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
                 template = env.get_template("talk.html")
-                f.write(template.render(event=event, talk=talk, secret_mode=True, **context))
+                f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), talk=talk, secret_mode=True, **context))
 
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
-        f.write(template.render(event=event, **context))
+        f.write(template.render(event=event, canonical=canonical_url(event.get("short_url")), **context))
         register_url(event.get("short_url").replace(".html",""))
 
     # template the secret event page
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
             template = env.get_template("event.html")
-            f.write(template.render(event=event, secret_mode=True, prefix=event.get("secret_url")+"_", **context))
+            f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
 # SPEAKER PAGES
 print(DIVIDER)
@@ -537,7 +541,7 @@ for speaker, items in speakers.items():
     url = generate_speaker_url(speaker)
     with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
         template = env.get_template("speaker.html")
-        f.write(template.render(speaker=speaker, items=items, **context))
+        f.write(template.render(speaker=speaker, canonical=canonical_url(url), items=items, **context))
         register_url(url)
 
 
@@ -583,7 +587,7 @@ for podcast in podcasts:
     # write out the template for the podcast episode
     with open(BASE_FOLDER + "/" + podcast.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("podcast_episode.html")
-        f.write(template.render(podcast=podcast, **context))
+        f.write(template.render(podcast=podcast, canonical=canonical_url(podcast.get("short_url")), **context))
         register_url(podcast.get("short_url").replace(".html",""))
 
 
@@ -616,7 +620,7 @@ for post in posts:
     print("Generating blog post subpage for", post.get("ShortURL"))
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, **context))
+        f.write(template.render(post=post, canonical=canonical_url(post.get("ShortURL")),  **context))
         register_url(post.get("ShortURL").replace(".html",""))
 
 # MAIN PAGES
@@ -626,8 +630,8 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)
-        f.write(template.render(page=page, **context))
-        if page != "index.html":
+        f.write(template.render(page=page, canonical=canonical_url(page), **context))
+        if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html"]:
             register_url(page.replace(".html",""))
 
 # SITEMAP
