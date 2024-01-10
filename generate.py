@@ -216,6 +216,16 @@ for event in events:
     print(url, others)
 
 
+# TESTIMONIALS
+print(DIVIDER)
+print("Reading testimonials metadata")
+testimonials = read_csv("./_db/testimonials.csv")
+for testimonial in testimonials:
+    testimonial["Picture"] = make_remote_address("headshots", testimonial["Headshot"])
+context["testimonials"] = testimonials
+print("Loaded %d testimonials metadata" % len(context["testimonials"]))
+
+
 # SPONSORS
 print(DIVIDER)
 print("Reading sponsor metadata")
