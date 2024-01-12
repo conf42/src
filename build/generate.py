@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
 import datetime
-import pprint
-import csv
-import textwrap
 import re
 import os
 import string
@@ -21,25 +18,14 @@ from ics import Calendar, Event
 from urllib.parse import quote, unquote
 from datetime import timedelta
 
+from .shared import read_talk_csv as read_talk_csv
+
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
 BASE_STATIC_URL = "https://conf42.github.io/static"
 
 def make_remote_address(path, name):
     return BASE_STATIC_URL + "/" + path + "/" + quote(name)
-
-def read_csv(path):
-    """ Read the pre-process the CSV """
-    items = []
-    with open(path, 'r') as f:
-        reader = csv.DictReader(f)
-        for item in reader:
-            item = dict(item)
-            if "Abstract" in item:
-                item["Abstract_s"] = textwrap.shorten(item.get("Abstract",""), 200-len(item.get("title","")), placeholder="...")
-                item["Abstract_m"] = textwrap.shorten(item.get("Abstract",""), 400-len(item.get("title","")), placeholder="...")
-            items.append(item)
-    return items
 
 def generate_short_url(event, talk):
     url = "{event}_{year}_{name1}{name2}{keywords}".format(
@@ -223,7 +209,7 @@ for event in events:
 # TESTIMONIALS
 print(DIVIDER)
 print("Reading testimonials metadata")
-testimonials = read_csv("./_db/testimonials.csv")
+testimonials = read_talk_csv("./_db/testimonials.csv")
 for testimonial in testimonials:
     testimonial["Picture"] = make_remote_address("headshots", testimonial["Headshot"])
 context["testimonials"] = testimonials
@@ -235,7 +221,7 @@ print(DIVIDER)
 print("Reading sponsor metadata")
 
 try:
-    sponsors_list = sorted(read_csv("./_db/sponsors.csv"), key=lambda x: x.get("id"))
+    sponsors_list = sorted(read_talk_csv("./_db/sponsors.csv"), key=lambda x: x.get("id"))
     context["sponsors"] = sponsors_list
     context["sponsors_by_id"] = {
         item.get("id"): item for item in sponsors_list
@@ -245,7 +231,7 @@ except Exception as e:
     print("Couldn't read sponsors", e)
 
 try:
-    sponsor_subpages = sorted(read_csv("./_db/subpages.csv"), key=lambda x: x.get("Sponsor"))
+    sponsor_subpages = sorted(read_talk_csv("./_db/subpages.csv"), key=lambda x: x.get("Sponsor"))
     for subpage in sponsor_subpages:
         subpage["YouTubeId"] = subpage.get("YouTube").split("/")[-1]
     context["sponsor_subpages"] = sponsor_subpages
@@ -280,7 +266,7 @@ for event in events:
 
     # attempt to read the talks CSV
     try:
-        talks = read_csv(event.get("db_path"))
+        talks = read_talk_csv(event.get("db_path"))
     except:
         talks = []
     event["talks_raw"] = talks
@@ -419,7 +405,7 @@ print(f"Found {len(speakers)} speakers")
 print(DIVIDER)
 print("Handling video stats")
 # read
-video_stats = [x for x in read_csv("./_db/video_stats.csv")][:-1]
+video_stats = [x for x in read_talk_csv("./_db/video_stats.csv")][:-1]
 for stat in video_stats:
     stat["Minutes"] = float(stat["Watch time (hours)"])*60
     stat["Content"] = stat["Content"].strip()
@@ -596,7 +582,7 @@ print(DIVIDER)
 print("Reading sponsor metadata")
 
 try:
-    posts = sorted(read_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
+    posts = sorted(read_talk_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
     context["posts"] = posts
     print("Loaded %s posts" % len(posts))
 except Exception as e:
