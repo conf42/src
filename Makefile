@@ -2,13 +2,13 @@ jpeg:
 	bash png_to_jpeg.sh
 
 deps:
-	pip install -r requirements.txt
+	pip install -r build/requirements.txt
 
 generate:
-	python generate.py
+	python build/generate.py
 
 verify:
-	CHECK_REMOTE=true python generate.py
+	CHECK_REMOTE=true python build/generate.py
 
 clean:
 	rm -rf ./docs/*.html
@@ -19,4 +19,4 @@ clean:
 env:
 	python3 -m venv env
 
-all: deps jpeg generate
+all: deps jpeg generate verify
