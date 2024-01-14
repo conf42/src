@@ -15,3 +15,16 @@ def find_transcripts(path):
                 transcripts[yt][lang] = process_transcript(os.path.join(root, filename))
 
     return transcripts
+
+def process_transcript(transcript):
+    sentences = [
+        x.strip() + "." for x in transcript.split(".")
+    ]
+    output = []
+    for sentence in sentences:
+        if len(sentence) < 100:
+            output.append(sentence)
+        else:
+            for i, x in enumerate(sentence.split(" so ")):
+                output.append(("" if i == 0 else " so ") + x)
+    return output

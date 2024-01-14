@@ -1,103 +1,39 @@
 #!/usr/bin/env python3
 
 import datetime
-import re
-import os
-import string
 import sys
 import urllib.parse
 import markdown
-import requests
-import yaml
 
 from collections import defaultdict
 from jinja2 import Environment, FileSystemLoader
 from jinja_markdown import MarkdownExtension
 import dateutil.parser
 from ics import Calendar, Event
-from urllib.parse import quote, unquote
-from datetime import timedelta
 
-from .shared import read_talk_csv
+
+from .shared import (
+    read_csv,
+    generate_speaker_url,
+    make_remote_address,
+    warn_on_missing_file,
+    generate_short_url,
+    get_canonical_url,
+    get_warnings,
+)
+from .events import get_enriched_metadata
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
-BASE_STATIC_URL = "https://conf42.github.io/static"
+SITEMAP_URLS = []
 
-def make_remote_address(path, name):
-    return BASE_STATIC_URL + "/" + path + "/" + quote(name)
+# store urls for the sitemap.xml
+def register_url(url):
+    SITEMAP_URLS.append(url)
 
-def generate_short_url(event, talk):
-    url = "{event}_{year}_{name1}{name2}{keywords}".format(
-        event=event.get("name", "").replace(" ", "_"),
-        year=event.get("year", "").replace(" ", "_"),
-        name1=talk.get("Name1", "").replace(" ", "_"),
-        name2=("_" + talk.get("Name2", "").replace(" ", "_")) if talk.get("Name2") else "",
-        keywords=("_" + talk.get("Keywords", "").replace(",", "_").replace(" ", "_")) if talk.get("Keywords") else "",
-    )
-    url = ''.join(filter(lambda x: x in string.printable, url))
-    url = re.sub('[\W]+', '', url)
-    return url[:100]
-
-def generate_speaker_url(name):
-    url = "speaker_{name}".format(
-        name=name.replace(" ", "_"),
-    )
-    url = ''.join(filter(lambda x: x in string.printable, url))
-    url = re.sub('[\W]+', '', url)
-    return url
-
-def pick_picture_file(base, pic):
-    pic_jpeg = pic.replace(".png", ".jpg").replace(".PNG", ".jpg")
-    if os.path.isfile(base + pic_jpeg):
-        print("Picking jpg: ", base + pic_jpeg)
-        return pic_jpeg
-    elif not os.path.isfile(base + pic):
-        print("Missing picture: %s%s" % (base, pic))
-    return pic
-
-def canonical_url(page):
-    canonical = "https://conf42.com/{}".format(page.replace(".html",""))
-    return canonical
-
-def process_transcript(transcript):
-    sentences = [
-        x.strip() + "." for x in transcript.split(".")
-    ]
-    output = []
-    for sentence in sentences:
-        if len(sentence) < 100:
-            output.append(sentence)
-        else:
-            for i, x in enumerate(sentence.split(" so ")):
-                output.append(("" if i == 0 else " so ") + x)
-    return output
-
-WARNINGS = []
-def warn_on_missing_file(path, remote=False):
-    if remote:
-        if not os.environ.get("CHECK_REMOTE"):
-            return True
-        res = requests.head(path)
-        if res.status_code == 404:
-            print("Missing remote file: %s (%s)" % (path, unquote(path)))
-            WARNINGS.append(unquote(path))
-            return False
-        return True
-    if not os.path.isfile(path):
-        print("Missing file: %s" % path)
-        return False
-    return True
-
-# generate times
-def start_time(event):
-    return datetime.datetime(
-        hour=17,
-        minute=0,
-        year=event.year,
-        month=event.month,
-        day=event.day,
-    )
+print(DIVIDER)
+print("Loading the context")
+context = get_enriched_metadata(BASE_FOLDER)
 
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
@@ -112,104 +48,27 @@ env.filters["format_sponsors"] = format_sponsors
 env.filters["speaker_url"] = generate_speaker_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
 
-# load the context from the metadata file
-context = dict()
-with open('metadata.yml') as f:
-    context = yaml.load(f, Loader=yaml.FullLoader)
 
-# store urls for the sitemap.xml
-SITEMAP_URLS = []
-def register_url(url):
-    SITEMAP_URLS.append(url)
-
-# EVENTS METADATA
+# SPONSORSHIPS
 print(DIVIDER)
-print("Loading events metadata")
-
-events = context.get("events")
-events.sort(key=lambda e: e.get("date"))
-print("Loaded %s events" % len(events))
-for event in events:
-    event["short_url"] = event.get("short_url")
-
-# Validate sponsorship levels
+print("Validating sponsorship levels")
 sponsorship_levels = [
     v.get("id") for v in context.get("sponsorships")
 ]
 context["sponsorship_levels"] = sponsorship_levels
 print(DIVIDER)
 print("Sponsorship levels:", sponsorship_levels)
-for event in events:
+for event in context.get("events"):
     for level in event.get("sponsors", dict()).keys():
         if level not in sponsorship_levels:
             print("Event %s has invalid sponsorship level: %s" % (event.get("name"), level))
             sys.exit(1)
 
-future_events = []
-past_events = []
-years = dict()
-featured_sponsors = set()
-for event in events:
-    # sort sponsors
-    for sponsor_type in event.get("sponsors", {}).keys():
-        event["sponsors"][sponsor_type].sort()
-        if sponsor_type in ["platinum", "diamond"]:
-            for sponsor in event["sponsors"][sponsor_type]:
-                featured_sponsors.add(sponsor)
-    # divide into past and future events
-    if datetime.date.today() + datetime.timedelta(days=2) >= event.get("date"):
-        event["cfp_closed"] = True
-        past_events.append(event)
-        current_event = event
-    else:
-        future_events.append(event)
-    # bucket by year
-    year = str(event.get("date").year)
-    event["year"] = year
-    if year not in years:
-        years[year] = []
-    years[year].append(event)
-    # mark as revealed or not
-    event["reveal_videos"] = False
-    vrd = event.get("videos_reveal_date")
-    if vrd is not None and datetime.date.today() >= vrd:
-        event["reveal_videos"] = True
-context["years"] = years
-context["years_sorted"] = sorted(years.keys(), reverse=True)
-context["future_events"] = future_events
-context["current_event"] = past_events[-1]
-context["past_events"] = past_events[:-1]
-context["past_events"].sort(key=lambda e: e.get("date"), reverse=True)
-context["featured_sponsors"] = sorted(list(featured_sponsors))
-
-# match up with prior years
-for event in events:
-    url = event.get("short_url")
-    others = []
-    event["other_editions"] = others
-    if not url:
-        continue
-    for year in context.get("years").keys():
-        if event.get("year") == year:
-            continue
-        for candidate in context.get("years").get(year):
-            # discard the last 4 chars - the year
-            url_candidate = candidate.get("short_url")
-            if not url_candidate:
-                continue
-            if url_candidate[:-4] == url[:-4]:
-                others.append({
-                    "year": year,
-                    "short_url": url_candidate,
-                })
-    others.sort(key=lambda x: x.get("year"))
-    print(url, others)
-
 
 # TESTIMONIALS
 print(DIVIDER)
 print("Reading testimonials metadata")
-testimonials = read_talk_csv("./_db/testimonials.csv")
+testimonials = read_csv("./_db/testimonials.csv")
 for testimonial in testimonials:
     testimonial["Picture"] = make_remote_address("headshots", testimonial["Headshot"])
 context["testimonials"] = testimonials
@@ -218,10 +77,9 @@ print("Loaded %d testimonials metadata" % len(context["testimonials"]))
 
 # SPONSORS
 print(DIVIDER)
-print("Reading sponsor metadata")
-
+print("Generating sponsor subpages")
 try:
-    sponsors_list = sorted(read_talk_csv("./_db/sponsors.csv"), key=lambda x: x.get("id"))
+    sponsors_list = sorted(read_csv("./_db/sponsors.csv"), key=lambda x: x.get("id"))
     context["sponsors"] = sponsors_list
     context["sponsors_by_id"] = {
         item.get("id"): item for item in sponsors_list
@@ -231,7 +89,7 @@ except Exception as e:
     print("Couldn't read sponsors", e)
 
 try:
-    sponsor_subpages = sorted(read_talk_csv("./_db/subpages.csv"), key=lambda x: x.get("Sponsor"))
+    sponsor_subpages = sorted(read_csv("./_db/subpages.csv"), key=lambda x: x.get("Sponsor"))
     for subpage in sponsor_subpages:
         subpage["YouTubeId"] = subpage.get("YouTube").split("/")[-1]
     context["sponsor_subpages"] = sponsor_subpages
@@ -240,95 +98,20 @@ try:
     }
     print("Loaded %d sponsor subpages" % len(context["sponsor_subpages"]))
 except Exception as e:
-    print("Couldn't read sponsors", e)
+    print("Couldn't read subpages", e)
 
-print(DIVIDER)
-print("Generating sponsor subpages")
 for subpage in context["sponsor_subpages"]:
     with open(BASE_FOLDER + "/" + subpage.get("Sponsor")  + ".html", "w") as f:
         template = env.get_template("sponsor_subpage.html")
         f.write(template.render(sponsor=subpage, secret_mode=True, **context))
 
-# pprint.pprint(context)
 
-# EVENT PAGES
 print(DIVIDER)
-print("Preprocessing events")
-
-for event in events:
-
-    # for external URLs, just use that as url
+print("Writing ics files")
+for event in context.get("events"):
+    # no need for the external events
     if "external_url" in event:
-        event["url"] = event["external_url"]
         continue
-    else:
-        event["url"] = context.get("base_path") + event["short_url"]
-
-    # attempt to read the talks CSV
-    try:
-        talks = read_talk_csv(event.get("db_path"))
-    except:
-        talks = []
-    event["talks_raw"] = talks
-    #talks.sort(key=lambda x: x.get("Title"))
-
-    print("%s %s /%s (%d talks)" % (event.get("date"), event.get("name"), event.get("short_url"), len(talks)))
-
-    # check and pick the picture
-    event["thumbnail_path"] = pick_picture_file(BASE_FOLDER + "/", event["thumbnail_path"])
-
-    # split into featured and not
-    event["talks_featured"] = [talk for talk in talks if talk.get("Featured","").lower() == "yes"]
-    event["talks_panel"] = [talk for talk in talks if talk.get("Panel","").lower() == "yes"]
-    context["panels"] = context.get("panels", []) + event["talks_panel"]
-    event["talks"] = [
-        talk for talk in talks
-        if talk.get("Featured","").lower() != "yes" and talk.get("Panel","").lower() != "yes"
-    ]
-
-    #counts
-    print("%d normal %s keynotes %d panels" % (len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
-
-    # extract and store the tracks
-    tracks_ordered = []
-    tracks = dict()
-    for talk in event["talks"]:
-        track = talk.get("Track", "other")
-        if track not in tracks:
-            tracks[track] = []
-        tracks[track].append(talk)
-        tracks_ordered.append(track)
-    event["tracks"] = tracks
-    event["tracks_ordered"] = tracks_ordered
-
-    # offset other tracks with that duration
-    DEFAULT_DURATION = 30
-    start = start_time(event.get("date"))
-    end = start_time(event.get("date"))
-    for i, track in enumerate(tracks_ordered):
-        current_time = start_time(event.get("date"))
-        current_time += timedelta(minutes=event.get("premiere_duration", 0))
-        for talk in event["talks_featured"] + event["talks_panel"]:
-            talk["start_time"] = current_time
-            talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
-            talk["offset"] = (current_time - start).total_seconds()/60
-            current_time += timedelta(minutes=talk["duration"])
-        for talk in tracks[track]:
-            talk["start_time"] = current_time
-            talk["duration"] = int(talk.get("duration") or DEFAULT_DURATION)
-            talk["offset"] = (current_time - start).total_seconds()/60
-            current_time += timedelta(minutes=talk["duration"])
-        if current_time > end:
-            end = current_time
-
-    context["talks_by_tracks"] = tracks
-    event["talks_start"] = start
-    event["talks_end"] = end
-    event["talks_end_offset"] = (end - start).total_seconds()/60
-    print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
-
-
-
     # render the google calendar link
     name = "Conf42: {}".format(event.get("name"))
     begin = '{} 17:00:00'.format(event.get("date").strftime('%Y-%m-%d'))
@@ -354,7 +137,14 @@ for event in events:
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".ics", 'w') as f:
         f.write(str(c))
 
-    for talk in talks:
+print(DIVIDER)
+print("Checking external assets")
+for event in context.get("events"):
+    # no need for the external events
+    if "external_url" in event:
+        continue
+    # enrich the talks
+    for talk in event["talks"]:
         # check the slide file exists
         slide_file = talk.get("Slides")
         if slide_file:
@@ -369,23 +159,12 @@ for event in events:
         talk["short_url"] = generate_short_url(event, talk)
         talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
 
-        # check if transcript exists
-        try:
-            with open(f"./transcripts_talks/{talk['YouTubeId']}.txt", "r") as f:
-                talk["transcript"] = f.read()
-            print(f"Found transcript for {talk['short_url']}")
-            talk["transcript_elements"] = process_transcript(talk["transcript"])
-        except:
-            pass
 
-
-
-# stats for speakers
 print(DIVIDER)
 print("Handling speaker stats")
 speakers = defaultdict(list)
 context["speakers"] = speakers
-for event in events:
+for event in context.get("events"):
     for talk in event.get("talks_raw", []):
         for field in ["Name1", "Name2"]:
             speaker = talk.get(field)
@@ -405,7 +184,7 @@ print(f"Found {len(speakers)} speakers")
 print(DIVIDER)
 print("Handling video stats")
 # read
-video_stats = [x for x in read_talk_csv("./_db/video_stats.csv")][:-1]
+video_stats = [x for x in read_csv("./_db/video_stats.csv")][:-1]
 for stat in video_stats:
     stat["Minutes"] = float(stat["Watch time (hours)"])*60
     stat["Content"] = stat["Content"].strip()
@@ -428,7 +207,7 @@ for index, stat in enumerate(video_stats):
 print(f"Found {len(video_to_stats)} stats")
 # match with talks
 counter = 0
-for event in events:
+for event in context.get("events"):
     totals = dict(
         minutes=0,
         views=0,
@@ -450,11 +229,10 @@ for event in events:
             totals["views"] += int(stats.get("Views"))
             totals["impressions"] += int(stats.get("Impressions"))
 print(f"Matched {counter} talks to stats")
-
 # match with the premieres
 premieres = []
 context["premieres"] = premieres
-for event in events:
+for event in context.get("events"):
     video_id = event.get("premiere_url")
     stats = video_to_stats.get(video_id)
     event["stats"] = stats
@@ -472,62 +250,53 @@ for event in events:
 premieres.sort(key=lambda x:int(x.get("stats").get("Views")), reverse=True)
 print(f"Matched {len(premieres)} premieres to stats")
 
+
 # EVENT PAGES
 print(DIVIDER)
-for event in events:
-
+print("Genearing events & talk pages")
+for event in context.get("events"):
+    # for external events, no need to generate pages
+    if "external_url" in event:
+        continue
     # just for dev experience - 2s vs 12s
     if "quick" in sys.argv:
         continue
 
     print(f"Templating out {event.get('name')} {event.get('year')}")
 
-    # for external events, no need to generate pages
-    if "external_url" in event:
-        continue
-
     # template each talk page for the event
     for talk in event.get("talks_raw"):
-
         # template the talk subpage
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
-            f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), talk=talk, **context))
+            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, **context))
             register_url(talk.get("short_url").replace(".html",""))
-
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
                 template = env.get_template("talk.html")
-                f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), talk=talk, secret_mode=True, **context))
+                f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, secret_mode=True, **context))
 
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
-        f.write(template.render(event=event, canonical=canonical_url(event.get("short_url")), **context))
+        f.write(template.render(event=event, canonical=get_canonical_url(event.get("short_url")), **context))
         register_url(event.get("short_url").replace(".html",""))
-
     # template the secret event page
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
             template = env.get_template("event.html")
-            f.write(template.render(event=event, canonical=canonical_url(talk.get("short_url")), secret_mode=True, prefix=event.get("secret_url")+"_", **context))
+            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), secret_mode=True, prefix=event.get("secret_url")+"_", **context))
 
 # SPEAKER PAGES
 print(DIVIDER)
+print("Generating speaker pages")
 for speaker, items in speakers.items():
-
-    # # just for dev experience - 2s vs 12s
-    # if "quick" in sys.argv:
-    #     continue
-
     print(f"Templating out {speaker}")
-
-    # template the talk subpage
     url = generate_speaker_url(speaker)
     with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
         template = env.get_template("speaker.html")
-        f.write(template.render(speaker=speaker, canonical=canonical_url(url), items=items, **context))
+        f.write(template.render(speaker=speaker, canonical=get_canonical_url(url), items=items, **context))
         register_url(url)
 
 
@@ -542,7 +311,6 @@ for podcast in podcasts:
     picture_path = make_remote_address("podcasts", podcast["picture_path"])
     warn_on_missing_file(picture_path, remote=True)
     podcast["picture_path"] = picture_path
-
     podcast["YouTubeId"] = podcast.get("url").split("/")[-1]
 
     transcript_path = podcast.get("transcript")
@@ -573,29 +341,23 @@ for podcast in podcasts:
     # write out the template for the podcast episode
     with open(BASE_FOLDER + "/" + podcast.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("podcast_episode.html")
-        f.write(template.render(podcast=podcast, canonical=canonical_url(podcast.get("short_url")), **context))
+        f.write(template.render(podcast=podcast, canonical=get_canonical_url(podcast.get("short_url")), **context))
         register_url(podcast.get("short_url").replace(".html",""))
 
 
 
 print(DIVIDER)
-print("Reading sponsor metadata")
-
+print("Generating blog posts")
 try:
-    posts = sorted(read_talk_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
+    posts = sorted(read_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
     context["posts"] = posts
     print("Loaded %s posts" % len(posts))
 except Exception as e:
     print("Couldn't read blog posts", e)
-
-
-# BLOG
-print(DIVIDER)
-print("Generating blog posts")
-
+# prepare the posts
 for post in posts:
     post["Date"] = dateutil.parser.parse(post["Date"])
-
+# template out the posts
 for post in posts:
     # just for dev experience - 2s vs 12s
     if "quick" in sys.argv:
@@ -606,7 +368,7 @@ for post in posts:
     print("Generating blog post subpage for", post.get("ShortURL"))
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, canonical=canonical_url(post.get("ShortURL")),  **context))
+        f.write(template.render(post=post, canonical=get_canonical_url(post.get("ShortURL")),  **context))
         register_url(post.get("ShortURL").replace(".html",""))
 
 # MAIN PAGES
@@ -616,7 +378,7 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)
-        f.write(template.render(page=page, canonical=canonical_url(page), **context))
+        f.write(template.render(page=page, canonical=get_canonical_url(page), **context))
         if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html"]:
             register_url(page.replace(".html",""))
 
@@ -630,6 +392,5 @@ with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
 
 print(DIVIDER)
 print("Warnings")
-print("Missing %d remote files" % len(WARNINGS))
-for w in WARNINGS:
+for w in get_warnings():
     print(w)
