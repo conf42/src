@@ -18,7 +18,7 @@ from ics import Calendar, Event
 from urllib.parse import quote, unquote
 from datetime import timedelta
 
-from .shared import read_talk_csv as read_talk_csv
+from .shared import read_talk_csv
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"

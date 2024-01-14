@@ -5,10 +5,10 @@ deps:
 	pip install -r build/requirements.txt
 
 generate:
-	python build/generate.py
+	python -m build.generate
 
 verify:
-	CHECK_REMOTE=true python build/generate.py
+	CHECK_REMOTE=true python -m build.generate
 
 clean:
 	rm -rf ./docs/*.html
