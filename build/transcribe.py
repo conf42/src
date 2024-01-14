@@ -1,8 +1,8 @@
+import yaml
 from .yt import download_youtube_audio, check_video_exists, get_yt_id
 from .assemblyai import check_transcript_exists, get_transcript, write_transcript, read_transcript
 
 DOWNLOAD_PATH = "./cache_yt"
-
 
 # find the videos without transcription
 # for each,
