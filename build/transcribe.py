@@ -1,33 +1,58 @@
-import yaml
-from .yt import download_youtube_audio, check_video_exists, get_yt_id
-from .assemblyai import check_transcript_exists, get_transcript, write_transcript, read_transcript
+from .yt import (
+    download_youtube_audio,
+    check_video_exists,
+    get_yt_id,
+)
+from .assemblyai import (
+    check_transcript_exists,
+    get_transcript,
+    write_transcript,
+    read_transcript,
+)
+from .events import (
+    get_enriched_metadata,
+    extract_keywords,
+)
 
 DOWNLOAD_PATH = "./cache_yt"
 
-# find the videos without transcription
-# for each,
-#       download the audio
-#       call the API to get the transcript
-#       store the outputs in the cache
 
-video_queue = ["https://youtu.be/kFX9E5PkqLo"]
+video_queue = []
+context = get_enriched_metadata("docs")
 
-for video in video_queue:
+# find all talk videos
+for event in context.get("events"):
+    for talk in event.get("talks", []):
+        video = talk.get("YouTube")
+        if video:
+            video_queue.append((talk, video))
+print(f"Found {len(video_queue)} talks with videos")
+
+# find all talks with missing transcriptions
+missing_transcriptions = []
+for talk, video in video_queue:
+    transcript_path = check_transcript_exists(get_yt_id(video))
+    if not transcript_path:
+        missing_transcriptions.append((talk, video))
+print(f"Found {len(missing_transcriptions)} talks without transcriptions")
+
+# TODO remove
+missing_transcriptions = missing_transcriptions[:1]
+
+for talk, video in missing_transcriptions:
     print(f"Processing video {video}")
-
+    # get the audio to transcribe
     audio_path = check_video_exists(DOWNLOAD_PATH, video)
     if not audio_path:
         audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)
-    
     print(f"Got audio: {audio_path}")
-
-    transcript_path = check_transcript_exists(get_yt_id(video))
     
-    if transcript_path:
-        transcript = read_transcript(yt_id)
-    else:
-        transcript = get_transcript(audio_path)
-        write_transcript(transcript)
+    # get the keywords
+    keywords = extract_keywords(talk)
+    # get the transcript
+    transcript = get_transcript(audio_path, keywords)
+    # write the transcript for later
+    write_transcript(transcript)
     
     print(transcript)
 
