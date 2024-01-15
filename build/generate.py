@@ -144,7 +144,7 @@ for event in context.get("events"):
     if "external_url" in event:
         continue
     # enrich the talks
-    for talk in event["talks"]:
+    for talk in event["talks_raw"]:
         # check the slide file exists
         slide_file = talk.get("Slides")
         if slide_file:
