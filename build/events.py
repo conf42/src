@@ -196,10 +196,11 @@ def extract_keywords(talk):
         keywords.extend(content.split(","))
     # lowercase
     keywords = [word.lower() for word in keywords]
-    # de-deplicate and remove common words
+    # remove common words and non-letters
     keywords = [
-        re.sub('[^a-zA-Z]', '', word)
-        for word in list(set(keywords))
+        re.sub('[^a-z]', '', word)
+        for word in keywords
         if word and word not in english_dict
     ]
-    return sorted(keywords[:1000])
+    # deduplicate and only first 1000
+    return sorted(list(set(keywords))[:1000])
