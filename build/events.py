@@ -1,5 +1,7 @@
 import yaml
 import datetime
+import re
+from english_dictionary.scripts.read_pickle import get_dict
 from datetime import timedelta
 
 from .shared import (
@@ -11,6 +13,8 @@ from .shared import (
 from .transcript import (
     process_transcript,
 )
+english_dict = get_dict()
+
 
 def get_metadata():
     context = dict()
@@ -173,3 +177,32 @@ def get_enriched_metadata(base_folder):
 
 
     return context
+
+def extract_keywords(talk):
+    keywords = ["Conf fourty two", "Conf42"]
+    # append some fields as they are - e.g. Amazon Web Services, or Site Reliability Engineer
+    for field in ["JobTitle1", "JobTitle2", "Name1", "Name2", "Company1", "Company2"]:
+        content = talk.get(field)
+        keywords.append(content)
+    # append all words from the list
+    for field in ["Title", "Abstract"]:
+        content = talk.get(field)
+        # replace whitespace with _
+        content = re.sub('[\s]+', '_', content)
+        # remove all non-word characters
+        content = re.sub('[\W]+', '', content)
+        # add back the keywords separated by _
+        keywords.extend(content.split("_"))
+    # append comma-separated keywords
+    for field in ["Keywords"]:
+        content = talk.get(field)
+        keywords.extend(content.split(","))
+    # lowercase
+    keywords = [word.lower() for word in keywords]
+    # de-deplicate and remove common words
+    keywords = [
+        word
+        for word in list(set(keywords))
+        if word and word not in english_dict
+    ]
+    return sorted(keywords[:1000])
