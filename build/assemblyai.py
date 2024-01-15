@@ -44,10 +44,10 @@ def write_transcript(yt_id, transcript):
         # remove the words portion, as it's super heavy
         resp.words = []
         f.write(json.dumps(resp))
-    with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
-        f.write(transcript.text)
-    with open(get_transcript_path(yt_id, extension=".vtt"), "w") as f:
-        f.write(transcript.export_subtitles_vtt())
+    #with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
+    #    f.write(transcript.text)
+    #with open(get_transcript_path(yt_id, extension=".vtt"), "w") as f:
+    #    f.write(transcript.export_subtitles_vtt())
     with open(get_transcript_path(yt_id, extension=".srt"), "w") as f:
         f.write(transcript.export_subtitles_srt())
     
