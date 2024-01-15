@@ -38,9 +38,12 @@ def get_transcript(audio_path, keywords):
         print(f"Highlight: {result.text}, Count: {result.count}, Rank: {result.rank}")
     return transcript
         
-def write_transcript(yt_id, transcript):
+def write_transcript(yt_id, transcript, context=None):
     with open(get_transcript_path(yt_id), "w") as f:
         f.write(json.dumps(transcript.json_response, indent=2))
+    if context is not None:
+        with open(get_transcript_path(yt_id, extension="_context.json"), "w") as f:
+            f.write(json.dumps(context, indent=2))
     with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
         f.write(transcript.text)
     with open(get_transcript_path(yt_id, extension=".vtt"), "w") as f:

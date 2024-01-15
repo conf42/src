@@ -55,7 +55,7 @@ for talk, video in missing_transcriptions:
     if not transcript:
         sys.exit(1)
     # write the transcript for later
-    write_transcript(get_yt_id(video), transcript)
+    write_transcript(get_yt_id(video), transcript, context=dict(keywords=keywords))
     
     print(transcript)
 
