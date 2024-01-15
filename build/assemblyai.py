@@ -40,7 +40,7 @@ def get_transcript(audio_path, keywords):
         
 def write_transcript(yt_id, transcript):
     with open(get_transcript_path(yt_id), "w") as f:
-        f.write(json.dumps(transcript.json_response))
+        f.write(json.dumps(transcript.json_response, indent=2))
     with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
         f.write(transcript.text)
     with open(get_transcript_path(yt_id, extension=".vtt"), "w") as f:
