@@ -45,7 +45,6 @@ def get_enriched_metadata(base_folder):
         if datetime.date.today() + datetime.timedelta(days=2) >= event.get("date"):
             event["cfp_closed"] = True
             past_events.append(event)
-            current_event = event
         else:
             future_events.append(event)
         # bucket by year
@@ -88,7 +87,6 @@ def get_enriched_metadata(base_folder):
                         "short_url": url_candidate,
                     })
         others.sort(key=lambda x: x.get("year"))
-        print(url, others)
 
     # read in the talks database
     for event in events:
@@ -170,7 +168,6 @@ def get_enriched_metadata(base_folder):
             try:
                 with open(f"./transcripts_talks/{talk['YouTubeId']}.txt", "r") as f:
                     talk["transcript"] = f.read()
-                print(f"Found transcript for {talk['short_url']}")
                 talk["transcript_elements"] = process_transcript(talk["transcript"])
             except:
                 pass

@@ -34,7 +34,7 @@ for talk, video in video_queue:
     transcript_path = check_transcript_exists(get_yt_id(video))
     if not transcript_path:
         missing_transcriptions.append((talk, video))
-print(f"Found {len(missing_transcriptions)} talks without transcriptions")
+print(f"Found {len(missing_transcriptions)} talks without transcripts")
 
 # TODO remove
 missing_transcriptions = missing_transcriptions[:1]
