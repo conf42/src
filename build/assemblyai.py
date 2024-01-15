@@ -32,10 +32,10 @@ def get_transcript(audio_path, keywords):
     if transcript.status == aai.TranscriptStatus.error:
         print(f"Transcription failed: {transcript.error}")
         return False
-    print(transcript.text)
 
-    for result in transcript.auto_highlights.results:
-        print(f"Highlight: {result.text}, Count: {result.count}, Rank: {result.rank}")
+    #print(transcript.text)
+    #for result in transcript.auto_highlights.results:
+    #    print(f"Highlight: {result.text}, Count: {result.count}, Rank: {result.rank}")
     return transcript
         
 def write_transcript(yt_id, transcript):
