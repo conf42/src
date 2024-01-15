@@ -22,7 +22,7 @@ video_queue = []
 context = get_enriched_metadata("docs")
 
 # sort from the most recent
-context.get("events").sort(key=lambda x: x.get("date"), reversed=True)
+context.get("events").sort(key=lambda x: x.get("date"), reverse=True)
 
 # find all talk videos
 for event in context.get("events"):
