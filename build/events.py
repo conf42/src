@@ -198,7 +198,7 @@ def extract_keywords(talk):
     keywords = [word.lower() for word in keywords]
     # remove common words and non-letters
     keywords = [
-        re.sub('[^a-z]', '', word)
+        re.sub('[^a-z ]', '', word)
         for word in keywords
         if word and word not in english_dict
     ]
