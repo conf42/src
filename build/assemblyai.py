@@ -29,6 +29,9 @@ def get_transcript(audio_path, keywords):
         audio_path,
         config=config,
     )
+    if transcript.status == aai.TranscriptStatus.error:
+        print(f"Transcription failed: {transcript.error}")
+        return False
     print(transcript.text)
 
     for result in transcript.auto_highlights.results:
@@ -38,6 +41,8 @@ def get_transcript(audio_path, keywords):
 def write_transcript(yt_id, transcript):
     with open(get_transcript_path(yt_id), "w") as f:
         f.write(json.dumps(transcript.json_response))
+    with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
+        f.write(transcript.text)
     with open(get_transcript_path(yt_id, extension=".vtt"), "w") as f:
         f.write(transcript.export_subtitles_vtt())
     with open(get_transcript_path(yt_id, extension=".srt"), "w") as f:

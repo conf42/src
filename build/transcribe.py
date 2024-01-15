@@ -1,3 +1,4 @@
+import sys
 from .yt import (
     download_youtube_audio,
     check_video_exists,
@@ -51,8 +52,10 @@ for talk, video in missing_transcriptions:
     keywords = extract_keywords(talk)
     # get the transcript
     transcript = get_transcript(audio_path, keywords)
+    if not transcript:
+        sys.exit(1)
     # write the transcript for later
-    write_transcript(transcript)
+    write_transcript(get_yt_id(video), transcript)
     
     print(transcript)
 
