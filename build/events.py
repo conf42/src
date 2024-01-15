@@ -176,7 +176,7 @@ def get_enriched_metadata(base_folder):
     return context
 
 def extract_keywords(talk):
-    keywords = ["Conf fourty two", "Conf42"]
+    keywords = ["Conf fourty two"]
     # append some fields as they are - e.g. Amazon Web Services, or Site Reliability Engineer
     for field in ["JobTitle1", "JobTitle2", "Name1", "Name2", "Company1", "Company2"]:
         content = talk.get(field)
