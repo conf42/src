@@ -40,8 +40,8 @@ for talk, video in video_queue:
         missing_transcriptions.append((talk, video))
 print(f"Found {len(missing_transcriptions)} talks without transcripts")
 
-for talk, video in missing_transcriptions:
-    print(f"Processing video {video}")
+for i, (talk, video) in enumerate(missing_transcriptions):
+    print(f"({i}/{len(missing_transcriptions)}) Processing video {video}")
 
     # get the audio to transcribe
     audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)

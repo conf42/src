@@ -42,7 +42,7 @@ def write_transcript(yt_id, transcript):
     with open(get_transcript_path(yt_id), "w") as f:
         resp = transcript.json_response
         # remove the words portion, as it's super heavy
-        resp.words = []
+        resp["words"] = []
         f.write(json.dumps(resp))
     #with open(get_transcript_path(yt_id, extension=".txt"), "w") as f:
     #    f.write(transcript.text)
