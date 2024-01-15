@@ -40,9 +40,6 @@ for talk, video in video_queue:
         missing_transcriptions.append((talk, video))
 print(f"Found {len(missing_transcriptions)} talks without transcripts")
 
-# TODO remove
-missing_transcriptions = missing_transcriptions[:1]
-
 for talk, video in missing_transcriptions:
     print(f"Processing video {video}")
 
