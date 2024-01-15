@@ -21,6 +21,9 @@ DOWNLOAD_PATH = "./cache_yt"
 video_queue = []
 context = get_enriched_metadata("docs")
 
+# sort from the most recent
+context.get("events").sort(key=lambda x: x.get("date"), reversed=True)
+
 # find all talk videos
 for event in context.get("events"):
     for talk in event.get("talks", []):
@@ -42,10 +45,9 @@ missing_transcriptions = missing_transcriptions[:1]
 
 for talk, video in missing_transcriptions:
     print(f"Processing video {video}")
+
     # get the audio to transcribe
-    audio_path = check_video_exists(DOWNLOAD_PATH, video)
-    if not audio_path:
-        audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)
+    audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)
     print(f"Got audio: {audio_path}")
     
     # get the keywords
@@ -53,10 +55,9 @@ for talk, video in missing_transcriptions:
     # get the transcript
     transcript = get_transcript(audio_path, keywords)
     if not transcript:
-        sys.exit(1)
+        #sys.exit(1)
+        continue
     # write the transcript for later
     write_transcript(get_yt_id(video), transcript)
-    
-    print(transcript)
 
     
