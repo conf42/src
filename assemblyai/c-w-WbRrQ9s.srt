@@ -1,0 +1,1780 @@
+1
+00:00:34,530 --> 00:00:38,934
+Hello everyone, and welcome to Comp 42, cloud native 2023.
+
+2
+00:00:39,132 --> 00:00:43,026
+My name is Shane Utt. I'm an engineer who works on Kubernetes networking
+
+3
+00:00:43,058 --> 00:00:46,082
+at Kong. I'm also a chair of Kubernetes
+
+4
+00:00:46,146 --> 00:00:49,866
+Networking special interest group and a maintainer of Gateway API.
+
+5
+00:00:50,018 --> 00:00:54,138
+And today we're going to talk about Ingress
+
+6
+00:00:54,234 --> 00:00:57,374
+and going beyond ingress in kubernetes with
+
+7
+00:00:57,412 --> 00:01:01,358
+Gateway API. So for this talk, our agenda is we're going
+
+8
+00:01:01,364 --> 00:01:04,702
+to do a review of the Ingress API. It's likely familiar to many
+
+9
+00:01:04,756 --> 00:01:08,046
+of you, it's been around for a long time. Then we'll do an introduction
+
+10
+00:01:08,078 --> 00:01:11,826
+to the Gateway API, why it exists, and what it can
+
+11
+00:01:11,848 --> 00:01:15,426
+do for you over Ingress. We'll do an overview and anatomy of
+
+12
+00:01:15,448 --> 00:01:19,538
+the various API resources that are available in Gateway API.
+
+13
+00:01:19,714 --> 00:01:23,282
+We'll talk about Kong's involvement with Gateway API
+
+14
+00:01:23,346 --> 00:01:26,806
+and our use of it, and we'll provide a brief demo that shows you
+
+15
+00:01:26,828 --> 00:01:30,726
+it in action. And then we'll discuss upcoming features
+
+16
+00:01:30,758 --> 00:01:34,246
+for the project and talk about subprojects and basically what's
+
+17
+00:01:34,278 --> 00:01:37,674
+coming next in Gateway API in the coming years. So to get
+
+18
+00:01:37,712 --> 00:01:41,406
+started, let's talk about Ingress. Ingress has
+
+19
+00:01:41,428 --> 00:01:44,782
+been around for five plus years. It's simple.
+
+20
+00:01:44,916 --> 00:01:48,462
+It provides host and path matching. You can forward to a service,
+
+21
+00:01:48,516 --> 00:01:52,186
+a Kubernetes service, and you can do TLS configuration.
+
+22
+00:01:52,378 --> 00:01:55,602
+On the right here you can see the basic example where we have a demo
+
+23
+00:01:55,656 --> 00:01:59,122
+app that's listening on port 80 for HTTP traffic, and Ingress is
+
+24
+00:01:59,176 --> 00:02:02,674
+exposing that so that you can access your demo app.
+
+25
+00:02:02,872 --> 00:02:06,030
+But there have been historically many limitations
+
+26
+00:02:06,110 --> 00:02:09,766
+with Ingress, things that we've learned over these years. One of
+
+27
+00:02:09,788 --> 00:02:13,346
+the big ones was for 22 plus implementations. There ended
+
+28
+00:02:13,378 --> 00:02:16,070
+up being a ton of non portable extensions.
+
+29
+00:02:17,050 --> 00:02:20,602
+Annotations ended up being everywhere, and still are.
+
+30
+00:02:20,736 --> 00:02:24,314
+We call this sort of the annotation Wild west, where no
+
+31
+00:02:24,352 --> 00:02:28,262
+two ingress controllers behave, usually even like remotely,
+
+32
+00:02:28,326 --> 00:02:32,554
+that similar to one another. There was an insufficient
+
+33
+00:02:32,602 --> 00:02:36,666
+permission model and it was mainly focused on HTTP traffic.
+
+34
+00:02:36,698 --> 00:02:40,430
+There are some caveats to this, but for the most part it's about HTTP traffic.
+
+35
+00:02:41,410 --> 00:02:44,654
+To a lesser extent, it was limited to north and south traffic,
+
+36
+00:02:44,702 --> 00:02:49,102
+which we'll get into a little bit later. And then it was heavily
+
+37
+00:02:49,166 --> 00:02:51,970
+reliant on the Kubernetes service API.
+
+38
+00:02:52,790 --> 00:02:56,020
+It uses service you kind of are bound to service.
+
+39
+00:02:57,050 --> 00:03:00,326
+So these are some of the things we want to change. And in
+
+40
+00:03:00,348 --> 00:03:04,182
+general, there are some very high level things that were the impetus for change
+
+41
+00:03:04,236 --> 00:03:06,550
+here, extensibility,
+
+42
+00:03:07,550 --> 00:03:10,630
+multiprotocol support, and conformance.
+
+43
+00:03:10,790 --> 00:03:14,378
+So extensibility with conformance was a
+
+44
+00:03:14,384 --> 00:03:17,494
+really big part of this. We wanted to have conformance
+
+45
+00:03:17,542 --> 00:03:20,934
+test suite conformance levels, which we'll talk about in a little bit,
+
+46
+00:03:20,992 --> 00:03:24,494
+and basically be able to have conformant implementations while
+
+47
+00:03:24,532 --> 00:03:28,138
+also accounting for the future of extensibility.
+
+48
+00:03:28,314 --> 00:03:32,320
+And then multi protocol support literally means we wanted to be able to support
+
+49
+00:03:33,010 --> 00:03:35,790
+GRPC, TCP, etc.
+
+50
+00:03:37,510 --> 00:03:41,314
+So with that and these impetuses for change, let's talk
+
+51
+00:03:41,352 --> 00:03:44,674
+about what Gateway API is, how it tried to bring around that
+
+52
+00:03:44,712 --> 00:03:45,300
+change.
+
+53
+00:03:49,210 --> 00:03:52,726
+So Gateway API is the next generation of Kubernetes routing and
+
+54
+00:03:52,748 --> 00:03:56,534
+load balancing APIs. It is literally the successor to
+
+55
+00:03:56,572 --> 00:04:00,102
+ingress. New features are not being developed for Ingress,
+
+56
+00:04:00,166 --> 00:04:03,130
+they arent being instead developed in Gateway API.
+
+57
+00:04:04,030 --> 00:04:06,730
+It's designed to be expressive and extensible.
+
+58
+00:04:07,150 --> 00:04:10,982
+It has multiple API resources. There's not just ingress and ingress
+
+59
+00:04:11,046 --> 00:04:15,058
+class anymore. I guess it's Gateway class, gateway and HTTP
+
+60
+00:04:15,094 --> 00:04:17,754
+route, which you can see from the diagram over here. And there are other routes
+
+61
+00:04:17,802 --> 00:04:21,386
+like TCP route, GRPC route, which we'll talk about later. And it's
+
+62
+00:04:21,418 --> 00:04:24,706
+role oriented. So a cluster administrator might be
+
+63
+00:04:24,728 --> 00:04:28,050
+responsible for your gateways, but then an application
+
+64
+00:04:28,120 --> 00:04:31,214
+developer might be responsible for the routes to their applications,
+
+65
+00:04:31,342 --> 00:04:32,370
+et cetera.
+
+66
+00:04:35,690 --> 00:04:39,522
+At a high level in kind of mostly focused on HTTP.
+
+67
+00:04:39,586 --> 00:04:43,554
+These are some of the features of Gateway API. We have TLS
+
+68
+00:04:43,602 --> 00:04:47,518
+configuration, HTTP matching with host path
+
+69
+00:04:47,634 --> 00:04:51,274
+header method, and query params. We also
+
+70
+00:04:51,312 --> 00:04:54,570
+have cross namespace gateway to route binding.
+
+71
+00:04:54,990 --> 00:04:58,774
+We have cross namespace forwarding HTTP
+
+72
+00:04:58,822 --> 00:05:03,158
+filters with header modifiers, request mirroring, request redirects,
+
+73
+00:05:03,174 --> 00:05:06,670
+and URL rewrites, and weight based
+
+74
+00:05:06,740 --> 00:05:10,286
+traffic splitting. Quite a few features, and to
+
+75
+00:05:10,308 --> 00:05:13,714
+be clear, the top are the features that are available
+
+76
+00:05:13,752 --> 00:05:16,834
+to you in ingress today, and the bottom are
+
+77
+00:05:16,872 --> 00:05:19,220
+only available in Gateway API today.
+
+78
+00:05:23,270 --> 00:05:27,122
+So how do we get this extensibility? Well, we came up with a concept
+
+79
+00:05:27,186 --> 00:05:30,274
+called conformance levels. We have three conformance
+
+80
+00:05:30,322 --> 00:05:33,560
+levels, core, extended and custom.
+
+81
+00:05:34,090 --> 00:05:38,874
+Core is where every implementation of Gateway API has
+
+82
+00:05:38,912 --> 00:05:42,106
+to basically adhere to this conformance level has
+
+83
+00:05:42,128 --> 00:05:44,700
+to meet the standard here.
+
+84
+00:05:45,150 --> 00:05:48,262
+Extended is where it's optional.
+
+85
+00:05:48,406 --> 00:05:52,174
+An implementation can opt into this, but we expect that
+
+86
+00:05:52,212 --> 00:05:56,190
+only a few implementations can implement an extended feature.
+
+87
+00:05:57,010 --> 00:06:01,214
+Custom, which also is kind of like implementation specific,
+
+88
+00:06:01,412 --> 00:06:05,770
+kind of goes into the we are aware of this feature, we don't necessarily
+
+89
+00:06:05,850 --> 00:06:09,346
+provide a whole lot of guidance for it, and that's how we can kind
+
+90
+00:06:09,368 --> 00:06:12,834
+of at least bring some of that back into the upstream and
+
+91
+00:06:12,952 --> 00:06:16,462
+make sure that other implementations are aware of things that are out there.
+
+92
+00:06:16,616 --> 00:06:20,246
+And for anything along this path, it is possible for
+
+93
+00:06:20,268 --> 00:06:23,714
+them to graduate up. So like custom could become extended
+
+94
+00:06:23,762 --> 00:06:27,362
+as implementations start to adopt something, extended can become core
+
+95
+00:06:27,426 --> 00:06:28,570
+and so forth.
+
+96
+00:06:31,710 --> 00:06:35,830
+So we talked a little bit about high level what Gateway
+
+97
+00:06:35,910 --> 00:06:39,874
+API is. There are some specific resources,
+
+98
+00:06:39,942 --> 00:06:43,742
+API resources that we're going to cover. These are kind of the current
+
+99
+00:06:43,796 --> 00:06:47,102
+ones that are in beta, and the most commonly used
+
+100
+00:06:47,156 --> 00:06:51,630
+ones, gateway class, gateway and HTTP route.
+
+101
+00:06:53,730 --> 00:06:57,330
+So Gateway class is similar to ingress class.
+
+102
+00:06:57,480 --> 00:07:00,882
+Your gateways basically are going to attach to a gateway class.
+
+103
+00:07:00,936 --> 00:07:04,660
+And what that does is it tells your operator, your controller, what have you.
+
+104
+00:07:05,050 --> 00:07:08,610
+This gateway class, which may be a named one like Kong,
+
+105
+00:07:08,770 --> 00:07:12,886
+is responsible for provisioning these gateways, and then
+
+106
+00:07:12,988 --> 00:07:16,274
+those gateways are responsible for provisioning
+
+107
+00:07:16,322 --> 00:07:20,246
+these routes. And you can see that from the diagram here, that it's
+
+108
+00:07:20,278 --> 00:07:23,974
+possible with Gateway API to have multiple gateways. And in this diagram,
+
+109
+00:07:24,102 --> 00:07:27,770
+Kong Gateway one, Kong Gateway two. These would be like actual
+
+110
+00:07:27,840 --> 00:07:31,446
+separate gateway instances, actual separate instances of the proxy,
+
+111
+00:07:31,558 --> 00:07:35,498
+all with their own routes and all potentially defined by different groups.
+
+112
+00:07:35,594 --> 00:07:39,066
+Maybe an operator of the cluster is responsible for creating the gateways, but maybe it's
+
+113
+00:07:39,098 --> 00:07:41,550
+different development groups that create the different routes.
+
+114
+00:07:43,730 --> 00:07:46,226
+Just a brief overview, just to kind of take a look at what these look
+
+115
+00:07:46,248 --> 00:07:49,826
+like. Gateway class is very straightforward. There's a controller name,
+
+116
+00:07:49,928 --> 00:07:53,554
+and it basically says this is the controller that's responsible for this and the things
+
+117
+00:07:53,592 --> 00:07:54,820
+attached to it.
+
+118
+00:07:56,950 --> 00:08:00,166
+Gateway can be as simple or as complex as you like, but one of the
+
+119
+00:08:00,188 --> 00:08:03,686
+main things that it's comprised of are listeners, which in this case we only have
+
+120
+00:08:03,708 --> 00:08:07,558
+a basic HTTP listener and then the Gateway class name, attaching it to
+
+121
+00:08:07,564 --> 00:08:11,114
+its gateway class and saying this is the controller that is responsible for
+
+122
+00:08:11,152 --> 00:08:14,854
+me. And then HTTP route,
+
+123
+00:08:14,902 --> 00:08:17,174
+which is one of many routes, and we'll get into some of the other routes
+
+124
+00:08:17,222 --> 00:08:20,778
+later, has rules, basically.
+
+125
+00:08:20,864 --> 00:08:24,702
+It too has parent refs, which says what gateways it's attached to,
+
+126
+00:08:24,756 --> 00:08:28,494
+and that can actually be multiple. It is possible to even
+
+127
+00:08:28,532 --> 00:08:32,174
+do things like migrate between different implementations by
+
+128
+00:08:32,212 --> 00:08:35,406
+having both implementations serve a route at the same time and
+
+129
+00:08:35,428 --> 00:08:39,202
+then removing or adding whatever you need to do as you're kind of moving
+
+130
+00:08:39,256 --> 00:08:42,882
+between implementations. There's rules. And this is similar
+
+131
+00:08:42,936 --> 00:08:46,514
+to what you saw with ingress, a little bit different structure with
+
+132
+00:08:46,552 --> 00:08:50,086
+backend refs, which by default refer to services.
+
+133
+00:08:50,268 --> 00:08:53,814
+So in this case we have a basic HTTP route that is
+
+134
+00:08:53,852 --> 00:08:57,510
+supposed to get HTTP traffic to a
+
+135
+00:08:57,580 --> 00:09:01,418
+demo app listening on port 80 with a service named demo.
+
+136
+00:09:01,584 --> 00:09:05,194
+You are not limited to services with HTTP route. For the back end
+
+137
+00:09:05,232 --> 00:09:10,198
+refs, there's a type field that's optional, that you can add practically
+
+138
+00:09:10,374 --> 00:09:14,014
+anything you wanted to if you have an implementation specific way of doing
+
+139
+00:09:14,052 --> 00:09:16,990
+this. You could do it with Gateway API.
+
+140
+00:09:18,450 --> 00:09:21,902
+All right, let's talk a little bit about what Gateway API is at
+
+141
+00:09:21,956 --> 00:09:25,406
+Kong, what it means to us, and kind of our journey with
+
+142
+00:09:25,428 --> 00:09:28,946
+it. For a high level overview of what
+
+143
+00:09:28,968 --> 00:09:32,498
+Kong is, we consider ourselves the cloud native API platform,
+
+144
+00:09:32,584 --> 00:09:36,402
+with products ranging from API design and testing with insomnia
+
+145
+00:09:36,546 --> 00:09:39,986
+north south traffic into your Kubernetes clusters with Kong Gateway
+
+146
+00:09:40,018 --> 00:09:43,190
+and Ingress, and Kong Mesh for east and west traffic.
+
+147
+00:09:46,010 --> 00:09:49,510
+Our Gateway API journey started with Ingress.
+
+148
+00:09:49,590 --> 00:09:52,842
+Like most people, Ingress has historically been the top
+
+149
+00:09:52,896 --> 00:09:56,634
+user configuration option. It's what most users are using in Kubernetes today
+
+150
+00:09:56,672 --> 00:10:01,254
+to configure their Kong gateway for extensibility
+
+151
+00:10:01,302 --> 00:10:04,266
+reasons, similar to what we talked about in the previous slides.
+
+152
+00:10:04,378 --> 00:10:07,994
+We ended up with custom resource definitions and annotations everywhere.
+
+153
+00:10:08,042 --> 00:10:11,534
+We were part of the annotation Wild west with custom things you can only do
+
+154
+00:10:11,572 --> 00:10:15,050
+in Kong with crdes and annotations kind
+
+155
+00:10:15,060 --> 00:10:18,818
+of available in our product for several years. We wanted to have
+
+156
+00:10:18,904 --> 00:10:22,274
+a common upstream API. We wanted users to not have
+
+157
+00:10:22,312 --> 00:10:25,826
+to learn things that were very specific to Kong, to be
+
+158
+00:10:25,848 --> 00:10:29,046
+able to do things in the networking space. And this was
+
+159
+00:10:29,068 --> 00:10:33,094
+a common thing among multiple implementations in Kubernetes in previous years.
+
+160
+00:10:33,212 --> 00:10:37,398
+So we got together and got involved in the early days and helped drive the
+
+161
+00:10:37,484 --> 00:10:41,142
+Gateway API project, which was meant to, as we've discussed,
+
+162
+00:10:41,206 --> 00:10:44,826
+kind of take it to the next level, take Ingress and step it up a
+
+163
+00:10:44,848 --> 00:10:48,534
+notch. We currently maintain three separate
+
+164
+00:10:48,582 --> 00:10:52,282
+implementations of Gateway API, including in our Kong Kubernetes ingress
+
+165
+00:10:52,346 --> 00:10:56,090
+controller, which we call the Kick, our Kong gateway operator,
+
+166
+00:10:56,170 --> 00:10:59,530
+which we call the KGO and Kuma, and Kong Mesh,
+
+167
+00:10:59,690 --> 00:11:01,710
+which is our service mesh offering.
+
+168
+00:11:03,830 --> 00:11:07,698
+So let's talk a little bit about Kuma. I'm going to focus in
+
+169
+00:11:07,704 --> 00:11:11,058
+on Kuma today, Kuma's implementation of
+
+170
+00:11:11,064 --> 00:11:14,450
+Gateway API. We'll start by just a really simple
+
+171
+00:11:14,520 --> 00:11:18,226
+definition of service mesh traffic. We're going to have services in
+
+172
+00:11:18,248 --> 00:11:21,570
+our Kubernetes cluster and they're going to talk to each other over the service mesh.
+
+173
+00:11:21,650 --> 00:11:25,970
+So you have two services here, both with an envoy proxy sidecar,
+
+174
+00:11:26,050 --> 00:11:28,650
+and they can communicate with each other through the mesh.
+
+175
+00:11:30,190 --> 00:11:33,254
+Well, what if you wanted to be able to get traffic
+
+176
+00:11:33,302 --> 00:11:37,050
+into one of those services from outside of the Kubernetes cluster from the Internet?
+
+177
+00:11:40,610 --> 00:11:44,394
+We have the functionality in Kuma today in the latest
+
+178
+00:11:44,442 --> 00:11:48,234
+release to be able to create gateways, that is, use the gateway
+
+179
+00:11:48,282 --> 00:11:53,454
+resource available from kubernetes and make a
+
+180
+00:11:53,492 --> 00:11:57,406
+Kuma gateway that will create, in this case, you'll see it'll provision
+
+181
+00:11:57,598 --> 00:12:01,022
+an envoy gateway that will then have ingress
+
+182
+00:12:01,086 --> 00:12:05,266
+access from the Internet and then
+
+183
+00:12:05,368 --> 00:12:09,526
+you can create HTTP routes so that in this case, let's say if the
+
+184
+00:12:09,548 --> 00:12:12,822
+service on the left was our demo app, we tell the
+
+185
+00:12:12,876 --> 00:12:16,518
+gateway this HTTP route is connected here
+
+186
+00:12:16,684 --> 00:12:20,394
+to our gateway so that we
+
+187
+00:12:20,432 --> 00:12:24,170
+open up a route to our service for port 80 traffic.
+
+188
+00:12:25,070 --> 00:12:28,534
+Pretty straightforward. And all can be done with upstream
+
+189
+00:12:28,582 --> 00:12:32,062
+Kubernetes API resources. Let's do a brief demo
+
+190
+00:12:32,116 --> 00:12:35,566
+of this and show it in action. So for
+
+191
+00:12:35,588 --> 00:12:39,674
+this demo we have a basic Kubernetes cluster.
+
+192
+00:12:39,802 --> 00:12:43,038
+Actually this is a kind cluster Kubernetes and docker running the
+
+193
+00:12:43,044 --> 00:12:44,450
+Kuma control plane.
+
+194
+00:12:46,230 --> 00:12:50,180
+We're using the Kuma counter demo which is a repository up online.
+
+195
+00:12:50,630 --> 00:12:54,466
+You can grab after this if you'd like. And in it there's a demo
+
+196
+00:12:54,568 --> 00:12:56,040
+yaml which will apply.
+
+197
+00:12:57,690 --> 00:13:01,686
+This creates a small app. Let's take
+
+198
+00:13:01,708 --> 00:13:05,462
+a look here. A demo app which is a web API and
+
+199
+00:13:05,516 --> 00:13:08,934
+a redis where it persists, a counter. Basically the web app
+
+200
+00:13:08,972 --> 00:13:12,646
+is capable of incrementing and decrementing a counter and redis is where it's
+
+201
+00:13:12,678 --> 00:13:16,730
+stored. And you'll see here that we have a couple pods initializing for each,
+
+202
+00:13:16,880 --> 00:13:20,826
+or a couple containers initializing for each pod. One of them is the sidecar from
+
+203
+00:13:20,848 --> 00:13:24,186
+Kuma. So these are connected into the Kuma service mesh.
+
+204
+00:13:24,378 --> 00:13:28,878
+So now what we want to do is we want to get access to
+
+205
+00:13:28,964 --> 00:13:32,222
+the demo app's service. We want
+
+206
+00:13:32,276 --> 00:13:36,574
+to communicate with it and open it up in a web browser.
+
+207
+00:13:36,702 --> 00:13:39,890
+So we can do that with Gateway API and HDB route.
+
+208
+00:13:40,870 --> 00:13:42,050
+By default,
+
+209
+00:13:49,370 --> 00:13:52,440
+Kuma will come with a gateway class.
+
+210
+00:13:53,370 --> 00:13:57,462
+It is just named the
+
+211
+00:13:57,516 --> 00:14:00,250
+Kuma controller. The gateway Kuma controller.
+
+212
+00:14:00,910 --> 00:14:04,442
+You can see here that the Kuma control plane has
+
+213
+00:14:04,496 --> 00:14:07,894
+picked up the gateway class and said, yes, I'm ready to start serving gateways
+
+214
+00:14:07,942 --> 00:14:13,934
+and routes. With this class we
+
+215
+00:14:13,972 --> 00:14:17,274
+have a gateway that we can create. It's really basic.
+
+216
+00:14:17,322 --> 00:14:20,666
+We're just going to open up port 80 80 connected
+
+217
+00:14:20,698 --> 00:14:24,242
+to the Kuma gateway class that we just showed. So let's apply
+
+218
+00:14:24,296 --> 00:14:24,900
+that.
+
+219
+00:14:28,470 --> 00:14:31,986
+Take a look at the gateway. Okay, so the gateway is
+
+220
+00:14:32,008 --> 00:14:35,766
+there. It's been assigned an ip address.
+
+221
+00:14:35,948 --> 00:14:39,958
+It's not quite ready yet. Give it a couple of seconds and it's ready.
+
+222
+00:14:40,124 --> 00:14:43,750
+We should be able to start at least poconet.
+
+223
+00:14:46,730 --> 00:14:50,362
+There we go. This is the Kuma mesh gateway. No routes are ready yet.
+
+224
+00:14:50,416 --> 00:14:52,940
+We haven't actually exposed our demo app yet.
+
+225
+00:14:53,950 --> 00:14:56,780
+So we have an HTTP route to expose our demo app.
+
+226
+00:14:57,790 --> 00:15:01,850
+This is pointing at the Kuma gateway, which we just created
+
+227
+00:15:02,270 --> 00:15:06,560
+to the demo app service which we looked at earlier on port 5000
+
+228
+00:15:07,250 --> 00:15:10,318
+and it's just doing a path prefix. So we're just going to send all the
+
+229
+00:15:10,324 --> 00:15:14,020
+traffic there, we'll apply that
+
+230
+00:15:16,630 --> 00:15:19,762
+and then we should start seeing our demo
+
+231
+00:15:19,816 --> 00:15:22,354
+API, which you can see the HTML for there.
+
+232
+00:15:22,552 --> 00:15:24,530
+Let's open that up in a browser.
+
+233
+00:15:26,150 --> 00:15:30,306
+So here's our demo app, and what we have here is we're accessing
+
+234
+00:15:30,418 --> 00:15:33,970
+the app through ingress, through HTTP route
+
+235
+00:15:34,050 --> 00:15:37,542
+from the outside of the cluster, and we have the demo app
+
+236
+00:15:37,596 --> 00:15:40,890
+talking to its redis on the inside of the service
+
+237
+00:15:40,960 --> 00:15:44,406
+mesh. So it's pretty straightforward, it's simple. The code's
+
+238
+00:15:44,438 --> 00:15:47,546
+here if you're interested in kind of doing the same demo yourself, but you
+
+239
+00:15:47,568 --> 00:15:51,046
+increment a counter and then it persists in redis.
+
+240
+00:15:51,078 --> 00:15:54,718
+So you can refresh, you can reset it, you can have it automatically update it,
+
+241
+00:15:54,804 --> 00:15:58,286
+et cetera. So that is a
+
+242
+00:15:58,308 --> 00:16:02,234
+very simple way to kind of get ingress traffic
+
+243
+00:16:02,282 --> 00:16:05,090
+into your Kumas service mesh using gateway API.
+
+244
+00:16:06,790 --> 00:16:10,094
+All right, so now that you've seen just the basics
+
+245
+00:16:10,142 --> 00:16:14,510
+of using HTTP route and gateway, let's go a little bit beyond HTTP.
+
+246
+00:16:14,590 --> 00:16:18,118
+Let's talk about the other APIs available,
+
+247
+00:16:18,284 --> 00:16:21,080
+and we'll also talk about what's coming next.
+
+248
+00:16:23,530 --> 00:16:26,854
+So we'll do just a brief overview of what
+
+249
+00:16:26,892 --> 00:16:31,322
+other APIs are available today. Now these APIs are in Alpha currently,
+
+250
+00:16:31,456 --> 00:16:34,730
+whereas HTTP route is in beta and on its way to Ga.
+
+251
+00:16:35,150 --> 00:16:39,098
+We have GRPC support which is in Alpha currently,
+
+252
+00:16:39,184 --> 00:16:42,446
+and we arent building conformance tests and stuff like this to move it on its
+
+253
+00:16:42,468 --> 00:16:45,614
+way to beta. As you can see there's parent
+
+254
+00:16:45,652 --> 00:16:48,894
+refs and rules similar to what we saw with the HTTP route, but also a
+
+255
+00:16:48,932 --> 00:16:52,202
+hostname TLS route
+
+256
+00:16:52,266 --> 00:16:55,854
+which is similar in spec to GRPC route but meant
+
+257
+00:16:55,902 --> 00:16:59,938
+for TLS communications, and also takes a
+
+258
+00:16:59,944 --> 00:17:03,902
+hostname UDP route
+
+259
+00:17:03,966 --> 00:17:07,162
+which can be used for UDP traffic, very basic,
+
+260
+00:17:07,246 --> 00:17:10,294
+as well as TCP route which is similar and is
+
+261
+00:17:10,332 --> 00:17:13,826
+used for TCP traffic. These are part of our layer
+
+262
+00:17:13,858 --> 00:17:16,440
+four story, which I'll touch on a little bit later.
+
+263
+00:17:17,690 --> 00:17:21,350
+And then we also have one that isn't a route called reference arent.
+
+264
+00:17:21,510 --> 00:17:25,034
+This is a particularly powerful API that is actually in
+
+265
+00:17:25,072 --> 00:17:28,746
+beta today, and it
+
+266
+00:17:28,768 --> 00:17:32,566
+gives you the capability of granting a reference from another namespace.
+
+267
+00:17:32,598 --> 00:17:36,090
+So as you can see from the diagram here, if a gateway
+
+268
+00:17:36,250 --> 00:17:39,914
+needs access to a secret in another namespace, you can provide a reference
+
+269
+00:17:39,962 --> 00:17:43,954
+grant which will say yes, that is allowed from the
+
+270
+00:17:44,152 --> 00:17:47,474
+referent namespace. This is
+
+271
+00:17:47,512 --> 00:17:51,570
+actually getting some traction in other places in upstream Kubernetes
+
+272
+00:17:52,470 --> 00:17:55,974
+including Sig storage and stuff like that. So you may actually see this
+
+273
+00:17:56,012 --> 00:17:59,826
+become a more General Kubernetes API as opposed to a Gateway API
+
+274
+00:18:00,018 --> 00:18:03,654
+resource soon has. There's a lot of interest in this
+
+275
+00:18:03,692 --> 00:18:04,710
+functionality.
+
+276
+00:18:07,050 --> 00:18:10,294
+So let's talk about what's coming down the pipeline,
+
+277
+00:18:10,342 --> 00:18:13,830
+what's coming next in the project. There's a lot of things going on. Gateway API
+
+278
+00:18:13,910 --> 00:18:17,206
+is one of the most active
+
+279
+00:18:17,398 --> 00:18:19,850
+subprojects within SiG network.
+
+280
+00:18:21,470 --> 00:18:25,182
+General availability GA is kind of the big next thing.
+
+281
+00:18:25,316 --> 00:18:29,518
+We don't have a specific due date. We'd like it to go out this year.
+
+282
+00:18:29,684 --> 00:18:33,630
+We expect that we'll have three APIs in version one, gateway class,
+
+283
+00:18:33,700 --> 00:18:37,746
+gateway and route, which are what we covered in the demo. Today we
+
+284
+00:18:37,768 --> 00:18:41,694
+are tracking this as the road to Ga and via
+
+285
+00:18:41,742 --> 00:18:45,238
+a milestone called one point. If you're interested to
+
+286
+00:18:45,244 --> 00:18:48,006
+go take a look at kind of how things are flowing as we kind of
+
+287
+00:18:48,028 --> 00:18:50,070
+move towards general availability.
+
+288
+00:18:53,130 --> 00:18:55,814
+We also have the gamma project,
+
+289
+00:18:56,012 --> 00:18:59,862
+which stands gamma stands for Gateway API for mesh management
+
+290
+00:18:59,926 --> 00:19:03,194
+Administration. So the idea here is
+
+291
+00:19:03,232 --> 00:19:07,114
+that we have service meshes interested in using
+
+292
+00:19:07,152 --> 00:19:11,306
+gateway API resources like HTTP route in
+
+293
+00:19:11,328 --> 00:19:14,746
+a service mesh context. For east and west
+
+294
+00:19:14,778 --> 00:19:18,314
+traffic. We have several contributors, including council Istio,
+
+295
+00:19:18,442 --> 00:19:21,646
+obviously Kuma and Kong Mesh Linkerd. There are others. These are
+
+296
+00:19:21,668 --> 00:19:23,860
+just the ones I got a hold of for the talk,
+
+297
+00:19:24,630 --> 00:19:28,334
+and we are currently in the early stages
+
+298
+00:19:28,382 --> 00:19:31,982
+of getting some conformance around how we would use HTTP
+
+299
+00:19:32,046 --> 00:19:35,454
+route. If you're interested in using some of these resources,
+
+300
+00:19:35,502 --> 00:19:39,186
+like in using Gateway API in a service mess context, we would
+
+301
+00:19:39,208 --> 00:19:42,486
+invite you to join. And I'll have a community page coming up here with some
+
+302
+00:19:42,508 --> 00:19:46,006
+information about where to go to join the community and kind of join in
+
+303
+00:19:46,028 --> 00:19:46,760
+on this.
+
+304
+00:19:49,870 --> 00:19:53,274
+Another project upcoming which is relevant to GA is
+
+305
+00:19:53,312 --> 00:19:56,966
+conformance profiles. So we have a conformance test suite
+
+306
+00:19:56,998 --> 00:20:00,554
+today, but you opt into it
+
+307
+00:20:00,592 --> 00:20:03,774
+as an implementer and it's kind of hard to keep
+
+308
+00:20:03,812 --> 00:20:07,246
+track of who's implementing what and who's running what tests. So the
+
+309
+00:20:07,268 --> 00:20:10,686
+conformance profiles project has high level testing profiles like
+
+310
+00:20:10,708 --> 00:20:14,634
+you can subscribe to. I do HTTP, I do GrPC,
+
+311
+00:20:14,682 --> 00:20:18,158
+UDP, TCP. Eventually we'll have mesh, et cetera.
+
+312
+00:20:18,334 --> 00:20:21,874
+And then there's a test suite that you can basically plug your profile and say,
+
+313
+00:20:21,912 --> 00:20:26,098
+I'm going to subscribe to, for instance, HTTP. You'll get
+
+314
+00:20:26,184 --> 00:20:29,230
+the test suite to run with automatic reporting, and then there's a
+
+315
+00:20:29,240 --> 00:20:32,834
+certification process where you can send your report back to Gateway API.
+
+316
+00:20:32,962 --> 00:20:36,306
+So on the right here you can kind of see the pipeline. Kong Kuma,
+
+317
+00:20:36,338 --> 00:20:40,042
+istio, any number of implementations can pick
+
+318
+00:20:40,096 --> 00:20:43,622
+their profiles, run the test suite, get certified,
+
+319
+00:20:43,686 --> 00:20:47,098
+and then produce a conformance report automatically, which they can send back to
+
+320
+00:20:47,104 --> 00:20:50,506
+the project. And this gives us the
+
+321
+00:20:50,528 --> 00:20:53,830
+ability to see what people are actually using in a
+
+322
+00:20:53,840 --> 00:20:56,926
+way that we couldn't really do well with Ingress. So in
+
+323
+00:20:56,948 --> 00:21:01,022
+addition to the conformance levels, which kind of allow us to track things that
+
+324
+00:21:01,076 --> 00:21:04,754
+maybe not every implementation is doing, we can now track who's actually
+
+325
+00:21:04,872 --> 00:21:08,158
+running tests for those and make sure that we're
+
+326
+00:21:08,174 --> 00:21:11,170
+kind of keeping track of what's being used in the ecosystem.
+
+327
+00:21:11,750 --> 00:21:14,890
+This is a requirement for GA.
+
+328
+00:21:14,990 --> 00:21:18,802
+It's currently in a provisional state and it's
+
+329
+00:21:18,946 --> 00:21:20,630
+under active development.
+
+330
+00:21:24,090 --> 00:21:27,910
+We have a lot of other things coming up in the experimental
+
+331
+00:21:29,150 --> 00:21:33,142
+phase. Right now we have layer four support, which is something that I'm personally actively
+
+332
+00:21:33,206 --> 00:21:36,714
+working towards getting into beta. Hopefully this
+
+333
+00:21:36,752 --> 00:21:40,394
+year we have policy attachment. So with
+
+334
+00:21:40,432 --> 00:21:43,738
+all of these APIs that we showed, we have kind of the ability to
+
+335
+00:21:43,744 --> 00:21:47,374
+set up routes and stuff like that. Policy around those routes is
+
+336
+00:21:47,412 --> 00:21:50,814
+something that we want to be able to provide some prescription for, even though that
+
+337
+00:21:50,852 --> 00:21:54,706
+does often get into implementation specific territory. So we have a
+
+338
+00:21:54,728 --> 00:21:57,822
+project just for talking about policy attachment.
+
+339
+00:21:57,886 --> 00:22:01,822
+We have a policy attachment resource template,
+
+340
+00:22:01,966 --> 00:22:05,106
+and we're working towards basically providing the documentation to
+
+341
+00:22:05,128 --> 00:22:08,786
+show people how to do policy attachment for their routes.
+
+342
+00:22:08,978 --> 00:22:11,990
+We also have multicluster services, which is a new project.
+
+343
+00:22:12,060 --> 00:22:16,066
+It's up and coming path redirects and rewrites,
+
+344
+00:22:16,258 --> 00:22:19,990
+which is currently an experimental and should be something
+
+345
+00:22:20,060 --> 00:22:23,180
+that is kind of on its way to standard, hopefully soon.
+
+346
+00:22:23,550 --> 00:22:26,954
+And then in the provisional section, which is kind of newer stuff, or just stuff
+
+347
+00:22:26,992 --> 00:22:30,666
+that isn't has teased out yet. We're working on
+
+348
+00:22:30,768 --> 00:22:34,490
+timeouts, which historically had been something we'd kind of pushed into
+
+349
+00:22:34,560 --> 00:22:38,250
+policy attachment territory. But now we're trying to do some explicit timeouts.
+
+350
+00:22:38,330 --> 00:22:40,734
+So we're experimenting with that. We're kind of looking at how that will look.
+
+351
+00:22:40,772 --> 00:22:44,190
+It's a little hard to do that well
+
+352
+00:22:44,260 --> 00:22:47,934
+across every implementation, but we're giving it a go. We also have a new effort
+
+353
+00:22:47,982 --> 00:22:51,262
+coming up from some members of the community for egress traffic,
+
+354
+00:22:51,406 --> 00:22:52,980
+which is kind of a big thing.
+
+355
+00:22:55,910 --> 00:22:59,366
+So that's kind of a roadmap of what's going on. There's definitely other
+
+356
+00:22:59,388 --> 00:23:03,126
+things going on that I didn't cover. But way down the road
+
+357
+00:23:03,228 --> 00:23:06,454
+one of the things that we're kind of interested in doing is being
+
+358
+00:23:06,492 --> 00:23:10,046
+a replacement for Kubernetes service. So Kubernetes
+
+359
+00:23:10,098 --> 00:23:13,702
+service has kind of become an overloaded API
+
+360
+00:23:13,766 --> 00:23:17,194
+and new requests come in all the time for new functionality on it. And in
+
+361
+00:23:17,232 --> 00:23:21,206
+general in upstream Kubernetes, we're not really in favor of continuing
+
+362
+00:23:21,238 --> 00:23:25,230
+to grow its scope. We want to keep its scope clean because
+
+363
+00:23:25,300 --> 00:23:28,682
+Gateway API has multiple APIs and just a wider berth.
+
+364
+00:23:28,746 --> 00:23:32,382
+It's kind of the place where we're starting to see where we might
+
+365
+00:23:32,436 --> 00:23:35,962
+put more of this type of functionality. For instance,
+
+366
+00:23:36,026 --> 00:23:38,802
+one of the big things we call it kind of like a North Star issue
+
+367
+00:23:38,856 --> 00:23:42,674
+is that we'd really like to see gateway itself be
+
+368
+00:23:42,712 --> 00:23:46,374
+a possible replacement for load balancer type services in the future.
+
+369
+00:23:46,572 --> 00:23:50,034
+Today, many implementations of Gateway
+
+370
+00:23:50,082 --> 00:23:54,150
+API coincidentally or subsequently use service
+
+371
+00:23:54,220 --> 00:23:57,334
+type load balancer under the hood to actually get traffic to
+
+372
+00:23:57,372 --> 00:24:01,238
+their proxy. In the future, we'd like to eliminate
+
+373
+00:24:01,254 --> 00:24:05,206
+the need for that. So you might see a lot more load
+
+374
+00:24:05,238 --> 00:24:08,538
+balancing functionality, things that have been proposed for service kind of
+
+375
+00:24:08,544 --> 00:24:10,460
+heading into Gateway API in the future.
+
+376
+00:24:11,710 --> 00:24:14,958
+So let's talk about what's next for you. If you want to
+
+377
+00:24:14,964 --> 00:24:18,254
+get involved and kind of learn more
+
+378
+00:24:18,292 --> 00:24:21,790
+about Gateway API, first things first, you can just
+
+379
+00:24:21,860 --> 00:24:25,330
+try out an implementation. We have 20 plus implementations and
+
+380
+00:24:25,400 --> 00:24:29,106
+there's like three integrations which are all available on our
+
+381
+00:24:29,128 --> 00:24:32,734
+website, gatewayapi sigs k IO
+
+382
+00:24:32,862 --> 00:24:36,534
+implementations. Go find the one that suits you, set it up,
+
+383
+00:24:36,572 --> 00:24:39,878
+try it out. Obviously I kind of covered this because these are
+
+384
+00:24:39,884 --> 00:24:44,246
+the ones that I've contributed to. But Kong's implementations include the
+
+385
+00:24:44,428 --> 00:24:47,926
+Kubernetes ingress controller, Kuma Kong mesh which we
+
+386
+00:24:47,948 --> 00:24:51,226
+covered, and the gateway operator which there are links here for as well.
+
+387
+00:24:51,248 --> 00:24:54,426
+And you can get started and try, but creating a gateway and setting up
+
+388
+00:24:54,448 --> 00:24:55,290
+some routes,
+
+389
+00:24:59,470 --> 00:25:03,706
+there are multiple subprojects within Gateway API.
+
+390
+00:25:03,818 --> 00:25:07,402
+We covered Gamma a little bit. That's for the service mesh
+
+391
+00:25:07,466 --> 00:25:10,842
+use case. It is in an early maturity
+
+392
+00:25:10,906 --> 00:25:14,494
+state. And again, if you're interested in kind of using these kind of routes
+
+393
+00:25:14,542 --> 00:25:18,178
+or having like a standard upstream Kubernetes API set for
+
+394
+00:25:18,264 --> 00:25:21,650
+service mesh, join the gamma project hit us up on our website
+
+395
+00:25:21,720 --> 00:25:25,726
+under contributing Gamma. Join our meetings and we'll
+
+396
+00:25:25,918 --> 00:25:29,750
+be happy to have you and help us grow this and develop this
+
+397
+00:25:29,820 --> 00:25:32,550
+part, this sub project. Within Gateway API,
+
+398
+00:25:33,210 --> 00:25:36,694
+there's ingress to Gateway. So we understood there would
+
+399
+00:25:36,732 --> 00:25:40,234
+probably be a general need from the end
+
+400
+00:25:40,272 --> 00:25:44,166
+users to be able to take an existing ingress
+
+401
+00:25:44,358 --> 00:25:48,122
+resource and kind of convert that into Gateway API. So we have a tool
+
+402
+00:25:48,176 --> 00:25:51,450
+for that under Kubernetes ingress to Gateway
+
+403
+00:25:51,950 --> 00:25:55,514
+right now. It is capable of doing some of the basics.
+
+404
+00:25:55,642 --> 00:25:58,958
+We want to be able to add things like annotation support and
+
+405
+00:25:58,964 --> 00:26:02,158
+stuff like that. That's in scope, but it's still kind of early in
+
+406
+00:26:02,164 --> 00:26:05,234
+the project, so if you arent interested, we'd love to have you join us and
+
+407
+00:26:05,272 --> 00:26:08,702
+help us develop that and get it to where it's kind of a really robust
+
+408
+00:26:08,766 --> 00:26:11,902
+conversion tool for a variety of different annotations
+
+409
+00:26:11,966 --> 00:26:15,490
+and extensions. It's written in go,
+
+410
+00:26:15,560 --> 00:26:18,710
+you can use it as a command line tool or as a go library.
+
+411
+00:26:19,690 --> 00:26:23,190
+And then we also have a project called Bleaks which
+
+412
+00:26:23,260 --> 00:26:26,822
+is started at Kong as an experimental layer four
+
+413
+00:26:26,876 --> 00:26:30,710
+load balancer written in Rust and
+
+414
+00:26:30,860 --> 00:26:34,842
+using EVPF. It is being
+
+415
+00:26:34,896 --> 00:26:39,462
+donated to Kubernetes Sigs as a testing and reference implementation,
+
+416
+00:26:39,526 --> 00:26:42,846
+something that we're going to use in our CI, and also something that's helping to
+
+417
+00:26:42,868 --> 00:26:46,906
+drive forward layer four support which had traditionally
+
+418
+00:26:46,938 --> 00:26:50,350
+or historically been kind of lagging because of lack of people coming together
+
+419
+00:26:50,420 --> 00:26:53,818
+and being able to help build the conformance test for. So this project helps
+
+420
+00:26:53,834 --> 00:26:57,102
+with that. Plus it's something that we're going to plug into our CI for automated
+
+421
+00:26:57,166 --> 00:27:00,974
+testing and also the control plane
+
+422
+00:27:01,022 --> 00:27:04,954
+written in Golang eventually is what we hope to be like a reference implementation
+
+423
+00:27:05,022 --> 00:27:08,738
+for people building rather building controllers
+
+424
+00:27:08,754 --> 00:27:12,630
+and stuff like that to kind of see how you would implement gateway API.
+
+425
+00:27:14,330 --> 00:27:17,538
+So yeah, those are some of the sub projects.
+
+426
+00:27:17,714 --> 00:27:21,066
+There's a lot of things going on in the ecosystem. We would love to have
+
+427
+00:27:21,088 --> 00:27:24,550
+you join our community. Our website is Gatewayapi
+
+428
+00:27:24,630 --> 00:27:27,930
+sigs caves IO. We have lots of meetings,
+
+429
+00:27:28,590 --> 00:27:31,898
+the main one, which is all you have to go to if you really just
+
+430
+00:27:31,904 --> 00:27:35,166
+kind of want to know what's going on. It happens every Monday and you can
+
+431
+00:27:35,188 --> 00:27:38,846
+find that on our website under community. We have our gamma meetings on
+
+432
+00:27:38,868 --> 00:27:42,318
+Tuesday and we have a code jam meeting, which is kind
+
+433
+00:27:42,324 --> 00:27:45,486
+of like a for fun pairing meeting that we do on Fridays. If you're
+
+434
+00:27:45,508 --> 00:27:48,878
+looking for a really lightweight place to kind of jump in and just see what's
+
+435
+00:27:48,894 --> 00:27:52,306
+going on, that might be a good place for you too. Please feel free
+
+436
+00:27:52,328 --> 00:27:56,318
+to join our discussion boards. We use GitHub discussions for our forums
+
+437
+00:27:56,494 --> 00:28:00,342
+and catch us on Kubernetes Slack. So these
+
+438
+00:28:00,396 --> 00:28:03,494
+are my co maintainers, Rob Scott and Nick Young.
+
+439
+00:28:03,692 --> 00:28:06,774
+We are all available on Kubernetes Slack. We would love to hear from you.
+
+440
+00:28:06,812 --> 00:28:10,774
+Please feel free to reach out to us. The main channel for us is
+
+441
+00:28:10,812 --> 00:28:14,374
+Sig network gateway API and you can reach
+
+442
+00:28:14,412 --> 00:28:18,326
+us there. Thank you very much. So I
+
+443
+00:28:18,348 --> 00:28:21,998
+hope that you enjoyed this and hope that we'll see you in the
+
+444
+00:28:22,004 --> 00:28:25,566
+Kubernetes community. Also enjoy the rest of the conference and have
+
+445
+00:28:25,588 --> 00:28:25,980
+a great day.
+

@@ -1,0 +1,1552 @@
+1
+00:00:34,450 --> 00:00:38,070
+Hello everyone, I'm Shai Almog. Today we'll talk about
+
+2
+00:00:38,140 --> 00:00:42,402
+debugging at scale in production, specifically about kubernetes
+
+3
+00:00:42,466 --> 00:00:46,114
+debugging. I'm assuming everyone here knows the basics
+
+4
+00:00:46,162 --> 00:00:49,882
+of kubernetes, so I will dive right into a basic
+
+5
+00:00:49,986 --> 00:00:54,222
+problem description. But first, let me say a couple of things about me.
+
+6
+00:00:54,356 --> 00:00:58,218
+I wrote a few books, including one about debugging, which covers
+
+7
+00:00:58,314 --> 00:01:01,886
+all of the topics we'll discuss here. I've worked in
+
+8
+00:01:01,908 --> 00:01:04,610
+this industry for decades, in many companies,
+
+9
+00:01:04,760 --> 00:01:08,846
+and as a consultant. You can contact me over my socials
+
+10
+00:01:08,878 --> 00:01:12,334
+listed here and follow me on LinkedIn, Twitter,
+
+11
+00:01:12,462 --> 00:01:16,162
+etc. My dms are open, but please try just
+
+12
+00:01:16,216 --> 00:01:19,846
+tweeting at me and if I don't answer, I just missed it with
+
+13
+00:01:19,868 --> 00:01:23,350
+all the flood messages I keep getting, so please try again.
+
+14
+00:01:23,500 --> 00:01:26,934
+Also, I'm on mastodone, et cetera, so you can reach
+
+15
+00:01:26,972 --> 00:01:30,902
+me there too. This is my Aprils book titled
+
+16
+00:01:30,966 --> 00:01:34,474
+Practical Debugging at Scale. I've put a lot of work into
+
+17
+00:01:34,512 --> 00:01:38,202
+this book and I can guarantee there's nothing out there like
+
+18
+00:01:38,256 --> 00:01:40,702
+it. I hope you check it out.
+
+19
+00:01:40,836 --> 00:01:44,526
+Everything in today's talk is there, and a
+
+20
+00:01:44,548 --> 00:01:47,966
+lot more. I gave a version of this talk in
+
+21
+00:01:47,988 --> 00:01:51,870
+the past. After I was done. They generated this absolutely
+
+22
+00:01:52,020 --> 00:01:54,830
+spectacular mind map of my presentation.
+
+23
+00:01:55,170 --> 00:01:58,786
+This is about an older version of this talk, but I
+
+24
+00:01:58,808 --> 00:02:02,514
+still like this a lot. I wish I could draw stuff like this. I still
+
+25
+00:02:02,552 --> 00:02:05,380
+have it because it's pretty close to the new talk.
+
+26
+00:02:05,770 --> 00:02:09,602
+One of the first things I hear when I talk to some developers
+
+27
+00:02:09,666 --> 00:02:12,642
+is why debug production?
+
+28
+00:02:12,786 --> 00:02:16,758
+Isn't that the problem of the DevOps team?
+
+29
+00:02:16,924 --> 00:02:20,666
+It's like they're a part of a completely different
+
+30
+00:02:20,768 --> 00:02:24,474
+universe. We write the software and they
+
+31
+00:02:24,512 --> 00:02:28,310
+make it run. We live in silos where production
+
+32
+00:02:28,390 --> 00:02:32,298
+isn't our problem. It's that other monkey
+
+33
+00:02:32,394 --> 00:02:35,360
+that's responsible for that, not me.
+
+34
+00:02:36,370 --> 00:02:39,722
+What we're building here isn't perfectly
+
+35
+00:02:39,786 --> 00:02:43,282
+running unit tests. It's a product that's running
+
+36
+00:02:43,336 --> 00:02:46,290
+in, you guessed it, production.
+
+37
+00:02:46,630 --> 00:02:50,190
+The thing is that when we say failure,
+
+38
+00:02:50,350 --> 00:02:53,906
+we aren't talking about a crash. This is one
+
+39
+00:02:53,928 --> 00:02:58,194
+of those things that we seem to associate with production bugs,
+
+40
+00:02:58,322 --> 00:03:01,400
+even though that's a small part of the problem.
+
+41
+00:03:02,010 --> 00:03:05,542
+When a debug gets into production, it's often the
+
+42
+00:03:05,596 --> 00:03:09,130
+worst kind of debug, only happens to
+
+43
+00:03:09,200 --> 00:03:13,034
+user X when the moonlight hits the water
+
+44
+00:03:13,232 --> 00:03:16,730
+at 37.5 degrees on a Tuesday.
+
+45
+00:03:17,790 --> 00:03:21,870
+To make it worse, I don't think I'm breaking any news by
+
+46
+00:03:21,940 --> 00:03:25,870
+saying that kubernetes debugging is hard. I'd argue
+
+47
+00:03:26,210 --> 00:03:29,518
+this is an understatement, at least for some of
+
+48
+00:03:29,524 --> 00:03:33,594
+the problems we run into. We will just use exec
+
+49
+00:03:33,642 --> 00:03:37,570
+to log in to a container and see what the hell is going on.
+
+50
+00:03:37,720 --> 00:03:41,038
+This is like working with my local shell,
+
+51
+00:03:41,214 --> 00:03:44,580
+which is pretty great, but it has some problems.
+
+52
+00:03:45,030 --> 00:03:47,970
+If I'm debugging a local install of kubernetes,
+
+53
+00:03:48,050 --> 00:03:51,590
+that's okay, but even if I'm tracking an issue
+
+54
+00:03:51,660 --> 00:03:55,382
+on staging, I don't want to disrupt other developers working
+
+55
+00:03:55,436 --> 00:03:59,286
+on this. I also want to use the best practices
+
+56
+00:03:59,398 --> 00:04:02,934
+because to me staging is really a grand
+
+57
+00:04:02,982 --> 00:04:06,346
+rehearsal to production. So we want to make
+
+58
+00:04:06,448 --> 00:04:09,994
+the best practices we have there and
+
+59
+00:04:10,192 --> 00:04:13,502
+take the best practices we have there and use them
+
+60
+00:04:13,556 --> 00:04:17,262
+as much as possible. The most obvious problem
+
+61
+00:04:17,316 --> 00:04:21,134
+with exec is that when we log into a
+
+62
+00:04:21,172 --> 00:04:25,074
+server we don't have various tools. If I want
+
+63
+00:04:25,112 --> 00:04:28,706
+a particular tool, I need to install it. This can work to
+
+64
+00:04:28,728 --> 00:04:32,462
+some degree, but it creates baggage dependencies that I fetch
+
+65
+00:04:32,526 --> 00:04:36,134
+might break the processes running on the container and
+
+66
+00:04:36,172 --> 00:04:39,394
+disrupt everything. That might be okay in staging,
+
+67
+00:04:39,442 --> 00:04:42,920
+but in production we really should never do that.
+
+68
+00:04:43,290 --> 00:04:46,358
+This is if the containers is even something
+
+69
+00:04:46,444 --> 00:04:50,662
+I can physically work with. It can be a skeleton containing
+
+70
+00:04:50,726 --> 00:04:54,714
+nothing to keep it as minimal as possible. That's a
+
+71
+00:04:54,752 --> 00:04:58,234
+great practice to reserve resources, but it makes it
+
+72
+00:04:58,272 --> 00:05:01,710
+pretty hard for an old Unix guy like me
+
+73
+00:05:01,860 --> 00:05:05,630
+to track an issue. How can I run stack twice now?
+
+74
+00:05:05,700 --> 00:05:09,790
+S trace now when a containers crashes
+
+75
+00:05:10,130 --> 00:05:14,066
+I have nothing. How can I log to that and
+
+76
+00:05:14,168 --> 00:05:18,050
+work from there? This is problematic.
+
+77
+00:05:18,390 --> 00:05:21,682
+We can use Kubectl debug in much
+
+78
+00:05:21,736 --> 00:05:24,906
+the same way as we use Kubectl exec.
+
+79
+00:05:25,038 --> 00:05:28,774
+It effectively opens for us a command prompt on a
+
+80
+00:05:28,812 --> 00:05:32,550
+container, but it isn't our container.
+
+81
+00:05:32,970 --> 00:05:36,674
+The ephemeral container is the kaiser soze
+
+82
+00:05:36,722 --> 00:05:40,886
+of containers. It wasn't invented by Kubectl Debug.
+
+83
+00:05:40,998 --> 00:05:44,794
+We had them around before, but they were a pain to deal with.
+
+84
+00:05:44,912 --> 00:05:48,582
+Kubectl Debug makes it easy to spin up a pod
+
+85
+00:05:48,646 --> 00:05:52,734
+next to our pod that lets us reproduce the issues and track the
+
+86
+00:05:52,772 --> 00:05:56,414
+problems. We can install and preinstall anything we
+
+87
+00:05:56,452 --> 00:05:59,594
+want. It will be gone completely once the pod
+
+88
+00:05:59,642 --> 00:06:03,282
+is destroyed. We can share process space and
+
+89
+00:06:03,336 --> 00:06:07,010
+file system with the pod, which means we can look into
+
+90
+00:06:07,080 --> 00:06:09,970
+a crashed container and see what happened there.
+
+91
+00:06:10,120 --> 00:06:13,742
+Since we're technically not inside the container,
+
+92
+00:06:13,886 --> 00:06:18,082
+we can peek without damaging. We can use various
+
+93
+00:06:18,146 --> 00:06:21,810
+base images which already have software
+
+94
+00:06:21,890 --> 00:06:25,334
+that we want pre installed. This makes
+
+95
+00:06:25,372 --> 00:06:27,922
+it easier for us to debug quickly.
+
+96
+00:06:28,076 --> 00:06:31,574
+We might be looking at a container running alpine,
+
+97
+00:06:31,702 --> 00:06:35,274
+but run Ubuntu on our own container when
+
+98
+00:06:35,312 --> 00:06:38,714
+I worked at lighter and we launched the coolkits project,
+
+99
+00:06:38,832 --> 00:06:42,046
+which was an uber container with everything you
+
+100
+00:06:42,068 --> 00:06:45,182
+might need to debug a container, you might find that
+
+101
+00:06:45,236 --> 00:06:48,686
+useful. So here's the first problem
+
+102
+00:06:48,788 --> 00:06:52,622
+we run into with a debugger. We can't just
+
+103
+00:06:52,756 --> 00:06:55,922
+start using it, we need to relaunch the app.
+
+104
+00:06:55,976 --> 00:07:00,082
+With debugging enabled, that means killing the existing process and running
+
+105
+00:07:00,136 --> 00:07:03,490
+it over again. That might not be something
+
+106
+00:07:03,560 --> 00:07:07,014
+you can just do. Furthermore, running in
+
+107
+00:07:07,052 --> 00:07:09,634
+this mode is a big security risk.
+
+108
+00:07:09,762 --> 00:07:13,314
+Notice I limit access to only the local server,
+
+109
+00:07:13,362 --> 00:07:17,042
+but still, it's a big risk. Leaving a remote
+
+110
+00:07:17,106 --> 00:07:21,114
+debugging port enabled in deployed server code is considered a
+
+111
+00:07:21,152 --> 00:07:24,662
+huge security vulnerability. If hackers can ride
+
+112
+00:07:24,726 --> 00:07:28,678
+a different vulnerability, they might be in a position to leverage
+
+113
+00:07:28,774 --> 00:07:32,222
+this from a local system. Still, if we
+
+114
+00:07:32,276 --> 00:07:35,694
+do this for a short period of time, this might not
+
+115
+00:07:35,732 --> 00:07:37,600
+be a big deal, right?
+
+116
+00:07:38,770 --> 00:07:42,522
+In a different window, I need to find the process id
+
+117
+00:07:42,596 --> 00:07:45,954
+for the application I just ran so I can
+
+118
+00:07:45,992 --> 00:07:49,614
+connect to it. I can now type it into the JDB
+
+119
+00:07:49,662 --> 00:07:53,810
+command, and now I'm connected with a debugging.
+
+120
+00:07:54,230 --> 00:07:58,070
+I can add a breakpoint using the stop at command.
+
+121
+00:07:58,970 --> 00:08:02,726
+Naturally, I need to know the name of the class and
+
+122
+00:08:02,748 --> 00:08:06,674
+the line number so I can set the breakpoint. Once stopped,
+
+123
+00:08:06,722 --> 00:08:10,502
+I can step over like I can with a regular debugger.
+
+124
+00:08:10,646 --> 00:08:14,234
+However, this is a pretty problematic notion on
+
+125
+00:08:14,272 --> 00:08:18,006
+multiple fronts. First off, I'm literally stopping
+
+126
+00:08:18,038 --> 00:08:22,318
+the threads accessing this application. That's probably not okay
+
+127
+00:08:22,404 --> 00:08:26,670
+on any container you have in the cloud. There are ways around
+
+128
+00:08:26,740 --> 00:08:30,254
+that, but they aren't trivial. The second problem is
+
+129
+00:08:30,292 --> 00:08:34,078
+different. I'm old and a Unix geek,
+
+130
+00:08:34,174 --> 00:08:38,066
+so people automatically assume I love the command line,
+
+131
+00:08:38,248 --> 00:08:41,694
+and I do to some degree, but I love Gui
+
+132
+00:08:41,742 --> 00:08:44,702
+more. And when I started programming,
+
+133
+00:08:44,766 --> 00:08:47,894
+there was no option. We didn't have ids on
+
+134
+00:08:47,932 --> 00:08:51,350
+a sinclair, an Apple two, or a PDP eleven.
+
+135
+00:08:51,850 --> 00:08:54,600
+But now that we have all of those things,
+
+136
+00:08:55,770 --> 00:08:59,162
+I don't want to go back. I programmed Java since
+
+137
+00:08:59,216 --> 00:09:02,810
+the first beta, and this was actually the first time
+
+138
+00:09:02,880 --> 00:09:06,854
+I used JDB. I'll use command
+
+139
+00:09:06,902 --> 00:09:11,194
+line tools when they give me power, but debugging
+
+140
+00:09:11,242 --> 00:09:15,550
+via commands, I just can't.
+
+141
+00:09:16,450 --> 00:09:19,630
+The obvious answer is JDWP.
+
+142
+00:09:20,130 --> 00:09:23,794
+We have a remote debug protocol that's supposed to
+
+143
+00:09:23,832 --> 00:09:26,100
+solve this exact problem, right?
+
+144
+00:09:27,110 --> 00:09:30,178
+But this is problematic. If we open
+
+145
+00:09:30,264 --> 00:09:34,194
+the server to remote access with JDWP, we might as
+
+146
+00:09:34,232 --> 00:09:38,150
+well hand the keys to the office to hackers.
+
+147
+00:09:38,490 --> 00:09:41,926
+A better approach is tunneling. During the age
+
+148
+00:09:41,948 --> 00:09:45,782
+of vps, we could just use Ssh tunneling like
+
+149
+00:09:45,836 --> 00:09:49,418
+this we'd connect to a remote host and forward
+
+150
+00:09:49,504 --> 00:09:52,614
+the port where the debugger was running locally.
+
+151
+00:09:52,742 --> 00:09:56,842
+Notice that in this sample I used port 9000 to
+
+152
+00:09:56,896 --> 00:10:00,118
+mislead hackers scanning port 5005,
+
+153
+00:10:00,224 --> 00:10:02,670
+although it wouldn't matter because it's ssh.
+
+154
+00:10:03,170 --> 00:10:07,198
+We can do the exact same thing with Kubernetes using the port forward
+
+155
+00:10:07,284 --> 00:10:10,906
+command to redirect a remote JDWP
+
+156
+00:10:11,098 --> 00:10:14,426
+connection to localhost. Port forwarding
+
+157
+00:10:14,458 --> 00:10:18,386
+opens a secure tunnel between your machine and the remote machine on
+
+158
+00:10:18,408 --> 00:10:22,014
+the given port, so when I connect to localhost on the forwarded
+
+159
+00:10:22,062 --> 00:10:25,842
+port, it seamlessly and securely connects to the remote
+
+160
+00:10:25,906 --> 00:10:29,350
+machine. Once we do that, I can just
+
+161
+00:10:29,420 --> 00:10:33,094
+open Intellij idea and add a local configuration for
+
+162
+00:10:33,132 --> 00:10:36,742
+remote debugging, which already exists and is
+
+163
+00:10:36,796 --> 00:10:40,860
+pre configured with the defaults such as port 5005.
+
+164
+00:10:41,390 --> 00:10:45,100
+I can give the new run configuration a name
+
+165
+00:10:45,550 --> 00:10:49,580
+and we're ready to go with debugging the app.
+
+166
+00:10:50,290 --> 00:10:54,254
+Notice I'm debugging on localhost even though my
+
+167
+00:10:54,292 --> 00:10:58,410
+pod is remote. That's because I'm port forwarding
+
+168
+00:10:58,570 --> 00:11:02,400
+everything. I make sure the right
+
+169
+00:11:03,190 --> 00:11:06,738
+run configuration is selected, which it is.
+
+170
+00:11:06,904 --> 00:11:10,754
+We can now just press debug to instantly connect
+
+171
+00:11:10,952 --> 00:11:14,258
+to the running process once it is done.
+
+172
+00:11:14,424 --> 00:11:18,050
+This feels and acts like any debugger instance
+
+173
+00:11:18,130 --> 00:11:20,600
+launched from within the Ide.
+
+174
+00:11:21,370 --> 00:11:25,702
+I can set breakpoint and step
+
+175
+00:11:25,756 --> 00:11:29,642
+over and get this wonderful debug gui I'm pretty much used
+
+176
+00:11:29,696 --> 00:11:32,540
+to. This is perfect, right?
+
+177
+00:11:34,190 --> 00:11:37,786
+The first thing we saw when debugging was the
+
+178
+00:11:37,808 --> 00:11:41,470
+need to restart the process. That isn't practical production.
+
+179
+00:11:41,890 --> 00:11:45,422
+Unfortunately, we can't leave JDWP just
+
+180
+00:11:45,476 --> 00:11:48,110
+running to debug a real world project.
+
+181
+00:11:48,260 --> 00:11:51,962
+I usually say that JDWP isn't secure,
+
+182
+00:11:52,026 --> 00:11:55,298
+isn't secure, this isn't the case,
+
+183
+00:11:55,464 --> 00:11:58,974
+this isn't correct. It's a wide open door.
+
+184
+00:11:59,102 --> 00:12:01,780
+There's no security to speak of.
+
+185
+00:12:02,550 --> 00:12:06,322
+Then it's breakpoints they break. I heard a story years ago
+
+186
+00:12:06,376 --> 00:12:10,546
+about a guy who debugged a rail system and it literally fell into the ocean
+
+187
+00:12:10,658 --> 00:12:14,086
+while he was stopped on a breakpoint because he didn't get the
+
+188
+00:12:14,108 --> 00:12:17,486
+stop command. I don't know if that's an urban legend,
+
+189
+00:12:17,618 --> 00:12:22,170
+but it's totally plausible. Remote debugging APIs
+
+190
+00:12:22,590 --> 00:12:25,882
+are a stability risk. How many times
+
+191
+00:12:25,936 --> 00:12:30,086
+did a debug process crash on you? Imagine adding a
+
+192
+00:12:30,128 --> 00:12:33,530
+breakpoint condition that's too expensive or incorrect.
+
+193
+00:12:33,690 --> 00:12:37,866
+It might destroy your app in production. Just loading
+
+194
+00:12:37,898 --> 00:12:41,838
+the variables in the watch can cause unforeseen problems
+
+195
+00:12:41,924 --> 00:12:45,554
+in some cases, but this is the
+
+196
+00:12:45,592 --> 00:12:48,882
+absolute worst. Say your
+
+197
+00:12:48,936 --> 00:12:52,846
+app has a place where it takes user credentials
+
+198
+00:12:52,878 --> 00:12:56,790
+for login, maybe a third party library
+
+199
+00:12:57,130 --> 00:13:00,342
+you use does that. You can
+
+200
+00:13:00,396 --> 00:13:03,622
+still place a breakpoint there and
+
+201
+00:13:03,676 --> 00:13:07,422
+steal user login details.
+
+202
+00:13:07,586 --> 00:13:11,366
+Worse, you can elevate the permissions
+
+203
+00:13:11,558 --> 00:13:15,546
+of your own user account because everything
+
+204
+00:13:15,648 --> 00:13:19,290
+is writable. Just set a value of a variable.
+
+205
+00:13:20,210 --> 00:13:23,866
+This goes against privacy laws and is very damn
+
+206
+00:13:23,898 --> 00:13:28,122
+likely 60% of security breaches in organizations
+
+207
+00:13:28,186 --> 00:13:31,534
+happen because of an employee. There's often a
+
+208
+00:13:31,572 --> 00:13:34,994
+misconception of security that targets the
+
+209
+00:13:35,032 --> 00:13:38,930
+outside world only. This just
+
+210
+00:13:39,000 --> 00:13:43,666
+isn't true. This isn't the
+
+211
+00:13:43,688 --> 00:13:47,686
+big picture though. These are all problems
+
+212
+00:13:47,868 --> 00:13:51,526
+that we would potentially have when
+
+213
+00:13:51,628 --> 00:13:54,690
+running one server or our own hardware
+
+214
+00:13:54,770 --> 00:13:58,598
+connected to the Internet. Kubernetes brings
+
+215
+00:13:58,694 --> 00:14:02,874
+scale, and with scale we have additional problems that
+
+216
+00:14:02,912 --> 00:14:08,534
+we don't normally face. People complain
+
+217
+00:14:08,662 --> 00:14:12,574
+about debugging, multiple threads do
+
+218
+00:14:12,612 --> 00:14:16,478
+that, while some of the threads are in
+
+219
+00:14:16,564 --> 00:14:18,960
+the other side of the world.
+
+220
+00:14:19,810 --> 00:14:23,730
+So this is a typical Kubernetes high level architecture
+
+221
+00:14:25,030 --> 00:14:28,654
+then. Our code as developers is this tiny
+
+222
+00:14:28,702 --> 00:14:31,726
+area that isn't even covered by kubernetes.
+
+223
+00:14:31,918 --> 00:14:34,914
+We have this huge infrastructure to run our code,
+
+224
+00:14:35,032 --> 00:14:38,694
+but once it's running somewhere, and by somewhere I mean
+
+225
+00:14:38,732 --> 00:14:41,400
+literally I have no idea where,
+
+226
+00:14:41,930 --> 00:14:45,606
+then I'm on my own. Kubernetes will help with running it
+
+227
+00:14:45,628 --> 00:14:49,370
+and guarantees, but it won't help me debug the code
+
+228
+00:14:49,520 --> 00:14:53,500
+and adds a lot of layers between me and my code.
+
+229
+00:14:54,350 --> 00:14:57,994
+Observabilit is the new debugging, which I hope
+
+230
+00:14:58,032 --> 00:15:01,694
+is pretty obvious to most of us. But it has
+
+231
+00:15:01,732 --> 00:15:05,642
+many pitfalls and many limitations when compared
+
+232
+00:15:05,706 --> 00:15:09,770
+to real debugging. The cost of observability
+
+233
+00:15:09,930 --> 00:15:13,666
+is one
+
+234
+00:15:13,688 --> 00:15:16,420
+of the things that we were just starting to understand.
+
+235
+00:15:16,870 --> 00:15:20,450
+Logs alone can be 30% or more
+
+236
+00:15:20,520 --> 00:15:24,698
+of your total cloud spend. That's absolutely insane.
+
+237
+00:15:24,894 --> 00:15:27,682
+The cloud was supposed to reduce costs.
+
+238
+00:15:27,746 --> 00:15:31,890
+Instead the reverse is true. The most problematic
+
+239
+00:15:31,970 --> 00:15:35,782
+aspect is that most of the observability technology will work with
+
+240
+00:15:35,836 --> 00:15:39,354
+is geared towards ops and less towards r
+
+241
+00:15:39,392 --> 00:15:43,670
+and D. It might say that a particular endpoint is experiencing
+
+242
+00:15:43,750 --> 00:15:47,242
+issue, but it won't point at
+
+243
+00:15:47,296 --> 00:15:50,970
+a line of code or give us the means
+
+244
+00:15:51,040 --> 00:15:54,626
+to debug it. If we have a bug lock,
+
+245
+00:15:54,678 --> 00:15:58,222
+a specific user that sees wrong
+
+246
+00:15:58,276 --> 00:16:02,062
+information, that's common and can
+
+247
+00:16:02,116 --> 00:16:06,126
+happen because of problematic flushing of caches,
+
+248
+00:16:06,318 --> 00:16:09,220
+how do we debug something like that?
+
+249
+00:16:10,150 --> 00:16:15,454
+We need to create observability dashboards
+
+250
+00:16:15,502 --> 00:16:18,946
+to the r and D team, involvement in
+
+251
+00:16:18,968 --> 00:16:22,454
+the day to day observability tasks is a must.
+
+252
+00:16:22,652 --> 00:16:26,134
+Reading production logs shouldn't be segregated to
+
+253
+00:16:26,172 --> 00:16:29,750
+a separate team. I'm not saying that SRE
+
+254
+00:16:29,830 --> 00:16:33,590
+shouldn't exist. I'm saying that we need vertical teams
+
+255
+00:16:33,750 --> 00:16:38,380
+where the SRE is embedded within them.
+
+256
+00:16:38,990 --> 00:16:42,910
+We should shift in both directions and have a
+
+257
+00:16:42,980 --> 00:16:46,910
+wider scope of responsibilities to qualify
+
+258
+00:16:49,730 --> 00:16:51,870
+to quality and production.
+
+259
+00:16:53,030 --> 00:16:56,530
+Debugging shouldn't stop at the boundaries of
+
+260
+00:16:56,600 --> 00:16:59,998
+the CI process. Developer observability
+
+261
+00:17:00,094 --> 00:17:03,374
+stands for a new generation of tools geared
+
+262
+00:17:03,422 --> 00:17:07,286
+to bring observability changes to the developer community.
+
+263
+00:17:07,468 --> 00:17:11,110
+What makes them different is that they
+
+264
+00:17:11,180 --> 00:17:14,742
+offer source based solutions. That means we
+
+265
+00:17:14,796 --> 00:17:20,840
+work with developer terminologies like
+
+266
+00:17:21,370 --> 00:17:23,720
+line numbers and source code.
+
+267
+00:17:24,250 --> 00:17:27,210
+I'll demonstrate light run because I'm familiar with that,
+
+268
+00:17:27,280 --> 00:17:30,886
+but there are other tools in the market. I used to work for Lightran
+
+269
+00:17:30,918 --> 00:17:34,622
+and wrote a lot of what you'll see, but I no longer
+
+270
+00:17:34,756 --> 00:17:38,414
+work for them. There are plenty of other solutions in the market with
+
+271
+00:17:38,452 --> 00:17:41,694
+different degrees of functionality. I didn't compare them because it would
+
+272
+00:17:41,732 --> 00:17:44,658
+be futile. The market changes too quickly.
+
+273
+00:17:44,824 --> 00:17:48,194
+I hope you'll get a sense of what's possible thanks to this
+
+274
+00:17:48,232 --> 00:17:51,374
+demo. On the left side is intellij
+
+275
+00:17:51,422 --> 00:17:55,450
+idea, which is my favorite IDE. Some developer observability
+
+276
+00:17:55,550 --> 00:17:59,334
+tools integrate directly into the IDE, which is convenient to
+
+277
+00:17:59,372 --> 00:18:02,566
+developers as that's where we spend
+
+278
+00:18:02,668 --> 00:18:07,042
+our time. Other tools have web based interfaces, et cetera.
+
+279
+00:18:07,186 --> 00:18:10,806
+On the right side I have an application that counts
+
+280
+00:18:10,838 --> 00:18:14,554
+the prime numbers running on a remote server. We can see
+
+281
+00:18:14,592 --> 00:18:18,326
+the console of that demo. The application doesn't
+
+282
+00:18:18,358 --> 00:18:21,850
+print any logs as it does the counting,
+
+283
+00:18:21,930 --> 00:18:26,062
+which makes it hard to debug if something didn't work
+
+284
+00:18:26,116 --> 00:18:29,934
+there. In the side of the ide we
+
+285
+00:18:29,972 --> 00:18:33,930
+can see the currently running agents
+
+286
+00:18:34,100 --> 00:18:37,810
+which are the server instances. We also see
+
+287
+00:18:37,880 --> 00:18:41,474
+the tags above them. Tags let us apply an action to
+
+288
+00:18:41,512 --> 00:18:45,054
+a group of server processes. If we have 1000 servers,
+
+289
+00:18:45,102 --> 00:18:48,662
+we can assign the tag production to 500
+
+290
+00:18:48,716 --> 00:18:52,150
+of them and then perform an operation on all 500
+
+291
+00:18:52,300 --> 00:18:55,814
+by performing it on a tag. A server can
+
+292
+00:18:55,852 --> 00:18:59,254
+have multiple tag designations such as East Coast,
+
+293
+00:18:59,302 --> 00:19:03,126
+Ubuntu 20, Green, et cetera. This effectively
+
+294
+00:19:03,158 --> 00:19:06,940
+solves the scale problem typical debuggers have.
+
+295
+00:19:07,950 --> 00:19:11,814
+We can apply observability operations to multiple servers.
+
+296
+00:19:11,942 --> 00:19:15,214
+Here I have only one tag and one server process because
+
+297
+00:19:15,252 --> 00:19:18,318
+this is a demo and I didn't want to crowd it.
+
+298
+00:19:18,484 --> 00:19:21,694
+Another important aspect to notice is the
+
+299
+00:19:21,732 --> 00:19:25,546
+fact that we don't see the actual server.
+
+300
+00:19:25,738 --> 00:19:29,214
+This all goes to management servers,
+
+301
+00:19:29,262 --> 00:19:33,442
+so production can be segregated behind a
+
+302
+00:19:33,496 --> 00:19:37,014
+firewall and I don't have
+
+303
+00:19:37,052 --> 00:19:41,126
+direct access to the physical production server. This is important.
+
+304
+00:19:41,308 --> 00:19:44,950
+We don't want R and D developers to have actual access
+
+305
+00:19:45,020 --> 00:19:48,902
+to production. I can see that a server process is running.
+
+306
+00:19:49,036 --> 00:19:53,066
+I can get some information about it, but I have no direct line to the
+
+307
+00:19:53,088 --> 00:19:57,066
+server. I can't ssh in and I can't change anything in
+
+308
+00:19:57,088 --> 00:20:01,214
+it. I can add a new log by right
+
+309
+00:20:01,252 --> 00:20:04,990
+clicking a line and adding it. I ask it
+
+310
+00:20:05,060 --> 00:20:08,990
+to log the value of variable I and
+
+311
+00:20:09,140 --> 00:20:13,330
+it will just print it to the application logs.
+
+312
+00:20:13,670 --> 00:20:17,314
+This will fit in order with the other
+
+313
+00:20:17,352 --> 00:20:20,900
+logs, so if I have a
+
+314
+00:20:21,990 --> 00:20:25,266
+log in the code, my added log will appear as
+
+315
+00:20:25,288 --> 00:20:29,190
+if it was written in the code next to it. They will get
+
+316
+00:20:29,340 --> 00:20:32,690
+ingested into services like elastics seamlessly,
+
+317
+00:20:32,850 --> 00:20:36,934
+or you can pipe them locally to the IDE. So this
+
+318
+00:20:36,972 --> 00:20:40,666
+plays very nicely with existing observability while
+
+319
+00:20:40,768 --> 00:20:44,390
+solving the fact that traditional observabilit isn't
+
+320
+00:20:44,470 --> 00:20:48,202
+dynamic enough. The tools complement each other,
+
+321
+00:20:48,336 --> 00:20:52,442
+they don't replace one another. Notice I can include complex
+
+322
+00:20:52,506 --> 00:20:56,666
+expressions like method, invocations, et cetera, but Lightran
+
+323
+00:20:56,698 --> 00:20:59,534
+enforces them all to be read only.
+
+324
+00:20:59,732 --> 00:21:02,030
+Some developers,
+
+325
+00:21:06,470 --> 00:21:10,690
+some developer observability tools do that while others don't,
+
+326
+00:21:11,510 --> 00:21:15,342
+but the thing I want to focus on is this.
+
+327
+00:21:15,496 --> 00:21:19,026
+Notice the log took too much cpu and Litran
+
+328
+00:21:19,058 --> 00:21:23,046
+pauses logging for a bit so it won't destroy the
+
+329
+00:21:23,068 --> 00:21:26,278
+server performance. Logs are restored automatically a
+
+330
+00:21:26,284 --> 00:21:29,910
+bit later when we're sure cpu isn't depleted.
+
+331
+00:21:30,070 --> 00:21:33,766
+Snapshots are breakpoints that don't stop. They include
+
+332
+00:21:33,798 --> 00:21:37,402
+the stack, the variable values, and all the stuff we need.
+
+333
+00:21:37,536 --> 00:21:40,874
+We can use conditions on snapshots, on logs, and on
+
+334
+00:21:40,912 --> 00:21:44,654
+metrics, just like we can in a regular debugger. With a
+
+335
+00:21:44,692 --> 00:21:48,654
+conditional breakpoint, we can apply everything to a tag which
+
+336
+00:21:48,692 --> 00:21:52,494
+will place it in multiple servers at once. We can then
+
+337
+00:21:52,532 --> 00:21:56,174
+inspect the resulting data like we would any breakpoint.
+
+338
+00:21:56,302 --> 00:21:59,842
+We can click on methods and view variables. We can step
+
+339
+00:21:59,896 --> 00:22:03,326
+over, but our app will never get stuck.
+
+340
+00:22:03,518 --> 00:22:06,786
+The demo was a bit simplistic. Here is
+
+341
+00:22:06,808 --> 00:22:10,534
+a different demo that's a bit more elaborate. In this
+
+342
+00:22:10,572 --> 00:22:14,294
+demo I will add a new snapshot, and in it I have an
+
+343
+00:22:14,332 --> 00:22:17,894
+option to define quite a lot of things. I won't
+
+344
+00:22:17,942 --> 00:22:21,846
+even discuss the advanced version of this dialog in this session,
+
+345
+00:22:21,958 --> 00:22:25,754
+but I will add a condition for the
+
+346
+00:22:25,792 --> 00:22:29,830
+snapshot. This is a really trivial
+
+347
+00:22:29,910 --> 00:22:33,486
+condition. We already have a simple security
+
+348
+00:22:33,588 --> 00:22:37,998
+utility class that I can use to query the current user id,
+
+349
+00:22:38,164 --> 00:22:41,386
+so I just make use of that and compare the response
+
+350
+00:22:41,418 --> 00:22:45,230
+to the id of the user that's experiencing a problem.
+
+351
+00:22:45,380 --> 00:22:48,690
+Notice I use the fully qualified name of the class.
+
+352
+00:22:48,840 --> 00:22:53,074
+I could have just written a security and
+
+353
+00:22:53,192 --> 00:22:56,994
+it's very possible it would have worked, but it isn't
+
+354
+00:22:57,042 --> 00:23:00,198
+guaranteed names can clash on the agent,
+
+355
+00:23:00,284 --> 00:23:04,326
+and the agent side isn't aware of all the things we have in the
+
+356
+00:23:04,348 --> 00:23:08,102
+iDe. As such, it's often a good practice
+
+357
+00:23:08,166 --> 00:23:09,580
+to be more specific.
+
+358
+00:23:11,790 --> 00:23:15,226
+After pressing ok, we see a special version of the
+
+359
+00:23:15,248 --> 00:23:19,222
+snapshot icon with a question mark on it. This indicates
+
+360
+00:23:19,286 --> 00:23:23,342
+that this action has a condition on it. Now it's just a
+
+361
+00:23:23,396 --> 00:23:27,294
+waiting game for the user to hit that snapshot. This is
+
+362
+00:23:27,332 --> 00:23:31,194
+the point where normally you can go make yourself a cup of coffee
+
+363
+00:23:31,242 --> 00:23:34,850
+or even just go home and check this out the next day.
+
+364
+00:23:35,000 --> 00:23:38,350
+That's the beauty of this sort of instrumentation.
+
+365
+00:23:38,510 --> 00:23:42,030
+I can see the snapshot with a timeout
+
+366
+00:23:42,110 --> 00:23:46,146
+of one week and just wait for users to reproduce
+
+367
+00:23:46,178 --> 00:23:49,862
+the problem at their convenience. It's a pretty cool
+
+368
+00:23:49,916 --> 00:23:53,234
+way to debug. In this case, we won't
+
+369
+00:23:53,282 --> 00:23:58,142
+wait long. The snapshot gets hit by the right user despite
+
+370
+00:23:58,306 --> 00:24:02,218
+other users coming in.
+
+371
+00:24:02,304 --> 00:24:05,946
+This specific request is from the right user id.
+
+372
+00:24:06,128 --> 00:24:09,674
+We can now review the stack information and fix a
+
+373
+00:24:09,712 --> 00:24:13,338
+user specific bug. Countermetric lets
+
+374
+00:24:13,354 --> 00:24:16,522
+us count the number of times a line of code is reached.
+
+375
+00:24:16,666 --> 00:24:20,190
+You can use conditions to count things like how many people
+
+376
+00:24:20,260 --> 00:24:23,126
+from a specific country reached a method.
+
+377
+00:24:23,258 --> 00:24:26,706
+If you're thinking about deprecating a
+
+378
+00:24:26,728 --> 00:24:29,966
+production API, this is the metric you need to keep your eye
+
+379
+00:24:29,998 --> 00:24:33,502
+on. Notice that metrics are logged by default,
+
+380
+00:24:33,646 --> 00:24:37,094
+but can be piped to statsd and Prometheus then
+
+381
+00:24:37,132 --> 00:24:41,074
+visualized in Grafana. There are also metrics
+
+382
+00:24:41,122 --> 00:24:44,434
+such as TikTok, method, duration, et cetera,
+
+383
+00:24:44,562 --> 00:24:47,720
+but I don't have time to cover all of that.
+
+384
+00:24:48,570 --> 00:24:53,720
+Thanks for bearing with me. Hope you enjoyed the
+
+385
+00:24:54,170 --> 00:24:57,414
+presentation. Please feel free to ask any
+
+386
+00:24:57,452 --> 00:25:02,078
+questions and also feel free to write to me. Also, check out debugagent.com,
+
+387
+00:25:02,164 --> 00:25:06,206
+my book and my YouTube channel where I have many tutorials on
+
+388
+00:25:06,228 --> 00:25:08,540
+these sorts of subjects. Thank you.
+
