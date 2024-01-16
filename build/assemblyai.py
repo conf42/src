@@ -4,6 +4,9 @@ import assemblyai as aai
 
 CACHE_PATH = "./assemblyai"
 
+from .transcript import (
+    parse_srt,
+)
 
 def get_transcript_path(yt_id, extension=".json"):
     if "https://" in yt_id:
@@ -73,16 +76,7 @@ def read_transcript(yt_id):
     try:
         with open(get_transcript_path(yt_id, extension=".srt"), "r") as f:
             transcript["srt"] = f.read()
-        for elem in transcript["srt"].split("\n\n"):
-            if not elem.strip():
-                continue
-            _, time_line, text = elem.split("\n")
-            time_start = time_line.split(" ")[0]
-            transcript["chunks"].append(dict(
-                text=text,
-                timestamp=time_start,
-                timestamp_s=0, # TODO
-            ))
+        transcript["chunks"] = parse_srt(transcript["srt"])
     except:
         pass
     return transcript
