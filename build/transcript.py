@@ -1,30 +1,28 @@
-import os
-from collections import defaultdict
+def parse_time_start(time_start):
+    """
+        Turns something like
+        00:00:37,644 --> 00:00:41,286
+        into seconds
+    """
+    seconds = 0
+    multiplier = 360 # hours
+    for elem in time_start.split(",")[0].split(":"):
+        seconds += multiplier * int(elem)
+        multiplier /= 60
+    return seconds
 
-
-def process_transcript(path):
-    with open(path, "r") as f:
-        return f.read()
-
-def find_transcripts(path):
-    transcripts = defaultdict(dict)
-    for root, dirs, files in os.walk(path):
-        for filename in files:
-            if filename.endswith(".txt") and len(filename.split("_")) == 2:
-                yt, lang = filename.split("_")
-                transcripts[yt][lang] = process_transcript(os.path.join(root, filename))
-
-    return transcripts
-
-def process_transcript(transcript):
-    sentences = [
-        x.strip() + "." for x in transcript.split(".")
-    ]
-    output = []
-    for sentence in sentences:
-        if len(sentence) < 100:
-            output.append(sentence)
-        else:
-            for i, x in enumerate(sentence.split(" so ")):
-                output.append(("" if i == 0 else " so ") + x)
-    return output
+def parse_srt(transcript):
+    chunks = []
+    for elem in transcript.split("\n\n"):
+        # handle extra whitespace
+        if not elem.strip():
+            continue
+        _, time_line, text = elem.split("\n")
+        time_start = time_line.split(" ")[0]
+        seconds = parse_time_start(time_start)
+        chunks.append(dict(
+            text=text,
+            timestamp=time_start,
+            timestamp_s=seconds,
+        ))
+    return chunks
