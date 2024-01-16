@@ -1,0 +1,2320 @@
+1
+00:00:24,410 --> 00:00:28,598
+Hi, welcome to this talk on the mythical machine learning
+
+2
+00:00:28,684 --> 00:00:32,806
+pipeline. My name's Jim Dowling, and I'm going to talk about
+
+3
+00:00:32,988 --> 00:00:36,918
+how we can refactor this monolithic machine learning pipeline that many
+
+4
+00:00:36,924 --> 00:00:40,262
+of you may have heard about before into what we call
+
+5
+00:00:40,316 --> 00:00:43,938
+feature training and inference pipelines. We're going to do it all in Python,
+
+6
+00:00:44,114 --> 00:00:48,086
+and we're going to decompose the machine learning pipelines into
+
+7
+00:00:48,188 --> 00:00:52,110
+these smaller, more manageable parts to build machine learning systems.
+
+8
+00:00:52,930 --> 00:00:56,858
+So I'm going to start by making a claim that mlops, or machine
+
+9
+00:00:56,874 --> 00:01:00,078
+learning operations as it exists today, is too hard. It's kind
+
+10
+00:01:00,084 --> 00:01:03,454
+of like this telecom tower here. It's a very brittle set
+
+11
+00:01:03,492 --> 00:01:07,790
+of systems that we're plugging together to try and put machine learning at production.
+
+12
+00:01:07,950 --> 00:01:11,346
+But really it's too complex to make anything which is
+
+13
+00:01:11,368 --> 00:01:14,686
+going to be either easy for developers and in particular python
+
+14
+00:01:14,718 --> 00:01:18,226
+developers to put in production or for people to
+
+15
+00:01:18,248 --> 00:01:21,814
+maintain. So if we look at mlops according to Google on
+
+16
+00:01:21,852 --> 00:01:25,734
+this diagram, we can see here a lot of boxes. So this notion that you
+
+17
+00:01:25,772 --> 00:01:29,466
+start at data and you go through many stages of processing the
+
+18
+00:01:29,488 --> 00:01:33,446
+data, validating it, preparing it, training models, validating models,
+
+19
+00:01:33,478 --> 00:01:36,470
+and all of this happens in one big, monolithic,
+
+20
+00:01:36,550 --> 00:01:40,106
+orchestrated ML pipeline. I'm going to show you that
+
+21
+00:01:40,128 --> 00:01:43,790
+we don't need to do it that way. Databricks are following a similar
+
+22
+00:01:43,860 --> 00:01:47,374
+pattern for how to encourage people to what they
+
+23
+00:01:47,412 --> 00:01:50,350
+say is follow Mlox best practice.
+
+24
+00:01:51,090 --> 00:01:54,754
+I see this really as being an overcomplication of something which is much
+
+25
+00:01:54,792 --> 00:01:58,370
+easier to do, which is just to build machine learning systems
+
+26
+00:01:58,790 --> 00:02:02,706
+and do it to the principles of decomposing complexity and
+
+27
+00:02:02,728 --> 00:02:05,966
+then putting those parts together again. And for ML ops
+
+28
+00:02:05,998 --> 00:02:09,538
+in particular, which is really about building systems
+
+29
+00:02:09,634 --> 00:02:13,174
+that we can incrementally improve and automatically test
+
+30
+00:02:13,292 --> 00:02:17,026
+and version and so on, we don't need to go down to the infrastructure
+
+31
+00:02:17,058 --> 00:02:19,738
+level, we can stay in Python. That's one of the key points I want to
+
+32
+00:02:19,744 --> 00:02:23,606
+make here. You don't need to become a dockers or a Kubernetes expert
+
+33
+00:02:23,718 --> 00:02:26,330
+in order to do ML ops.
+
+34
+00:02:28,110 --> 00:02:31,674
+This is classic tensorflow extended. This is what
+
+35
+00:02:31,712 --> 00:02:35,402
+many people learn in courses that they take in machine learning operations,
+
+36
+00:02:35,546 --> 00:02:38,782
+that you need to go from the very beginning to the very end in one
+
+37
+00:02:38,836 --> 00:02:42,778
+big m to ML pipeline. So machine learning pipeline,
+
+38
+00:02:42,874 --> 00:02:45,970
+I say it's mythical, because in practice, I've never seen
+
+39
+00:02:46,120 --> 00:02:49,314
+an end to end pipeline written like this. Where the data comes
+
+40
+00:02:49,352 --> 00:02:52,990
+in, it's validated, transformed into features,
+
+41
+00:02:53,070 --> 00:02:56,942
+models are trained, models are analyzed, then they're validated,
+
+42
+00:02:57,006 --> 00:03:01,006
+and then they're served all in one big monolithic directed
+
+43
+00:03:01,038 --> 00:03:04,566
+acyclic graph. That's not typically the way it works. And the
+
+44
+00:03:04,588 --> 00:03:07,922
+reason why it doesn't work like that is because monolithic ML
+
+45
+00:03:07,986 --> 00:03:12,086
+pipelines, they couple different natural stages
+
+46
+00:03:12,278 --> 00:03:15,434
+of machine learning systems. So you have what's called
+
+47
+00:03:15,472 --> 00:03:19,082
+feature engineering, where we take the raw data and turn it into the data,
+
+48
+00:03:19,136 --> 00:03:22,174
+the features that we're going to use to train models, but also
+
+49
+00:03:22,212 --> 00:03:25,514
+to make predictions with. Now, if you couple that phase
+
+50
+00:03:25,642 --> 00:03:29,354
+with the model training phase, training might require
+
+51
+00:03:29,402 --> 00:03:33,274
+gpus. If you're using deep learning, feature engineering does not require
+
+52
+00:03:33,322 --> 00:03:36,370
+gpus. You put it all into one large system,
+
+53
+00:03:36,520 --> 00:03:39,726
+and then suddenly you're using maybe gpus for feature engineering,
+
+54
+00:03:39,758 --> 00:03:43,646
+which is quite wasteful in terms of resources. If your feature engineering
+
+55
+00:03:43,678 --> 00:03:46,946
+is done once a day, because your new data arrives every day, but you
+
+56
+00:03:46,968 --> 00:03:50,486
+need to predict every hour, why would you couple those two things together?
+
+57
+00:03:50,588 --> 00:03:54,086
+Inference should not be coupled to feature engineering when they run at
+
+58
+00:03:54,108 --> 00:03:58,118
+different cadences. By coupling them all together, you're adding development
+
+59
+00:03:58,214 --> 00:04:02,394
+and operational complexity. You're also not reusing any
+
+60
+00:04:02,432 --> 00:04:05,786
+of the data or features that have been created by your
+
+61
+00:04:05,808 --> 00:04:08,874
+feature pipelines, and it's too hard to build
+
+62
+00:04:08,912 --> 00:04:12,394
+these systems in such a way to get to a minimal viable product.
+
+63
+00:04:12,512 --> 00:04:16,302
+I'll give you an example of one, Kubeflow pipelines, just to pick on one
+
+64
+00:04:16,436 --> 00:04:20,254
+could have picked on many different systems. They claim on their website
+
+65
+00:04:20,372 --> 00:04:24,110
+that it enables you to reuse components and pipelines
+
+66
+00:04:24,190 --> 00:04:27,934
+quickly, easily, to create end to end solutions
+
+67
+00:04:27,982 --> 00:04:31,570
+without having to rebuild each time. I've never seen this happen in practice.
+
+68
+00:04:31,990 --> 00:04:36,002
+So mlops, we still want to follow
+
+69
+00:04:36,056 --> 00:04:39,986
+the principles of mlops, and that means testing your software.
+
+70
+00:04:40,098 --> 00:04:43,666
+And you can think of it as being a hierarchy of needs. You have raw
+
+71
+00:04:43,698 --> 00:04:47,286
+data which needs to be tested to create features. Features are
+
+72
+00:04:47,308 --> 00:04:50,546
+used to create models, so the features need to be tested in order to create
+
+73
+00:04:50,588 --> 00:04:54,106
+the models, and the models need to be tested in
+
+74
+00:04:54,128 --> 00:04:58,182
+order to use them by the ML enabled applications. And typically your ML
+
+75
+00:04:58,246 --> 00:05:02,534
+enabled application will want to a b test a model before it then uses
+
+76
+00:05:02,582 --> 00:05:06,206
+and switches over to a new version of a model. But that's where we want
+
+77
+00:05:06,228 --> 00:05:10,126
+to get on the top of the pyramid of needs, if we will,
+
+78
+00:05:10,228 --> 00:05:13,294
+for mlops. But we need to start somewhere. And the place
+
+79
+00:05:13,332 --> 00:05:16,414
+to start, as any software developer will tell you, is with
+
+80
+00:05:16,452 --> 00:05:19,826
+a working system. And in this case we're building a machine learning system. So we
+
+81
+00:05:19,848 --> 00:05:23,362
+need to get to a working machine learning system as quickly as possible.
+
+82
+00:05:23,496 --> 00:05:27,214
+And that means we need to have some code which will create the features
+
+83
+00:05:27,262 --> 00:05:30,278
+we need to have some code to train the model, and we need to have
+
+84
+00:05:30,284 --> 00:05:33,526
+some code to make predictions or inference on new data that
+
+85
+00:05:33,548 --> 00:05:37,186
+arrives using our model. So ML
+
+86
+00:05:37,218 --> 00:05:40,726
+Ops as a set of principles helps you to get through
+
+87
+00:05:40,748 --> 00:05:44,074
+a working system as quickly as possible with a baseline and
+
+88
+00:05:44,112 --> 00:05:47,526
+iteratively improve it. And the reason why you should be able to iteratively improve
+
+89
+00:05:47,558 --> 00:05:50,534
+your software, if you're following DevOps or ML Ops principles,
+
+90
+00:05:50,662 --> 00:05:54,618
+is that you're testing. We're testing the features, the models,
+
+91
+00:05:54,794 --> 00:05:58,666
+and we're versioning the features and models. So if we're going to do upgrades,
+
+92
+00:05:58,698 --> 00:06:02,586
+if we're going to deploy a new model that's connected to some new features,
+
+93
+00:06:02,618 --> 00:06:06,178
+if they're both not versioned, we'll have a terrible time
+
+94
+00:06:06,344 --> 00:06:10,286
+connecting those two things together and ensuring that things can be safely upgraded.
+
+95
+00:06:10,398 --> 00:06:13,954
+So once you have testing and versioning in place for
+
+96
+00:06:13,992 --> 00:06:18,338
+the two main assets that we see in machine learning systems, features and models,
+
+97
+00:06:18,514 --> 00:06:22,550
+then you're able to move quickly, you're able to make small changes
+
+98
+00:06:22,700 --> 00:06:26,374
+and improve your iteration speed, and you're testing your
+
+99
+00:06:26,412 --> 00:06:30,114
+models and you're testing your features. So you're improving the quality of your software,
+
+100
+00:06:30,162 --> 00:06:33,530
+and that's ultimately where you want to get to where you can move more quickly,
+
+101
+00:06:33,600 --> 00:06:37,014
+make small changes to iteratively improve your systems,
+
+102
+00:06:37,142 --> 00:06:41,034
+and be confident that the changes that you make will not break everything.
+
+103
+00:06:41,232 --> 00:06:44,846
+So that's the goal of Mlops, and that's what we as developers would
+
+104
+00:06:44,868 --> 00:06:48,698
+like to use to make our code better. Let's jump
+
+105
+00:06:48,714 --> 00:06:52,058
+into ML Ops. In Python, we're not going to use infrastructure.
+
+106
+00:06:52,154 --> 00:06:55,678
+There'll be no docker or Kubernetes or we're not
+
+107
+00:06:55,684 --> 00:06:59,106
+going to talk cloud infrastructure. We're going to talk about the way
+
+108
+00:06:59,128 --> 00:07:02,690
+in which we advocate, and particularly I advocate for structuring these
+
+109
+00:07:02,760 --> 00:07:05,762
+machine learning systems to make it easier to manage them.
+
+110
+00:07:05,896 --> 00:07:10,274
+So what we typically have are these three main components, the feature pipeline,
+
+111
+00:07:10,322 --> 00:07:14,162
+the training pipeline, the inference pipeline. I call this the FTI
+
+112
+00:07:14,226 --> 00:07:18,166
+pattern to make it easier to remember you have one program. In this
+
+113
+00:07:18,188 --> 00:07:21,446
+case, we're looking to look at Python programs, which takes data from our
+
+114
+00:07:21,468 --> 00:07:24,842
+data sources. This program will be typically an operational program,
+
+115
+00:07:24,896 --> 00:07:27,830
+so it might need to be scheduled. It could be airflow if it's Python,
+
+116
+00:07:27,910 --> 00:07:31,326
+or it could be a Python program that's scheduled to run
+
+117
+00:07:31,348 --> 00:07:34,762
+in the cloud. So there's some pretty nice tooling out there, like modal,
+
+118
+00:07:34,826 --> 00:07:38,590
+who allow you to schedule these Python programs
+
+119
+00:07:41,090 --> 00:07:45,054
+with a cron like hourly run or daily
+
+120
+00:07:45,102 --> 00:07:48,994
+run. And those programs are basically going to read your
+
+121
+00:07:49,032 --> 00:07:52,526
+raw data, compute, features. If you've got supervised
+
+122
+00:07:52,558 --> 00:07:56,114
+machine learning, you may need to create labels as well. And rather than
+
+123
+00:07:56,152 --> 00:07:59,986
+store that data in an object store or in a distributed file
+
+124
+00:08:00,018 --> 00:08:03,366
+system, we're going to look at a feature store as a way
+
+125
+00:08:03,388 --> 00:08:06,534
+to store that data. And that's because the feature store will provide
+
+126
+00:08:06,572 --> 00:08:10,066
+us with a very nice data frame API. Much feature engineering and feature
+
+127
+00:08:10,098 --> 00:08:14,134
+pipelines are written in frameworks like pandas. If you need more performance,
+
+128
+00:08:14,182 --> 00:08:16,906
+you might move to polars. If you have a lot of data, you might move
+
+129
+00:08:16,928 --> 00:08:20,266
+to Pyspark. But the output of all of
+
+130
+00:08:20,288 --> 00:08:24,366
+those is a data frame. So if you can write that data frame, and you
+
+131
+00:08:24,388 --> 00:08:28,346
+can obviously do that in a secure manner. So we'll use API keys.
+
+132
+00:08:28,378 --> 00:08:32,138
+For example, when we write to Hopsworks, then you don't
+
+133
+00:08:32,154 --> 00:08:35,322
+have to worry about the complexity of if you're in a cloud environment,
+
+134
+00:08:35,386 --> 00:08:38,866
+getting access to a particular bucket, an IAM role that gives
+
+135
+00:08:38,888 --> 00:08:42,194
+you permissions to do that. It's basically going to be an
+
+136
+00:08:42,232 --> 00:08:45,506
+API key, some privileges associated with it, and then write
+
+137
+00:08:45,528 --> 00:08:48,598
+your data frame. So your training pipeline should be able to use the
+
+138
+00:08:48,604 --> 00:08:51,446
+feature store in the same way. We'll be able to say, okay,
+
+139
+00:08:51,628 --> 00:08:55,122
+I'm going to select features from all of the available features,
+
+140
+00:08:55,266 --> 00:08:59,334
+create some training data, select labels as well, train my
+
+141
+00:08:59,372 --> 00:09:02,134
+model, and when my model has been trained, I'll need to store it somewhere.
+
+142
+00:09:02,182 --> 00:09:06,006
+So typically where we would store models is in some place called a model registry.
+
+143
+00:09:06,118 --> 00:09:09,286
+There are many model registries out there, some of them are hosted
+
+144
+00:09:09,318 --> 00:09:12,694
+over the Internet. Hopsteryx is also hosted over the Internet.
+
+145
+00:09:12,742 --> 00:09:16,240
+We can call that serverless model registry or serverless feature store.
+
+146
+00:09:16,610 --> 00:09:19,966
+But it basically means at least when you're getting started, you can write
+
+147
+00:09:19,988 --> 00:09:23,502
+a python program on your laptop or in colab, and it
+
+148
+00:09:23,556 --> 00:09:27,422
+can read from a feature store and write your model back into a model
+
+149
+00:09:27,476 --> 00:09:30,820
+registry. So Hopsrix also is a model registry. We'll look at that later.
+
+150
+00:09:31,270 --> 00:09:34,418
+And then finally, when you have an inference pipeline, this is when you want to
+
+151
+00:09:34,424 --> 00:09:37,826
+generate value for your model. And this is where most machine learning courses
+
+152
+00:09:37,938 --> 00:09:43,490
+stop. They'll train a model they'll evaluate on a static
+
+153
+00:09:43,650 --> 00:09:46,838
+test set. So a holdout data set to see how the
+
+154
+00:09:46,844 --> 00:09:49,974
+model generalizes on data it hasn't seen before, which is
+
+155
+00:09:50,012 --> 00:09:54,026
+great. But if you want to see your model in the natural environment where
+
+156
+00:09:54,048 --> 00:09:57,146
+it's creating value, you should write an end to end system
+
+157
+00:09:57,248 --> 00:10:00,934
+so that new data can come in through the feature pipelines. And for a batch
+
+158
+00:10:00,982 --> 00:10:04,426
+inference application it can take that new data that's been written via
+
+159
+00:10:04,458 --> 00:10:07,966
+the feature pipeline. Read it up as features, read up the model from the
+
+160
+00:10:07,988 --> 00:10:11,978
+model registry, generate the predictions, and store them somewhere
+
+161
+00:10:12,074 --> 00:10:15,550
+where maybe a downstream dashboard or an operational
+
+162
+00:10:15,630 --> 00:10:19,134
+system will consume those production to make those applications
+
+163
+00:10:19,182 --> 00:10:22,802
+AI enabled. Of course, this generates logs. You typically want to save
+
+164
+00:10:22,856 --> 00:10:26,920
+those to help improve your observability and monitoring of the system.
+
+165
+00:10:27,450 --> 00:10:30,566
+So I'm going to look at a little demo later on. The code is available
+
+166
+00:10:30,668 --> 00:10:34,646
+on the link below. It's basically
+
+167
+00:10:34,748 --> 00:10:38,514
+looking at credit scoring as a machine learning system. This is quite a popular
+
+168
+00:10:38,562 --> 00:10:41,974
+type of machine learning system we see at financial
+
+169
+00:10:42,022 --> 00:10:46,154
+institutions. You may have information about people
+
+170
+00:10:46,192 --> 00:10:49,494
+who would like to apply for credit, and we'd like to give them a score
+
+171
+00:10:49,542 --> 00:10:53,158
+to decide on whether we're going to give that person credit or
+
+172
+00:10:53,184 --> 00:10:56,494
+not. So typically what you'll need to have is data
+
+173
+00:10:56,532 --> 00:10:59,822
+from different sources. And you can see there's some sources on the left
+
+174
+00:10:59,876 --> 00:11:03,346
+here. A feature pipeline will create the features from those
+
+175
+00:11:03,368 --> 00:11:06,514
+data sources. Training pipeline will train your model. We look
+
+176
+00:11:06,552 --> 00:11:09,906
+at an Xgboost model and then inference pipeline will take
+
+177
+00:11:09,928 --> 00:11:13,460
+this XgBoost model and then some new credits.
+
+178
+00:11:14,870 --> 00:11:18,766
+So credit applications to score and that could be done in a batch manner.
+
+179
+00:11:18,878 --> 00:11:22,246
+You could have like a batch that arrive and once a day you score them
+
+180
+00:11:22,268 --> 00:11:25,586
+and then you send an email out the next day to say you're approved.
+
+181
+00:11:25,698 --> 00:11:29,846
+But even better would be an interactive application. So as the user goes
+
+182
+00:11:29,868 --> 00:11:33,420
+to a website and fills in their details, then we can have an online
+
+183
+00:11:33,790 --> 00:11:37,626
+system which can read those features back and the feature store and
+
+184
+00:11:37,648 --> 00:11:40,778
+hopsearch in particular enables that. We're going to look at the batch case
+
+185
+00:11:40,864 --> 00:11:44,126
+today and the training pipeline. It can
+
+186
+00:11:44,148 --> 00:11:47,562
+be run in any kind of training environment, any Python
+
+187
+00:11:47,626 --> 00:11:50,894
+enabled environment. And our pipelines can also be run in any
+
+188
+00:11:50,932 --> 00:11:54,110
+Python environment. So today we'll look at running it in my notebook,
+
+189
+00:11:54,450 --> 00:11:58,206
+but of course you can schedule them to run in any Python
+
+190
+00:11:58,238 --> 00:12:01,810
+environment. So let's start and look at feature pipelines
+
+191
+00:12:02,790 --> 00:12:05,666
+and have a look at a little bit of the code that we need to
+
+192
+00:12:05,688 --> 00:12:08,882
+create a feature pipeline. So the feature pipeline will take your raw data,
+
+193
+00:12:09,016 --> 00:12:12,742
+it'll compute features from it that's compressed signal that we're going to use to train
+
+194
+00:12:12,796 --> 00:12:16,566
+our models with and also to make predictions with. So there's an example here
+
+195
+00:12:16,588 --> 00:12:20,154
+we're using pandas to do our transformations. So we
+
+196
+00:12:20,192 --> 00:12:23,338
+call these model independent transformations because the features we store in the
+
+197
+00:12:23,344 --> 00:12:27,130
+features store should be reusable across many different models.
+
+198
+00:12:27,790 --> 00:12:31,834
+We can see here that here we're doing a classic aggregation
+
+199
+00:12:31,882 --> 00:12:35,710
+where we're counting the number of events happening in a four hour window.
+
+200
+00:12:36,290 --> 00:12:39,706
+We can see here that when we've created
+
+201
+00:12:39,738 --> 00:12:43,226
+a data frame window AGSDF here with our features
+
+202
+00:12:43,258 --> 00:12:47,106
+that we'd like to use in our feature store, we'd like to
+
+203
+00:12:47,128 --> 00:12:50,562
+store them in the feature store. And these features here are related to the credit
+
+204
+00:12:50,616 --> 00:12:54,466
+card, the number of transactions, or the frequency of the transactions in
+
+205
+00:12:54,488 --> 00:12:58,018
+that four hour period of time. But basically with this
+
+206
+00:12:58,184 --> 00:13:01,798
+window AGS data frame, what we're going to do is we're going
+
+207
+00:13:01,804 --> 00:13:04,726
+to insert it into this thing called a feature store. So here we're creating the
+
+208
+00:13:04,748 --> 00:13:07,698
+feature store. We're giving it a name and a version, a description.
+
+209
+00:13:07,794 --> 00:13:12,374
+We're identifying which column is the primary key. So the unique row level identifier
+
+210
+00:13:12,422 --> 00:13:16,038
+column that uniquely identifies each row in this data frame.
+
+211
+00:13:16,214 --> 00:13:19,542
+If there is a unique timestamp column
+
+212
+00:13:19,606 --> 00:13:23,242
+within that particular data
+
+213
+00:13:23,296 --> 00:13:26,366
+frame, it doesn't need to be unique. Of course, they can be
+
+214
+00:13:26,388 --> 00:13:29,630
+the same across many different rows, but if there is an event time at which
+
+215
+00:13:29,780 --> 00:13:33,274
+that particular row was generated as a column, you can specify
+
+216
+00:13:33,322 --> 00:13:36,918
+it here, because what we'll see is that in feature stores,
+
+217
+00:13:36,954 --> 00:13:41,122
+if I have many different tables of features that have different event times on them,
+
+218
+00:13:41,256 --> 00:13:44,882
+we need to line those up so that we don't get what we call data
+
+219
+00:13:44,936 --> 00:13:48,830
+leakage. So we don't get future data. When we join these columns
+
+220
+00:13:48,910 --> 00:13:52,578
+of features together from different tables, we don't want to have data that's
+
+221
+00:13:52,594 --> 00:13:56,022
+in the future because then our model will be able to learn from future data
+
+222
+00:13:56,076 --> 00:13:58,706
+which we don't want to do. So that's called data leakage. We want to avoid
+
+223
+00:13:58,738 --> 00:14:03,226
+it. So if you specify the event time column in your feature group that
+
+224
+00:14:03,248 --> 00:14:06,598
+can be used by the feature store to do what's
+
+225
+00:14:06,614 --> 00:14:10,746
+called a point in time correct join, so there's no data leakage. So once
+
+226
+00:14:10,768 --> 00:14:14,426
+you've created this feature group object, you can just insert your pandas data frame.
+
+227
+00:14:14,458 --> 00:14:17,886
+So you just call insert on it, it'll write it to the feature store and
+
+228
+00:14:17,908 --> 00:14:20,160
+your data will end up there. Now,
+
+229
+00:14:20,930 --> 00:14:24,814
+Python is great for that smaller scale of data. If you have
+
+230
+00:14:24,852 --> 00:14:28,146
+larger volumes of data, you may want to use to Pyspark. It's great
+
+231
+00:14:28,168 --> 00:14:32,258
+for scale and testing, but it's obviously a bit more challenging to develop with,
+
+232
+00:14:32,424 --> 00:14:35,966
+more challenging to debug with and operate. SQL is also
+
+233
+00:14:36,008 --> 00:14:39,922
+quite popular. SQL has low operational
+
+234
+00:14:39,986 --> 00:14:43,734
+overhead. It can scale quite well. There are many different features, as you know,
+
+235
+00:14:43,772 --> 00:14:46,994
+that are very difficult to implement in SQL.
+
+236
+00:14:47,042 --> 00:14:50,090
+Even if you embed udfs in your data warehouse,
+
+237
+00:14:50,670 --> 00:14:54,086
+things like embeddings and there's many libraries
+
+238
+00:14:54,118 --> 00:14:57,302
+of course, in pandas we use to compute features that are not particularly suitable
+
+239
+00:14:57,366 --> 00:15:01,102
+in SQL. Now Python is obviously
+
+240
+00:15:01,236 --> 00:15:04,526
+a great and popular language to develop
+
+241
+00:15:04,628 --> 00:15:08,106
+features in, so it has low operational overhead.
+
+242
+00:15:08,138 --> 00:15:11,402
+Pandas is very popular, Polars has become popular.
+
+243
+00:15:11,546 --> 00:15:14,590
+It scales to larger data volumes than pandas,
+
+244
+00:15:15,490 --> 00:15:18,974
+but they're all good choices. Now if you need stream processing,
+
+245
+00:15:19,022 --> 00:15:22,514
+so very low latency features that are computed on real time data,
+
+246
+00:15:22,632 --> 00:15:26,502
+then you might want to look at a streaming framework like Flink or
+
+247
+00:15:26,556 --> 00:15:29,394
+Pyspark, which also has spark streaming.
+
+248
+00:15:29,442 --> 00:15:32,886
+So if you want to write that code in Python, probably Pyspark is your best.
+
+249
+00:15:32,908 --> 00:15:36,230
+But Flink is very Java centric.
+
+250
+00:15:36,650 --> 00:15:40,182
+So in hopsworks we can write the data
+
+251
+00:15:40,236 --> 00:15:43,894
+to the feature store from Python in what we call a streaming API
+
+252
+00:15:43,942 --> 00:15:47,514
+or a batch API. The batch API will store the data offline. It's only
+
+253
+00:15:47,552 --> 00:15:51,302
+historical data, so it'll only be available via this offline API.
+
+254
+00:15:51,366 --> 00:15:54,806
+So the offline API is to get training data or batch data
+
+255
+00:15:54,848 --> 00:15:58,238
+that you'd like to do inference on. But if you have an online application,
+
+256
+00:15:58,324 --> 00:16:01,566
+you need low latency access to your features. So if we
+
+257
+00:16:01,588 --> 00:16:05,146
+have for example the credit scoring application that needs to look up your
+
+258
+00:16:05,188 --> 00:16:09,582
+features within a few milliseconds because it's going to do a live prediction
+
+259
+00:16:09,646 --> 00:16:13,090
+of your credit score, then you need the online
+
+260
+00:16:13,160 --> 00:16:16,290
+API. So in that case you write using the streaming API.
+
+261
+00:16:16,710 --> 00:16:19,886
+Now in Hopster's the default is a streaming API.
+
+262
+00:16:19,918 --> 00:16:23,026
+So when I called insert on my feature group, it wrote the data via
+
+263
+00:16:23,058 --> 00:16:34,358
+this API. It'll be stored both an online offline store and
+
+264
+00:16:34,444 --> 00:16:37,770
+it'll be available via both the online and offline APIs.
+
+265
+00:16:38,750 --> 00:16:42,406
+Now what we can see here is that the tables of features
+
+266
+00:16:42,438 --> 00:16:45,520
+are called feature groups, and then we have something called a feature view.
+
+267
+00:16:45,970 --> 00:16:49,774
+So in hopsworks you're able to reuse features across many
+
+268
+00:16:49,812 --> 00:16:53,326
+different models. And the way you do that is by selecting features into something called
+
+269
+00:16:53,348 --> 00:16:57,102
+a feature view. So you can select from many different feature groups, all updated potentially
+
+270
+00:16:57,166 --> 00:17:00,930
+by different feature pipelines, and then the feature store will perform
+
+271
+00:17:01,000 --> 00:17:03,940
+this point in time correct join for you.
+
+272
+00:17:05,590 --> 00:17:08,766
+So if we're able to reuse features across many different models,
+
+273
+00:17:08,878 --> 00:17:12,386
+we can see here one model at the top it has a feature view selecting
+
+274
+00:17:12,418 --> 00:17:16,002
+a certain set of features, another feature view down here selecting different features,
+
+275
+00:17:16,066 --> 00:17:19,686
+and each one can create their own training data sets. Train your models on
+
+276
+00:17:19,788 --> 00:17:23,514
+and each one can pull out. Then if we're doing batch inference, you'll pull the
+
+277
+00:17:23,552 --> 00:17:27,066
+features by the feature view, say well, the data that arrived in the last 24
+
+278
+00:17:27,088 --> 00:17:30,394
+hours, for example, and then you'll
+
+279
+00:17:30,442 --> 00:17:32,560
+do inference on those with your model.
+
+280
+00:17:34,450 --> 00:17:38,366
+Now training pipelines use these feature views to
+
+281
+00:17:38,388 --> 00:17:41,566
+read data to train models with. So it
+
+282
+00:17:41,588 --> 00:17:45,434
+uses this offline API. You can get your data back as files,
+
+283
+00:17:45,482 --> 00:17:49,486
+maybe CSV or parquet or TF records
+
+284
+00:17:49,518 --> 00:17:52,418
+even. Or you can get in the back as a pandas data frame if the
+
+285
+00:17:52,424 --> 00:17:55,554
+data is not too large. And you can train directly with
+
+286
+00:17:55,592 --> 00:17:59,026
+your data. And it has if support written nice things like random splits and
+
+287
+00:17:59,048 --> 00:18:01,606
+time series splits of your data. So you don't need to do that. Even in
+
+288
+00:18:01,628 --> 00:18:05,542
+Scikitlearn you can just read the ready made split data
+
+289
+00:18:05,596 --> 00:18:07,590
+frames with your features and labels.
+
+290
+00:18:09,130 --> 00:18:12,810
+So the feature view itself is an API for model development and also
+
+291
+00:18:12,880 --> 00:18:16,522
+for operations. In the online case, you basically select
+
+292
+00:18:16,576 --> 00:18:20,422
+your features. You say what label it is for this particular feature
+
+293
+00:18:20,486 --> 00:18:24,186
+view. One other thing that you might want to do is features
+
+294
+00:18:24,218 --> 00:18:27,886
+are typically shared untransformed. So what that means
+
+295
+00:18:27,908 --> 00:18:32,026
+is if you have a categorical variable, store it in the feature store unencoded,
+
+296
+00:18:32,138 --> 00:18:35,662
+and then when your model is selected, it can encode it, because some models
+
+297
+00:18:35,806 --> 00:18:39,170
+will need to encode categorical variables.
+
+298
+00:18:39,670 --> 00:18:42,914
+So for example gradient descent based models, but other
+
+299
+00:18:42,952 --> 00:18:46,100
+models, so cat boost for example,
+
+300
+00:18:46,550 --> 00:18:50,326
+can work directly with the categorical data. And the same
+
+301
+00:18:50,348 --> 00:18:53,794
+is true for numerical variables. So we call those model specific transformations.
+
+302
+00:18:53,842 --> 00:18:57,334
+They can be associated with features in the feature view so that you don't have
+
+303
+00:18:57,372 --> 00:19:00,858
+to write that code separately yourself.
+
+304
+00:19:00,944 --> 00:19:03,974
+Because there is a potential that if you write the code in the training pipeline
+
+305
+00:19:04,022 --> 00:19:07,482
+to transform features like encode them
+
+306
+00:19:07,536 --> 00:19:11,338
+or normalize numerical features, you need to do the same thing in the
+
+307
+00:19:11,344 --> 00:19:14,606
+inference pipeline. And there is a potential for what we call SKU there.
+
+308
+00:19:14,628 --> 00:19:18,446
+So the feature view will help you avoid that potential problem,
+
+309
+00:19:18,628 --> 00:19:22,414
+feature view. Then once you have it, it can apply the model
+
+310
+00:19:22,452 --> 00:19:25,794
+specific transformations on the data, create training data, batch inference data,
+
+311
+00:19:25,832 --> 00:19:28,690
+and it'll apply those transformations consistently.
+
+312
+00:19:29,510 --> 00:19:33,666
+So the point in time correct join I mentioned already, you take tables from
+
+313
+00:19:33,768 --> 00:19:37,046
+features from different tables, ensure that they're lined up on
+
+314
+00:19:37,068 --> 00:19:40,438
+the correct transaction event time here. So this value
+
+315
+00:19:40,524 --> 00:19:43,766
+of this category at this point
+
+316
+00:19:43,788 --> 00:19:46,950
+in time, we can look up the amount
+
+317
+00:19:47,020 --> 00:19:50,486
+for that particular week and month, and we're not going to get future values in
+
+318
+00:19:50,508 --> 00:19:53,866
+here. There'd be no data leakage. Now, if you
+
+319
+00:19:53,888 --> 00:19:57,258
+were to write this join this point in time correct join yourself. It's going to
+
+320
+00:19:57,264 --> 00:20:00,854
+be quite complex. For that example, we can see there's quite a lot of SQL
+
+321
+00:20:00,902 --> 00:20:04,382
+code for it, but in Python you just write the following code below.
+
+322
+00:20:04,436 --> 00:20:07,546
+You select the features that you'd like from the different feature groups.
+
+323
+00:20:07,658 --> 00:20:10,906
+You join them together in pandas like syntax,
+
+324
+00:20:11,098 --> 00:20:14,714
+and you then get back what's called a query
+
+325
+00:20:14,762 --> 00:20:18,066
+object. This is our selection of features, and then we can create our
+
+326
+00:20:18,088 --> 00:20:21,170
+feature view with that particular selection of features.
+
+327
+00:20:21,830 --> 00:20:25,474
+Now once we've created our feature view, we can see we've got a feature view
+
+328
+00:20:25,512 --> 00:20:28,770
+object here, we can create training data from it, and we can
+
+329
+00:20:28,840 --> 00:20:32,294
+ready split that train data into random sets, a test
+
+330
+00:20:32,332 --> 00:20:36,118
+set and a training set, and a validation set as well, even, and you
+
+331
+00:20:36,124 --> 00:20:39,142
+can say what the file format you'd like to store that train data is.
+
+332
+00:20:39,276 --> 00:20:42,986
+You can also get the train data back directly as pandas data
+
+333
+00:20:43,008 --> 00:20:46,380
+frames. So here we can get our features in the training,
+
+334
+00:20:47,150 --> 00:20:50,234
+test and validation sets and the labels in the training,
+
+335
+00:20:50,352 --> 00:20:54,522
+validation and test sets back. And I don't need to run it through scikitlearn
+
+336
+00:20:54,666 --> 00:20:57,678
+splitting algorithm. This is going to be a random split, but there is also a
+
+337
+00:20:57,684 --> 00:21:01,406
+time series split. So you can say if I've got a
+
+338
+00:21:01,428 --> 00:21:05,314
+time series model and time series data, I'll train on maybe
+
+339
+00:21:05,352 --> 00:21:09,330
+the data here up to version two, and then I'll predict
+
+340
+00:21:09,910 --> 00:21:13,650
+how my test set will be the data that came after the
+
+341
+00:21:13,720 --> 00:21:16,580
+end of this particular point in time.
+
+342
+00:21:17,830 --> 00:21:21,462
+Now what you can also do with a feature view is you can get training
+
+343
+00:21:21,516 --> 00:21:24,834
+data, for example for version one of your model, or get training data for version
+
+344
+00:21:24,882 --> 00:21:29,062
+two. New data will keep training in the system, the feature pipelines will keep
+
+345
+00:21:29,196 --> 00:21:32,474
+training new features, and then you can read that
+
+346
+00:21:32,512 --> 00:21:35,626
+data and make predictions on it. So we can do batch inference with
+
+347
+00:21:35,648 --> 00:21:39,994
+the feature view as well. We create batch inference data and
+
+348
+00:21:40,032 --> 00:21:43,578
+finally for feature views we can specify specific features
+
+349
+00:21:43,594 --> 00:21:47,294
+that we'd like to transform. So here we're saying the amount of money last month
+
+350
+00:21:47,332 --> 00:21:50,826
+we're going to apply the standard scalar, the category
+
+351
+00:21:50,858 --> 00:21:53,914
+variable. We're going to encode it, it's categorical variable,
+
+352
+00:21:54,042 --> 00:21:57,246
+apply a label encoder on it, and the same for amount last week,
+
+353
+00:21:57,268 --> 00:22:00,814
+the standard scalar. So when we read the training data, the batch
+
+354
+00:22:00,862 --> 00:22:04,382
+inference data, or in this case the online inference data, the feature
+
+355
+00:22:04,446 --> 00:22:08,038
+vector, it'll apply these transformations after it's read the
+
+356
+00:22:08,044 --> 00:22:11,778
+data in the feature store, but before it's returned to the client. And this ensures
+
+357
+00:22:11,874 --> 00:22:15,538
+consistency of these transformation functions between this training pipeline
+
+358
+00:22:15,634 --> 00:22:19,858
+and this inference pipeline. You can do it yourself in scikitlearn pipelines,
+
+359
+00:22:19,954 --> 00:22:23,130
+and then you need to make sure that both of these are consistent.
+
+360
+00:22:24,590 --> 00:22:28,326
+So let's move over to inference pipelines and we'll
+
+361
+00:22:28,358 --> 00:22:31,910
+have a look at some of the code. This is a predictor
+
+362
+00:22:31,990 --> 00:22:35,262
+class. So this is a model that you will be deployed in a model
+
+363
+00:22:35,316 --> 00:22:39,130
+serving server. We can see here the method called predict.
+
+364
+00:22:39,210 --> 00:22:42,346
+But before we predict, we need to initialize this object. So when it's
+
+365
+00:22:42,378 --> 00:22:45,742
+loaded into our model serving server, init will be called
+
+366
+00:22:45,876 --> 00:22:49,582
+we'll connect to the feature store that we can see here. We'll initialize the feature
+
+367
+00:22:49,646 --> 00:22:53,154
+store. And what we need to do is we need to tell it what
+
+368
+00:22:53,192 --> 00:22:56,718
+the version of the training data was that we trained
+
+369
+00:22:56,734 --> 00:22:59,854
+our model on, because we can create many different train data sets from a feature
+
+370
+00:22:59,902 --> 00:23:03,334
+view. So here it was version number one. So we say, okay, I'm going to
+
+371
+00:23:03,452 --> 00:23:06,566
+initialize my feature view on version number one. The reason we need to do that
+
+372
+00:23:06,588 --> 00:23:10,006
+is the transformations often need the state from
+
+373
+00:23:10,028 --> 00:23:13,670
+that training data set version. So if I'm normalizing a numerical feature,
+
+374
+00:23:13,750 --> 00:23:17,226
+I'll need to know what the mean value of that feature was in
+
+375
+00:23:17,248 --> 00:23:20,586
+the training data set the model was training on. So that
+
+376
+00:23:20,688 --> 00:23:24,302
+information is captured in the feature view. You don't need to supply train data set
+
+377
+00:23:24,356 --> 00:23:27,280
+when you're deploying your model for serving here.
+
+378
+00:23:27,810 --> 00:23:31,738
+And then you can see we're loading the model from the model registry and it's
+
+379
+00:23:31,754 --> 00:23:34,578
+now available in our predict object. So when a request comes in to make a
+
+380
+00:23:34,584 --> 00:23:38,606
+prediction, the model is loaded, the connection to the feature store has been established,
+
+381
+00:23:38,718 --> 00:23:42,530
+and we can just call self dot model
+
+382
+00:23:42,680 --> 00:23:45,778
+predict, return the pre computed features from the
+
+383
+00:23:45,784 --> 00:23:49,426
+feature store here and then send them to the model to make the prediction.
+
+384
+00:23:49,458 --> 00:23:52,946
+So this is going to go to the feature store, return our precomputed features.
+
+385
+00:23:52,978 --> 00:23:56,294
+We're going to cast them to a numpy array, and then the
+
+386
+00:23:56,332 --> 00:23:59,718
+model predict method will be applied to that numpy array to make our prediction,
+
+387
+00:23:59,734 --> 00:24:03,626
+which is returned to the client. Let's have
+
+388
+00:24:03,648 --> 00:24:07,674
+a quick look at a demo. So this
+
+389
+00:24:07,712 --> 00:24:11,034
+particular demo, the way that we often see
+
+390
+00:24:11,072 --> 00:24:14,126
+a lot of these machine learning systems built when
+
+391
+00:24:14,148 --> 00:24:17,694
+people are starting out, when you want to use get started as
+
+392
+00:24:17,732 --> 00:24:21,694
+quickly as possible, is you can write Python programs in a very
+
+393
+00:24:21,732 --> 00:24:25,454
+nice tool called modal. So modal has a very generous
+
+394
+00:24:25,502 --> 00:24:29,086
+free tier. It basically can schedule Python programs
+
+395
+00:24:29,118 --> 00:24:33,166
+for you. And if you need to install libraries, you just annotate the functions
+
+396
+00:24:33,198 --> 00:24:35,700
+and say Pip, install hopsworks, for example.
+
+397
+00:24:37,190 --> 00:24:40,886
+And in that modal code we can write our feature engineering pipeline that we
+
+398
+00:24:40,908 --> 00:24:44,914
+saw earlier. It'll read the data and write data frames to hopsworks.
+
+399
+00:24:45,042 --> 00:24:48,886
+And then modal can also train. You may want to train because training is
+
+400
+00:24:48,908 --> 00:24:52,220
+not an operational system. You can train on colab and do it
+
+401
+00:24:53,950 --> 00:24:57,386
+offline, if you will, or on demand, or when the
+
+402
+00:24:57,408 --> 00:25:00,842
+model has become stale. You don't necessarily need to do it every day as you
+
+403
+00:25:00,896 --> 00:25:04,446
+would when in a feature pipeline if new data was arriving every day,
+
+404
+00:25:04,628 --> 00:25:08,318
+and then for inference. Again, it's an operational system.
+
+405
+00:25:08,404 --> 00:25:11,802
+So maybe it's going to be either on demand when the user
+
+406
+00:25:11,866 --> 00:25:15,086
+goes into the website in an interactive system, makes a prediction,
+
+407
+00:25:15,198 --> 00:25:19,086
+or maybe it's going to be a dashboard that gets updated
+
+408
+00:25:19,198 --> 00:25:22,834
+at some cadence. So hugging faces is a really nice way of
+
+409
+00:25:22,872 --> 00:25:26,414
+doing a lot of inference, because it has, again, a very generous
+
+410
+00:25:26,462 --> 00:25:30,678
+free tier where you can use hugging face spaces to
+
+411
+00:25:30,844 --> 00:25:34,994
+do some really nice uis for dashboards or for interactive applications,
+
+412
+00:25:35,122 --> 00:25:38,774
+in this case from hopsearch. They can read the models and the
+
+413
+00:25:38,812 --> 00:25:41,882
+data frames. This is the data that you want to make your predictions with.
+
+414
+00:25:42,016 --> 00:25:45,494
+And we can also even save the logs back to hopsearch
+
+415
+00:25:45,542 --> 00:25:49,286
+and even do user interfaces in hugging
+
+416
+00:25:49,318 --> 00:25:53,158
+face for monitoring our models in production. So hopsearch in this
+
+417
+00:25:53,184 --> 00:25:56,346
+case, again, has another free serverless tier.
+
+418
+00:25:56,378 --> 00:26:00,218
+You don't need to install anything, you get 25gb of free storage.
+
+419
+00:26:00,314 --> 00:26:03,822
+This is a really nice way to build what we call serverless machine learning
+
+420
+00:26:03,876 --> 00:26:07,378
+systems. And here's some examples. There's a bunch of these on the
+
+421
+00:26:07,384 --> 00:26:10,482
+Internet. I think there's about 40 or 50 of them now. Some really nice ones
+
+422
+00:26:10,536 --> 00:26:14,420
+are air quality predictions. In Poland, this is a streamlet application.
+
+423
+00:26:16,550 --> 00:26:19,790
+It runs the feature pipelines daily on mobile,
+
+424
+00:26:19,950 --> 00:26:23,894
+and it stores then these features and hopsworks. And then
+
+425
+00:26:24,012 --> 00:26:27,078
+when you go to the dashboard here, it can redraw with the
+
+426
+00:26:27,084 --> 00:26:30,362
+predictions of the air quality in the different cities. So this is for
+
+427
+00:26:30,416 --> 00:26:34,566
+today in early, this is actually early March,
+
+428
+00:26:34,678 --> 00:26:37,754
+and you can look at different days and it will connect to hopsworks, read down
+
+429
+00:26:37,792 --> 00:26:41,526
+new data to score and redraw this particular UI
+
+430
+00:26:41,558 --> 00:26:45,278
+and streamlit. And there's another one here that will predict whether
+
+431
+00:26:45,364 --> 00:26:49,658
+your post on Reddit will be liked or not. So it's using sentiment analysis
+
+432
+00:26:49,754 --> 00:26:53,486
+and it's very interesting. Another one on Tesla, stock price production.
+
+433
+00:26:53,678 --> 00:26:57,554
+So I think it's using sentiment from Twitter, amongst other
+
+434
+00:26:57,592 --> 00:27:01,010
+places, and then another one using New York electricity.
+
+435
+00:27:03,830 --> 00:27:07,138
+A lot of services globally have been digitalized and a lot of data is
+
+436
+00:27:07,144 --> 00:27:10,310
+available now for us to build these prediction services with.
+
+437
+00:27:10,460 --> 00:27:13,686
+So you can write a Python program which will go to the
+
+438
+00:27:13,708 --> 00:27:16,934
+New York electricity market. And if you follow this link,
+
+439
+00:27:16,972 --> 00:27:20,154
+you'll see where they get the data from. And you can see in many
+
+440
+00:27:20,192 --> 00:27:24,026
+cases, it's actually outperforming the ETA's forecast or
+
+441
+00:27:24,048 --> 00:27:26,940
+the EIA's daily forecast, which it's doing here.
+
+442
+00:27:28,350 --> 00:27:30,586
+So there's a lot of cool things you can build. I'm going to show you
+
+443
+00:27:30,608 --> 00:27:34,266
+briefly this one that I mentioned here. There's a ton
+
+444
+00:27:34,288 --> 00:27:37,786
+of them here in Hopsterick's tutorials. The one I'm going to show you briefly
+
+445
+00:27:37,818 --> 00:27:41,466
+here is called credit scores. Now, I've actually opened
+
+446
+00:27:41,498 --> 00:27:45,422
+up the notebooks already, so this is just running on my laptop here. This is
+
+447
+00:27:45,476 --> 00:27:48,210
+the hopster tutorials that I've checked out locally.
+
+448
+00:27:49,030 --> 00:27:52,322
+Do I need quick start? No, I don't. Let's move to the first
+
+449
+00:27:52,376 --> 00:27:55,966
+one. So in this case we've got the advanced tutorials,
+
+450
+00:27:55,998 --> 00:27:59,374
+credit scores. So what this is going to do is I actually have two feature
+
+451
+00:27:59,422 --> 00:28:02,966
+pipelines at the beginning. Sometimes you'll have two, one for historical data to create your
+
+452
+00:28:02,988 --> 00:28:06,674
+feature groups and add all the metadata. And this is a backfill
+
+453
+00:28:06,722 --> 00:28:10,326
+one. So what this one is doing is basically reading some csv files
+
+454
+00:28:10,358 --> 00:28:13,366
+with our loan applications, bureau balance,
+
+455
+00:28:13,398 --> 00:28:16,890
+credit card data, payment installments and a lot of other data,
+
+456
+00:28:17,040 --> 00:28:20,394
+doing some feature engineering. It's also
+
+457
+00:28:20,432 --> 00:28:23,886
+showing you doing some EDA as well, which you typically would do,
+
+458
+00:28:24,068 --> 00:28:26,110
+and then creating the feature groups.
+
+459
+00:28:27,730 --> 00:28:30,446
+This is where I ran it, I think, earlier on. So there might be some
+
+460
+00:28:30,468 --> 00:28:34,560
+diagrams in here. You can see we're trying to understand basically
+
+461
+00:28:35,270 --> 00:28:38,830
+the data before we get into the process of modeling.
+
+462
+00:28:38,910 --> 00:28:41,940
+But obviously the kind of things you do here is clean up the data,
+
+463
+00:28:43,270 --> 00:28:46,180
+extract any features that you need to extract or create.
+
+464
+00:28:46,790 --> 00:28:50,054
+And then what we can have is a feature pipeline. So this is a much
+
+465
+00:28:50,092 --> 00:28:52,280
+simpler program. It's going to read the data,
+
+466
+00:28:53,530 --> 00:28:57,126
+it's going to read the new data. And this should run on a
+
+467
+00:28:57,148 --> 00:29:00,598
+cadence. Now, it's a notebook, so it's really just for learning. But it'll connect to
+
+468
+00:29:00,604 --> 00:29:04,186
+the feature store. We can see here that it's getting a reference to
+
+469
+00:29:04,208 --> 00:29:08,074
+the feature groups. And in this case, we're not reading new data
+
+470
+00:29:08,112 --> 00:29:11,306
+from the Internet because this is credit card loans and so
+
+471
+00:29:11,328 --> 00:29:14,862
+on. That information is not available. So what we're doing is generating data.
+
+472
+00:29:14,916 --> 00:29:18,394
+So this is a really good way of doing synthetic feature pipelines
+
+473
+00:29:18,442 --> 00:29:21,806
+if you can't access the actual data. So we're just generating some
+
+474
+00:29:21,908 --> 00:29:25,840
+random data in this case, or not random, but based on the distribution of
+
+475
+00:29:26,310 --> 00:29:30,206
+the historical data. So it's generating new feature values
+
+476
+00:29:30,238 --> 00:29:33,506
+based on those distributions. And then we're just going to write to
+
+477
+00:29:33,528 --> 00:29:36,830
+the feature story. So you're just basically going to call insert on these data frames.
+
+478
+00:29:36,990 --> 00:29:39,846
+And now you'll have some feature groups in here. So let's have a look at
+
+479
+00:29:39,868 --> 00:29:43,494
+what the feature groups look like. We can see here,
+
+480
+00:29:43,612 --> 00:29:47,318
+this is hopsearch here, and we've got a bunch of projects. And this is app
+
+481
+00:29:47,404 --> 00:29:50,754
+hopsearch AI. So it's free to create an account. It's time unlimited.
+
+482
+00:29:50,882 --> 00:29:53,994
+You can build systems on it, and you can see there's a bunch of these
+
+483
+00:29:54,032 --> 00:29:57,226
+feature groups that have been created. One of them is
+
+484
+00:29:57,248 --> 00:30:00,506
+called application. We can see all the features that are in here.
+
+485
+00:30:00,528 --> 00:30:04,240
+There's quite a lot of features, 72 in total.
+
+486
+00:30:05,250 --> 00:30:08,750
+We can see how it's being used as a feature view created from it.
+
+487
+00:30:08,900 --> 00:30:13,114
+You can have expectations, if you want to use great expectations to do data validation
+
+488
+00:30:13,162 --> 00:30:16,194
+before you write to the feature store. And you can see the results of those
+
+489
+00:30:16,232 --> 00:30:19,474
+expectations here, the same, you can create alerts if bad
+
+490
+00:30:19,512 --> 00:30:22,958
+data is being ingested. We can preview some of the data that's
+
+491
+00:30:22,974 --> 00:30:26,466
+in there to just do some EDA. You can see, have a look at some
+
+492
+00:30:26,488 --> 00:30:29,506
+of the data, quite a lot in there. So just give me a random sample
+
+493
+00:30:29,538 --> 00:30:33,394
+of some rows there. We can pre compute statistics
+
+494
+00:30:33,442 --> 00:30:36,946
+over the data so you can understand the distribution. In this case, we got descriptive
+
+495
+00:30:36,978 --> 00:30:40,614
+statistics of the features, and we can see what's happened in this feature group
+
+496
+00:30:40,652 --> 00:30:43,894
+over time. So we had some data written to it earlier,
+
+497
+00:30:43,942 --> 00:30:46,380
+and then we wrote some more data to it later on.
+
+498
+00:30:46,830 --> 00:30:50,582
+So the feature view you can create is the selection of features.
+
+499
+00:30:50,726 --> 00:30:53,966
+So this is what it looks like here, and I'll show you the notebook in
+
+500
+00:30:53,988 --> 00:30:57,274
+a second. We can see the provenance of those features.
+
+501
+00:30:57,322 --> 00:31:00,734
+This one came from this particular feature group bureau. Another one came from
+
+502
+00:31:00,772 --> 00:31:04,894
+application. This is the target column that our supervised machine learning
+
+503
+00:31:04,932 --> 00:31:08,418
+model is going to use as the label. And then
+
+504
+00:31:08,424 --> 00:31:11,746
+we can see any training data sets created from it. So I only created one
+
+505
+00:31:11,768 --> 00:31:15,186
+training data set from it, but let's look at the
+
+506
+00:31:15,208 --> 00:31:18,418
+code for that. So in our feature view, what we do is we just get
+
+507
+00:31:18,424 --> 00:31:22,502
+a reference to these feature groups first, and then we need to select
+
+508
+00:31:22,556 --> 00:31:26,358
+our features. And that's what's happening in here. It calls a query preparation, but really
+
+509
+00:31:26,444 --> 00:31:29,526
+what it's doing is feature selection. So let's call it that,
+
+510
+00:31:29,548 --> 00:31:34,118
+it's feature selection. We're selecting features
+
+511
+00:31:34,294 --> 00:31:37,386
+from a bunch of different feature groups or tables, and we
+
+512
+00:31:37,408 --> 00:31:41,020
+join them together. You can add filters and things in here as well.
+
+513
+00:31:41,550 --> 00:31:44,958
+Now, the point in time correct join is very complex, as you see, but the
+
+514
+00:31:44,964 --> 00:31:48,330
+only code we had to write was this relatively straightforward
+
+515
+00:31:48,410 --> 00:31:52,000
+code in Python. What we can do then is
+
+516
+00:31:52,550 --> 00:31:56,386
+we can add transformation functions. And here what we
+
+517
+00:31:56,408 --> 00:31:58,740
+do is we can see, we're saying, okay,
+
+518
+00:32:00,310 --> 00:32:04,254
+in this particular case we're looking at a mapping
+
+519
+00:32:04,302 --> 00:32:09,714
+transformer here, a label encoder and a standard encoder and we're
+
+520
+00:32:09,762 --> 00:32:13,110
+basically applying those transformation functions then to those select
+
+521
+00:32:13,180 --> 00:32:15,400
+set of features that are defined in here.
+
+522
+00:32:17,050 --> 00:32:20,786
+So basically what it's saying is all the columns that are categorical we're
+
+523
+00:32:20,818 --> 00:32:23,958
+going to apply the label encoder to and all the columns that are numerical we're
+
+524
+00:32:23,974 --> 00:32:27,638
+going to apply the standard encoder to. And that's
+
+525
+00:32:27,654 --> 00:32:30,140
+all going to be captured in this mapping transformer object.
+
+526
+00:32:31,310 --> 00:32:34,978
+So the feature view is created with this selection of features called FG Query.
+
+527
+00:32:35,094 --> 00:32:38,506
+We're applying these transformations to them. We've identified the target column,
+
+528
+00:32:38,538 --> 00:32:41,774
+which is called target funnily enough, and then we've given
+
+529
+00:32:41,812 --> 00:32:45,214
+a name and version so the feature views and the feature groups can both
+
+530
+00:32:45,252 --> 00:32:48,926
+be versioned to enable you to apply ML Ops best principles.
+
+531
+00:32:48,958 --> 00:32:52,498
+Of course, once we have a reference to it and here we're just getting a
+
+532
+00:32:52,504 --> 00:32:55,586
+reference to the feature group again, we don't need to January. It's just if
+
+533
+00:32:55,608 --> 00:32:59,286
+I start my notebook from here it's nice and handy, then what
+
+534
+00:32:59,308 --> 00:33:02,646
+I can do is I can create training data here. I didn't specify the
+
+535
+00:33:02,668 --> 00:33:05,880
+version train data so it just defaulted to version one.
+
+536
+00:33:06,410 --> 00:33:09,598
+And I've created the training data as files and it's
+
+537
+00:33:09,634 --> 00:33:13,002
+a random split with 20% test data and 80% training
+
+538
+00:33:13,056 --> 00:33:16,314
+data. Now the train data
+
+539
+00:33:16,352 --> 00:33:20,106
+sets being created so I could have kept in the same notebook and just
+
+540
+00:33:20,128 --> 00:33:23,514
+gone ahead and read the train data and train. My model I separated into
+
+541
+00:33:23,552 --> 00:33:26,586
+two notebooks. So these two notebooks really make up the training pipeline.
+
+542
+00:33:26,698 --> 00:33:29,482
+In a production system you typically have a single pipeline.
+
+543
+00:33:29,626 --> 00:33:32,606
+But what we can do here is we can get back our feature view and
+
+544
+00:33:32,628 --> 00:33:35,566
+say, hey, that train data has been created as files. I just want to read
+
+545
+00:33:35,588 --> 00:33:39,422
+it up. And I want to read it up, split into my features,
+
+546
+00:33:39,486 --> 00:33:42,866
+the training and test set and then my labels, the Y train and
+
+547
+00:33:42,888 --> 00:33:46,642
+y test from the training and test set. So that's great.
+
+548
+00:33:46,696 --> 00:33:50,182
+Now I can do some messing with the data here,
+
+549
+00:33:50,236 --> 00:33:53,686
+just cleaning up a little bit. Then I can use just a simple model so
+
+550
+00:33:53,708 --> 00:33:56,966
+I can use scikitlearn random forest classifier, I can use
+
+551
+00:33:56,988 --> 00:34:00,790
+XgBoost. I'm just going to fit to my training
+
+552
+00:34:00,860 --> 00:34:04,266
+features, sorry, my features in the
+
+553
+00:34:04,288 --> 00:34:07,562
+training set and my labels in the training set. And now I've got my model
+
+554
+00:34:07,616 --> 00:34:10,314
+and I can predict on the test set and check the accuracy of the model
+
+555
+00:34:10,352 --> 00:34:14,314
+and save the model to the model registry. Then I have an inference
+
+556
+00:34:14,442 --> 00:34:18,078
+pipeline, in this case the batch prediction pipeline. It's going to go
+
+557
+00:34:18,164 --> 00:34:21,946
+to the feature store, connect to the model registry
+
+558
+00:34:21,978 --> 00:34:25,418
+as well, download our model, get some batch data that's
+
+559
+00:34:25,434 --> 00:34:28,386
+going to score with in this case it's getting all the data. But we can
+
+560
+00:34:28,408 --> 00:34:32,434
+specify a time range or a set of ids that we'd like to score for,
+
+561
+00:34:32,552 --> 00:34:35,966
+and then we can go ahead and make our predictions,
+
+562
+00:34:36,078 --> 00:34:39,510
+and then we can save those predictions. So what we're doing is downloading the model
+
+563
+00:34:39,580 --> 00:34:42,886
+first. But once we have the model, then we can make predictions on our
+
+564
+00:34:42,908 --> 00:34:46,934
+data frame and we can save those then predictions to
+
+565
+00:34:47,052 --> 00:34:50,506
+a data store and we're done. So that's it. That's the kind of end to
+
+566
+00:34:50,528 --> 00:34:54,970
+end machine learning system that you can have and build with
+
+567
+00:34:55,040 --> 00:34:58,646
+this feature training inference pipeline
+
+568
+00:34:58,678 --> 00:35:02,314
+architecture. And we do the feature store model registry as the data layer,
+
+569
+00:35:02,362 --> 00:35:06,080
+pulling it all together. If you're curious to find out more,
+
+570
+00:35:06,610 --> 00:35:10,506
+I work with Hopsirix, which is a core part of this new serverless
+
+571
+00:35:10,538 --> 00:35:14,366
+machine training stack. You can go to app hopsearch AI and create
+
+572
+00:35:14,388 --> 00:35:17,906
+a free account or join our slack. But if you really want to learn more
+
+573
+00:35:17,928 --> 00:35:22,114
+about building these service machine learning systems, I recommend you take
+
+574
+00:35:22,152 --> 00:35:25,694
+a course that I developed called serverless ML. It's all Python,
+
+575
+00:35:25,742 --> 00:35:29,302
+pure Python. The course came out in the fall last year,
+
+576
+00:35:29,356 --> 00:35:32,726
+so we weren't using modal or hugging face. There is no hugging face there,
+
+577
+00:35:32,748 --> 00:35:36,674
+I should admit, but it uses GitHub actions instead of modal.
+
+578
+00:35:36,722 --> 00:35:40,466
+But they're both great tools for orchestrating and running Python
+
+579
+00:35:40,498 --> 00:35:45,298
+programs. If you want to learn more, go to serverlessml.org,
+
+580
+00:35:45,474 --> 00:35:49,300
+give it a whirl, and good luck on your journey on serverless machine learning.
+

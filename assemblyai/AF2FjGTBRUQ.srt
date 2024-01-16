@@ -1,0 +1,1684 @@
+1
+00:01:54,330 --> 00:01:57,630
+Cool. Awesome few tech, eh?
+
+2
+00:01:58,290 --> 00:02:02,074
+So to kick things off, my name is Chris Nesbittsmith.
+
+3
+00:02:02,122 --> 00:02:05,762
+I'm based in London and currently an instructor for learn KX
+
+4
+00:02:05,826 --> 00:02:09,318
+and a consultant to various bits of UK government and a
+
+5
+00:02:09,324 --> 00:02:12,822
+tinkerer of open source stuff. I've been using and
+
+6
+00:02:12,876 --> 00:02:16,166
+abusing kubernetes in production since it was 0.4,
+
+7
+00:02:16,268 --> 00:02:19,674
+so believe me when I say it's been a journey. I've certainly
+
+8
+00:02:19,712 --> 00:02:22,380
+got the scars and the war wounds to show for it.
+
+9
+00:02:23,390 --> 00:02:26,870
+So you believe the hype that Kubernetes
+
+10
+00:02:26,950 --> 00:02:30,934
+lets you scale infinitely, auto heal your cluster and
+
+11
+00:02:30,992 --> 00:02:34,426
+so on. So your cluster is self monitoring, it's scaling up instances
+
+12
+00:02:34,458 --> 00:02:37,594
+of your cloud native stateless applications on demand
+
+13
+00:02:37,642 --> 00:02:38,800
+when you need more,
+
+14
+00:02:40,290 --> 00:02:43,842
+but all of a sudden your nodes are full, you can
+
+15
+00:02:43,896 --> 00:02:48,206
+scale no more. Well, enter the cluster autoscaling
+
+16
+00:02:48,238 --> 00:02:51,700
+and of course a splash of yaml in order to save the day.
+
+17
+00:02:52,230 --> 00:02:56,018
+And that can integrate with your cloud vendor to provision
+
+18
+00:02:56,114 --> 00:02:59,446
+more necessary nodes. And the good news is that
+
+19
+00:02:59,468 --> 00:03:03,810
+the autoscaler is configurable. Though sadly,
+
+20
+00:03:03,890 --> 00:03:07,462
+as we'll see, it's not quite as configurable as you might hope
+
+21
+00:03:07,516 --> 00:03:10,986
+or expect. There are alternatives, but the
+
+22
+00:03:11,008 --> 00:03:15,210
+official cluster autoscaling only scales up when there's pending pods
+
+23
+00:03:15,710 --> 00:03:19,370
+in order to satisfy the demand, which is probably a good idea
+
+24
+00:03:19,440 --> 00:03:22,574
+since there's little point adding more nodes unless you have
+
+25
+00:03:22,612 --> 00:03:25,662
+the workload that needs them. Okay,
+
+26
+00:03:25,716 --> 00:03:29,130
+so first let's refresh ourselves on how the Kubernetes
+
+27
+00:03:29,210 --> 00:03:32,874
+kind of scheduler works. So if I create a deployment
+
+28
+00:03:32,922 --> 00:03:36,306
+with two replicas, I do this by submitting some
+
+29
+00:03:36,328 --> 00:03:39,810
+Yaml to the API server, which then writes it to etcd.
+
+30
+00:03:40,310 --> 00:03:43,202
+The controller is watching for this type of event,
+
+31
+00:03:43,336 --> 00:03:46,674
+recognizes it needs to go and create some pods, which it does,
+
+32
+00:03:46,712 --> 00:03:50,338
+and then these are now pending. The scheduler is that there's
+
+33
+00:03:50,354 --> 00:03:53,958
+a component that is looking for pending nodes, sees these, and then
+
+34
+00:03:54,044 --> 00:03:56,790
+schedules or assigns them to a node.
+
+35
+00:03:57,210 --> 00:04:01,194
+The scheduling, however, is broken down into a few steps from the
+
+36
+00:04:01,232 --> 00:04:04,742
+initial queue through filtering viable nodes
+
+37
+00:04:04,806 --> 00:04:08,330
+to then scoring them before actually finally creating the binding.
+
+38
+00:04:09,150 --> 00:04:12,586
+But how does the scheduler know how much memory and cpu
+
+39
+00:04:12,618 --> 00:04:15,418
+a pod uses? Well, it doesn't,
+
+40
+00:04:15,514 --> 00:04:19,802
+strictly speaking. So you need to spoon feed this with requests
+
+41
+00:04:19,866 --> 00:04:23,638
+and limits. So if you don't specify requests and limits,
+
+42
+00:04:23,674 --> 00:04:27,682
+kubernetes will play completely blind. Your cluster will inevitably become
+
+43
+00:04:27,736 --> 00:04:31,566
+overloaded, nodes will become oversubscribed, and you'll be constantly
+
+44
+00:04:31,598 --> 00:04:35,106
+fighting fires. So if your only takeaway from any of this is
+
+45
+00:04:35,128 --> 00:04:38,770
+that all your containers should definitely have requests and limits defined,
+
+46
+00:04:38,850 --> 00:04:42,498
+then we've at least achieved something useful here. So requests
+
+47
+00:04:42,514 --> 00:04:45,922
+are the initial ask and limits are the point where the container will be throttled
+
+48
+00:04:45,986 --> 00:04:48,890
+at cpu or killed if it exceeds the memory.
+
+49
+00:04:50,350 --> 00:04:53,846
+Okay, so applications come in all sorts of shapes
+
+50
+00:04:53,878 --> 00:04:57,894
+and sizes. So you may have some applications that are more cpu intensive
+
+51
+00:04:57,942 --> 00:05:01,870
+and don't require much memory, while on the other hand you may have others
+
+52
+00:05:01,940 --> 00:05:04,990
+that have a greater memory than a cpu footprint.
+
+53
+00:05:05,650 --> 00:05:10,346
+So those applications have to be deployed inside computing
+
+54
+00:05:10,378 --> 00:05:14,226
+units which have again their own cpu and memory kind of
+
+55
+00:05:14,248 --> 00:05:17,934
+characteristics. So for every application deployed
+
+56
+00:05:17,982 --> 00:05:21,694
+in a cluster, Kubernetes makes a note of the memory and cpu
+
+57
+00:05:21,742 --> 00:05:25,426
+requirements. It then decides where to place the application in
+
+58
+00:05:25,448 --> 00:05:28,718
+the cluster. In this case, it's on the far left node.
+
+59
+00:05:28,894 --> 00:05:32,566
+If another application of the same size is deployed, well, Kubernetes goes through that
+
+60
+00:05:32,588 --> 00:05:35,398
+same process and finds the best node to run the app.
+
+61
+00:05:35,564 --> 00:05:38,490
+In this case, it picks the right hand node.
+
+62
+00:05:38,910 --> 00:05:43,094
+As more applications are submitted to the cluster, Kubernetes keeps
+
+63
+00:05:43,142 --> 00:05:46,886
+making nodes of the cpu and memory requirements
+
+64
+00:05:46,998 --> 00:05:49,770
+and allocating these applications in the cluster.
+
+65
+00:05:50,190 --> 00:05:54,338
+If you play this game long enough, you might notice that Kubernetes appears
+
+66
+00:05:54,374 --> 00:05:57,678
+at least to be a reasonably skilled tetris player. So your servers of the
+
+67
+00:05:57,684 --> 00:06:01,134
+board, your apps of the blocks and Kubernetes is trying to
+
+68
+00:06:01,172 --> 00:06:03,760
+fit as many blocks as efficiently as possible.
+
+69
+00:06:05,170 --> 00:06:08,706
+But what about the size of the worker nodes? Well, what kind of
+
+70
+00:06:08,728 --> 00:06:12,814
+instance types can you use to build your cluster? Well, nowadays the cloud vendors
+
+71
+00:06:12,862 --> 00:06:16,098
+make almost every instance type available to be part of
+
+72
+00:06:16,104 --> 00:06:19,030
+the cluster, so you've got pretty much free choice.
+
+73
+00:06:19,610 --> 00:06:23,270
+There is a catch though, so could be forgiven for thinking
+
+74
+00:06:23,340 --> 00:06:26,998
+that if you get an eight gig ram and two cpu node from your
+
+75
+00:06:27,004 --> 00:06:30,474
+cloud vendor, you could deploy four pods that
+
+76
+00:06:30,512 --> 00:06:34,490
+are one and a half gig ram and need a quarter of a cpu.
+
+77
+00:06:34,830 --> 00:06:38,566
+However, it's not quite so one of those pods
+
+78
+00:06:38,598 --> 00:06:42,302
+would remain pending, which if configured will of course cause
+
+79
+00:06:42,356 --> 00:06:45,566
+the cluster autoscaler to go and create a new node and
+
+80
+00:06:45,588 --> 00:06:47,950
+then eventually your workload becomes scheduled.
+
+81
+00:06:48,770 --> 00:06:52,794
+But why is this so? When you provision a managed
+
+82
+00:06:52,842 --> 00:06:56,178
+instance, you might think that the memory and cpu available
+
+83
+00:06:56,264 --> 00:06:59,940
+can be used for running pods. And you are right.
+
+84
+00:07:00,630 --> 00:07:04,194
+However, some memory and cpu should be reserved for
+
+85
+00:07:04,232 --> 00:07:08,194
+the operating system and you should also reserve memory
+
+86
+00:07:08,242 --> 00:07:10,070
+and cpu for the Kubelet.
+
+87
+00:07:10,970 --> 00:07:13,910
+But surely the rest is available to my pods, right?
+
+88
+00:07:13,980 --> 00:07:17,926
+Well, not quite yet. So you also need to reserve some memory for the eviction
+
+89
+00:07:17,958 --> 00:07:21,286
+threshold. So if the kubelet notices that the memory
+
+90
+00:07:21,318 --> 00:07:25,210
+usage is going over that point, it will start evicting nodes.
+
+91
+00:07:26,510 --> 00:07:30,122
+Your cloud vendor will usually choose these numbers for you.
+
+92
+00:07:30,176 --> 00:07:34,186
+For example, say AWS typically reserves 255 meg memory
+
+93
+00:07:34,218 --> 00:07:37,646
+for kubernetes, eleven meg for each pod that you
+
+94
+00:07:37,668 --> 00:07:41,386
+can deploy on that instance. So this is the reserved
+
+95
+00:07:41,418 --> 00:07:44,910
+memory for the Kubernetes. So the cpu reserved is usually around zero
+
+96
+00:07:44,980 --> 00:07:48,210
+three to zero four of a cpu for the operating system.
+
+97
+00:07:48,280 --> 00:07:51,886
+They reserve 100 meg of memory and zero one cpu
+
+98
+00:07:51,918 --> 00:07:55,010
+for the eviction threshold and another 100 meg.
+
+99
+00:07:56,310 --> 00:08:00,146
+So in AWS if you select an m five large, though, here's a visual
+
+100
+00:08:00,178 --> 00:08:03,522
+recap of how the resources are subdivided. With this particular instance,
+
+101
+00:08:03,586 --> 00:08:06,550
+you can deploy 27 nodes.
+
+102
+00:08:07,210 --> 00:08:10,860
+The other thing to consider is all the time that this takes.
+
+103
+00:08:11,790 --> 00:08:15,642
+So let's assume that you've configured your horizontal pod autoscaler or
+
+104
+00:08:15,696 --> 00:08:19,862
+HPA in order to scale up your pods dynamically. So well,
+
+105
+00:08:20,016 --> 00:08:22,910
+that's where the journey probably starts.
+
+106
+00:08:23,410 --> 00:08:27,502
+So to start with, about 90 seconds is what's needed
+
+107
+00:08:27,556 --> 00:08:31,114
+for your horizontal pod autoscaler to react and decide
+
+108
+00:08:31,162 --> 00:08:33,200
+to scale up your application.
+
+109
+00:08:34,610 --> 00:08:38,638
+Then the cluster autoscaler then takes around say 30 seconds
+
+110
+00:08:38,734 --> 00:08:42,770
+to request a new node from the cloud vendor, then around
+
+111
+00:08:42,840 --> 00:08:45,090
+three to four minutes for the machine to boot,
+
+112
+00:08:45,590 --> 00:08:49,014
+and then around another 30 seconds for it to join the cluster and then be
+
+113
+00:08:49,052 --> 00:08:52,486
+ready to run workloads. Then you can of course add on
+
+114
+00:08:52,508 --> 00:08:56,098
+time for pulling your container image that won't be cached on this brand
+
+115
+00:08:56,114 --> 00:08:59,186
+new machine as well record. So to help visualize
+
+116
+00:08:59,218 --> 00:09:03,114
+the impact of this this can have I did a library last
+
+117
+00:09:03,152 --> 00:09:07,174
+year that actually fakes a Kubernetes scheduler. It allows you to specify
+
+118
+00:09:07,222 --> 00:09:10,394
+many different types of pods and model their
+
+119
+00:09:10,432 --> 00:09:14,238
+scaling dynamics, tracking container startup times, so on,
+
+120
+00:09:14,404 --> 00:09:18,526
+and define your node properties. So it takes a lot of shortcuts in
+
+121
+00:09:18,548 --> 00:09:22,462
+order to provide hundreds of thousands of intervals representing kind of days
+
+122
+00:09:22,596 --> 00:09:26,486
+and do that in tens of milliseconds. It's not the real Kubernetes
+
+123
+00:09:26,538 --> 00:09:29,860
+scheduler. Pull requests are very welcome if you'd like to improve it.
+
+124
+00:09:31,030 --> 00:09:33,858
+So to give you a way to play with that, I also made a game
+
+125
+00:09:33,944 --> 00:09:37,378
+as a novelty for Kubecon last year called Black Friday.
+
+126
+00:09:37,554 --> 00:09:41,634
+The scenario is that you're an SRE team supporting a retailer
+
+127
+00:09:41,762 --> 00:09:45,686
+facing a spike in traffic on Black Friday, and then again on
+
+128
+00:09:45,708 --> 00:09:49,462
+cyber Monday with a lull between and a calm before
+
+129
+00:09:49,516 --> 00:09:52,818
+and after she sees
+
+130
+00:09:52,834 --> 00:09:56,266
+some yes, it's a
+
+131
+00:09:56,288 --> 00:10:00,486
+three tier service of a front end, back end and database,
+
+132
+00:10:00,678 --> 00:10:03,950
+all of which have different kind of scaling properties,
+
+133
+00:10:04,530 --> 00:10:07,758
+startup times, et cetera. So we can see some
+
+134
+00:10:07,764 --> 00:10:11,562
+of the details here in the hints. So we can see the properties
+
+135
+00:10:11,626 --> 00:10:15,078
+on our nodes or different node types,
+
+136
+00:10:15,114 --> 00:10:19,170
+and we can see the profile of the
+
+137
+00:10:19,240 --> 00:10:22,686
+front end and similar for the back end. A bit zoomed in at the minute
+
+138
+00:10:22,718 --> 00:10:25,410
+on this presentation. So you can see here.
+
+139
+00:10:25,480 --> 00:10:29,006
+Here's my Friday spike, and here's my cyber Monday
+
+140
+00:10:29,038 --> 00:10:32,840
+spike and how the heuristics of how that trials off.
+
+141
+00:10:34,330 --> 00:10:37,926
+So the goal is to configure your cluster
+
+142
+00:10:37,958 --> 00:10:41,338
+to as closely follow the spike with just enough
+
+143
+00:10:41,424 --> 00:10:44,906
+infrastructure. So failing some requests and getting a
+
+144
+00:10:44,928 --> 00:10:48,646
+few SLA penalties might actually result in a greater
+
+145
+00:10:48,678 --> 00:10:52,110
+profit ultimately. So let's
+
+146
+00:10:52,530 --> 00:10:56,078
+have a kind of play on this. So if I, for example,
+
+147
+00:10:56,164 --> 00:10:59,760
+change my, say, minimum node count down to one,
+
+148
+00:11:00,690 --> 00:11:04,466
+and similarly, just let's, let's see what this looks like. If I
+
+149
+00:11:04,568 --> 00:11:08,020
+drop everything down to start at one instance of everything,
+
+150
+00:11:10,310 --> 00:11:11,300
+1015,
+
+151
+00:11:15,430 --> 00:11:18,958
+you can see I can change the point on when I scale my,
+
+152
+00:11:19,144 --> 00:11:23,522
+when I scale up these, these pods. So let's
+
+153
+00:11:23,586 --> 00:11:27,238
+see. Hopefully that should schedule out and we'll see some failed requests. Yeah,
+
+154
+00:11:27,324 --> 00:11:30,540
+love you. Maybe live demos. Hey.
+
+155
+00:11:37,550 --> 00:11:40,570
+Yep, that's live demo failing.
+
+156
+00:11:41,490 --> 00:11:44,080
+Maybe let's go with. Go with two.
+
+157
+00:11:48,990 --> 00:11:51,610
+Failing to schedule my first interval.
+
+158
+00:11:55,410 --> 00:11:59,358
+Okay, so we can see that in this, we've reached a
+
+159
+00:11:59,364 --> 00:12:02,826
+point where we've
+
+160
+00:12:02,858 --> 00:12:06,478
+got some failed requests right here and
+
+161
+00:12:06,564 --> 00:12:10,366
+some more failed requests on Cyber Monday. So this is where my infrastructure scaling
+
+162
+00:12:10,398 --> 00:12:14,514
+and my pod auto scaling failed to follow the
+
+163
+00:12:14,552 --> 00:12:17,700
+spike up of demand as closely as it needed to.
+
+164
+00:12:19,830 --> 00:12:22,998
+But that has actually only caused me a
+
+165
+00:12:23,004 --> 00:12:26,710
+penalty in this scenario of $1,154.
+
+166
+00:12:26,780 --> 00:12:30,406
+So, in effect, my company is in profit based
+
+167
+00:12:30,428 --> 00:12:34,010
+on where it presumed it would be if it didn't have any auto scaling of
+
+168
+00:12:34,080 --> 00:12:37,050
+about $15,000. So maybe not a bad idea.
+
+169
+00:12:37,120 --> 00:12:40,410
+Perhaps. And you can tune and tweak these numbers.
+
+170
+00:12:40,480 --> 00:12:43,580
+So please do feel free to play with this.
+
+171
+00:12:44,270 --> 00:12:47,726
+May the odds ever be in your favor. Ultimately, this is an
+
+172
+00:12:47,748 --> 00:12:51,150
+experiment to kind of play with and try and get your name on the leaderboard.
+
+173
+00:12:53,010 --> 00:12:56,000
+Cool. Okay, first live demo out the way.
+
+174
+00:12:58,550 --> 00:13:02,340
+What do we do in order to stack some of the nodes in our favor?
+
+175
+00:13:03,430 --> 00:13:07,666
+Well, we can not scale at all. That is always an option
+
+176
+00:13:07,848 --> 00:13:09,810
+and often overlooked.
+
+177
+00:13:11,510 --> 00:13:14,790
+Or what if we could get a head start on the scaling?
+
+178
+00:13:15,210 --> 00:13:18,886
+So maybe not scaling at all. Sounds a bit flippant, but what
+
+179
+00:13:18,908 --> 00:13:22,386
+do I really mean by that? Well, going back to our scenario of fitting
+
+180
+00:13:22,418 --> 00:13:25,846
+our pods on a machine, taking into account the reserves
+
+181
+00:13:25,878 --> 00:13:29,210
+for the Kubernetes, if we sized our machine correctly,
+
+182
+00:13:30,110 --> 00:13:34,154
+we might be able to fit all of our workload in a node. So this
+
+183
+00:13:34,192 --> 00:13:37,834
+isn't easy, given the vast array of possible machine sizes.
+
+184
+00:13:37,962 --> 00:13:41,626
+So we've done some of the hard work for you in this space and created
+
+185
+00:13:41,658 --> 00:13:44,590
+an instance calculator. Next live demo.
+
+186
+00:13:44,660 --> 00:13:47,834
+So with this I can tune and tweak
+
+187
+00:13:47,882 --> 00:13:51,714
+the configuration of my nodes so I can say that I want to look
+
+188
+00:13:51,752 --> 00:13:55,506
+at the efficiency and how many pods I
+
+189
+00:13:55,528 --> 00:13:59,266
+can fit on it, so I can size my pods up in memory and see
+
+190
+00:13:59,288 --> 00:14:03,270
+that dynamically move around. So I can see that I've not got a particularly efficient
+
+191
+00:14:03,690 --> 00:14:07,574
+nodes size. Now I can flip around, I can see that
+
+192
+00:14:07,612 --> 00:14:11,494
+other nodes offer a bearing level of efficiency if
+
+193
+00:14:11,532 --> 00:14:15,930
+my pod looks like it requires these sorts of kind of properties,
+
+194
+00:14:16,750 --> 00:14:20,534
+and I can densely stack my things so I can hunt
+
+195
+00:14:20,582 --> 00:14:24,140
+around for different cloud vendors and pick the right tool,
+
+196
+00:14:24,670 --> 00:14:28,382
+pick the right node for the type, and I can optimize for either
+
+197
+00:14:28,436 --> 00:14:31,182
+cpu or indeed for memory as well,
+
+198
+00:14:31,316 --> 00:14:35,294
+and change some of the properties around demon sets and agents
+
+199
+00:14:35,412 --> 00:14:36,740
+and things like that.
+
+200
+00:14:38,790 --> 00:14:42,606
+Cool. Okay, so finally onto the topic of this webinar.
+
+201
+00:14:42,638 --> 00:14:46,050
+All the waits over, he says
+
+202
+00:14:46,120 --> 00:14:49,250
+his clicker stops working. So what if we could always
+
+203
+00:14:49,320 --> 00:14:53,762
+have at least one node that's ready for when you need it? So removing
+
+204
+00:14:53,826 --> 00:14:57,670
+that three and a bit minute wait. Well, to do this, we can
+
+205
+00:14:57,740 --> 00:15:01,574
+create a placeholder pod that as soon as your workload comes
+
+206
+00:15:01,612 --> 00:15:05,450
+along needing the resource, the placeholder pod becomes evicted,
+
+207
+00:15:05,950 --> 00:15:09,786
+causing your cluster autoscaler to boot a new machine in
+
+208
+00:15:09,808 --> 00:15:13,338
+order to host the new replacement placeholder. And this will continue
+
+209
+00:15:13,424 --> 00:15:17,214
+as you scale into further nodes, keeping you always one
+
+210
+00:15:17,252 --> 00:15:20,782
+step ahead. Okay, now to praise the demo
+
+211
+00:15:20,836 --> 00:15:24,462
+gods again, where I do a real live demo and hope that everything works
+
+212
+00:15:24,516 --> 00:15:28,086
+with a real Kubernetes cluster. I have backup
+
+213
+00:15:28,138 --> 00:15:31,540
+plans of videos if not. So let's have a look.
+
+214
+00:15:32,230 --> 00:15:35,554
+So behind the scenes here, there is a real
+
+215
+00:15:35,592 --> 00:15:38,758
+Kubernetes cluster, and I can prove that in a minute. So we've got
+
+216
+00:15:38,764 --> 00:15:41,878
+a simple application where we can see the effects of clicking on
+
+217
+00:15:41,884 --> 00:15:46,520
+the scale buttons. So if I say to scale to five,
+
+218
+00:15:47,290 --> 00:15:50,630
+we start with one replica, okay.
+
+219
+00:15:50,700 --> 00:15:56,386
+And clicking the five, hopefully that should start across
+
+220
+00:15:56,428 --> 00:15:58,700
+my fingers and hope that the thing that I built works.
+
+221
+00:16:03,730 --> 00:16:06,590
+Cool. Hopefully. So they're pending.
+
+222
+00:16:08,290 --> 00:16:10,670
+Never works. We have a backup plan.
+
+223
+00:16:10,820 --> 00:16:23,026
+Finer they
+
+224
+00:16:23,048 --> 00:16:26,446
+are all there for the browser not loading the timer.
+
+225
+00:16:26,478 --> 00:16:29,922
+Right. So what you would see is this timer starting to count
+
+226
+00:16:29,976 --> 00:16:33,030
+up. We'll ignore it for the minutes, but it will add
+
+227
+00:16:33,100 --> 00:16:36,326
+a. We'll check back in a
+
+228
+00:16:36,348 --> 00:16:39,814
+sec, but what you'll see is this timer should elapse to three minutes.
+
+229
+00:16:39,852 --> 00:16:42,790
+So if you look at the time of how long we've been talking here,
+
+230
+00:16:42,940 --> 00:16:46,666
+it will be about three minutes in order to scale up to
+
+231
+00:16:46,688 --> 00:16:50,298
+have two nodes. So in the minute the cluster auto scaler is going off and
+
+232
+00:16:50,304 --> 00:16:54,234
+asking for a new node, we can do that in a separate
+
+233
+00:16:54,282 --> 00:17:00,366
+instance over here. So I've got two cluster to
+
+234
+00:17:00,388 --> 00:17:03,920
+actually at least show you the timer that actually works. It did.
+
+235
+00:17:06,870 --> 00:17:10,014
+Okay, fine. Live demos.
+
+236
+00:17:10,062 --> 00:17:13,474
+Okay, similarly, so assume that this is like plus 10
+
+237
+00:17:13,512 --> 00:17:16,580
+seconds, the other one's plus how many minutes, fine, we'll come back to them.
+
+238
+00:17:19,270 --> 00:17:22,866
+We started one replica, we scaled to five. So the current node
+
+239
+00:17:22,978 --> 00:17:26,658
+gets saturated with the four nodes and one is left pending behind the scenes.
+
+240
+00:17:26,754 --> 00:17:30,614
+So now the cluster autoscaling is going to request a new node from
+
+241
+00:17:30,652 --> 00:17:34,266
+Linode. So while I stall for about three minutes of what would
+
+242
+00:17:34,288 --> 00:17:37,802
+otherwise be kind of radio silence of me praying for it to kind of work
+
+243
+00:17:37,856 --> 00:17:41,834
+properly, are there any questions I can come
+
+244
+00:17:41,872 --> 00:17:45,518
+to? So, Sam, if we create
+
+245
+00:17:45,604 --> 00:17:49,114
+a prescaled node for each node pool,
+
+246
+00:17:49,162 --> 00:17:52,206
+would that then cost high?
+
+247
+00:17:52,228 --> 00:17:54,800
+Right, so how to turn them off when we're not in use?
+
+248
+00:17:56,150 --> 00:18:00,206
+So, yeah, if you've got a node that's hanging around that's
+
+249
+00:18:00,398 --> 00:18:04,100
+basically just running a placeholder, then yeah,
+
+250
+00:18:04,710 --> 00:18:08,574
+your plan is to ultimately
+
+251
+00:18:08,622 --> 00:18:12,054
+waste some money, ultimately. So your plan is to keep
+
+252
+00:18:12,172 --> 00:18:16,034
+that spare. So this isn't fundamentally an uncommon pattern
+
+253
+00:18:16,082 --> 00:18:19,606
+that you might be used to seeing in
+
+254
+00:18:19,628 --> 00:18:22,854
+other worlds where you might have a raid array, where you might have a hot
+
+255
+00:18:22,892 --> 00:18:26,582
+spare in that, because sure, you can go and get a new
+
+256
+00:18:26,636 --> 00:18:30,218
+drive or something or a new blade unit to throw in the chassis, but if
+
+257
+00:18:30,224 --> 00:18:33,338
+you've got one already wrapped up, it saves you a trip to the data center.
+
+258
+00:18:33,424 --> 00:18:37,566
+So likewise, albeit that's a timeline that normally is measured in
+
+259
+00:18:37,668 --> 00:18:41,214
+best hours, probably days. This is, we're trying
+
+260
+00:18:41,252 --> 00:18:44,398
+to now shave minutes off. So we're at a better place than we might have
+
+261
+00:18:44,404 --> 00:18:46,930
+been with more traditional infrastructure and hardware.
+
+262
+00:18:47,270 --> 00:18:50,546
+But I'll come to some of that point at the end how you
+
+263
+00:18:50,568 --> 00:18:54,210
+might be able to lessen the financial impact
+
+264
+00:18:54,790 --> 00:18:56,690
+of this sort of pattern.
+
+265
+00:18:59,450 --> 00:19:03,254
+So we mentioned oversubscribing the nodes with
+
+266
+00:19:03,292 --> 00:19:07,046
+requests and limits. How does
+
+267
+00:19:07,068 --> 00:19:12,554
+that work when we oversubscribe our vms in VMware? So if
+
+268
+00:19:12,592 --> 00:19:16,426
+you oversubscribe your nodes in
+
+269
+00:19:16,448 --> 00:19:19,882
+the hypervisor, then you are in
+
+270
+00:19:19,936 --> 00:19:23,178
+for a bad day. I guess it's a
+
+271
+00:19:23,184 --> 00:19:26,822
+very short answer. Kubernetes is not
+
+272
+00:19:26,976 --> 00:19:30,318
+how it's designed to work in the same way as you'll notice that Kubernetes does
+
+273
+00:19:30,324 --> 00:19:33,854
+not play well with a swap for
+
+274
+00:19:33,892 --> 00:19:37,394
+memory. It relies on kind of real resource, and you need to really
+
+275
+00:19:37,432 --> 00:19:41,074
+kind of give kubernetes as
+
+276
+00:19:41,112 --> 00:19:45,058
+much as it can get in terms of empowerment to kind
+
+277
+00:19:45,064 --> 00:19:48,898
+of know what's going on. I think
+
+278
+00:19:49,064 --> 00:19:52,454
+on the first node I can see. So I've got two clusters here, there's two
+
+279
+00:19:52,492 --> 00:19:55,814
+tabs. This first cluster has now got its
+
+280
+00:19:55,852 --> 00:19:59,682
+second node. So we should see a second pod.
+
+281
+00:19:59,826 --> 00:20:03,420
+So once that's pending at the minute, I want the other nodes. There we go.
+
+282
+00:20:04,510 --> 00:20:07,674
+Fine. Okay, so that took about three minutes.
+
+283
+00:20:07,712 --> 00:20:11,242
+So sorry, I'll just finish off that question. So,
+
+284
+00:20:11,376 --> 00:20:15,030
+yeah, you really need to give kubernetes as much information as you can in
+
+285
+00:20:15,040 --> 00:20:18,702
+order for it to make the best decision. So like help it, help you
+
+286
+00:20:18,756 --> 00:20:21,520
+ultimately tell it what's going on.
+
+287
+00:20:22,210 --> 00:20:26,222
+That's okay. So as you can see, that took about
+
+288
+00:20:26,276 --> 00:20:29,458
+three minutes for my pod to scale from one to five.
+
+289
+00:20:29,544 --> 00:20:32,946
+The first bit of it was done within about 10 seconds and
+
+290
+00:20:32,968 --> 00:20:36,180
+then the last kind of pending pod took a bit longer.
+
+291
+00:20:36,950 --> 00:20:41,090
+So let's see what the difference is
+
+292
+00:20:41,160 --> 00:20:44,566
+if I use my placeholder pattern. So what I'm going to do is
+
+293
+00:20:44,588 --> 00:20:47,906
+I'm going to scale back down to one should hopefully
+
+294
+00:20:47,938 --> 00:20:51,334
+go and kill my pods. Cool. And then
+
+295
+00:20:51,372 --> 00:20:54,906
+I'm going to deploy my placeholder. So I've shown a minute, this is
+
+296
+00:20:54,928 --> 00:20:58,746
+a real Kubernetes cluster. I've just got some Javascript and
+
+297
+00:20:58,768 --> 00:21:02,550
+a web page that make it like submitting some yaml, just so you've
+
+298
+00:21:03,050 --> 00:21:07,506
+got a visual view of what's going on my other screen, I am panically
+
+299
+00:21:07,638 --> 00:21:11,806
+watching the actual kind of the logs and the events. So now
+
+300
+00:21:11,828 --> 00:21:15,146
+I've got a node here. So I'm back down to my original scenario
+
+301
+00:21:15,178 --> 00:21:18,734
+where I have my one instance of the application running and I
+
+302
+00:21:18,772 --> 00:21:22,282
+have my placeholder nodes keeping the other nodes
+
+303
+00:21:22,346 --> 00:21:25,762
+present. So it's a kind of hack on the auto scaler just to keep
+
+304
+00:21:25,816 --> 00:21:27,860
+like a node available.
+
+305
+00:21:28,970 --> 00:21:32,280
+So now if I click scale to five,
+
+306
+00:21:33,770 --> 00:21:39,398
+I'll quite quickly see that it saturated the first node and in a
+
+307
+00:21:39,404 --> 00:21:43,126
+few seconds. 7 seconds, there we go. My container
+
+308
+00:21:43,158 --> 00:21:46,860
+has now booted in the second node. So we've gone from
+
+309
+00:21:47,230 --> 00:21:50,822
+near on four minutes down to about 7 seconds.
+
+310
+00:21:50,886 --> 00:21:53,930
+Pretty good, right? Cool.
+
+311
+00:21:54,000 --> 00:21:54,620
+Okay,
+
+312
+00:21:57,310 --> 00:22:00,798
+we can turn the placeholder back on and what that will do in
+
+313
+00:22:00,804 --> 00:22:04,458
+the background is that will go off and start another node.
+
+314
+00:22:04,554 --> 00:22:08,010
+Sorry, the placeholder was already on. Sorry, I didn't need to do it. The placeholder
+
+315
+00:22:08,510 --> 00:22:12,846
+was there. So in the background or what's already happening is that the scheduler
+
+316
+00:22:12,878 --> 00:22:15,810
+has started booting another node.
+
+317
+00:22:16,310 --> 00:22:19,490
+So we can do that again in my second cluster.
+
+318
+00:22:21,590 --> 00:22:24,998
+Just stall showing the number of nodes. Fine. Okay. Maybe we
+
+319
+00:22:25,004 --> 00:22:27,480
+won't do it in the second cluster. Something weird is going on there.
+
+320
+00:22:30,010 --> 00:22:31,910
+Fine. At least I had two plans.
+
+321
+00:22:33,230 --> 00:22:36,140
+Cool. Okay, that was the stressful bit out of the way.
+
+322
+00:22:38,670 --> 00:22:40,060
+The slides don't change.
+
+323
+00:22:45,170 --> 00:22:49,022
+Cool. So to prove that this is a real cluster, this is
+
+324
+00:22:49,156 --> 00:22:51,760
+what was just going on just a second ago,
+
+325
+00:22:52,210 --> 00:22:55,566
+looking at the events that were kind
+
+326
+00:22:55,588 --> 00:22:58,906
+of streaming out the cluster, demonstrating the nodes coming up and down and the pods
+
+327
+00:22:58,938 --> 00:23:00,580
+being scaled up and down as I went.
+
+328
+00:23:01,990 --> 00:23:05,106
+We can skip past these because this is the backup videos that I had of
+
+329
+00:23:05,128 --> 00:23:08,962
+it working. Cool. So how did I make this all
+
+330
+00:23:09,016 --> 00:23:12,834
+happen, though? So firstly, we need a placeholder,
+
+331
+00:23:12,882 --> 00:23:16,962
+and that needs to be big enough to know that it will never be schedulable
+
+332
+00:23:17,106 --> 00:23:19,986
+alongside any real workload on a node.
+
+333
+00:23:20,098 --> 00:23:23,746
+So it should be sized big enough in order to fill
+
+334
+00:23:23,788 --> 00:23:27,958
+the whole compute node. Then you need to specify
+
+335
+00:23:28,054 --> 00:23:31,546
+a low priority class in order to make sure that it's evicted as
+
+336
+00:23:31,568 --> 00:23:35,238
+soon as there's a real workload that comes along and needs that capacity.
+
+337
+00:23:35,414 --> 00:23:38,874
+So the placeholder pod competes for resources.
+
+338
+00:23:38,922 --> 00:23:42,778
+So we need to define that. We want it to have that low priority
+
+339
+00:23:42,874 --> 00:23:45,850
+with a priority of minus one. All other pods,
+
+340
+00:23:46,010 --> 00:23:49,814
+even by default ones, will have precedents,
+
+341
+00:23:49,882 --> 00:23:53,540
+and the placeholder is then evicted as soon as the cluster runs out of space.
+
+342
+00:23:56,870 --> 00:23:59,640
+We should hopefully almost maybe.
+
+343
+00:24:00,330 --> 00:24:04,774
+There we go. Bingo. So we've now got our over
+
+344
+00:24:04,812 --> 00:24:08,134
+provisioned node, and if I scale back down to
+
+345
+00:24:08,252 --> 00:24:11,286
+one and turn the placeholder off, we can come back
+
+346
+00:24:11,308 --> 00:24:14,938
+to that at the end and hopefully see that the
+
+347
+00:24:14,944 --> 00:24:18,346
+auto scaler has reduced us back down to zero. That could take
+
+348
+00:24:18,448 --> 00:24:22,540
+a minute or so for the cluster auto scaler to recognize that.
+
+349
+00:24:25,870 --> 00:24:29,294
+Okay, so now for a demo of how this works
+
+350
+00:24:29,332 --> 00:24:33,360
+with autoscaling. However, though. So just now we demoed it with
+
+351
+00:24:33,890 --> 00:24:37,806
+kind of point and click to change the replica count. How does this work
+
+352
+00:24:37,828 --> 00:24:41,458
+in a more real worldish type scenario where you may have your kind
+
+353
+00:24:41,464 --> 00:24:44,706
+of horizontal portal scaling? I'll be
+
+354
+00:24:44,728 --> 00:24:48,178
+honest with you, I have definitely exhausted my credit with the
+
+355
+00:24:48,184 --> 00:24:51,478
+demo gods. So I'm going to be playing some videos here and provide a
+
+356
+00:24:51,484 --> 00:24:55,286
+bit of narration and also save us all hanging around for the three minutes or
+
+357
+00:24:55,308 --> 00:25:02,764
+so that it takes before
+
+358
+00:25:02,802 --> 00:25:05,964
+I start to provide a little orientation. On the left hand side,
+
+359
+00:25:06,002 --> 00:25:09,680
+we can see the request per second that we're serving. The bottom
+
+360
+00:25:09,750 --> 00:25:13,216
+left, you can see the nodes and the pods on them. And you can
+
+361
+00:25:13,238 --> 00:25:17,212
+see my nodes in here again, can take up to four workload
+
+362
+00:25:17,276 --> 00:25:20,544
+pods. I've got a simple application that can handle
+
+363
+00:25:20,592 --> 00:25:24,192
+a fixed number of requests and I'm ramping up traffic.
+
+364
+00:25:24,256 --> 00:25:27,716
+As you can see, we start with two nodes, and we're able to kind of
+
+365
+00:25:27,738 --> 00:25:31,304
+sustainably handle the traffic as it increases in
+
+366
+00:25:31,342 --> 00:25:35,016
+until we fill both nodes. And at that point that
+
+367
+00:25:35,038 --> 00:25:38,296
+the HPA has decided to scale up, and then we
+
+368
+00:25:38,318 --> 00:25:41,516
+finally see the cluster auto scaler in a minute or
+
+369
+00:25:41,538 --> 00:25:45,020
+two's time that I can fast forward start to actually provide
+
+370
+00:25:45,170 --> 00:25:48,060
+the more nodes that will be required.
+
+371
+00:25:50,000 --> 00:25:51,710
+Skip forward a bit. There we go.
+
+372
+00:25:53,440 --> 00:25:57,148
+Cluster auto scale has now come in and provided the extra nodes. So I've
+
+373
+00:25:57,164 --> 00:26:00,736
+manipulated these results a little so as not to leave you waiting too long,
+
+374
+00:26:00,838 --> 00:26:03,856
+which be about around four minutes for
+
+375
+00:26:03,878 --> 00:26:07,152
+the nodes to be available. So in that time,
+
+376
+00:26:07,206 --> 00:26:10,612
+while we were waiting for the nodes to be available, well, the traffic that we
+
+377
+00:26:10,666 --> 00:26:14,436
+were able to kind of service as an application
+
+378
+00:26:14,618 --> 00:26:18,384
+really kind of flattens out. But as soon as we've kind of got the resources,
+
+379
+00:26:18,512 --> 00:26:22,330
+it kind of goes up again, and we can see the recovery curve coming in.
+
+380
+00:26:23,900 --> 00:26:27,720
+Okay, so next round.
+
+381
+00:26:32,380 --> 00:26:36,312
+Yeah, cool. So now we can compare that to our more proactive pattern
+
+382
+00:26:36,376 --> 00:26:39,752
+where we have a placeholder pod that's keeping us a spare
+
+383
+00:26:39,816 --> 00:26:43,212
+node ready at all times. As the traffic builds up,
+
+384
+00:26:43,266 --> 00:26:47,404
+we can see that that placeholder quickly becomes evicted and our workload pods
+
+385
+00:26:47,452 --> 00:26:50,476
+become scheduled. On that node, a new placeholder
+
+386
+00:26:50,508 --> 00:26:53,548
+pod is created as pending, causing the cluster autoscaling
+
+387
+00:26:53,564 --> 00:26:57,744
+to go off and create a new node. So sometimes, however, as happens here,
+
+388
+00:26:57,862 --> 00:27:01,668
+we'll see the traffic buildup in the HPA outpace, the speed at
+
+389
+00:27:01,674 --> 00:27:04,020
+which we were able to stand up the new nodes.
+
+390
+00:27:06,520 --> 00:27:09,876
+There you go. The placeholder pod
+
+391
+00:27:09,908 --> 00:27:12,890
+didn't actually get landed on the nodes until sometime later.
+
+392
+00:27:19,480 --> 00:27:22,836
+As you can see, we're adding nodes, and immediately, we're not even
+
+393
+00:27:22,858 --> 00:27:25,916
+getting the chance to schedule the over provisioning pod
+
+394
+00:27:25,968 --> 00:27:29,304
+in them, though the over provisioning pod has always made sure
+
+395
+00:27:29,342 --> 00:27:32,932
+that we've always had a request in flight to get a new node.
+
+396
+00:27:33,076 --> 00:27:36,476
+But the result of this ultimately is, as you can see here, is that the
+
+397
+00:27:36,498 --> 00:27:39,836
+traffic steadily kind of paces up. There's some
+
+398
+00:27:39,858 --> 00:27:43,516
+bumps, but we can see that there's no kind of
+
+399
+00:27:43,538 --> 00:27:46,680
+flasting out. So there's no point where we actually are
+
+400
+00:27:46,850 --> 00:27:48,690
+failing requests at any point.
+
+401
+00:27:51,780 --> 00:27:55,552
+So this all comes at an inevitable cost. Your plan is,
+
+402
+00:27:55,606 --> 00:27:59,148
+in this case, to always have extra capacity ready and waiting
+
+403
+00:27:59,164 --> 00:28:03,024
+for your workload to require it. What might therefore
+
+404
+00:28:03,072 --> 00:28:06,276
+be some better answers, though? Well, you can tune your
+
+405
+00:28:06,298 --> 00:28:09,940
+workload in order to make sure that you're not leaving gaps.
+
+406
+00:28:10,520 --> 00:28:13,892
+Or better yet, remember that pod priority thing that we used? Well,
+
+407
+00:28:13,946 --> 00:28:17,384
+if you've got workload that suits it on your cluster that could like
+
+408
+00:28:17,422 --> 00:28:21,412
+to run and would give you more return on investment than just a placeholder.
+
+409
+00:28:21,476 --> 00:28:25,336
+So stuff that can handle stopping and starting when
+
+410
+00:28:25,358 --> 00:28:29,284
+it's appropriate to. So perhaps some housekeeping, some analytics
+
+411
+00:28:29,332 --> 00:28:32,604
+and machine learning or maybe just less important services.
+
+412
+00:28:32,722 --> 00:28:36,712
+So you might want to say prioritize the shopping cart supporting
+
+413
+00:28:36,856 --> 00:28:41,084
+applications and nodes over say the customer service desk ones
+
+414
+00:28:41,202 --> 00:28:44,968
+that you can structure, allowing you to structure your cluster
+
+415
+00:28:44,984 --> 00:28:48,860
+workload to be more aligned to your business benefits and goals.
+
+416
+00:28:50,280 --> 00:28:53,668
+I've been Chris Nesbittsmith thank you again for joining me today.
+
+417
+00:28:53,754 --> 00:28:57,348
+Like subscribe, whatever the kids do on LinkedIn, GitHub, whatever you can
+
+418
+00:28:57,354 --> 00:29:00,772
+be. Rest assured there'll be little to no spam since I'm much content
+
+419
+00:29:00,826 --> 00:29:04,436
+at all since I'm awful at self promotion, especially on social media.
+
+420
+00:29:04,538 --> 00:29:08,036
+CNS me just points at my LinkedIn talks. CNS me
+
+421
+00:29:08,058 --> 00:29:10,210
+contains this and some other talks and they're all open.
+

@@ -1,0 +1,924 @@
+1
+00:02:01,060 --> 00:02:04,268
+Hi everyone, this is Shay Lin. This talk I'm
+
+2
+00:02:04,284 --> 00:02:08,096
+going to talk about the streaming aggregation of cloud
+
+3
+00:02:08,198 --> 00:02:12,010
+scale telemetry. First we are going to talk about why
+
+4
+00:02:13,100 --> 00:02:16,760
+were we even talking about telemetry? In what context?
+
+5
+00:02:17,980 --> 00:02:21,672
+Then we are going to touch upon the evolution of
+
+6
+00:02:21,806 --> 00:02:26,412
+telemetry serving platform at confluent and
+
+7
+00:02:26,466 --> 00:02:29,260
+finally deep dive into the architecture.
+
+8
+00:02:31,120 --> 00:02:34,430
+Telemetry is the unit measurement for
+
+9
+00:02:35,280 --> 00:02:38,492
+observability as these foundation of chaos
+
+10
+00:02:38,556 --> 00:02:41,250
+engineering. As we all know,
+
+11
+00:02:42,660 --> 00:02:47,084
+observability is here to establish measurements for the knowns.
+
+12
+00:02:47,212 --> 00:02:49,824
+It helps us to discover the unknown,
+
+13
+00:02:49,872 --> 00:02:52,390
+unknowns. And finally,
+
+14
+00:02:53,080 --> 00:02:57,008
+this is often considered as the prerequisite
+
+15
+00:02:57,184 --> 00:02:59,940
+of continuous experiment.
+
+16
+00:03:01,340 --> 00:03:05,064
+So we're going to talk about Kafka reliability in
+
+17
+00:03:05,102 --> 00:03:07,720
+context of KLS engineering.
+
+18
+00:03:10,140 --> 00:03:13,720
+For those who aren't familiar with Apache Kafka,
+
+19
+00:03:14,160 --> 00:03:17,656
+the Kafka brokers are a compute
+
+20
+00:03:17,688 --> 00:03:21,580
+unit within the Kafka cluster. By nature,
+
+21
+00:03:22,160 --> 00:03:25,256
+brokers handle read and write requests.
+
+22
+00:03:25,368 --> 00:03:29,180
+Simple. It also handles data replication
+
+23
+00:03:29,340 --> 00:03:31,360
+and the partitioning strategy.
+
+24
+00:03:33,620 --> 00:03:37,200
+As simple as it sounds, if we zoom into any given
+
+25
+00:03:37,270 --> 00:03:40,660
+broker, there are quite a few things
+
+26
+00:03:40,730 --> 00:03:44,724
+happening. There's your network threads, there's your
+
+27
+00:03:44,762 --> 00:03:48,404
+IO threads, there's caching disk I o.
+
+28
+00:03:48,522 --> 00:03:49,910
+Everything is happening.
+
+29
+00:03:51,500 --> 00:03:55,144
+So now that we mastered our knowledge of
+
+30
+00:03:55,182 --> 00:03:59,240
+Apache Kafka, let's try and do a global deployment
+
+31
+00:04:00,860 --> 00:04:04,148
+as an SRE. If you look at this graph,
+
+32
+00:04:04,324 --> 00:04:08,616
+you're scared. If your backend engineer or product manager
+
+33
+00:04:08,648 --> 00:04:12,456
+approach you and say, hey shay, can we roll
+
+34
+00:04:12,488 --> 00:04:16,364
+out this feature tomorrow please? And your boss
+
+35
+00:04:16,412 --> 00:04:19,890
+asks, what if us west two is down?
+
+36
+00:04:20,500 --> 00:04:24,464
+Those are the questions you have to answer in order to support
+
+37
+00:04:24,662 --> 00:04:28,690
+continuous rollout and experimentation of your products.
+
+38
+00:04:34,120 --> 00:04:37,936
+The first thing an SRE would do is to start instrumenting
+
+39
+00:04:37,968 --> 00:04:41,524
+telemetry. It means having
+
+40
+00:04:41,642 --> 00:04:45,252
+your client send out telemetry, having your brokers
+
+41
+00:04:45,316 --> 00:04:48,680
+send out telemetry so you have your basics elements coming
+
+42
+00:04:48,750 --> 00:04:52,296
+in. It would probably look like
+
+43
+00:04:52,478 --> 00:04:56,840
+something like this, different elements coming from everywhere
+
+44
+00:04:57,000 --> 00:04:59,870
+and all into a big giant data store.
+
+45
+00:05:01,120 --> 00:05:04,252
+So what do we do about it? After a while,
+
+46
+00:05:04,306 --> 00:05:07,712
+we quickly find out. The usage patterns are as
+
+47
+00:05:07,766 --> 00:05:11,836
+follows. Number of total network invites
+
+48
+00:05:11,868 --> 00:05:15,052
+in the last hour. We're looking for facts.
+
+49
+00:05:15,196 --> 00:05:19,040
+We're also looking for trends. For example, what's the
+
+50
+00:05:19,110 --> 00:05:21,510
+cpu usage in the last seven days?
+
+51
+00:05:22,280 --> 00:05:25,620
+We also try to use this data for diagnostics.
+
+52
+00:05:27,000 --> 00:05:31,268
+And more importantly, things also start to become
+
+53
+00:05:31,354 --> 00:05:35,352
+complex in terms of attribution. You want to see
+
+54
+00:05:35,406 --> 00:05:39,572
+whether there are potential correlations between cpu usage,
+
+55
+00:05:39,636 --> 00:05:43,588
+trend and fetch requests. Think of a typical
+
+56
+00:05:43,684 --> 00:05:45,580
+datadog dashboard.
+
+57
+00:05:51,920 --> 00:05:55,436
+Now that we have a data store rolling and
+
+58
+00:05:55,538 --> 00:05:59,870
+all the telemetry rolling up flowing in
+
+59
+00:06:01,620 --> 00:06:05,890
+things start to make sense a little bit you
+
+60
+00:06:06,340 --> 00:06:09,696
+might have based on the data that you
+
+61
+00:06:09,718 --> 00:06:12,892
+are looking at, you have some basic ideas
+
+62
+00:06:13,036 --> 00:06:17,136
+like clients are often getting declined for unknown
+
+63
+00:06:17,168 --> 00:06:21,364
+reasons and you come up with certain hypotheses such
+
+64
+00:06:21,402 --> 00:06:25,120
+as your fan out could be a problem. Your deployment
+
+65
+00:06:25,200 --> 00:06:29,096
+cannot just support too many connections at the same time.
+
+66
+00:06:29,278 --> 00:06:33,348
+But in many situations,
+
+67
+00:06:33,444 --> 00:06:37,032
+a simple data store cannot support these
+
+68
+00:06:37,086 --> 00:06:42,380
+complex diagnose or attribution analysis.
+
+69
+00:06:44,080 --> 00:06:47,612
+That's where we bring in time series optimized data
+
+70
+00:06:47,666 --> 00:06:48,460
+stores,
+
+71
+00:06:50,400 --> 00:06:54,156
+otherwise known as OLAP datastore. We can use Apache
+
+72
+00:06:54,188 --> 00:06:59,216
+Druid as an example. Here in
+
+73
+00:06:59,238 --> 00:07:02,780
+the bottom, we can simply assume
+
+74
+00:07:02,860 --> 00:07:06,212
+data is flowing in in these near real time manner into
+
+75
+00:07:06,266 --> 00:07:09,584
+the segments. We have a query
+
+76
+00:07:09,632 --> 00:07:13,040
+engine that's smart enough to take in the incoming queries
+
+77
+00:07:13,120 --> 00:07:16,550
+and then fetch data
+
+78
+00:07:17,180 --> 00:07:20,664
+in the corresponding segments. So this
+
+79
+00:07:20,702 --> 00:07:23,880
+works great. Now we have better visibility
+
+80
+00:07:24,300 --> 00:07:27,384
+and faster compute in order to answer questions
+
+81
+00:07:27,502 --> 00:07:29,720
+such as number of fetch requests.
+
+82
+00:07:34,680 --> 00:07:37,732
+As your business grow, you'll probably run
+
+83
+00:07:37,786 --> 00:07:41,604
+into these situation. Your segments are
+
+84
+00:07:41,642 --> 00:07:45,540
+getting filled up quickly. So how does segments even
+
+85
+00:07:45,610 --> 00:07:49,528
+get filled up in the first place? I'd like to think of it as
+
+86
+00:07:49,614 --> 00:07:53,172
+filling a cup of water. You have continuous
+
+87
+00:07:53,236 --> 00:07:56,524
+water raw telemetry that's coming in from a
+
+88
+00:07:56,562 --> 00:08:01,212
+fire. These each
+
+89
+00:08:01,266 --> 00:08:05,496
+water bottle has a capacity limit. Once it's
+
+90
+00:08:05,528 --> 00:08:08,704
+filled up, we push this away,
+
+91
+00:08:08,822 --> 00:08:11,810
+bring the new water bottle and go from there.
+
+92
+00:08:12,580 --> 00:08:16,384
+So you will see segments gets created all the
+
+93
+00:08:16,422 --> 00:08:20,432
+time. And just to put things
+
+94
+00:08:20,486 --> 00:08:24,260
+in perspective, oftentimes for cloud
+
+95
+00:08:24,330 --> 00:08:28,304
+providers like confluent data is flowing
+
+96
+00:08:28,352 --> 00:08:32,036
+in at millions of events per second. And then you
+
+97
+00:08:32,058 --> 00:08:35,172
+can easily accumulate petabyte scale
+
+98
+00:08:35,316 --> 00:08:37,290
+amount of data within an hour.
+
+99
+00:08:39,500 --> 00:08:42,792
+On the consumption side, which is on the upper part of
+
+100
+00:08:42,846 --> 00:08:47,224
+this diagram, you have increasing
+
+101
+00:08:47,272 --> 00:08:51,070
+amount of interest of pulling similar data set.
+
+102
+00:08:51,600 --> 00:08:56,504
+Give me the number of fetch requests for the Kafka cluster XYZ
+
+103
+00:08:56,632 --> 00:09:00,400
+in the last hour and the question is often asked
+
+104
+00:09:00,470 --> 00:09:03,756
+by many different parties. You have your internal
+
+105
+00:09:03,788 --> 00:09:07,436
+customers such as billing Sres,
+
+106
+00:09:07,628 --> 00:09:11,236
+who's making the continuous monitoring, and then on
+
+107
+00:09:11,258 --> 00:09:14,950
+the other side of the house we have your external customers.
+
+108
+00:09:15,800 --> 00:09:19,376
+Obviously for privacy reasons, you don't
+
+109
+00:09:19,408 --> 00:09:23,476
+want external customers to be able to view data of
+
+110
+00:09:23,658 --> 00:09:27,480
+other customers. However, they are very
+
+111
+00:09:27,550 --> 00:09:30,872
+interested in how their own kafka cluster is
+
+112
+00:09:30,926 --> 00:09:31,530
+doing.
+
+113
+00:09:37,460 --> 00:09:41,712
+When we look at the status of these things, to serve highly confluent
+
+114
+00:09:41,776 --> 00:09:45,904
+ingestion and queries at the same time is extremely
+
+115
+00:09:45,952 --> 00:09:50,448
+hard. Some of the concerns that arises are
+
+116
+00:09:50,554 --> 00:09:53,000
+repetitive queries on hot entities.
+
+117
+00:09:54,460 --> 00:09:58,692
+The compute and serving costs are getting extremely expensive.
+
+118
+00:09:58,836 --> 00:10:02,760
+As you can imagine, segments have been created, queries coming
+
+119
+00:10:02,830 --> 00:10:06,536
+in concurrently. And more importantly,
+
+120
+00:10:06,728 --> 00:10:10,684
+it's very hard to control what
+
+121
+00:10:10,882 --> 00:10:14,984
+customer a thinks about this metric versus what billing
+
+122
+00:10:15,032 --> 00:10:17,440
+thinks about this metric.
+
+123
+00:10:18,740 --> 00:10:21,952
+And the goal is to have
+
+124
+00:10:22,006 --> 00:10:25,584
+everyone come to the consensus of hey, this is how
+
+125
+00:10:25,622 --> 00:10:29,092
+we define this particular metric and go from
+
+126
+00:10:29,146 --> 00:10:33,042
+there to
+
+127
+00:10:33,096 --> 00:10:36,766
+solve the problem of serving telemetry
+
+128
+00:10:36,878 --> 00:10:40,498
+at scale. The solution that
+
+129
+00:10:40,504 --> 00:10:44,914
+we landed on is to push asynchronous aggregations
+
+130
+00:10:45,042 --> 00:10:48,360
+through kafka. What that means is,
+
+131
+00:10:50,490 --> 00:10:54,470
+yes, data is still falling into these raw segments.
+
+132
+00:10:54,910 --> 00:10:58,314
+That's all the way on the left. Instead of
+
+133
+00:10:58,352 --> 00:11:02,086
+serving repetitive queries
+
+134
+00:11:02,278 --> 00:11:06,650
+to many different customers and internal usages,
+
+135
+00:11:08,050 --> 00:11:12,090
+the goal is to publish predefined aggregations
+
+136
+00:11:12,170 --> 00:11:15,950
+that are commonly reused everywhere.
+
+137
+00:11:16,930 --> 00:11:20,030
+This is done through Kafka streams,
+
+138
+00:11:20,110 --> 00:11:24,126
+which I'll talk more in a little bit, and then once that's
+
+139
+00:11:24,238 --> 00:11:28,194
+pre aggregated, once the telemetry gets
+
+140
+00:11:28,232 --> 00:11:32,438
+aggregated, we publish it back to
+
+141
+00:11:32,604 --> 00:11:36,674
+our customers as well as druid
+
+142
+00:11:36,802 --> 00:11:39,910
+to store the aggregation segments.
+
+143
+00:11:45,260 --> 00:11:48,780
+Here we have a nice set of Kafka stream topologies.
+
+144
+00:11:49,920 --> 00:11:53,340
+How it works is these is all event driven.
+
+145
+00:11:54,320 --> 00:11:58,252
+Once a segment gets filled up, there are certain
+
+146
+00:11:58,306 --> 00:12:02,288
+signals being sent out. So our service
+
+147
+00:12:02,374 --> 00:12:05,984
+essentially listens to signals coming out of
+
+148
+00:12:06,022 --> 00:12:09,552
+the segments and then start to compute from
+
+149
+00:12:09,606 --> 00:12:14,960
+there. We have a central repository registry
+
+150
+00:12:15,040 --> 00:12:18,580
+for all the metric definitions. That means what are the
+
+151
+00:12:18,650 --> 00:12:21,460
+predefined aggregations that we want to serve?
+
+152
+00:12:23,480 --> 00:12:27,236
+In the first topology, there is a global task
+
+153
+00:12:27,268 --> 00:12:30,376
+manager that tries to break down the task into these
+
+154
+00:12:30,398 --> 00:12:33,924
+smallest unit that we can work with oftentimes.
+
+155
+00:12:33,972 --> 00:12:38,060
+That depends on how many clusters we need to aggregate on
+
+156
+00:12:38,210 --> 00:12:41,672
+what's the metric granularity
+
+157
+00:12:41,736 --> 00:12:43,550
+in terms of space and time.
+
+158
+00:12:44,640 --> 00:12:48,476
+Once the aggregation tasks are created, things are
+
+159
+00:12:48,498 --> 00:12:51,900
+straightforward subtopology.
+
+160
+00:12:51,980 --> 00:12:56,240
+Two in the middle handles all the processing request
+
+161
+00:12:56,980 --> 00:13:00,370
+with external compute. And finally,
+
+162
+00:13:01,140 --> 00:13:05,136
+those predefined aggregations are published into Kafka.
+
+163
+00:13:05,168 --> 00:13:08,740
+Again here. Just to note,
+
+164
+00:13:09,560 --> 00:13:13,396
+there are additional processing that might be
+
+165
+00:13:13,418 --> 00:13:17,640
+needed per your consumption contract.
+
+166
+00:13:17,980 --> 00:13:21,930
+For example, here we are using
+
+167
+00:13:23,180 --> 00:13:27,312
+open telemetry for publishing telemetry metrics.
+
+168
+00:13:27,476 --> 00:13:30,984
+That means certain semantics are applied upon
+
+169
+00:13:31,112 --> 00:13:33,100
+what if it's a content metric,
+
+170
+00:13:34,480 --> 00:13:37,020
+it's a gauge metric, et cetera.
+
+171
+00:13:37,440 --> 00:13:41,088
+You want to make sure that you process and maintain the state
+
+172
+00:13:41,254 --> 00:13:45,308
+in order for your consumers to consume it correctly
+
+173
+00:13:45,404 --> 00:13:49,148
+so that the data isn't duplicated
+
+174
+00:13:49,324 --> 00:13:52,676
+over time. Aside from the
+
+175
+00:13:52,698 --> 00:13:56,500
+Kafka streams solution that we landed on, there are
+
+176
+00:13:56,570 --> 00:14:00,390
+obviously alternative architectures to support this.
+
+177
+00:14:01,480 --> 00:14:03,300
+There are two general routes.
+
+178
+00:14:04,600 --> 00:14:07,400
+One offline custom roll up tasks.
+
+179
+00:14:08,140 --> 00:14:11,464
+This is actually made available in
+
+180
+00:14:11,662 --> 00:14:16,090
+some of these databases today. For example in P zero.
+
+181
+00:14:16,860 --> 00:14:19,420
+This is done through Star Tree index.
+
+182
+00:14:19,920 --> 00:14:23,516
+Essentially, if we look at the
+
+183
+00:14:23,538 --> 00:14:26,812
+current data set, there's likely five different
+
+184
+00:14:26,866 --> 00:14:30,464
+dimensions, and then the goal is to reduce it into,
+
+185
+00:14:30,582 --> 00:14:33,570
+say, three dimensions out of the five.
+
+186
+00:14:34,500 --> 00:14:38,336
+This is done by setting the Star Tree index, and Pinot will
+
+187
+00:14:38,358 --> 00:14:41,680
+handle it through background tasks called mediums.
+
+188
+00:14:42,180 --> 00:14:45,460
+On the other side, our party druid also offers
+
+189
+00:14:46,040 --> 00:14:49,956
+injecting custom roll up tasks and handle it
+
+190
+00:14:49,978 --> 00:14:53,396
+for you. On the
+
+191
+00:14:53,418 --> 00:14:57,156
+other hand, of the things we can always process raw
+
+192
+00:14:57,188 --> 00:15:00,792
+telemetry through stream processing. What we did
+
+193
+00:15:00,846 --> 00:15:04,648
+find out through POC is
+
+194
+00:15:04,814 --> 00:15:08,760
+that your partition strategy
+
+195
+00:15:09,100 --> 00:15:12,664
+should be highly coherent with
+
+196
+00:15:12,782 --> 00:15:15,390
+how you're aggregating your data.
+
+197
+00:15:16,560 --> 00:15:18,270
+If you're not doing so,
+
+198
+00:15:20,100 --> 00:15:23,488
+chances are that you're replicating the data set
+
+199
+00:15:23,654 --> 00:15:27,488
+throughout the process processing schemes, which is often
+
+200
+00:15:27,574 --> 00:15:30,080
+less agile and very expensive.
+
+201
+00:15:31,540 --> 00:15:37,232
+With the scale of data that we are talking about picking
+
+202
+00:15:37,376 --> 00:15:40,544
+one of the architectures, it is understandable
+
+203
+00:15:40,672 --> 00:15:44,820
+that you always need to look at your current state of systems.
+
+204
+00:15:45,260 --> 00:15:49,192
+For example, how's the data
+
+205
+00:15:49,246 --> 00:15:55,576
+store cluster doing? Is it powerful enough to
+
+206
+00:15:55,598 --> 00:15:57,960
+do some additional custom roll ups?
+
+207
+00:15:58,480 --> 00:16:02,476
+How about adding additional clusters? And on the
+
+208
+00:16:02,498 --> 00:16:06,312
+other hand, you need to understand your consumption
+
+209
+00:16:06,456 --> 00:16:10,960
+semantics well, to understand whether shrink processing
+
+210
+00:16:12,260 --> 00:16:13,810
+will meet your needs,
+
+211
+00:16:15,220 --> 00:16:18,784
+we're talking about two dimensions here.
+
+212
+00:16:18,902 --> 00:16:23,128
+One processing through space, other processing
+
+213
+00:16:23,164 --> 00:16:27,424
+through time. And the more compressed
+
+214
+00:16:27,472 --> 00:16:30,976
+your data is, which is these lower end of this curve,
+
+215
+00:16:31,088 --> 00:16:34,724
+it's likely that your compressed data is only going to be able to
+
+216
+00:16:34,762 --> 00:16:37,560
+serve a narrower set of use cases.
+
+217
+00:16:38,300 --> 00:16:42,248
+However, on the other hand, the more
+
+218
+00:16:42,334 --> 00:16:45,050
+dimension your data set have,
+
+219
+00:16:45,740 --> 00:16:48,924
+the more likelihood that you're going to serve a broader set
+
+220
+00:16:48,962 --> 00:16:52,460
+of use cases. So defining
+
+221
+00:16:53,440 --> 00:16:59,772
+what set of predefined aggregations so
+
+222
+00:16:59,826 --> 00:17:03,900
+defining what set of predefined aggregations
+
+223
+00:17:03,980 --> 00:17:07,452
+you want to perform in this kind of aggregation
+
+224
+00:17:07,516 --> 00:17:10,944
+platform in this
+
+225
+00:17:10,982 --> 00:17:14,370
+kind of aggregation engine is key to success.
+
+226
+00:17:19,330 --> 00:17:23,022
+So now we're getting into a much better
+
+227
+00:17:23,076 --> 00:17:26,638
+state. As a
+
+228
+00:17:26,644 --> 00:17:30,226
+site reliability ability engineer, you look at this graph
+
+229
+00:17:30,338 --> 00:17:33,574
+at any given time, correlations are
+
+230
+00:17:33,612 --> 00:17:37,702
+very clear attribution. It's very easy
+
+231
+00:17:37,756 --> 00:17:39,730
+to dive into a specific region.
+

@@ -1,0 +1,1372 @@
+1
+00:00:00,410 --> 00:00:06,174
+Jamaica real
+
+2
+00:00:06,212 --> 00:00:09,578
+time feedback into the behavior of your distributed systems
+
+3
+00:00:09,674 --> 00:00:13,374
+and observing changes exceptions errors in
+
+4
+00:00:13,412 --> 00:00:16,746
+real time allows you to not only experiment with confidence,
+
+5
+00:00:16,858 --> 00:00:20,480
+but respond instantly to get things working again.
+
+6
+00:00:24,610 --> 00:00:49,082
+Close today
+
+7
+00:00:49,136 --> 00:00:52,666
+I'm going to be talking about implementing a performance URL parser
+
+8
+00:00:52,698 --> 00:00:56,158
+from scratch. So before we start, I want to
+
+9
+00:00:56,164 --> 00:00:59,994
+give some a little bit of information about me I'm
+
+10
+00:01:00,042 --> 00:01:03,814
+yold Nizipli. I'm a software engineer. I'm a master's
+
+11
+00:01:03,882 --> 00:01:05,890
+student at Fordham University.
+
+12
+00:01:07,110 --> 00:01:10,782
+I'm a node core collaborator and performance team member.
+
+13
+00:01:10,846 --> 00:01:14,226
+Ive been mainly focusing on text encoders and decoders and the
+
+14
+00:01:14,248 --> 00:01:18,246
+performant in nodeshifts. I'm the creator of
+
+15
+00:01:18,268 --> 00:01:21,030
+URL state machine and fast query string.
+
+16
+00:01:21,770 --> 00:01:25,302
+So let's give a little bit of a background before
+
+17
+00:01:25,356 --> 00:01:28,838
+we start into what URL parses are and
+
+18
+00:01:28,924 --> 00:01:32,266
+how that goes. So a little bit of brief introduction to
+
+19
+00:01:32,288 --> 00:01:36,266
+JavaScript runtimes. So nodejs is a runtime on top
+
+20
+00:01:36,288 --> 00:01:39,770
+of v eight engine, the JavaScript engine behind chromium.
+
+21
+00:01:40,750 --> 00:01:44,302
+Just like Nodejs, Dino is also using v eight and
+
+22
+00:01:44,436 --> 00:01:48,234
+a little bit of new runtime bound GS using webkit
+
+23
+00:01:48,282 --> 00:01:49,550
+as a runtime.
+
+24
+00:01:53,030 --> 00:01:57,246
+Basically in JavaScript runtimes is that whenever
+
+25
+00:01:57,358 --> 00:02:00,686
+you call a function, the javascript under lines user
+
+26
+00:02:00,718 --> 00:02:04,574
+land runs a c plus plus code using a bridge through node js.
+
+27
+00:02:04,702 --> 00:02:08,686
+And the value that you retrieve
+
+28
+00:02:08,718 --> 00:02:12,342
+from the C Plus plus is deserialized on the JavaScript side and then present
+
+29
+00:02:12,396 --> 00:02:15,846
+to the user, which is the developer so computationally has a
+
+30
+00:02:15,868 --> 00:02:21,594
+function living in C plays plus. This means that you don't need to focus
+
+31
+00:02:21,712 --> 00:02:24,826
+any of your code in JavaScript, but you can write it in
+
+32
+00:02:24,848 --> 00:02:28,598
+c if you want to produce performant
+
+33
+00:02:28,774 --> 00:02:32,590
+code. So let's start with URL parsers.
+
+34
+00:02:33,170 --> 00:02:36,318
+Why URL parser matters? So URL parsers are
+
+35
+00:02:36,324 --> 00:02:40,554
+the most important functionality for a web server. Every single network request
+
+36
+00:02:40,602 --> 00:02:43,918
+uses URL parser, and it basically creates
+
+37
+00:02:43,934 --> 00:02:47,490
+the baseline of benchmarks with any
+
+38
+00:02:47,560 --> 00:02:51,186
+network request. So this is
+
+39
+00:02:51,208 --> 00:02:55,086
+an example of a diagram of a request coming to a server. So it's basically
+
+40
+00:02:55,208 --> 00:02:58,870
+on the left side there's this person, let's say Alice or Bob.
+
+41
+00:03:00,730 --> 00:03:04,066
+Bob submits a credential through user
+
+42
+00:03:04,098 --> 00:03:07,942
+agent which sends to the client. The client sends a
+
+43
+00:03:07,996 --> 00:03:11,286
+request, submits the credentials client id, redirect URL
+
+44
+00:03:11,318 --> 00:03:14,666
+to authorization server authorization, returns authorization code,
+
+45
+00:03:14,768 --> 00:03:18,806
+and then user agents like redirects authorization code and client request
+
+46
+00:03:18,838 --> 00:03:22,206
+token and so on and so forth. So basically every arrow from left
+
+47
+00:03:22,228 --> 00:03:25,146
+to right includes a URL,
+
+48
+00:03:25,258 --> 00:03:28,974
+and for every left to right request it
+
+49
+00:03:29,012 --> 00:03:32,878
+needs to parse and understand
+
+50
+00:03:32,964 --> 00:03:36,846
+what that URL is and what the path is. So that's where URL
+
+51
+00:03:36,878 --> 00:03:40,222
+parses come in. So URL parser is a very significant
+
+52
+00:03:40,286 --> 00:03:43,906
+component, but it's too complex and leads to bugs and that's why
+
+53
+00:03:44,008 --> 00:03:47,346
+nobody focuses and nobody wants to focus on
+
+54
+00:03:47,368 --> 00:03:50,630
+it. So this is one of the examples while I was
+
+55
+00:03:50,780 --> 00:03:54,246
+working on this project is that I thought
+
+56
+00:03:54,268 --> 00:03:58,550
+that I found a bug and it seems that like 256-25-6256
+
+57
+00:03:58,620 --> 00:04:02,406
+URL is invalid. And one of the libraries what
+
+58
+00:04:02,428 --> 00:04:05,594
+we URL recommended that actually it worked in Chrome and
+
+59
+00:04:05,632 --> 00:04:09,414
+safari, but not in Node Js. So this means that the initial
+
+60
+00:04:09,462 --> 00:04:12,846
+implementing of a URL parser was somehow wrong or not
+
+61
+00:04:12,868 --> 00:04:16,142
+up to date. So after
+
+62
+00:04:16,196 --> 00:04:19,486
+this feedback that I get, I opened an
+
+63
+00:04:19,508 --> 00:04:23,162
+issue like URL parsers does not relate to IP before with more than four parts.
+
+64
+00:04:23,226 --> 00:04:26,622
+This is one of the issues, URL is not compliant with specification.
+
+65
+00:04:26,686 --> 00:04:30,434
+This is another issue created by me and later they're all
+
+66
+00:04:30,472 --> 00:04:33,646
+fixed. But let's
+
+67
+00:04:33,678 --> 00:04:36,630
+talk about the goal of a URL parser. What is the goal?
+
+68
+00:04:38,090 --> 00:04:42,006
+Basically, if you look into this diagram, you will see on the
+
+69
+00:04:42,108 --> 00:04:46,438
+orange side that HTTPs userpassample.com
+
+70
+00:04:46,524 --> 00:04:50,102
+80 80. So basically HTTPs is the protocol.
+
+71
+00:04:50,166 --> 00:04:54,406
+Username password is an optional value with add characters
+
+72
+00:04:54,518 --> 00:04:57,020
+and then hostname is always there.
+
+73
+00:04:57,470 --> 00:05:01,002
+The port, if it's another special
+
+74
+00:05:01,136 --> 00:05:05,458
+port which is like 80 or four, four three. It's not required because URL parsers
+
+75
+00:05:05,494 --> 00:05:08,974
+understand that. And then we might need some path name
+
+76
+00:05:09,012 --> 00:05:12,206
+and search and hash. So if you look at from this diagram, you can
+
+77
+00:05:12,228 --> 00:05:15,926
+easily say that oh, okay, it's really easy to understand and implement URL parse,
+
+78
+00:05:15,978 --> 00:05:19,090
+right? You just need to get, if it starts with HTTPs,
+
+79
+00:05:19,510 --> 00:05:23,326
+if there's a user and path, what about hostnames? What about ports?
+
+80
+00:05:23,358 --> 00:05:26,674
+What about path name? We want to make sure that the search
+
+81
+00:05:26,712 --> 00:05:30,134
+is a valid one and so on and so forth. But it's not
+
+82
+00:05:30,172 --> 00:05:34,070
+as easy as writing a regex and it's much more complicated.
+
+83
+00:05:34,570 --> 00:05:38,342
+So what is the state machine behind it? There is actually a specification
+
+84
+00:05:38,406 --> 00:05:42,330
+for writing URL parsers and this is an
+
+85
+00:05:42,400 --> 00:05:46,330
+example of it. This represents all of the state machines
+
+86
+00:05:46,750 --> 00:05:50,330
+that needs to traverse
+
+87
+00:05:50,830 --> 00:05:54,174
+in order to complete the URL parser. So if you look at from
+
+88
+00:05:54,212 --> 00:05:57,582
+a much more closer perspective, there is a schema start
+
+89
+00:05:57,636 --> 00:06:01,374
+state scheme. Start state can go to no schema state. Let's say we don't have
+
+90
+00:06:01,412 --> 00:06:04,794
+HTTP HTTPs. If it starts,
+
+91
+00:06:04,842 --> 00:06:08,014
+then it's schema state. Then we need to parse that schema.
+
+92
+00:06:08,062 --> 00:06:11,758
+What is that valid one? What are the valid ones. If it's HTTPs
+
+93
+00:06:11,854 --> 00:06:15,570
+then we might omit the port part because
+
+94
+00:06:15,640 --> 00:06:19,286
+HTTPs is always four four, three. If it's HTTP then
+
+95
+00:06:19,308 --> 00:06:22,562
+it's 80 if it's SSH. So there are some special cases
+
+96
+00:06:22,626 --> 00:06:27,106
+and according to schema state it can go to special authority estate,
+
+97
+00:06:27,218 --> 00:06:30,422
+special relative authority state or relative state.
+
+98
+00:06:30,476 --> 00:06:34,106
+So special authority estate, which means that either I
+
+99
+00:06:34,128 --> 00:06:37,014
+have a username password kind of combination,
+
+100
+00:06:37,062 --> 00:06:40,854
+so I need to parse that state. If it's a special relative or authority
+
+101
+00:06:40,902 --> 00:06:44,086
+state, it can be a file path. In windows it's
+
+102
+00:06:44,118 --> 00:06:47,182
+something else, in Mac OS Unix systems it's something
+
+103
+00:06:47,236 --> 00:06:50,638
+else. And according to that, it can be a relative state. It can be a
+
+104
+00:06:50,644 --> 00:06:54,306
+relative state. So it's not as easy as writing regex or
+
+105
+00:06:54,328 --> 00:06:57,966
+userland. So this is one of the states that are available in the URL
+
+106
+00:06:57,998 --> 00:07:01,678
+parsing specification. So let's
+
+107
+00:07:01,694 --> 00:07:05,138
+dive into scheme start state. So if c
+
+108
+00:07:05,224 --> 00:07:09,154
+sees a character is an ASG alpha append c lowercase
+
+109
+00:07:09,202 --> 00:07:12,722
+to buffer and set the state to schema state. So this is pretty straightforward.
+
+110
+00:07:12,866 --> 00:07:15,974
+Otherwise, if state override is not given, set state
+
+111
+00:07:16,012 --> 00:07:19,666
+to no scheme state and decrease pointer by one, otherwise validationary
+
+112
+00:07:19,698 --> 00:07:23,622
+return further. So if you look at from this perspective, it's pretty straightforward,
+
+113
+00:07:23,686 --> 00:07:28,474
+right? But this is one of the, I think 20 states
+
+114
+00:07:28,592 --> 00:07:31,686
+that are available in this specification. So let's
+
+115
+00:07:31,718 --> 00:07:35,070
+look into a little bit more complex efforts. No scheme state.
+
+116
+00:07:35,220 --> 00:07:38,926
+What happens if I don't have a HTTP, HTTPs and so on and so
+
+117
+00:07:38,948 --> 00:07:42,702
+forth? If base is null or base has an OPAC path and c is not
+
+118
+00:07:42,756 --> 00:07:45,726
+u, which is like hashtag validation error return failure.
+
+119
+00:07:45,758 --> 00:07:49,442
+So first of all we need to know what is an OPAC path? It's all
+
+120
+00:07:49,496 --> 00:07:51,250
+explained in the documentation.
+
+121
+00:07:52,550 --> 00:07:56,114
+Otherwise, if base has an OpAC path and sees an hashtag set
+
+122
+00:07:56,152 --> 00:07:59,742
+URL scheme to the base scheme, URL path to path URL query
+
+123
+00:07:59,806 --> 00:08:03,526
+base and URL fragment to the empty stream. So if my path starts with
+
+124
+00:08:03,548 --> 00:08:06,998
+a hashtag, which means that this is a fragment state, so the URL needs to
+
+125
+00:08:07,004 --> 00:08:10,902
+go to the fragment state and that's one of the end states, otherwise blah.
+
+126
+00:08:10,966 --> 00:08:14,662
+So this is what URL specification
+
+127
+00:08:14,726 --> 00:08:17,580
+URL part of specification is all about.
+
+128
+00:08:19,790 --> 00:08:22,894
+I kind of hear, why are we even
+
+129
+00:08:22,932 --> 00:08:26,494
+talking about it? So the main issue that
+
+130
+00:08:26,532 --> 00:08:30,030
+actually led me to this implementation is that there's a significant
+
+131
+00:08:30,850 --> 00:08:33,854
+performance issue with what Wegrl in node js,
+
+132
+00:08:33,902 --> 00:08:37,954
+and in order to update it there was
+
+133
+00:08:37,992 --> 00:08:41,954
+an issue opened and I
+
+134
+00:08:41,992 --> 00:08:45,538
+wanted to make it faster. So can it be faster? So this is
+
+135
+00:08:45,544 --> 00:08:49,250
+one of the issues re implement was VGrL parser and Wassem.
+
+136
+00:08:49,850 --> 00:08:52,680
+The URL is there for you if you want to look.
+
+137
+00:08:53,290 --> 00:08:56,642
+And it was actually opened by one of the technical
+
+138
+00:08:56,706 --> 00:09:00,078
+steering committee members, which is James Nell.
+
+139
+00:09:00,274 --> 00:09:03,338
+He basically said that it should be possible to realize a
+
+140
+00:09:03,344 --> 00:09:07,238
+significant performant improvement by porting the implementation to WASM.
+
+141
+00:09:07,334 --> 00:09:11,846
+So wasm is webassembly. So if we implementing the URL
+
+142
+00:09:11,878 --> 00:09:15,306
+parser through WASM, then we might get a URL
+
+143
+00:09:15,338 --> 00:09:18,926
+parser. So this was pretty interesting to me, because right now I know what
+
+144
+00:09:18,948 --> 00:09:22,926
+I needed to do. I need to port the implementation in a language that's
+
+145
+00:09:22,958 --> 00:09:26,126
+performant like C or rust,
+
+146
+00:09:26,238 --> 00:09:29,522
+and then I need to expose the API through
+
+147
+00:09:29,576 --> 00:09:32,900
+webassembly so that node js applications can consume it.
+
+148
+00:09:33,910 --> 00:09:37,494
+But before we start, let's take a step back and understand what our
+
+149
+00:09:37,532 --> 00:09:41,346
+options are. Webassembly is really webassembly
+
+150
+00:09:41,378 --> 00:09:44,642
+our only option. The potential solutions,
+
+151
+00:09:44,786 --> 00:09:48,310
+not for writing URL parses, but also for most of the application,
+
+152
+00:09:48,380 --> 00:09:52,390
+is that you can either compile C, rust or any other language
+
+153
+00:09:52,550 --> 00:09:55,834
+through webassembly and expose the API. Or you can
+
+154
+00:09:55,872 --> 00:09:59,142
+write an API which is node API in C rust,
+
+155
+00:09:59,206 --> 00:10:02,526
+and you can actually run the C code and expose it
+
+156
+00:10:02,548 --> 00:10:05,562
+through the c binding. Or you can write a pure Javascript.
+
+157
+00:10:05,626 --> 00:10:09,054
+So we don't want to write and expose our
+
+158
+00:10:09,092 --> 00:10:12,414
+implementation through C
+
+159
+00:10:12,532 --> 00:10:15,966
+and rust through any API, because that's the actual implementing what's
+
+160
+00:10:15,998 --> 00:10:19,986
+happening right now. So let's start with webassembly then.
+
+161
+00:10:20,088 --> 00:10:24,046
+So I chose rust because it's
+
+162
+00:10:24,078 --> 00:10:27,222
+proven that rust is super performance. Actually,
+
+163
+00:10:27,276 --> 00:10:30,738
+I wanted to learn rust. So this is one of the emotional
+
+164
+00:10:30,914 --> 00:10:34,760
+decisions that led to this decision making process.
+
+165
+00:10:35,690 --> 00:10:39,266
+So webassembly and rust is a really good job thanks to Firefox. There are lots
+
+166
+00:10:39,298 --> 00:10:43,082
+of contributions on that side. There are really great libraries, and the ecosystem is ready
+
+167
+00:10:43,136 --> 00:10:46,666
+for mass adoption. And one of the
+
+168
+00:10:46,688 --> 00:10:50,154
+most crucial parts in nodejs, and on top
+
+169
+00:10:50,192 --> 00:10:53,200
+of that there was umdichi. Umdichi is a really good example.
+
+170
+00:10:53,810 --> 00:10:57,742
+It's backed by node and actually
+
+171
+00:10:57,876 --> 00:11:02,010
+by using webassembly and compiling LLA HTTP
+
+172
+00:11:02,090 --> 00:11:07,090
+to webassembly, they had a 1329%
+
+173
+00:11:07,160 --> 00:11:11,214
+performance boost and it was really good, and it was the basis of webassembly.
+
+174
+00:11:11,262 --> 00:11:15,054
+But these are the expectations. But the reality is decoding
+
+175
+00:11:15,102 --> 00:11:17,540
+UTF 16 to UDF eight.
+
+176
+00:11:18,470 --> 00:11:21,926
+Webassembly communication relies on shared memory. Okay, there's some
+
+177
+00:11:21,948 --> 00:11:24,920
+problems with deserialization, and deserialization of that data.
+
+178
+00:11:25,290 --> 00:11:30,182
+Shared memory requires decoding and encoding. So text
+
+179
+00:11:30,236 --> 00:11:33,846
+encoding and decoding in nodejs relies on c plays plus, which means that we're
+
+180
+00:11:33,878 --> 00:11:38,554
+going to use text encoder and text decoder. So why
+
+181
+00:11:38,592 --> 00:11:40,890
+did we end up with text nodejs?
+
+182
+00:11:41,490 --> 00:11:44,954
+So a quick recap. So the goal of this presentation
+
+183
+00:11:45,002 --> 00:11:49,482
+was that we are trying to improve the existing implementing improving
+
+184
+00:11:49,546 --> 00:11:51,710
+by removing the c bridge,
+
+185
+00:11:52,930 --> 00:11:56,554
+but text encoding and decoding in node
+
+186
+00:11:56,602 --> 00:12:00,194
+js relied on c. So let's do a benchmark about
+
+187
+00:12:00,232 --> 00:12:03,570
+all of those things. If you use a webassembly and
+
+188
+00:12:03,640 --> 00:12:07,350
+if you use rust and expose it through webassembly,
+
+189
+00:12:08,490 --> 00:12:11,638
+this is again roughly estimation. This is not a full
+
+190
+00:12:11,724 --> 00:12:15,634
+feature set URL parses that's written in rust, but the rust
+
+191
+00:12:15,682 --> 00:12:18,614
+implementing is 28 24% slower.
+
+192
+00:12:18,742 --> 00:12:22,426
+For URL constructor, this is just by passing the
+
+193
+00:12:22,448 --> 00:12:25,260
+URL and returning an object. That's it.
+
+194
+00:12:26,910 --> 00:12:31,322
+On the other side, URL search param set is 86%
+
+195
+00:12:31,376 --> 00:12:34,926
+slower because whenever you are calling set, get those kind
+
+196
+00:12:34,948 --> 00:12:38,410
+of variables. There's a c plus plus to JavaScript communication,
+
+197
+00:12:38,490 --> 00:12:42,206
+which is we are using webassembly but there's always a bridge between it and for
+
+198
+00:12:42,228 --> 00:12:45,726
+fm it's 96% slower. The main
+
+199
+00:12:45,748 --> 00:12:49,166
+reason for URL search params is slobber is that because it's
+
+200
+00:12:49,198 --> 00:12:52,946
+actually implemented in JavaScript and nodejs. But I wanted to make
+
+201
+00:12:52,968 --> 00:12:57,154
+sure that if it's possible to also improve the URL search parameters implementation
+
+202
+00:12:57,202 --> 00:13:00,386
+too. So it means that it's 86% slower.
+
+203
+00:13:00,418 --> 00:13:02,520
+That's a fact, not a random number.
+
+204
+00:13:03,130 --> 00:13:06,902
+And here we are again, we are starting this
+
+205
+00:13:06,956 --> 00:13:10,694
+presentation from scratch. Can we write a fast URL parser using
+
+206
+00:13:10,732 --> 00:13:14,118
+Javascript? So today I'm going to talk about the road fast URL parser
+
+207
+00:13:14,134 --> 00:13:18,006
+for node js. My name is Dipli and let's start from scratch
+
+208
+00:13:18,038 --> 00:13:20,730
+again. So why Javascript?
+
+209
+00:13:21,090 --> 00:13:24,494
+So if you know, there was three
+
+210
+00:13:24,532 --> 00:13:27,774
+main reasons that we thought what are the three
+
+211
+00:13:27,812 --> 00:13:32,238
+alternatives? We could either use c plays plus and
+
+212
+00:13:32,404 --> 00:13:36,466
+rot through webassembly. We could either use Nodejs API with
+
+213
+00:13:36,568 --> 00:13:39,954
+c, or we could just write
+
+214
+00:13:39,992 --> 00:13:43,154
+any javascript. So existing implementation in C we
+
+215
+00:13:43,192 --> 00:13:46,478
+tried webassembly and did some benchmarking, but it
+
+216
+00:13:46,504 --> 00:13:49,766
+was slow. So there are no other solutions that does not use
+
+217
+00:13:49,788 --> 00:13:53,078
+a c bridge. So I'm kind of limited by the technology
+
+218
+00:13:53,164 --> 00:13:55,670
+of my time as Howard Starkin.
+
+219
+00:13:57,630 --> 00:14:01,526
+So as a result, URL state machine mpm
+
+220
+00:14:01,718 --> 00:14:05,574
+package rise. It's available through GitHub
+
+221
+00:14:05,622 --> 00:14:08,858
+on anonyric URL, which I will include at
+
+222
+00:14:08,864 --> 00:14:12,646
+the end of this presentation. But it basically is a super fast compliant
+
+223
+00:14:12,678 --> 00:14:16,042
+URL state machine for nodejs that's written in JavaScript,
+
+224
+00:14:16,186 --> 00:14:20,206
+but not as fast as I would expect it to be. So this
+
+225
+00:14:20,228 --> 00:14:23,938
+is one of the packages, the usage example. So if you just pass the
+
+226
+00:14:24,024 --> 00:14:28,066
+string of the URL, then it actually returns an object which
+
+227
+00:14:28,088 --> 00:14:32,340
+is scheme username password, and you can retrieve those information.
+
+228
+00:14:33,190 --> 00:14:36,574
+So let's do some benchmarks about the JavaScript implementation
+
+229
+00:14:36,622 --> 00:14:40,146
+of it. There's another library called what we G
+
+230
+00:14:40,168 --> 00:14:44,982
+URL, which provides the same feature set, and it's around 576%
+
+231
+00:14:45,036 --> 00:14:48,802
+slower. URL state machines is yes,
+
+232
+00:14:48,876 --> 00:14:52,934
+five, six times faster, I guess. And the actual URL
+
+233
+00:14:52,982 --> 00:14:56,906
+implementation provided by node js is that it's 85% faster than
+
+234
+00:14:56,928 --> 00:15:00,886
+my solution. So this means that the decoding and
+
+235
+00:15:00,928 --> 00:15:04,314
+encoding side of it, and it's slow, and JavaScript
+
+236
+00:15:04,362 --> 00:15:07,178
+is kind of slow for these particular operations.
+
+237
+00:15:07,354 --> 00:15:11,338
+So there are some of optimizations
+
+238
+00:15:11,354 --> 00:15:14,654
+that I did, and I'm going to talk about those things. So using function versus
+
+239
+00:15:14,702 --> 00:15:18,050
+class, actually up until nodejs 18,
+
+240
+00:15:18,550 --> 00:15:22,366
+up until v eight 9.59.7 version,
+
+241
+00:15:22,558 --> 00:15:26,326
+if you create a class and have private variables on
+
+242
+00:15:26,348 --> 00:15:29,442
+top of it, it was actually 55% slower.
+
+243
+00:15:29,586 --> 00:15:33,302
+And just by converting a class to function, a bit
+
+244
+00:15:33,356 --> 00:15:37,822
+like function prototype kind of keywords,
+
+245
+00:15:37,906 --> 00:15:41,660
+it makes your code 55% faster. So this is one of the first
+
+246
+00:15:42,670 --> 00:15:47,274
+optimizations that I did. The second thing was if
+
+247
+00:15:47,312 --> 00:15:50,880
+you change your conditional function to
+
+248
+00:15:51,890 --> 00:15:56,186
+switch, or if it actually improves
+
+249
+00:15:56,218 --> 00:15:59,070
+your quota. So if you have more than ten keys,
+
+250
+00:16:00,130 --> 00:16:03,226
+if you're doing an if else statement, actually converting it to switch
+
+251
+00:16:03,258 --> 00:16:05,954
+is faster. If you have less than ten,
+
+252
+00:16:06,152 --> 00:16:08,930
+then if is faster. So again,
+
+253
+00:16:09,000 --> 00:16:12,846
+it depends on how your implementation is going, and you need to choose correctly
+
+254
+00:16:12,878 --> 00:16:16,440
+and do some micro benchmarks in order to understand. But again,
+
+255
+00:16:18,410 --> 00:16:21,814
+if you're using a new node version, these dynamics can change because
+
+256
+00:16:21,852 --> 00:16:24,680
+there are micro benchmarking that are based on v eight.
+
+257
+00:16:25,530 --> 00:16:29,090
+So there's another one that like string to number comparison.
+
+258
+00:16:29,170 --> 00:16:32,426
+This is really important because if you want to compare, let's say string, how would
+
+259
+00:16:32,448 --> 00:16:35,734
+you compare two different strings? First you would check for if their lengths
+
+260
+00:16:35,782 --> 00:16:39,514
+are equal. If their lengths are equal, then you would traverse every
+
+261
+00:16:39,552 --> 00:16:43,406
+character one by one and make sure that each character is equal to each
+
+262
+00:16:43,428 --> 00:16:46,926
+other. This means that I need to access all of
+
+263
+00:16:46,948 --> 00:16:50,830
+these compared strings, each character one time, and then
+
+264
+00:16:50,980 --> 00:16:55,582
+make an equal operation and then check it. So this is one of the idiomatic
+
+265
+00:16:55,646 --> 00:16:59,474
+implementations that you need to do. So just
+
+266
+00:16:59,512 --> 00:17:03,250
+by changing my alternative, like my states from strings to
+
+267
+00:17:03,320 --> 00:17:06,322
+numbers, which means that this is one of the changes that I did.
+
+268
+00:17:06,376 --> 00:17:09,320
+The authority 100 schemes start 101,
+
+269
+00:17:10,730 --> 00:17:14,226
+I had a really huge performance.
+
+270
+00:17:14,338 --> 00:17:17,080
+So this is one of the changes that I did,
+
+271
+00:17:17,850 --> 00:17:21,526
+again, really important. One of the other thing is that
+
+272
+00:17:21,548 --> 00:17:25,082
+with slice versus substring. Slice creates a new
+
+273
+00:17:25,216 --> 00:17:29,562
+string, substring does not, but actually
+
+274
+00:17:29,616 --> 00:17:34,000
+slice is faster. This is one of the examples. Instead of having
+
+275
+00:17:34,370 --> 00:17:37,966
+substring this point to plus one and this input length, I just change it
+
+276
+00:17:37,988 --> 00:17:41,198
+with a slice and calculation of fragment is
+
+277
+00:17:41,364 --> 00:17:45,486
+a lot faster. On top of that is none.
+
+278
+00:17:45,598 --> 00:17:49,506
+So defining if it's not a number versus if it's checking for
+
+279
+00:17:49,608 --> 00:17:53,300
+undefined is actually really
+
+280
+00:17:53,750 --> 00:17:57,238
+costly operation. This is one of the mistakes that I did. Not a
+
+281
+00:17:57,244 --> 00:18:00,962
+mistake, but it was mentioned directly in the URL
+
+282
+00:18:01,026 --> 00:18:05,026
+parser specification and I wanted to be 100% compliant
+
+283
+00:18:05,058 --> 00:18:08,870
+to it. So in order to make it faster. Right now I'm starting
+
+284
+00:18:08,940 --> 00:18:12,310
+to divert from the specification
+
+285
+00:18:12,390 --> 00:18:16,266
+and I'm trying to introduce optimizations of it. So this is what happens with
+
+286
+00:18:16,288 --> 00:18:19,910
+all of those runtimes. If you want to make things faster, you need to find
+
+287
+00:18:20,000 --> 00:18:23,120
+shortcuts. And those shortcuts are not always
+
+288
+00:18:25,090 --> 00:18:28,414
+means that you are going to follow specification. And then there
+
+289
+00:18:28,452 --> 00:18:31,706
+might be some uncode issues that might occur.
+
+290
+00:18:31,818 --> 00:18:35,906
+And because you are not following the specification, it will be also super hard for
+
+291
+00:18:35,928 --> 00:18:39,762
+you to track. So yeah, instead of saying core point
+
+292
+00:18:39,816 --> 00:18:43,154
+and accessing grid, I just checked it for if
+
+293
+00:18:43,192 --> 00:18:46,562
+it's undefined, undefined. If it's not, just get the core point at
+
+294
+00:18:46,616 --> 00:18:50,150
+character zero. And this is also a really huge
+
+295
+00:18:50,220 --> 00:18:53,318
+boost. Instead of saying is none, then I'm just
+
+296
+00:18:53,404 --> 00:18:56,200
+checking for if it's undefined again.
+
+297
+00:18:57,630 --> 00:19:01,446
+So one of the again, most important parts
+
+298
+00:19:01,478 --> 00:19:05,862
+of optimization is memorization. If you're recalculating
+
+299
+00:19:05,926 --> 00:19:09,242
+a variable every time, if you're doing comparison many times,
+
+300
+00:19:09,296 --> 00:19:13,726
+then if you store that variable in the memory and then access
+
+301
+00:19:13,908 --> 00:19:17,450
+to that variable in the function callback,
+
+302
+00:19:17,530 --> 00:19:21,086
+then again super fast. So this is
+
+303
+00:19:21,108 --> 00:19:25,090
+one of the optimizations that I did. So the URL
+
+304
+00:19:25,510 --> 00:19:29,042
+specification actually states that you need to check
+
+305
+00:19:29,096 --> 00:19:32,862
+for if the current URL scheme is a special schemes
+
+306
+00:19:33,006 --> 00:19:36,930
+state. So previously I was just checking
+
+307
+00:19:37,590 --> 00:19:41,446
+if it's in an object of special schemes, then I
+
+308
+00:19:41,468 --> 00:19:44,566
+would assume that it was a special URL. But the thing is, you just need
+
+309
+00:19:44,588 --> 00:19:48,586
+to set these if it's a special URL or not, when you
+
+310
+00:19:48,608 --> 00:19:51,930
+are changing the URL scheme, then it's actually a lot faster.
+
+311
+00:19:52,990 --> 00:19:57,034
+So let's do some statistics. So because
+
+312
+00:19:57,072 --> 00:20:00,294
+of the work that I did, there's almost 2000
+
+313
+00:20:00,352 --> 00:20:05,018
+lines of code was written, more than 800 benchmarks
+
+314
+00:20:05,114 --> 00:20:08,654
+was run, and the current implementation is 99.9
+
+315
+00:20:08,692 --> 00:20:12,298
+perfect spec compliant, that's 0.1%.
+
+316
+00:20:12,484 --> 00:20:16,034
+That one test is related to text encoders and
+
+317
+00:20:16,072 --> 00:20:19,326
+like encoding UTF eight and UTF 16.
+
+318
+00:20:19,518 --> 00:20:22,914
+But it again can be completed 100% really
+
+319
+00:20:22,952 --> 00:20:26,894
+easily. There were 733 successful
+
+320
+00:20:26,942 --> 00:20:30,882
+web platform tests that was run in under to make sure that our implementing
+
+321
+00:20:30,946 --> 00:20:34,246
+is correct. And even though I use all
+
+322
+00:20:34,268 --> 00:20:38,810
+of the I tested all of those WPT tests,
+
+323
+00:20:39,630 --> 00:20:43,734
+it was actually 96% covered
+
+324
+00:20:43,782 --> 00:20:47,446
+in the tests. So this means that the URL specification
+
+325
+00:20:47,558 --> 00:20:51,582
+does not have the necessary tests to cover 100%
+
+326
+00:20:51,636 --> 00:20:54,766
+of the code that was written. And I
+
+327
+00:20:54,788 --> 00:20:58,734
+think this should be handled on the web platform test.
+
+328
+00:20:58,932 --> 00:21:02,426
+So performance in terms of
+
+329
+00:21:02,468 --> 00:21:08,050
+performance, the JavaScript based parser was 566 66%
+
+330
+00:21:08,120 --> 00:21:11,442
+faster compared to the other
+
+331
+00:21:11,576 --> 00:21:15,074
+JavaScript implementation, but again it was 95
+
+332
+00:21:15,112 --> 00:21:18,770
+and 96% slower than the native C plus plays implementation.
+
+333
+00:21:18,930 --> 00:21:22,614
+So what basically is that there's a really
+
+334
+00:21:22,652 --> 00:21:25,974
+great guy from Brooklyn that said that great power comes with
+
+335
+00:21:26,012 --> 00:21:29,446
+great responsibility after v eight fixes this performance problem. So we are
+
+336
+00:21:29,468 --> 00:21:33,686
+really dependent on v eight on performance, and I hope we
+
+337
+00:21:33,708 --> 00:21:37,222
+will have some breakthroughs in the future. So a small
+
+338
+00:21:37,276 --> 00:21:41,162
+footnote, this is a product, this, this whole presentation,
+
+339
+00:21:41,226 --> 00:21:44,714
+this whole project was a product of my graduation thesis,
+
+340
+00:21:44,842 --> 00:21:48,286
+Fordham University. And so I would like to thank William Lord from
+
+341
+00:21:48,308 --> 00:21:51,466
+Fordham University, as well as James Nell and Mario
+
+342
+00:21:51,578 --> 00:21:55,518
+Colina from Nodejs and
+
+343
+00:21:55,604 --> 00:21:57,930
+thank you for that. And thank you for listening.
+

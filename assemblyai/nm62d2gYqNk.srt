@@ -1,0 +1,948 @@
+1
+00:02:01,060 --> 00:02:04,896
+Hi everyone. I am Tanveer Gill, co founder and CTO of
+
+2
+00:02:04,918 --> 00:02:08,924
+Flux Ninja. I've spent the better part of last decade working with SRE
+
+3
+00:02:08,972 --> 00:02:12,952
+and DevOps practitioners. I co founded two companies in this space, the last
+
+4
+00:02:13,006 --> 00:02:16,516
+one has in the observability domain, I've gained a deep understanding
+
+5
+00:02:16,548 --> 00:02:19,736
+of the challenges and problems faced by practitioners like yourself.
+
+6
+00:02:19,838 --> 00:02:23,428
+Today, I'm eager to share my insights and knowledge with you in this presentation
+
+7
+00:02:23,524 --> 00:02:27,372
+on graceful degradation, keeping the lights on when everything goes
+
+8
+00:02:27,426 --> 00:02:30,344
+wrong as operators and practitioners,
+
+9
+00:02:30,472 --> 00:02:33,848
+we know all too well that despite our best efforts to design robust
+
+10
+00:02:33,944 --> 00:02:37,708
+microservices, failures are an inevitable reality. Whether it's
+
+11
+00:02:37,724 --> 00:02:40,992
+due to bugs introduced through high velocity development or
+
+12
+00:02:41,046 --> 00:02:45,212
+unexpected traffic spikes, the complex interdependencies of microservices
+
+13
+00:02:45,356 --> 00:02:48,796
+can lead to cascading failures that can take down entire systems.
+
+14
+00:02:48,908 --> 00:02:52,896
+In this presentation, I'll be sharing practical techniques for implementing
+
+15
+00:02:52,928 --> 00:02:56,336
+graceful degradation through prioritized load shedding. By prioritizing
+
+16
+00:02:56,368 --> 00:02:59,892
+which workloads or users receive resources during a degraded state,
+
+17
+00:03:00,026 --> 00:03:03,432
+we can ensure that critical user experiences are preserved and
+
+18
+00:03:03,486 --> 00:03:07,476
+services remain healthy and responsive. I'll help you form an intuition
+
+19
+00:03:07,508 --> 00:03:11,316
+about load management by building up from basic principles of queuing theory
+
+20
+00:03:11,348 --> 00:03:14,872
+and littlestock. These concepts are universally applicable to any
+
+21
+00:03:14,926 --> 00:03:18,828
+system that serves requests, making them pretty valuable tools in
+
+22
+00:03:18,834 --> 00:03:22,616
+your arsenal. So join me as we explore how to keep the lights
+
+23
+00:03:22,648 --> 00:03:26,430
+on even in the face of unexpected failures. If you have any questions
+
+24
+00:03:27,040 --> 00:03:30,912
+during or after the presentation, please feel free. CTO reach out CTo me
+
+25
+00:03:31,046 --> 00:03:34,032
+either over LinkedIn or Twitter. I've shared my handles here.
+
+26
+00:03:34,166 --> 00:03:37,712
+Let's go over the agenda for this presentation. In the first part,
+
+27
+00:03:37,766 --> 00:03:41,404
+we will discuss the consequences of poor load management in microservices.
+
+28
+00:03:41,532 --> 00:03:45,764
+This will involve exploring how failures in one part of the system can impact others.
+
+29
+00:03:45,882 --> 00:03:49,476
+Given the interdependent nature of microservices, we will see how a
+
+30
+00:03:49,498 --> 00:03:52,724
+lack of effective load management can lead to cascading failures and
+
+31
+00:03:52,762 --> 00:03:56,564
+even complete system outage. In the second part, we will examine the limitations
+
+32
+00:03:56,612 --> 00:04:00,276
+of autoscaling as a solution for managing load and microservices.
+
+33
+00:04:00,388 --> 00:04:04,404
+We will use the case study of Pokemon Go's migration to GCLV
+
+34
+00:04:04,532 --> 00:04:08,696
+to understand the limitation of autoscaling and how it can impact the overall performance
+
+35
+00:04:08,728 --> 00:04:12,088
+of a system. The goal of this discussion is to highlight that auto
+
+36
+00:04:12,104 --> 00:04:15,836
+scaling is not a complete solution on its own, but rather a piece in
+
+37
+00:04:15,858 --> 00:04:19,376
+the larger load management puzzle. In the third part, we will discuss the
+
+38
+00:04:19,398 --> 00:04:22,924
+benefits of using concurrency limits in managing load in microservices,
+
+39
+00:04:23,052 --> 00:04:26,476
+but we will also highlight the challenges in implementing concurrency limits
+
+40
+00:04:26,508 --> 00:04:29,984
+in a constantly changing microservices environment. In the last part,
+
+41
+00:04:30,022 --> 00:04:33,616
+we will introduce you to aperture, which addresses these challenges by providing
+
+42
+00:04:33,648 --> 00:04:37,412
+a dynamic and adaptive concurrency limit system. Let's get started.
+
+43
+00:04:37,546 --> 00:04:40,336
+Let's take a look at what happens when a service becomes overwhelmed.
+
+44
+00:04:40,448 --> 00:04:43,508
+The top of the diagram depicts a healthy service under normal load with a
+
+45
+00:04:43,514 --> 00:04:47,336
+steady response time. However, when the service becomes overloaded, requests start to back
+
+46
+00:04:47,358 --> 00:04:50,196
+up and response times skyrocket, eventually leading to timeouts.
+
+47
+00:04:50,228 --> 00:04:53,896
+This is depicted in the lower part of the diagram. There are several reasons why
+
+48
+00:04:53,918 --> 00:04:57,612
+a service may become overwhelmed, including unexpected traffic spikes during
+
+49
+00:04:57,666 --> 00:05:00,972
+new product launches or sales promotions. Or there could be service
+
+50
+00:05:01,026 --> 00:05:04,556
+upgrades that introduce performance regression due to bugs, or there could just
+
+51
+00:05:04,578 --> 00:05:08,136
+be slowdowns in upstream services or third party dependencies. Through load
+
+52
+00:05:08,168 --> 00:05:11,964
+testing, we can determine that a service latency increases under heavy load as various
+
+53
+00:05:12,012 --> 00:05:15,516
+factors such as thread contention, context switching, garbage collection,
+
+54
+00:05:15,628 --> 00:05:19,116
+or I o contention become bottlenecks. These factors lead to a limit
+
+55
+00:05:19,148 --> 00:05:22,876
+on the number of requests a service can process in parallel, and this limit
+
+56
+00:05:22,908 --> 00:05:26,688
+is called the concurrency limit of a service. But no matter how complex the inner
+
+57
+00:05:26,704 --> 00:05:30,084
+workings of a service might be, it can still be modeled through little's law,
+
+58
+00:05:30,202 --> 00:05:33,396
+which states that l the number of requests in flight is
+
+59
+00:05:33,418 --> 00:05:36,808
+equal to lambda the average throughput multiplied by w the
+
+60
+00:05:36,814 --> 00:05:40,100
+average response time. Let's apply little slaw to a microservice.
+
+61
+00:05:40,180 --> 00:05:43,784
+As we discussed, l the maximum number of requests in progress is
+
+62
+00:05:43,822 --> 00:05:47,084
+capped due cto the nature of underlying resources w
+
+63
+00:05:47,202 --> 00:05:50,296
+the response time is predetermined based on the nature of the workload.
+
+64
+00:05:50,408 --> 00:05:54,536
+Thus, the maximum value of maximum average throughput lambda
+
+65
+00:05:54,648 --> 00:05:57,720
+can also be inferred based on these two previous parameters.
+
+66
+00:05:57,800 --> 00:06:01,484
+The service cannot handle any throughput beyond lambda, and any excess requests
+
+67
+00:06:01,532 --> 00:06:04,956
+must queue up in front of the service. Therefore, there is an inflection
+
+68
+00:06:04,988 --> 00:06:08,124
+point whenever the number of requests in lights exceeds the concurrency
+
+69
+00:06:08,172 --> 00:06:11,504
+limit of the service. Beyond this point, any excess requests begin
+
+70
+00:06:11,542 --> 00:06:15,504
+to queue up, leading to an increase in response time latency. The following
+
+71
+00:06:15,552 --> 00:06:19,296
+chart helps to illustrate the impact of a service becoming overwhelmed. The xaxis
+
+72
+00:06:19,328 --> 00:06:22,544
+plots the incoming throughput of requests, while the left y axis
+
+73
+00:06:22,592 --> 00:06:26,788
+shows median latency and the right y axis shows availability represented
+
+74
+00:06:26,804 --> 00:06:30,408
+as a proportion of requests served within timeout. As shown in the left portion of
+
+75
+00:06:30,414 --> 00:06:34,164
+the graph, as long as the number of requests in flight stays within the concurrency
+
+76
+00:06:34,212 --> 00:06:37,316
+limit, latency remains normal. Once the concurrency limit
+
+77
+00:06:37,348 --> 00:06:41,068
+is reached, any increase in throughput contributes to an increase in latency. As a
+
+78
+00:06:41,074 --> 00:06:44,764
+queue begins to build up, the availability line measures the number of requests served within
+
+79
+00:06:44,802 --> 00:06:48,120
+the timeout limit. Once median latency becomes equal to the timeout,
+
+80
+00:06:48,200 --> 00:06:51,964
+the availability drops to 50%. As half of the requests are now timing
+
+81
+00:06:52,012 --> 00:06:55,872
+out has throughput continues to increase, availability rapidly drops to zero.
+
+82
+00:06:56,006 --> 00:06:59,644
+This chart clearly shows the importance of managing load in a service to avoid latency
+
+83
+00:06:59,692 --> 00:07:03,360
+spikes and ensure that requests are being served within the desired time frame.
+
+84
+00:07:03,440 --> 00:07:06,804
+In microservice architectures, the complex web of dependencies means
+
+85
+00:07:06,842 --> 00:07:10,880
+that any failure can quickly escalate into wider outage due to cascading failures.
+
+86
+00:07:11,040 --> 00:07:14,784
+For example, when service a fails, it can also impact service b,
+
+87
+00:07:14,842 --> 00:07:18,456
+which depends on a. Additionally, failures can spread laterally within a service.
+
+88
+00:07:18,558 --> 00:07:21,656
+This can happen when a subset of instances fail, leading to an
+
+89
+00:07:21,678 --> 00:07:25,716
+increased load on the remaining instances. This sudden increase in load can cause these instances
+
+90
+00:07:25,748 --> 00:07:29,144
+to overload and fail, leading to a domino effect that causes a wider
+
+91
+00:07:29,192 --> 00:07:33,144
+outage. It's important to remember that we cannot make assumptions about the reliability
+
+92
+00:07:33,192 --> 00:07:36,364
+of any part of the system to ensure that each subpart of the system
+
+93
+00:07:36,402 --> 00:07:40,396
+can degrade gracefully, it's crucial to implement measures that allow for graceful
+
+94
+00:07:40,428 --> 00:07:44,428
+degradation. By doing so, we can minimize the chance of cascading failures
+
+95
+00:07:44,524 --> 00:07:48,124
+and keep our services up and running even during localized failures.
+
+96
+00:07:48,252 --> 00:07:51,796
+Now that we have a clear understanding of the consequences of poor load management in
+
+97
+00:07:51,818 --> 00:07:55,088
+microservices, let's see if autoscaling could offer a solution.
+
+98
+00:07:55,184 --> 00:07:58,868
+We'll examine the limitations of autoscale and see why it's not sufficient as
+
+99
+00:07:58,874 --> 00:08:02,496
+a standalone load management strategy. Autoscaling is a popular solution
+
+100
+00:08:02,528 --> 00:08:06,324
+for managing load in microservices. While it's great for addressing persistent
+
+101
+00:08:06,372 --> 00:08:09,736
+changes in demand and optimizing cloud compute costs, it's not without its
+
+102
+00:08:09,758 --> 00:08:13,176
+limitations. One of the main limitations is that auto enabling can be slow to
+
+103
+00:08:13,198 --> 00:08:17,116
+respond, especially for services that need some time to be available. This means that
+
+104
+00:08:17,138 --> 00:08:20,830
+it may take some time for auto scaling to actually respond to a change,
+
+105
+00:08:21,440 --> 00:08:25,208
+which can result in increased latency for your end users. Another limitation
+
+106
+00:08:25,224 --> 00:08:28,712
+of auto scaling is that it's limited by resource usage quotas,
+
+107
+00:08:28,776 --> 00:08:33,452
+particularly compute quotas, which are often shared amongst multiple microservices.
+
+108
+00:08:33,596 --> 00:08:36,576
+This means that there may be limits on the number of resources that can be
+
+109
+00:08:36,598 --> 00:08:40,012
+added, which can limit the effectiveness of auto scaling and managing load.
+
+110
+00:08:40,076 --> 00:08:44,384
+Additionally, auto scaling can also contribute to load amplification and dependencies.
+
+111
+00:08:44,432 --> 00:08:47,684
+This means that adding more resources to one part of the system can actually
+
+112
+00:08:47,722 --> 00:08:51,088
+overload other parts of the system, potentially leading to cascading
+
+113
+00:08:51,104 --> 00:08:54,568
+failures. The case study of Pokemon Go's migration to
+
+114
+00:08:54,654 --> 00:08:58,856
+Google Cloud load balancer is a good illustration of this point. In their
+
+115
+00:08:58,958 --> 00:09:02,376
+migration, they moved to GCLB in
+
+116
+00:09:02,398 --> 00:09:05,976
+order to scale the load balancing layer, but it actually resulted in overwhelming their
+
+117
+00:09:05,998 --> 00:09:09,448
+backend stack as the load increased once they scaled the load
+
+118
+00:09:09,464 --> 00:09:13,324
+balancing layer. So this actually ended up prolonging their outage rather
+
+119
+00:09:13,362 --> 00:09:17,004
+than helping. So while auto scaling is a helpful tool for
+
+120
+00:09:17,042 --> 00:09:20,716
+managing load, it's important to be aware of its limitations and to consider graceful
+
+121
+00:09:20,748 --> 00:09:24,236
+degradation techniques such as concurrency limits and prioritized
+
+122
+00:09:24,268 --> 00:09:28,240
+load shedding. Graceful degradation techniques can ensure that services continue
+
+123
+00:09:28,310 --> 00:09:32,048
+to serve at their provision capacity while scaling is performed. In the
+
+124
+00:09:32,054 --> 00:09:35,924
+background in this section, we'll explore how to optimize the availability and
+
+125
+00:09:35,962 --> 00:09:39,236
+performance of a service using concurrency limits. The idea is to
+
+126
+00:09:39,258 --> 00:09:42,388
+set a maximum limit on the number of inflight requests a service can handle at
+
+127
+00:09:42,394 --> 00:09:46,012
+any given time. Any requests beyond that limit would be rejected or loadshed.
+
+128
+00:09:46,096 --> 00:09:49,476
+By setting a concurrency limit, we can ensure that the service remains performant
+
+129
+00:09:49,508 --> 00:09:52,996
+even under high rate of incoming traffic. The approach is based on the assumption
+
+130
+00:09:53,028 --> 00:09:56,216
+that we have a clear understanding of the maximum concurrency limit that
+
+131
+00:09:56,238 --> 00:09:59,768
+the service can support. If we can accurately determine this limit, we can take proactive
+
+132
+00:09:59,784 --> 00:10:02,808
+measures to maintain high performance and availability for our users.
+
+133
+00:10:02,904 --> 00:10:06,856
+Let's take a look at how concurrency limits can help preserve service performance.
+
+134
+00:10:06,968 --> 00:10:10,868
+The following chart provides a visual representation of this concept. On the Xaxis,
+
+135
+00:10:10,904 --> 00:10:15,052
+we have the incoming throughput of requests. The left y axis shows the median latency,
+
+136
+00:10:15,116 --> 00:10:18,816
+while the right y axis shows availability, which is represented as a proportion of
+
+137
+00:10:18,838 --> 00:10:22,596
+requests served before the timeout. As shown on the chart, the availability remains at
+
+138
+00:10:22,618 --> 00:10:26,324
+100% even when the incoming throughput becomes much higher than
+
+139
+00:10:26,362 --> 00:10:30,176
+what the service can process. This is due to the fact that any excess load
+
+140
+00:10:30,208 --> 00:10:33,572
+is shed because of the maximum concurrency limit set on the service.
+
+141
+00:10:33,706 --> 00:10:36,984
+This means that the service can continue to perform optimally even under high
+
+142
+00:10:37,022 --> 00:10:40,596
+traffic. The chart demonstrates how concurrency limits can help us preserve performance
+
+143
+00:10:40,628 --> 00:10:43,476
+and availability for our users even in the face of high traffic.
+
+144
+00:10:43,588 --> 00:10:47,276
+Implementing concurrency limits for a service can help to preserve performance, but it
+
+145
+00:10:47,298 --> 00:10:50,796
+also presents some challenges. One of the main challenges is determining the
+
+146
+00:10:50,818 --> 00:10:53,676
+maximum number of concurrent requests that a service can process.
+
+147
+00:10:53,858 --> 00:10:57,208
+Setting this limit too low can result in requests being rejected
+
+148
+00:10:57,224 --> 00:11:00,816
+even when the service has plenty of capacity. While setting the limit too high can
+
+149
+00:11:00,838 --> 00:11:04,428
+lead to slow and unresponsive servers, it's difficult to determine
+
+150
+00:11:04,444 --> 00:11:07,980
+the maximum concurrency limit in a constantly changing microservices environment.
+
+151
+00:11:08,060 --> 00:11:11,504
+With new deployments, auto scaling, new dependencies,
+
+152
+00:11:11,552 --> 00:11:15,076
+popping up, and changing machine configurations, the ideal value can
+
+153
+00:11:15,098 --> 00:11:19,568
+quickly become outdated, leading to unexpected outages or overloads. This highlights
+
+154
+00:11:19,584 --> 00:11:23,456
+the need for dynamic and adaptive concurrency limits that can adapt to changing workloads
+
+155
+00:11:23,488 --> 00:11:27,352
+and dependencies. Having such a system in place won't just be able to protect against
+
+156
+00:11:27,406 --> 00:11:30,676
+traffic spikes, but also against performance aggressions.
+
+157
+00:11:30,788 --> 00:11:34,212
+Now let's examine how we can implement concurrency limits effectively.
+
+158
+00:11:34,356 --> 00:11:37,908
+As we saw earlier, concurrency limits can be an effective solution for preserving
+
+159
+00:11:37,924 --> 00:11:41,516
+the performance of a service, but it can be challenging to determine the maximum number
+
+160
+00:11:41,538 --> 00:11:44,584
+of concurrent requests that a service can support. Therefore,
+
+161
+00:11:44,632 --> 00:11:48,888
+we will be using the open source project aperture to implement dynamic concurrency limits,
+
+162
+00:11:48,984 --> 00:11:52,176
+which can adapt to changing workloads and dependencies. This is a high
+
+163
+00:11:52,198 --> 00:11:56,224
+level diagram of how aperture agent interfaces with youll service. Aperture agent
+
+164
+00:11:56,262 --> 00:12:00,224
+runs next CTO your services. On each request, the service checks with the aperture agent
+
+165
+00:12:00,262 --> 00:12:03,556
+whether to admit a request or drop it. Aperture agent returns a yes or
+
+166
+00:12:03,578 --> 00:12:06,656
+no answer based on the overall health of the service and the rate of incoming
+
+167
+00:12:06,688 --> 00:12:10,164
+requests. Before we dive deeper, here is some high level information about
+
+168
+00:12:10,202 --> 00:12:13,936
+aperture. Aperture is an open source reliability automation platform.
+
+169
+00:12:14,058 --> 00:12:17,796
+Aperture is designed to help you manage the load and performance of your microservices.
+
+170
+00:12:17,908 --> 00:12:21,544
+With Aperture, you can define and visualize your load management policies using
+
+171
+00:12:21,582 --> 00:12:25,540
+a declarative policy language that's represented as a circuit graph.
+
+172
+00:12:25,620 --> 00:12:28,716
+This makes it easy to understand and maintain your policies over time.
+
+173
+00:12:28,818 --> 00:12:32,152
+Aperture supports a wide range of use cases including concurrency limiting,
+
+174
+00:12:32,216 --> 00:12:35,800
+rate limiting, workload prioritization, and auto scaling.
+
+175
+00:12:35,880 --> 00:12:39,452
+It integrates seamlessly with popular language frameworks so you can quickly
+
+176
+00:12:39,506 --> 00:12:42,796
+and easily add it to your existing environment. And if you're using a service mesh
+
+177
+00:12:42,828 --> 00:12:46,176
+like envoy, you can easily insert aperture into your architecture without having
+
+178
+00:12:46,198 --> 00:12:49,404
+to make any changes to your service. Aperture policies
+
+179
+00:12:49,452 --> 00:12:53,204
+are designed using a circuit graph. These policies can be used as ready to use
+
+180
+00:12:53,242 --> 00:12:56,928
+templates that can work with any service. The policy been shown adjusts
+
+181
+00:12:56,944 --> 00:13:00,708
+the concurrency limit of a service based on response times, which are an indicator of
+
+182
+00:13:00,714 --> 00:13:03,732
+service health. Let's take a closer look at how the circuit works.
+
+183
+00:13:03,866 --> 00:13:07,256
+On the top left, we have a promQl component that queries the response time
+
+184
+00:13:07,278 --> 00:13:10,456
+of a service from Prometheus. Then this response time signal is
+
+185
+00:13:10,478 --> 00:13:14,232
+trended over time using an exponential moving average. The current value
+
+186
+00:13:14,286 --> 00:13:17,308
+of the response time is compared with the long term trend. CTO determine if the
+
+187
+00:13:17,314 --> 00:13:20,776
+service is overloaded. These signals are then fed into an AiMD
+
+188
+00:13:20,808 --> 00:13:24,088
+concurrency control component which controls the concurrency.
+
+189
+00:13:24,264 --> 00:13:27,532
+This control component is inspired by TCP congestion control
+
+190
+00:13:27,586 --> 00:13:31,456
+algorithms, so it gradually increases the concurrency limit of a service by ramping up
+
+191
+00:13:31,478 --> 00:13:35,324
+the throughput. If the response times start deteriorating, there is multiplicative
+
+192
+00:13:35,372 --> 00:13:38,668
+backoff in place to prevent further degradation. To demonstrate
+
+193
+00:13:38,684 --> 00:13:41,616
+the effectiveness of aperture's concurrency control policy,
+
+194
+00:13:41,718 --> 00:13:45,428
+we will be simulating a test traffic scenario. We have designed the service in a
+
+195
+00:13:45,434 --> 00:13:49,056
+way that it can serve only up to ten users concurrently. Using k six load
+
+196
+00:13:49,088 --> 00:13:52,596
+generator, we will alternate the number of users below and above ten users in
+
+197
+00:13:52,618 --> 00:13:56,532
+order to simulate periodic overloads. This will help us show how aperture dynamically
+
+198
+00:13:56,596 --> 00:13:59,716
+adjusts the concurrency limit based on the service health let's
+
+199
+00:13:59,748 --> 00:14:03,508
+compare the response times of the service before and after installing aperture's
+
+200
+00:14:03,524 --> 00:14:06,904
+concurrency control policy. The first panel shows the response times
+
+201
+00:14:06,942 --> 00:14:10,536
+of the service, while the second panel displays the count of different decisions
+
+202
+00:14:10,568 --> 00:14:13,512
+made by aperture's agents on incoming requests.
+
+203
+00:14:13,656 --> 00:14:17,368
+The left part of the chart highlights the issue of high latency without aperture.
+
+204
+00:14:17,464 --> 00:14:21,116
+However, once aperture's policy is in place, it dynamically limits
+
+205
+00:14:21,148 --> 00:14:24,592
+the concurrency as soon as response times start to deteriorate. As a result,
+
+206
+00:14:24,646 --> 00:14:28,176
+the latency remains within a reasonable bound. The second panel shows the number
+
+207
+00:14:28,198 --> 00:14:32,012
+of requests that were accepted or dropped by aperture when the policy is applied.
+
+208
+00:14:32,076 --> 00:14:35,236
+The blue and red lines indicate the number of requests that were dropped by
+
+209
+00:14:35,258 --> 00:14:38,496
+aperture. One important question in load management is determining
+
+210
+00:14:38,528 --> 00:14:42,256
+which requests to admit and which ones to drop. This is where prioritization
+
+211
+00:14:42,288 --> 00:14:46,216
+load shedding comes in. In some cases, certain users or application paths are more
+
+212
+00:14:46,238 --> 00:14:49,956
+important and need to be given higher priority. This requires some sort of scheduling
+
+213
+00:14:49,988 --> 00:14:54,116
+mechanism. Inspired by packet scheduling techniques such as weighted fair queuing,
+
+214
+00:14:54,148 --> 00:14:57,388
+aperture allows sharing resources among users and workloads in
+
+215
+00:14:57,394 --> 00:15:01,464
+a fair manner. For example, you can specify that checkout is a higher priority
+
+216
+00:15:01,512 --> 00:15:05,276
+than slash recommendation or that subscribed users should be
+
+217
+00:15:05,298 --> 00:15:09,336
+allocated a greater share of resources compared to guest users. Aperture scheduler
+
+218
+00:15:09,368 --> 00:15:13,596
+will then automatically figure out how to allocate the resources. In the test traffic
+
+219
+00:15:13,628 --> 00:15:17,424
+scenario, there are equal number of guests and subscribed users. The yellow line
+
+220
+00:15:17,462 --> 00:15:21,144
+in the second panel represents acceptance rate for subscribed user,
+
+221
+00:15:21,212 --> 00:15:25,136
+whereas the green line represents the acceptance rate for the guest users.
+
+222
+00:15:25,248 --> 00:15:28,964
+As can be seen, during the overload condition, subscribed users are getting
+
+223
+00:15:29,002 --> 00:15:32,308
+roughly four times the acceptance rate of guest users due CTO the
+
+224
+00:15:32,314 --> 00:15:36,084
+higher priority assigned to them. And that concludes our talk on graceful degradation,
+
+225
+00:15:36,132 --> 00:15:39,524
+keeping the lights on when everything goes wrong I hope you have gained valuable
+
+226
+00:15:39,572 --> 00:15:43,748
+insights on how to improve the reliability of your microservices through graceful degradation.
+
+227
+00:15:43,844 --> 00:15:47,704
+In this presentation, we have covered the importance of load management and microservices and
+
+228
+00:15:47,742 --> 00:15:51,608
+the consequences of poor load management. We've also explored the limitations of auto
+
+229
+00:15:51,624 --> 00:15:55,256
+scaling and the challenges of implementing concurrency limits. We introduce
+
+230
+00:15:55,288 --> 00:15:59,004
+you to aperture, a platform for reliability automation which brings rate
+
+231
+00:15:59,042 --> 00:16:02,316
+limits and concurrency limits to any service and even performs load
+
+232
+00:16:02,348 --> 00:16:05,504
+based auto scaling. With its integration with Prometheus and the ability to
+
+233
+00:16:05,542 --> 00:16:09,088
+perform continuous signal processing on matrix, Aperture offers a
+
+234
+00:16:09,094 --> 00:16:13,136
+comprehensive solution for controlling and automating microservices. We encourage you to check
+
+235
+00:16:13,158 --> 00:16:17,324
+out the aperture project on GitHub and give it a try. Your feedback and contributions
+
+236
+00:16:17,372 --> 00:16:20,208
+are always welcome to help us improve the platform and make it better for the
+
+237
+00:16:20,214 --> 00:16:22,230
+community. Thank for joining us for this talk today.
+
