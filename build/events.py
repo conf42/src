@@ -10,8 +10,8 @@ from .shared import (
     pick_picture_file,
     start_time,
 )
-from .transcript import (
-    process_transcript,
+from .assemblyai import (
+    read_transcript,
 )
 english_dict = get_dict()
 
@@ -165,13 +165,9 @@ def get_enriched_metadata(base_folder):
             talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
 
             # check if transcript exists
-            try:
-                with open(f"./transcripts_talks/{talk['YouTubeId']}.txt", "r") as f:
-                    talk["transcript"] = f.read()
-                talk["transcript_elements"] = process_transcript(talk["transcript"])
-            except:
-                pass
-
+            transcript = read_transcript(talk["YouTubeId"])
+            if transcript:
+                talk["transcript"] = transcript
 
     return context
 
