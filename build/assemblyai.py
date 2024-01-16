@@ -54,5 +54,27 @@ def write_transcript(yt_id, transcript):
         f.write(transcript.export_subtitles_srt())
     
 def read_transcript(yt_id):
-    with open(get_transcript_path(yt_id), "r") as f:
-        return json.loads(f.read())
+    transcript = dict(chunks=[])
+    # read the json
+    try:
+        with open(get_transcript_path(yt_id), "r") as f:
+            transcript["metadata"] = json.loads(f.read())
+    except:
+        return None
+    # read the srt, if present, and parse for easy usage
+    try:
+        with open(get_transcript_path(yt_id, extension=".srt"), "r") as f:
+            transcript["srt"] = f.read()
+        for elem in transcript["srt"].split("\n\n"):
+            _, time_line, text = elem.split("\n")
+            time_start = time_line.split(" ")[0]
+            transcript["chunks"].append(dict(
+                text=text,
+                timestamp=time_start,
+                timestamp_s=0, # TODO
+            ))
+    except:
+        pass
+    # process the srt into an array
+
+    return transcript
