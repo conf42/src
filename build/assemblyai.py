@@ -6,6 +6,8 @@ CACHE_PATH = "./assemblyai"
 
 
 def get_transcript_path(yt_id, extension=".json"):
+    if "https://" in yt_id:
+        yt_id = yt_id.split("/")[-1]
     return os.path.join(CACHE_PATH, yt_id + extension)
 
 def check_transcript_exists(yt_id):
