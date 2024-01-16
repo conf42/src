@@ -1,0 +1,2156 @@
+1
+00:02:08,710 --> 00:02:12,406
+Thanks for joining me today. I'm Christine
+
+2
+00:02:12,598 --> 00:02:15,866
+and I'm going to start with a disclaimer. Honeycomb is
+
+3
+00:02:15,888 --> 00:02:19,706
+an observability tool, but the techniques that I'll describe today should
+
+4
+00:02:19,728 --> 00:02:23,834
+be transferable to your tool of about this
+
+5
+00:02:23,872 --> 00:02:27,814
+will draw from our experience of building on llms,
+
+6
+00:02:27,942 --> 00:02:32,246
+but should apply to whatever LLM and observability stack
+
+7
+00:02:32,358 --> 00:02:35,986
+you're using today. All right,
+
+8
+00:02:36,048 --> 00:02:39,714
+it software in 2023 feels more like
+
+9
+00:02:39,752 --> 00:02:43,358
+magic than it ever has before. There are llms everywhere
+
+10
+00:02:43,534 --> 00:02:47,278
+with a cheap API call to your provider of choice.
+
+11
+00:02:47,454 --> 00:02:51,650
+It feels like every CEO or even CEO
+
+12
+00:02:51,810 --> 00:02:55,766
+is now turning to their teams and asking how llms can be incorporated into
+
+13
+00:02:55,788 --> 00:03:00,150
+their core product. Many are reaching to define an AI strategy,
+
+14
+00:03:00,570 --> 00:03:04,138
+and there's lots to be excited about here. It's cool to be squarely in
+
+15
+00:03:04,144 --> 00:03:07,754
+the middle of a phase change in progress where everything is new to
+
+16
+00:03:07,792 --> 00:03:11,914
+everyone altogether. But there's also a reality check to trying
+
+17
+00:03:11,952 --> 00:03:15,598
+to suddenly incorporate all this new technology into our products.
+
+18
+00:03:15,764 --> 00:03:19,406
+There's suddenly a lot more demand for AI functionality than
+
+19
+00:03:19,428 --> 00:03:23,898
+there are people who carry expertise for it and software engineering teams
+
+20
+00:03:23,994 --> 00:03:27,742
+everywhere sre often just diving in to figure it out
+
+21
+00:03:27,876 --> 00:03:30,914
+because we're the only ones left. Which to be clear,
+
+22
+00:03:30,952 --> 00:03:34,126
+is just fine by me. As someone who used to identify as a generalist software
+
+23
+00:03:34,158 --> 00:03:37,582
+engineer, the fewer silos we can build in this industry,
+
+24
+00:03:37,726 --> 00:03:41,318
+the better. Because on one know,
+
+25
+00:03:41,404 --> 00:03:45,014
+using a large language model through an API is like any other
+
+26
+00:03:45,052 --> 00:03:48,406
+black box you interact with via API. Lots of
+
+27
+00:03:48,428 --> 00:03:51,866
+consistent expectations we can set about how we make sense of these
+
+28
+00:03:51,888 --> 00:03:55,014
+APIs, how we send parameters
+
+29
+00:03:55,062 --> 00:03:56,170
+to the API,
+
+30
+00:03:58,110 --> 00:04:01,994
+what types and scopes those inputs will
+
+31
+00:04:02,032 --> 00:04:05,310
+be, what we'll get back from those APIs,
+
+32
+00:04:06,130 --> 00:04:09,726
+and it's usually done over a standard protocol. And so all of these
+
+33
+00:04:09,748 --> 00:04:12,670
+properties make working with APIs,
+
+34
+00:04:13,490 --> 00:04:16,118
+these black boxes of logic,
+
+35
+00:04:16,314 --> 00:04:20,210
+into something that is testable and mockable,
+
+36
+00:04:20,550 --> 00:04:24,754
+a pretty reliable component in our system. But there's one key difference
+
+37
+00:04:24,872 --> 00:04:29,410
+between having your application behavior relied on an LLM versus,
+
+38
+00:04:29,570 --> 00:04:33,730
+say, a payments provider. That difference is how predictable
+
+39
+00:04:33,810 --> 00:04:38,082
+the behavior of that black box is, which then in turn influences
+
+40
+00:04:38,146 --> 00:04:41,346
+how testable or how mockable it is. And that
+
+41
+00:04:41,388 --> 00:04:44,998
+difference ends up breaking apart all the different techniques
+
+42
+00:04:45,014 --> 00:04:48,970
+that we've built up along the years for making sense of these complex systems.
+
+43
+00:04:49,310 --> 00:04:53,690
+With normal APIs, you can write unit best.
+
+44
+00:04:54,290 --> 00:04:57,454
+With an API you can conceivably scope or
+
+45
+00:04:57,492 --> 00:05:01,594
+predict the full range of inputs in a useful way. On the LLMs
+
+46
+00:05:01,642 --> 00:05:05,502
+side, you're not working
+
+47
+00:05:05,556 --> 00:05:09,458
+with just the full range of negative and positive numbers.
+
+48
+00:05:09,624 --> 00:05:13,470
+You've got a long tail of literally what we're soliciting
+
+49
+00:05:13,550 --> 00:05:16,770
+is free form natural language input from users.
+
+50
+00:05:17,590 --> 00:05:21,206
+We're not going to be able to have a reasonable test suite that we
+
+51
+00:05:21,228 --> 00:05:25,750
+can run reliably for reproducibility
+
+52
+00:05:26,730 --> 00:05:30,098
+APIs. Again, especially if it's
+
+53
+00:05:30,114 --> 00:05:34,038
+a software, as a service, it's something very consistent. You have
+
+54
+00:05:34,044 --> 00:05:37,994
+a payments service, typically when you say debit $5
+
+55
+00:05:38,032 --> 00:05:41,130
+from my bank account, the balance goes down by $5. It's predictable.
+
+56
+00:05:43,070 --> 00:05:46,222
+Ideally it's item potent, where if you're doing the same
+
+57
+00:05:46,276 --> 00:05:48,430
+transaction, bank account aside,
+
+58
+00:05:49,730 --> 00:05:53,406
+there's no additional strange side effects on
+
+59
+00:05:53,428 --> 00:05:57,394
+the LLM side. The way that many of these public
+
+60
+00:05:57,432 --> 00:06:01,074
+APIs are set up, usage by the public is
+
+61
+00:06:01,112 --> 00:06:04,322
+teaching the model itself additional behavior. And so
+
+62
+00:06:04,376 --> 00:06:08,306
+you have these API level regressions that
+
+63
+00:06:08,328 --> 00:06:12,166
+are happening, you can't control. And as
+
+64
+00:06:12,188 --> 00:06:15,986
+software engineers using that LLM, you need to adapt your prompts.
+
+65
+00:06:16,098 --> 00:06:19,110
+So again, not mockable, not reproducible.
+
+66
+00:06:19,610 --> 00:06:23,098
+And again, with a normal API, you can kind of reason
+
+67
+00:06:23,264 --> 00:06:27,014
+what it's supposed to be doing and whether the problem is on the API's
+
+68
+00:06:27,062 --> 00:06:30,838
+side or your application logic side, because there's
+
+69
+00:06:30,854 --> 00:06:34,406
+a spec, because it's explainable and you're
+
+70
+00:06:34,438 --> 00:06:37,790
+able to fit it in your head. On the LLM side,
+
+71
+00:06:37,940 --> 00:06:42,234
+it's really hard to make sense of some of these changes programmatically, because llms
+
+72
+00:06:42,282 --> 00:06:45,498
+are meant to almost simulate human behaviors.
+
+73
+00:06:45,594 --> 00:06:48,834
+It's kind of the point. And so a thing that we can see is
+
+74
+00:06:48,872 --> 00:06:52,862
+that very small changes to the prompt can yield very dramatic
+
+75
+00:06:52,926 --> 00:06:56,900
+changes to the results in ways that, again, make it hard
+
+76
+00:06:57,590 --> 00:07:01,234
+for humans to explain and debug,
+
+77
+00:07:01,362 --> 00:07:04,310
+and sort of build a mental model of how it's supposed to behave.
+
+78
+00:07:04,890 --> 00:07:08,802
+Now, these three techniques
+
+79
+00:07:08,866 --> 00:07:12,518
+on the left are ways that we have traditionally
+
+80
+00:07:12,694 --> 00:07:16,170
+tried to ensure correctness of our software.
+
+81
+00:07:16,750 --> 00:07:20,522
+And if you ask an ML team, the right
+
+82
+00:07:20,576 --> 00:07:24,538
+way to ensure correctness of something like
+
+83
+00:07:24,624 --> 00:07:28,494
+an LLM feature is to build an evaluation system to
+
+84
+00:07:28,532 --> 00:07:31,470
+evaluate the effectiveness of the model or the prompt.
+
+85
+00:07:32,370 --> 00:07:36,270
+But most of us trying to make sense of llms aren't ML engineers.
+
+86
+00:07:36,610 --> 00:07:39,774
+And the promise of llms exposed via APIs is that we shouldn't
+
+87
+00:07:39,822 --> 00:07:43,330
+have to be to fold these new capabilities into our software.
+
+88
+00:07:44,150 --> 00:07:47,790
+There's even one more layer of unpredictability
+
+89
+00:07:47,870 --> 00:07:51,346
+that llms introduce. There's a concept
+
+90
+00:07:51,378 --> 00:07:54,502
+of, I don't know how familiar everyone is with this piece,
+
+91
+00:07:54,556 --> 00:07:58,038
+but there's an acronym that is used in this world,
+
+92
+00:07:58,204 --> 00:08:01,582
+rag rags or retrieval augmented generation.
+
+93
+00:08:01,746 --> 00:08:05,290
+Effectively, it's a practice of pulling in
+
+94
+00:08:05,360 --> 00:08:08,874
+additional context within your domain to
+
+95
+00:08:08,912 --> 00:08:11,450
+help your llms return better results.
+
+96
+00:08:12,270 --> 00:08:16,174
+If you think about using Chat GPT prompt, it's where you
+
+97
+00:08:16,212 --> 00:08:19,470
+say, oh, do this but in this style, or do this
+
+98
+00:08:19,540 --> 00:08:22,846
+but in
+
+99
+00:08:22,868 --> 00:08:26,182
+a certain voice. All that extra context
+
+100
+00:08:26,266 --> 00:08:30,180
+helps make sure the LLM returns the result that you're looking for.
+
+101
+00:08:30,550 --> 00:08:34,962
+But it is because of the way that these
+
+102
+00:08:35,096 --> 00:08:38,514
+RaE Rag pipelines end up being built.
+
+103
+00:08:38,712 --> 00:08:42,146
+Really, it means that your app is pulling in even more dynamic
+
+104
+00:08:42,178 --> 00:08:45,574
+content and context that can
+
+105
+00:08:45,612 --> 00:08:49,746
+again create and result in big changes in how the LLM
+
+106
+00:08:49,778 --> 00:08:52,906
+is built, how the LLM is responding, and so
+
+107
+00:08:52,928 --> 00:08:56,266
+you have even more unpredictability in trying
+
+108
+00:08:56,288 --> 00:08:59,654
+to figure out why is my user
+
+109
+00:08:59,702 --> 00:09:02,460
+not having the experience that I want them to have?
+
+110
+00:09:04,030 --> 00:09:07,646
+So this turning upside down of our worldview is happening
+
+111
+00:09:07,828 --> 00:09:11,360
+on a literal software engineering and systems engineering level.
+
+112
+00:09:11,730 --> 00:09:15,918
+We know these black boxes aren't testable or debuggable in a traditional sense,
+
+113
+00:09:16,004 --> 00:09:19,214
+so there's no solid sense of correct behavior
+
+114
+00:09:19,262 --> 00:09:22,546
+that we can fall back to. It's also true from
+
+115
+00:09:22,568 --> 00:09:26,306
+a meta level where there's no environment within which we can conduct our
+
+116
+00:09:26,328 --> 00:09:29,430
+tests and feel confident in the results.
+
+117
+00:09:31,610 --> 00:09:35,766
+There's no creating a staging environment where we can be sure that the LLMs experience
+
+118
+00:09:35,868 --> 00:09:39,254
+or feature that we're building behaves correctly or
+
+119
+00:09:39,292 --> 00:09:43,354
+does what the user wants. Going even
+
+120
+00:09:43,392 --> 00:09:46,726
+one step further, even product development
+
+121
+00:09:46,758 --> 00:09:50,394
+or release practices are turned a little bit inside out.
+
+122
+00:09:50,592 --> 00:09:54,074
+Instead of being able to start with early access and then
+
+123
+00:09:54,272 --> 00:09:57,786
+putting your product through its paces and then feeling confident in a later or broader
+
+124
+00:09:57,818 --> 00:10:01,834
+release, early access programs are inherently going to fail
+
+125
+00:10:01,882 --> 00:10:05,470
+to capture that full range of user behavior and edge cases.
+
+126
+00:10:06,370 --> 00:10:10,222
+All these programs do is delay the inevitable failures that you'll encounter
+
+127
+00:10:10,286 --> 00:10:14,370
+when you have an uncontrolled and unprompted group of group of users doing
+
+128
+00:10:14,440 --> 00:10:17,140
+things that you never expected them to do.
+
+129
+00:10:17,510 --> 00:10:21,190
+So at this point,
+
+130
+00:10:21,260 --> 00:10:25,350
+do we just give up on everything we've learned about building and operating software systems
+
+131
+00:10:25,850 --> 00:10:29,186
+and embrace the rise of prompt engineer as an entirely
+
+132
+00:10:29,218 --> 00:10:33,370
+separate skill set. Well, if you've been paying attention to the title of this talk,
+
+133
+00:10:33,440 --> 00:10:35,740
+the answer is obviously not,
+
+134
+00:10:36,830 --> 00:10:40,138
+because we already have a model for how to measure and debug and move the
+
+135
+00:10:40,144 --> 00:10:43,020
+needle on an unpredictable qualitative experience.
+
+136
+00:10:44,270 --> 00:10:48,006
+Observability. And I'll say this term
+
+137
+00:10:48,038 --> 00:10:51,258
+has become so commonplace today, it's fallen out of fashion to define
+
+138
+00:10:51,274 --> 00:10:54,894
+it. But as someone who's been talking about all of this since before it was
+
+139
+00:10:54,932 --> 00:10:58,260
+cool, humor me. I think it'll help some pieces click into place.
+
+140
+00:11:00,230 --> 00:11:03,726
+This here is the formal Wikipedia definition
+
+141
+00:11:03,758 --> 00:11:07,362
+of observability. It comes from control theory. It's about
+
+142
+00:11:07,496 --> 00:11:10,822
+looking at a system based on the inputs and outputs and using
+
+143
+00:11:10,876 --> 00:11:15,010
+that to model what this system is doing. Black box
+
+144
+00:11:15,170 --> 00:11:19,138
+and it feels a little overly formal when talking about production systems.
+
+145
+00:11:19,314 --> 00:11:21,994
+Software systems still applies to,
+
+146
+00:11:22,192 --> 00:11:26,026
+but it feels like really applicable to a system like
+
+147
+00:11:26,048 --> 00:11:30,634
+an LLM, like this thing that's changing over time because
+
+148
+00:11:30,672 --> 00:11:34,510
+it can't be monitored or simulated with traditional techniques.
+
+149
+00:11:35,410 --> 00:11:39,018
+Another way I like to think about this is that less formally,
+
+150
+00:11:39,114 --> 00:11:43,406
+observability is a way of comparing what you expect in
+
+151
+00:11:43,428 --> 00:11:46,350
+your head versus the actual behavior,
+
+152
+00:11:46,790 --> 00:11:50,446
+but in live systems. And so let's
+
+153
+00:11:50,478 --> 00:11:53,234
+take a look at what this means for a standard web app.
+
+154
+00:11:53,432 --> 00:11:56,900
+Well, you're looking at this box has your application.
+
+155
+00:11:57,910 --> 00:12:01,650
+Because it's our application, we actually get to instrument it and we can capture what
+
+156
+00:12:01,720 --> 00:12:05,078
+arguments were sent to it. On any given HTTP request, we can
+
+157
+00:12:05,084 --> 00:12:08,326
+capture some metadata about how the app was running and we can
+
+158
+00:12:08,348 --> 00:12:12,194
+capture data about what was returned. This lets us reason about the behavior
+
+159
+00:12:12,242 --> 00:12:15,654
+we can expect for a given user and endpoint
+
+160
+00:12:15,782 --> 00:12:19,242
+and set of parameters. And it lets us debug and reproduce the issue
+
+161
+00:12:19,296 --> 00:12:23,046
+if the actual behavior we see deviates from that expectation.
+
+162
+00:12:23,238 --> 00:12:27,046
+Again, lots of parallels to best, but on live
+
+163
+00:12:27,088 --> 00:12:30,798
+data. What about this payment service over here on the right?
+
+164
+00:12:30,964 --> 00:12:34,686
+It's that black box that the app depends on. It's out of my control.
+
+165
+00:12:34,868 --> 00:12:38,014
+Might be another company entirely. And even
+
+166
+00:12:38,052 --> 00:12:41,794
+if I wanted to, because of that, I couldn't go and shove instrumentation inside
+
+167
+00:12:41,832 --> 00:12:44,658
+of it. You can think of this like a database too, right? You're not going
+
+168
+00:12:44,664 --> 00:12:48,274
+to go and fork Mysql and shove your own instrumentation in there.
+
+169
+00:12:48,472 --> 00:12:51,634
+But I know what requests my app has sent to it.
+
+170
+00:12:51,832 --> 00:12:54,934
+I know where those requests are coming from in the code
+
+171
+00:12:55,052 --> 00:12:58,326
+and on behalf of which user. And then I know how long it took
+
+172
+00:12:58,348 --> 00:13:01,586
+to respond from the app's perspective, whether it was successful,
+
+173
+00:13:01,698 --> 00:13:05,258
+and probably some other metadata. By capturing all of
+
+174
+00:13:05,264 --> 00:13:09,110
+that I can again start to reason, or at least have a paper trail,
+
+175
+00:13:09,190 --> 00:13:12,566
+to understand how these inputs impact the outputs
+
+176
+00:13:12,598 --> 00:13:16,446
+of my black box and then how the choices my application makes and the
+
+177
+00:13:16,468 --> 00:13:19,454
+inputs into that application impacts all of that.
+
+178
+00:13:19,652 --> 00:13:23,486
+And that approach becomes the same for llms, as unpredictable and
+
+179
+00:13:23,508 --> 00:13:27,226
+nondeterministic as they are. We know how a user interacts
+
+180
+00:13:27,258 --> 00:13:30,562
+with the app, we know how the app turns that into
+
+181
+00:13:30,616 --> 00:13:33,666
+parameters for the black box, and we know
+
+182
+00:13:33,688 --> 00:13:37,630
+how they respond. It's a blanket statement that in complex systems,
+
+183
+00:13:37,710 --> 00:13:41,240
+software usage patterns will become unpredictable and change over time.
+
+184
+00:13:41,610 --> 00:13:44,626
+With llms, that assertion becomes a guarantee.
+
+185
+00:13:44,818 --> 00:13:48,440
+If you use llms, as many of us are,
+
+186
+00:13:48,890 --> 00:13:52,530
+your data set is going to be unpredictable and will absolutely
+
+187
+00:13:52,620 --> 00:13:56,038
+change over time. So the key to operating sanely
+
+188
+00:13:56,054 --> 00:13:59,946
+on top of that magical foundation is having a way of
+
+189
+00:13:59,968 --> 00:14:03,354
+gathering, aggregating and exploring that data in a way
+
+190
+00:14:03,392 --> 00:14:07,066
+that captures what the user experienced as expressively
+
+191
+00:14:07,098 --> 00:14:10,382
+as possible. That's what lets you build and reason
+
+192
+00:14:10,436 --> 00:14:13,966
+and ensure a quality experience on top of llms, the ability to
+
+193
+00:14:13,988 --> 00:14:17,714
+understand from the outside why your user got a certain
+
+194
+00:14:17,752 --> 00:14:20,100
+response from your llmbacked application.
+
+195
+00:14:20,790 --> 00:14:23,954
+Observability creates these feedback loops to let
+
+196
+00:14:23,992 --> 00:14:26,866
+you learn from what's really happening with your code,
+
+197
+00:14:27,048 --> 00:14:31,762
+the same way we've all learned how to work iteratively with tests.
+
+198
+00:14:31,906 --> 00:14:34,550
+Observability enables us all to ship sooner,
+
+199
+00:14:34,890 --> 00:14:38,486
+observe those results in the wild, and then wrap those observations back
+
+200
+00:14:38,508 --> 00:14:41,746
+into the development process. With llms rapidly
+
+201
+00:14:41,778 --> 00:14:45,126
+becoming some piece of every software
+
+202
+00:14:45,158 --> 00:14:48,038
+system, we all get to learn some new skills.
+
+203
+00:14:48,214 --> 00:14:51,798
+SRes who are used to thinking of APIs as black boxes that can be modeled
+
+204
+00:14:51,814 --> 00:14:55,386
+and asserted on, now have to get used to drift and peeling
+
+205
+00:14:55,418 --> 00:14:58,110
+back a layer to examine that emergent behavior.
+
+206
+00:14:58,690 --> 00:15:02,186
+Software engineers who are used to boolean logic and discrete math
+
+207
+00:15:02,218 --> 00:15:06,074
+and correctness and test driven development now
+
+208
+00:15:06,132 --> 00:15:10,546
+have to think about data quality, probabilistic systems and
+
+209
+00:15:10,648 --> 00:15:15,090
+representivity, or how well your model test
+
+210
+00:15:15,160 --> 00:15:18,030
+environment or your staging environment,
+
+211
+00:15:18,110 --> 00:15:21,080
+or your mental code represents the production system.
+
+212
+00:15:22,010 --> 00:15:25,526
+And everyone in engineering needs to reorient themselves around
+
+213
+00:15:25,628 --> 00:15:29,078
+what this LLM thing is
+
+214
+00:15:29,244 --> 00:15:32,714
+trying to achieve, what the business goals are, what the product use cases are,
+
+215
+00:15:32,752 --> 00:15:36,394
+what the ideal user experience is, instead of
+
+216
+00:15:36,432 --> 00:15:39,530
+sterile concepts like correctness, reliability or availability.
+
+217
+00:15:39,950 --> 00:15:43,222
+Those last three are still important. But ultimately,
+
+218
+00:15:43,286 --> 00:15:47,694
+when you bring in this thing that is so free form that
+
+219
+00:15:47,812 --> 00:15:51,470
+the human on the other end is going to have their own opinion of whether
+
+220
+00:15:51,620 --> 00:15:54,846
+your LLM feature was useful or not, we all need
+
+221
+00:15:54,868 --> 00:15:58,686
+to think expand our mental models of what it means to provide a great
+
+222
+00:15:58,708 --> 00:16:01,620
+service to include that definition as well.
+
+223
+00:16:01,990 --> 00:16:05,138
+So, okay, why am I up here talking about this and why should
+
+224
+00:16:05,144 --> 00:16:09,206
+you believe me? I'm going to tell you a little bit about a
+
+225
+00:16:09,228 --> 00:16:13,638
+feature that we released and our experience building it,
+
+226
+00:16:13,804 --> 00:16:17,446
+trying to ensure that it would be a great experience, and maintaining it
+
+227
+00:16:17,468 --> 00:16:21,174
+going forward. So earlier this year we
+
+228
+00:16:21,212 --> 00:16:24,300
+released our query assistant in May 2023.
+
+229
+00:16:24,750 --> 00:16:28,140
+Took about six weeks of development super fast,
+
+230
+00:16:28,750 --> 00:16:31,626
+and we spent another eight weeks iterating on it.
+
+231
+00:16:31,808 --> 00:16:34,906
+And to give you a little bit of an overview of what it was trying
+
+232
+00:16:34,928 --> 00:16:38,460
+to do, Honeycomb as an observability tool
+
+233
+00:16:38,910 --> 00:16:42,154
+lets our users work with a lot of data. Our product has a visual query
+
+234
+00:16:42,202 --> 00:16:45,614
+interface. We believe that point and click is always going to be easier for someone
+
+235
+00:16:45,652 --> 00:16:49,166
+to learn and play around with than an open text box. But even
+
+236
+00:16:49,188 --> 00:16:52,434
+so, there's a learning curve to the user's interface and we were really
+
+237
+00:16:52,472 --> 00:16:56,658
+excited about being able to use llms as a translation layer from
+
+238
+00:16:56,744 --> 00:16:59,962
+what the human is trying to do over here on the right of this slide
+
+239
+00:17:00,126 --> 00:17:05,074
+into the UI. And so we added this little experimental
+
+240
+00:17:05,122 --> 00:17:08,626
+piece to the query. Building collapsed most of the time, but people could expand
+
+241
+00:17:08,658 --> 00:17:12,386
+it and we let people type in in English
+
+242
+00:17:12,498 --> 00:17:16,298
+what they were hoping to SRE. And we also another thing that was
+
+243
+00:17:16,304 --> 00:17:19,898
+important to us is that we preserve the editability and explorability that's sort of
+
+244
+00:17:19,904 --> 00:17:24,186
+inherent in our product. The same way that we
+
+245
+00:17:24,208 --> 00:17:27,518
+all as consumers have gotten used to being able to edit or iterate on
+
+246
+00:17:27,524 --> 00:17:30,654
+our response with Chat GPT. We wanted users to be able
+
+247
+00:17:30,692 --> 00:17:33,966
+to get the output honeycomb would
+
+248
+00:17:34,068 --> 00:17:37,406
+building the query for them, but be able to tweak
+
+249
+00:17:37,438 --> 00:17:41,490
+and iterate on it. Because we wanted to encourage that iteration,
+
+250
+00:17:41,830 --> 00:17:45,474
+we realized that there would be no concrete and
+
+251
+00:17:45,512 --> 00:17:49,826
+quantitative result we could rely on that would cleanly
+
+252
+00:17:49,858 --> 00:17:53,186
+describe whether the feature itself was good. If users ran
+
+253
+00:17:53,218 --> 00:17:57,430
+more queries, maybe it was good, maybe we were just consistently
+
+254
+00:17:58,250 --> 00:18:02,278
+being not useful. Maybe fewer queries were good,
+
+255
+00:18:02,444 --> 00:18:06,074
+but maybe they just weren't using the product or they didn't understand what was going
+
+256
+00:18:06,112 --> 00:18:09,926
+on. So we knew we would need to capture this qualitative feedback,
+
+257
+00:18:10,118 --> 00:18:13,674
+the yes no, I'm not sure buttons, so that we
+
+258
+00:18:13,712 --> 00:18:17,742
+could understand from the user's perspective whether
+
+259
+00:18:17,796 --> 00:18:21,086
+this thing that we tried to sre them was actually helpful or not.
+
+260
+00:18:21,268 --> 00:18:25,166
+And then we could posit some higher level product goals, like product retention for
+
+261
+00:18:25,188 --> 00:18:29,134
+new uses, to layer on top of that as
+
+262
+00:18:29,172 --> 00:18:32,258
+a spoiler, we hit these goals. We were thrilled, but we did a lot of
+
+263
+00:18:32,264 --> 00:18:34,660
+stumbling around in the dark along the way.
+
+264
+00:18:35,270 --> 00:18:39,042
+And today, six months later, it's so much more common for
+
+265
+00:18:39,096 --> 00:18:43,238
+us to meet someone playing around with llms than someone
+
+266
+00:18:43,404 --> 00:18:46,498
+whose product has actual LLM functionality deployed
+
+267
+00:18:46,514 --> 00:18:50,466
+in production. And we think that a lot of this is rooted
+
+268
+00:18:50,498 --> 00:18:54,338
+in the fact that our teams have really embraced observability techniques
+
+269
+00:18:54,354 --> 00:18:57,834
+in how we ship software, period. And those were key to
+
+270
+00:18:57,872 --> 00:19:01,690
+building the confidence to ship this thing fast
+
+271
+00:19:01,840 --> 00:19:05,406
+and iterate live and really just understand that
+
+272
+00:19:05,428 --> 00:19:08,890
+we were going to have to react
+
+273
+00:19:08,970 --> 00:19:12,494
+based on how the broader user base
+
+274
+00:19:12,612 --> 00:19:13,680
+used the product.
+
+275
+00:19:16,850 --> 00:19:20,050
+These were some learnings that we had fairly early on.
+
+276
+00:19:20,120 --> 00:19:23,666
+There's a great blog post that this is excerpted from. You should
+
+277
+00:19:23,688 --> 00:19:27,090
+check it out if you're again in the phase of building on llms
+
+278
+00:19:27,430 --> 00:19:31,030
+but it's all about things are going to fall apart.
+
+279
+00:19:31,450 --> 00:19:34,790
+It's not a question of how to prevent failures from happening,
+
+280
+00:19:34,860 --> 00:19:38,262
+it's a question of can you detect it quickly
+
+281
+00:19:38,316 --> 00:19:41,706
+enough? Because you just can't predict what a user is
+
+282
+00:19:41,728 --> 00:19:45,254
+going to type into that freeform text box. You will ship
+
+283
+00:19:45,302 --> 00:19:48,570
+something that breaks something else, and it's okay.
+
+284
+00:19:48,640 --> 00:19:53,206
+And again, you can't predict. You can't rely
+
+285
+00:19:53,238 --> 00:19:56,350
+on your test frameworks, you can't rely on your CI pipelines.
+
+286
+00:19:56,850 --> 00:20:00,302
+So how do you react quickly enough? How do you capture the information
+
+287
+00:20:00,356 --> 00:20:04,874
+that you need in order to come in and debug and improve
+
+288
+00:20:04,922 --> 00:20:08,190
+going forward? So let's get a little bit,
+
+289
+00:20:08,260 --> 00:20:12,542
+go one level deeper. How do we go forward? Well, talked a lot about capturing
+
+290
+00:20:12,606 --> 00:20:15,666
+instrumentation, leaving this paper trail for how and why your
+
+291
+00:20:15,688 --> 00:20:19,394
+code behaves a certain way. I think of instrumentation,
+
+292
+00:20:19,522 --> 00:20:23,538
+frankly, like documentation and tests,
+
+293
+00:20:23,634 --> 00:20:27,670
+they sre all ways to try to get your code
+
+294
+00:20:27,740 --> 00:20:31,674
+to explain itself back to you. And instrumentation is
+
+295
+00:20:31,792 --> 00:20:35,020
+like capturing debug statements and breakpoints in your production code,
+
+296
+00:20:36,350 --> 00:20:39,882
+as much in the language of your application and
+
+297
+00:20:40,016 --> 00:20:43,158
+the unique business logic of your product and domain
+
+298
+00:20:43,254 --> 00:20:46,958
+as possible. In a normal software system, this can let you
+
+299
+00:20:46,964 --> 00:20:50,574
+do things as simple as figure out quickly which
+
+300
+00:20:50,612 --> 00:20:54,270
+individual user or account is associated with that unexpected behavior.
+
+301
+00:20:54,850 --> 00:20:58,286
+It can let you do things as complex as deploy a
+
+302
+00:20:58,308 --> 00:21:01,714
+few different implementations of a given np complete problem,
+
+303
+00:21:01,832 --> 00:21:05,566
+get it behind a given feature flag, compare the results of each approach,
+
+304
+00:21:05,678 --> 00:21:08,500
+and pick the implementation that behaves best on live data.
+
+305
+00:21:09,430 --> 00:21:13,780
+When you have rich data that you need to
+
+306
+00:21:14,170 --> 00:21:18,226
+tease apart all the different parameters that you're varying in your experiment,
+
+307
+00:21:18,418 --> 00:21:22,658
+you're able to then validate your hypothesis much more quickly and flexibly
+
+308
+00:21:22,754 --> 00:21:26,138
+along the way. And so in the LLM world, this is how
+
+309
+00:21:26,144 --> 00:21:29,786
+we applied those principles. You want to capture as much as you can about
+
+310
+00:21:29,808 --> 00:21:33,494
+what your users are doing in your system in a format that lets you view
+
+311
+00:21:33,552 --> 00:21:37,294
+overarching performance, and then also debug any
+
+312
+00:21:37,332 --> 00:21:40,878
+individual transaction. Over here on the right is actually a
+
+313
+00:21:40,884 --> 00:21:44,880
+screenshot of a real trace that we have for how we sre
+
+314
+00:21:45,570 --> 00:21:49,154
+building up a request to our
+
+315
+00:21:49,192 --> 00:21:52,626
+LLM provider. This goes from user click through
+
+316
+00:21:52,648 --> 00:21:56,094
+the dynamic prompt building to the actual LLM request
+
+317
+00:21:56,222 --> 00:21:59,666
+response parsing, response validation and the query execution in
+
+318
+00:21:59,688 --> 00:22:02,934
+our product. And having all of this
+
+319
+00:22:02,972 --> 00:22:06,950
+full trace and then lots of metadata on each of those individual spans
+
+320
+00:22:07,290 --> 00:22:10,706
+lets us ask high level questions about the end user
+
+321
+00:22:10,738 --> 00:22:13,778
+experience. Here you can see the results
+
+322
+00:22:13,794 --> 00:22:17,386
+of that yes, those yes no I'm not sure buttons in a way that
+
+323
+00:22:17,408 --> 00:22:20,838
+lets us quantitatively ask questions and tricky progress,
+
+324
+00:22:21,014 --> 00:22:24,480
+but always be able to get back to okay for
+
+325
+00:22:25,010 --> 00:22:28,686
+this one interaction where someone said no,
+
+326
+00:22:28,868 --> 00:22:32,586
+it didn't answer their question, what was their input?
+
+327
+00:22:32,698 --> 00:22:36,754
+What did we try to do? How could we build up that prompt? Better to
+
+328
+00:22:36,792 --> 00:22:40,526
+make sure that their intent gets passed to the LLM and reflected
+
+329
+00:22:40,558 --> 00:22:43,540
+in our product as effectively as possible.
+
+330
+00:22:44,390 --> 00:22:47,890
+Let us ask high level questions about things like
+
+331
+00:22:48,040 --> 00:22:51,506
+trends in the latency of actual LLM request and
+
+332
+00:22:51,528 --> 00:22:55,126
+response calls, and then let
+
+333
+00:22:55,148 --> 00:22:58,582
+us take those metrics and group them on really fine
+
+334
+00:22:58,636 --> 00:23:02,346
+grained characteristics of each request. And this lets us then
+
+335
+00:23:02,368 --> 00:23:05,706
+draw conclusions about how certain parameters for
+
+336
+00:23:05,728 --> 00:23:08,842
+a given team, for a given column data set,
+
+337
+00:23:08,976 --> 00:23:12,250
+whatever might impact the actual LLM operation.
+
+338
+00:23:12,830 --> 00:23:16,174
+Again, you can think of that was an e commerce site having
+
+339
+00:23:16,212 --> 00:23:20,062
+things like shopping cart id or number of items in the cart as
+
+340
+00:23:20,116 --> 00:23:24,074
+parameters here. But by capturing all of this related
+
+341
+00:23:24,122 --> 00:23:28,634
+to the LLM, I am now armed to deal with whoa,
+
+342
+00:23:28,682 --> 00:23:32,974
+something weird started happening with llms with our LLM response.
+
+343
+00:23:33,102 --> 00:23:36,370
+What changed? Why? What's different
+
+344
+00:23:36,440 --> 00:23:39,634
+about that one account that is having a dramatically different experience
+
+345
+00:23:39,752 --> 00:23:43,910
+than everyone else, and then what's intended?
+
+346
+00:23:45,530 --> 00:23:48,802
+We were also able to really closely capture and track errors,
+
+347
+00:23:48,946 --> 00:23:52,342
+but in a flexible, not everything marked an error is
+
+348
+00:23:52,396 --> 00:23:55,706
+necessarily an error kind of way. It's early. We don't know
+
+349
+00:23:55,728 --> 00:23:59,178
+which errors to take seriously and which ones don't. I think a
+
+350
+00:23:59,184 --> 00:24:03,094
+principle I go by is not every exception is exceptional.
+
+351
+00:24:03,222 --> 00:24:06,006
+Not everything exceptional is captured as an exception.
+
+352
+00:24:06,118 --> 00:24:09,166
+And so we wanted to capture things that were fairly open ended, that always let
+
+353
+00:24:09,188 --> 00:24:12,974
+us correlate back to, okay, well, what was the user actually trying to do?
+
+354
+00:24:13,092 --> 00:24:16,174
+What did they see? And we captured this all in
+
+355
+00:24:16,212 --> 00:24:19,554
+one trace. So we had the full context for what
+
+356
+00:24:19,592 --> 00:24:23,566
+went into a given response to a user. This blue
+
+357
+00:24:23,598 --> 00:24:26,722
+span I've highlighted at the bottom, it's tiny text,
+
+358
+00:24:26,856 --> 00:24:31,206
+but if you squint, you can see that this finally is
+
+359
+00:24:31,228 --> 00:24:34,678
+our call to OpenAI. All the spans above it
+
+360
+00:24:34,764 --> 00:24:37,958
+are work that we are doing inside the application to build the best prompt that
+
+361
+00:24:37,964 --> 00:24:41,862
+we can. Which also means there are that many
+
+362
+00:24:41,916 --> 00:24:45,414
+possible things that could go wrong that could result in a poor response
+
+363
+00:24:45,462 --> 00:24:48,060
+from OpenAI or whatever llms you're using.
+
+364
+00:24:48,670 --> 00:24:52,058
+And so as we were building this feature, and as we
+
+365
+00:24:52,064 --> 00:24:55,914
+knew we wanted to iterate, we'd need all this context if we had any
+
+366
+00:24:55,952 --> 00:24:59,374
+hope of figuring out why things were going to go wrong and
+
+367
+00:24:59,412 --> 00:25:02,446
+how to iterate towards a better future. Now,
+
+368
+00:25:02,548 --> 00:25:05,934
+a lot of these behaviors have been on the rise for a while,
+
+369
+00:25:06,132 --> 00:25:08,160
+may already be practiced by your team.
+
+370
+00:25:09,330 --> 00:25:12,974
+I think that's an awesome thing. As a baby software engineer,
+
+371
+00:25:13,102 --> 00:25:17,006
+I took a lot of pride in just shipping really fast, and I wrote
+
+372
+00:25:17,038 --> 00:25:20,542
+lots of tests along the way, of course, because I was an accepted and celebrated
+
+373
+00:25:20,606 --> 00:25:24,054
+part of shipping good code. But in the last decade or
+
+374
+00:25:24,092 --> 00:25:27,270
+so, we've seen a bit of a shift in the conversation.
+
+375
+00:25:27,690 --> 00:25:31,390
+Instead of just writing lots of code being a sign of a good developer,
+
+376
+00:25:31,570 --> 00:25:35,770
+there's phrases like service ownership, putting developers on call,
+
+377
+00:25:35,920 --> 00:25:39,354
+testing in production. And as these phrases have entered our
+
+378
+00:25:39,392 --> 00:25:43,450
+collective consciousness, it has shifted
+
+379
+00:25:43,810 --> 00:25:47,790
+the domain, I think, of a developer from
+
+380
+00:25:47,940 --> 00:25:52,270
+purely thinking about development to also thinking about production.
+
+381
+00:25:52,690 --> 00:25:56,526
+And I'm really excited about this because a lot of these, the shift that
+
+382
+00:25:56,548 --> 00:25:59,966
+is already kind of underway of taking what
+
+383
+00:25:59,988 --> 00:26:04,482
+we do in its TDD world and
+
+384
+00:26:04,616 --> 00:26:08,610
+recognizing they can apply to production as well through Ollie or observability.
+
+385
+00:26:09,430 --> 00:26:12,562
+We're just taking these behaviors that we know as developers
+
+386
+00:26:12,626 --> 00:26:16,434
+and applying it under a different name in development
+
+387
+00:26:16,482 --> 00:26:19,714
+or in the test environment. We're identifying the levers that impact
+
+388
+00:26:19,762 --> 00:26:23,514
+logical branches in the code for debug ability and reproducibility, and making
+
+389
+00:26:23,552 --> 00:26:26,730
+sure to exercise those in a test in observability.
+
+390
+00:26:27,310 --> 00:26:31,130
+You're instrumenting code with intention so that you can do the same in production.
+
+391
+00:26:31,470 --> 00:26:34,974
+When you're writing a test, you're thinking about what you
+
+392
+00:26:35,012 --> 00:26:38,478
+expect and you're asserting on what
+
+393
+00:26:38,484 --> 00:26:42,014
+you'll actually get with observability and looking
+
+394
+00:26:42,052 --> 00:26:45,886
+at your systems in production. You're just inspecting results after
+
+395
+00:26:45,908 --> 00:26:49,746
+the changes have been rolled out and you're watching for deviations when
+
+396
+00:26:49,768 --> 00:26:53,650
+you're writing tests, especially if you're practicing real TDD,
+
+397
+00:26:54,310 --> 00:26:58,410
+I know not everyone does. You're embracing these fast fail loops,
+
+398
+00:26:58,510 --> 00:27:03,090
+fast feedback loops. You are expecting
+
+399
+00:27:03,170 --> 00:27:06,680
+to act on the output of these feedback loops to make your code better.
+
+400
+00:27:07,050 --> 00:27:09,718
+And that's all observability is all about.
+
+401
+00:27:09,884 --> 00:27:13,274
+It's shipping to production quickly through your
+
+402
+00:27:13,312 --> 00:27:17,206
+CI CD pipeline or through feature flags, and then expecting
+
+403
+00:27:17,238 --> 00:27:20,726
+to iterate even on code that you think is shipped. And it's
+
+404
+00:27:20,758 --> 00:27:24,814
+exciting that these are guardrails that we've generalized for
+
+405
+00:27:24,852 --> 00:27:29,134
+building and maintaining and supporting complex software systems that
+
+406
+00:27:29,172 --> 00:27:32,654
+actually are pretty transferable to llms and maybe to
+
+407
+00:27:32,692 --> 00:27:36,398
+greater effect for everything that we've talked about here, where again with
+
+408
+00:27:36,404 --> 00:27:40,242
+the unpredictability of llms, test driven development was all about
+
+409
+00:27:40,296 --> 00:27:43,346
+the practice of helping software engineers build the habit of
+
+410
+00:27:43,368 --> 00:27:47,314
+checking our mental models while we wrote code. Observability is
+
+411
+00:27:47,432 --> 00:27:50,566
+all about the practice of helping software engineers and sres or
+
+412
+00:27:50,588 --> 00:27:54,626
+DevOps teams have a backstop to and sanity check for our mental
+
+413
+00:27:54,658 --> 00:27:58,246
+models when we ship code and this ability to
+
+414
+00:27:58,268 --> 00:28:01,154
+sanity check is just so necessary for llms,
+
+415
+00:28:01,282 --> 00:28:05,610
+where our mental models are never going to be accurate enough to rely on entirely.
+
+416
+00:28:07,790 --> 00:28:10,380
+This is a truth I couldn't help but put in here.
+
+417
+00:28:11,230 --> 00:28:14,774
+That has always been true that software
+
+418
+00:28:14,822 --> 00:28:18,158
+behaves in unpredictable and emergent ways, especially as you put it out
+
+419
+00:28:18,164 --> 00:28:21,662
+there in front of users that aren't you. But it's never
+
+420
+00:28:21,716 --> 00:28:25,614
+been more true than with llms that the most important part
+
+421
+00:28:25,652 --> 00:28:28,718
+is seeing and tracking and leveraging about how your user
+
+422
+00:28:28,734 --> 00:28:32,114
+SRE using it as it's running in production in order
+
+423
+00:28:32,152 --> 00:28:33,650
+to make it better incrementally.
+
+424
+00:28:35,590 --> 00:28:39,270
+Now, before we wrap, I want to highlight one very specific example
+
+425
+00:28:39,340 --> 00:28:42,898
+of a concept popularized through the rise of SRE,
+
+426
+00:28:43,074 --> 00:28:46,482
+most commonly associated with ensuring consistent performance
+
+427
+00:28:46,546 --> 00:28:50,630
+of production systems service level objectives are slos.
+
+428
+00:28:51,050 --> 00:28:54,398
+Given the audience and this conference, I will assume that most of you are familiar
+
+429
+00:28:54,434 --> 00:28:57,418
+with what they are. But in the hopes that this talk is shareable with a
+
+430
+00:28:57,424 --> 00:29:00,570
+wider audience, I'm going to do a little bit of background.
+
+431
+00:29:01,390 --> 00:29:04,654
+Slos, I think are frankly really good for
+
+432
+00:29:04,692 --> 00:29:08,622
+forcing product and service owners to align on a definition of what it means
+
+433
+00:29:08,676 --> 00:29:11,870
+to provide great service to users.
+
+434
+00:29:12,290 --> 00:29:15,774
+And it's intentionally thinking about from
+
+435
+00:29:15,812 --> 00:29:19,166
+the client or user perspective rather than, oh,
+
+436
+00:29:19,268 --> 00:29:22,658
+cpu or latency or things that we are used to when we think from the
+
+437
+00:29:22,664 --> 00:29:27,250
+systems perspective. Often slos are used as a way to set a baseline
+
+438
+00:29:27,590 --> 00:29:31,734
+and measure degradation over time of a key product workflow. You hear
+
+439
+00:29:31,772 --> 00:29:35,830
+them associated a lot with uptime or performance or SRE metrics,
+
+440
+00:29:36,170 --> 00:29:40,354
+and being alerted and going and acting
+
+441
+00:29:40,482 --> 00:29:44,026
+if slos burn through
+
+442
+00:29:44,128 --> 00:29:47,706
+an error budget. But you remember this slide when
+
+443
+00:29:47,728 --> 00:29:51,174
+the LLM landscape is moving this quickly and best practices
+
+444
+00:29:51,222 --> 00:29:54,730
+are still emerging, that degradation is guaranteed.
+
+445
+00:29:55,070 --> 00:29:58,078
+You will break one thing when you think you're fixing another,
+
+446
+00:29:58,244 --> 00:30:00,880
+and having slos over the top of your product,
+
+447
+00:30:01,410 --> 00:30:04,846
+measuring that user experience are especially well
+
+448
+00:30:04,868 --> 00:30:08,578
+suited to helping with this. And so what our team did
+
+449
+00:30:08,744 --> 00:30:12,238
+after these six weeks, from like first line of code to having fully
+
+450
+00:30:12,254 --> 00:30:16,494
+featured out the door, the team chose to uses slos
+
+451
+00:30:16,542 --> 00:30:20,466
+to set a baseline at release and then track how their
+
+452
+00:30:20,488 --> 00:30:23,558
+incremental work would move the needle. They expected this to go up over time because
+
+453
+00:30:23,564 --> 00:30:27,538
+they were actively working on it, and they initially set this SLO
+
+454
+00:30:27,714 --> 00:30:31,170
+to track the proportion of requests that complete without an error,
+
+455
+00:30:31,250 --> 00:30:34,986
+because again, early days we weren't sure what the
+
+456
+00:30:35,008 --> 00:30:38,140
+LLM API would accept from us and what uses would put in.
+
+457
+00:30:38,830 --> 00:30:41,414
+And unlike most slos,
+
+458
+00:30:41,542 --> 00:30:45,150
+which usually have to include lots of nines to be considered good,
+
+459
+00:30:45,300 --> 00:30:48,480
+the team set their initial baseline at 75%.
+
+460
+00:30:49,010 --> 00:30:51,760
+This is released as an experimental feature after all,
+
+461
+00:30:52,370 --> 00:30:55,658
+and they aimed to iterate upwards. Today we're closer
+
+462
+00:30:55,674 --> 00:30:57,410
+to 95% compliance.
+
+463
+00:30:59,190 --> 00:31:02,882
+This little inset here on the bottom right is
+
+464
+00:31:03,016 --> 00:31:06,562
+an example of what you can do with slos once
+
+465
+00:31:06,696 --> 00:31:10,766
+you start measuring them, once you are able to cleanly separate out.
+
+466
+00:31:10,888 --> 00:31:14,854
+These are requests that did not complete successfully versus the ones that did.
+
+467
+00:31:15,052 --> 00:31:18,978
+You can go in and take all of this rich metadata
+
+468
+00:31:18,994 --> 00:31:23,590
+you've captured along the way and find outliers and then prioritize
+
+469
+00:31:24,330 --> 00:31:27,580
+what work has the highest impact on. Yours is having a great experience.
+
+470
+00:31:28,350 --> 00:31:31,818
+This sort of telemetry and analysis over time.
+
+471
+00:31:31,984 --> 00:31:35,214
+This is a seven day view. There's 30 day views. Whatever your tool
+
+472
+00:31:35,252 --> 00:31:38,926
+will have different time windows. But being able to
+
+473
+00:31:38,948 --> 00:31:42,650
+track this historical compliance is what allows the team to iterate
+
+474
+00:31:42,730 --> 00:31:46,218
+fast and confidently. Remember, the core
+
+475
+00:31:46,234 --> 00:31:50,686
+of this is that llms are unpredictable and hard to model through traditional testing approaches.
+
+476
+00:31:50,878 --> 00:31:54,980
+And so the team here chose to measure from the outside in
+
+477
+00:31:55,430 --> 00:31:58,786
+to start with the measurements that mattered, users being
+
+478
+00:31:58,808 --> 00:32:01,720
+able to use the feature period and have a good experience,
+
+479
+00:32:02,490 --> 00:32:05,814
+and then debug as necessary and
+
+480
+00:32:05,852 --> 00:32:09,474
+improve iteratively. I'll leave you with two other stories.
+
+481
+00:32:09,602 --> 00:32:13,014
+So you believe that it's not just us. As we were building our feature,
+
+482
+00:32:13,062 --> 00:32:17,206
+we actually learned that two of our customers were using honeycomb
+
+483
+00:32:17,238 --> 00:32:19,020
+for a very similar thing.
+
+484
+00:32:21,150 --> 00:32:25,422
+Duolingo language learning app care
+
+485
+00:32:25,476 --> 00:32:29,710
+a lot about latency. With their LLMS features being
+
+486
+00:32:29,780 --> 00:32:33,054
+heavily mobile, they really wanted to make sure that whatever they
+
+487
+00:32:33,092 --> 00:32:36,450
+introduced felt fast. And so
+
+488
+00:32:36,520 --> 00:32:40,574
+they captured all this. Metadata only shown
+
+489
+00:32:40,622 --> 00:32:44,354
+two examples, and they wanted
+
+490
+00:32:44,392 --> 00:32:48,482
+to really closely measure what would
+
+491
+00:32:48,616 --> 00:32:52,150
+impact the llms being slos and the overall user experience
+
+492
+00:32:52,220 --> 00:32:55,718
+being slow. And what they found, actually,
+
+493
+00:32:55,884 --> 00:32:59,990
+the total latency was influenced way more by the things that they controlled
+
+494
+00:33:00,410 --> 00:33:04,582
+in that long trace, that building up that prompt and then capturing additional
+
+495
+00:33:04,646 --> 00:33:08,166
+context. That was where the bulk of the time was being spent,
+
+496
+00:33:08,198 --> 00:33:11,420
+not the LLM call itself. And so again,
+
+497
+00:33:12,030 --> 00:33:15,694
+their unpredictability happened in a different way. But in using
+
+498
+00:33:15,732 --> 00:33:19,726
+these new technologies, you won't know where the potholes will
+
+499
+00:33:19,748 --> 00:33:23,546
+be. And they were able to be confident
+
+500
+00:33:23,738 --> 00:33:28,046
+by capturing this rich data, by capturing telemetry
+
+501
+00:33:28,078 --> 00:33:31,858
+from the user's perspective that, okay, this is where we need to focus to
+
+502
+00:33:31,864 --> 00:33:33,780
+make the whole feature fast.
+
+503
+00:33:36,950 --> 00:33:40,950
+Second story I'll have for you is intercom.
+
+504
+00:33:41,370 --> 00:33:45,654
+Intercom is a sort of a messaging application for
+
+505
+00:33:45,692 --> 00:33:47,910
+businesses to message with their users.
+
+506
+00:33:48,570 --> 00:33:52,390
+And they were rapidly iterating on
+
+507
+00:33:52,460 --> 00:33:56,806
+a few different approaches to their LLM backed chatbot,
+
+508
+00:33:56,838 --> 00:34:00,620
+I believe. And they really wanted to keep tabs on the user experience,
+
+509
+00:34:01,150 --> 00:34:05,322
+even though there was all this change to the plumbing using on underneath.
+
+510
+00:34:05,466 --> 00:34:09,134
+And so they tracked tons of
+
+511
+00:34:09,172 --> 00:34:12,990
+pieces of metadata for each user interaction.
+
+512
+00:34:13,330 --> 00:34:17,374
+They captured what was happening in the application, they captured all these different
+
+513
+00:34:17,412 --> 00:34:20,786
+timings, time to first token, time to first usable token, how long it took
+
+514
+00:34:20,808 --> 00:34:23,780
+to get to the end user, how long the overall latency was, everything.
+
+515
+00:34:24,230 --> 00:34:27,730
+Then they tracked everything that they were changing along the way
+
+516
+00:34:27,880 --> 00:34:31,286
+version of the algorithm, which model they were using, the type
+
+517
+00:34:31,308 --> 00:34:35,234
+of metadata they were getting back. And critically, this was traced
+
+518
+00:34:35,362 --> 00:34:39,206
+with everything else happening inside their application. They needed the
+
+519
+00:34:39,228 --> 00:34:43,014
+full picture of the user experience to be confident in
+
+520
+00:34:43,052 --> 00:34:46,540
+understanding that they pull one lever over here,
+
+521
+00:34:47,070 --> 00:34:50,538
+they see the result over here, and they recognize that
+
+522
+00:34:50,624 --> 00:34:54,750
+using an LLM is just one piece of understanding this user experience
+
+523
+00:34:54,900 --> 00:34:58,586
+through telemetry of your application, not something to be siloed
+
+524
+00:34:58,618 --> 00:35:01,360
+over there with an ML team or something else.
+
+525
+00:35:02,050 --> 00:35:06,094
+So in the end, LLMs break many of
+
+526
+00:35:06,132 --> 00:35:09,442
+our existing tools and techniques that we use to rely on
+
+527
+00:35:09,496 --> 00:35:12,580
+ensuring correctness and a good user experience.
+
+528
+00:35:13,350 --> 00:35:17,380
+Observability can help. Think about the problem from the outside in.
+
+529
+00:35:17,830 --> 00:35:21,794
+Capture all the metadata so that you have that paper trail to debug and figure
+
+530
+00:35:21,832 --> 00:35:25,060
+out what was going on with this weird LLM box
+
+531
+00:35:25,590 --> 00:35:27,250
+and embrace the unpredictability.
+
+532
+00:35:28,710 --> 00:35:32,074
+Get out to production quickly, get in front of user yours and plan
+
+533
+00:35:32,112 --> 00:35:35,606
+to iterate fast. Plan to be reactive and embrace
+
+534
+00:35:35,638 --> 00:35:38,700
+that as a good thing instead of a stressful piece instead.
+
+535
+00:35:39,070 --> 00:35:42,474
+Thanks for your attention so far. If you want to learn
+
+536
+00:35:42,512 --> 00:35:45,878
+more about this, we've got a bunch of blog posts that go into much greater
+
+537
+00:35:45,894 --> 00:35:48,700
+detail than I was able to in the time we had together.
+
+538
+00:35:49,150 --> 00:35:52,810
+But thanks for your time. Enjoy the rest of the conference.
+
+539
+00:35:53,790 --> 00:35:54,070
+Bye.
+

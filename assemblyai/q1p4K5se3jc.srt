@@ -1,0 +1,2020 @@
+1
+00:00:19,930 --> 00:00:23,306
+Hi everyone. My name is Nishant Roy and I'm excited
+
+2
+00:00:23,338 --> 00:00:26,662
+to be here today at 42 Golang 2023
+
+3
+00:00:26,796 --> 00:00:29,906
+to talk to you about heap optimizations for Go systems.
+
+4
+00:00:30,098 --> 00:00:33,042
+After this session, you should have a good idea of how to triage,
+
+5
+00:00:33,106 --> 00:00:36,678
+whether your application is being plagued by memory issues, how to
+
+6
+00:00:36,684 --> 00:00:40,822
+track down hotspots in your code, and how to go about optimizing
+
+7
+00:00:40,886 --> 00:00:42,490
+your application's performance.
+
+8
+00:00:43,710 --> 00:00:46,620
+Before we dive in, here's a little about myself.
+
+9
+00:00:47,310 --> 00:00:51,158
+I'm the engineering manager for the ad serving platform team at Pinterest,
+
+10
+00:00:51,334 --> 00:00:55,786
+and our team owns multiple critical systems that help power Pinterest's $2 billion
+
+11
+00:00:55,818 --> 00:00:59,070
+a year over $2 billion a year ad delivery systems.
+
+12
+00:00:59,570 --> 00:01:02,974
+Our central ad serving platform itself is implemented in Go and
+
+13
+00:01:03,012 --> 00:01:06,334
+has really high performance requirements, which is why we spend a lot of time
+
+14
+00:01:06,372 --> 00:01:09,586
+thinking about how to scale our systems efficiently. And one
+
+15
+00:01:09,608 --> 00:01:12,830
+of the areas in particular that we spent a lot of time on is taming
+
+16
+00:01:12,910 --> 00:01:16,350
+the impact of the Go garbage collector to improve our system's performance.
+
+17
+00:01:16,510 --> 00:01:19,400
+So I'm here to talk about what I've learned from that experience.
+
+18
+00:01:21,370 --> 00:01:25,062
+So let's start with a really quick intro to memory management and how it works
+
+19
+00:01:25,116 --> 00:01:28,806
+in Go. Memory management at a high level refers to
+
+20
+00:01:28,828 --> 00:01:32,586
+allocating memory for an application upon request and then releasing it
+
+21
+00:01:32,608 --> 00:01:35,340
+for use by other applications once it's no longer needed.
+
+22
+00:01:36,110 --> 00:01:39,386
+The great part about Go is that it does not require users to perform any
+
+23
+00:01:39,408 --> 00:01:43,294
+manual memory management, so users do not need to manually allocate and
+
+24
+00:01:43,332 --> 00:01:46,702
+clear memory. Both these functionalities are abstracted away from
+
+25
+00:01:46,756 --> 00:01:50,266
+them, and the benefit of this is that it minimizes the chance of memory
+
+26
+00:01:50,298 --> 00:01:50,990
+leaks.
+
+27
+00:01:53,090 --> 00:01:56,946
+The Go garbage collector, in order to run it basically has a
+
+28
+00:01:56,968 --> 00:02:00,562
+threshold. So every time that the heap hits a certain target size,
+
+29
+00:02:00,616 --> 00:02:04,466
+which by default is whenever the heap grows by 100% since the
+
+30
+00:02:04,488 --> 00:02:07,698
+last time the garbage collector ran, the Go garbage collector is going
+
+31
+00:02:07,704 --> 00:02:11,506
+to run one more time. This setting is configurable through a config flag,
+
+32
+00:02:11,538 --> 00:02:14,882
+and there are more config flags that have been rolled out in recent versions
+
+33
+00:02:14,946 --> 00:02:18,680
+to make this tunable at a more granular level.
+
+34
+00:02:20,510 --> 00:02:24,566
+So the go garbage collector uses what is known as a tricolor algorithm
+
+35
+00:02:24,598 --> 00:02:28,122
+for marking the objects, which means it divides objects into three different
+
+36
+00:02:28,176 --> 00:02:31,706
+sets. Objects that are marked as white are collectible, since that
+
+37
+00:02:31,728 --> 00:02:35,066
+means that they're not in use in memory. Objects marked as
+
+38
+00:02:35,088 --> 00:02:38,618
+black are not collectible since they are definitely in use in memory, and then objects
+
+39
+00:02:38,634 --> 00:02:41,786
+that are marked as gray, which is the third color, means they may be collectible,
+
+40
+00:02:41,818 --> 00:02:45,106
+but it hasn't been determined yet. So by using this
+
+41
+00:02:45,128 --> 00:02:48,594
+tricolor algorithm, the Go garbage collector is
+
+42
+00:02:48,632 --> 00:02:52,882
+able to run concurrently with your main program without
+
+43
+00:02:52,936 --> 00:02:56,946
+using a stop the world pause similar to some other languages like Java famously
+
+44
+00:02:56,978 --> 00:03:01,106
+used to, which therefore minimizes
+
+45
+00:03:01,138 --> 00:03:04,120
+the impact of garbage collection on your main program itself.
+
+46
+00:03:06,170 --> 00:03:09,834
+So then the question is, how does garbage collection actually impact your
+
+47
+00:03:09,872 --> 00:03:13,718
+application's performance? The Go garbage collector
+
+48
+00:03:13,894 --> 00:03:18,070
+aims to use no more than 25% of the available cpu resources,
+
+49
+00:03:18,150 --> 00:03:21,674
+which obviously ideally minimizes the impact on your program's
+
+50
+00:03:21,722 --> 00:03:24,078
+performance and latency, et cetera. However,
+
+51
+00:03:24,164 --> 00:03:28,094
+as memory pressure starts to increase, which means
+
+52
+00:03:28,292 --> 00:03:32,026
+the heap size is really large, the garbage collector suddenly
+
+53
+00:03:32,058 --> 00:03:35,590
+needs a lot more cpu resources. So it starts to steal resources
+
+54
+00:03:35,610 --> 00:03:38,942
+from your main program, which can then really start to hinder the performance
+
+55
+00:03:39,006 --> 00:03:43,234
+of your program itself. So, for instance, if the rate of memory allocation is
+
+56
+00:03:43,272 --> 00:03:47,326
+really high, then the Go garbage collector is going to start stealing
+
+57
+00:03:47,358 --> 00:03:50,834
+Go routines or threads from your main program to assist with the marking phase
+
+58
+00:03:50,882 --> 00:03:54,386
+in order to quickly and efficiently scan all the objects
+
+59
+00:03:54,418 --> 00:03:57,894
+in the heap and determine what can be cleared up. This does
+
+60
+00:03:57,932 --> 00:04:02,086
+two things. Firstly, it allows us to ensure that the rate of memory allocation
+
+61
+00:04:02,118 --> 00:04:05,498
+is not greater than the rate of memory cleanup, preventing the heap from growing to
+
+62
+00:04:05,504 --> 00:04:07,930
+be very large. Secondly,
+
+63
+00:04:09,150 --> 00:04:12,766
+it slows down your main program itself,
+
+64
+00:04:12,868 --> 00:04:16,400
+which therefore reduces the rate of memory increase as well.
+
+65
+00:04:20,930 --> 00:04:24,714
+So what causes GC to actually run slower? What does memory pressure
+
+66
+00:04:24,762 --> 00:04:27,986
+mean? So, in order to determine what memory is
+
+67
+00:04:28,008 --> 00:04:31,362
+ready to be cleaned up, the garbage collector needs to scan every single
+
+68
+00:04:31,416 --> 00:04:34,418
+object in the heap to see if it is still in use or not.
+
+69
+00:04:34,584 --> 00:04:37,330
+So as the number of objects in the heap grows,
+
+70
+00:04:37,750 --> 00:04:40,630
+so does the amount of time spent scanning the entire heap.
+
+71
+00:04:41,530 --> 00:04:45,240
+Then the next question is, what is actually on the heap in the first place?
+
+72
+00:04:45,610 --> 00:04:49,222
+And the heap essentially is one of two areas that a computer
+
+73
+00:04:49,276 --> 00:04:52,758
+system uses for memory allocation. The first one is known
+
+74
+00:04:52,774 --> 00:04:56,154
+as a stack, which is a special area of the computer's memory which stores any
+
+75
+00:04:56,192 --> 00:04:59,546
+temporary variables or memory allocations that are created by
+
+76
+00:04:59,568 --> 00:05:03,374
+a function or method. Since each function stack is
+
+77
+00:05:03,412 --> 00:05:07,210
+then cleared once it's done executing. If the variables
+
+78
+00:05:07,290 --> 00:05:10,986
+within that function were not moved elsewhere, we would have no way of accessing
+
+79
+00:05:11,018 --> 00:05:14,646
+these variables later on. So that's where the heap comes in. The heap
+
+80
+00:05:14,698 --> 00:05:18,034
+is sort of a more free floating memory region used
+
+81
+00:05:18,072 --> 00:05:21,810
+to store global variables or variables that are referenced outside
+
+82
+00:05:21,880 --> 00:05:25,570
+the scope of function, shared between functions, between packages, et cetera.
+
+83
+00:05:26,790 --> 00:05:30,406
+So how does go determine what needs to go in the heap? There's this
+
+84
+00:05:30,428 --> 00:05:34,166
+process called escape analysis, which is beyond the scope of this talk, but at
+
+85
+00:05:34,188 --> 00:05:37,414
+a high level the way you can think about it is if an object is
+
+86
+00:05:37,452 --> 00:05:41,158
+only referenced within the scope of a certain function call, then we
+
+87
+00:05:41,164 --> 00:05:43,740
+can allocate it to the stack just for that function.
+
+88
+00:05:44,270 --> 00:05:47,706
+The stack will be cleared once that function is complete, and we'll lose that
+
+89
+00:05:47,728 --> 00:05:51,840
+object forever. So you don't need to worry about scanning it, cleaning it up later.
+
+90
+00:05:52,290 --> 00:05:55,966
+But if an object is accessed outside that function, then it needs
+
+91
+00:05:55,988 --> 00:05:59,566
+to be allocated to the heap in order
+
+92
+00:05:59,588 --> 00:06:03,106
+for it to be accessible later on. So that
+
+93
+00:06:03,128 --> 00:06:05,250
+is the essence of escape analysis.
+
+94
+00:06:07,590 --> 00:06:11,294
+So then how does one go about determining if garbage
+
+95
+00:06:11,342 --> 00:06:15,566
+collection is actually the problem for your application? So typically
+
+96
+00:06:15,598 --> 00:06:19,414
+the way this conversation starts is you see that your application is suffering from really
+
+97
+00:06:19,452 --> 00:06:23,190
+high latency issues. So that's your symptom, that's what you observe.
+
+98
+00:06:25,130 --> 00:06:28,934
+Intuition is really the first step towards figuring out if GC
+
+99
+00:06:28,982 --> 00:06:33,430
+is the problem. So typically, if garbage collection
+
+100
+00:06:33,590 --> 00:06:37,654
+is the reason for your application's performance suffering, you'll see really high tail
+
+101
+00:06:37,702 --> 00:06:41,486
+latency. And what that means is we have a small percentage of
+
+102
+00:06:41,508 --> 00:06:45,546
+requests to a system. So again, I'm talking about large scale distributed
+
+103
+00:06:45,578 --> 00:06:48,682
+systems with really high volumes of traffic,
+
+104
+00:06:48,746 --> 00:06:52,590
+enough to get a decent percentile breakdown of latency,
+
+105
+00:06:53,090 --> 00:06:56,782
+which is what Pinterest systems are like, of course. So tail latency
+
+106
+00:06:56,846 --> 00:07:00,402
+means that we have a small percentage of requests coming into our system that result
+
+107
+00:07:00,456 --> 00:07:04,114
+in really slow responses. So we often talk about latency as
+
+108
+00:07:04,152 --> 00:07:07,894
+percentiles. So high tail latency here might refer to really
+
+109
+00:07:07,932 --> 00:07:11,270
+high values for p 99 latency or even p 90 latency.
+
+110
+00:07:11,850 --> 00:07:15,174
+Typically for Gc, what we've seen is the p
+
+111
+00:07:15,212 --> 00:07:19,146
+99 latency is what really gets affected because of the infrequency of the
+
+112
+00:07:19,168 --> 00:07:22,682
+garbage collector. Running it only really affects that last
+
+113
+00:07:22,736 --> 00:07:26,986
+1% of requests. So if
+
+114
+00:07:27,008 --> 00:07:30,630
+you're also observing systems like this really high p 99 latency,
+
+115
+00:07:30,710 --> 00:07:34,398
+then there's a good chance that garbage collection pressure could be the
+
+116
+00:07:34,404 --> 00:07:37,486
+root cause. Especially if you already know that your program has pretty
+
+117
+00:07:37,508 --> 00:07:41,374
+high memory usage, which you can tell by just
+
+118
+00:07:41,412 --> 00:07:45,374
+observing various system metrics how much memory is being used on the host
+
+119
+00:07:45,422 --> 00:07:49,522
+that is running your application, et cetera, et cetera. So the next step is
+
+120
+00:07:49,576 --> 00:07:53,214
+to confirm your hypothesis. You can use this runtime
+
+121
+00:07:53,262 --> 00:07:56,270
+environment variable that go makes available, called go debug.
+
+122
+00:07:56,430 --> 00:07:59,926
+By setting it to go. Debug equals GC, trace equals one. As you can see
+
+123
+00:07:59,948 --> 00:08:03,666
+on the slide here, you'll force your program to output debug logs
+
+124
+00:08:03,698 --> 00:08:07,190
+for every single GC cycle. And this will also
+
+125
+00:08:07,260 --> 00:08:10,566
+include a detailed printout of the time spent in
+
+126
+00:08:10,588 --> 00:08:14,314
+the various phases of garbage collection. And then
+
+127
+00:08:14,352 --> 00:08:17,642
+the last step is to take what you measured and align it with your system
+
+128
+00:08:17,696 --> 00:08:21,498
+metrics. So the way we did this was we looked at the logs from
+
+129
+00:08:21,584 --> 00:08:25,626
+Gctrace and if we noticed that the system's
+
+130
+00:08:25,658 --> 00:08:29,246
+performance so there were spikes in latency that aligned with when
+
+131
+00:08:29,268 --> 00:08:32,638
+the GC cycles were occurring, that's a great way to
+
+132
+00:08:32,644 --> 00:08:35,826
+conclude that there's a good chance that GC is
+
+133
+00:08:35,848 --> 00:08:37,810
+the cause of your performance regression.
+
+134
+00:08:40,150 --> 00:08:43,266
+So here's an example of what GCT trace output looks like, with an
+
+135
+00:08:43,288 --> 00:08:46,546
+explanation with a detailed breakdown of every single component in there.
+
+136
+00:08:46,648 --> 00:08:49,538
+Credits to Arden Labs here. If you want to find the blog post, you can
+
+137
+00:08:49,544 --> 00:08:52,898
+just look up GCT trace Arden labs. That's how I found this screenshot.
+
+138
+00:08:53,074 --> 00:08:56,518
+So taking a quick look at this, we see that GCtrace gives us a
+
+139
+00:08:56,524 --> 00:08:59,926
+lot of information. It shows us how many GC cycles we've
+
+140
+00:08:59,958 --> 00:09:03,020
+had so far since our application started,
+
+141
+00:09:03,550 --> 00:09:07,206
+how much of our program's total cpu has been spent on garbage
+
+142
+00:09:07,238 --> 00:09:11,274
+collection, how much wall clock and cpu time was
+
+143
+00:09:11,312 --> 00:09:14,606
+spent in the various phases of GC, what our memory users looks like
+
+144
+00:09:14,628 --> 00:09:18,046
+before and after garbage collection runs, et cetera. Et I'm not
+
+145
+00:09:18,068 --> 00:09:21,466
+going to go too deep into these aspects, but check out the blog
+
+146
+00:09:21,498 --> 00:09:25,134
+post if you're looking for a detailed breakdown of all
+
+147
+00:09:25,172 --> 00:09:28,446
+of these GC components. What I found helpful is really just to
+
+148
+00:09:28,468 --> 00:09:32,174
+let GC trace run in the background. And I added a separate background
+
+149
+00:09:32,222 --> 00:09:36,226
+thread to print out certain key system metrics, things like p
+
+150
+00:09:36,248 --> 00:09:40,006
+90, p 99, n latency observed over like
+
+151
+00:09:40,028 --> 00:09:43,446
+a 1 minute to 32nd period. Print these
+
+152
+00:09:43,468 --> 00:09:47,298
+out in a regular interval and look for correlations between JC cycles occurring
+
+153
+00:09:47,314 --> 00:09:48,730
+and latency degradations.
+
+154
+00:09:51,630 --> 00:09:55,414
+So let's assume now that we have a reasonable amount of confidence
+
+155
+00:09:55,462 --> 00:09:58,902
+that garbage collection is the root cause for our application's
+
+156
+00:09:58,966 --> 00:10:02,374
+poor performance. How do we then go about profiling our heap
+
+157
+00:10:02,422 --> 00:10:05,898
+usage? So go has quite a few built in tools
+
+158
+00:10:05,994 --> 00:10:08,910
+to study our heap usage, and I'm going to talk about two main ones here.
+
+159
+00:10:08,980 --> 00:10:12,814
+These are the two that I found really helpful. The first one is the
+
+160
+00:10:12,852 --> 00:10:16,286
+memstats library, and then the second one is the PPRF package.
+
+161
+00:10:16,398 --> 00:10:20,194
+So memstats is essentially this library that is built
+
+162
+00:10:20,232 --> 00:10:23,486
+into go runtime and provides you with statistics about the memory
+
+163
+00:10:23,518 --> 00:10:26,974
+allocator itself, things like how much memory has been allocated,
+
+164
+00:10:27,022 --> 00:10:30,326
+how much memory is requested from the system, how much memory has been
+
+165
+00:10:30,348 --> 00:10:33,830
+freed, GC metrics, et cetera, et cetera. I'll dive into
+
+166
+00:10:33,900 --> 00:10:36,918
+that a little bit more in a second, and the second one is pprof which
+
+167
+00:10:36,924 --> 00:10:40,106
+is a system profile visualizer, and we'll talk about that in a little bit more
+
+168
+00:10:40,128 --> 00:10:43,850
+detail as well. But these are really helpful to understand how your application
+
+169
+00:10:43,920 --> 00:10:47,370
+is managing memory and also visually
+
+170
+00:10:48,110 --> 00:10:51,786
+inspect your system's cpu data
+
+171
+00:10:51,888 --> 00:10:54,190
+or cpu usage, heap usage, et cetera.
+
+172
+00:10:56,130 --> 00:10:59,566
+So here's just a really short glimpse into what memstats gives
+
+173
+00:10:59,588 --> 00:11:03,146
+you. These are some stats that I found helpful. Like I said, it essentially exposes
+
+174
+00:11:03,178 --> 00:11:07,194
+these stats about the system's memory usage, garbage collector performance,
+
+175
+00:11:07,242 --> 00:11:10,626
+et cetera, et cetera. So we can use this library to monitor a
+
+176
+00:11:10,648 --> 00:11:14,366
+few different things. What I found helpful is to monitor the total number of objects
+
+177
+00:11:14,398 --> 00:11:17,526
+in the heap. We discussed this earlier, but as the number of objects in the
+
+178
+00:11:17,548 --> 00:11:21,698
+heap increases, it takes much longer for the garbage collector
+
+179
+00:11:21,794 --> 00:11:24,882
+to mark the entire heap to scan and mark the entire heap.
+
+180
+00:11:25,026 --> 00:11:28,360
+So if we notice this metric going up,
+
+181
+00:11:29,210 --> 00:11:32,250
+there's a good chance that GC pressure is going to increase.
+
+182
+00:11:32,590 --> 00:11:36,682
+Similarly, if that metric is going down, we made some good optimizations and
+
+183
+00:11:36,816 --> 00:11:40,266
+the impact of GC should be decreasing. So I used this
+
+184
+00:11:40,288 --> 00:11:43,966
+metric as one of my indicators for success. As I rolled out new
+
+185
+00:11:43,988 --> 00:11:47,898
+optimizations, this metric dropped and I noticed that the system's performance
+
+186
+00:11:48,074 --> 00:11:51,818
+started to improve. And the memsite
+
+187
+00:11:51,994 --> 00:11:55,950
+docs provide a really clear explanation of all the various statistics.
+
+188
+00:11:56,450 --> 00:12:00,274
+I think there's close to 20. These are the three that I use once again.
+
+189
+00:12:00,312 --> 00:12:03,566
+So heap objects number of allocated heap objects heap alloc
+
+190
+00:12:03,598 --> 00:12:07,106
+is actual bytes that are allocated to heap. This is helpful because
+
+191
+00:12:07,208 --> 00:12:11,458
+this is how the go runtime determines when to actually trigger GC.
+
+192
+00:12:11,554 --> 00:12:15,206
+So like we said before, it essentially by default triggers whenever your
+
+193
+00:12:15,228 --> 00:12:18,978
+heap grows by 100% since the last cycle. So that's
+
+194
+00:12:18,994 --> 00:12:21,894
+what heap alloc can be used for. And then lastly,
+
+195
+00:12:21,942 --> 00:12:25,654
+heap sys talks about the total bytes memory obtained from the OS.
+
+196
+00:12:25,782 --> 00:12:29,686
+So actually requesting memory from the operating system is a slightly
+
+197
+00:12:29,718 --> 00:12:32,810
+heavyweight process because it's essentially blocking.
+
+198
+00:12:33,250 --> 00:12:36,414
+So if you're seeing that this number is also continuously going
+
+199
+00:12:36,452 --> 00:12:39,966
+up, there's a good chance that you're continuously having
+
+200
+00:12:39,988 --> 00:12:43,918
+to request a lot of memory, which is also blocking threads and impacting
+
+201
+00:12:43,934 --> 00:12:47,154
+your system's performance. I don't have slides on this,
+
+202
+00:12:47,192 --> 00:12:50,674
+but one new cool feature that Go has rolled out
+
+203
+00:12:50,712 --> 00:12:55,202
+since I made these slides originally is another
+
+204
+00:12:55,256 --> 00:12:58,786
+runtime flag, which allows you to actually set a soft memory
+
+205
+00:12:58,818 --> 00:13:02,210
+limit. So rather than the default behavior
+
+206
+00:13:02,290 --> 00:13:05,398
+of GOGC triggering whenever your
+
+207
+00:13:05,404 --> 00:13:09,186
+heap grows by 100%, you can actually set a target saying only
+
+208
+00:13:09,228 --> 00:13:13,126
+trigger go Gc when my heap size hits x megabytes,
+
+209
+00:13:13,158 --> 00:13:16,618
+x gigabytes, whatever it is, which therefore lowers the number of
+
+210
+00:13:16,624 --> 00:13:20,186
+times GC needs to run, therefore lowering the impact of
+
+211
+00:13:20,208 --> 00:13:23,638
+GC in your application's performance. That's one way to go about
+
+212
+00:13:23,664 --> 00:13:27,114
+it, and can be an easy and dirty way to just tame
+
+213
+00:13:27,242 --> 00:13:30,686
+the impact. However, some of the steps we'll talk about here will really just
+
+214
+00:13:30,708 --> 00:13:34,994
+help you tune your actual heap usage itself,
+
+215
+00:13:35,192 --> 00:13:38,270
+which is likely well, one, it's a good practice,
+
+216
+00:13:38,350 --> 00:13:42,206
+and two, it's likely to give you more consistent and perhaps more significant wins
+
+217
+00:13:42,238 --> 00:13:46,166
+as well. So here's a quick program that
+
+218
+00:13:46,188 --> 00:13:49,586
+I put together on how to use memsats, so just wrote
+
+219
+00:13:49,618 --> 00:13:53,942
+this little method on the right here to read
+
+220
+00:13:53,996 --> 00:13:57,110
+memsats every however frequently you need it.
+
+221
+00:13:57,180 --> 00:14:01,266
+Print out number of heap objects allocated, number of bytes allocated
+
+222
+00:14:01,298 --> 00:14:04,698
+to heap, et cetera, as well as the number of GC cycles that have been
+
+223
+00:14:04,704 --> 00:14:08,214
+triggered. Since this can be really helpful to see how often and how frequently
+
+224
+00:14:08,262 --> 00:14:11,486
+GC is getting triggered. The example I did here
+
+225
+00:14:11,508 --> 00:14:14,890
+is essentially we're allocating this slice of integers
+
+226
+00:14:14,970 --> 00:14:17,790
+or this array of int slices,
+
+227
+00:14:18,130 --> 00:14:22,666
+and you can see how I'll
+
+228
+00:14:22,698 --> 00:14:26,526
+show you in the next slide. You can essentially see how the number of heap
+
+229
+00:14:26,558 --> 00:14:30,034
+objects and heap allocated bytes changes, as well as how the
+
+230
+00:14:30,072 --> 00:14:32,580
+GC counter increments as well.
+
+231
+00:14:33,190 --> 00:14:35,300
+So here's what we got when we ran it.
+
+232
+00:14:36,250 --> 00:14:39,574
+You can see that the heap objects drop whenever we
+
+233
+00:14:39,692 --> 00:14:42,946
+run GC, which is basically the penultimate
+
+234
+00:14:42,978 --> 00:14:46,470
+line in this slide. Otherwise, heap objects continue
+
+235
+00:14:46,540 --> 00:14:50,478
+to increase. You can see that on the last line we see num GC incremented
+
+236
+00:14:50,514 --> 00:14:53,318
+to one, and that's where heap objects dropped.
+
+237
+00:14:53,414 --> 00:14:57,206
+It's a clear indicator that things worked as expected. You can also see that heap
+
+238
+00:14:57,238 --> 00:15:01,386
+alloc dropped very significantly, almost to ten
+
+239
+00:15:01,408 --> 00:15:05,166
+or 11% of what it used to be. So GC did its job, and we
+
+240
+00:15:05,188 --> 00:15:08,414
+freed up a lot of space on the heat. This is a really
+
+241
+00:15:08,452 --> 00:15:11,914
+simple program, but you can use something very similar to essentially understand the memory
+
+242
+00:15:11,962 --> 00:15:15,926
+behavior of even more complex systems. So this is how memsats
+
+243
+00:15:15,978 --> 00:15:17,170
+can be really helpful.
+
+244
+00:15:19,110 --> 00:15:22,738
+The second package that I talked about is Pprof. It's a
+
+245
+00:15:22,744 --> 00:15:26,206
+built in package as well. It allows us to visualize several
+
+246
+00:15:26,238 --> 00:15:29,778
+different system profiles. It is CPU memory usage, heap, et cetera.
+
+247
+00:15:29,954 --> 00:15:32,898
+Here we're going to talk specifically about the heap profile.
+
+248
+00:15:32,994 --> 00:15:36,466
+So the tool comes with a bunch of options to investigate specific aspects
+
+249
+00:15:36,498 --> 00:15:38,998
+of the heap, and those are the ones listed here.
+
+250
+00:15:39,164 --> 00:15:42,954
+So if you were concerned about auto memory issues, you may be
+
+251
+00:15:42,992 --> 00:15:46,486
+interested in inspecting the actual amount of memory
+
+252
+00:15:46,518 --> 00:15:50,166
+used rather than objects, for instance. So you can use the right option accordingly.
+
+253
+00:15:50,278 --> 00:15:53,470
+In our case, we know that GC pressure is what we're investigating.
+
+254
+00:15:53,810 --> 00:15:57,086
+It's tied very closely to the number of objects in the heap. So the
+
+255
+00:15:57,108 --> 00:16:00,894
+inused objects or allocated objects, fields or options are more
+
+256
+00:16:00,932 --> 00:16:03,966
+useful to us here. So the first command shown here,
+
+257
+00:16:04,068 --> 00:16:08,020
+go tool pprof and input your options. Then pass in
+
+258
+00:16:08,950 --> 00:16:12,386
+the URL of wherever your application is running and pass in the
+
+259
+00:16:12,408 --> 00:16:16,366
+API endpoint that you want to hit, which is debug. PProf is going
+
+260
+00:16:16,408 --> 00:16:20,210
+to essentially download that profile data to your machine
+
+261
+00:16:20,370 --> 00:16:24,760
+and puts you in an interactive command line tool to start visualizing this data,
+
+262
+00:16:25,610 --> 00:16:29,106
+and it's really helpful. So one thing I forgot to mention is in order
+
+263
+00:16:29,148 --> 00:16:32,874
+to generate this profile, you do need to register this
+
+264
+00:16:32,912 --> 00:16:35,370
+HTTP endpoint upon application startup.
+
+265
+00:16:37,070 --> 00:16:40,300
+I don't have a slide for that either, but you can just quickly look up
+
+266
+00:16:41,170 --> 00:16:44,494
+the pprof docs on Go's main
+
+267
+00:16:44,532 --> 00:16:47,886
+doc site and it's essentially one line to
+
+268
+00:16:47,908 --> 00:16:51,470
+register this HTTP endpoint and generate your heap profiles.
+
+269
+00:16:52,930 --> 00:16:56,414
+So like I said, when you run this, it'll put you in a command line
+
+270
+00:16:56,452 --> 00:16:59,666
+interface to start playing around with the data. You can essentially run help in your
+
+271
+00:16:59,688 --> 00:17:02,686
+command line tool and command line interface,
+
+272
+00:17:02,798 --> 00:17:06,162
+and it'll show you all the available options to slice and dice this data.
+
+273
+00:17:06,296 --> 00:17:09,794
+What I really like is to run a second command, the last one shown here,
+
+274
+00:17:09,832 --> 00:17:12,934
+which is gotool pprof, pass in the port that you want to run
+
+275
+00:17:12,972 --> 00:17:16,706
+the web UI on, and then the path to the actual profile
+
+276
+00:17:16,898 --> 00:17:20,746
+data itself, and it'll open up an interactive web browser, which I
+
+277
+00:17:20,768 --> 00:17:24,970
+find much easier and more helpful in inspecting heap usage.
+
+278
+00:17:25,470 --> 00:17:28,954
+So to jump ahead and show you what that looks like,
+
+279
+00:17:29,152 --> 00:17:32,570
+here is one of the visualizations that Pprof gives you.
+
+280
+00:17:32,720 --> 00:17:35,934
+It lets you see the number of objects in use by various call
+
+281
+00:17:35,972 --> 00:17:39,022
+stacks, which can be really helpful in narrowing down problematic code.
+
+282
+00:17:39,156 --> 00:17:41,550
+So here it's showing you the entire call stack.
+
+283
+00:17:42,290 --> 00:17:45,518
+The size of the box is roughly proportionate to
+
+284
+00:17:45,684 --> 00:17:49,106
+whatever is allocated in the most number of objects, so it really helps you
+
+285
+00:17:49,128 --> 00:17:53,202
+narrow down in this case if you see buff Iot new reader size is
+
+286
+00:17:53,256 --> 00:17:56,610
+about 45% of our heap allocation. So we can
+
+287
+00:17:56,760 --> 00:18:00,834
+conclude that that is one of the reasons for our heap allocation,
+
+288
+00:18:00,882 --> 00:18:03,560
+or the number of objects in our heap being so high.
+
+289
+00:18:04,330 --> 00:18:07,618
+Then we can trace through that stack and try and figure out what we can
+
+290
+00:18:07,644 --> 00:18:10,966
+do to optimize this. Some options are not creating
+
+291
+00:18:10,998 --> 00:18:14,806
+a new reader every single time we need to use it, perhaps reusing
+
+292
+00:18:14,838 --> 00:18:17,370
+one, pooling them, et cetera, et cetera.
+
+293
+00:18:19,870 --> 00:18:23,770
+This is another visualization that Pprof offers that I actually use really heavily.
+
+294
+00:18:24,110 --> 00:18:27,498
+It lets you visualize heap usage as a flame graph. And this flame
+
+295
+00:18:27,514 --> 00:18:30,478
+graph is also interactive, so you can click on any bar to focus in on
+
+296
+00:18:30,484 --> 00:18:33,786
+it and the call stack below it, et cetera, et cetera. The depth
+
+297
+00:18:33,818 --> 00:18:37,566
+of the call stack doesn't really matter here, but the width of the call stack
+
+298
+00:18:37,598 --> 00:18:40,942
+is what represents the number of heap objects that are allocated.
+
+299
+00:18:41,086 --> 00:18:44,594
+So essentially, the wider call stacks use a higher number of heap objects, at least
+
+300
+00:18:44,632 --> 00:18:48,574
+when this profile was captured. So it's really easy to just jump
+
+301
+00:18:48,622 --> 00:18:52,646
+in to certain hotspots and dig deeper into there to try
+
+302
+00:18:52,668 --> 00:18:57,270
+and find the lowest hanging fruit and the biggest possible optimizations.
+
+303
+00:18:58,970 --> 00:19:02,710
+So I'm also going to show you what the CLI
+
+304
+00:19:02,790 --> 00:19:05,834
+can be used for. So from the previous slide here,
+
+305
+00:19:05,872 --> 00:19:09,494
+we can try and figure out which method or which call stack
+
+306
+00:19:09,542 --> 00:19:12,934
+is allocating a large number of objects. And then through the CLI,
+
+307
+00:19:12,982 --> 00:19:16,206
+you can use this list command, which is really cool to pass in
+
+308
+00:19:16,228 --> 00:19:20,410
+a function name and see line by line which lines
+
+309
+00:19:20,490 --> 00:19:24,062
+of that method are allocating how many objects. So in this one,
+
+310
+00:19:24,196 --> 00:19:27,054
+this is a fake method. But let's say we have a method called create catalog
+
+311
+00:19:27,102 --> 00:19:30,526
+map that is essentially creating this map of products that a particular seller
+
+312
+00:19:30,558 --> 00:19:34,146
+has. We can jump in. We know
+
+313
+00:19:34,168 --> 00:19:37,778
+that this method creates a large number of objects itself. Here we can go in
+
+314
+00:19:37,784 --> 00:19:41,254
+and see line by line, exactly how many objects are allocated by each
+
+315
+00:19:41,292 --> 00:19:44,790
+line in the object in the method, and figure out where to focus
+
+316
+00:19:44,860 --> 00:19:48,658
+our efforts. So here you can see that lines
+
+317
+00:19:48,834 --> 00:19:52,102
+233 and through 237 create a lot of new objects,
+
+318
+00:19:52,166 --> 00:19:54,410
+which results in a large number of feeb allocations.
+
+319
+00:19:55,470 --> 00:19:58,518
+And then line 241, surprisingly,
+
+320
+00:19:58,694 --> 00:20:01,786
+is not actually creating new objects, but it's adding all those objects to a
+
+321
+00:20:01,808 --> 00:20:05,166
+map, which is also causing a large number of feeb allocations. So that
+
+322
+00:20:05,188 --> 00:20:07,840
+looks a little suspicious. We'll come back to that in a second.
+
+323
+00:20:10,370 --> 00:20:14,094
+Let's first talk about how to lower or limit the impact of garbage collection on
+
+324
+00:20:14,132 --> 00:20:18,066
+your system. First one we've been talking about for a while, lower the
+
+325
+00:20:18,088 --> 00:20:21,826
+number of objects in your heap. This is going to reduce the amount of
+
+326
+00:20:21,848 --> 00:20:25,310
+time it takes a garbage collection to scan your heap and therefore lower its impact.
+
+327
+00:20:25,470 --> 00:20:29,094
+The second one is to reduce the rate of object allocation. And then the third
+
+328
+00:20:29,132 --> 00:20:32,806
+one is actually to optimize their data structures to minimize how much memory they
+
+329
+00:20:32,828 --> 00:20:36,274
+use, which will therefore reduce the need for more frequent
+
+330
+00:20:36,322 --> 00:20:40,154
+GC triggers. So these three are
+
+331
+00:20:40,192 --> 00:20:44,298
+ways that we can use to mitigate the impact of garbage collection, make our application
+
+332
+00:20:44,384 --> 00:20:48,058
+more lightweight, and free up more resources for our program to
+
+333
+00:20:48,144 --> 00:20:49,450
+operate efficiently.
+
+334
+00:20:51,390 --> 00:20:54,734
+So let's dive a little bit into the first one. How do we
+
+335
+00:20:54,772 --> 00:20:58,126
+reduce objects in the heap? So really the
+
+336
+00:20:58,148 --> 00:21:01,466
+question is, how do you reduce long living heap objects? Because these are objects
+
+337
+00:21:01,498 --> 00:21:04,894
+that are essentially living in the heap for a long time, and we
+
+338
+00:21:04,932 --> 00:21:09,054
+expect them to keep living there, which means every single time the garbage collector
+
+339
+00:21:09,102 --> 00:21:12,434
+runs, it needs to scan these objects, determine that they're still in use,
+
+340
+00:21:12,472 --> 00:21:16,226
+and they can't be cleaned up, et cetera, et cetera. So rather than having these
+
+341
+00:21:16,248 --> 00:21:19,654
+objects live on the heap, they can be created as values rather
+
+342
+00:21:19,692 --> 00:21:23,366
+than references on demand. So for instance, let's take
+
+343
+00:21:23,388 --> 00:21:26,966
+the Pinterest ad system as an example. If every single time that
+
+344
+00:21:26,988 --> 00:21:30,002
+we're determining which ads to show a user,
+
+345
+00:21:30,146 --> 00:21:33,606
+let's say we need some data for each item in that user request.
+
+346
+00:21:33,638 --> 00:21:37,020
+So every potential ad candidate has some data associated with it.
+
+347
+00:21:37,390 --> 00:21:41,030
+Rather than pre computing that data and storing it in this long lived map,
+
+348
+00:21:41,110 --> 00:21:44,186
+we could just compute it on a per request basis to
+
+349
+00:21:44,208 --> 00:21:47,262
+reduce the number of objects in the heat. So what that is going to do
+
+350
+00:21:47,316 --> 00:21:50,542
+is increase the amount of computation for
+
+351
+00:21:50,596 --> 00:21:54,546
+each average request. However, it is going to reduce the sort
+
+352
+00:21:54,568 --> 00:21:57,678
+of like tail latency problem, because you have a very reliable
+
+353
+00:21:57,854 --> 00:22:01,486
+measure of how much compute is being used per request,
+
+354
+00:22:01,678 --> 00:22:05,262
+and it's easier to essentially optimize a particular request
+
+355
+00:22:05,326 --> 00:22:07,750
+rather than optimize this long tail latency.
+
+356
+00:22:08,970 --> 00:22:12,178
+So that's one way to do it, create your objects in demand rather than storing
+
+357
+00:22:12,194 --> 00:22:14,790
+them in a long lived map on the heap.
+
+358
+00:22:16,330 --> 00:22:19,926
+The second and third are very related, but be mindful of
+
+359
+00:22:19,948 --> 00:22:23,526
+where you're using pointers. Go makes it really easy to create and reference
+
+360
+00:22:23,558 --> 00:22:27,290
+pointers. However, if we have a reference to an object and that object
+
+361
+00:22:27,360 --> 00:22:30,762
+itself contains further pointers or further references within
+
+362
+00:22:30,816 --> 00:22:34,218
+it, these are all going to be considered individual objects
+
+363
+00:22:34,234 --> 00:22:37,934
+in the heap, even though they may be nested together. The reason for this is,
+
+364
+00:22:37,972 --> 00:22:41,966
+if you think about it, I have a pointer to some object x,
+
+365
+00:22:42,068 --> 00:22:45,840
+or let's say the object is a person is of type person.
+
+366
+00:22:46,550 --> 00:22:50,274
+Each person has a name, each person has an age, et cetera. If I have
+
+367
+00:22:50,312 --> 00:22:53,934
+a pointer to the person's name and it's referenced somewhere,
+
+368
+00:22:53,982 --> 00:22:58,470
+there's a good chance that the name may be used even after the main person
+
+369
+00:22:58,540 --> 00:23:01,954
+object ceases to exist. So the go memory allocator
+
+370
+00:23:02,002 --> 00:23:05,426
+needs to store that object separately in memory, which means it's
+
+371
+00:23:05,458 --> 00:23:08,946
+a whole second object that needs to be scanned by the garbage
+
+372
+00:23:08,978 --> 00:23:12,378
+collector later on. So reducing the number of
+
+373
+00:23:12,464 --> 00:23:15,578
+pointers that we use, reducing the number of nested pointers is going to
+
+374
+00:23:15,584 --> 00:23:18,490
+reduce the number of objects that your garbage collector needs to scan.
+
+375
+00:23:19,390 --> 00:23:22,650
+The third one is just sort of a gotcha.
+
+376
+00:23:22,990 --> 00:23:26,254
+Strings and binaries are treated as pointers under the hood. So each
+
+377
+00:23:26,292 --> 00:23:30,062
+one is going to be an object in the heap. So wherever possible,
+
+378
+00:23:30,196 --> 00:23:33,886
+if you try and represent these as other non pointer values. So strings,
+
+379
+00:23:33,918 --> 00:23:37,330
+perhaps you could represent as integers or floats if possible,
+
+380
+00:23:37,480 --> 00:23:41,102
+hashing them for instance, or representing
+
+381
+00:23:41,166 --> 00:23:44,338
+dates as actual time time objects, so on and
+
+382
+00:23:44,344 --> 00:23:47,474
+so forth. Those are ways to reduce the number of strings you're using, and therefore
+
+383
+00:23:47,522 --> 00:23:49,590
+reduce the number of pointers.
+
+384
+00:23:51,530 --> 00:23:55,800
+So going back to our example, if we
+
+385
+00:23:56,170 --> 00:23:59,478
+look at line, if we
+
+386
+00:23:59,484 --> 00:24:03,014
+look at line 272 37, we're creating a new catalog listing
+
+387
+00:24:03,062 --> 00:24:06,998
+each time. And then on line 241, we're assigning
+
+388
+00:24:07,014 --> 00:24:10,906
+it to a map. So we're using this catalog listing
+
+389
+00:24:10,938 --> 00:24:14,206
+key, which we're doing by encoding product id and
+
+390
+00:24:14,228 --> 00:24:17,360
+seller id together. Let's say
+
+391
+00:24:19,010 --> 00:24:22,880
+this catalog listing key is actually a string object.
+
+392
+00:24:24,370 --> 00:24:27,986
+If we then change how we're creating the key to
+
+393
+00:24:28,008 --> 00:24:31,554
+instead using a struct. So lines 239 to 241
+
+394
+00:24:31,592 --> 00:24:34,418
+here show that we are starting to use a struct for the key instead,
+
+395
+00:24:34,504 --> 00:24:37,746
+rather than using a string as previously, we can see that we
+
+396
+00:24:37,768 --> 00:24:41,734
+reduce the number of heap objects by 26 million between
+
+397
+00:24:41,772 --> 00:24:45,494
+these slides, which is around 20% of our heap usage. So we didn't actually change
+
+398
+00:24:45,532 --> 00:24:48,454
+that much, we just changed how we're representing the exact same data,
+
+399
+00:24:48,572 --> 00:24:52,006
+and we're able to significantly reduce the amount of work that our garbage
+
+400
+00:24:52,038 --> 00:24:55,354
+collector needs to do. So here's one example of how a simple thing like
+
+401
+00:24:55,392 --> 00:24:58,874
+removing strings can actually have a very significant impact on
+
+402
+00:24:58,912 --> 00:25:02,350
+your application's heap usage, and therefore its performance.
+
+403
+00:25:04,850 --> 00:25:08,330
+So the other thing you can think about is reducing the rate of allocation.
+
+404
+00:25:08,490 --> 00:25:12,298
+So if your program tends to create a large number of short lived objects
+
+405
+00:25:12,474 --> 00:25:16,162
+in bursts, object pooling is something that might benefit you,
+
+406
+00:25:16,216 --> 00:25:19,986
+because you can use that to object pools can essentially be
+
+407
+00:25:20,008 --> 00:25:23,586
+used to allocate in free memory blocks manually and reduce the number
+
+408
+00:25:23,608 --> 00:25:27,570
+of GC, the amount of work that your garbage collector needs to do.
+
+409
+00:25:27,720 --> 00:25:31,138
+Because object pools are expected to be retained for a longer scope, we don't
+
+410
+00:25:31,154 --> 00:25:34,962
+need to keep allocating, clearing up these objects, and GC doesn't
+
+411
+00:25:35,026 --> 00:25:38,534
+scan it over and over again. However, I will put
+
+412
+00:25:38,572 --> 00:25:41,994
+out a warning here, because the garbage collector is not going
+
+413
+00:25:42,032 --> 00:25:45,162
+to scan and clear up your object pool for you,
+
+414
+00:25:45,296 --> 00:25:49,066
+it can lead to memory leaks if not used properly. So I'd only recommend
+
+415
+00:25:49,248 --> 00:25:52,640
+using this if you know what you're doing and if you've exhausted all other options.
+
+416
+00:25:53,890 --> 00:25:57,786
+For instance, if you're continuously allocating new objects
+
+417
+00:25:57,818 --> 00:26:01,406
+rather than reusing objects from
+
+418
+00:26:01,428 --> 00:26:04,778
+the pool, this could lead to a memory leak and cause your
+
+419
+00:26:04,804 --> 00:26:09,090
+application to crash due to out of memory errors. A second potential problem
+
+420
+00:26:09,160 --> 00:26:13,278
+here is if you're not properly sanitizing your objects before returning
+
+421
+00:26:13,294 --> 00:26:16,546
+them to the pool, data may be persisted beyond its intended
+
+422
+00:26:16,578 --> 00:26:20,502
+scope and could potentially be leaked to other scopes. So if we're storing some
+
+423
+00:26:20,636 --> 00:26:24,486
+sensitive, personally identifiable information on
+
+424
+00:26:24,508 --> 00:26:27,986
+a per request basis for each user, and we're
+
+425
+00:26:28,018 --> 00:26:31,386
+using pools to represent the user object, if we
+
+426
+00:26:31,408 --> 00:26:34,774
+don't sanitize that data, then there's a good chance that we could potentially leak
+
+427
+00:26:34,822 --> 00:26:38,634
+data from one user's profile to another user's profile, which would
+
+428
+00:26:38,672 --> 00:26:41,690
+obviously have really disastrous consequences,
+
+429
+00:26:42,110 --> 00:26:45,194
+not only in terms of our application itself, but in terms of the user's privacy
+
+430
+00:26:45,242 --> 00:26:48,302
+concerns, et cetera, et cetera. So these are the risks of object
+
+431
+00:26:48,356 --> 00:26:52,078
+pooling, but it can be a really powerful tool to reduce the amount of
+
+432
+00:26:52,084 --> 00:26:55,618
+work that your garbage collector needs to do and give you some more control over
+
+433
+00:26:55,704 --> 00:26:57,060
+memory management yourself.
+
+434
+00:26:59,670 --> 00:27:03,346
+The third thing that we talked about is thinking about how we organize and
+
+435
+00:27:03,368 --> 00:27:06,786
+represent our data to reduce the amount of memory that
+
+436
+00:27:06,808 --> 00:27:09,966
+it's using. So one way to do this is to clean up any unused
+
+437
+00:27:09,998 --> 00:27:13,426
+data fields. Basic types in Go are going to have default values.
+
+438
+00:27:13,458 --> 00:27:16,299
+For example, a boolean is going to default to false, an integer is going to
+
+439
+00:27:16,799 --> 00:27:20,022
+default to zero, et cetera, et cetera. So even if you're not using these fields,
+
+440
+00:27:20,086 --> 00:27:23,226
+the go memory allocator still needs to allocate space on
+
+441
+00:27:23,248 --> 00:27:26,090
+the heap for these objects, and they're there for consuming memory.
+
+442
+00:27:27,150 --> 00:27:30,918
+So fields I through L here are unused,
+
+443
+00:27:30,934 --> 00:27:34,378
+but they're still taking on their default values. So if we remove those,
+
+444
+00:27:34,544 --> 00:27:38,506
+we essentially went from 64 bytes to 40 bytes, which is a pretty significant
+
+445
+00:27:38,538 --> 00:27:41,006
+win if you think about the number of objects that you might be storing on
+
+446
+00:27:41,028 --> 00:27:43,680
+heap on a very large scale application.
+
+447
+00:27:45,250 --> 00:27:49,026
+The other side benefit of this is that you're actually simplifying your code and making
+
+448
+00:27:49,048 --> 00:27:52,626
+it easier to understand and reducing the amount of errors that might come up from
+
+449
+00:27:52,648 --> 00:27:55,700
+someone who misunderstands what a field is in the future.
+
+450
+00:27:58,230 --> 00:28:02,034
+This 1 may be a little familiar to folks coming from A-C-C plus plus background,
+
+451
+00:28:02,082 --> 00:28:05,906
+but the ordering of your fields can actually really impact
+
+452
+00:28:05,938 --> 00:28:09,606
+your memory usage as well. Stago memory allocator does
+
+453
+00:28:09,628 --> 00:28:13,274
+not optimize for data structure alignment. So in this case
+
+454
+00:28:13,312 --> 00:28:17,050
+we have two objects with completely identical fields. They're just ordered differently.
+
+455
+00:28:17,630 --> 00:28:21,498
+The way the memory allocator works is it goes down the
+
+456
+00:28:21,504 --> 00:28:25,214
+fields, allocates them one at a time. So in order to respect word
+
+457
+00:28:25,252 --> 00:28:28,446
+alignment, it might need to add padding to the data in
+
+458
+00:28:28,468 --> 00:28:32,560
+memory. So going through here, going to the bad object,
+
+459
+00:28:33,890 --> 00:28:37,426
+starting with field a, it's a boolean, which is one byte. So it allocates one
+
+460
+00:28:37,448 --> 00:28:41,234
+byte in memory, and then it needs to allocate eight bytes for field b,
+
+461
+00:28:41,272 --> 00:28:44,734
+which is nn 64. Now, if it allocated
+
+462
+00:28:44,782 --> 00:28:48,162
+those eight bytes right after, it would break the system's word alignment.
+
+463
+00:28:48,306 --> 00:28:51,734
+So therefore, it needs to pad on seven bytes first, and then
+
+464
+00:28:51,772 --> 00:28:54,920
+allocate the next eight bytes for field B.
+
+465
+00:28:55,930 --> 00:28:59,186
+And you can see this goes on. So for field c, it allocates one byte,
+
+466
+00:28:59,218 --> 00:29:02,470
+and then field d is an n 32, which means it needs four bytes.
+
+467
+00:29:02,550 --> 00:29:06,218
+So it pads in three fields and then adds in field d, so on and
+
+468
+00:29:06,224 --> 00:29:09,366
+so forth. If we simply reorder
+
+469
+00:29:09,398 --> 00:29:13,134
+these, as we did in the good object on the right, you can see the
+
+470
+00:29:13,172 --> 00:29:16,814
+memory allocation is much better aligned. And we
+
+471
+00:29:16,852 --> 00:29:20,266
+went from having an object that consumes 40 bytes
+
+472
+00:29:20,298 --> 00:29:23,966
+to an object that contains 24 bytes. So we did two
+
+473
+00:29:23,988 --> 00:29:27,762
+things here. We just removed unused fields, which is great,
+
+474
+00:29:27,896 --> 00:29:31,666
+and then we rearranged the remaining fields that we actually need, and we went
+
+475
+00:29:31,688 --> 00:29:35,170
+from 64 bytes to 24 bytes, which is a 62%
+
+476
+00:29:35,240 --> 00:29:38,520
+drop in the amount of memory used per object.
+
+477
+00:29:39,130 --> 00:29:42,466
+Think about, again, a large scale system with thousands, millions, or even billions
+
+478
+00:29:42,498 --> 00:29:46,086
+of such objects in use. This simple method could
+
+479
+00:29:46,108 --> 00:29:49,354
+just really reduce your memory usage and
+
+480
+00:29:49,392 --> 00:29:51,050
+improve your system's performance.
+
+481
+00:29:53,790 --> 00:29:57,530
+So, to conclude, the Go garbage collector is
+
+482
+00:29:57,600 --> 00:30:01,018
+highly optimized for most use cases. It's a fantastic piece of
+
+483
+00:30:01,024 --> 00:30:04,426
+technology, and most developers do not need to worry about how it's
+
+484
+00:30:04,458 --> 00:30:07,598
+implemented and don't need to worry about its performance. However,
+
+485
+00:30:07,684 --> 00:30:11,866
+for some heavy, very large scale use cases, the garbage collector
+
+486
+00:30:12,058 --> 00:30:15,770
+could cause pretty significant impact to your program's performance.
+
+487
+00:30:15,930 --> 00:30:19,682
+And in this case, having an understanding of how the GC works,
+
+488
+00:30:19,816 --> 00:30:22,994
+how memory management works, and then understanding some of the built
+
+489
+00:30:23,032 --> 00:30:26,310
+in tools that the Go team provides, can be really, really important
+
+490
+00:30:26,380 --> 00:30:29,880
+to understanding and reducing the problem.
+
+491
+00:30:30,810 --> 00:30:34,630
+From there, we have a lot of options to actually optimize our system,
+
+492
+00:30:34,780 --> 00:30:38,058
+improve performance, and have much happier users and
+
+493
+00:30:38,064 --> 00:30:42,710
+much happier engineers. So three steps.
+
+494
+00:30:42,870 --> 00:30:47,062
+Start with observing. We have some ways of knowing intuitively
+
+495
+00:30:47,126 --> 00:30:50,330
+that there are certain systems, like really high tail latency,
+
+496
+00:30:51,870 --> 00:30:54,906
+that might be caused by GC. From there, we go
+
+497
+00:30:54,928 --> 00:30:57,566
+in and add some measurement. We can look at heap usage. We can look at
+
+498
+00:30:57,588 --> 00:31:01,210
+GC trace output, et cetera, to try and narrow down whether GC
+
+499
+00:31:01,290 --> 00:31:04,542
+actually is the problem. And then from there, we talked about a few different
+
+500
+00:31:04,596 --> 00:31:08,000
+ways by which we can start to optimize our system.
+
+501
+00:31:10,370 --> 00:31:13,854
+That's all I have for you today. Thank you all for listening. I hope this
+
+502
+00:31:13,892 --> 00:31:17,126
+helped you understand how guard garbage collection works and go. And how you can go
+
+503
+00:31:17,148 --> 00:31:20,790
+about optimizing your system to minimize the impact of the garbage collector.
+
+504
+00:31:21,210 --> 00:31:24,326
+Thank you. And if you have any questions, feel free to reach out to me.
+
+505
+00:31:24,508 --> 00:31:25,220
+Have a great day.
+
