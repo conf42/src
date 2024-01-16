@@ -54,7 +54,8 @@ for i, (talk, video) in enumerate(missing_transcriptions):
     # get the transcript
     transcript = get_transcript(audio_path, keywords)
     if not transcript:
-        sys.exit(1)
+        #sys.exit(1)
+        continue
     # write the transcript for later
     write_transcript(get_yt_id(video), transcript)
 
