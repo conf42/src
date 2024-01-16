@@ -57,4 +57,7 @@ for i, (talk, video) in enumerate(missing_transcriptions):
     # write the transcript for later
     write_transcript(get_yt_id(video), transcript)
 
+    # TODO remove
+    break
+
     
