@@ -1,4 +1,6 @@
 import sys
+import os
+
 from .yt import (
     download_youtube_audio,
     check_video_exists,
@@ -55,6 +57,9 @@ for i, (talk, video) in enumerate(missing_transcriptions):
         sys.exit(1)
     # write the transcript for later
     write_transcript(get_yt_id(video), transcript)
+
+    # clean up the working dir
+    os.remove(audio_path)
 
     # TODO remove - batch for now
     if i == 299:
