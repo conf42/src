@@ -1,0 +1,1516 @@
+1
+00:01:54,330 --> 00:01:57,390
+Hello. Welcome to our session the power of AWS tax,
+
+2
+00:01:57,540 --> 00:02:01,066
+in which we're going to tell you how we managed to implement the twoperson approval
+
+3
+00:02:01,098 --> 00:02:04,914
+on top of AWS IAM and implemented a scalable ABAC solution
+
+4
+00:02:05,002 --> 00:02:08,946
+around that. My name is Yoav Yanilov. I'm the solutions architect
+
+5
+00:02:08,978 --> 00:02:13,026
+for Axiom Security, and my co host Itamar Bareket, CTO of Mobimatter,
+
+6
+00:02:13,058 --> 00:02:15,990
+is not here today because he just moved with his wife to Dubai.
+
+7
+00:02:16,490 --> 00:02:20,182
+The agenda for today is to first realize that ABAC is broken,
+
+8
+00:02:20,326 --> 00:02:24,566
+fixing it, and then profit. But the real agenda is asking ourselves,
+
+9
+00:02:24,758 --> 00:02:27,610
+can someone delete an obvious cluster in my organization?
+
+10
+00:02:28,270 --> 00:02:31,766
+And if so, who? The answer
+
+11
+00:02:31,808 --> 00:02:34,590
+we all like to give is no one.
+
+12
+00:02:34,740 --> 00:02:38,906
+But come to think of it, there is some sort of an admin user.
+
+13
+00:02:39,018 --> 00:02:41,578
+Maybe it's behind some breaklast protocol,
+
+14
+00:02:41,754 --> 00:02:46,066
+but are we really sure that we are defending this user the
+
+15
+00:02:46,088 --> 00:02:49,826
+way it is supposed to be defended? This is going to be an
+
+16
+00:02:49,848 --> 00:02:53,534
+advanced IAM session, so we are assuming that you are familiar with AWS
+
+17
+00:02:53,582 --> 00:02:56,758
+IAM. And in case you're not, here's a
+
+18
+00:02:56,764 --> 00:03:00,742
+very quick refresher. Tags are
+
+19
+00:03:00,796 --> 00:03:03,430
+essential to ABAC in AWS,
+
+20
+00:03:03,770 --> 00:03:08,114
+and each in flight request in IAM carries
+
+21
+00:03:08,162 --> 00:03:11,406
+over metadata about the tags involving the principle,
+
+22
+00:03:11,458 --> 00:03:15,194
+which is the identity making the request. The request itself can have
+
+23
+00:03:15,232 --> 00:03:19,402
+tags also, and the resource that
+
+24
+00:03:19,456 --> 00:03:23,262
+the request addresses can have tags as well.
+
+25
+00:03:23,396 --> 00:03:26,894
+And in addition to the three of those, there's also
+
+26
+00:03:26,932 --> 00:03:30,634
+metadata that concept the keys for the tags
+
+27
+00:03:30,682 --> 00:03:33,886
+that are being passed in the inflight request. This is very important and
+
+28
+00:03:33,908 --> 00:03:37,570
+we'll see why in a bit. But first things first.
+
+29
+00:03:37,720 --> 00:03:41,746
+How do you enforce permissions on can account level? This is something
+
+30
+00:03:41,768 --> 00:03:45,602
+that AWS has for a while. It's called an SCP and just
+
+31
+00:03:45,656 --> 00:03:49,878
+an IAM policy. Only you apply it on the organization's level,
+
+32
+00:03:50,044 --> 00:03:54,098
+meaning you apply it to an organizational unit or several accounts,
+
+33
+00:03:54,194 --> 00:03:57,842
+and it applies to each and every role and user and IAM
+
+34
+00:03:57,906 --> 00:04:01,194
+principle in that account. Let's talk
+
+35
+00:04:01,232 --> 00:04:05,306
+a back assuming I want to make sure
+
+36
+00:04:05,408 --> 00:04:08,410
+that no one can delete an RDS cluster in my organization,
+
+37
+00:04:08,750 --> 00:04:11,738
+I can have some sort of an SCP that looks like this.
+
+38
+00:04:11,824 --> 00:04:14,862
+It says you must be tagged with an isadmin. True,
+
+39
+00:04:14,916 --> 00:04:18,474
+the principle must be tagged in order to run any delete operations
+
+40
+00:04:18,522 --> 00:04:21,854
+on the RDS service. And it seems fine enough,
+
+41
+00:04:22,052 --> 00:04:25,506
+but who'll guard the guards here, right? We have to
+
+42
+00:04:25,528 --> 00:04:29,186
+implement sort of logic that says you
+
+43
+00:04:29,208 --> 00:04:32,558
+must be in the club in order to get other people in the club,
+
+44
+00:04:32,654 --> 00:04:35,874
+meaning you must be an admin in order to be able
+
+45
+00:04:35,912 --> 00:04:39,240
+to tag someone is admin equals true.
+
+46
+00:04:39,610 --> 00:04:42,934
+Without that logic, some sort of an
+
+47
+00:04:42,972 --> 00:04:47,510
+iM user or privileged role may have a path
+
+48
+00:04:48,570 --> 00:04:52,106
+that might not be direct, might go around like passing some
+
+49
+00:04:52,128 --> 00:04:55,546
+sort of a role to a lambda or something, but it will eventually be able
+
+50
+00:04:55,568 --> 00:04:59,334
+to tag some other role or user with admin equals
+
+51
+00:04:59,382 --> 00:05:02,846
+true and bypass the original constraint that the
+
+52
+00:05:02,868 --> 00:05:06,222
+SAP has. So this is why ABAC is sort of a mess
+
+53
+00:05:06,276 --> 00:05:09,982
+in AWS. And to
+
+54
+00:05:10,116 --> 00:05:13,746
+add more fuel to that fire, we have
+
+55
+00:05:13,768 --> 00:05:17,358
+CTO scale that entire logic,
+
+56
+00:05:17,534 --> 00:05:20,830
+meaning we're not going CTO have just one SAP in organization.
+
+57
+00:05:20,990 --> 00:05:23,470
+We're going to have a couple, or maybe tens,
+
+58
+00:05:23,550 --> 00:05:27,154
+hundreds. And writing that same logic
+
+59
+00:05:27,202 --> 00:05:31,094
+over and over again is error prone and tedious. What we have
+
+60
+00:05:31,132 --> 00:05:34,822
+here is a classic scenario of data
+
+61
+00:05:34,876 --> 00:05:38,722
+plane, which is essentially who can do what depending on tags,
+
+62
+00:05:38,786 --> 00:05:42,250
+and the control plane, which is sort of like the integrity logic.
+
+63
+00:05:43,310 --> 00:05:47,222
+And this is how we perceive these two things. There's the access control logic
+
+64
+00:05:47,286 --> 00:05:50,794
+and the tagging integrity logic. The first one is plain
+
+65
+00:05:50,842 --> 00:05:53,790
+simple and the other one is kind of tricky to implement,
+
+66
+00:05:54,530 --> 00:05:57,866
+but we want to be able to scale the tagging
+
+67
+00:05:57,898 --> 00:06:01,310
+integrity for our scps in organizations.
+
+68
+00:06:02,210 --> 00:06:05,534
+So let's take a path based approach here. Let's say that
+
+69
+00:06:05,572 --> 00:06:09,330
+Alice is granted write access to Alice.
+
+70
+00:06:10,070 --> 00:06:13,586
+She can then access everything within that
+
+71
+00:06:13,688 --> 00:06:18,046
+path, that grant area. So Gitmes.
+
+72
+00:06:18,158 --> 00:06:22,182
+But she does not have access to Bob's Humfolder and
+
+73
+00:06:22,236 --> 00:06:26,066
+system. And if you translate this into IAM, if we're
+
+74
+00:06:26,098 --> 00:06:29,282
+saying that Alice's grant area is
+
+75
+00:06:29,356 --> 00:06:33,014
+home Alice, then she can add or remove tag
+
+76
+00:06:33,062 --> 00:06:36,870
+keys, right? Meaning tag or untagged, any tag that matches
+
+77
+00:06:37,030 --> 00:06:39,610
+the home Alice prefix.
+
+78
+00:06:40,210 --> 00:06:43,950
+And then we have the chicken and an egg problem
+
+79
+00:06:44,020 --> 00:06:48,426
+all over again. So if it was Unix
+
+80
+00:06:48,458 --> 00:06:52,154
+tagbased system, you can imagine that there's a file
+
+81
+00:06:52,202 --> 00:06:56,114
+called Grant path under mega, and no one can
+
+82
+00:06:56,232 --> 00:07:00,398
+write to that file. And that file contains the prefixes,
+
+83
+00:07:00,494 --> 00:07:04,260
+the grant areas for each and every one of the users in the system.
+
+84
+00:07:04,870 --> 00:07:08,370
+And when we come to translate this into IAM,
+
+85
+00:07:08,450 --> 00:07:12,006
+we realize that there is no centralized grants file. And that's why
+
+86
+00:07:12,028 --> 00:07:15,906
+we have to make a unique special tag
+
+87
+00:07:15,938 --> 00:07:19,366
+key that's called path, which denotes
+
+88
+00:07:19,398 --> 00:07:23,782
+the grant path for each and every one of the principals that are playing
+
+89
+00:07:23,846 --> 00:07:27,610
+this game of control tags.
+
+90
+00:07:28,910 --> 00:07:32,346
+And of course no one has any
+
+91
+00:07:32,528 --> 00:07:35,546
+permission to add
+
+92
+00:07:35,648 --> 00:07:38,862
+or remove tags undermeda. So how does
+
+93
+00:07:38,916 --> 00:07:42,800
+one go about doing something like that? We'll say that in a bit.
+
+94
+00:07:43,110 --> 00:07:46,894
+Introducing control tags. Control tags is a scalable
+
+95
+00:07:47,022 --> 00:07:51,010
+tagbased control plane for tagging operations on top of AWS IAM.
+
+96
+00:07:51,590 --> 00:07:55,198
+And we start off with
+
+97
+00:07:55,304 --> 00:07:58,870
+saying something. You know what control
+
+98
+00:07:58,940 --> 00:08:02,418
+tags are? Tags that start with SWCDL.
+
+99
+00:08:02,514 --> 00:08:06,626
+SW stands for similar web. This is where me and IAM worked when we developed
+
+100
+00:08:06,658 --> 00:08:10,246
+this methodology. So SWCDL
+
+101
+00:08:10,358 --> 00:08:14,150
+denotes control tags, and other tags
+
+102
+00:08:14,230 --> 00:08:16,170
+are not without prefix.
+
+103
+00:08:18,270 --> 00:08:22,094
+If we had to pick the most important slide in
+
+104
+00:08:22,132 --> 00:08:26,170
+this presentation, it's this one. This is the entirety,
+
+105
+00:08:26,250 --> 00:08:30,042
+more or less, of the control tags SCP
+
+106
+00:08:30,106 --> 00:08:33,120
+policy. So what are we looking at here?
+
+107
+00:08:33,570 --> 00:08:37,554
+The first palette is the sort
+
+108
+00:08:37,592 --> 00:08:40,658
+of a club thing. You have to be in the club in
+
+109
+00:08:40,664 --> 00:08:44,862
+order to invite other people to the club. Meaning that
+
+110
+00:08:45,016 --> 00:08:48,214
+if you're trying to tag something with SWCTL and
+
+111
+00:08:48,252 --> 00:08:52,040
+you don't have made a grant path, you are denied. Right?
+
+112
+00:08:52,890 --> 00:08:56,822
+And the second part? The second statement says
+
+113
+00:08:56,956 --> 00:09:00,214
+that if you are tagging or untagging
+
+114
+00:09:00,262 --> 00:09:04,358
+a control tag, that control tag
+
+115
+00:09:04,454 --> 00:09:07,622
+must be an extension of the grant path,
+
+116
+00:09:07,686 --> 00:09:11,402
+which you already own, or one of our organization's
+
+117
+00:09:11,466 --> 00:09:15,706
+legacy tags, which is kind of critical. If you want to use infrastructure
+
+118
+00:09:15,738 --> 00:09:20,046
+AWS co systems like terraform, and have that play
+
+119
+00:09:20,148 --> 00:09:22,670
+nicely with this mechanism,
+
+120
+00:09:23,510 --> 00:09:27,074
+then we get what seems to be a very
+
+121
+00:09:27,272 --> 00:09:30,770
+simple recipe to ABAC at scale. You have
+
+122
+00:09:30,840 --> 00:09:34,526
+the control tags policy, which you then associate
+
+123
+00:09:34,558 --> 00:09:38,498
+or connect with an AWS account or organization unit.
+
+124
+00:09:38,594 --> 00:09:43,080
+And then you write your own featured SCP in a
+
+125
+00:09:43,850 --> 00:09:47,878
+different policy, and you attach both of them to
+
+126
+00:09:47,964 --> 00:09:51,386
+the target account or ou. Let's revise the
+
+127
+00:09:51,408 --> 00:09:55,194
+bad example and see how much simpler it is.
+
+128
+00:09:55,392 --> 00:09:59,062
+Look at it. There's only addressing
+
+129
+00:09:59,126 --> 00:10:02,686
+of the tagging access control logic. Nothing about the
+
+130
+00:10:02,708 --> 00:10:06,410
+integrity here, because the integrity is implicit. It is derived
+
+131
+00:10:06,490 --> 00:10:09,600
+from the guarantees of the control tags policy.
+
+132
+00:10:10,530 --> 00:10:13,802
+By specifying the admin
+
+133
+00:10:13,946 --> 00:10:17,698
+RDS, we realize that you must have a
+
+134
+00:10:17,704 --> 00:10:21,554
+grant of either the first one,
+
+135
+00:10:21,752 --> 00:10:25,586
+v one admin RdS, deleter, v one admin, v one,
+
+136
+00:10:25,768 --> 00:10:30,018
+or the root in order to be able CTO beat RDS resources.
+
+137
+00:10:30,194 --> 00:10:33,030
+But can we make it even more secure?
+
+138
+00:10:33,770 --> 00:10:37,320
+What if we must have
+
+139
+00:10:37,690 --> 00:10:41,066
+some other admins approval if we want CTO delete an
+
+140
+00:10:41,088 --> 00:10:45,226
+RDS cluster? Right? Seems much more secure. And now
+
+141
+00:10:45,248 --> 00:10:47,900
+we arrive to the concept of approvals in the cloud.
+
+142
+00:10:48,590 --> 00:10:52,366
+In other systems like GitHub, it's very popular to
+
+143
+00:10:52,388 --> 00:10:56,266
+have an approval button, and if someone else did not approve
+
+144
+00:10:56,298 --> 00:10:59,534
+your tool request, you're unable to merge it.
+
+145
+00:10:59,652 --> 00:11:02,810
+But in cloud environments, it's kind of hard
+
+146
+00:11:02,900 --> 00:11:06,846
+CTO think about it, because destroying an RDS cluster
+
+147
+00:11:06,958 --> 00:11:09,646
+is one single API request,
+
+148
+00:11:09,758 --> 00:11:13,518
+so it either succeeds or fails.
+
+149
+00:11:13,614 --> 00:11:16,760
+There's no multi step process here.
+
+150
+00:11:18,650 --> 00:11:21,702
+Our first use case is very
+
+151
+00:11:21,756 --> 00:11:25,126
+simple, very naive. We don't want anyone to
+
+152
+00:11:25,148 --> 00:11:28,678
+be able to delete RDS resources or s three buckets
+
+153
+00:11:28,774 --> 00:11:32,038
+or even vpcs without an admin's
+
+154
+00:11:32,054 --> 00:11:34,090
+approval. A second admin's approval.
+
+155
+00:11:35,230 --> 00:11:38,390
+And first and foremost,
+
+156
+00:11:38,470 --> 00:11:41,774
+we want to convince you that it works. So let's watch
+
+157
+00:11:41,812 --> 00:11:45,834
+a demo. What we have here is two terminal
+
+158
+00:11:45,882 --> 00:11:49,086
+sessions. The upper one is mine and
+
+159
+00:11:49,108 --> 00:11:51,070
+the lower one is ecomas.
+
+160
+00:11:52,610 --> 00:11:56,354
+And now I attempt to look for s
+
+161
+00:11:56,392 --> 00:11:59,906
+three bucket with my surname. There it is. CTO. Meet me if
+
+162
+00:11:59,928 --> 00:12:03,380
+you can. So I'll try to delete that bucket, see what happens.
+
+163
+00:12:04,550 --> 00:12:08,370
+It fails, right? It fails because I do not have an approval
+
+164
+00:12:08,530 --> 00:12:12,610
+from IAM. Now Itama runs a script which approves
+
+165
+00:12:12,770 --> 00:12:16,546
+my identity. And when I attempt to delete
+
+166
+00:12:16,578 --> 00:12:19,660
+a bucket again, let's see if it works.
+
+167
+00:12:20,830 --> 00:12:24,278
+It does. No error. Let's search for that bucket and make sure that's
+
+168
+00:12:24,294 --> 00:12:27,530
+not here. It is not there.
+
+169
+00:12:27,680 --> 00:12:30,880
+So what just happened here?
+
+170
+00:12:31,410 --> 00:12:34,590
+In an approval pattern based on AWS Im,
+
+171
+00:12:34,740 --> 00:12:38,234
+Alice approves Bob's role by tagging
+
+172
+00:12:38,282 --> 00:12:41,306
+his role with a two PA ticket tag.
+
+173
+00:12:41,498 --> 00:12:44,914
+So it's just an IM tags that's used to
+
+174
+00:12:44,952 --> 00:12:48,190
+carry over enough metadata in order to convince
+
+175
+00:12:48,270 --> 00:12:51,666
+AWS iam that Bob acts with
+
+176
+00:12:51,688 --> 00:12:55,074
+Alice's approval. Let's see the
+
+177
+00:12:55,112 --> 00:12:57,170
+anatomy of a two p ticket.
+
+178
+00:12:57,990 --> 00:13:01,374
+So the part of the key is,
+
+179
+00:13:01,432 --> 00:13:04,722
+of course, sits under the admin,
+
+180
+00:13:04,786 --> 00:13:08,426
+meaning it's an admin only feature. Admin, two PA
+
+181
+00:13:08,528 --> 00:13:12,950
+ticket. And the value for that tag consists
+
+182
+00:13:13,030 --> 00:13:17,510
+of three areas. The first one denotes Alice's
+
+183
+00:13:17,590 --> 00:13:21,546
+identity, the third one, Bob's, and the middle can
+
+184
+00:13:21,568 --> 00:13:25,342
+have some sort of a payload which is kind of useful. We'll see later
+
+185
+00:13:25,396 --> 00:13:28,798
+on. Why. Now we're going to deep dive into the
+
+186
+00:13:28,804 --> 00:13:31,840
+control plane of the two PA SCP itself.
+
+187
+00:13:32,630 --> 00:13:36,786
+Hold your breath. The first thing first we
+
+188
+00:13:36,808 --> 00:13:40,030
+have to have some sort of an organizational chokehold
+
+189
+00:13:40,190 --> 00:13:43,518
+around who can even assign
+
+190
+00:13:43,614 --> 00:13:48,178
+source identities. Source identities in Aws are sticky
+
+191
+00:13:48,354 --> 00:13:52,066
+meanings. Once they're set on a role session, they cannot
+
+192
+00:13:52,098 --> 00:13:55,350
+be unset or even removed.
+
+193
+00:13:55,770 --> 00:13:59,050
+And here we request some sort of control
+
+194
+00:13:59,120 --> 00:14:02,806
+tag under meta, again, so not accessible
+
+195
+00:14:02,838 --> 00:14:06,602
+to admins, which denotes identity broker equals true.
+
+196
+00:14:06,736 --> 00:14:10,406
+And we're going to tag each and every one of the relevant OIDC
+
+197
+00:14:10,438 --> 00:14:14,006
+or Sam'l providers or even our homegrown identity
+
+198
+00:14:14,038 --> 00:14:17,850
+brokers with that role, which is going to guarantee
+
+199
+00:14:18,010 --> 00:14:22,350
+that if you attempt to set a source identity without that tag,
+
+200
+00:14:22,710 --> 00:14:26,530
+you are denied. And also,
+
+201
+00:14:26,680 --> 00:14:30,674
+we have a second statement here saying that you cannot do any
+
+202
+00:14:30,712 --> 00:14:34,500
+tagging operations on IAM if you don't have
+
+203
+00:14:36,170 --> 00:14:39,638
+a source identity attached, meaning you have to have a
+
+204
+00:14:39,644 --> 00:14:43,240
+source identity which has been dispensed to you by
+
+205
+00:14:44,570 --> 00:14:48,394
+an allow listed identity broker. The second part
+
+206
+00:14:48,512 --> 00:14:52,346
+deals with antireflexive integrity. What does
+
+207
+00:14:52,368 --> 00:14:55,802
+that mean? It means that the receiver section, the last
+
+208
+00:14:55,856 --> 00:14:59,066
+one, meaning that it can all
+
+209
+00:14:59,088 --> 00:15:03,370
+be set to the identity
+
+210
+00:15:03,450 --> 00:15:07,566
+of the principal making the request. Right? Meaning I
+
+211
+00:15:07,588 --> 00:15:11,040
+cannot give an approval ticket for myself.
+
+212
+00:15:11,570 --> 00:15:15,566
+I can give an approval ticket for any other source
+
+213
+00:15:15,598 --> 00:15:19,234
+identity in the system, whether it exists or not, but never to my
+
+214
+00:15:19,272 --> 00:15:23,118
+own. The third part deals with forgery,
+
+215
+00:15:23,294 --> 00:15:26,678
+meaning I cannot go about and forging a
+
+216
+00:15:26,684 --> 00:15:30,034
+ticket, say, to Bob, and telling it's
+
+217
+00:15:30,082 --> 00:15:33,814
+from Eve and not myself. This is
+
+218
+00:15:33,852 --> 00:15:37,494
+crucial because those typing operations are audited in
+
+219
+00:15:37,532 --> 00:15:41,306
+Cloudtrade, so we want to always have visibility into
+
+220
+00:15:41,488 --> 00:15:43,770
+who gave the ticket to whom.
+
+221
+00:15:44,430 --> 00:15:46,902
+In summary, it's an admin only feature.
+
+222
+00:15:47,046 --> 00:15:50,418
+It provides us with identity integrity,
+
+223
+00:15:50,614 --> 00:15:53,562
+anti reflexive integrity, anti forgery integrity,
+
+224
+00:15:53,706 --> 00:15:56,554
+and it is payload bearing,
+
+225
+00:15:56,682 --> 00:16:00,906
+meaning we can specify a CTO, a Unix timestamp
+
+226
+00:16:00,938 --> 00:16:05,060
+if you may, for that ticket, and have an external retention process
+
+227
+00:16:05,750 --> 00:16:09,166
+remove the tickets when the time is due.
+
+228
+00:16:09,358 --> 00:16:13,762
+And turns out it can't all be nice
+
+229
+00:16:13,816 --> 00:16:17,106
+and simple. IaM, we need to write some code for
+
+230
+00:16:17,128 --> 00:16:20,486
+that as well. So what we have here is the architecture for that.
+
+231
+00:16:20,508 --> 00:16:23,686
+It looks kind of complex, but it's fairly simple.
+
+232
+00:16:23,868 --> 00:16:27,014
+We have a lambda function that wakes up
+
+233
+00:16:27,052 --> 00:16:30,550
+every 30 minutes, scans the entire organization,
+
+234
+00:16:30,970 --> 00:16:34,666
+and just removes two PI tickets from each and
+
+235
+00:16:34,688 --> 00:16:38,380
+every role or user where they are
+
+236
+00:16:38,990 --> 00:16:43,322
+applied to, if their TTL has elapsed,
+
+237
+00:16:43,386 --> 00:16:47,200
+or if their TTL expires way
+
+238
+00:16:47,650 --> 00:16:50,640
+into the future, more than 4 hours into the future.
+
+239
+00:16:51,250 --> 00:16:54,322
+Right. Now that we got the control plane out of the way,
+
+240
+00:16:54,456 --> 00:16:57,940
+let's look at the data plane, and it's surprisingly short.
+
+241
+00:16:58,790 --> 00:17:02,690
+This is the entire data plane for that SCP.
+
+242
+00:17:03,510 --> 00:17:07,394
+Let's read it. It says you deny the actions
+
+243
+00:17:07,442 --> 00:17:11,430
+of deleting an s three bucket, an RDS instance or cluster,
+
+244
+00:17:11,770 --> 00:17:15,286
+unless you have an
+
+245
+00:17:15,308 --> 00:17:18,806
+approval ticket which is assigned for your own
+
+246
+00:17:18,908 --> 00:17:21,798
+source identity. And that's it.
+
+247
+00:17:21,804 --> 00:17:25,370
+That's the solution here. But then we looked at this
+
+248
+00:17:25,520 --> 00:17:28,202
+condition and we said,
+
+249
+00:17:28,256 --> 00:17:32,254
+hey, this looks very relevant. Let's copy and
+
+250
+00:17:32,292 --> 00:17:36,350
+paste that back into the control
+
+251
+00:17:36,420 --> 00:17:40,094
+tags SAP itself. So what does it
+
+252
+00:17:40,132 --> 00:17:44,066
+do in that context? In that context, what it
+
+253
+00:17:44,088 --> 00:17:48,100
+means is that you can escape the
+
+254
+00:17:48,630 --> 00:17:52,162
+guardrails of the control tags themselves by
+
+255
+00:17:52,216 --> 00:17:54,894
+having another admin's approval.
+
+256
+00:17:55,022 --> 00:17:58,614
+Meaning that if two admins collaborate, they can
+
+257
+00:17:58,652 --> 00:18:02,194
+tags or untag things outside the grant path.
+
+258
+00:18:02,242 --> 00:18:05,538
+So I'm not just bound to v one admin anymore,
+
+259
+00:18:05,634 --> 00:18:09,654
+I can tag v one, meta or v two hello world.
+
+260
+00:18:09,772 --> 00:18:13,480
+Whatever I like a second use case,
+
+261
+00:18:14,330 --> 00:18:17,414
+has more of a granular nature
+
+262
+00:18:17,462 --> 00:18:21,634
+to it. We said, great, we can restrict sensitive
+
+263
+00:18:21,702 --> 00:18:24,974
+actions, but now we want to restrict sensitive actions on some
+
+264
+00:18:25,012 --> 00:18:28,734
+resources. And we refer to this features as
+
+265
+00:18:28,772 --> 00:18:32,286
+two pa seals, which we also like to call two
+
+266
+00:18:32,308 --> 00:18:36,660
+PA seals. And the way it works is,
+
+267
+00:18:37,350 --> 00:18:40,846
+let's say I have an AWS secrets manager secret
+
+268
+00:18:40,958 --> 00:18:44,820
+and I want to tag it with seal equals total.
+
+269
+00:18:45,190 --> 00:18:50,006
+And once I do that, I want an admin room to
+
+270
+00:18:50,028 --> 00:18:53,526
+be able to describe that secret, but not to
+
+271
+00:18:53,548 --> 00:18:57,254
+reveal it, and never to remove the seal. Whereas the
+
+272
+00:18:57,292 --> 00:19:01,162
+same admin role with a two PA ticket can
+
+273
+00:19:01,216 --> 00:19:04,150
+describe the secret, reveal it, and even remove the seal.
+
+274
+00:19:04,230 --> 00:19:05,820
+So let's see how it's done.
+
+275
+00:19:08,190 --> 00:19:11,920
+But first, let's reflect about seals for a bit.
+
+276
+00:19:12,690 --> 00:19:15,710
+We're saying that sealing something totally,
+
+277
+00:19:16,450 --> 00:19:20,254
+it's useful for manually covered keys. That's how we store
+
+278
+00:19:20,452 --> 00:19:24,718
+vault keys in our organization. And sealing
+
+279
+00:19:24,894 --> 00:19:28,494
+trust relationship is kind of useful against privilege escalations.
+
+280
+00:19:28,542 --> 00:19:32,258
+And we'll see why in a bit. Let's explore trust relationship
+
+281
+00:19:32,344 --> 00:19:36,142
+seals. Right?
+
+282
+00:19:36,216 --> 00:19:39,958
+So the first part says that you
+
+283
+00:19:40,124 --> 00:19:43,666
+cannot bypass the seal without a two p a ticket. That shouldn't
+
+284
+00:19:43,698 --> 00:19:47,154
+be surprising, right? If the resource is sealed with a deny
+
+285
+00:19:47,202 --> 00:19:51,030
+trust update and you don't have a two PA ticket, you are unable
+
+286
+00:19:51,110 --> 00:19:54,422
+to update that roles.
+
+287
+00:19:54,486 --> 00:19:58,362
+Assume a policy. And the second part
+
+288
+00:19:58,416 --> 00:20:01,934
+here is the seal lifecycle. Right.
+
+289
+00:20:02,132 --> 00:20:05,566
+It means that you cannot change the seal or
+
+290
+00:20:05,588 --> 00:20:09,310
+delete it without a two PA ticket.
+
+291
+00:20:09,730 --> 00:20:13,970
+But press not, the end is near. Let's see just
+
+292
+00:20:14,040 --> 00:20:17,630
+how useful those trust relationship seals
+
+293
+00:20:17,710 --> 00:20:21,762
+are. This is what we call the two PA trust
+
+294
+00:20:21,816 --> 00:20:25,334
+relief pattern, and it gives us two
+
+295
+00:20:25,372 --> 00:20:28,594
+guarantees. The first one is you cannot
+
+296
+00:20:28,642 --> 00:20:31,798
+assume that role without an approval, without a
+
+297
+00:20:31,804 --> 00:20:35,720
+two PA ticket. And the second guarantee is that
+
+298
+00:20:36,170 --> 00:20:39,974
+you cannot make any changes to the trust policy without an approval.
+
+299
+00:20:40,022 --> 00:20:43,670
+That's a guarantee of the deny trust update two pa seal.
+
+300
+00:20:43,830 --> 00:20:47,834
+So here we have that trust policy that allows the
+
+301
+00:20:47,872 --> 00:20:52,510
+admin role to assume it, but denies any kind of action
+
+302
+00:20:53,090 --> 00:20:56,570
+if there is no two PA ticket attached.
+
+303
+00:20:56,730 --> 00:20:59,070
+And let's call that role super admin.
+
+304
+00:20:59,650 --> 00:21:03,294
+And at the bottom of the slide, you see that there's also
+
+305
+00:21:03,332 --> 00:21:07,102
+a tag on it, a two PA seal with a value of deny
+
+306
+00:21:07,166 --> 00:21:10,862
+trust update. Using that trust relay pattern
+
+307
+00:21:10,926 --> 00:21:14,146
+we just saw, we can extend the process of
+
+308
+00:21:14,168 --> 00:21:16,610
+approval to other systems like AWS eks.
+
+309
+00:21:17,370 --> 00:21:21,142
+The first thing we're going to do is make sure that the super
+
+310
+00:21:21,196 --> 00:21:24,760
+admin role is assigned to
+
+311
+00:21:25,290 --> 00:21:29,194
+systems masters on our EKs cluster, and that
+
+312
+00:21:29,232 --> 00:21:32,586
+the regular admin role is assigned to some sort
+
+313
+00:21:32,608 --> 00:21:35,926
+of auto group. And it's important to denote
+
+314
+00:21:35,958 --> 00:21:39,642
+here that this group does not have the equivalent of
+
+315
+00:21:39,696 --> 00:21:43,834
+IAM permissions within bks, right? So regular
+
+316
+00:21:43,882 --> 00:21:47,914
+admin cannot make new Kubernetes roles and Kubernetes
+
+317
+00:21:47,962 --> 00:21:52,582
+role bindings. The second part would be to provision
+
+318
+00:21:52,746 --> 00:21:56,626
+said super admin user with the trust policy
+
+319
+00:21:56,728 --> 00:22:00,820
+and the tags, the seal that we just saw and
+
+320
+00:22:01,670 --> 00:22:05,166
+that's it. That's how you relay the trust to an audience
+
+321
+00:22:05,198 --> 00:22:08,566
+systems, the same way that it has been
+
+322
+00:22:08,588 --> 00:22:12,034
+done for eks can be done for a hashicop
+
+323
+00:22:12,082 --> 00:22:15,474
+vault. Let's play a game of cat and mouse
+
+324
+00:22:15,522 --> 00:22:19,494
+for a second here. Let's suppose we have packed
+
+325
+00:22:19,542 --> 00:22:23,500
+admin in the system and that
+
+326
+00:22:23,950 --> 00:22:28,330
+packed is eyeing data within a sensitive bucket,
+
+327
+00:22:29,230 --> 00:22:32,862
+the system is protected. The bucket has
+
+328
+00:22:32,916 --> 00:22:35,262
+a two PA ticket God around it,
+
+329
+00:22:35,396 --> 00:22:38,526
+meaning the bucket policy cannot be
+
+330
+00:22:38,548 --> 00:22:42,046
+changed without a ticket. It also specifies that only the
+
+331
+00:22:42,068 --> 00:22:45,858
+sensitive role may access it. The sensitive role has a two PA
+
+332
+00:22:45,944 --> 00:22:49,858
+seal around it, and the super admin of
+
+333
+00:22:49,864 --> 00:22:53,422
+the system has a two PA seal
+
+334
+00:22:53,566 --> 00:22:56,930
+and requires a two PA ticket to assume.
+
+335
+00:22:57,690 --> 00:23:01,554
+That's a guarantee here. And the first thing the hacked admin
+
+336
+00:23:01,602 --> 00:23:04,994
+is going to attempt to do is get object or put bucket
+
+337
+00:23:05,042 --> 00:23:08,860
+policy, but both of those are denied by
+
+338
+00:23:10,110 --> 00:23:13,690
+the bucket policy, which kind of hardens the bucket.
+
+339
+00:23:14,270 --> 00:23:18,502
+Then the attacker may attempt CTO, assume the sensitive role,
+
+340
+00:23:18,566 --> 00:23:22,062
+or pass it on to Lambda or EC two machine where
+
+341
+00:23:22,116 --> 00:23:25,422
+it can privilege those permissions and gain access
+
+342
+00:23:25,476 --> 00:23:29,466
+to the bucket. But it is going to fail because it is denied
+
+343
+00:23:29,498 --> 00:23:33,406
+by the trust policy which only allows access from
+
+344
+00:23:33,428 --> 00:23:37,238
+the eks path. Then the actor
+
+345
+00:23:37,274 --> 00:23:40,882
+will attempt to change that trust policy and
+
+346
+00:23:40,936 --> 00:23:45,074
+it is denied by the two Paco because you must have an
+
+347
+00:23:45,112 --> 00:23:48,838
+approval ticket if you want to change the bucket policy. If you want
+
+348
+00:23:48,844 --> 00:23:52,134
+to change the sensitive roles policy, and then
+
+349
+00:23:52,172 --> 00:23:55,558
+the attacker might attempt to exact into
+
+350
+00:23:55,644 --> 00:23:59,266
+the EKs cluster he's going to try to edit
+
+351
+00:23:59,378 --> 00:24:02,854
+the AWS off config map which is in
+
+352
+00:24:02,892 --> 00:24:06,854
+the Kube system namespace, or even create role bindings or cluster
+
+353
+00:24:06,902 --> 00:24:10,514
+role bindings in order to elevate its own permissions.
+
+354
+00:24:10,662 --> 00:24:14,334
+But if we made sure that the regular admin role does
+
+355
+00:24:14,372 --> 00:24:18,158
+not inside the Kubernetes cluster does not have access
+
+356
+00:24:18,244 --> 00:24:21,646
+to those APIs, those will fail as
+
+357
+00:24:21,668 --> 00:24:25,214
+well. Then the hacker might attempt
+
+358
+00:24:25,262 --> 00:24:28,546
+to assume the super admin role and continue
+
+359
+00:24:28,648 --> 00:24:32,014
+from there to the eks cluster,
+
+360
+00:24:32,142 --> 00:24:35,746
+but it's unauthorized again because the
+
+361
+00:24:35,768 --> 00:24:39,270
+admin role requires a two k ticket in order to assume it.
+
+362
+00:24:39,420 --> 00:24:42,694
+The last thing an Acura might attempt to do is create his
+
+363
+00:24:42,732 --> 00:24:46,390
+own Sam'l provider or IDC provider
+
+364
+00:24:46,810 --> 00:24:51,642
+and then create two roles and have one
+
+365
+00:24:51,696 --> 00:24:56,090
+role attempt to sign an approval for the second role.
+
+366
+00:24:56,830 --> 00:25:00,498
+But that will fail as well because the sample
+
+367
+00:25:00,534 --> 00:25:04,462
+provider or IDC provider that the hackers just created does not
+
+368
+00:25:04,516 --> 00:25:08,266
+have the identity integrity clause assigned
+
+369
+00:25:08,298 --> 00:25:12,334
+to it. That identity broker equals true tag. So the two PA
+
+370
+00:25:12,372 --> 00:25:16,274
+SCP is going to deny that? Yeah, so it's all
+
+371
+00:25:16,312 --> 00:25:19,682
+control tags, always has been. We're using
+
+372
+00:25:19,736 --> 00:25:22,962
+it in production for more than two years
+
+373
+00:25:23,016 --> 00:25:27,234
+now. It's used by a team of more than ten
+
+374
+00:25:27,282 --> 00:25:30,786
+admins, and we're
+
+375
+00:25:30,818 --> 00:25:37,926
+using it for basically anything. It made the
+
+376
+00:25:37,948 --> 00:25:41,314
+process of creating new security features
+
+377
+00:25:41,362 --> 00:25:45,206
+on organization very agile and seamless because we
+
+378
+00:25:45,228 --> 00:25:49,030
+never have to stop and think about tagging integrity.
+
+379
+00:25:49,610 --> 00:25:50,540
+But thank you very much.
+
