@@ -200,7 +200,9 @@ def extract_keywords(talk):
     keywords = [
         re.sub('[^a-z ]', '', word)
         for word in keywords
-        if word and word not in english_dict
+        if word not in english_dict
     ]
+    # remove empties
+    keywords = [word for word in keywords if word]
     # deduplicate and only first 1000
     return sorted(list(set(keywords))[:1000])
