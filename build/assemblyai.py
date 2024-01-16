@@ -61,6 +61,14 @@ def read_transcript(yt_id):
             transcript["metadata"] = json.loads(f.read())
     except:
         return None
+
+    # preprocess the summary
+    transcript["summary"] = [
+        li
+        for li in transcript["metadata"]["summary"].split("- ")
+        if li
+    ]
+
     # read the srt, if present, and parse for easy usage
     try:
         with open(get_transcript_path(yt_id, extension=".srt"), "r") as f:
@@ -77,6 +85,4 @@ def read_transcript(yt_id):
             ))
     except:
         pass
-    # process the srt into an array
-
     return transcript
