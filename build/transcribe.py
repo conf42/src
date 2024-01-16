@@ -56,7 +56,8 @@ for i, (talk, video) in enumerate(missing_transcriptions):
     # write the transcript for later
     write_transcript(get_yt_id(video), transcript)
 
-    # TODO remove - break after the first one
-    sys.exit(0)
+    # TODO remove - batch for now
+    if i == 299:
+        sys.exit(0)
 
     
