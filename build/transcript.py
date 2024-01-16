@@ -5,7 +5,7 @@ def parse_time_start(time_start):
         into seconds
     """
     seconds = 0
-    multiplier = 360 # hours
+    multiplier = 3600 # hours
     for elem in time_start.split(",")[0].split(":"):
         seconds += multiplier * int(elem)
         multiplier /= 60
