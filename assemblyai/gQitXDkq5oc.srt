@@ -1,0 +1,1940 @@
+1
+00:00:34,450 --> 00:00:37,814
+Hey everyone, welcome to my talk. I'll cover cloud
+
+2
+00:00:37,852 --> 00:00:41,874
+native observability today and how we can actually get true Kubernetes
+
+3
+00:00:41,922 --> 00:00:45,526
+observability using EBPF, which is a super interesting technology
+
+4
+00:00:45,628 --> 00:00:47,960
+that we'll dive into in a sec.
+
+5
+00:00:48,650 --> 00:00:51,934
+Before starting anything, just wanted to kind of align us
+
+6
+00:00:51,972 --> 00:00:55,898
+on the core value of observability. Observability is a core competency
+
+7
+00:00:55,994 --> 00:01:00,030
+for every single team out there. I mean, there is no single
+
+8
+00:01:00,100 --> 00:01:03,602
+team almost in the entire globe that isn't using some sort
+
+9
+00:01:03,656 --> 00:01:07,294
+of observability, whatever you would call it. It could be logs,
+
+10
+00:01:07,422 --> 00:01:11,298
+infrastructure metrics, custom metrics that customers
+
+11
+00:01:11,384 --> 00:01:15,322
+create for themselves, or even deep application performance monitoring
+
+12
+00:01:15,406 --> 00:01:19,750
+like we know from advanced tools in the market. But today
+
+13
+00:01:19,820 --> 00:01:23,574
+we've reached a point where observability spends are
+
+14
+00:01:23,612 --> 00:01:27,638
+about 20% to 30% of infrastructure spend, which is,
+
+15
+00:01:27,804 --> 00:01:31,670
+say, what you would pay AWS or GCP for hosting
+
+16
+00:01:31,750 --> 00:01:35,594
+your cloud infrastructure. Now you have to agree with me that
+
+17
+00:01:35,632 --> 00:01:39,242
+we should just stop here for a second since these numbers are huge.
+
+18
+00:01:39,376 --> 00:01:43,150
+Just wrap your hand around these numbers, like 20 or 30%
+
+19
+00:01:43,220 --> 00:01:46,718
+from infrastructure costs. That's unheard of, and I think most teams are even
+
+20
+00:01:46,804 --> 00:01:50,480
+not aware of it. But besides being
+
+21
+00:01:51,890 --> 00:01:54,922
+super costly, they're also unpredictable.
+
+22
+00:01:54,986 --> 00:01:58,638
+I mean, on the left we can see data dogs pricing, which is clearly
+
+23
+00:01:58,734 --> 00:02:02,834
+one of the market leaders in observability. And the
+
+24
+00:02:02,872 --> 00:02:06,254
+expectancy of what you would pay eventually,
+
+25
+00:02:06,302 --> 00:02:09,986
+at the end of the month, is super unclear. Vendors are expecting
+
+26
+00:02:10,018 --> 00:02:13,782
+us as engineers, as engineers managers, to know
+
+27
+00:02:13,836 --> 00:02:17,126
+too much details about the volumes of our production from so
+
+28
+00:02:17,148 --> 00:02:20,630
+many different aspects. I mean, just imagine you have to pay for logs.
+
+29
+00:02:20,710 --> 00:02:24,394
+So on the left, you would have to assume and know how
+
+30
+00:02:24,432 --> 00:02:27,862
+many logs you have per month on a volume basis,
+
+31
+00:02:27,926 --> 00:02:31,750
+like the amount of log lines and the amount of gigabytes
+
+32
+00:02:31,830 --> 00:02:35,110
+that you would actually ingest inside datadog over a
+
+33
+00:02:35,120 --> 00:02:38,766
+period of a month. I mean, you have to know that, right? No, no one
+
+34
+00:02:38,788 --> 00:02:43,058
+knows that, and it's too complicated to know. And even if you do know that,
+
+35
+00:02:43,224 --> 00:02:47,326
+one engineer can just cause 30% rise
+
+36
+00:02:47,358 --> 00:02:50,734
+in your build next month due to some cardinality or volume
+
+37
+00:02:50,782 --> 00:02:54,270
+error that he introduced into production or dev environments.
+
+38
+00:02:54,430 --> 00:02:56,840
+So that's the really scary part.
+
+39
+00:02:57,850 --> 00:03:01,734
+And before we just ask ourselves, how did we even got
+
+40
+00:03:01,772 --> 00:03:05,750
+here, I mean, cloud native, which is clearly a super high
+
+41
+00:03:05,820 --> 00:03:08,886
+buzzword in the last few years and impacting a lot of
+
+42
+00:03:08,908 --> 00:03:12,294
+our decision making and architectures over the few years, cloud native
+
+43
+00:03:12,342 --> 00:03:14,090
+has just made things worse.
+
+44
+00:03:15,390 --> 00:03:19,318
+We see, and this is a report by O'Reilly, we see that observability
+
+45
+00:03:19,414 --> 00:03:23,626
+data is rising much faster than actual business related data or
+
+46
+00:03:23,728 --> 00:03:27,174
+business volume of cloud
+
+47
+00:03:27,312 --> 00:03:30,366
+based companies. And the reason is
+
+48
+00:03:30,388 --> 00:03:33,986
+very clear. In a sense, we're just segregating our
+
+49
+00:03:34,008 --> 00:03:37,986
+environments into a lot of different components, microservices that talk to
+
+50
+00:03:38,008 --> 00:03:42,494
+each other and communicate over API driven interactions.
+
+51
+00:03:42,622 --> 00:03:46,582
+And basically to monitor one single flow of
+
+52
+00:03:46,636 --> 00:03:50,166
+one request from your customer over your production. Suddenly you have
+
+53
+00:03:50,188 --> 00:03:53,906
+to monitor a distributed system with dozens of components
+
+54
+00:03:53,938 --> 00:03:56,710
+talking to each other, creating their own logs,
+
+55
+00:03:57,050 --> 00:04:00,806
+exchanging API and traces between one another. And it means that you have
+
+56
+00:04:00,828 --> 00:04:04,218
+to store so much to get the same insight of what exactly happened,
+
+57
+00:04:04,304 --> 00:04:07,946
+or where is my bottleneck? Or why am I responding in a
+
+58
+00:04:07,968 --> 00:04:11,694
+false response to the actual user. So that actually made
+
+59
+00:04:11,732 --> 00:04:15,886
+things worse. And it's clear to understand why when
+
+60
+00:04:16,068 --> 00:04:20,078
+a recent survey by Kong last year just showed that most companies,
+
+61
+00:04:20,164 --> 00:04:23,986
+or the average company, has over 180 microservices in
+
+62
+00:04:24,008 --> 00:04:27,554
+production. I mean, that's a crazy amount if you just think
+
+63
+00:04:27,592 --> 00:04:31,362
+of what's standing behind that enormous number.
+
+64
+00:04:31,496 --> 00:04:34,802
+There's a lot of teams working in
+
+65
+00:04:34,936 --> 00:04:39,098
+different ways and different technology stacks
+
+66
+00:04:39,134 --> 00:04:42,182
+and so on, to just create a mesh of business
+
+67
+00:04:42,236 --> 00:04:46,258
+logics that communicates with itself and eventually
+
+68
+00:04:46,434 --> 00:04:48,380
+serves value to your customers.
+
+69
+00:04:50,110 --> 00:04:53,882
+Now part of the reason of how we got here
+
+70
+00:04:54,016 --> 00:04:57,690
+is actually the advantage of how observability was actually built
+
+71
+00:04:57,760 --> 00:05:01,454
+when we just started off. I mean, observability in a sense was built
+
+72
+00:05:01,492 --> 00:05:05,470
+to be part of the dev cycle. It was very clear
+
+73
+00:05:05,540 --> 00:05:09,774
+that developers will eventually integrate the solution, either by
+
+74
+00:05:09,892 --> 00:05:13,306
+changing the runtime or integrating an SDK into their
+
+75
+00:05:13,348 --> 00:05:16,626
+code that would help them observe their application. They will
+
+76
+00:05:16,648 --> 00:05:20,020
+then decide what to measure, where to instrument code,
+
+77
+00:05:20,710 --> 00:05:24,260
+what metrics to actually expose, and so on. And then
+
+78
+00:05:24,710 --> 00:05:28,226
+they would happily enjoy that value and build dashboards
+
+79
+00:05:28,338 --> 00:05:31,766
+and alerts, and set whatever goals and
+
+80
+00:05:31,788 --> 00:05:35,062
+KPIs they would like to measure as part of the new data that
+
+81
+00:05:35,116 --> 00:05:38,486
+they just collected. This had a clear advantage. I mean,
+
+82
+00:05:38,588 --> 00:05:42,866
+you could have one team in a big company creating
+
+83
+00:05:42,898 --> 00:05:46,646
+impact on their observability stack pretty easily. They could
+
+84
+00:05:46,668 --> 00:05:50,734
+just integrate their code, change what they wanted to
+
+85
+00:05:50,932 --> 00:05:54,446
+change, observe what they wanted to observe, and get value really fast.
+
+86
+00:05:54,628 --> 00:05:58,330
+Because the alternative would be integrating the observability
+
+87
+00:05:58,410 --> 00:06:02,358
+solutions from the infrastructure, from the wide
+
+88
+00:06:02,554 --> 00:06:05,746
+low denominator of all
+
+89
+00:06:05,768 --> 00:06:09,474
+the company teams that are working on different
+
+90
+00:06:09,672 --> 00:06:13,106
+kind of stacks at the same time. So if you integrate a
+
+91
+00:06:13,128 --> 00:06:17,282
+solution through the infrastructure, you would get maybe a uniform
+
+92
+00:06:17,346 --> 00:06:21,190
+value. But suddenly it's much harder to integrate because
+
+93
+00:06:21,340 --> 00:06:24,966
+developers don't have a decision on which tools to
+
+94
+00:06:24,988 --> 00:06:28,258
+install on their Kubernetes cluster, for example. They don't have access to
+
+95
+00:06:28,284 --> 00:06:32,170
+it. It's a harder reach for a developer to impact
+
+96
+00:06:34,030 --> 00:06:38,026
+the structure of the infrastructure of the company. So observability was
+
+97
+00:06:38,048 --> 00:06:40,540
+built in a sense, in a way that made sense.
+
+98
+00:06:41,550 --> 00:06:44,842
+Now when you imagine the different teams
+
+99
+00:06:44,906 --> 00:06:48,526
+on top of it. Today we're creating a situation, which I think is
+
+100
+00:06:48,548 --> 00:06:52,078
+good, that teams have the autonomy to select their own technology
+
+101
+00:06:52,164 --> 00:06:55,746
+stacks. I mean, you have data science teams working in Python, a web
+
+102
+00:06:55,768 --> 00:06:58,786
+team working in OJs, a backend team working in go.
+
+103
+00:06:58,968 --> 00:07:02,782
+That's all super reasonable in today's microservices architecture.
+
+104
+00:07:02,926 --> 00:07:06,322
+But who's asking the question of, is all this
+
+105
+00:07:06,376 --> 00:07:09,926
+data really needed? I mean, if I let the data science team and the
+
+106
+00:07:09,948 --> 00:07:12,994
+web team all collect their own data instrument,
+
+107
+00:07:13,042 --> 00:07:17,106
+their own code, decide what to measure for observability purposes,
+
+108
+00:07:17,218 --> 00:07:19,720
+who is actually in charge of asking the question,
+
+109
+00:07:20,090 --> 00:07:23,770
+is all this data needed? Are we paying the correct
+
+110
+00:07:23,840 --> 00:07:26,874
+price for the insights that we need as a company, as an R and D
+
+111
+00:07:26,912 --> 00:07:30,266
+group? That's harder when you work in a distributed manner
+
+112
+00:07:30,298 --> 00:07:34,222
+like this. And I think also another important question
+
+113
+00:07:34,276 --> 00:07:37,914
+is, are we given who's responsible, I mean, debt worried
+
+114
+00:07:37,962 --> 00:07:41,642
+DevOps or SREs that you see here, they're eventually
+
+115
+00:07:41,706 --> 00:07:45,306
+responsible for waking up at night and saving production
+
+116
+00:07:45,338 --> 00:07:48,546
+when things go bad. So are we giving them the tools to
+
+117
+00:07:48,568 --> 00:07:52,082
+succeed if they can't eventually impact each and every team?
+
+118
+00:07:52,136 --> 00:07:55,346
+Or they have to work super hard to align all the
+
+119
+00:07:55,368 --> 00:07:58,806
+teams to do what they want to do, are they
+
+120
+00:07:58,828 --> 00:08:02,134
+able to get 100% coverage? I mean, eventually, if there's one
+
+121
+00:08:02,172 --> 00:08:06,034
+team kind of maintaining a legacy code, can the SRE
+
+122
+00:08:06,082 --> 00:08:09,114
+or DevOps really impact this team to instrument the code?
+
+123
+00:08:09,232 --> 00:08:12,710
+Not exactly. So they're already having blind spots.
+
+124
+00:08:12,870 --> 00:08:16,940
+Can they ensure cost, visibility, trade off? I mean, can they control
+
+125
+00:08:17,310 --> 00:08:21,434
+what logs are being stored in a specific team inside a huge company
+
+126
+00:08:21,632 --> 00:08:25,262
+to make sure that cost doesn't drive a crazy amount
+
+127
+00:08:25,316 --> 00:08:28,446
+next month? Not exactly. I mean, they have partial tools to do that,
+
+128
+00:08:28,468 --> 00:08:32,494
+but not exactly. So we're putting them in a position where
+
+129
+00:08:32,532 --> 00:08:35,738
+we expect so much work on
+
+130
+00:08:35,764 --> 00:08:38,898
+production, make sure it's healthy, get all the observability you
+
+131
+00:08:38,904 --> 00:08:42,274
+need to do that, but it's your job. But eventually the developers are
+
+132
+00:08:42,312 --> 00:08:45,334
+responsible for what value they will actually get
+
+133
+00:08:45,372 --> 00:08:49,320
+or what tools they will actually get to succeed in their job.
+
+134
+00:08:50,090 --> 00:08:53,634
+Now, legacy observability solutions
+
+135
+00:08:53,762 --> 00:08:57,506
+also have kind of another disadvantage
+
+136
+00:08:57,538 --> 00:09:02,106
+when it comes to cloud native environments. We mentioned data
+
+137
+00:09:02,208 --> 00:09:06,346
+rising so fast and the amounts of money you have to pay to get
+
+138
+00:09:06,368 --> 00:09:10,022
+insights with these tools. But eventually it results from their
+
+139
+00:09:10,176 --> 00:09:13,150
+pricing models being completely unscalable.
+
+140
+00:09:13,810 --> 00:09:16,954
+Once you base a pricing model on volume,
+
+141
+00:09:17,082 --> 00:09:20,974
+cardinality, or any of these unpredictable things,
+
+142
+00:09:21,092 --> 00:09:24,542
+eventually engineers can't really know what will
+
+143
+00:09:24,596 --> 00:09:28,082
+happen next month. But they can also know that it won't scale well,
+
+144
+00:09:28,136 --> 00:09:31,938
+because if currently I have five microservices, I'm not exactly
+
+145
+00:09:32,024 --> 00:09:35,286
+sure how much I would pay with these pricing models when
+
+146
+00:09:35,308 --> 00:09:38,710
+I go to 50 microservices. And the reason is that eventually
+
+147
+00:09:39,370 --> 00:09:43,506
+communications don't rise linearly in a microservices
+
+148
+00:09:43,618 --> 00:09:47,158
+kind of mesh architecture. And these pricing models have
+
+149
+00:09:47,164 --> 00:09:51,194
+been proven to be unscalable. Once you pay 20 or 30%
+
+150
+00:09:51,232 --> 00:09:55,446
+from your cloud cost, it already means that you've reached a point where you're
+
+151
+00:09:55,478 --> 00:09:58,998
+paying too much for observability and it doesn't scale well with your production.
+
+152
+00:09:59,174 --> 00:10:02,702
+Another reason, another deficiency, as we mentioned,
+
+153
+00:10:02,756 --> 00:10:06,590
+it is harder organizational alignment. It's so hard to implement
+
+154
+00:10:06,930 --> 00:10:10,874
+the same observability solution across such a heterogeneous
+
+155
+00:10:11,002 --> 00:10:15,134
+R and D group in a big company. Getting everybody to align
+
+156
+00:10:15,182 --> 00:10:18,750
+on the same value, on the same observability
+
+157
+00:10:18,830 --> 00:10:22,402
+standards, on the same measures that they measure in production dev
+
+158
+00:10:22,456 --> 00:10:26,066
+and staging, that's really hard in a big organization once you
+
+159
+00:10:26,088 --> 00:10:29,634
+go the legacy way of letting developers instrument their code and
+
+160
+00:10:29,672 --> 00:10:33,474
+work for their observability vendor. And the third part is data privacy.
+
+161
+00:10:33,522 --> 00:10:36,934
+I think that when these solutions were built over
+
+162
+00:10:36,972 --> 00:10:40,474
+a decade ago, it made sense in most cases to send all
+
+163
+00:10:40,512 --> 00:10:44,182
+your data to the vendor to be stored. And eventually
+
+164
+00:10:44,246 --> 00:10:47,542
+these vendors are data companies storing
+
+165
+00:10:47,686 --> 00:10:51,198
+and eventually charging you for data volumes being stored on
+
+166
+00:10:51,204 --> 00:10:55,338
+their side. So the data isn't private. You're working in a cloud native environment,
+
+167
+00:10:55,514 --> 00:10:59,470
+usually already segregated inside a very cloud native
+
+168
+00:11:00,050 --> 00:11:03,394
+primitive, such as kubernetes, clusters and namespaces and all that.
+
+169
+00:11:03,432 --> 00:11:07,390
+But eventually you just send all this data log traces
+
+170
+00:11:07,470 --> 00:11:10,862
+which contain sensitive information, sometimes PiI,
+
+171
+00:11:11,006 --> 00:11:14,722
+to your observability vendor just because you have no other
+
+172
+00:11:14,776 --> 00:11:18,870
+choice. And it doesn't make sense in cloud native modern environments.
+
+173
+00:11:19,450 --> 00:11:23,094
+Now the bottom line is very clear, I think,
+
+174
+00:11:23,132 --> 00:11:27,670
+that observability is under adopted. On the left you can see a recent survey
+
+175
+00:11:28,090 --> 00:11:31,802
+that shows that deep observability solutions are being
+
+176
+00:11:31,856 --> 00:11:35,126
+heavily under adopted, with about 70% of teams
+
+177
+00:11:35,158 --> 00:11:38,454
+using logs as kind of the basic measures for observability
+
+178
+00:11:38,502 --> 00:11:41,806
+or the basic layer for observability. Much, much less of
+
+179
+00:11:41,828 --> 00:11:45,946
+these teams are implementing apms or application performance monitoring
+
+180
+00:11:45,978 --> 00:11:49,774
+tools that everybody agrees on the value of the value
+
+181
+00:11:49,892 --> 00:11:53,726
+of these tools. I mean, eventually it means that there's a gap.
+
+182
+00:11:53,918 --> 00:11:57,086
+It can be any one of the reasons
+
+183
+00:11:57,118 --> 00:11:59,380
+that we stated before, it could be the price,
+
+184
+00:12:00,630 --> 00:12:04,510
+the hardship of getting this solution onboarded into a big organization
+
+185
+00:12:04,670 --> 00:12:08,150
+or data privacy. It could be any one of these things. But the bottom line
+
+186
+00:12:08,220 --> 00:12:11,826
+is very clear. Teams are not adopting these solutions
+
+187
+00:12:11,858 --> 00:12:15,400
+as you would expect from such high value
+
+188
+00:12:16,250 --> 00:12:19,606
+solutions, and that can help them troubleshoot better in production,
+
+189
+00:12:19,638 --> 00:12:23,046
+basically. Now that's exactly the reason that we've
+
+190
+00:12:23,078 --> 00:12:26,874
+built ground cover. Ground cover is built to be a
+
+191
+00:12:26,912 --> 00:12:30,394
+modern cloud native observability solution. We'll talk about
+
+192
+00:12:30,432 --> 00:12:33,950
+how it's built in a second, but as a concept, ground cover
+
+193
+00:12:34,100 --> 00:12:38,106
+is trying to create a modern way that would fit teams
+
+194
+00:12:38,138 --> 00:12:41,838
+working in cloud native environments and would solve the problems that we stated before.
+
+195
+00:12:42,004 --> 00:12:46,066
+And we can state three different measures that ground cover took
+
+196
+00:12:46,168 --> 00:12:49,986
+in order to kind of build our vision in
+
+197
+00:12:50,008 --> 00:12:53,458
+what we think is the correct way to build an observability platform.
+
+198
+00:12:53,624 --> 00:12:57,590
+One is that data is not being collected through
+
+199
+00:12:57,740 --> 00:13:01,430
+the DEV cycle. Basically, to collect data,
+
+200
+00:13:01,500 --> 00:13:05,074
+we don't need to be part of the development cycle
+
+201
+00:13:05,122 --> 00:13:08,946
+and worry about each team inside a big company implementing
+
+202
+00:13:08,978 --> 00:13:12,586
+the solution and working to integrate the observability solution. It's not that
+
+203
+00:13:12,608 --> 00:13:16,246
+developers aren't needed in the process. They're super important to determine
+
+204
+00:13:16,278 --> 00:13:21,774
+what to measure together with SRE and DevOps and all these teams. But we
+
+205
+00:13:21,812 --> 00:13:25,518
+empower one DevOps or one SRE person
+
+206
+00:13:25,604 --> 00:13:29,102
+to integrate an observability solution all across a huge company
+
+207
+00:13:29,236 --> 00:13:33,034
+without working its way through too many stakeholders
+
+208
+00:13:33,082 --> 00:13:36,478
+inside the company. And how are we doing that? We're doing that with EVPF.
+
+209
+00:13:36,574 --> 00:13:40,834
+EBPF is a technology that we'll talk about later in a second, but it
+
+210
+00:13:40,872 --> 00:13:44,958
+allows us to collect information or observability
+
+211
+00:13:45,054 --> 00:13:49,026
+data out of band from the application. We don't have to be part of
+
+212
+00:13:49,048 --> 00:13:52,902
+the development cycle, we don't have to be part of the application code to actually
+
+213
+00:13:52,956 --> 00:13:56,374
+collect data about what the application is doing and to
+
+214
+00:13:56,412 --> 00:14:00,134
+observe it in a deep way, and that's a really major leap
+
+215
+00:14:00,182 --> 00:14:03,926
+forward. The other is that data is being digested
+
+216
+00:14:04,038 --> 00:14:06,874
+distributedly where it lies. Basically,
+
+217
+00:14:07,072 --> 00:14:11,146
+ground cover digests data as it flows through our agent,
+
+218
+00:14:11,248 --> 00:14:13,994
+which is distributed across your cloud native environment.
+
+219
+00:14:14,122 --> 00:14:17,406
+And decisions about the data is already being made in
+
+220
+00:14:17,428 --> 00:14:21,390
+a very early stage of the process. It allows us to collect data
+
+221
+00:14:21,460 --> 00:14:24,706
+really smartly, reduce the volumes of data that
+
+222
+00:14:24,728 --> 00:14:28,802
+we collect for the same insights that you would expect and
+
+223
+00:14:28,856 --> 00:14:32,430
+break. Basically the volume based pricing models
+
+224
+00:14:32,510 --> 00:14:36,214
+where you would pay for volume, you can pay differently once
+
+225
+00:14:36,252 --> 00:14:39,442
+you digest data in a distributed manner,
+
+226
+00:14:39,506 --> 00:14:43,126
+as your cloud native environment is actually built. And the
+
+227
+00:14:43,148 --> 00:14:46,962
+other is privacy. We use in cloud architecture,
+
+228
+00:14:47,106 --> 00:14:50,722
+which is really sophisticated, where all the data plane basically resides
+
+229
+00:14:50,786 --> 00:14:54,154
+in your cloud environment. Basically ground cover has no access
+
+230
+00:14:54,192 --> 00:14:58,026
+to the data, all the data is kept private in your cloud environment, while we
+
+231
+00:14:58,048 --> 00:15:01,802
+still provide a SaaS experience that can be shared inside the organization
+
+232
+00:15:01,866 --> 00:15:05,870
+and so on. So these are three major differentiators that
+
+233
+00:15:06,020 --> 00:15:09,694
+kind of push an observability system into the cloud native domain and more
+
+234
+00:15:09,732 --> 00:15:13,614
+fit for modern teams. Now let's cover these
+
+235
+00:15:13,652 --> 00:15:17,442
+three segments one by one. One is
+
+236
+00:15:17,576 --> 00:15:21,262
+observability is basically hard to integrate. We see a lot of R and D efforts
+
+237
+00:15:21,326 --> 00:15:24,914
+and a lot of coordinations inside team. So we
+
+238
+00:15:24,952 --> 00:15:28,614
+know that just to prove that point, we know that for one
+
+239
+00:15:28,652 --> 00:15:32,802
+team to eventually be able to instrument open telemetry,
+
+240
+00:15:32,946 --> 00:15:36,022
+they would have to work hard and change part of their code,
+
+241
+00:15:36,076 --> 00:15:39,514
+change actual integrate an SDK and change lines of their
+
+242
+00:15:39,552 --> 00:15:44,394
+code across the application to eventually implement the
+
+243
+00:15:44,432 --> 00:15:48,266
+value of opentelemetry or any other vendor based
+
+244
+00:15:48,448 --> 00:15:52,014
+SDK. And this is the
+
+245
+00:15:52,052 --> 00:15:55,166
+best that we can get in part
+
+246
+00:15:55,188 --> 00:15:58,926
+of the languages. This auto instrumentation doesn't really work. You have
+
+247
+00:15:58,948 --> 00:16:03,530
+to work really manually to get that. And now
+
+248
+00:16:03,700 --> 00:16:06,882
+we're still being stuck inside that Dev cycle. I mean,
+
+249
+00:16:07,016 --> 00:16:10,946
+developers instrument their code, they wait for the
+
+250
+00:16:10,968 --> 00:16:14,786
+version release next cycle to actually reach production, and then they
+
+251
+00:16:14,808 --> 00:16:17,442
+get the value in production. That's a pretty long cycle. I mean,
+
+252
+00:16:17,496 --> 00:16:21,206
+for one team, but say reasonable for one team.
+
+253
+00:16:21,308 --> 00:16:25,826
+But what happens in a real company, like when you have 180
+
+254
+00:16:25,858 --> 00:16:29,962
+different teams or 180 different microservices that you have to work
+
+255
+00:16:30,016 --> 00:16:33,322
+your way through to actually get to production? That is where
+
+256
+00:16:33,376 --> 00:16:36,502
+things get really hard. Because eventually
+
+257
+00:16:36,646 --> 00:16:40,446
+getting all these teams to do all this at the same time with the same
+
+258
+00:16:40,468 --> 00:16:43,434
+principles at the same depth, without making mistakes,
+
+259
+00:16:43,562 --> 00:16:47,006
+that's the real pain in being part
+
+260
+00:16:47,028 --> 00:16:48,670
+of the development cycle.
+
+261
+00:16:49,810 --> 00:16:53,266
+And eventually you still get to the point where you have the
+
+262
+00:16:53,288 --> 00:16:57,314
+same worried or SRe person responsible for
+
+263
+00:16:57,352 --> 00:17:00,754
+aligning all these teams into, can they even do it? Can they
+
+264
+00:17:00,792 --> 00:17:04,340
+get a one uniform approach aside, a huge company,
+
+265
+00:17:04,890 --> 00:17:08,182
+can they set high professional standards that will allow them to say,
+
+266
+00:17:08,236 --> 00:17:11,800
+set and track slos? It's hard.
+
+267
+00:17:12,810 --> 00:17:15,714
+Now EBPF is the next Linux superpower.
+
+268
+00:17:15,762 --> 00:17:19,826
+That's one of the attributes
+
+269
+00:17:19,938 --> 00:17:24,234
+it was given. EBPF allows basically to
+
+270
+00:17:24,272 --> 00:17:27,734
+run business logic in a sandbox environment inside the Linux
+
+271
+00:17:27,782 --> 00:17:31,486
+kernel. One interesting comparison is
+
+272
+00:17:31,508 --> 00:17:33,790
+one that was made by Brendan Gregg,
+
+273
+00:17:34,770 --> 00:17:38,814
+which is an ex Netflix engineer, that says that EBPF is
+
+274
+00:17:38,852 --> 00:17:42,586
+kind of like what javascript did to HTML. Eventually it
+
+275
+00:17:42,628 --> 00:17:46,782
+allows you the flexibility to enjoy the high performance
+
+276
+00:17:46,846 --> 00:17:50,642
+of the Linux kernel, which was before unreachable without
+
+277
+00:17:50,696 --> 00:17:54,482
+writing a kernel model and eventually using
+
+278
+00:17:54,536 --> 00:17:58,662
+them to get the value that you need for your company in a programmable way.
+
+279
+00:17:58,796 --> 00:18:02,406
+What it actually means is that you
+
+280
+00:18:02,428 --> 00:18:05,830
+can actually get value from the kernel really fast.
+
+281
+00:18:05,900 --> 00:18:09,434
+I mean, if before, as you see on the left, I would
+
+282
+00:18:09,472 --> 00:18:12,650
+have to say get something
+
+283
+00:18:12,720 --> 00:18:16,074
+really special happening for my application needs inside
+
+284
+00:18:16,192 --> 00:18:19,606
+the Linux kernel, I would have to wait five years for the push
+
+285
+00:18:19,638 --> 00:18:23,726
+my id, wait for the kernel community to adopt it, and wait for eventually the
+
+286
+00:18:23,748 --> 00:18:26,842
+new distribution that I just made to reach developers
+
+287
+00:18:26,906 --> 00:18:28,640
+in say five years from now.
+
+288
+00:18:29,650 --> 00:18:33,838
+EBPF was basically an
+
+289
+00:18:33,844 --> 00:18:37,106
+all technology in a sense that it's already been part
+
+290
+00:18:37,128 --> 00:18:39,220
+of our Linux kernel for a while.
+
+291
+00:18:40,790 --> 00:18:44,258
+As a technology called EBPF, it was part of tcp dump and a lot
+
+292
+00:18:44,264 --> 00:18:47,518
+of different packet routing mechanisms inside the kernel already.
+
+293
+00:18:47,624 --> 00:18:51,106
+But in 2014, which is exactly the year where Kubernetes
+
+294
+00:18:51,218 --> 00:18:54,882
+was born, EVPF kind of rose and allowed
+
+295
+00:18:54,946 --> 00:18:58,422
+for a lot of new features to be relevant for actual
+
+296
+00:18:58,476 --> 00:19:02,026
+application developers to say, okay, part of my logic can
+
+297
+00:19:02,048 --> 00:19:05,350
+actually run inside the Linux kernel and it can be safe
+
+298
+00:19:05,430 --> 00:19:09,194
+and it can be fast. And I guess
+
+299
+00:19:09,232 --> 00:19:12,646
+around 2017, with the kernel version
+
+300
+00:19:12,678 --> 00:19:16,666
+414, that's where things really picked. And that's
+
+301
+00:19:16,698 --> 00:19:19,994
+where a lot of the modern features of UPF really reached
+
+302
+00:19:20,042 --> 00:19:23,374
+a maturity point where we can actually do things like
+
+303
+00:19:23,412 --> 00:19:26,750
+deep observability using UVPF. Now,
+
+304
+00:19:26,820 --> 00:19:30,594
+the UPF architecture basically is very
+
+305
+00:19:30,632 --> 00:19:34,254
+interesting. We're not going to dive too deep into that. But I can load
+
+306
+00:19:34,302 --> 00:19:39,122
+from the user space an EBPF program which eventually is
+
+307
+00:19:39,176 --> 00:19:42,578
+transformed into EBPF bytecode
+
+308
+00:19:42,594 --> 00:19:46,246
+and loaded into the kernel. It's been verified by a verifier. So it
+
+309
+00:19:46,268 --> 00:19:49,658
+means that the runtime of this specific
+
+310
+00:19:49,744 --> 00:19:53,626
+program is limited, it's super safe, it can access part of the
+
+311
+00:19:53,648 --> 00:19:57,402
+kernel where it shouldn't. It behaves in a passive way
+
+312
+00:19:57,456 --> 00:20:00,554
+where I can't actually crash my applications or
+
+313
+00:20:00,592 --> 00:20:03,734
+hurt the kernel in any way. And it's then been
+
+314
+00:20:03,792 --> 00:20:07,710
+compiled at runtime to an actual
+
+315
+00:20:07,780 --> 00:20:11,486
+machine code which allows us to be super efficient. So basically now I have
+
+316
+00:20:11,508 --> 00:20:15,314
+the ability to run business logic inside the kernel, while I still
+
+317
+00:20:15,352 --> 00:20:18,898
+have the ability using different primitives like maps to communicate with
+
+318
+00:20:18,904 --> 00:20:23,214
+the user space. So imagine for an observability solution.
+
+319
+00:20:23,342 --> 00:20:27,630
+I can collect data like traces or API calls between microservices
+
+320
+00:20:27,710 --> 00:20:31,186
+from the kernel space and process them back in the user
+
+321
+00:20:31,218 --> 00:20:35,350
+space. And to do that, I don't have to be part of the application
+
+322
+00:20:35,420 --> 00:20:39,378
+in the user space, because once I'm in the kernel space, I have the
+
+323
+00:20:39,404 --> 00:20:42,806
+privileges of the ability to observe everything that is happening in the user
+
+324
+00:20:42,838 --> 00:20:46,182
+space. Now why run things in the kernel
+
+325
+00:20:46,246 --> 00:20:50,098
+anyway? The reason is very clear. One is efficiency.
+
+326
+00:20:50,294 --> 00:20:54,398
+You get to enjoy the super efficient performance of
+
+327
+00:20:54,564 --> 00:20:59,006
+the kernel resources. Did you ever thought about how much
+
+328
+00:20:59,188 --> 00:21:03,022
+overhead, which is really hard to measure, your observability
+
+329
+00:21:03,086 --> 00:21:06,706
+SDK currently takes? I mean, say you implement open telemetry, do you know how
+
+330
+00:21:06,728 --> 00:21:10,610
+much overhead, even in CPU memory
+
+331
+00:21:12,390 --> 00:21:16,146
+response time, does your SDK incur in your
+
+332
+00:21:16,168 --> 00:21:19,686
+application? That's really hard to measure and really scary sometimes.
+
+333
+00:21:19,868 --> 00:21:22,902
+Second is safety. You can't crash the application in any way,
+
+334
+00:21:22,956 --> 00:21:26,514
+which a badly implemented SDK or a kernel
+
+335
+00:21:26,562 --> 00:21:31,110
+module can definitely crash your application or even your entire server and
+
+336
+00:21:31,180 --> 00:21:34,602
+100% coverage. I mean you can see everything that happens in the user space
+
+337
+00:21:34,656 --> 00:21:38,474
+all at once out of band. So imagine in the old
+
+338
+00:21:38,512 --> 00:21:42,234
+world of one process from say one Java
+
+339
+00:21:42,282 --> 00:21:46,234
+program that wasn't such a big advantage. I mean you could clearly instrument
+
+340
+00:21:46,282 --> 00:21:49,614
+that one Java process and get whatever you want to get from that
+
+341
+00:21:49,652 --> 00:21:53,122
+process. But imagine our current
+
+342
+00:21:53,176 --> 00:21:57,086
+servers. Current our current servers are actually kubernetes nodes,
+
+343
+00:21:57,118 --> 00:22:00,862
+for example in the cloud native domain.
+
+344
+00:22:01,006 --> 00:22:05,042
+And a kubernetes node can suddenly host 150
+
+345
+00:22:05,096 --> 00:22:08,374
+different containers on top of it, observing all of them
+
+346
+00:22:08,412 --> 00:22:12,182
+at once at the same depth, without changing even one
+
+347
+00:22:12,236 --> 00:22:16,098
+runtime or one container code running inside this node.
+
+348
+00:22:16,194 --> 00:22:19,260
+That's really amazing. And that's part of what EBPF can do.
+
+349
+00:22:20,270 --> 00:22:23,670
+And that also empowers our DevOps or Sre
+
+350
+00:22:23,750 --> 00:22:27,258
+to basically do things on their own. They don't have
+
+351
+00:22:27,264 --> 00:22:30,634
+to convince R D anymore to do what they want. They can set
+
+352
+00:22:30,672 --> 00:22:34,654
+one uniform approach and they can set a super high professional standard
+
+353
+00:22:34,772 --> 00:22:37,898
+and actually hold onto it and perform really well because they're
+
+354
+00:22:37,914 --> 00:22:41,326
+responsible for integrating the solution out of band from the application,
+
+355
+00:22:41,508 --> 00:22:45,982
+and they're responsible for using the solutions to actually measure
+
+356
+00:22:46,046 --> 00:22:49,186
+performance, debug and alert things that they want to
+
+357
+00:22:49,208 --> 00:22:53,006
+be alerted on. The second is, as we said, observability doesn't
+
+358
+00:22:53,038 --> 00:22:56,786
+scale. I mean you store huge amounts of irrelevant data and it doesn't
+
+359
+00:22:56,818 --> 00:23:00,034
+make sense anymore to get such little insight
+
+360
+00:23:00,082 --> 00:23:03,410
+for so much data. And it makes cost unbearable.
+
+361
+00:23:03,570 --> 00:23:07,400
+And the reason is the centralized architectures that we talked about before,
+
+362
+00:23:07,710 --> 00:23:11,466
+you have a lot of instrumented applications sending deep observability data.
+
+363
+00:23:11,568 --> 00:23:14,678
+You also have agents monitoring your infrastructure,
+
+364
+00:23:14,774 --> 00:23:19,018
+and everything goes back into huge data storages inside your
+
+365
+00:23:19,184 --> 00:23:22,654
+APM vendor where you get a friendly UI that
+
+366
+00:23:22,692 --> 00:23:24,960
+allows you to query them and explore your data.
+
+367
+00:23:26,850 --> 00:23:30,186
+Using certarat architectures definitely introduced
+
+368
+00:23:30,218 --> 00:23:33,870
+a big depth in how we actually treat
+
+369
+00:23:33,940 --> 00:23:38,226
+data volumes as part of our observability stack one
+
+370
+00:23:38,328 --> 00:23:41,060
+is that we have to use random sampling. I mean,
+
+371
+00:23:41,910 --> 00:23:45,682
+people ask all the time, how can I control these huge data volumes? I have
+
+372
+00:23:45,736 --> 00:23:49,286
+super high throughput APIs like redis and Kafka flowing through
+
+373
+00:23:49,308 --> 00:23:52,838
+my production environment. How am I expected to
+
+374
+00:23:52,844 --> 00:23:56,886
+pay for all this storage? Who's going to store that for me? So the
+
+375
+00:23:56,908 --> 00:23:59,954
+vendor allows you to do things like random sampling.
+
+376
+00:24:00,002 --> 00:24:03,386
+Just sample half a percent of your production, store it, and it
+
+377
+00:24:03,408 --> 00:24:06,854
+will be enough in most cases to get what you want. That's definitely a scary
+
+378
+00:24:06,902 --> 00:24:10,614
+situation where you have to catch that interesting bug
+
+379
+00:24:10,662 --> 00:24:14,974
+that happens one in 10,000 requests, and that's usually the bugs or
+
+380
+00:24:15,092 --> 00:24:18,878
+the issues that you care about. That's a scary primitive to
+
+381
+00:24:18,884 --> 00:24:21,914
+work with. Second is that raw
+
+382
+00:24:21,962 --> 00:24:25,214
+data is being stored so that the centralized
+
+383
+00:24:25,262 --> 00:24:28,942
+architecture can be efficient. Raw data such as spans and traces
+
+384
+00:24:29,006 --> 00:24:33,214
+are being sent to the observability vendor where they're processed
+
+385
+00:24:33,262 --> 00:24:37,206
+there for insights. I mean, insights could be something as simple as
+
+386
+00:24:37,228 --> 00:24:40,786
+a p 50 latency, like the median latency of a specific API
+
+387
+00:24:40,818 --> 00:24:44,278
+resource over time. That's something that is super common
+
+388
+00:24:44,364 --> 00:24:47,730
+for setting, say, slos and enforcing slos.
+
+389
+00:24:47,890 --> 00:24:52,118
+So if all I want is that p 50 metric,
+
+390
+00:24:52,214 --> 00:24:55,926
+why the hell should I store all these spans? To allow the vendor
+
+391
+00:24:55,958 --> 00:24:59,706
+to just deduce the metrics that I want at his back
+
+392
+00:24:59,728 --> 00:25:03,230
+end. That doesn't make sense anymore. And that's one debt
+
+393
+00:25:03,970 --> 00:25:07,594
+that we're facing with another is that it's
+
+394
+00:25:07,642 --> 00:25:09,950
+really built around a rigid data collection.
+
+395
+00:25:11,250 --> 00:25:14,640
+You're built in a way where the data collection is simple.
+
+396
+00:25:15,170 --> 00:25:18,386
+You just send all the things back to the vendor's back end and
+
+397
+00:25:18,408 --> 00:25:22,082
+then the magic happens. Now that's great,
+
+398
+00:25:22,136 --> 00:25:25,194
+but what happens when you want to collect things at different depth?
+
+399
+00:25:25,262 --> 00:25:28,726
+Say I have 10,000 requests, which are
+
+400
+00:25:28,828 --> 00:25:32,582
+HTTP requests, which return 200. Okay, they're all perfect.
+
+401
+00:25:32,716 --> 00:25:36,070
+And I have one request failing with returning 500.
+
+402
+00:25:36,140 --> 00:25:40,054
+Internal server error. Do I really want to know the same about these
+
+403
+00:25:40,092 --> 00:25:44,294
+two requests? I mean, not exactly. I want to know much more details
+
+404
+00:25:44,342 --> 00:25:47,846
+about the failed request, such as give me the full body request
+
+405
+00:25:47,878 --> 00:25:51,534
+and response of that payload. I want to see what happened. I might not
+
+406
+00:25:51,572 --> 00:25:55,518
+be interested at knowing that for all the other
+
+407
+00:25:55,684 --> 00:25:59,550
+perfectly fine requests that flew through that microservice
+
+408
+00:26:01,010 --> 00:26:04,558
+eventually. Basically what happens is that you store irrelevant data
+
+409
+00:26:04,644 --> 00:26:08,130
+all the time. I mean, as we said before, to get
+
+410
+00:26:08,280 --> 00:26:11,326
+something as simple as a matrix, you have to store so many raw
+
+411
+00:26:11,358 --> 00:26:14,846
+data all the time to eventually get that value.
+
+412
+00:26:14,968 --> 00:26:18,870
+And that creates an equation that you can eventually
+
+413
+00:26:19,370 --> 00:26:21,430
+hold onto when it comes to pricing,
+
+414
+00:26:22,890 --> 00:26:26,294
+it forces you to be limited in cardinality, because where you
+
+415
+00:26:26,332 --> 00:26:30,634
+do care about a specific error, you don't get all the information that
+
+416
+00:26:30,752 --> 00:26:34,186
+you would have wanted, because otherwise you would have to store so
+
+417
+00:26:34,208 --> 00:26:37,750
+much data across all the information that you're collecting
+
+418
+00:26:37,830 --> 00:26:39,610
+with your observability vendor.
+
+419
+00:26:40,290 --> 00:26:43,550
+Now, that's where things are
+
+420
+00:26:43,620 --> 00:26:47,502
+done differently in a cloud native approach, and that's where ground cover is actually
+
+421
+00:26:47,556 --> 00:26:52,062
+different. We're, for example, using in
+
+422
+00:26:52,116 --> 00:26:56,242
+house span based metrics, which means that we can actually
+
+423
+00:26:56,296 --> 00:27:00,126
+create metrics from the raw data as they're flying through the EVPF
+
+424
+00:27:00,158 --> 00:27:03,630
+agent without storing all these spans,
+
+425
+00:27:03,790 --> 00:27:07,222
+just to eventually pay for their storage at the vendor side,
+
+426
+00:27:07,276 --> 00:27:10,534
+and then enjoying the value of the metrics that we actually want
+
+427
+00:27:10,572 --> 00:27:14,386
+to observe. And we also support variant
+
+428
+00:27:14,418 --> 00:27:18,106
+depth capturing, which means that we can collect, for example,
+
+429
+00:27:18,208 --> 00:27:22,170
+the full payload and all the logs around a specific failed request,
+
+430
+00:27:23,870 --> 00:27:27,098
+and we can decide to collect other things, say for a
+
+431
+00:27:27,104 --> 00:27:30,394
+high latency event, for example, collect the
+
+432
+00:27:30,432 --> 00:27:34,222
+cpu usage of the node at the same time, or whatever we want.
+
+433
+00:27:34,356 --> 00:27:37,982
+But we can collect different very shallow things
+
+434
+00:27:38,036 --> 00:27:41,546
+for a normal flow, and for example, not collect
+
+435
+00:27:41,738 --> 00:27:45,694
+all the okay requests of a normal flow and just sample there
+
+436
+00:27:45,732 --> 00:27:49,106
+differently. This is a major advantage when it comes to real systems at
+
+437
+00:27:49,128 --> 00:27:52,814
+high throughput, where there's a lot of things that are perfectly
+
+438
+00:27:52,862 --> 00:27:56,226
+fine, you just want to know some information about them, how they
+
+439
+00:27:56,248 --> 00:27:59,686
+behave. Give me a few examples of a normal flow, but you really
+
+440
+00:27:59,708 --> 00:28:03,286
+want to dive deep into high latency, bad failure requests and
+
+441
+00:28:03,308 --> 00:28:06,518
+so on. And the third thing is that,
+
+442
+00:28:06,684 --> 00:28:09,994
+as we said, information isn't kept private. It doesn't make
+
+443
+00:28:10,032 --> 00:28:14,058
+sense to store traces and logs in modern ages in the
+
+444
+00:28:14,144 --> 00:28:17,834
+vendor side. So ground cover is
+
+445
+00:28:17,872 --> 00:28:21,550
+built differently than the architectures that we see here. It's built differently than
+
+446
+00:28:21,700 --> 00:28:25,950
+digesting data, storing it on the vendor side, and then accessing it.
+
+447
+00:28:26,100 --> 00:28:29,514
+It's built in an architecture where the data plane sits
+
+448
+00:28:29,562 --> 00:28:32,974
+inside your in cloud deployment, so eventually you
+
+449
+00:28:33,012 --> 00:28:36,754
+get the persistent storage of
+
+450
+00:28:36,792 --> 00:28:40,206
+the data you actually care about, like log traces and metrics stored
+
+451
+00:28:40,238 --> 00:28:43,826
+at your side, while all the control plane allows you to access it.
+
+452
+00:28:43,928 --> 00:28:48,118
+From a SAS experience that has a
+
+453
+00:28:48,124 --> 00:28:52,760
+few really interesting advantages. One is that
+
+454
+00:28:54,730 --> 00:28:58,214
+you're eventually allowing teams to enjoy and
+
+455
+00:28:58,252 --> 00:29:01,546
+reuse that value, and also allowing them
+
+456
+00:29:01,568 --> 00:29:05,590
+to keep that private. So once I store that value inside my environment,
+
+457
+00:29:05,750 --> 00:29:09,526
+I'm also able to reuse it for different purposes,
+
+458
+00:29:09,638 --> 00:29:13,680
+and I'm also able to protect it and allow maybe
+
+459
+00:29:14,690 --> 00:29:18,894
+broader data collection around more sensitive areas that will have been debugged than
+
+460
+00:29:18,932 --> 00:29:22,238
+I would otherwise do. While I store it on the
+
+461
+00:29:22,244 --> 00:29:26,654
+vendor side, which is a much scarier aspect
+
+462
+00:29:26,702 --> 00:29:30,398
+of the security of my company. Now, this is our current reality.
+
+463
+00:29:30,494 --> 00:29:34,498
+This is not something that we're dreaming of or a vision that is far away.
+
+464
+00:29:34,584 --> 00:29:38,174
+This is the current reality of ground cover and all future cloud
+
+465
+00:29:38,232 --> 00:29:42,546
+native solutions that will emerge in the next few years. We're using EVPF instrumentation
+
+466
+00:29:42,658 --> 00:29:46,034
+that allows us immediate time to value and out of band deployment,
+
+467
+00:29:46,082 --> 00:29:49,740
+so one person can just get instant value
+
+468
+00:29:50,830 --> 00:29:54,886
+within two minutes on a huge company cloud native environment.
+
+469
+00:29:54,998 --> 00:29:58,646
+We're using edge based observability or distributed data collection and ingestion,
+
+470
+00:29:58,678 --> 00:30:01,934
+which eventually allows us to be built for scale and also break
+
+471
+00:30:01,972 --> 00:30:05,646
+all these trade offs of pricing, which is
+
+472
+00:30:05,668 --> 00:30:09,242
+based on volume, which is unpredictable and costly.
+
+473
+00:30:09,386 --> 00:30:12,846
+And we're also using in cloud architecture, where data is kept
+
+474
+00:30:12,878 --> 00:30:15,460
+private and basically in your full control.
+
+475
+00:30:18,070 --> 00:30:21,746
+That's it. That was kind of a sneak peek into
+
+476
+00:30:21,928 --> 00:30:25,574
+what cloud native environments will look in the future,
+
+477
+00:30:25,692 --> 00:30:29,606
+and how the disadvantages of
+
+478
+00:30:29,788 --> 00:30:33,494
+legacy solutions inside cloud native environments can
+
+479
+00:30:33,532 --> 00:30:37,206
+be transformed into solutions that actually fit the way you develop,
+
+480
+00:30:37,308 --> 00:30:41,080
+think and operate in a cloud native environment. Ground cover
+
+481
+00:30:41,610 --> 00:30:45,458
+is one of these solutions, and we encourage you to explore ground
+
+482
+00:30:45,474 --> 00:30:48,822
+cover and other solutions that might fit your stack better than what
+
+483
+00:30:48,876 --> 00:30:52,794
+you're currently using. And feel free to start free with our solution anytime
+
+484
+00:30:52,842 --> 00:30:56,206
+soon, and we're happy to answer any questions about it. Thank you,
+
+485
+00:30:56,228 --> 00:30:56,300
+guys.
+
