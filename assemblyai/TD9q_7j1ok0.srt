@@ -1,0 +1,1692 @@
+1
+00:00:23,770 --> 00:00:28,274
+This presentation will discuss describe how we're using Argo workflows within spectrum labs
+
+2
+00:00:28,402 --> 00:00:31,778
+to build and deploy scalable data pipelines.
+
+3
+00:00:31,874 --> 00:00:35,666
+In particular, it will show how we have built a framework that allows
+
+4
+00:00:35,698 --> 00:00:39,858
+you to deploy can elastically scaling spark cluster
+
+5
+00:00:40,034 --> 00:00:43,510
+using only a couple of lines of configuration.
+
+6
+00:00:43,850 --> 00:00:47,970
+So, a quick overview of the structure of the presentation
+
+7
+00:00:48,130 --> 00:00:52,094
+I'm going to describe can introduction to argo workflows and
+
+8
+00:00:52,132 --> 00:00:55,594
+an automated demo. Likewise, I will give a walkthrough
+
+9
+00:00:55,642 --> 00:00:59,482
+of one of our pipelines that we use. I describe
+
+10
+00:00:59,546 --> 00:01:03,754
+the SDK that we've developed to simplify the development,
+
+11
+00:01:03,802 --> 00:01:07,410
+deployment and implication of our argo workflows. I will
+
+12
+00:01:07,480 --> 00:01:11,262
+give an overview of argo events and automated demo. And lastly,
+
+13
+00:01:11,326 --> 00:01:14,846
+we'll talk about some of the challenges that we've had using Argo and Spark.
+
+14
+00:01:14,878 --> 00:01:17,966
+Together. Spectrum Labs
+
+15
+00:01:18,078 --> 00:01:21,240
+build b to b trust and safety technology.
+
+16
+00:01:21,610 --> 00:01:25,010
+Our customers, which are gaming apps,
+
+17
+00:01:25,090 --> 00:01:28,230
+dating apps, social media platforms, et cetera,
+
+18
+00:01:28,570 --> 00:01:32,282
+send us text conversations. Our deep learning
+
+19
+00:01:32,336 --> 00:01:36,278
+models can then identify any toxic behaviors in those conversations
+
+20
+00:01:36,374 --> 00:01:40,066
+and trigger an action. An action may involve a human moderator
+
+21
+00:01:40,118 --> 00:01:44,346
+making an intervention, or it may involve an automated action
+
+22
+00:01:44,458 --> 00:01:48,430
+that can be configured via our guardian moderation software.
+
+23
+00:01:49,330 --> 00:01:52,794
+So to support the development of these deep learning models,
+
+24
+00:01:52,842 --> 00:01:56,786
+our team of data scientists require data pipelines that
+
+25
+00:01:56,808 --> 00:02:00,350
+can run on large data sets. This is a very simplified version
+
+26
+00:02:00,430 --> 00:02:03,486
+of the lifecycle, but we may have processing steps
+
+27
+00:02:03,598 --> 00:02:06,946
+that involve cleaning data. We have the training of our
+
+28
+00:02:06,968 --> 00:02:10,806
+models. We may run eval sets to validate that our
+
+29
+00:02:10,828 --> 00:02:14,226
+models are meeting a certain quality threshold before we release
+
+30
+00:02:14,258 --> 00:02:17,638
+them to production. For all of these, our data scientists require the
+
+31
+00:02:17,644 --> 00:02:21,050
+ability to easily kick off workflows, to be able to monitor them,
+
+32
+00:02:21,120 --> 00:02:24,666
+to be able to troubleshoot them. So we have
+
+33
+00:02:24,768 --> 00:02:29,020
+chosen Argo workflows as our tool of choice to facilitate this process.
+
+34
+00:02:29,630 --> 00:02:32,910
+Argo workflows is a container native workflow engine for
+
+35
+00:02:32,980 --> 00:02:36,942
+running jobs on Kubernetes. It's open
+
+36
+00:02:36,996 --> 00:02:40,638
+source and it is supported by the Cloud
+
+37
+00:02:40,724 --> 00:02:44,830
+Native Foundation. I think a key advantage of it is that it's native to Kubernetes.
+
+38
+00:02:44,910 --> 00:02:48,942
+So if you're already deploying your services and your systems on kubernetes,
+
+39
+00:02:49,086 --> 00:02:52,622
+Argo workflows is a great fit. It can be easily installed
+
+40
+00:02:52,686 --> 00:02:56,126
+via Helmchart and involves obviously configuration,
+
+41
+00:02:56,238 --> 00:02:59,794
+but it's fairly straightforward to get up and running. The argo suite
+
+42
+00:02:59,842 --> 00:03:03,206
+consists of four components, argo workflows and argo events, which we're going to go through
+
+43
+00:03:03,228 --> 00:03:06,866
+in this presentation. There's also continuous deployments and argo rollouts.
+
+44
+00:03:06,898 --> 00:03:10,410
+Then lastly, which is a blue green type deployment framework.
+
+45
+00:03:10,990 --> 00:03:14,378
+So at its core, argo workflows provides you with
+
+46
+00:03:14,384 --> 00:03:17,590
+the ability to define your pipelines via
+
+47
+00:03:17,670 --> 00:03:21,006
+YAML files. Each pipelines can then
+
+48
+00:03:21,028 --> 00:03:24,222
+be packaged up via helm and deployed and
+
+49
+00:03:24,276 --> 00:03:28,474
+shared like any other helm chart. So each task
+
+50
+00:03:28,522 --> 00:03:31,834
+runs on its own pod. A task contains a template.
+
+51
+00:03:31,882 --> 00:03:35,918
+A template defines a docker image and some instructions
+
+52
+00:03:36,094 --> 00:03:39,458
+to that image, which then executes as a
+
+53
+00:03:39,464 --> 00:03:43,154
+container within the pod. So you can size and scale your
+
+54
+00:03:43,192 --> 00:03:46,838
+tasks and your pods independently of each other when it
+
+55
+00:03:46,844 --> 00:03:51,190
+comes to message passing. Then between tasks you can define
+
+56
+00:03:51,770 --> 00:03:55,746
+string parameters which argo will pass from container
+
+57
+00:03:55,778 --> 00:03:59,194
+to container. Or you can also define a
+
+58
+00:03:59,312 --> 00:04:02,794
+file artifact. A file artifact may be the output from
+
+59
+00:04:02,832 --> 00:04:06,854
+a previous task, which can then be referenced further downstream
+
+60
+00:04:06,982 --> 00:04:10,406
+behind the scenes. Argo will package that
+
+61
+00:04:10,448 --> 00:04:13,710
+up into its artifact repository and place
+
+62
+00:04:13,780 --> 00:04:18,430
+it on any pod or task where it's defined.
+
+63
+00:04:19,810 --> 00:04:23,614
+So I'd like to dig into some of the core concepts
+
+64
+00:04:23,662 --> 00:04:27,134
+of argo workflows now via a simple demo. So I'm going to switch
+
+65
+00:04:27,182 --> 00:04:30,738
+over here to my ide and walk through
+
+66
+00:04:30,904 --> 00:04:33,954
+a simple
+
+67
+00:04:33,992 --> 00:04:37,674
+enough argo workflow. So this is packaged up as a Helen
+
+68
+00:04:37,742 --> 00:04:41,778
+chart. So I've defined a main yaml file which consists
+
+69
+00:04:41,874 --> 00:04:45,618
+of a dag. So the input to the argo
+
+70
+00:04:45,634 --> 00:04:50,042
+workflow is a string batch which references an s three batch. So the
+
+71
+00:04:50,096 --> 00:04:54,586
+first task in the workflow will references that
+
+72
+00:04:54,688 --> 00:04:58,246
+string path and it will download
+
+73
+00:04:58,278 --> 00:05:02,430
+these file from s three and register it as an argo file artifact.
+
+74
+00:05:02,930 --> 00:05:07,274
+These the next task refers to that file
+
+75
+00:05:07,322 --> 00:05:10,906
+artifact from above. So what it's saying here is the input
+
+76
+00:05:11,018 --> 00:05:14,570
+artifact, this particular task is these output
+
+77
+00:05:14,650 --> 00:05:18,606
+artifact from the task above, and then it invokes
+
+78
+00:05:18,798 --> 00:05:22,418
+this template which will display some of the contents of the file on
+
+79
+00:05:22,424 --> 00:05:26,146
+the screen. So further up here we've defined the
+
+80
+00:05:26,168 --> 00:05:30,226
+templates inline. Now typically you would probably define each template
+
+81
+00:05:30,258 --> 00:05:33,302
+within its own yaml file, but for the purpose of these demo we keep things
+
+82
+00:05:33,356 --> 00:05:36,726
+simple. So this particular template consists of an
+
+83
+00:05:36,748 --> 00:05:40,338
+image and some instructions to that image, which will then execute as a
+
+84
+00:05:40,364 --> 00:05:43,834
+container on its own part. So what's happening here is we
+
+85
+00:05:43,872 --> 00:05:47,738
+are using the s three ClI to download the
+
+86
+00:05:47,744 --> 00:05:51,066
+file from s three and save it to this local temp directory.
+
+87
+00:05:51,178 --> 00:05:54,462
+We then unzip it and we write the output to this
+
+88
+00:05:54,516 --> 00:05:58,462
+temp output file txt. Then the
+
+89
+00:05:58,516 --> 00:06:02,678
+output from this particular task is to register
+
+90
+00:06:02,874 --> 00:06:06,642
+that local file as an artifact within
+
+91
+00:06:06,696 --> 00:06:10,770
+the artifact repository. So the next step in the task
+
+92
+00:06:11,270 --> 00:06:14,622
+has referenced to this particular artifact.
+
+93
+00:06:14,686 --> 00:06:18,246
+And what we're saying here is download that artifact to
+
+94
+00:06:18,268 --> 00:06:20,630
+this particular local location.
+
+95
+00:06:21,370 --> 00:06:24,566
+Then within this particular task. Again, we've defined our
+
+96
+00:06:24,588 --> 00:06:27,946
+image and we've defined some instructions which are
+
+97
+00:06:27,968 --> 00:06:31,866
+basically to take the first number of lines from
+
+98
+00:06:31,888 --> 00:06:35,340
+this particular file and display those on the screen.
+
+99
+00:06:36,590 --> 00:06:39,580
+We are using our own custom image here,
+
+100
+00:06:40,450 --> 00:06:44,302
+but this particular workflow could probably work under
+
+101
+00:06:44,356 --> 00:06:47,934
+any image that contains the s three CLI and
+
+102
+00:06:48,052 --> 00:06:51,840
+can use batch. So I want to just highlight this particular
+
+103
+00:06:52,850 --> 00:06:56,274
+notation here. This is helm templating that allows you
+
+104
+00:06:56,312 --> 00:06:59,806
+to plug in values from your values at yaml lines.
+
+105
+00:06:59,838 --> 00:07:03,026
+So in this case we've defined headcount as 100. So when
+
+106
+00:07:03,048 --> 00:07:06,238
+we deploy this particular chart,
+
+107
+00:07:06,414 --> 00:07:10,006
+helm will plug in 100 here as these value. So this gives a lot of
+
+108
+00:07:10,028 --> 00:07:13,506
+power which will show later on in more complex workflows.
+
+109
+00:07:13,538 --> 00:07:17,406
+So it gives us the power of timidizing
+
+110
+00:07:17,538 --> 00:07:18,810
+our workflows.
+
+111
+00:07:20,670 --> 00:07:23,782
+So I'll now show you how we execute
+
+112
+00:07:23,846 --> 00:07:27,286
+this and we will view it then in the argo
+
+113
+00:07:27,318 --> 00:07:31,446
+UI. So now we're going to deploy
+
+114
+00:07:31,558 --> 00:07:35,038
+and run this argo workflow. So the first thing we do is run the
+
+115
+00:07:35,044 --> 00:07:39,146
+helm command that deploys this particular workflow.
+
+116
+00:07:39,338 --> 00:07:42,666
+So this is the same Yaml file that I showed you previously, except we've
+
+117
+00:07:42,698 --> 00:07:46,126
+plugged in the value from the values of yaml file.
+
+118
+00:07:46,238 --> 00:07:47,730
+When we do the deployment,
+
+119
+00:07:50,950 --> 00:07:54,146
+we then execute the workflow via a
+
+120
+00:07:54,168 --> 00:07:57,874
+curl statement. So typically you're not going
+
+121
+00:07:57,912 --> 00:08:02,082
+to execute your ago workflows using this approach.
+
+122
+00:08:02,226 --> 00:08:05,858
+Argo has its own CLI that you can use with inspectum. We've created
+
+123
+00:08:05,874 --> 00:08:09,574
+our own CLI to simplify the execution
+
+124
+00:08:09,702 --> 00:08:13,446
+of these workflows, but for the purposes
+
+125
+00:08:13,478 --> 00:08:16,934
+of showing the mechanics here, I'm going to run the curl statement.
+
+126
+00:08:17,062 --> 00:08:20,698
+So what's happening here is Argo hosts a
+
+127
+00:08:20,784 --> 00:08:24,842
+web server where you can basically post a request
+
+128
+00:08:24,986 --> 00:08:28,506
+to run an argo workflow. So in this case, all we're
+
+129
+00:08:28,538 --> 00:08:31,806
+doing is we're defining the workflow that we
+
+130
+00:08:31,828 --> 00:08:36,142
+want to run, which is our demo main workflow,
+
+131
+00:08:36,206 --> 00:08:39,618
+and we're defining the path, the string batch to the
+
+132
+00:08:39,704 --> 00:08:43,010
+s these file that we wish to download and display.
+
+133
+00:08:44,970 --> 00:08:48,866
+So Argo has returned back a 200 response,
+
+134
+00:08:48,898 --> 00:08:52,806
+which means it has now begun executing that
+
+135
+00:08:52,988 --> 00:08:56,182
+workflow. So I'm going to switch over here to
+
+136
+00:08:56,236 --> 00:08:59,750
+my local host UI. This is a read only UI,
+
+137
+00:08:59,830 --> 00:09:03,706
+which allows you to view all the workflows that have
+
+138
+00:09:03,728 --> 00:09:06,970
+executed in your cluster,
+
+139
+00:09:07,470 --> 00:09:11,150
+and it allows you to click on a particular workflow and
+
+140
+00:09:11,220 --> 00:09:14,938
+view its progress. So it contains
+
+141
+00:09:14,954 --> 00:09:18,414
+the ability to read some metadata about your
+
+142
+00:09:18,452 --> 00:09:22,126
+agile workflow. It also has the ability to resubmit, stop it,
+
+143
+00:09:22,228 --> 00:09:25,970
+terminate it, et cetera. So while this first
+
+144
+00:09:26,120 --> 00:09:29,614
+task is executing, you can click on a pod
+
+145
+00:09:29,662 --> 00:09:34,194
+here and it gives you some useful metadata about that
+
+146
+00:09:34,232 --> 00:09:38,022
+particular task. It shows
+
+147
+00:09:38,076 --> 00:09:41,414
+you also like the container that
+
+148
+00:09:41,452 --> 00:09:45,430
+run the image, the arguments that image, et cetera.
+
+149
+00:09:48,340 --> 00:09:51,728
+So this has executed successfully. I'm just going
+
+150
+00:09:51,734 --> 00:09:55,028
+to click on the logs here, show the output. As you can see here,
+
+151
+00:09:55,114 --> 00:09:59,060
+it's done a can on the first 100 records of that particular
+
+152
+00:09:59,130 --> 00:10:03,720
+file. So this workflow has executed successfully.
+
+153
+00:10:04,700 --> 00:10:08,264
+So a few other things about the UI. You can view all
+
+154
+00:10:08,302 --> 00:10:12,100
+the workflow templates, which are these helm charts that have been deployed
+
+155
+00:10:12,180 --> 00:10:15,352
+to your cluster here as well. You can
+
+156
+00:10:15,406 --> 00:10:18,492
+look at cron jobs if you have argo events set up.
+
+157
+00:10:18,546 --> 00:10:20,750
+You can look at the argo events too as well.
+
+158
+00:10:22,960 --> 00:10:26,476
+So to give a little bit more context on the kind of pipelines that
+
+159
+00:10:26,498 --> 00:10:31,372
+we have within spectrum labs, I'm going to explain this Iro pipeline.
+
+160
+00:10:31,516 --> 00:10:35,440
+This pipelines is used as an input into the training of
+
+161
+00:10:35,510 --> 00:10:39,508
+our models. It will be typically executed against
+
+162
+00:10:39,674 --> 00:10:43,204
+labeled feature sets that would consist of
+
+163
+00:10:43,322 --> 00:10:46,756
+tens of millions of human
+
+164
+00:10:46,938 --> 00:10:50,496
+labeled records. So the pipeline will involve
+
+165
+00:10:50,528 --> 00:10:54,484
+some preprocessing. We will then perform some language
+
+166
+00:10:54,532 --> 00:10:57,320
+detection using our own in house framework.
+
+167
+00:10:57,740 --> 00:11:01,588
+The data is then cleaned and tokenized. And lastly
+
+168
+00:11:01,684 --> 00:11:05,000
+we will download embeddings for each token.
+
+169
+00:11:05,080 --> 00:11:09,292
+So embeddings describe these relationships between words and
+
+170
+00:11:09,346 --> 00:11:13,420
+consist of these large vectors. So typically
+
+171
+00:11:13,760 --> 00:11:16,892
+can input file could be, like I said,
+
+172
+00:11:16,946 --> 00:11:20,816
+tens of millions of records and the output file could be
+
+173
+00:11:20,838 --> 00:11:24,816
+over 100gb once we include these embeddings. So to
+
+174
+00:11:24,838 --> 00:11:28,416
+achieve this kind of scale, we need to use a
+
+175
+00:11:28,438 --> 00:11:32,112
+distributed framework. So we are using Apache Spark
+
+176
+00:11:32,256 --> 00:11:35,456
+within spectrum to run this within Argo we're
+
+177
+00:11:35,488 --> 00:11:38,660
+using the Kubernetes spark operator so we can install
+
+178
+00:11:38,730 --> 00:11:42,792
+this as a Kubernetes custom resource and it
+
+179
+00:11:42,846 --> 00:11:47,428
+then allows us these ability to submit
+
+180
+00:11:47,524 --> 00:11:51,092
+spark jobs and it basically orchestrates
+
+181
+00:11:51,236 --> 00:11:55,070
+the creation and the management of the spark job.
+
+182
+00:11:55,600 --> 00:11:59,432
+So now I'm going to walk through a demo of the IRO
+
+183
+00:11:59,496 --> 00:12:03,192
+workflow to show how we use Spark within Argo
+
+184
+00:12:03,256 --> 00:12:06,816
+and these framework that we've created. So to show
+
+185
+00:12:06,838 --> 00:12:10,752
+how we are running Spark within
+
+186
+00:12:10,806 --> 00:12:14,556
+Argo, I'm going to walk through our Iro pipeline which I described
+
+187
+00:12:14,588 --> 00:12:15,200
+above.
+
+188
+00:12:20,380 --> 00:12:24,824
+So our IRO workflow consists of
+
+189
+00:12:24,942 --> 00:12:28,696
+a couple of YAML files and the mainly YAML file references our
+
+190
+00:12:28,718 --> 00:12:31,944
+spark standard workflow template. Then we've also got a SPAC
+
+191
+00:12:31,992 --> 00:12:35,192
+job YAMl file which references our SPaC job templates.
+
+192
+00:12:35,256 --> 00:12:38,864
+What we've done here is we've created these templates that can be used
+
+193
+00:12:38,902 --> 00:12:42,748
+without spectrum for any particular spark job. So you can configure
+
+194
+00:12:42,844 --> 00:12:46,608
+a spark job or spark pipeline with a
+
+195
+00:12:46,614 --> 00:12:50,276
+couple of lines of Yaml and a couple of lines of configuration or
+
+196
+00:12:50,298 --> 00:12:53,904
+values of YAML file. And when this pipeline is in deployed
+
+197
+00:12:53,952 --> 00:12:57,840
+you get a fully scalable spark pipeline.
+
+198
+00:12:57,920 --> 00:13:01,780
+So to explain how that works, I will first show you
+
+199
+00:13:01,850 --> 00:13:05,748
+the spark job template. This spark job template
+
+200
+00:13:05,844 --> 00:13:09,464
+is can argo template like
+
+201
+00:13:09,502 --> 00:13:12,680
+I described earlier on. It's obviously a lot more complicated.
+
+202
+00:13:13,360 --> 00:13:16,664
+In these case you see all the various parameters
+
+203
+00:13:16,792 --> 00:13:20,008
+that are provided at runtime, the number of executors,
+
+204
+00:13:20,184 --> 00:13:24,168
+how much memory, et cetera, et cetera. Down here we've defined the
+
+205
+00:13:24,274 --> 00:13:28,368
+manifest which is used to
+
+206
+00:13:28,454 --> 00:13:32,496
+configure and submit the spark application to
+
+207
+00:13:32,518 --> 00:13:35,712
+the Kubernetes spark operator. So within this we
+
+208
+00:13:35,766 --> 00:13:39,300
+define what image to use. In this case, this defines
+
+209
+00:13:40,840 --> 00:13:44,150
+contains the spark binaries that we're going to use,
+
+210
+00:13:44,680 --> 00:13:47,936
+then contains configuration like location of the SPAC
+
+211
+00:13:47,968 --> 00:13:51,620
+submit job, then the main class to run within.
+
+212
+00:13:51,690 --> 00:13:55,076
+We've got a lot of standard configuration here that a developer doesn't need to worry
+
+213
+00:13:55,108 --> 00:13:58,664
+about. Further down, you have the ability to
+
+214
+00:13:58,702 --> 00:14:02,092
+plug in any custom configuration that you wish that is particular
+
+215
+00:14:02,146 --> 00:14:05,756
+to your particular job. Similarly, you can
+
+216
+00:14:05,778 --> 00:14:09,724
+define your driver, how much
+
+217
+00:14:09,762 --> 00:14:13,710
+memory you want, other custom configurations that you want
+
+218
+00:14:14,020 --> 00:14:17,090
+to plug in your executor as well.
+
+219
+00:14:18,580 --> 00:14:23,052
+Some of these are provided at runtime and others are defined
+
+220
+00:14:23,196 --> 00:14:25,410
+are provide at deploy time.
+
+221
+00:14:28,570 --> 00:14:31,826
+So anything that is defined in your values of YAML
+
+222
+00:14:31,858 --> 00:14:35,254
+file is plugged in at
+
+223
+00:14:35,292 --> 00:14:39,314
+deploy time. So these are typically static configuration
+
+224
+00:14:39,362 --> 00:14:42,750
+values. So we're defining here the job name which contains
+
+225
+00:14:42,850 --> 00:14:46,842
+the batch to these s three bucket, the main class to run, how much
+
+226
+00:14:46,896 --> 00:14:50,058
+memory to use, and then some other
+
+227
+00:14:50,144 --> 00:14:53,606
+configurations like the versions to use of Java and some
+
+228
+00:14:53,648 --> 00:14:58,602
+environment variables. The key parameter
+
+229
+00:14:58,666 --> 00:15:01,998
+here is this process record in milliseconds. This will become a little
+
+230
+00:15:02,004 --> 00:15:05,518
+bit clearer later on, but what this does is defines how long
+
+231
+00:15:05,604 --> 00:15:08,958
+it takes to process an individual record in
+
+232
+00:15:08,964 --> 00:15:12,862
+your spray job. And using this our framework can then elastically
+
+233
+00:15:12,926 --> 00:15:16,398
+scale out how many executors
+
+234
+00:15:16,574 --> 00:15:20,022
+that you need and how big batch of those should be
+
+235
+00:15:20,156 --> 00:15:24,054
+based on the lines that you're looking to process
+
+236
+00:15:24,172 --> 00:15:25,720
+and this particular value.
+
+237
+00:15:27,610 --> 00:15:30,958
+To run this particular iRo workflow we first need to deploy
+
+238
+00:15:30,994 --> 00:15:35,066
+it. So we run the helm command similar to before we
+
+239
+00:15:35,088 --> 00:15:38,700
+provide the values file that we wish to configure with.
+
+240
+00:15:41,950 --> 00:15:46,110
+This renders all the AML files that were defined in our templates and amalgamates
+
+241
+00:15:47,010 --> 00:15:50,714
+the configuration values in our values file
+
+242
+00:15:50,842 --> 00:15:52,190
+with these templates.
+
+243
+00:15:53,970 --> 00:15:58,706
+So if I just go to the very end I will show you the
+
+244
+00:15:58,728 --> 00:16:02,210
+spark template. So in this case
+
+245
+00:16:02,360 --> 00:16:06,062
+we have plugged in some of the all of the configuration
+
+246
+00:16:06,126 --> 00:16:09,394
+items that were in the values file. So you can see here we have
+
+247
+00:16:09,432 --> 00:16:13,506
+defined the path where the s three or where the spark submit
+
+248
+00:16:13,538 --> 00:16:18,354
+job is on s three we've defined the main class further
+
+249
+00:16:18,402 --> 00:16:21,626
+down. You can see here we've plugged in how much memory that we want the
+
+250
+00:16:21,648 --> 00:16:25,450
+driver to have. We have also then provided some
+
+251
+00:16:25,600 --> 00:16:29,770
+configuration for this third party
+
+252
+00:16:30,830 --> 00:16:35,050
+service that the spark application uses
+
+253
+00:16:37,870 --> 00:16:41,454
+to run this in within spectrum we've created our
+
+254
+00:16:41,492 --> 00:16:45,178
+own CLI which takes in a YAmL file.
+
+255
+00:16:45,274 --> 00:16:48,498
+So when I showed the provides demo,
+
+256
+00:16:48,664 --> 00:16:52,658
+you saw that Argo's API is a
+
+257
+00:16:52,744 --> 00:16:55,966
+web service that allows you to pass up a string parameter.
+
+258
+00:16:56,078 --> 00:16:59,670
+So what happens here is we want to provide instructions to
+
+259
+00:16:59,820 --> 00:17:03,094
+a pipeline. We define a YAml file for this
+
+260
+00:17:03,132 --> 00:17:06,406
+particular YAml file we're specifying to use a
+
+261
+00:17:06,428 --> 00:17:09,270
+text cleaner job which maps to iroh.
+
+262
+00:17:09,770 --> 00:17:13,122
+We specify these input location. This is a file
+
+263
+00:17:13,266 --> 00:17:17,050
+that we want to perform processing on that contain a couple of hundred thousand
+
+264
+00:17:17,200 --> 00:17:20,426
+records, the output location and the embeddings to
+
+265
+00:17:20,448 --> 00:17:24,282
+you. So what happens behind the scenes when Argonaut submits
+
+266
+00:17:24,346 --> 00:17:27,726
+this? It will convert this
+
+267
+00:17:27,828 --> 00:17:31,678
+into a GRPC message, or, sorry, a protof message.
+
+268
+00:17:31,844 --> 00:17:34,986
+It will then serialize that as a hex decimal string,
+
+269
+00:17:35,098 --> 00:17:39,118
+pass that up as a string parameter to the workflow,
+
+270
+00:17:39,294 --> 00:17:43,058
+and when the workflow runs, the first step it will do is it
+
+271
+00:17:43,064 --> 00:17:46,866
+will convert that string back into a
+
+272
+00:17:46,888 --> 00:17:50,786
+probable message, which is then passed as a file artifact
+
+273
+00:17:50,898 --> 00:17:54,310
+between all the tasks in the workflow.
+
+274
+00:17:55,690 --> 00:17:59,366
+So to execute this particular workflow, I'm going to
+
+275
+00:17:59,388 --> 00:18:02,490
+submit the job to a dev environment.
+
+276
+00:18:04,830 --> 00:18:07,770
+And this workflow has now been created.
+
+277
+00:18:08,910 --> 00:18:12,010
+So as you can see here, the IRO
+
+278
+00:18:12,350 --> 00:18:14,974
+workflow has kicked off.
+
+279
+00:18:15,172 --> 00:18:18,320
+So I'll show you one that completed earlier on.
+
+280
+00:18:19,650 --> 00:18:23,086
+So as you can see, the pipeline contain quite a
+
+281
+00:18:23,108 --> 00:18:27,022
+few tasks. The first step
+
+282
+00:18:27,076 --> 00:18:31,042
+here is the one that I have mentioned, whereby we convert these
+
+283
+00:18:31,096 --> 00:18:34,526
+string hexadecimal into a file
+
+284
+00:18:34,558 --> 00:18:38,226
+artifact which has been passed down through all the tasks. We do some
+
+285
+00:18:38,248 --> 00:18:42,070
+preprocessing first. This particular pod is the actual
+
+286
+00:18:42,140 --> 00:18:45,670
+spark job. You can see here that it's using
+
+287
+00:18:45,740 --> 00:18:49,362
+five executor instances, each one with 15 cores,
+
+288
+00:18:49,506 --> 00:18:53,434
+and it also specifies the recommended partition count. So we
+
+289
+00:18:53,472 --> 00:18:56,954
+didn't define any of these in our values file. These are
+
+290
+00:18:56,992 --> 00:19:01,046
+calculated at runtime in these particular preprocessing
+
+291
+00:19:01,078 --> 00:19:05,114
+steps. So these two particular tasks here
+
+292
+00:19:05,232 --> 00:19:08,734
+will look at the process record time in milliseconds the size
+
+293
+00:19:08,772 --> 00:19:12,426
+of your file. It will look up our internal
+
+294
+00:19:12,458 --> 00:19:15,870
+catalog to figure out how big this file is,
+
+295
+00:19:15,940 --> 00:19:19,630
+and then it figures out based on that configuration item,
+
+296
+00:19:19,790 --> 00:19:23,634
+it will figure out how big your cluster should
+
+297
+00:19:23,672 --> 00:19:26,994
+be, and it will size it accordingly. We also have
+
+298
+00:19:27,032 --> 00:19:30,694
+some other processing tasks. These for example, there's one
+
+299
+00:19:30,732 --> 00:19:34,418
+here that figures out the optimal number of partitions.
+
+300
+00:19:34,514 --> 00:19:38,230
+We also have one that figures out what node type to use.
+
+301
+00:19:38,300 --> 00:19:42,406
+So we have defined different types
+
+302
+00:19:42,438 --> 00:19:46,006
+of nodes, we've spot instances and we have on demand
+
+303
+00:19:46,038 --> 00:19:48,460
+instances. So depending on the size of your job,
+
+304
+00:19:48,910 --> 00:19:53,450
+we will pick a suitably sized
+
+305
+00:19:55,250 --> 00:19:58,320
+kubernetes node to run the spark job on.
+
+306
+00:20:01,940 --> 00:20:06,448
+So as you can see here, this particular job
+
+307
+00:20:06,614 --> 00:20:10,532
+took nine minutes to run on five
+
+308
+00:20:10,586 --> 00:20:13,780
+executors to process a
+
+309
+00:20:13,850 --> 00:20:17,510
+data sets that's a couple of hundred thousand records in size.
+
+310
+00:20:21,200 --> 00:20:24,656
+So just to reiterate, some of the items I covered in
+
+311
+00:20:24,678 --> 00:20:28,992
+the workflow there. So, to support elastic scalability within
+
+312
+00:20:29,046 --> 00:20:32,640
+our framework, you define how
+
+313
+00:20:32,710 --> 00:20:35,996
+long it will take to process an individual record. In milliseconds,
+
+314
+00:20:36,028 --> 00:20:40,016
+you configure that in your values file from there. Then our preprocessing
+
+315
+00:20:40,048 --> 00:20:43,684
+steps, which run prior to this batch job, will figure
+
+316
+00:20:43,722 --> 00:20:46,896
+out how many records are in your file
+
+317
+00:20:46,928 --> 00:20:50,448
+that you're looking to process. So it'll first query our catalog to see if we've
+
+318
+00:20:50,464 --> 00:20:53,576
+covered cost this file before. If it's not there, these we
+
+319
+00:20:53,598 --> 00:20:57,192
+open up a file and we estimate how many records are in the data
+
+320
+00:20:57,246 --> 00:21:01,156
+set. If the files are too big and they exceed a certain number of gigabytes,
+
+321
+00:21:01,188 --> 00:21:05,544
+then we do an estimate and we take a guess at how many records
+
+322
+00:21:05,592 --> 00:21:09,196
+are in that data set. So from there then we figure out
+
+323
+00:21:09,298 --> 00:21:13,244
+how long in total it would take to process this data set,
+
+324
+00:21:13,362 --> 00:21:17,376
+and we then size our cluster accordingly. So this allows us
+
+325
+00:21:17,478 --> 00:21:22,028
+to elastically scale out our spark cluster
+
+326
+00:21:22,204 --> 00:21:25,636
+depending on the size of your data set and the type of
+
+327
+00:21:25,658 --> 00:21:29,408
+job that you're executing. Within spectrum,
+
+328
+00:21:29,424 --> 00:21:33,332
+we've created our own pipeline framework to simplify the
+
+329
+00:21:33,466 --> 00:21:37,176
+execution, the monitoring, and the development of
+
+330
+00:21:37,198 --> 00:21:40,676
+our pipelines. So as I showed earlier on, we have the Argonaut
+
+331
+00:21:40,708 --> 00:21:44,536
+CLI, which allows you to specify your
+
+332
+00:21:44,638 --> 00:21:47,690
+instructions to your workflow in a
+
+333
+00:21:48,060 --> 00:21:51,896
+user friendly format, whether that's a YAML file or a JSON file that's
+
+334
+00:21:51,928 --> 00:21:55,624
+then converted into a hexadecimal string and pushed
+
+335
+00:21:55,672 --> 00:21:59,176
+up as a string parameter to the argo
+
+336
+00:21:59,288 --> 00:22:03,552
+workflow. So within spectrum, we're primarily a
+
+337
+00:22:03,606 --> 00:22:07,520
+scala shop. We use protobuff as our message
+
+338
+00:22:07,590 --> 00:22:11,756
+format. We have created some libraries
+
+339
+00:22:11,788 --> 00:22:15,172
+that can be used by any task in a
+
+340
+00:22:15,226 --> 00:22:19,156
+workflow to simplify the configuration of a
+
+341
+00:22:19,178 --> 00:22:22,576
+file from a local file
+
+342
+00:22:22,608 --> 00:22:26,336
+and into a protocol message and also, likewise, converting a protocol
+
+343
+00:22:26,368 --> 00:22:30,224
+message back out into a file so that it's then referenced
+
+344
+00:22:30,352 --> 00:22:32,840
+as can Argo artifact.
+
+345
+00:22:33,820 --> 00:22:37,768
+We've also created cron cleanup jobs that can be used to
+
+346
+00:22:37,854 --> 00:22:40,952
+clean up any headless spark applications,
+
+347
+00:22:41,016 --> 00:22:44,376
+or also any long running workflows.
+
+348
+00:22:44,568 --> 00:22:48,444
+On each pod, we have deployed a datadog agent,
+
+349
+00:22:48,562 --> 00:22:51,976
+which will push up metrics and logs to datadogs.
+
+350
+00:22:52,008 --> 00:22:56,252
+We have a centralized location then for troubleshooting our argo workflows.
+
+351
+00:22:56,396 --> 00:22:59,644
+Lastly, we have the ability to run all this locally via minikube.
+
+352
+00:22:59,692 --> 00:23:03,532
+Minikube allows us to run a kubernetes locally and greatly simplifies
+
+353
+00:23:03,676 --> 00:23:07,252
+the development, deployment and testing of these,
+
+354
+00:23:07,306 --> 00:23:10,740
+particularly when it comes to dealing with YaMl files.
+
+355
+00:23:11,880 --> 00:23:15,284
+For the examples I've shown so far, our data scientists will
+
+356
+00:23:15,322 --> 00:23:19,316
+typically kick off an argo workflow manually via
+
+357
+00:23:19,348 --> 00:23:22,904
+the Argonaut CLI. However, in some cases, and as we bring in more
+
+358
+00:23:22,942 --> 00:23:26,164
+scale, we will want to trigger these workflows
+
+359
+00:23:26,212 --> 00:23:29,988
+based on automated events. So Argo events
+
+360
+00:23:30,004 --> 00:23:33,544
+is a framework that allows you to achieve that allows you to register
+
+361
+00:23:33,672 --> 00:23:37,196
+events with Argo and then trigger some
+
+362
+00:23:37,218 --> 00:23:40,344
+actions based on those events. So the classic
+
+363
+00:23:40,392 --> 00:23:43,656
+example here is a file being dropped into an s three bucket and then
+
+364
+00:23:43,698 --> 00:23:47,392
+triggering an event based on that. So in our case, what I'm going to demo
+
+365
+00:23:47,446 --> 00:23:51,516
+next is an argo workflow being triggered
+
+366
+00:23:51,628 --> 00:23:55,036
+based on that event. You can also register other types
+
+367
+00:23:55,068 --> 00:23:58,400
+of events, whether those are kind of message queues, or Kafka
+
+368
+00:23:58,480 --> 00:24:01,350
+is another one that we use.
+
+369
+00:24:04,760 --> 00:24:06,964
+So what I'm going to do here is I'm going to remove a file from
+
+370
+00:24:07,002 --> 00:24:10,484
+the s three bucket, and I am then using to
+
+371
+00:24:10,522 --> 00:24:12,180
+upload that file to the bucket.
+
+372
+00:24:20,640 --> 00:24:24,684
+So, to show you how that works, we have set up argo events here.
+
+373
+00:24:24,802 --> 00:24:28,256
+So with s three. It doesn't work with s three directly for
+
+374
+00:24:28,278 --> 00:24:32,192
+some reason. What we have to do instead is with s three, you have to
+
+375
+00:24:32,326 --> 00:24:36,080
+configure the s three event to trigger an SQS
+
+376
+00:24:36,820 --> 00:24:40,992
+message, which you can then listen
+
+377
+00:24:41,046 --> 00:24:44,224
+to events for. So, in this case, we have defined this template,
+
+378
+00:24:44,352 --> 00:24:48,196
+which will be triggered when an
+
+379
+00:24:48,298 --> 00:24:52,084
+SQS message is put on the particular topic.
+
+380
+00:24:52,132 --> 00:24:55,930
+So what happens here is this piece of code will
+
+381
+00:24:56,620 --> 00:25:00,216
+be invoked when the SQS message is
+
+382
+00:25:00,238 --> 00:25:04,220
+received, and we will translate that message
+
+383
+00:25:04,370 --> 00:25:08,300
+into a protobuff message, and then invoke
+
+384
+00:25:08,640 --> 00:25:10,780
+the IRO pipelines.
+
+385
+00:25:15,380 --> 00:25:19,040
+So, as you can see here, the argo events orchestrator
+
+386
+00:25:19,460 --> 00:25:21,890
+has consumed that event.
+
+387
+00:25:23,780 --> 00:25:26,960
+Just click on this. We get some Elena, you can see here the JSON
+
+388
+00:25:27,300 --> 00:25:30,724
+from the SQS message, and down here you will
+
+389
+00:25:30,762 --> 00:25:34,400
+see the bucket name and the file
+
+390
+00:25:34,560 --> 00:25:36,820
+that was placed in the s three bucket.
+
+391
+00:25:42,400 --> 00:25:45,500
+That in turn these has kicked off the IRO workflow.
+
+392
+00:25:47,360 --> 00:25:50,864
+So within spectrum we find argo workflows and argo lines to be
+
+393
+00:25:50,902 --> 00:25:54,284
+a great fit for our data pipelines. But there are some challenges
+
+394
+00:25:54,332 --> 00:25:58,064
+that we encounter along the way. I think the big one is that the spark
+
+395
+00:25:58,112 --> 00:26:02,228
+operator is not a native aggregate component. So for example,
+
+396
+00:26:02,314 --> 00:26:05,684
+sometimes when you were to kill an agile workflow, it may
+
+397
+00:26:05,722 --> 00:26:09,344
+not always kill the underlying spark job. So in
+
+398
+00:26:09,402 --> 00:26:13,032
+that case we have created our own cron jobs which will kill
+
+399
+00:26:13,086 --> 00:26:17,364
+these kind of headless spark applications. The yaml
+
+400
+00:26:17,412 --> 00:26:19,480
+definitions are cumbersome.
+
+401
+00:26:21,020 --> 00:26:25,204
+Yaml by its definition it's easy to introduce typos,
+
+402
+00:26:25,252 --> 00:26:28,412
+et cetera. So that's where the mini cube setup is really important.
+
+403
+00:26:28,546 --> 00:26:32,216
+We have the ability to run all our pipelines locally and deploy
+
+404
+00:26:32,248 --> 00:26:36,192
+them locally, and that means we can get feedback on these kind of errors in
+
+405
+00:26:36,246 --> 00:26:39,776
+seconds rather than minutes. It's a newer technology.
+
+406
+00:26:39,958 --> 00:26:43,360
+The documentation is quite good, particularly for
+
+407
+00:26:43,430 --> 00:26:47,116
+agro workflows three x, but compared
+
+408
+00:26:47,148 --> 00:26:50,256
+to something like Apache Airflow, there's probably a lot less answers
+
+409
+00:26:50,288 --> 00:26:53,140
+on the lines of stack overflow, et cetera.
+
+410
+00:26:53,960 --> 00:26:57,920
+So it can be a little bit tricky sometimes when you're trying to troubleshoot
+
+411
+00:26:58,000 --> 00:27:02,024
+issues, I think. Lastly then, is the platform tuning for
+
+412
+00:27:02,062 --> 00:27:05,844
+Spark? When you're running Spark on your own Kubernetes
+
+413
+00:27:05,892 --> 00:27:09,876
+infrastructure instead of EMR, there's obviously a lot more configuration required, so we'd
+
+414
+00:27:09,908 --> 00:27:12,920
+set stuff up around claims policies,
+
+415
+00:27:13,580 --> 00:27:17,690
+various node types in particular too. As well, we had custom
+
+416
+00:27:18,380 --> 00:27:22,264
+Spark configuration to allow our jobs to
+
+417
+00:27:22,302 --> 00:27:25,564
+run resiliently on spot
+
+418
+00:27:25,612 --> 00:27:28,992
+instances. So quite a bit there in terms
+
+419
+00:27:29,046 --> 00:27:33,500
+of getting Spark to run efficiently
+
+420
+00:27:33,580 --> 00:27:35,440
+on our own Kubernetes infrastructure.
+
+421
+00:27:36,500 --> 00:27:40,140
+So that concludes my overview of argo workflows
+
+422
+00:27:40,220 --> 00:27:43,740
+and argo events. I'd like now to invite
+
+423
+00:27:43,900 --> 00:27:46,700
+any questions that people may have on the presentation.
+
