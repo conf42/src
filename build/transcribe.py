@@ -72,7 +72,7 @@ for i, (talk, video) in enumerate(missing_transcriptions):
     os.remove(audio_path)
 
     # TODO remove - batch for now
-    if i == 199:
+    if i == 99:
         sys.exit(0)
 
     
