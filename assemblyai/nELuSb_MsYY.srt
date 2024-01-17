@@ -1,0 +1,1304 @@
+1
+00:01:28,370 --> 00:01:31,906
+Welcome everyone. My name is Natan Silnitsky and I'm
+
+2
+00:01:31,938 --> 00:01:35,080
+a backend infrastructure team lead@wix.com.
+
+3
+00:01:35,530 --> 00:01:38,978
+For most of last year, my team at Wix
+
+4
+00:01:39,154 --> 00:01:43,178
+worked on migrating Wix's 2000 microservices
+
+5
+00:01:43,354 --> 00:01:47,082
+from self hosted Kafka clusters. Migrating multi
+
+6
+00:01:47,146 --> 00:01:50,206
+cluster managed Kafka platform. This was
+
+7
+00:01:50,228 --> 00:01:54,066
+the most challenging project I have ever led. So today I
+
+8
+00:01:54,088 --> 00:01:57,506
+want to share with you key to sign decisions. We took
+
+9
+00:01:57,688 --> 00:02:01,266
+some war stories and best practices for this kind
+
+10
+00:02:01,288 --> 00:02:04,530
+of migration. But first
+
+11
+00:02:04,600 --> 00:02:08,390
+a few words about Wix. So Wix is a website
+
+12
+00:02:08,460 --> 00:02:12,210
+building platform that allows you to manage your online presence
+
+13
+00:02:12,370 --> 00:02:15,080
+but also manage your business online.
+
+14
+00:02:16,810 --> 00:02:20,186
+Now, over the last few years, our usage of
+
+15
+00:02:20,208 --> 00:02:24,218
+Kafka has grown tremendously, from around 5000
+
+16
+00:02:24,304 --> 00:02:28,214
+topics and a little bit less than half a billion messages
+
+17
+00:02:28,342 --> 00:02:31,630
+produced per day per cluster in 2019,
+
+18
+00:02:32,210 --> 00:02:35,834
+to over 20,000 topics
+
+19
+00:02:35,962 --> 00:02:39,854
+and more than 2.5 billion messages produced every day
+
+20
+00:02:39,972 --> 00:02:43,138
+in each cluster last year.
+
+21
+00:02:43,304 --> 00:02:47,394
+So this was a very big traffic increase and
+
+22
+00:02:47,432 --> 00:02:50,820
+also a lot of more metadata which really
+
+23
+00:02:51,190 --> 00:02:54,858
+gave our clusters some overloading.
+
+24
+00:02:55,054 --> 00:02:59,606
+And it means that restarts of brokers took longer
+
+25
+00:02:59,788 --> 00:03:03,398
+than we expected and it really started to feel
+
+26
+00:03:03,484 --> 00:03:05,510
+with production impact,
+
+27
+00:03:06,090 --> 00:03:07,910
+adverse production impact.
+
+28
+00:03:09,150 --> 00:03:12,934
+So we decided that we have to first split our clusters
+
+29
+00:03:12,982 --> 00:03:17,866
+to smaller chunks and also manage
+
+30
+00:03:17,968 --> 00:03:21,654
+this more efficiently by moving this
+
+31
+00:03:21,712 --> 00:03:24,800
+to the cloud. Moving the Kafka clusters to the cloud.
+
+32
+00:03:25,250 --> 00:03:28,894
+So why did we do that? Why did it decide it?
+
+33
+00:03:29,092 --> 00:03:32,454
+With manage Kafka Cloud Poem and we these confluent
+
+34
+00:03:32,522 --> 00:03:35,810
+cloud you get better cluster performance and flexibility.
+
+35
+00:03:36,630 --> 00:03:40,222
+You have experts at confluent that balance
+
+36
+00:03:40,286 --> 00:03:44,030
+your brokers and achieve the most efficient capacity
+
+37
+00:03:44,110 --> 00:03:47,474
+needed. So you can increase capacity and shrink it really easily.
+
+38
+00:03:47,522 --> 00:03:51,122
+If you need transparent Kafka version upgrades,
+
+39
+00:03:51,266 --> 00:03:54,434
+you get all the bug fixes for free without any risk.
+
+40
+00:03:54,482 --> 00:03:58,966
+During deployments it's really easy to add new clusters,
+
+41
+00:03:59,158 --> 00:04:02,730
+you just click a few buttons and confluent cloud
+
+42
+00:04:02,800 --> 00:04:07,062
+also offers tiered storage so you can have much more retention
+
+43
+00:04:07,126 --> 00:04:10,266
+of your messages for more than a week for as
+
+44
+00:04:10,288 --> 00:04:14,158
+long as you want, basically, and you are not limited by disk space
+
+45
+00:04:14,324 --> 00:04:18,110
+and you don't even manage it, it's just there
+
+46
+00:04:18,260 --> 00:04:22,030
+they use s these and it works great with great performance.
+
+47
+00:04:23,670 --> 00:04:27,550
+At Wix we use our own Kafka client
+
+48
+00:04:27,710 --> 00:04:31,246
+which is called Greyhound and it's
+
+49
+00:04:31,438 --> 00:04:36,214
+an SDK on top of the Kafka client SDK and
+
+50
+00:04:36,252 --> 00:04:40,326
+it serves as a library for our jvm services with
+
+51
+00:04:40,348 --> 00:04:43,606
+Scala and Java or Greyhound also serves as a
+
+52
+00:04:43,628 --> 00:04:46,834
+service to work with Kafka for non jvm
+
+53
+00:04:46,882 --> 00:04:49,850
+stack like node and go and Python.
+
+54
+00:04:50,270 --> 00:04:53,974
+So what Greyhound does, it wraps these Kafka producer
+
+55
+00:04:54,022 --> 00:04:57,942
+and Kafka consumer with its own API,
+
+56
+00:04:58,006 --> 00:05:01,182
+which is really easy to use and offers a lot of cool
+
+57
+00:05:01,236 --> 00:05:04,270
+features. For Wix's 2000 microservices,
+
+58
+00:05:05,890 --> 00:05:10,110
+for example, we have the ecom flow and we have a checkout service
+
+59
+00:05:10,260 --> 00:05:14,254
+that produces some event the checkout has completed
+
+60
+00:05:14,382 --> 00:05:17,758
+and then payment service gets notification
+
+61
+00:05:17,854 --> 00:05:19,890
+and does some payment processing.
+
+62
+00:05:22,470 --> 00:05:26,502
+So today we're going to see how we decided to split our
+
+63
+00:05:26,556 --> 00:05:30,390
+cluster into multiple clusters, how developers choose
+
+64
+00:05:30,460 --> 00:05:34,226
+which cluster to work with and how they do it. Then we'll
+
+65
+00:05:34,258 --> 00:05:37,870
+talk about the migration, the design of the migration
+
+66
+00:05:37,970 --> 00:05:41,242
+and best practices, and we'll complete things.
+
+67
+00:05:41,296 --> 00:05:44,714
+Talk with what you can expect, some war stories and
+
+68
+00:05:44,752 --> 00:05:45,900
+stuff like that.
+
+69
+00:05:48,190 --> 00:05:51,786
+So a single cluster became overloaded, like I said,
+
+70
+00:05:51,968 --> 00:05:55,546
+and we decided that it's time to split
+
+71
+00:05:55,578 --> 00:05:59,578
+it. So in each data center we has only one single cluster
+
+72
+00:05:59,674 --> 00:06:03,102
+where you produce and consume two. Of course there has also replication between
+
+73
+00:06:03,156 --> 00:06:06,254
+dcs, but here we are targeting
+
+74
+00:06:06,302 --> 00:06:10,322
+a single data center. So for
+
+75
+00:06:10,376 --> 00:06:14,482
+data centers that had more traffic than others, we decided to add more
+
+76
+00:06:14,536 --> 00:06:18,210
+clusters and we split the clusters according to SLA.
+
+77
+00:06:18,370 --> 00:06:22,594
+So different clusters had in charge of different flows
+
+78
+00:06:22,722 --> 00:06:25,942
+and different types of wix users in order to
+
+79
+00:06:25,996 --> 00:06:29,820
+reduce the blast radius in case of something happening,
+
+80
+00:06:30,190 --> 00:06:33,914
+something happening in production. Now if
+
+81
+00:06:33,952 --> 00:06:37,660
+a developer Wix wants to produce some domain event,
+
+82
+00:06:38,110 --> 00:06:41,786
+then how does she choose the cluster?
+
+83
+00:06:41,978 --> 00:06:45,834
+So it's really simple with Greyhound
+
+84
+00:06:45,882 --> 00:06:49,694
+API that we have, we can
+
+85
+00:06:49,812 --> 00:06:53,762
+alter it as much as we want. So we just added really
+
+86
+00:06:53,816 --> 00:06:56,962
+simply to the consumer spec API and
+
+87
+00:06:57,016 --> 00:07:00,626
+producer spec. Just add the logical cluster name
+
+88
+00:07:00,728 --> 00:07:04,900
+and then you're done. And if a developer wants to know
+
+89
+00:07:07,450 --> 00:07:11,414
+which cluster these topic is deployed in, then just go to our
+
+90
+00:07:11,452 --> 00:07:15,480
+back office, select the topic or type it,
+
+91
+00:07:17,630 --> 00:07:21,526
+and then they can see the cluster
+
+92
+00:07:21,558 --> 00:07:25,114
+of this topic so they can start specifying it and consuming from
+
+93
+00:07:25,152 --> 00:07:28,490
+it. Great, so now
+
+94
+00:07:28,560 --> 00:07:31,280
+let's talk about the migration itself.
+
+95
+00:07:32,210 --> 00:07:37,034
+So we started off in a bad place with overloaded
+
+96
+00:07:37,082 --> 00:07:41,022
+clusters that had unbalanced brokers between them,
+
+97
+00:07:41,156 --> 00:07:45,054
+an unclear Kafka strategy. Do we maintain it ourselves?
+
+98
+00:07:45,182 --> 00:07:48,978
+Do we move to the cloud? Do we
+
+99
+00:07:48,984 --> 00:07:52,850
+have enough expertise? Too many partitions
+
+100
+00:07:53,270 --> 00:07:57,190
+with huge scale and real production impact.
+
+101
+00:07:57,530 --> 00:08:01,414
+So we made a decision to move to a multicluster and
+
+102
+00:08:01,452 --> 00:08:05,222
+managed environment. First we thought
+
+103
+00:08:05,356 --> 00:08:09,382
+that we're going to completely drain the data center or region
+
+104
+00:08:09,526 --> 00:08:12,694
+before we switch over producers and consumers,
+
+105
+00:08:12,822 --> 00:08:15,962
+which meant that the switching itself would be dead simple.
+
+106
+00:08:16,016 --> 00:08:18,300
+You don't have any traffic to worry about.
+
+107
+00:08:19,550 --> 00:08:23,066
+But this plan was canceled as we learned
+
+108
+00:08:23,098 --> 00:08:26,894
+that these are data centers where services had
+
+109
+00:08:26,932 --> 00:08:30,960
+to rely only on being a single data center and also
+
+110
+00:08:31,970 --> 00:08:35,150
+it can be quite risky to just switch.
+
+111
+00:08:35,310 --> 00:08:38,686
+Maybe there's some edge cases that we are not familiar
+
+112
+00:08:38,718 --> 00:08:42,274
+with, so switching an entire data center could
+
+113
+00:08:42,312 --> 00:08:45,734
+be quite risky once traffic comes back. It's not
+
+114
+00:08:45,772 --> 00:08:49,686
+gradual and the longer we wait
+
+115
+00:08:49,868 --> 00:08:53,574
+with getting traffic back, the riskier this whole plan is
+
+116
+00:08:53,612 --> 00:08:57,454
+for weeks. So instead we decided that we're going to migrate
+
+117
+00:08:57,522 --> 00:09:00,598
+with traffic incoming to producers
+
+118
+00:09:00,614 --> 00:09:03,962
+and consumers, which meant that it had to be
+
+119
+00:09:04,016 --> 00:09:08,138
+seamless, meaning that should be simple even though
+
+120
+00:09:08,304 --> 00:09:11,902
+that you migrate with
+
+121
+00:09:11,956 --> 00:09:16,126
+incoming traffic so you don't want to lose any messages and
+
+122
+00:09:16,148 --> 00:09:19,534
+it has to be production safe. If in case
+
+123
+00:09:19,652 --> 00:09:23,470
+some rollback is needed these it should be readily available
+
+124
+00:09:23,540 --> 00:09:27,106
+and really easy to do. So I
+
+125
+00:09:27,128 --> 00:09:30,786
+understood that we're going to need to have as much automation in
+
+126
+00:09:30,808 --> 00:09:34,754
+place for the migration process as possible in order to make it
+
+127
+00:09:34,792 --> 00:09:38,610
+smooth, seamless and safe, and not rely
+
+128
+00:09:38,690 --> 00:09:43,474
+on laborious human interaction
+
+129
+00:09:43,522 --> 00:09:44,470
+and actions.
+
+130
+00:09:47,390 --> 00:09:51,798
+We could here with this automatic migration utilize
+
+131
+00:09:51,814 --> 00:09:56,006
+the fact that we have greyhound, which is our own layer
+
+132
+00:09:56,038 --> 00:09:59,734
+on top of Kafka, so we can request
+
+133
+00:09:59,782 --> 00:10:03,102
+greyhound to actually do these migration for us.
+
+134
+00:10:03,156 --> 00:10:06,510
+Migrate from self hosted Kafka cluster,
+
+135
+00:10:07,090 --> 00:10:10,590
+consuming from that and start consuming from confluent cloud.
+
+136
+00:10:10,740 --> 00:10:13,230
+Same situation with our producers.
+
+137
+00:10:14,790 --> 00:10:18,690
+In order to not lose any messages while switching over
+
+138
+00:10:18,760 --> 00:10:22,626
+and consuming from confluent cloud, we decided we're going to
+
+139
+00:10:22,648 --> 00:10:26,626
+have a replication service that first replicates
+
+140
+00:10:26,658 --> 00:10:30,434
+these messages from the self hosted Kafka cluster to confluent
+
+141
+00:10:30,482 --> 00:10:34,434
+cloud. So how does it work? First it consumes
+
+142
+00:10:34,482 --> 00:10:38,314
+messages from the self hosted cluster in
+
+143
+00:10:38,352 --> 00:10:42,582
+each partition. Then it produces the messages
+
+144
+00:10:42,726 --> 00:10:46,506
+to the target partition in console and cloud in
+
+145
+00:10:46,528 --> 00:10:50,394
+the correct cluster. And it also saves offsets
+
+146
+00:10:50,442 --> 00:10:54,026
+mapping. So offsets mapping allows
+
+147
+00:10:54,058 --> 00:10:57,550
+these consumer to start off from the exact point
+
+148
+00:10:57,620 --> 00:11:01,438
+it needs to when it starts consuming from console and cloud.
+
+149
+00:11:01,604 --> 00:11:05,854
+So for instance, if the last committed message in the self hosted cluster
+
+150
+00:11:05,902 --> 00:11:09,170
+was an offset 57 of this partition,
+
+151
+00:11:09,510 --> 00:11:13,042
+these replicator server says that it
+
+152
+00:11:13,096 --> 00:11:16,978
+should start off from the first non
+
+153
+00:11:16,994 --> 00:11:20,806
+committed message in console and cloud. So the mapping is five,
+
+154
+00:11:20,988 --> 00:11:24,326
+from 57 to five. That means that the consumer will
+
+155
+00:11:24,348 --> 00:11:25,880
+start from offset wix.
+
+156
+00:11:28,190 --> 00:11:31,482
+In addition, we had our migration orchestrator service
+
+157
+00:11:31,616 --> 00:11:35,174
+that sent but requests to replicator
+
+158
+00:11:35,222 --> 00:11:38,890
+service to replicate all topics of the
+
+159
+00:11:38,960 --> 00:11:42,198
+consumer groups that we are migrating and also sends
+
+160
+00:11:42,214 --> 00:11:46,430
+out the requests for greyhound. So how does it work? In practice?
+
+161
+00:11:47,010 --> 00:11:50,574
+When you want to migrate a consumer, you first replicate to
+
+162
+00:11:50,612 --> 00:11:54,266
+confluent. So migration orchestrator sends but
+
+163
+00:11:54,308 --> 00:11:58,226
+a request to the replicator service for all the topics and they
+
+164
+00:11:58,248 --> 00:12:02,274
+are replicated and the service makes sure
+
+165
+00:12:02,392 --> 00:12:06,470
+and the scripts that are running the migration make sure that there are no lags.
+
+166
+00:12:07,290 --> 00:12:11,842
+These migration orchestrator requests
+
+167
+00:12:11,986 --> 00:12:15,702
+greyhound in the relevant services through
+
+168
+00:12:15,836 --> 00:12:19,686
+Kafka topic of course everything here is event driven
+
+169
+00:12:19,878 --> 00:12:23,350
+to unsubscribe from self hosted Kafka cluster.
+
+170
+00:12:23,510 --> 00:12:26,970
+Once the migration orchestrator finds that
+
+171
+00:12:27,040 --> 00:12:30,526
+there are no longer any pods that are subscribed to
+
+172
+00:12:30,548 --> 00:12:34,718
+the self hosted Kafka cluster, then it then
+
+173
+00:12:34,804 --> 00:12:38,522
+can safely request Greyhound to subscribe to confluent,
+
+174
+00:12:38,666 --> 00:12:42,602
+of course utilizing the offsets that were
+
+175
+00:12:42,676 --> 00:12:45,854
+saved by the replicator service. So Greyhound
+
+176
+00:12:45,982 --> 00:12:50,126
+these starts off the subscription to consolid
+
+177
+00:12:50,238 --> 00:12:53,602
+from the correct offsets that it needs to so no
+
+178
+00:12:53,656 --> 00:12:56,962
+message is lost and also no message is duplicated.
+
+179
+00:12:57,026 --> 00:13:00,306
+Processing in case of any unexpected
+
+180
+00:13:00,338 --> 00:13:04,882
+failure, the migration orchestrator will stop, the script will alert,
+
+181
+00:13:05,026 --> 00:13:07,982
+and then the script runner,
+
+182
+00:13:08,146 --> 00:13:12,518
+the person can activate automatic rollback
+
+183
+00:13:12,614 --> 00:13:16,486
+to switch back safely to the self hosted Kafka cluster
+
+184
+00:13:16,598 --> 00:13:21,882
+where there may be a little bit duplicate and
+
+185
+00:13:22,016 --> 00:13:25,920
+it's a simpler story for process so I won't repeat it. You just
+
+186
+00:13:26,610 --> 00:13:30,190
+switch the state of producer and then restart the service.
+
+187
+00:13:30,260 --> 00:13:34,194
+So it then produces to the new cluster some best
+
+188
+00:13:34,232 --> 00:13:38,322
+practices. Make sure that you create
+
+189
+00:13:38,456 --> 00:13:41,810
+a migration script that checks state by itself
+
+190
+00:13:41,960 --> 00:13:44,740
+so it have as automatic as possible.
+
+191
+00:13:45,290 --> 00:13:48,994
+But if it sees some unexpected
+
+192
+00:13:49,042 --> 00:13:52,854
+state, it stops the migration. It doesn't do any
+
+193
+00:13:52,892 --> 00:13:56,754
+auto healing by itself in order because we deem that too risky.
+
+194
+00:13:56,882 --> 00:14:00,826
+It alerts the person that's selfrunning the script and then the
+
+195
+00:14:00,848 --> 00:14:04,762
+person has tools available for
+
+196
+00:14:04,816 --> 00:14:08,346
+him or her to actually roll back the
+
+197
+00:14:08,368 --> 00:14:12,014
+migration. So these rollback has to be readily available
+
+198
+00:14:12,212 --> 00:14:15,646
+even if you're starting off and you want
+
+199
+00:14:15,668 --> 00:14:19,914
+to check all these flows of forward and backward switching
+
+200
+00:14:19,962 --> 00:14:23,906
+of clusters with test topics. So you want
+
+201
+00:14:23,928 --> 00:14:28,450
+to make sure that you don't actually have production impact
+
+202
+00:14:28,950 --> 00:14:33,102
+when you start off. If you want to have real production
+
+203
+00:14:33,166 --> 00:14:36,726
+traffic, you can actually relayed the traffic to the
+
+204
+00:14:36,748 --> 00:14:40,374
+test topic. So you consume from the real production topic and
+
+205
+00:14:40,412 --> 00:14:44,178
+then you produce the traffic to the test topic
+
+206
+00:14:44,274 --> 00:14:47,560
+and you migrate the test topic so you have
+
+207
+00:14:48,190 --> 00:14:51,450
+safe migration at first without
+
+208
+00:14:51,520 --> 00:14:54,700
+any production impact, but with real production data.
+
+209
+00:14:55,790 --> 00:14:59,938
+And of course you have all kinds of monitoring dashboards,
+
+210
+00:14:59,974 --> 00:15:03,370
+I'm sure already. But it's really important to create dedicated
+
+211
+00:15:03,450 --> 00:15:07,326
+custom matrix dashboards for the migration itself
+
+212
+00:15:07,508 --> 00:15:11,146
+that show only the information that is required
+
+213
+00:15:11,258 --> 00:15:15,010
+for the person running the script to make sure that
+
+214
+00:15:15,080 --> 00:15:18,418
+everything has turned out correctly in a
+
+215
+00:15:18,424 --> 00:15:21,460
+single quick glance. Really, really important.
+
+216
+00:15:24,230 --> 00:15:28,006
+Okay, so we talked a little bit about the migration. Now let's move on
+
+217
+00:15:28,028 --> 00:15:31,670
+to the final part of the talk, which is a little bit about war
+
+218
+00:15:31,740 --> 00:15:33,480
+stories and what to expect.
+
+219
+00:15:34,970 --> 00:15:38,554
+So our replicator service started replicating more and
+
+220
+00:15:38,592 --> 00:15:42,662
+more topics, and we couldn't just stop replicating
+
+221
+00:15:42,726 --> 00:15:46,234
+these topics very fast because in order to stop
+
+222
+00:15:46,272 --> 00:15:49,706
+replication, we first have to migrate all of the
+
+223
+00:15:49,728 --> 00:15:53,226
+topics producers. And in order to migrate the topic producer,
+
+224
+00:15:53,338 --> 00:15:57,280
+we first needed to migrate all of the consumers from all the services.
+
+225
+00:15:57,650 --> 00:16:00,894
+So that's a situation that took us a little bit more
+
+226
+00:16:00,932 --> 00:16:05,198
+time, which meant that more and more topics were getting subscribed
+
+227
+00:16:05,214 --> 00:16:09,714
+to by the replicator consumer group and it
+
+228
+00:16:09,752 --> 00:16:13,406
+started to become risky. And indeed
+
+229
+00:16:13,438 --> 00:16:16,886
+at some point we noticed an
+
+230
+00:16:16,908 --> 00:16:20,662
+alert that replication has completely stopped and
+
+231
+00:16:20,716 --> 00:16:24,214
+there is an unexpected error from sync group. So we
+
+232
+00:16:24,252 --> 00:16:28,082
+learned that one of the probable causes
+
+233
+00:16:28,226 --> 00:16:32,802
+is that the message maximal
+
+234
+00:16:32,866 --> 00:16:36,886
+size in the protocol between these consumer group and the Kafka broker
+
+235
+00:16:36,998 --> 00:16:41,242
+may be too small for all these partitions that are being relayed
+
+236
+00:16:41,386 --> 00:16:44,638
+by this consumer group. So we went over
+
+237
+00:16:44,724 --> 00:16:48,890
+and called this dynamic command to actually increase
+
+238
+00:16:49,050 --> 00:16:53,014
+the amount of message max bytes from 1 megabytes,
+
+239
+00:16:53,162 --> 00:16:56,626
+and this actually helped and replication resumed and we were
+
+240
+00:16:56,648 --> 00:17:00,190
+happy. Then on Christmas Eve
+
+241
+00:17:00,270 --> 00:17:03,538
+2021, the same error happened
+
+242
+00:17:03,624 --> 00:17:07,414
+again, but we weren't worried because we knew that we
+
+243
+00:17:07,452 --> 00:17:11,480
+can fix it. So we
+
+244
+00:17:12,890 --> 00:17:16,818
+again increased the message max bytes
+
+245
+00:17:16,914 --> 00:17:20,678
+property in Kafka config script from four megabytes
+
+246
+00:17:20,694 --> 00:17:23,740
+to eight megabytes because we knew that can solve it.
+
+247
+00:17:24,270 --> 00:17:27,114
+Then something completely unexpected happened.
+
+248
+00:17:27,312 --> 00:17:31,306
+Kafka records started getting deleted from the Kafka brokers
+
+249
+00:17:31,418 --> 00:17:35,034
+much faster than expected. And also for compacted
+
+250
+00:17:35,082 --> 00:17:38,302
+topics where records are deleted not
+
+251
+00:17:38,356 --> 00:17:41,770
+because they are old in time, but because they are stale
+
+252
+00:17:41,850 --> 00:17:45,346
+in value, like a storage topic that is
+
+253
+00:17:45,368 --> 00:17:49,186
+kind of storage. So this is really worrying because
+
+254
+00:17:49,368 --> 00:17:52,820
+some of these kafka topics were the source of truth for this data.
+
+255
+00:17:53,990 --> 00:17:57,558
+And thankfully we didn't do the change in
+
+256
+00:17:57,644 --> 00:18:00,840
+the configuration that caused the situation
+
+257
+00:18:01,210 --> 00:18:04,742
+in all the data centers. So we were able
+
+258
+00:18:04,796 --> 00:18:08,186
+to restore records from another data center. So we
+
+259
+00:18:08,208 --> 00:18:11,754
+were very lucky on this regard. And then
+
+260
+00:18:11,792 --> 00:18:16,422
+we dug up and understood that there is a bug in Kafka.
+
+261
+00:18:16,566 --> 00:18:21,774
+In certain versions. If you see here where if
+
+262
+00:18:21,812 --> 00:18:25,450
+you change these configuration dynamically twice,
+
+263
+00:18:25,610 --> 00:18:28,762
+it reverts the log configuration to be the default.
+
+264
+00:18:28,906 --> 00:18:33,014
+So no matter what your topics configuration that you specify,
+
+265
+00:18:33,162 --> 00:18:36,942
+it's cleanup policy compact or your retention
+
+266
+00:18:37,006 --> 00:18:41,058
+time, it just reverts to the defaults for the entire
+
+267
+00:18:41,144 --> 00:18:44,830
+cluster. Meaning that in order to fix this situation,
+
+268
+00:18:45,000 --> 00:18:49,014
+we had to go and place a change of dummy value for
+
+269
+00:18:49,052 --> 00:18:53,094
+each of the topic configurations in order to make sure that
+
+270
+00:18:53,212 --> 00:18:56,520
+the bug is mitigated completely.
+
+271
+00:18:58,490 --> 00:19:02,466
+And then we said, okay, no more changing any dynamic
+
+272
+00:19:02,498 --> 00:19:06,546
+configuration. We just added more consumer
+
+273
+00:19:06,578 --> 00:19:10,206
+group shards for these replicator service. So each
+
+274
+00:19:10,228 --> 00:19:14,158
+of this consumer group worked on a different set of topics that
+
+275
+00:19:14,244 --> 00:19:17,786
+they replicated. And indeed this allowed
+
+276
+00:19:17,818 --> 00:19:21,054
+us to have the scale that we needed and no
+
+277
+00:19:21,092 --> 00:19:24,526
+more issues with the replication and we finished
+
+278
+00:19:24,558 --> 00:19:26,210
+the migration successfully.
+
+279
+00:19:28,230 --> 00:19:32,354
+And now that we have the migration infrastructure in place,
+
+280
+00:19:32,552 --> 00:19:36,642
+we knew that this can actually help us in a lot of non migrating related
+
+281
+00:19:36,706 --> 00:19:40,114
+features. For instance, we can actually request
+
+282
+00:19:40,162 --> 00:19:44,338
+Greyhound from outside the service to switch to a different cluster
+
+283
+00:19:44,434 --> 00:19:48,870
+if the previous cluster was assigned by mistake or it's no longer relevant.
+
+284
+00:19:49,030 --> 00:19:52,986
+We can also request Greyhound to skip messages in case there
+
+285
+00:19:53,008 --> 00:19:56,874
+was some data corruption or some
+
+286
+00:19:56,912 --> 00:20:00,118
+issue with old messages that shouldn't be processed anymore.
+
+287
+00:20:00,214 --> 00:20:03,966
+We can just skip it and request Greyhound to do that,
+
+288
+00:20:04,148 --> 00:20:07,662
+or we can request Greyhound to change the processing rate
+
+289
+00:20:07,716 --> 00:20:11,034
+in each of the pods. So Greyhound allows
+
+290
+00:20:11,082 --> 00:20:14,740
+parallel processing and you can limit it or extend it
+
+291
+00:20:16,310 --> 00:20:19,486
+by what's your relevant use case if you don't
+
+292
+00:20:19,518 --> 00:20:23,266
+want to hurt your database because
+
+293
+00:20:23,448 --> 00:20:27,458
+it has partial performance. So you can really
+
+294
+00:20:27,544 --> 00:20:31,026
+reduce the processing rate and you can do all of that externally
+
+295
+00:20:31,058 --> 00:20:34,342
+to the service where you don't need to change any code, you don't need to
+
+296
+00:20:34,396 --> 00:20:38,454
+ga any service, you just send out commands via
+
+297
+00:20:38,502 --> 00:20:42,140
+some back office, which we're really excited about that.
+
+298
+00:20:42,990 --> 00:20:46,742
+So to summarize, we switched and migrated
+
+299
+00:20:46,886 --> 00:20:50,326
+from single cluster topology in each of our data centers,
+
+300
+00:20:50,438 --> 00:20:54,430
+which we self hosted and managed to a multi cluster
+
+301
+00:20:54,770 --> 00:20:58,318
+confluent cloud managed cloud platform which is completely
+
+302
+00:20:58,404 --> 00:21:02,342
+optimized for us. And we used greyhound,
+
+303
+00:21:02,506 --> 00:21:06,322
+our Kafka client own Kafka client layer and
+
+304
+00:21:06,376 --> 00:21:10,606
+dedicated orchestration services and scripts to have automation
+
+305
+00:21:10,718 --> 00:21:13,170
+safe and gradual migrating.
+
+306
+00:21:14,470 --> 00:21:18,242
+Now if you want to dig deeper into how we perform the migration,
+
+307
+00:21:18,386 --> 00:21:22,358
+you can actually check out this blog post I written to give
+
+308
+00:21:22,364 --> 00:21:26,040
+you more information. This is the link
+
+309
+00:21:26,810 --> 00:21:30,394
+and you can
+
+310
+00:21:30,432 --> 00:21:34,170
+also check out ground which is an open source library
+
+311
+00:21:34,670 --> 00:21:38,362
+that has a lot of cool features like I mentioned,
+
+312
+00:21:38,416 --> 00:21:41,774
+parallel processing, but also these
+
+313
+00:21:41,812 --> 00:21:45,290
+ability to have all kinds of retry policies,
+
+314
+00:21:45,370 --> 00:21:49,840
+both of the consumer and the producer, in case you
+
+315
+00:21:50,210 --> 00:21:53,470
+have potential processing errors and you want to successfully
+
+316
+00:21:53,630 --> 00:21:57,806
+complete processing eventually, and all kinds of other cool features
+
+317
+00:21:57,918 --> 00:22:01,298
+like user context propagation and all kinds of
+
+318
+00:22:01,384 --> 00:22:05,666
+other features. So I highly recommend you to check it out and
+
+319
+00:22:05,688 --> 00:22:09,414
+I want to thank you very much. And you can find all the slides in
+
+320
+00:22:09,452 --> 00:22:14,646
+Slideshare and the links I've shared. And you can check out my website@natansale.com
+
+321
+00:22:14,748 --> 00:22:18,198
+to find out other blog posts I've written and
+
+322
+00:22:18,284 --> 00:22:22,178
+other conference talks I gave and you can follow me on Twitter
+
+323
+00:22:22,274 --> 00:22:25,318
+and LinkedIn in order to get updates on everything.
+
+324
+00:22:25,404 --> 00:22:29,234
+Our data streams team at Wix are up to around Kafka,
+
+325
+00:22:29,282 --> 00:22:33,146
+around in architecture and also about software engineering
+
+326
+00:22:33,258 --> 00:22:36,800
+best practices in general. So thank you again.
+

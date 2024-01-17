@@ -1,0 +1,1068 @@
+1
+00:02:15,000 --> 00:02:19,104
+Hello. I'm here today to talk about exposing
+
+2
+00:02:19,152 --> 00:02:23,172
+log metrics to Prometheus with the best practice possible. I mean
+
+3
+00:02:23,306 --> 00:02:27,220
+industry standard. I mean, there are a couple of ways to play around
+
+4
+00:02:27,290 --> 00:02:30,948
+moving log metrics to Prometheus, but we're going
+
+5
+00:02:30,954 --> 00:02:34,276
+to highlight a couple of best practices today and I really
+
+6
+00:02:34,298 --> 00:02:37,628
+do hope you enjoy the conversation. By the
+
+7
+00:02:37,634 --> 00:02:39,390
+way, welcome to conf 42.
+
+8
+00:02:40,800 --> 00:02:44,316
+This is about me. I'm an infrastructure engineer. I work with o
+
+9
+00:02:44,338 --> 00:02:48,556
+one labs. I work with the velocity team. So I
+
+10
+00:02:48,578 --> 00:02:52,236
+am involved in ensuring that code developers code
+
+11
+00:02:52,258 --> 00:02:56,604
+get to production as fast as possible. The name of our product is Mina protocol.
+
+12
+00:02:56,732 --> 00:03:00,336
+That's my Twitter handle and that is my email, so you can reach out
+
+13
+00:03:00,358 --> 00:03:03,396
+to me anytime. Well, let's get to what
+
+14
+00:03:03,418 --> 00:03:07,156
+we have to do today. This is an introduction. In this
+
+15
+00:03:07,178 --> 00:03:11,684
+age of fastgrowing, advancement in the cloud and
+
+16
+00:03:11,722 --> 00:03:15,044
+debugging of applications and managing of services in the cloud,
+
+17
+00:03:15,242 --> 00:03:19,076
+there is very serious need for us to understand how logs
+
+18
+00:03:19,108 --> 00:03:22,792
+and metrics works. The software engineering field
+
+19
+00:03:22,846 --> 00:03:26,436
+is not built one way. It's not built for you to just garbage
+
+20
+00:03:26,468 --> 00:03:29,736
+in and garbage out. Some things have to happen in the process for it for
+
+21
+00:03:29,758 --> 00:03:32,668
+you to get to where you need to get to. I'll give you an example.
+
+22
+00:03:32,834 --> 00:03:34,750
+Assuming you need to build a house,
+
+23
+00:03:36,000 --> 00:03:38,268
+there'll be need for you to do some testing, there'll be need for you to
+
+24
+00:03:38,274 --> 00:03:41,888
+do load testing, there will be need for you to ensure that the size of
+
+25
+00:03:41,894 --> 00:03:45,228
+concrete for a certain place is required for that certain spot.
+
+26
+00:03:45,324 --> 00:03:48,444
+So it's the same thing in software
+
+27
+00:03:48,492 --> 00:03:52,224
+engineering. It's not a straightforward thing. At some point
+
+28
+00:03:52,262 --> 00:03:55,812
+you got to understand why some setting things fails and
+
+29
+00:03:55,946 --> 00:03:59,572
+how you could correct those issues. And that's where log metrics come
+
+30
+00:03:59,626 --> 00:04:03,284
+into play. I mean, it's a huge part of observability and
+
+31
+00:04:03,322 --> 00:04:06,952
+it's a huge part of the success of any running application.
+
+32
+00:04:07,086 --> 00:04:10,250
+So we're going to talk about different things, about understanding your system,
+
+33
+00:04:11,580 --> 00:04:14,936
+creating postmortem analysis from what you studied in the logs and
+
+34
+00:04:14,958 --> 00:04:17,880
+metrics, and yeah, several other functions.
+
+35
+00:04:19,100 --> 00:04:22,476
+There are tons of ways to ship log and metrics of Prometheus. But today our
+
+36
+00:04:22,498 --> 00:04:26,220
+case study is vector. Vector Dev is a very interesting
+
+37
+00:04:26,290 --> 00:04:29,644
+product and by the time I'm done breaking down certain things,
+
+38
+00:04:29,682 --> 00:04:33,296
+you would see the importance of using vector. Wherefore what this
+
+39
+00:04:33,318 --> 00:04:36,556
+picture is explaining is the server, the pipeline,
+
+40
+00:04:36,588 --> 00:04:39,644
+and then Prometheus. So we have the server,
+
+41
+00:04:39,692 --> 00:04:43,590
+which is the blue stuff, and then you have the pipeline where actually
+
+42
+00:04:44,200 --> 00:04:48,084
+the application runs to and then Prometheus. So in this case, we're talking about
+
+43
+00:04:48,202 --> 00:04:51,876
+the logs and metrics in the pipeline before it gets to
+
+44
+00:04:52,058 --> 00:04:53,220
+Prometheus.
+
+45
+00:04:55,880 --> 00:04:59,224
+Some of the real life edge cases that are concerned with what we're talking about
+
+46
+00:04:59,262 --> 00:05:02,728
+today is one reduction of total observability cost.
+
+47
+00:05:02,814 --> 00:05:06,088
+Well, you could say the advantage, but I like to see it as
+
+48
+00:05:06,094 --> 00:05:11,512
+a use case. And when it comes to observability, cost revamping
+
+49
+00:05:11,576 --> 00:05:14,956
+or follow up, then I think what we are
+
+50
+00:05:14,978 --> 00:05:18,556
+discussing today is very important. Secondly, if you
+
+51
+00:05:18,578 --> 00:05:21,864
+want to improve observability, performance totally, and reliability,
+
+52
+00:05:21,992 --> 00:05:25,212
+reliability in the sense that if you
+
+53
+00:05:25,266 --> 00:05:28,616
+have good view of how your application runs the logs,
+
+54
+00:05:28,648 --> 00:05:31,908
+the communication between the services, then at some point you'll be able to tell that
+
+55
+00:05:31,914 --> 00:05:34,276
+this is where your infrastructure is and this is where you want to get it
+
+56
+00:05:34,298 --> 00:05:38,036
+to. So a study of the logs at this point kind of gives you the
+
+57
+00:05:38,058 --> 00:05:40,916
+opportunity to take it to where you want to get it to. So yeah,
+
+58
+00:05:41,098 --> 00:05:44,650
+this is another use case, real life use case of our conversation today.
+
+59
+00:05:45,740 --> 00:05:49,316
+Another thing is transitioning vendors without disrupting
+
+60
+00:05:49,428 --> 00:05:53,976
+workflows. Workflows in this sense is in
+
+61
+00:05:53,998 --> 00:05:57,084
+a system. I mean we've got different things that are involved in running our system
+
+62
+00:05:57,122 --> 00:06:01,336
+and ensuring it gets where it's supposed to get to. But observability
+
+63
+00:06:01,448 --> 00:06:04,908
+or log metric study kind of give an opportunity
+
+64
+00:06:05,074 --> 00:06:08,968
+to transition between vendors without disrupting
+
+65
+00:06:09,144 --> 00:06:12,016
+the real workflow of the application or the service.
+
+66
+00:06:12,198 --> 00:06:15,596
+So you could change, say services that receive
+
+67
+00:06:15,628 --> 00:06:19,376
+the logs, you could change different things, you could change different options
+
+68
+00:06:19,558 --> 00:06:22,688
+on the system just because of the logs. You've seen the
+
+69
+00:06:22,694 --> 00:06:26,436
+logs, you've seen exactly what is happening. You can exactly tell, okay, this application does
+
+70
+00:06:26,458 --> 00:06:30,772
+not seem to do what we want. Can we change it without disrupting the
+
+71
+00:06:30,826 --> 00:06:33,824
+real key workflow or the key function of the system as service?
+
+72
+00:06:33,882 --> 00:06:37,944
+Running another use case is enhancing data quality
+
+73
+00:06:37,982 --> 00:06:39,560
+and improving insights.
+
+74
+00:06:40,700 --> 00:06:44,804
+Observability is about insights looking given an outlook
+
+75
+00:06:44,852 --> 00:06:48,500
+of your application and if you have insights, you'll be able to tell where your
+
+76
+00:06:48,510 --> 00:06:52,540
+application is going, where it is right now, and where it used to be before.
+
+77
+00:06:52,610 --> 00:06:55,464
+So with this you can call it document, excel,
+
+78
+00:06:55,512 --> 00:06:58,430
+spreadsheet, postmortem analysis and all that.
+
+79
+00:07:00,720 --> 00:07:04,480
+This is about consolidating agents and eliminating agent fatigue.
+
+80
+00:07:04,900 --> 00:07:08,704
+Agent in this case is not exactly a human being. Of course I speak everyone
+
+81
+00:07:08,742 --> 00:07:12,284
+to understand that, but agent here just means something that represents
+
+82
+00:07:12,332 --> 00:07:15,804
+a certain service. I'll give you an example, say ansible or
+
+83
+00:07:15,862 --> 00:07:19,204
+you got to install agent for ansible on services or
+
+84
+00:07:19,242 --> 00:07:22,356
+on servers, rather to be able to ensure that ansible can
+
+85
+00:07:22,378 --> 00:07:25,808
+communicate with server, you understand. So in this case we're
+
+86
+00:07:25,824 --> 00:07:29,610
+going to be talking about how to eliminate agent fatigue so you don't have to
+
+87
+00:07:29,980 --> 00:07:33,672
+stress out any agent of some sort in the service or in
+
+88
+00:07:33,726 --> 00:07:37,176
+the service. In this case, you'll be able to look
+
+89
+00:07:37,198 --> 00:07:41,004
+at different options as far as observability is concerned. But this is very
+
+90
+00:07:41,042 --> 00:07:44,348
+important from the log and metrics that we're going to
+
+91
+00:07:44,354 --> 00:07:48,092
+get from the application. Okay. So coming
+
+92
+00:07:48,146 --> 00:07:51,664
+down home, we're looking at, first of all, let's understand the relevance of logs in
+
+93
+00:07:51,702 --> 00:07:54,496
+SRE. I mean, you understand what SRE means.
+
+94
+00:07:54,678 --> 00:07:58,384
+SRE is just about maintaining production status in some companies, they're called
+
+95
+00:07:58,422 --> 00:08:02,592
+production engineers. So SRE
+
+96
+00:08:02,656 --> 00:08:06,452
+is just about maintaining production status of any application on the cloud.
+
+97
+00:08:06,586 --> 00:08:10,496
+So we are talking about, let's understand, first understand the relevance
+
+98
+00:08:10,528 --> 00:08:14,292
+of logs in SRE. Log data
+
+99
+00:08:14,346 --> 00:08:17,876
+contains stories now, but log data contains information
+
+100
+00:08:17,978 --> 00:08:21,896
+such as memory exception had these errors. This is very helpful to
+
+101
+00:08:21,918 --> 00:08:25,336
+help us identify why behind a problem either that a user has brought to
+
+102
+00:08:25,358 --> 00:08:28,540
+our attention or that we have uncovered. We here in this case is
+
+103
+00:08:28,610 --> 00:08:31,916
+the engineering team. But what this is saying is the
+
+104
+00:08:31,938 --> 00:08:35,724
+logs have an opportunity or have. What word
+
+105
+00:08:35,762 --> 00:08:39,520
+will I use? Logs has it in itself to be able to provide
+
+106
+00:08:39,590 --> 00:08:42,492
+the communication between services in a server.
+
+107
+00:08:42,636 --> 00:08:46,444
+It also could tell you if there are memory logs, if there are hattix
+
+108
+00:08:46,492 --> 00:08:49,884
+errors, if we have memory
+
+109
+00:08:49,932 --> 00:08:53,184
+exceptions, if we need to increase
+
+110
+00:08:53,232 --> 00:08:57,012
+the memory, if we need to read how
+
+111
+00:08:57,066 --> 00:09:00,784
+setting calls C URL are done in the network,
+
+112
+00:09:00,912 --> 00:09:03,536
+if we need to look at the time it failed.
+
+113
+00:09:03,728 --> 00:09:07,696
+And in some cases, you may run a certain server
+
+114
+00:09:07,728 --> 00:09:11,256
+and it crashes at some point. And when it crashes, you can't even get into
+
+115
+00:09:11,278 --> 00:09:14,964
+the server to check what is wrong. So you could start up the server
+
+116
+00:09:15,012 --> 00:09:18,456
+again. Ensure that you get into the server when it's running and
+
+117
+00:09:18,478 --> 00:09:21,472
+then you look at the logs until it crashes. The last line of its crash
+
+118
+00:09:21,556 --> 00:09:25,064
+could tell you exactly what is wrong with that service or the server.
+
+119
+00:09:25,112 --> 00:09:28,188
+It could be the image running, it could be the server configuration itself,
+
+120
+00:09:28,274 --> 00:09:31,768
+it could be memories, it could be whatever. But that last line kind
+
+121
+00:09:31,794 --> 00:09:35,308
+of gives you an insight of what is happening with the server
+
+122
+00:09:35,324 --> 00:09:39,212
+and why it's crashing. So that is the core relevance of logs in SRE.
+
+123
+00:09:39,356 --> 00:09:42,592
+Brian Redmond said this. It was Brian Redmond that said,
+
+124
+00:09:42,646 --> 00:09:46,516
+but one, that being an expert is more than understanding how a
+
+125
+00:09:46,538 --> 00:09:50,116
+system is supposed to work. Expertise is gained by investigating why
+
+126
+00:09:50,138 --> 00:09:53,508
+a system doesn't work. Everything around what brand just said
+
+127
+00:09:53,594 --> 00:09:57,076
+is tied to logs, to understanding logs
+
+128
+00:09:57,108 --> 00:09:59,610
+data or log data, rather. So, yeah.
+
+129
+00:10:00,860 --> 00:10:04,932
+Viewing metrics in SRE, each exposing metric
+
+130
+00:10:04,996 --> 00:10:08,516
+should serve a purpose. Resist the temptation of exporting a handful
+
+131
+00:10:08,548 --> 00:10:12,076
+of metrics just because they are easy to generate. Exactly. This is
+
+132
+00:10:12,098 --> 00:10:15,144
+just saying, when you're dealing with metrics, you don't just ship
+
+133
+00:10:15,192 --> 00:10:18,636
+everything in the application or in the server, you don't do that. You have
+
+134
+00:10:18,658 --> 00:10:22,688
+to ship what is relevant, you have to check what does the team need.
+
+135
+00:10:22,854 --> 00:10:26,704
+Instead of giving us updates on how
+
+136
+00:10:26,742 --> 00:10:30,016
+the servers are operating every time, give us updates on when it's down. Probably why
+
+137
+00:10:30,038 --> 00:10:33,664
+it is down. So this
+
+138
+00:10:33,702 --> 00:10:36,870
+conversation could elapse into alighting and all that. But yeah,
+
+139
+00:10:37,320 --> 00:10:41,028
+just understand the point that when you're viewing metrics, it has to be exactly
+
+140
+00:10:41,194 --> 00:10:44,532
+what needs to be viewed. What is going to help you get better
+
+141
+00:10:44,586 --> 00:10:47,896
+hand of the infrastructure. Metrics is just a part of observability and
+
+142
+00:10:47,918 --> 00:10:50,712
+that's why you have the picture there. You have traces, you have logs. So all
+
+143
+00:10:50,766 --> 00:10:54,010
+these combine together to make observability a very successful run.
+
+144
+00:10:55,900 --> 00:10:59,096
+I said that we're going to talk about vector and here it is. When you
+
+145
+00:10:59,118 --> 00:11:01,516
+have vector, what does it mean? I mean I should have called this vector the
+
+146
+00:11:01,538 --> 00:11:05,196
+dev, but the general name is vector. When you hear vector, what does
+
+147
+00:11:05,218 --> 00:11:08,300
+it mean utilizing vector to expose metrics?
+
+148
+00:11:11,300 --> 00:11:14,736
+From the top of my mind, vector is just a
+
+149
+00:11:14,758 --> 00:11:18,656
+product that makes it easy for you to ship logs to
+
+150
+00:11:18,678 --> 00:11:22,036
+Prometheus. But it catches this. Prometheus does
+
+151
+00:11:22,058 --> 00:11:25,280
+not accept logs, it accepts metrics.
+
+152
+00:11:25,360 --> 00:11:28,836
+So vector kind of provides that
+
+153
+00:11:28,858 --> 00:11:32,116
+pipeline to convert logs to logmetrics and then
+
+154
+00:11:32,138 --> 00:11:35,508
+take them to Prometheus easily with just a couple of exposure in the servers and
+
+155
+00:11:35,514 --> 00:11:39,096
+all that. So that is a summary of what vector does. You could
+
+156
+00:11:39,118 --> 00:11:42,616
+check about them. They have very interesting documentation. I've used them a couple
+
+157
+00:11:42,638 --> 00:11:46,548
+of times in the past as well. So some of the best practices
+
+158
+00:11:46,644 --> 00:11:50,250
+we are going to be dissecting is
+
+159
+00:11:51,500 --> 00:11:54,972
+these are steps in the implementations, but I'm just going to point out
+
+160
+00:11:55,026 --> 00:11:58,024
+a couple of tiny things that are going to help you when you're initializing vector
+
+161
+00:11:58,072 --> 00:12:01,436
+to expose metrics. One of it is you need to set
+
+162
+00:12:01,458 --> 00:12:05,200
+up web server configuration in vector toml t o ML.
+
+163
+00:12:06,580 --> 00:12:10,252
+You can get this in documentation, it's pretty easy. A couple of five, six lines
+
+164
+00:12:10,396 --> 00:12:14,544
+should get this running for you. The next thing is passing logs before transform
+
+165
+00:12:14,592 --> 00:12:18,432
+to metrics. So before vector
+
+166
+00:12:18,496 --> 00:12:23,092
+does the transformation to metrics, you need to find a way to pass
+
+167
+00:12:23,146 --> 00:12:26,784
+the logs. You need to find a way to pass the logs.
+
+168
+00:12:26,832 --> 00:12:29,812
+Remember, Prometheus does not accept logs but metrics.
+
+169
+00:12:29,956 --> 00:12:33,556
+So if the logs are not passed properly, vector won't be able to transform.
+
+170
+00:12:33,668 --> 00:12:37,576
+So you need to consider this as well because sometimes I have seen scenarios where
+
+171
+00:12:37,598 --> 00:12:40,476
+people just want to get the logs, metrics and all that. It needs to be
+
+172
+00:12:40,498 --> 00:12:41,356
+passed first parse,
+
+173
+00:12:41,378 --> 00:12:44,604
+and then
+
+174
+00:12:44,642 --> 00:12:47,932
+the next thing we're going to talk about is effectively counting log,
+
+175
+00:12:47,986 --> 00:12:51,324
+component and strings. It is this
+
+176
+00:12:51,362 --> 00:12:54,784
+response that we can imagine from EGOC will be collecting for any observability process.
+
+177
+00:12:54,902 --> 00:12:58,860
+Now the logs that are going to be converted to metrics
+
+178
+00:12:59,020 --> 00:13:02,656
+is going to contain so much information, but we need to understand what we want
+
+179
+00:13:02,678 --> 00:13:06,916
+to see. Do we want to see request status? Do we want to see the
+
+180
+00:13:06,938 --> 00:13:10,230
+service status? Is a 200? Is it file four? Is it 308?
+
+181
+00:13:12,120 --> 00:13:15,584
+What exactly in the log do we want to see? So this is about effectively
+
+182
+00:13:15,632 --> 00:13:19,064
+counting log, component and strings. Vector makes this very easy. You could
+
+183
+00:13:19,102 --> 00:13:22,664
+say you could get a counter that could count
+
+184
+00:13:22,862 --> 00:13:26,456
+setting components. How many times did the service fail? How many times did
+
+185
+00:13:26,478 --> 00:13:30,068
+it count? 200? Is it an unlimited 200 and all those
+
+186
+00:13:30,094 --> 00:13:34,492
+kind of responses? So this is kind of to skew whatever
+
+187
+00:13:34,546 --> 00:13:37,836
+I sent to Prometheus. I give you solid information on what you need.
+
+188
+00:13:37,858 --> 00:13:41,436
+You don't have to get everything all if you just do it, basically everything will
+
+189
+00:13:41,458 --> 00:13:44,976
+run, everything will go in, but I think it will be difficult to decipher through
+
+190
+00:13:44,998 --> 00:13:47,490
+the system or decipher through the lot exactly what you need.
+
+191
+00:13:48,180 --> 00:13:51,536
+So this is about effectively collecting logs and it will
+
+192
+00:13:51,558 --> 00:13:54,070
+give you proper visibility on exactly what happens.
+
+193
+00:13:56,680 --> 00:13:59,956
+Explore the Prometheus exporter. Of course, this is general, whether vector or
+
+194
+00:13:59,978 --> 00:14:03,750
+non vector, Prometheus has an exporter that you've got to use.
+
+195
+00:14:05,160 --> 00:14:08,856
+Now you can bring in Prometheus into the equation after the URL has
+
+196
+00:14:08,878 --> 00:14:12,916
+been exposed by vector for scripting, we can use Prometheus exporter sync
+
+197
+00:14:12,948 --> 00:14:14,360
+feature provided by vector.
+
+198
+00:14:15,580 --> 00:14:18,956
+That's incomplete, but okay. Vector has an
+
+199
+00:14:18,978 --> 00:14:22,430
+exporter sync that you could use to work with Prometheus and all that.
+
+200
+00:14:23,120 --> 00:14:26,620
+Explore the Prometheus script to view on the dashboard.
+
+201
+00:14:28,080 --> 00:14:31,028
+I don't have to talk a lot about this. I mean, this is Prometheus scripting.
+
+202
+00:14:31,064 --> 00:14:34,592
+It's just about scripting the metrics. That has been convenient. And then,
+
+203
+00:14:34,646 --> 00:14:37,904
+yeah, go ahead. So the next thing
+
+204
+00:14:37,942 --> 00:14:41,344
+I'm going to talk about is, which is the last thing
+
+205
+00:14:41,382 --> 00:14:44,668
+now is that you need to set actionable alerts.
+
+206
+00:14:44,764 --> 00:14:48,064
+A well defined alerting strategy can help you achieve effective performance
+
+207
+00:14:48,192 --> 00:14:51,316
+monitoring. Now, the thing is, I have slightly talked
+
+208
+00:14:51,338 --> 00:14:54,390
+about this before, but I'm going to talk about it more right now.
+
+209
+00:14:57,880 --> 00:15:01,450
+Setting up a threshold when you are sending an alert is very important.
+
+210
+00:15:01,820 --> 00:15:05,924
+I mean, you're just not going to send things to Prometheus, right? For Prometheus,
+
+211
+00:15:05,972 --> 00:15:08,660
+I got to be able to be alerted, maybe from slack with some sort of
+
+212
+00:15:08,670 --> 00:15:12,172
+webhook or on discord or on WhatsApp or my email,
+
+213
+00:15:12,306 --> 00:15:15,704
+whatever the case may be, I got to be alerted
+
+214
+00:15:15,752 --> 00:15:18,510
+of what is happening on Prometheus. Do you understand?
+
+215
+00:15:20,000 --> 00:15:23,904
+But you can't alert him on every behavior of the system because
+
+216
+00:15:23,942 --> 00:15:27,408
+anything could happen. And then probably we have a restart procedure or a
+
+217
+00:15:27,414 --> 00:15:31,056
+replica set of his kubernetes we're talking about, and then the
+
+218
+00:15:31,078 --> 00:15:34,496
+node or the port cloud restart itself. You'll be
+
+219
+00:15:34,518 --> 00:15:37,732
+bugging me. If every time it restarts or every time it needs to create
+
+220
+00:15:37,786 --> 00:15:41,556
+more the scaling procedures, I get an alert. It will be so
+
+221
+00:15:41,578 --> 00:15:43,780
+much, it will be overwhelming.
+
+222
+00:15:45,080 --> 00:15:48,436
+Google called it alert fatigue. So what
+
+223
+00:15:48,458 --> 00:15:51,804
+we try to encourage, or what I'm encouraging is that you set actionable alert.
+
+224
+00:15:51,872 --> 00:15:55,144
+Alerts that requires actions. So if we have a
+
+225
+00:15:55,182 --> 00:15:58,636
+down failure, that's something to be aware of. If we have
+
+226
+00:15:58,658 --> 00:16:01,452
+a crash loopback error, that's something to be aware of.
+
+227
+00:16:01,586 --> 00:16:04,860
+Things like this that could not easily be
+
+228
+00:16:05,010 --> 00:16:08,508
+handled automatically from the system. Let the people, let the
+
+229
+00:16:08,514 --> 00:16:12,060
+engineering team be aware. So set actionable alerts. Alerts that will require
+
+230
+00:16:12,140 --> 00:16:15,650
+your attention, not alert, that is going to tell you, oh, this is happening.
+
+231
+00:16:16,100 --> 00:16:20,048
+So, yeah, you should ensure that notifications are properly configured to reach
+
+232
+00:16:20,134 --> 00:16:23,676
+the appropriate team in a timely manner. In some teams
+
+233
+00:16:23,708 --> 00:16:27,796
+you can have on call engineers that could helps in getting this running at
+
+234
+00:16:27,818 --> 00:16:31,750
+the time they are on call. I think that's the last thing.
+
+235
+00:16:33,000 --> 00:16:35,716
+There are lots of things to say, but I don't want to bog you with
+
+236
+00:16:35,738 --> 00:16:39,256
+so much information. Just wanted to get the five concise ways that you could get
+
+237
+00:16:39,278 --> 00:16:42,244
+this running and be at the top of your game when it comes to shipping
+
+238
+00:16:42,292 --> 00:16:45,944
+logs or converting logs metrics using vector dev
+
+239
+00:16:45,982 --> 00:16:49,368
+to prometheus. Now, in conclusion, the good monitoring system pays
+
+240
+00:16:49,384 --> 00:16:52,792
+dividend. It's well worth the investment to pay to put substantial
+
+241
+00:16:52,856 --> 00:16:56,604
+thought into what solution best meets your needs and to iterate until
+
+242
+00:16:56,642 --> 00:17:00,604
+you get it right. The success of a good monitoring system,
+
+243
+00:17:00,642 --> 00:17:04,588
+the success of observability is tied to how good the team
+
+244
+00:17:04,674 --> 00:17:07,936
+could sort of logs. I have been in teams where we don't have so much
+
+245
+00:17:07,958 --> 00:17:12,192
+of the best engineers, but they are so good at debugging and
+
+246
+00:17:12,246 --> 00:17:16,148
+personal motor analysis and log and metrics and all this kind
+
+247
+00:17:16,154 --> 00:17:18,916
+of gives them a hand and you think, oh, they are senior engineers because they
+
+248
+00:17:18,938 --> 00:17:22,096
+could read logs and interpret
+
+249
+00:17:22,128 --> 00:17:27,592
+what happens to a system, that kind of a thing. So we
+
+250
+00:17:27,646 --> 00:17:31,336
+must understand the best practices when it cases to monitoring the system.
+
+251
+00:17:31,438 --> 00:17:35,732
+Just like this conclusion says, a good monitoring system pays
+
+252
+00:17:35,876 --> 00:17:40,190
+dividends. I think I've come to the end of my talk and,
+
+253
+00:17:40,960 --> 00:17:44,812
+oh, yeah, gratitude to my core researcher, Edima Mark. My company
+
+254
+00:17:44,866 --> 00:17:48,204
+overlaps. We have an opportunity to do these things in
+
+255
+00:17:48,242 --> 00:17:52,088
+real life, and then, of course, the comfort to organizers.
+
+256
+00:17:52,264 --> 00:17:55,360
+I really do appreciate the time, and I really hope that
+
+257
+00:17:55,430 --> 00:17:58,656
+I've been able to teach someone a thing or two. Of course,
+
+258
+00:17:58,678 --> 00:18:02,432
+if you have any questions, you could reach out to me and, yeah,
+
+259
+00:18:02,486 --> 00:18:05,716
+let us know what we can do. Of course,
+
+260
+00:18:05,738 --> 00:18:09,284
+you can always reach out to me, like I said here.
+
+261
+00:18:09,402 --> 00:18:12,676
+So you can send me, tweet at me, send me a message, or send me
+
+262
+00:18:12,698 --> 00:18:16,196
+an email. I'm always available. I use WhatsApp as well,
+
+263
+00:18:16,218 --> 00:18:19,860
+but I just thought, why should I add my contact here? But anyways,
+
+264
+00:18:20,360 --> 00:18:23,684
+it was really good speaking to everyone and I really do
+
+265
+00:18:23,722 --> 00:18:27,596
+hope that we have a more interesting time. I'm listening to other speakers in
+
+266
+00:18:27,618 --> 00:18:31,116
+this comfort zone. Thank you. Thank you. Thank you.
+
+267
+00:18:31,298 --> 00:18:32,270
+Thank you.
+

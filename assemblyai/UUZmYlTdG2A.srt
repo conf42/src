@@ -1,0 +1,1440 @@
+1
+00:00:23,370 --> 00:00:26,870
+Hello. Today we're going to about detecting silent machine learning
+
+2
+00:00:26,940 --> 00:00:30,806
+model failure in models that are already deployed in production so
+
+3
+00:00:30,828 --> 00:00:34,486
+they are making business decisions. It's going to serve as a sort of
+
+4
+00:00:34,508 --> 00:00:37,960
+production to machine learning monitoring. So let's get started
+
+5
+00:00:39,050 --> 00:00:42,150
+on the agenda today we have three things. First,
+
+6
+00:00:42,220 --> 00:00:45,586
+we're going to discuss two main reasons why machine learning models
+
+7
+00:00:45,618 --> 00:00:49,106
+can fail in production. These reasons are concept drift and data drift.
+
+8
+00:00:49,138 --> 00:00:52,670
+We will define them and we'll define how they can impact
+
+9
+00:00:53,330 --> 00:00:56,846
+performance of your machine learning models and to what extent they
+
+10
+00:00:56,868 --> 00:01:00,110
+normally impact these models. Then we're going to talk about
+
+11
+00:01:00,180 --> 00:01:03,422
+performance estimation calculation. We'll discuss why
+
+12
+00:01:03,476 --> 00:01:07,374
+calculation is rarely possible and why access to targets
+
+13
+00:01:07,422 --> 00:01:10,626
+data after you make predictions is often limited and we need
+
+14
+00:01:10,648 --> 00:01:14,194
+to estimate performance instead. And then we're going to
+
+15
+00:01:14,232 --> 00:01:17,746
+come back to find to data and concept drift. And we'll
+
+16
+00:01:17,778 --> 00:01:21,410
+try to find the link between drop in performance and potential
+
+17
+00:01:21,490 --> 00:01:25,030
+reasons for that that we can find in data drift.
+
+18
+00:01:25,450 --> 00:01:29,640
+And before we start doing that, let's set the stage with an example
+
+19
+00:01:30,250 --> 00:01:34,058
+use case that most of you should be already familiar with. We're going
+
+20
+00:01:34,064 --> 00:01:37,626
+to talk about a simple binary classification use
+
+21
+00:01:37,648 --> 00:01:41,034
+case when we're trying to predict whether a client is going to default on their
+
+22
+00:01:41,072 --> 00:01:44,426
+loan. So we take credit scores and customer information
+
+23
+00:01:44,608 --> 00:01:48,218
+and we're trying to predict whether a customer is going to default on the loan.
+
+24
+00:01:48,314 --> 00:01:52,126
+Our target is going to be non payment within one year, which means we'll have
+
+25
+00:01:52,148 --> 00:01:56,046
+to wait for an entire year after making a prediction before we
+
+26
+00:01:56,068 --> 00:02:00,302
+can get access to the ground through data, before we can simply calculate the performance.
+
+27
+00:02:00,446 --> 00:02:04,098
+And we're going to use a technical metric to evaluate the quality of our model.
+
+28
+00:02:04,184 --> 00:02:06,450
+And for that we're going to use Rokuc.
+
+29
+00:02:07,130 --> 00:02:10,866
+So before delving into the details
+
+30
+00:02:10,898 --> 00:02:14,278
+of data and concept drift, let's do a quick refresh and
+
+31
+00:02:14,364 --> 00:02:18,006
+define again, what are we trying to actually do when
+
+32
+00:02:18,028 --> 00:02:21,802
+we train a machine learning model. So there exists some true
+
+33
+00:02:21,856 --> 00:02:25,206
+pattern in reality, not even in these data, but just in reality,
+
+34
+00:02:25,318 --> 00:02:29,206
+something that relates one variable to the other or multiple
+
+35
+00:02:29,238 --> 00:02:32,778
+variables to some other variable. So in this example here, we're going to
+
+36
+00:02:32,784 --> 00:02:36,794
+have just one input feature, x, and we're going to have a relative frequency
+
+37
+00:02:36,842 --> 00:02:40,074
+of positive and negative class. And as the x increases,
+
+38
+00:02:40,122 --> 00:02:43,774
+we're going to have some kind of function that maps this increase in
+
+39
+00:02:43,812 --> 00:02:47,426
+x to the relative frequency. So the higher these value of x,
+
+40
+00:02:47,528 --> 00:02:50,946
+the less likely it is that the data point belongs to
+
+41
+00:02:50,968 --> 00:02:55,038
+a positive class. Then what we'll do is we're going to sample
+
+42
+00:02:55,134 --> 00:02:58,734
+this from this pattern from this population,
+
+43
+00:02:58,782 --> 00:03:01,894
+we're going to sample our data set, and this data set is all
+
+44
+00:03:01,932 --> 00:03:05,974
+the data we actually have access to. So it can be our training, validation and
+
+45
+00:03:06,012 --> 00:03:10,042
+testing data, for example. And that is what we take.
+
+46
+00:03:10,096 --> 00:03:13,542
+And then we try to find this true underlying pattern
+
+47
+00:03:13,686 --> 00:03:15,850
+by using machine learning algorithms.
+
+48
+00:03:16,910 --> 00:03:19,834
+And let's say that we capture this pattern in some way,
+
+49
+00:03:19,872 --> 00:03:23,306
+maybe imperfectly, maybe perfectly. Most likely it's
+
+50
+00:03:23,338 --> 00:03:26,702
+not going to be to be a perfect capture of this true
+
+51
+00:03:26,756 --> 00:03:30,062
+pattern, but it's going to be close enough. And these
+
+52
+00:03:30,116 --> 00:03:33,422
+let's examine what happens if we experience data
+
+53
+00:03:33,476 --> 00:03:37,246
+drift. So, data drift can be defined as change in the sampling
+
+54
+00:03:37,278 --> 00:03:41,134
+method. So the true pattern that exists in reality remains
+
+55
+00:03:41,182 --> 00:03:44,642
+the same. But what changes is how we sample this data.
+
+56
+00:03:44,696 --> 00:03:48,566
+So the data is going to be different, the input to the
+
+57
+00:03:48,588 --> 00:03:52,034
+model is going to be different, but the underlying pattern
+
+58
+00:03:52,082 --> 00:03:55,842
+between the model inputs and the targets is going to remain
+
+59
+00:03:55,906 --> 00:03:59,474
+the same. So now we can formally
+
+60
+00:03:59,522 --> 00:04:02,682
+define it after we've built a bit of intuition about what data
+
+61
+00:04:02,736 --> 00:04:05,930
+drip is, and we can say that it's a change in
+
+62
+00:04:06,000 --> 00:04:09,642
+join model input distribution. So again, it's all about the model
+
+63
+00:04:09,696 --> 00:04:12,506
+inputs and it has nothing to do with the targets,
+
+64
+00:04:12,538 --> 00:04:16,202
+but of course it does have to do with the model outputs.
+
+65
+00:04:16,346 --> 00:04:20,000
+And just to illustrate here, we see that there is
+
+66
+00:04:21,650 --> 00:04:24,606
+data here before and after the data drift,
+
+67
+00:04:24,718 --> 00:04:27,650
+and we will see that class balance might actually change,
+
+68
+00:04:27,720 --> 00:04:31,678
+because class balance might be dependent, and normal is dependent
+
+69
+00:04:31,854 --> 00:04:35,422
+on where in the space of your inputs
+
+70
+00:04:35,486 --> 00:04:38,706
+and the data exists. So that's data drift.
+
+71
+00:04:38,738 --> 00:04:42,646
+And data drift can, but does not have to
+
+72
+00:04:42,668 --> 00:04:45,942
+impact your model performance. If your data moves from one
+
+73
+00:04:45,996 --> 00:04:49,814
+region when model is performing very well, to another region where model is performing
+
+74
+00:04:49,862 --> 00:04:53,254
+equally well, we do not expect to see a significant
+
+75
+00:04:53,302 --> 00:04:56,678
+drop in performance. Now, let's define concept
+
+76
+00:04:56,694 --> 00:05:00,362
+drift. So, unlike data drift here, what changes is the true
+
+77
+00:05:00,416 --> 00:05:03,786
+pattern. So we will sample our data in exactly the same
+
+78
+00:05:03,808 --> 00:05:07,294
+way. Of course, if we have concept drift, that is only concept drift and does
+
+79
+00:05:07,332 --> 00:05:10,670
+not have a data drift component, and then what changes
+
+80
+00:05:10,740 --> 00:05:14,526
+is the true pattern? So the actual underlying pattern that we're trying to
+
+81
+00:05:14,548 --> 00:05:18,046
+find, or the underlying function that we're trying to find between the model inputs
+
+82
+00:05:18,078 --> 00:05:21,646
+and the target changes. So our data or the model inputs
+
+83
+00:05:21,678 --> 00:05:24,946
+can look more or less the same, or even exactly the same,
+
+84
+00:05:25,128 --> 00:05:28,100
+but how they map to the target will change,
+
+85
+00:05:29,030 --> 00:05:32,774
+and we can visualize it here in a slightly different way. So imagine that
+
+86
+00:05:32,812 --> 00:05:36,466
+we have a two dimensional data set, and we have training data and production
+
+87
+00:05:36,498 --> 00:05:40,042
+data, and we'll see that the data tools very similar, the data points
+
+88
+00:05:40,096 --> 00:05:43,782
+are basically in the same regions in space, but the class boundary
+
+89
+00:05:43,846 --> 00:05:47,900
+is going to be completely different. And that also means that if
+
+90
+00:05:48,350 --> 00:05:51,914
+you experience or your data, your use cases experiences
+
+91
+00:05:51,962 --> 00:05:56,106
+strong concept drift, your models are almost guaranteed to fail
+
+92
+00:05:56,298 --> 00:05:59,950
+because the pattern that they have learned is no longer valid.
+
+93
+00:06:04,470 --> 00:06:07,806
+And now that we've defined concept drift
+
+94
+00:06:07,838 --> 00:06:11,598
+and data drift, we know how they can potentially impact performance.
+
+95
+00:06:11,694 --> 00:06:14,914
+Let's talk about why we need to worry about performance at
+
+96
+00:06:14,952 --> 00:06:17,430
+all, actually. So first and foremost,
+
+97
+00:06:18,330 --> 00:06:21,826
+just monitoring data drift is not enough, because data drift
+
+98
+00:06:21,858 --> 00:06:25,670
+does not always lead to performance. And if you were to do that, data changes
+
+99
+00:06:25,740 --> 00:06:30,354
+constantly. And especially if you have a lot of features.
+
+100
+00:06:30,482 --> 00:06:33,974
+And if you look at data drift from kind of feature to feature perspective,
+
+101
+00:06:34,022 --> 00:06:37,562
+you will really have a lot of alerts, so many that they will become
+
+102
+00:06:37,616 --> 00:06:41,242
+basically useless. So because data drift does not always
+
+103
+00:06:41,296 --> 00:06:44,862
+mean performance drop, we cannot just monitor the data
+
+104
+00:06:44,916 --> 00:06:48,154
+drift. Another reason why we should monitor performance directly
+
+105
+00:06:48,202 --> 00:06:51,934
+is that this is something that we've been directly optimizing for in
+
+106
+00:06:51,972 --> 00:06:55,726
+training. We chose the model that has the best performance. However we define performance,
+
+107
+00:06:55,758 --> 00:06:59,346
+it can be our like in our example, the RoC AUC can
+
+108
+00:06:59,368 --> 00:07:02,642
+be precision, recall for classification examples can be root mean square
+
+109
+00:07:02,696 --> 00:07:06,930
+error for regression examples, et cetera. Another thing
+
+110
+00:07:07,080 --> 00:07:10,662
+why we need to look at performance is that it is the
+
+111
+00:07:10,716 --> 00:07:14,178
+best proxy we have for the business impact. Of course, when we develop machine
+
+112
+00:07:14,194 --> 00:07:18,566
+learning use cases in industry setting, what we care about is creating
+
+113
+00:07:18,598 --> 00:07:22,602
+value, creating business impact. And the only
+
+114
+00:07:22,656 --> 00:07:26,026
+way we can quantify it easily in development and within the
+
+115
+00:07:26,048 --> 00:07:29,754
+technical setting is to look at these technical metrics for
+
+116
+00:07:29,792 --> 00:07:31,450
+the machine learning performance.
+
+117
+00:07:33,710 --> 00:07:36,986
+So, since now we know that we need to measure performance
+
+118
+00:07:37,018 --> 00:07:40,526
+or monitor performance, how do we do this? The easiest thing would be
+
+119
+00:07:40,548 --> 00:07:44,098
+to take the ground truth. After we make the prediction, compare it,
+
+120
+00:07:44,264 --> 00:07:47,838
+sorry, after we've obtained it, compare it with our prediction
+
+121
+00:07:47,934 --> 00:07:51,886
+and see what's the difference. Just measure it, literally calculate
+
+122
+00:07:51,918 --> 00:07:56,018
+the performance. However, this is very rarely really possible.
+
+123
+00:07:56,184 --> 00:07:59,878
+Why is that? First and foremost, in some of
+
+124
+00:07:59,884 --> 00:08:03,606
+these use cases, the data is delayed. So let's take our example again,
+
+125
+00:08:03,708 --> 00:08:06,934
+and we'll have to wait one year, sometimes maybe even longer,
+
+126
+00:08:07,052 --> 00:08:10,186
+to get actual target data.
+
+127
+00:08:10,288 --> 00:08:13,546
+So our model will be operating always for a
+
+128
+00:08:13,568 --> 00:08:17,418
+year. And without knowing the performance for a
+
+129
+00:08:17,424 --> 00:08:20,966
+fact, that means that we are exposed to huge risk
+
+130
+00:08:21,078 --> 00:08:24,794
+of giving loans to people who should not have received the loans and generally
+
+131
+00:08:24,842 --> 00:08:27,934
+mispricing these loans. And this is the risk that it's not
+
+132
+00:08:27,972 --> 00:08:30,862
+acceptable and you should always try to minimize it.
+
+133
+00:08:30,996 --> 00:08:34,874
+Another thing is that even when we do get the labels, these labels
+
+134
+00:08:34,922 --> 00:08:38,162
+are not complete. What I mean by that is, we do know whether the people
+
+135
+00:08:38,216 --> 00:08:42,146
+that received the loan, whether they paid it or not. But what we don't know
+
+136
+00:08:42,248 --> 00:08:46,082
+is whether the people who have not received the loan youll have paid
+
+137
+00:08:46,136 --> 00:08:49,686
+or not, had they been given the loan. And the
+
+138
+00:08:49,788 --> 00:08:53,334
+last reason or example where we do not have
+
+139
+00:08:53,452 --> 00:08:57,206
+the ground truth is automation. Use cases. These are the use cases when we
+
+140
+00:08:57,228 --> 00:09:00,862
+try to automate some menial human task,
+
+141
+00:09:00,946 --> 00:09:04,698
+such as, let's say document classification, most of computer
+
+142
+00:09:04,784 --> 00:09:08,650
+vision tasks, when we want to replace or augment human
+
+143
+00:09:08,800 --> 00:09:11,878
+to do something. In these cases,
+
+144
+00:09:11,974 --> 00:09:16,026
+we train model based on data that was manually processed
+
+145
+00:09:16,058 --> 00:09:19,902
+by humans, and now we want to replace them. That means that we will never
+
+146
+00:09:19,956 --> 00:09:23,338
+get ground truth for all the data. That would literally defeat
+
+147
+00:09:23,354 --> 00:09:26,702
+the purpose of developing such an algorithm. We can also,
+
+148
+00:09:26,756 --> 00:09:30,674
+of course, do some kind of spot checking when we can take maybe 1%
+
+149
+00:09:30,712 --> 00:09:34,274
+of the data and have it double checked by the human. But that will not
+
+150
+00:09:34,312 --> 00:09:38,054
+give us a full picture of performance of the algorithm. So that
+
+151
+00:09:38,092 --> 00:09:41,654
+means that we need to estimate the performance of a machine learning
+
+152
+00:09:41,692 --> 00:09:44,994
+model. So we arrive at performance
+
+153
+00:09:45,042 --> 00:09:48,406
+estimation. And that
+
+154
+00:09:48,428 --> 00:09:52,386
+is possibly the most interesting part of machine learning, monitoring and detecting
+
+155
+00:09:52,418 --> 00:09:55,942
+science. Model failure is that you can indeed estimate
+
+156
+00:09:56,006 --> 00:10:00,118
+the performance, and specifically you can fully estimate
+
+157
+00:10:00,214 --> 00:10:03,738
+the impact of data drift on the performance.
+
+158
+00:10:03,914 --> 00:10:07,374
+And I'm going to give you a high level intuition how this
+
+159
+00:10:07,412 --> 00:10:11,150
+algorithm works. It's an algorithm that we developed. It's part of our open source
+
+160
+00:10:12,130 --> 00:10:15,298
+library, so feel free to check it out.
+
+161
+00:10:15,384 --> 00:10:18,882
+So what we're going to do is we're going to look at
+
+162
+00:10:18,936 --> 00:10:22,562
+the confidence of a model. So in our
+
+163
+00:10:22,616 --> 00:10:26,078
+example of a binary classification, this is just going to be the model scored
+
+164
+00:10:26,094 --> 00:10:29,634
+number between zero and one. If these number is close to either one or to
+
+165
+00:10:29,672 --> 00:10:32,966
+zero, it means that the model is very confident. If the number is close to
+
+166
+00:10:32,988 --> 00:10:36,646
+0.5, it means that the model is not confident. First thing we need
+
+167
+00:10:36,668 --> 00:10:40,234
+to do is we need to confirm that these
+
+168
+00:10:40,272 --> 00:10:44,074
+scores do represent probabilities. They don't always,
+
+169
+00:10:44,272 --> 00:10:47,882
+and sometimes we need to do probability calibration to make sure that
+
+170
+00:10:47,936 --> 00:10:52,106
+these scores are turned into something that actually represents real probabilities.
+
+171
+00:10:52,218 --> 00:10:55,742
+That if a model output 0.6,
+
+172
+00:10:55,796 --> 00:10:59,374
+there is actually 60% chance that this data point is
+
+173
+00:10:59,412 --> 00:11:02,606
+going to belong to class one. So after we have
+
+174
+00:11:02,628 --> 00:11:06,130
+that, we have properly calibrated probabilities, we're going to
+
+175
+00:11:06,200 --> 00:11:10,082
+look at the expected performance of a model as a function
+
+176
+00:11:10,136 --> 00:11:14,450
+of this uncertainty. So imagine that in training we have
+
+177
+00:11:14,520 --> 00:11:17,734
+the picture on the left here, and in this picture youll will see that most
+
+178
+00:11:17,772 --> 00:11:21,298
+of the data points are in the high confidence regions.
+
+179
+00:11:21,474 --> 00:11:25,010
+Maybe the part of this kind of butterfly wings,
+
+180
+00:11:25,090 --> 00:11:28,710
+one of the butterfly wing is concentration of negative class.
+
+181
+00:11:28,780 --> 00:11:32,346
+Another one can be the concentration of positive class. And kind of the
+
+182
+00:11:32,368 --> 00:11:36,374
+body of the butterfly is going to be the class boundary when the algorithm
+
+183
+00:11:36,422 --> 00:11:40,194
+is really uncertain whether this class is positive
+
+184
+00:11:40,262 --> 00:11:44,094
+or negative. So then imagine that
+
+185
+00:11:44,132 --> 00:11:47,642
+sometime passes and we see significant data drift.
+
+186
+00:11:47,706 --> 00:11:50,990
+And this data drift is of a specific form
+
+187
+00:11:51,060 --> 00:11:54,574
+that it moves from high performance regions or high confidence
+
+188
+00:11:54,622 --> 00:11:58,786
+regions to low confidence regions. That means we would expect the
+
+189
+00:11:58,808 --> 00:12:02,226
+model to perform worse, and the model itself
+
+190
+00:12:02,328 --> 00:12:05,766
+expects to perform worse. We can these take that
+
+191
+00:12:05,868 --> 00:12:08,962
+and convert it into expected confusion metrics.
+
+192
+00:12:09,106 --> 00:12:12,982
+And from there we can calculate the expected value of basically any
+
+193
+00:12:13,036 --> 00:12:17,510
+metric you want, it being accuracy, precision, et cetera.
+
+194
+00:12:17,850 --> 00:12:21,354
+I will not go into details how youll actually go about it as
+
+195
+00:12:21,392 --> 00:12:25,082
+that would take too much time, but do feel free to check our docs with
+
+196
+00:12:25,136 --> 00:12:28,906
+more explanation on it. So now we have estimated the
+
+197
+00:12:28,928 --> 00:12:32,118
+performance. What is the next step? The next step is trying to figure out if
+
+198
+00:12:32,144 --> 00:12:35,434
+there's identify issues, see if there's failures.
+
+199
+00:12:35,482 --> 00:12:38,782
+And if we see that there are some issues with performance, we want to figure
+
+200
+00:12:38,836 --> 00:12:42,666
+out why they haven't. Just before we jump
+
+201
+00:12:42,698 --> 00:12:46,286
+there, let's look at an example of how such performance
+
+202
+00:12:46,318 --> 00:12:50,002
+estimation algorithms performs on a real life data set.
+
+203
+00:12:50,056 --> 00:12:53,934
+So we took, for the purposes of these presentation, we took a California
+
+204
+00:12:53,982 --> 00:12:57,110
+housing data set that's available basically everywhere
+
+205
+00:12:57,530 --> 00:13:01,186
+in scikitlearn, among other places. We turned
+
+206
+00:13:01,218 --> 00:13:05,282
+this model into a classification problem and created
+
+207
+00:13:05,346 --> 00:13:08,758
+very simple algorithm. I think it was random forest. We trained it on
+
+208
+00:13:08,844 --> 00:13:12,918
+the training part of the data set, and then we evaluated in production.
+
+209
+00:13:13,014 --> 00:13:16,406
+And you see here that this algorithm that explained
+
+210
+00:13:16,438 --> 00:13:20,226
+to detect the impact of data drift on performance. So the performance
+
+211
+00:13:20,278 --> 00:13:24,206
+estimation algorithm works quite well, and the estimated rock AUC is
+
+212
+00:13:24,228 --> 00:13:26,590
+very, very close to the real rock AUC.
+
+213
+00:13:27,810 --> 00:13:31,840
+So now let's jump into figuring out why
+
+214
+00:13:32,210 --> 00:13:36,420
+models can fail. So then we'll go back to the data drift. And here
+
+215
+00:13:37,110 --> 00:13:40,942
+we want to basically figure out what features or sets of features
+
+216
+00:13:41,006 --> 00:13:44,754
+or segments of the data can be responsible for the drop in
+
+217
+00:13:44,792 --> 00:13:47,846
+performance. And we can do it in two ways. First, we can look at the
+
+218
+00:13:47,868 --> 00:13:51,510
+data feature by feature, and just see which features changes
+
+219
+00:13:51,580 --> 00:13:54,310
+significantly. This is the univariate data drift,
+
+220
+00:13:55,370 --> 00:13:58,466
+or we, youll also look at multivariate data drift.
+
+221
+00:13:58,498 --> 00:14:02,470
+So we look at maybe all features at once, or some subsets of features,
+
+222
+00:14:02,550 --> 00:14:05,930
+and we're trying to figure out whether there is a significant change in
+
+223
+00:14:06,000 --> 00:14:10,318
+joint distribution of these features. The simplest and most
+
+224
+00:14:10,404 --> 00:14:14,266
+interpretable option is of course the univariate data drift. So we're
+
+225
+00:14:14,298 --> 00:14:20,122
+trying to detect it. And to do that we can use simple tests,
+
+226
+00:14:20,186 --> 00:14:24,186
+simple statistical tests such as comoger ks test or chisquare
+
+227
+00:14:24,218 --> 00:14:27,682
+test, where we will just look at the reference data set
+
+228
+00:14:27,736 --> 00:14:30,946
+for which we know that these performance is stable and high
+
+229
+00:14:31,048 --> 00:14:34,370
+and all the data looks like it should, which could be, for example,
+
+230
+00:14:34,440 --> 00:14:37,746
+our test set, or it could be the first month of production and
+
+231
+00:14:37,768 --> 00:14:41,558
+we're going to compare it to our analysis data set, which is
+
+232
+00:14:41,724 --> 00:14:44,834
+the part of the data for which the performance has decreased
+
+233
+00:14:44,962 --> 00:14:48,490
+and we'll see if there's any changes in the data that are significant.
+
+234
+00:14:50,430 --> 00:14:53,718
+These tests of course have few shortcomings.
+
+235
+00:14:53,894 --> 00:14:57,494
+The first one is that if you have hundreds of features,
+
+236
+00:14:57,622 --> 00:15:01,562
+you will get reallife a lot of false positives in absolute terms.
+
+237
+00:15:01,696 --> 00:15:05,546
+And that means that let's say if you go into thousands of features,
+
+238
+00:15:05,658 --> 00:15:09,146
+you will just not be able to go through all these false positives
+
+239
+00:15:09,178 --> 00:15:12,720
+and you will not be able to find the real issues with the data.
+
+240
+00:15:13,650 --> 00:15:17,326
+The other shortcoming of these approaches is that they fail
+
+241
+00:15:17,518 --> 00:15:21,406
+to find more subtle types of data drift. If we see only the shift
+
+242
+00:15:21,438 --> 00:15:24,734
+in correlation between features or some changes in internal
+
+243
+00:15:24,782 --> 00:15:28,306
+data structure that is not really visible from univariate
+
+244
+00:15:28,338 --> 00:15:31,634
+changes. This test of course will fail to detect
+
+245
+00:15:31,682 --> 00:15:35,320
+that kind of data drift. So kind of to alleviate this problem,
+
+246
+00:15:36,010 --> 00:15:39,394
+we can look at the multivariate data drift
+
+247
+00:15:39,442 --> 00:15:43,258
+detection approaches. And here I'm going to present one that we develop,
+
+248
+00:15:43,424 --> 00:15:46,874
+which has to do with the data reconstruction. So what we're going to do here
+
+249
+00:15:46,912 --> 00:15:50,314
+is we're going to take our original data. So all
+
+250
+00:15:50,352 --> 00:15:53,414
+the failures that we have and we're going to compress it,
+
+251
+00:15:53,472 --> 00:15:57,438
+we're going to project it to a latent space at lower dimensional and then
+
+252
+00:15:57,524 --> 00:16:01,182
+we're going to do the invariance transform. We will reconstruct the data,
+
+253
+00:16:01,316 --> 00:16:04,846
+then we will compare the original
+
+254
+00:16:04,878 --> 00:16:08,910
+data with the reconstructed data and we'll see what is the compression loss,
+
+255
+00:16:08,990 --> 00:16:12,754
+how strongly this data is different. And we
+
+256
+00:16:12,792 --> 00:16:16,466
+will use basically any dimensionality reduction or compression
+
+257
+00:16:16,498 --> 00:16:19,798
+algorithm that is fitted on the data.
+
+258
+00:16:19,884 --> 00:16:23,382
+So any algorithm that learns the internal structure of the data can be used
+
+259
+00:16:23,436 --> 00:16:26,120
+here. Let's delve deeper into that.
+
+260
+00:16:27,610 --> 00:16:31,046
+So first, when it comes to the choice of this algorithm,
+
+261
+00:16:31,158 --> 00:16:34,554
+there's few requirements. First, as I already mentioned, the encoding needs
+
+262
+00:16:34,592 --> 00:16:38,362
+to learn the internal structure of the data because we want to
+
+263
+00:16:38,416 --> 00:16:42,186
+track the changes in that structure. That's the entire underlying intuition here
+
+264
+00:16:42,208 --> 00:16:45,866
+is that we want to track how the internal structure of the data is changing,
+
+265
+00:16:45,898 --> 00:16:49,470
+and we can measure that using the change between the
+
+266
+00:16:49,540 --> 00:16:53,226
+original dislocation of points before and after the reconstruction.
+
+267
+00:16:53,258 --> 00:16:56,980
+So between the original space and the reconstructed space,
+
+268
+00:16:57,590 --> 00:17:01,298
+then this encoding needs to reduce dimensionality of the data
+
+269
+00:17:01,384 --> 00:17:05,042
+because we want to compress the data in some way so that
+
+270
+00:17:05,096 --> 00:17:09,426
+this internal structure of these data needs to be learned in order to perform compression.
+
+271
+00:17:09,538 --> 00:17:13,366
+Well, then of course the inverse transformation needs to
+
+272
+00:17:13,388 --> 00:17:16,726
+be possible because we want to reconstruct the data. That one is obvious,
+
+273
+00:17:16,908 --> 00:17:20,774
+and there's one important requirement these is that the latent
+
+274
+00:17:20,822 --> 00:17:24,506
+structure needs to map in a stable way to the
+
+275
+00:17:24,528 --> 00:17:28,554
+original space. So let's say if you took out
+
+276
+00:17:28,592 --> 00:17:32,590
+encoder that is not variational, so traditional one there,
+
+277
+00:17:32,660 --> 00:17:36,286
+you would see that the latent space can map in completely
+
+278
+00:17:36,388 --> 00:17:40,510
+unpredictable way to the original spacer, which means
+
+279
+00:17:40,660 --> 00:17:44,270
+that these reconstruction error is not going to be a reliable metric
+
+280
+00:17:44,350 --> 00:17:47,330
+to measure really the change in the data structure.
+
+281
+00:17:48,870 --> 00:17:52,254
+So what we're going to do is we take, let's say PCA,
+
+282
+00:17:52,382 --> 00:17:56,046
+we do the PCA, we reduce
+
+283
+00:17:56,158 --> 00:18:00,082
+number of components, we take let's say top end components,
+
+284
+00:18:00,146 --> 00:18:03,398
+we keep 95% of variance in the data,
+
+285
+00:18:03,564 --> 00:18:06,354
+and then we do the inverse transformation.
+
+286
+00:18:06,482 --> 00:18:09,594
+We measure the dislocation of points before and
+
+287
+00:18:09,632 --> 00:18:13,194
+after the reconstruction. And to do it we can use
+
+288
+00:18:13,232 --> 00:18:16,874
+any distance metric. We're using the minuclidean distance between
+
+289
+00:18:16,912 --> 00:18:20,886
+the original and reconstructed points, and we get the reconstruction error.
+
+290
+00:18:20,998 --> 00:18:24,846
+And then we only need to keep track of one metric to
+
+291
+00:18:24,868 --> 00:18:28,302
+see what is the data drift here. Of course,
+
+292
+00:18:28,356 --> 00:18:32,858
+this does have a certain shortcoming, that it becomes less and less interpretable.
+
+293
+00:18:32,954 --> 00:18:36,466
+If we look at maybe five features at a time and we do the
+
+294
+00:18:36,488 --> 00:18:40,178
+data reconstruction these, it's still reasonably interpretable. If we
+
+295
+00:18:40,184 --> 00:18:43,874
+look at the entire data set and we perform this
+
+296
+00:18:43,912 --> 00:18:48,034
+kind of multivariate drift detection, it's not going to be interpretable.
+
+297
+00:18:48,082 --> 00:18:51,894
+But we will still know that if there is drop in performance and we
+
+298
+00:18:51,932 --> 00:18:55,462
+see spike in our multivariate data
+
+299
+00:18:55,516 --> 00:18:59,114
+drift, we see that data drift is responsible. And we'll have to dig
+
+300
+00:18:59,152 --> 00:19:03,882
+deeper to find out what exactly change in our data that
+
+301
+00:19:03,936 --> 00:19:07,562
+affects performance. And just
+
+302
+00:19:07,696 --> 00:19:10,982
+a few words about how to actually interpret this reconstruction error.
+
+303
+00:19:11,046 --> 00:19:14,378
+We will have some kind of baseline reconstruction error because this compression
+
+304
+00:19:14,394 --> 00:19:17,886
+is meant to be lossy. And as you deploy your model,
+
+305
+00:19:17,988 --> 00:19:21,678
+you can see that this reconstruction error stays roughly constant, which is
+
+306
+00:19:21,764 --> 00:19:25,186
+perfect case scenario. In that case, we see no drift, it increases or
+
+307
+00:19:25,208 --> 00:19:28,510
+it decreases if it increases. We see that these encoding,
+
+308
+00:19:28,590 --> 00:19:33,010
+the internal structure that was learned by the encoding is no longer appropriate.
+
+309
+00:19:35,510 --> 00:19:39,714
+So these compression doesn't work as well. We see increase
+
+310
+00:19:39,762 --> 00:19:43,286
+in the reconstruction error and we have data drift. However, if there is a
+
+311
+00:19:43,308 --> 00:19:46,854
+drop in reconstruction error, that means that the
+
+312
+00:19:46,972 --> 00:19:50,262
+internal structure learned by the encoding is even more
+
+313
+00:19:50,316 --> 00:19:53,754
+appropriate to the data than it used to be before. So we still see data
+
+314
+00:19:53,792 --> 00:19:56,460
+drift. This case is rare, but it might happen.
+
+315
+00:19:58,030 --> 00:20:02,080
+And I want to give you a very quick example of where
+
+316
+00:20:03,410 --> 00:20:07,434
+such an algorithm would be necessary to detect drift and univaliate approaches
+
+317
+00:20:07,482 --> 00:20:11,534
+would fail. So let's imagine two
+
+318
+00:20:11,572 --> 00:20:14,826
+very simple data sets, the reference data set in blue,
+
+319
+00:20:14,858 --> 00:20:18,370
+these when we know everything's fine, and the orange data set,
+
+320
+00:20:18,520 --> 00:20:21,794
+which would be the analysis data set. So we see there is some
+
+321
+00:20:21,832 --> 00:20:24,862
+kind of drop in performance. We want to find out why.
+
+322
+00:20:25,016 --> 00:20:28,738
+And if we just look at the univariate data drift
+
+323
+00:20:28,754 --> 00:20:32,262
+detection methods, we would see that there is no
+
+324
+00:20:32,316 --> 00:20:36,710
+increase in the d statistic. There is basically
+
+325
+00:20:36,780 --> 00:20:40,058
+no alerts, because from univariate perspective, if you
+
+326
+00:20:40,064 --> 00:20:44,138
+just look at the x and the y axis, these data sets look basically
+
+327
+00:20:44,224 --> 00:20:48,246
+the same. However, if we do our encoding
+
+328
+00:20:48,278 --> 00:20:52,026
+decoding and we measure the distance between the reconstructing
+
+329
+00:20:52,058 --> 00:20:55,710
+area, the original space, we will see that there is a strong
+
+330
+00:20:55,780 --> 00:20:59,514
+difference. These because the internal structure of the data has significantly
+
+331
+00:20:59,562 --> 00:21:02,994
+changed, obviously. So this is the
+
+332
+00:21:03,032 --> 00:21:06,418
+simplest possible example where multivariate data
+
+333
+00:21:06,504 --> 00:21:08,690
+detection would be absolutely necessary.
+
+334
+00:21:10,230 --> 00:21:13,102
+So we're slowly nearing the end of the presentation.
+
+335
+00:21:13,166 --> 00:21:16,366
+Let's summarize. So first thing is that there's
+
+336
+00:21:16,398 --> 00:21:19,766
+two reasons why. Two main reasons why performance can
+
+337
+00:21:19,788 --> 00:21:23,990
+drop in machine learning models deployed in production. It is data drift and concept drift.
+
+338
+00:21:24,330 --> 00:21:28,646
+Data drift does not always lead to drop in performance, whereas concept drift tends
+
+339
+00:21:28,678 --> 00:21:31,846
+to almost always lead to drop
+
+340
+00:21:31,878 --> 00:21:35,878
+in performance. Ideally, we'd like to always calculate
+
+341
+00:21:35,894 --> 00:21:40,426
+the performance of a machine learning model in production to
+
+342
+00:21:40,448 --> 00:21:44,622
+really know whether there's any issues or not. However, this is rarely possible because
+
+343
+00:21:44,756 --> 00:21:48,778
+production targets are often not available because they are either delayed,
+
+344
+00:21:48,874 --> 00:21:52,240
+not available at all, or we dealing with an automation use case
+
+345
+00:21:52,610 --> 00:21:55,940
+where you can only get a very small percentage of these.
+
+346
+00:21:56,390 --> 00:21:59,554
+And that means that performance estimation of our target data is
+
+347
+00:21:59,592 --> 00:22:03,966
+key to machine learning monitoring because it allows us to estimate
+
+348
+00:22:04,078 --> 00:22:07,206
+what is the current performance of the model, whether we need to be worried or
+
+349
+00:22:07,228 --> 00:22:10,582
+not, and then we need to go back to data drive detection and
+
+350
+00:22:10,716 --> 00:22:13,974
+figure out why. So thanks
+
+351
+00:22:14,012 --> 00:22:17,142
+for listening. And if you'd like to learn more about
+
+352
+00:22:17,276 --> 00:22:20,386
+the topic about detection
+
+353
+00:22:20,418 --> 00:22:23,574
+of silent machine learning failures, either visit our
+
+354
+00:22:23,612 --> 00:22:26,594
+website, shoot me an email, add me on LinkedIn,
+
+355
+00:22:26,722 --> 00:22:29,682
+or most importantly, check out our GitHub.
+
+356
+00:22:29,746 --> 00:22:33,360
+We are, we've just launched our product,
+
+357
+00:22:33,890 --> 00:22:38,218
+so we have our GitHub. It's publicly available. You can just pip install the library
+
+358
+00:22:38,314 --> 00:22:42,078
+and use the method I described in the presentation. So,
+
+359
+00:22:42,164 --> 00:22:46,026
+yeah, that's it. Thank you very much, and I'm
+
+360
+00:22:46,058 --> 00:22:48,780
+happy to talk more on LinkedIn or anywhere else.
+

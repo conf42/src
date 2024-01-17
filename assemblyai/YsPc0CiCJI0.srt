@@ -1,0 +1,968 @@
+1
+00:01:28,130 --> 00:01:31,910
+Hi everyone and welcome to my talk. Distributed rogue based access
+
+2
+00:01:31,980 --> 00:01:35,522
+control with open policy agent I'm Serei Komachi,
+
+3
+00:01:35,586 --> 00:01:38,966
+senior technical leader at Miaplatform and what I will present you is
+
+4
+00:01:38,988 --> 00:01:41,998
+the work of the recent month when my team and I had to face a
+
+5
+00:01:42,004 --> 00:01:45,534
+new challenge. We had to change our authorization model from
+
+6
+00:01:45,572 --> 00:01:48,878
+simple session validation to using codebase access control.
+
+7
+00:01:48,964 --> 00:01:52,858
+In fact, in this talk I will present you our journey of discovery
+
+8
+00:01:52,954 --> 00:01:56,594
+for implementing a solution for errorback that worked for
+
+9
+00:01:56,632 --> 00:01:59,874
+our use case, but is built to be easily enough and
+
+10
+00:01:59,912 --> 00:02:02,978
+extensible to be generic and work
+
+11
+00:02:03,144 --> 00:02:06,642
+well in any context and platform. We will dive into technical
+
+12
+00:02:06,706 --> 00:02:10,786
+problems we faced with using a stack based on CNCF technologies
+
+13
+00:02:10,898 --> 00:02:13,970
+and how these problems affected our design decisions.
+
+14
+00:02:14,050 --> 00:02:17,798
+We will work a bit with Kubernetes open policy agent go,
+
+15
+00:02:17,884 --> 00:02:21,466
+and a few more. Of course, in this talk we may reference to Miaplatform as
+
+16
+00:02:21,488 --> 00:02:25,306
+it was the primary subject for our RBAC, but the same approach and
+
+17
+00:02:25,328 --> 00:02:29,558
+consideration can be applied to any other context. Before going any farther,
+
+18
+00:02:29,654 --> 00:02:32,686
+let's take a moment to review the basic of RBAC, which is
+
+19
+00:02:32,708 --> 00:02:36,414
+an authorization model meant to group actions user can take in your
+
+20
+00:02:36,452 --> 00:02:40,426
+platform into roles representing specific job functions.
+
+21
+00:02:40,618 --> 00:02:44,078
+These roles are then used to be assigned
+
+22
+00:02:44,094 --> 00:02:48,114
+to users. This model simplifies access control governance and makes your
+
+23
+00:02:48,152 --> 00:02:51,262
+platform more secure, allowing for easier
+
+24
+00:02:51,326 --> 00:02:54,866
+auditing and easier permission updates. Since you are limited to
+
+25
+00:02:54,888 --> 00:02:58,706
+take action on a specific role rather than each individual user.
+
+26
+00:02:58,818 --> 00:03:02,306
+Okay, that's enough. Introduction with the basic of errorback
+
+27
+00:03:02,338 --> 00:03:05,714
+set, let's start our journey. Even though using RBAC
+
+28
+00:03:05,762 --> 00:03:09,570
+seems pretty reasonable, more security, easy auditing and updates
+
+29
+00:03:09,650 --> 00:03:13,546
+is cool. Errorback is not something you may see every day as it
+
+30
+00:03:13,568 --> 00:03:16,954
+does not come for free. You either buy a ready made solution or
+
+31
+00:03:16,992 --> 00:03:20,186
+invest much time and resources to build your own.
+
+32
+00:03:20,288 --> 00:03:23,926
+So why did we need to introducing erbuck? Well, when we
+
+33
+00:03:23,968 --> 00:03:27,534
+platform users using our product are capable of
+
+34
+00:03:27,572 --> 00:03:31,520
+performing several different actions impacting their software application
+
+35
+00:03:31,970 --> 00:03:35,146
+running on kubernetes. To say a few users can
+
+36
+00:03:35,188 --> 00:03:38,734
+configure a microservice, define a new data model, deploy,
+
+37
+00:03:38,782 --> 00:03:42,306
+monitor and scale their services on a runtime environment. As you
+
+38
+00:03:42,328 --> 00:03:46,082
+can understand, it is not safe enough to let any user perform every
+
+39
+00:03:46,136 --> 00:03:49,510
+actions available. For this reason we identified different
+
+40
+00:03:49,580 --> 00:03:53,330
+personas, to say a few examples. We have owners
+
+41
+00:03:53,410 --> 00:03:57,046
+that can do any actions they want. They are the owners. We have
+
+42
+00:03:57,068 --> 00:04:00,986
+developers who may be able to perform limited actions on
+
+43
+00:04:01,008 --> 00:04:04,886
+their configuration or deploy on certain runtime environments,
+
+44
+00:04:04,998 --> 00:04:08,966
+and we have guests who have read only access to a specific subset
+
+45
+00:04:08,998 --> 00:04:12,682
+of resources. Based on these personas, we identified.
+
+46
+00:04:12,826 --> 00:04:16,634
+We then mapped each of our APIs that requested
+
+47
+00:04:16,682 --> 00:04:20,414
+a different access level, and each of these APIs is
+
+48
+00:04:20,452 --> 00:04:23,726
+mapped to a specific permission. We defined our own naming
+
+49
+00:04:23,758 --> 00:04:27,870
+conventions for permission and eventually grouped our list of capabilities
+
+50
+00:04:27,950 --> 00:04:30,814
+into roles. After defining our roles,
+
+51
+00:04:30,942 --> 00:04:35,538
+we decided to take a step farther as we noticed that API access control
+
+52
+00:04:35,704 --> 00:04:39,206
+has basically two different behaviors. In fact, we had a
+
+53
+00:04:39,228 --> 00:04:42,690
+set of API that has to be completely blocked
+
+54
+00:04:42,770 --> 00:04:46,466
+from unrestrict undesired access, while other APIs
+
+55
+00:04:46,578 --> 00:04:50,074
+were open to many different users. But the data this
+
+56
+00:04:50,112 --> 00:04:53,866
+user may see have to be different, either because we have
+
+57
+00:04:53,888 --> 00:04:57,274
+to filter some list of documents or because some
+
+58
+00:04:57,312 --> 00:05:01,034
+fields in the response body payload have some
+
+59
+00:05:01,072 --> 00:05:05,382
+visibility restrictions. For these reasons, we defined three requirements
+
+60
+00:05:05,446 --> 00:05:09,514
+our Airbux solution had to meet in order for us to be usable
+
+61
+00:05:09,642 --> 00:05:13,306
+as we wanted to decide whether a request is allowed
+
+62
+00:05:13,338 --> 00:05:17,138
+or not. So grant access to it or deny access to it.
+
+63
+00:05:17,224 --> 00:05:20,114
+And we wanted to filter data in two different ways.
+
+64
+00:05:20,232 --> 00:05:24,014
+We wanted to be able to filter data before they were retrieved
+
+65
+00:05:24,062 --> 00:05:28,054
+from the database in order for our services to only operate with
+
+66
+00:05:28,092 --> 00:05:31,698
+previously authorized data and we wanted to modify
+
+67
+00:05:31,794 --> 00:05:34,950
+the response body in order to take
+
+68
+00:05:35,100 --> 00:05:39,686
+much more granular control on the field visibility
+
+69
+00:05:39,798 --> 00:05:43,654
+of their users. Okay, so we identified our user,
+
+70
+00:05:43,782 --> 00:05:47,434
+our roles and our permission. We have the requirements set,
+
+71
+00:05:47,552 --> 00:05:51,458
+we start coding, right? No, unlikely, no opening
+
+72
+00:05:51,494 --> 00:05:54,874
+our editor and starting implementing our solution
+
+73
+00:05:54,922 --> 00:05:58,746
+has to wait. In fact, we have to address two important concerns.
+
+74
+00:05:58,858 --> 00:06:02,878
+First of all, where are we going to write our code and
+
+75
+00:06:02,964 --> 00:06:07,074
+how are written RBAC decisions? And second concern is
+
+76
+00:06:07,192 --> 00:06:11,202
+we know for sure that every single request in our platform will
+
+77
+00:06:11,256 --> 00:06:14,482
+run through RBAC. So how do we make it
+
+78
+00:06:14,536 --> 00:06:17,458
+resilient enough to very high request volumes?
+
+79
+00:06:17,554 --> 00:06:21,654
+Let's try and answer these questions. So where is the code?
+
+80
+00:06:21,772 --> 00:06:25,350
+Well, the first thing that came to our mind was this easiest one.
+
+81
+00:06:25,420 --> 00:06:28,758
+Let's embed herback code into each service. That's a
+
+82
+00:06:28,764 --> 00:06:32,474
+hard solution as we know for sure that we were incurring a lot of code
+
+83
+00:06:32,512 --> 00:06:36,054
+duplication. So yeah, we can write some software
+
+84
+00:06:36,102 --> 00:06:39,866
+library to abstract the complexity, right? Of course
+
+85
+00:06:39,968 --> 00:06:43,614
+we can do write libraries, but in an application composed of
+
+86
+00:06:43,652 --> 00:06:46,590
+different microservices written in different languages,
+
+87
+00:06:46,930 --> 00:06:49,450
+we would have to write a lot of libraries.
+
+88
+00:06:49,610 --> 00:06:53,662
+Also, we did not want to create a potential barrier
+
+89
+00:06:53,726 --> 00:06:57,566
+for adopting of new technologies that needed the errorback
+
+90
+00:06:57,598 --> 00:07:01,054
+library to be written first before they were usable.
+
+91
+00:07:01,182 --> 00:07:04,546
+And eventually recoding errorback into each service would
+
+92
+00:07:04,568 --> 00:07:07,766
+be extremely disruptive for our code base. We would
+
+93
+00:07:07,788 --> 00:07:11,126
+have to change the code of many services and with the risk of
+
+94
+00:07:11,148 --> 00:07:14,774
+introducing bugs and regression in existing code base,
+
+95
+00:07:14,972 --> 00:07:19,006
+that risk is too much to be taken lightly.
+
+96
+00:07:19,138 --> 00:07:23,030
+For these reasons, we decided that there should be some new component
+
+97
+00:07:23,110 --> 00:07:26,442
+in our architecture that holds all the arabic code.
+
+98
+00:07:26,576 --> 00:07:29,706
+Now for the second question, it gets a
+
+99
+00:07:29,728 --> 00:07:33,614
+bit trickier because we decided to introducing a new component in our
+
+100
+00:07:33,652 --> 00:07:37,566
+Kubernetes architecture and we know for sure that this component will
+
+101
+00:07:37,588 --> 00:07:41,274
+be contacted for all the API requests.
+
+102
+00:07:41,402 --> 00:07:44,402
+So how do we make it resilient? Okay,
+
+103
+00:07:44,536 --> 00:07:46,340
+we could deploy a new service,
+
+104
+00:07:47,270 --> 00:07:50,574
+centralized service, and horizontally scale it to sustain
+
+105
+00:07:50,622 --> 00:07:54,260
+high volumes. However, we would incur into two problems.
+
+106
+00:07:54,630 --> 00:07:58,690
+The first one being that we're introducing a single point of failure.
+
+107
+00:07:58,850 --> 00:08:02,310
+No matter the scaling, if it goes down, everything is down.
+
+108
+00:08:02,460 --> 00:08:06,114
+And the second problem is how is it invoked?
+
+109
+00:08:06,242 --> 00:08:10,154
+Should every service invoke it? Again, that's disrupting for the code
+
+110
+00:08:10,192 --> 00:08:14,410
+base. And so we took our second decision. Our backcode
+
+111
+00:08:14,830 --> 00:08:18,806
+should be somehow intercepting requests and be distributed
+
+112
+00:08:18,838 --> 00:08:22,214
+among the service that need it. Okay, now that we addressed
+
+113
+00:08:22,262 --> 00:08:25,486
+our concerns, we can proceed with the design. Since we are
+
+114
+00:08:25,508 --> 00:08:29,274
+running our application as pods in a Kubernetes cluster, we decided
+
+115
+00:08:29,322 --> 00:08:33,022
+to adopt the sidecar container pattern. And so we deploy our
+
+116
+00:08:33,076 --> 00:08:36,466
+erbux sidecar with all the services holding ownership on
+
+117
+00:08:36,488 --> 00:08:39,218
+a specific resource. To make a clear example,
+
+118
+00:08:39,384 --> 00:08:43,186
+the services that provide APIs for managing the configuration of
+
+119
+00:08:43,208 --> 00:08:47,074
+a project is in charge of making airbag decisions for that
+
+120
+00:08:47,112 --> 00:08:50,882
+resource. So it is that service that will block any attempt
+
+121
+00:08:50,946 --> 00:08:54,614
+to change the configuration of a project by a user that has not
+
+122
+00:08:54,652 --> 00:08:58,182
+enough permission to do so. Also, in order to operate
+
+123
+00:08:58,246 --> 00:09:01,494
+the sitecare container, intercepts all the incoming
+
+124
+00:09:01,542 --> 00:09:05,254
+requests, performs all the necessary
+
+125
+00:09:05,302 --> 00:09:08,570
+authorization controls, and if everything is fine,
+
+126
+00:09:08,640 --> 00:09:12,606
+the request is proxied to the application container. Otherwise the
+
+127
+00:09:12,628 --> 00:09:16,094
+API is immediately rejected. Okay, but how
+
+128
+00:09:16,132 --> 00:09:20,094
+is the sitecare built? Creating a new service allows us to be
+
+129
+00:09:20,132 --> 00:09:23,386
+language agnostic and so we can adopt any language we prefer.
+
+130
+00:09:23,498 --> 00:09:26,722
+We decided to use go as it helps us keeping a lower
+
+131
+00:09:26,776 --> 00:09:30,686
+source consumption profile while being able to keep a high request throughput.
+
+132
+00:09:30,798 --> 00:09:34,366
+Please note that these two are not the only factors that contributed
+
+133
+00:09:34,398 --> 00:09:38,066
+in our language choice, but for now let's accept them as they
+
+134
+00:09:38,088 --> 00:09:41,706
+are. And so the design is now clear without our buck,
+
+135
+00:09:41,758 --> 00:09:45,078
+any request the user does to an API is received by the
+
+136
+00:09:45,084 --> 00:09:49,030
+application container and the response is immediately returned to it.
+
+137
+00:09:49,180 --> 00:09:52,454
+However, as soon as we introduce our back
+
+138
+00:09:52,492 --> 00:09:55,910
+sitecare container, we are able to intercept each request
+
+139
+00:09:55,990 --> 00:09:59,958
+and decide whether it should be rejected or allowed.
+
+140
+00:10:00,134 --> 00:10:03,326
+Okay, at this point we were happy with the design, but we had to
+
+141
+00:10:03,348 --> 00:10:07,034
+ask ourselves, does this design still meet our original
+
+142
+00:10:07,082 --> 00:10:10,554
+requirements? Remember that we wanted to be able to assign
+
+143
+00:10:10,602 --> 00:10:14,750
+job function roles such as guest developer maintainer to
+
+144
+00:10:14,820 --> 00:10:18,546
+the users in order to decide whether to give access or
+
+145
+00:10:18,568 --> 00:10:22,466
+not to a specific API in order to filter data before they
+
+146
+00:10:22,488 --> 00:10:26,182
+were retrieved from the database, and to manipulate the response body
+
+147
+00:10:26,316 --> 00:10:29,078
+in order to restrict even more data access.
+
+148
+00:10:29,244 --> 00:10:32,806
+Luckily, the sitecare design doesn't provide any obstacle to
+
+149
+00:10:32,828 --> 00:10:36,706
+these requirements. However, the sitecare itself must be implemented
+
+150
+00:10:36,738 --> 00:10:40,422
+from scratch. All these requirements must be mapped into
+
+151
+00:10:40,476 --> 00:10:44,230
+code and some configuration that let the sitecare knows how to behave.
+
+152
+00:10:44,310 --> 00:10:48,454
+Based on each API we would have to write the service that receives
+
+153
+00:10:48,502 --> 00:10:52,720
+some big configuration maps, every API with an action to take,
+
+154
+00:10:53,570 --> 00:10:57,582
+which properties to filter, and so on and so forth. So that
+
+155
+00:10:57,636 --> 00:11:00,750
+seemed a bit complicated and the team was worried and asked,
+
+156
+00:11:00,900 --> 00:11:04,814
+do we really have to make this? Luckily, the answer was
+
+157
+00:11:04,852 --> 00:11:08,258
+no. In fact, we decided to adopt open policy
+
+158
+00:11:08,344 --> 00:11:11,858
+agent, which is an open source general purpose policy engine
+
+159
+00:11:11,944 --> 00:11:15,394
+that can be used to perform pretty much any kind of query thanks
+
+160
+00:11:15,432 --> 00:11:19,522
+to Rego, a declarative language designed for policymaking.
+
+161
+00:11:19,666 --> 00:11:22,934
+Rego is a full fledged programming language, and so it
+
+162
+00:11:22,972 --> 00:11:25,910
+allows us to write security policies as code,
+
+163
+00:11:26,060 --> 00:11:28,662
+test them, and deploy production with it.
+
+164
+00:11:28,796 --> 00:11:32,234
+OPA provide sdks in several languages to
+
+165
+00:11:32,272 --> 00:11:35,674
+directly integrate it in your application, and it is here
+
+166
+00:11:35,712 --> 00:11:38,922
+that their Golang SDK shines, allowing us to take
+
+167
+00:11:38,976 --> 00:11:42,114
+full control of their engine. With direct SDK,
+
+168
+00:11:42,182 --> 00:11:46,046
+we are able to do much more than simply running policies. We can
+
+169
+00:11:46,148 --> 00:11:49,786
+also isolate the engine recompile policies to improve
+
+170
+00:11:49,818 --> 00:11:54,174
+evaluation performance, prepare data stores, and create dynamic input
+
+171
+00:11:54,222 --> 00:11:57,986
+information to be supplied to the running policies, allowing us
+
+172
+00:11:58,008 --> 00:12:01,666
+to make decisions having everything we need to know
+
+173
+00:12:01,768 --> 00:12:04,126
+from the API that we are protecting.
+
+174
+00:12:04,318 --> 00:12:06,760
+So how is it actually made?
+
+175
+00:12:07,130 --> 00:12:10,786
+As anticipated, in order to integrate with OPA and Rego
+
+176
+00:12:10,818 --> 00:12:13,878
+policies, our service has to gather a few information,
+
+177
+00:12:14,044 --> 00:12:17,858
+bundles them together, and eventually run the policy evaluation.
+
+178
+00:12:18,034 --> 00:12:22,086
+To do so, it collects data from the request of the order response.
+
+179
+00:12:22,118 --> 00:12:25,382
+Depending on the flow we are protecting, we take the headers,
+
+180
+00:12:25,446 --> 00:12:29,130
+the complete URL and its parameters, and the request body.
+
+181
+00:12:29,280 --> 00:12:32,938
+Then we fetch data from our user role binding database
+
+182
+00:12:33,034 --> 00:12:36,142
+to be able to understand what the users can do
+
+183
+00:12:36,196 --> 00:12:39,338
+based on the permission mapping. And eventually,
+
+184
+00:12:39,434 --> 00:12:43,166
+after a few data preparation, OPA policy are loaded from a
+
+185
+00:12:43,188 --> 00:12:46,494
+configuration and run using all previously bundled
+
+186
+00:12:46,542 --> 00:12:49,906
+data. Okay, let's see some policy examples that can
+
+187
+00:12:49,928 --> 00:12:53,666
+be used to solve our constraints and see if they're good enough for us
+
+188
+00:12:53,688 --> 00:12:57,206
+to use. So the allowed policies example that we
+
+189
+00:12:57,228 --> 00:13:00,710
+see here is an example of a grant or deny access
+
+190
+00:13:00,780 --> 00:13:04,470
+policy. So this policy takes the project
+
+191
+00:13:04,540 --> 00:13:07,858
+Id provided in the input request path parameters,
+
+192
+00:13:08,034 --> 00:13:11,802
+defines an iterator, and then looks through each of the
+
+193
+00:13:11,856 --> 00:13:15,526
+resource bindings that are defined in our role
+
+194
+00:13:15,718 --> 00:13:19,386
+binding database. If there is
+
+195
+00:13:19,408 --> 00:13:23,338
+a binding that is mapped to this specific project id and
+
+196
+00:13:23,424 --> 00:13:27,066
+holds the permission project, view the policy results
+
+197
+00:13:27,098 --> 00:13:31,166
+to true if any of this assertion is false. Otherwise the
+
+198
+00:13:31,188 --> 00:13:35,060
+policy is rejected and the API is not proxy to
+
+199
+00:13:35,430 --> 00:13:38,290
+the other container. In this other example,
+
+200
+00:13:38,360 --> 00:13:42,158
+we see a query generation policy which is a bit more trickier
+
+201
+00:13:42,334 --> 00:13:46,386
+as it uses the OPA concept of unknown data to
+
+202
+00:13:46,408 --> 00:13:50,034
+be able for the policy to return a set of variables definition
+
+203
+00:13:50,162 --> 00:13:53,762
+in the form of the assertion you see here. These definitions
+
+204
+00:13:53,826 --> 00:13:57,138
+are later used by the service to generate a query
+
+205
+00:13:57,234 --> 00:14:00,474
+that is provided to the API underneath and so it
+
+206
+00:14:00,512 --> 00:14:03,500
+can filter data. In this last example,
+
+207
+00:14:05,550 --> 00:14:09,114
+we are running the policy in the response flow and we are able to
+
+208
+00:14:09,152 --> 00:14:12,346
+provide rego with the regional response body received from the
+
+209
+00:14:12,368 --> 00:14:15,998
+application service. The policy can then manipulate it.
+
+210
+00:14:16,084 --> 00:14:19,518
+In this example, we are going to drop the sales forecast property,
+
+211
+00:14:19,604 --> 00:14:23,710
+for instance from each document in the list using a simple
+
+212
+00:14:23,780 --> 00:14:27,314
+list comprehension okay, we are at the end of this
+
+213
+00:14:27,352 --> 00:14:31,074
+talk, but before saying goodbye, let's share some final thoughts on this
+
+214
+00:14:31,112 --> 00:14:34,658
+design with this solution. In fact, we were able to create a
+
+215
+00:14:34,664 --> 00:14:38,310
+platform that complies with many best practices. In fact,
+
+216
+00:14:38,380 --> 00:14:41,782
+by writing security policy as code, we are able to test
+
+217
+00:14:41,836 --> 00:14:44,934
+them and make sure we don't introduce any regression in our
+
+218
+00:14:44,972 --> 00:14:48,770
+authorization model. Also, having all the policies centralized
+
+219
+00:14:48,850 --> 00:14:52,026
+in a single place allows us to define Orego functions to
+
+220
+00:14:52,048 --> 00:14:55,782
+abstract complex logics and always have an overall overview
+
+221
+00:14:55,846 --> 00:14:59,414
+on what our policies do. Also, from a scaling
+
+222
+00:14:59,462 --> 00:15:03,418
+and high availability perspective, even though we introduced a
+
+223
+00:15:03,424 --> 00:15:06,734
+new hope in the request call chain, we measured a very
+
+224
+00:15:06,772 --> 00:15:10,714
+low latency introduction and having a background as a sidecar
+
+225
+00:15:10,762 --> 00:15:14,434
+gives us the possibility to scale and boost resources on the most
+
+226
+00:15:14,472 --> 00:15:18,350
+requested services while keeping other with tighter resources.
+
+227
+00:15:18,510 --> 00:15:22,066
+Also, thanks to OPA and Rego, we can express any kind
+
+228
+00:15:22,088 --> 00:15:25,294
+of security policy we want. So for real, the sky
+
+229
+00:15:25,342 --> 00:15:28,834
+is the limit okay, now the talk is over and I leave
+
+230
+00:15:28,872 --> 00:15:32,646
+you here some links the first one is OPA. It is an
+
+231
+00:15:32,668 --> 00:15:35,986
+amazing tool as you may have seen, and I strongly recommend you checking
+
+232
+00:15:36,018 --> 00:15:39,206
+it out if you don't know it. The second one is a blog post I
+
+233
+00:15:39,228 --> 00:15:42,502
+wrote for mia platform and it dives into more details about our
+
+234
+00:15:42,556 --> 00:15:46,070
+use case, so if you're interested, you can check it out too.
+
+235
+00:15:46,220 --> 00:15:50,110
+Now, whether you like it or not, these talk I would
+
+236
+00:15:50,220 --> 00:15:53,662
+really appreciate if you leave a feedback, so please scan the correct
+
+237
+00:15:53,716 --> 00:15:57,006
+code and submit the form. Thank you for your time.
+
+238
+00:15:57,108 --> 00:16:00,302
+I really hope that you found this talk interesting and
+
+239
+00:16:00,356 --> 00:16:03,726
+if you wish to follow me I don't use much social network, but you can
+
+240
+00:16:03,748 --> 00:16:07,754
+find me on GitHub and LinkedIn. I am even on Discord.
+
+241
+00:16:07,882 --> 00:16:11,118
+So if you have any questions, you can find me there now.
+
+242
+00:16:11,204 --> 00:16:11,950
+Thanks a lot,
+

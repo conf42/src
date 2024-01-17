@@ -1,0 +1,1640 @@
+1
+00:01:28,770 --> 00:01:32,386
+This is Giovannijilisko and in the next 20 minutes or so I'll
+
+2
+00:01:32,418 --> 00:01:35,990
+share with you some of our experiences in tuning applications running
+
+3
+00:01:36,060 --> 00:01:39,286
+on kubernetes. These are the contents that
+
+4
+00:01:39,308 --> 00:01:42,970
+we will cover. We'll start by identifying some challenges
+
+5
+00:01:43,050 --> 00:01:47,226
+of modern applications for ensuring performance and reliability.
+
+6
+00:01:47,418 --> 00:01:50,794
+We'll then review how Kubernetes manages container
+
+7
+00:01:50,842 --> 00:01:54,418
+resources and the factors we need to be aware of if we want
+
+8
+00:01:54,424 --> 00:01:57,246
+to ensure high performance and cost efficiency.
+
+9
+00:01:57,438 --> 00:02:00,990
+We will introduce a new approach we implemented at Akamas,
+
+10
+00:02:01,070 --> 00:02:04,642
+which leverages machine learning to automate the optimization process,
+
+11
+00:02:04,776 --> 00:02:07,720
+and we will do that with a real world example.
+
+12
+00:02:08,090 --> 00:02:11,350
+Finally, we will conclude by sharing some takeaways.
+
+13
+00:02:11,770 --> 00:02:15,458
+Before proceeding, let me introduce myself. My name Giovanni Paolo
+
+14
+00:02:15,474 --> 00:02:18,850
+Gibilisco and I serve as head of engineering at Akamas.
+
+15
+00:02:19,010 --> 00:02:23,194
+Okay, let's start with a quick overview of some of the main challenges that
+
+16
+00:02:23,232 --> 00:02:26,874
+comes with the development of modern applications. The advent of
+
+17
+00:02:26,912 --> 00:02:30,906
+agile practices allowed developers to speed up the development cycle
+
+18
+00:02:31,018 --> 00:02:34,426
+with the goal of getting rapid feedback and iteratively
+
+19
+00:02:34,458 --> 00:02:38,250
+improve applications. Though increasing the release frequency,
+
+20
+00:02:38,410 --> 00:02:41,470
+it's now common to see applications, or part of them,
+
+21
+00:02:41,540 --> 00:02:45,442
+released to production weekly or even daily. At the same time,
+
+22
+00:02:45,496 --> 00:02:49,358
+the underlying frameworks and runtimes, such as the JVM
+
+23
+00:02:49,454 --> 00:02:53,170
+that are used to build those applications, have grown in complexity.
+
+24
+00:02:53,670 --> 00:02:57,874
+The emergence of architectural patterns such as microservices
+
+25
+00:02:58,002 --> 00:03:02,066
+have also brought an increase in the number of frameworks and technologies
+
+26
+00:03:02,178 --> 00:03:05,526
+used within a single application. It's now common to
+
+27
+00:03:05,548 --> 00:03:09,018
+see application composed by tens or even hundreds of services,
+
+28
+00:03:09,184 --> 00:03:13,094
+written in different languages and interacting with multiple
+
+29
+00:03:13,142 --> 00:03:16,346
+runtimes and databases. Kubernetes provides a
+
+30
+00:03:16,368 --> 00:03:19,754
+great platform to run such applications, but it has its
+
+31
+00:03:19,792 --> 00:03:23,082
+own complexities. These Kubernetes
+
+32
+00:03:23,146 --> 00:03:26,378
+failure stories is a website specifically created
+
+33
+00:03:26,394 --> 00:03:29,806
+to share incident reports in order to allow the community
+
+34
+00:03:29,908 --> 00:03:33,326
+to learn from failures and prevent them for further
+
+35
+00:03:33,438 --> 00:03:37,474
+happening. Many of these stories describe teams struggling with
+
+36
+00:03:37,512 --> 00:03:41,154
+Kubernetes application performance and stability issues such
+
+37
+00:03:41,192 --> 00:03:45,066
+as unexpected cpu's, loaddowns and even sudden container
+
+38
+00:03:45,118 --> 00:03:48,486
+terminations. Engineers at Airbnb even got
+
+39
+00:03:48,508 --> 00:03:52,486
+to the point of suggesting that Kubernetes may actually hurt the
+
+40
+00:03:52,508 --> 00:03:56,534
+performance of latency sensitive applications. But why
+
+41
+00:03:56,572 --> 00:04:00,534
+it's so difficult to manage application performance, stability and efficiency
+
+42
+00:04:00,582 --> 00:04:03,978
+on Kubernetes? The simple answer is that Kubernetes is a
+
+43
+00:04:03,984 --> 00:04:07,894
+glaze platform to run containerized applications, but it requires
+
+44
+00:04:07,942 --> 00:04:11,674
+applications to be carefully configured to ensure high performance
+
+45
+00:04:11,722 --> 00:04:15,342
+and stability, as we're going to see. To answer
+
+46
+00:04:15,396 --> 00:04:19,450
+this question, let's now get back to the fundamentals and see how Kubernetes
+
+47
+00:04:19,530 --> 00:04:23,234
+resource management works to better understand the
+
+48
+00:04:23,272 --> 00:04:26,558
+main parameters that impact Kubernetes application performance,
+
+49
+00:04:26,654 --> 00:04:29,810
+stability and cost efficiency. Let's go through
+
+50
+00:04:29,880 --> 00:04:32,850
+five main key aspects and their implications.
+
+51
+00:04:33,430 --> 00:04:37,314
+The first important concept is resource requests.
+
+52
+00:04:37,442 --> 00:04:40,934
+When a developer is defined pod, she has the possibility to
+
+53
+00:04:40,972 --> 00:04:44,914
+specify resource results. These are the amount of cpu
+
+54
+00:04:44,962 --> 00:04:48,870
+and memory the pod or better, a container within the pod
+
+55
+00:04:48,950 --> 00:04:52,726
+is guaranteed to get. Kubernetes will schedule
+
+56
+00:04:52,758 --> 00:04:56,154
+the pod on a node where the requested resources are
+
+57
+00:04:56,192 --> 00:04:58,778
+actually available. In this example,
+
+58
+00:04:58,864 --> 00:05:02,782
+pod a acquires two cpus and is scheduled on a
+
+59
+00:05:02,836 --> 00:05:05,918
+four cpu node. When a new pod b on the
+
+60
+00:05:05,924 --> 00:05:09,198
+same side is created, it can also be scheduled on
+
+61
+00:05:09,204 --> 00:05:13,134
+the same node. This node now has all of its four
+
+62
+00:05:13,172 --> 00:05:16,606
+cpus requested. If a pod c is created,
+
+63
+00:05:16,718 --> 00:05:20,546
+Kubernetes won't schedule it on the same node as its
+
+64
+00:05:20,568 --> 00:05:24,350
+capacity is full. This means that those numbers these developers
+
+65
+00:05:24,430 --> 00:05:28,246
+specify in the deployment yaml are directly affect the
+
+66
+00:05:28,268 --> 00:05:32,354
+cluster capacity. A strong difference with respect to virtualization
+
+67
+00:05:32,482 --> 00:05:36,054
+and hypervisors is that with Kubernetes there is
+
+68
+00:05:36,092 --> 00:05:40,090
+no overcommitment on the requests. You cannot request more
+
+69
+00:05:40,160 --> 00:05:42,854
+cpus than those available in the cluster.
+
+70
+00:05:42,982 --> 00:05:46,794
+Another important aspect is that resource requests are
+
+71
+00:05:46,832 --> 00:05:50,794
+not equal to utilization. If pod requests are
+
+72
+00:05:50,832 --> 00:05:54,506
+much higher than the actual resource usage, you might end up with these cluster
+
+73
+00:05:54,538 --> 00:05:58,174
+that is at full capacity even though its cpu utilization is
+
+74
+00:05:58,212 --> 00:06:01,594
+only 10%. So the takeaway
+
+75
+00:06:01,642 --> 00:06:04,674
+here is that setting proper pod request is
+
+76
+00:06:04,712 --> 00:06:08,242
+paramount to ensure Kubernetes cost efficiency. The second
+
+77
+00:06:08,296 --> 00:06:11,810
+important concept is resource limits.
+
+78
+00:06:12,230 --> 00:06:15,598
+Resource requests are guaranteed resources that
+
+79
+00:06:15,624 --> 00:06:19,206
+a container will get, but usage can be higher.
+
+80
+00:06:19,388 --> 00:06:23,026
+Resource limits is the mechanisms that allows you to define
+
+81
+00:06:23,058 --> 00:06:26,710
+the maximum amount of resources that a container can use,
+
+82
+00:06:26,860 --> 00:06:30,230
+like two cpus or 1gb of memory.
+
+83
+00:06:30,730 --> 00:06:34,934
+All this is great, but what happens when resource usage hits
+
+84
+00:06:34,982 --> 00:06:38,102
+the limit? Kubernetes treat cpu and memory
+
+85
+00:06:38,166 --> 00:06:41,482
+differently here. When a cpu usage approaches the limit,
+
+86
+00:06:41,546 --> 00:06:45,530
+the container gets throttled. This means that these cpu is artificially
+
+87
+00:06:45,610 --> 00:06:49,594
+restricted and this usually results in application performance
+
+88
+00:06:49,642 --> 00:06:53,278
+issues. Instead, when memory usage hits the limit,
+
+89
+00:06:53,374 --> 00:06:56,786
+the container gets terminated, so there is no application
+
+90
+00:06:56,888 --> 00:07:00,382
+slowdown due to paging or swapping as we had in traditional
+
+91
+00:07:00,446 --> 00:07:03,986
+operating systems. With the Kubernetes your pod will
+
+92
+00:07:04,008 --> 00:07:08,178
+simply disappear and you may face serious application stability
+
+93
+00:07:08,274 --> 00:07:12,022
+issues. The third fact is about an important and less
+
+94
+00:07:12,076 --> 00:07:16,290
+known effect that cpu limits have on application performance.
+
+95
+00:07:16,450 --> 00:07:20,282
+We have seen that cpu limits called throttling and you may think that
+
+96
+00:07:20,336 --> 00:07:23,830
+this happens only when cpu usage hits the limit.
+
+97
+00:07:23,990 --> 00:07:27,366
+Surprisingly, the reality is that cpu throttling starts
+
+98
+00:07:27,398 --> 00:07:31,194
+even when cpu usage is well below the limit. We did
+
+99
+00:07:31,232 --> 00:07:34,878
+quite a bit of research on this aspect in our labs and found
+
+100
+00:07:34,964 --> 00:07:38,334
+that cpu throttling start when cpu usage is as
+
+101
+00:07:38,372 --> 00:07:41,898
+low as 30% of the limit. This is due
+
+102
+00:07:41,914 --> 00:07:46,018
+to a particular way cpu limits are implemented at the Linux kernel level.
+
+103
+00:07:46,184 --> 00:07:49,794
+These aggressive cpu throttling has a huge impact on
+
+104
+00:07:49,832 --> 00:07:53,550
+service performance. You can get sudden latency spikes
+
+105
+00:07:53,630 --> 00:07:56,982
+that may breach your slos without any apparent reason,
+
+106
+00:07:57,116 --> 00:08:00,678
+even at low cpu usage. Now, some people,
+
+107
+00:08:00,764 --> 00:08:04,482
+including engineers at buffers, tried to remove cpu limits.
+
+108
+00:08:04,626 --> 00:08:08,386
+What these got was an impressive reduction of service latency.
+
+109
+00:08:08,578 --> 00:08:12,410
+So is it a good idea to get rid of cpu limits?
+
+110
+00:08:13,310 --> 00:08:16,586
+Apparently not. Cpu limits exist to
+
+111
+00:08:16,608 --> 00:08:19,770
+bound the amount of resources a container can consume.
+
+112
+00:08:20,290 --> 00:08:23,866
+This allows many containers to coexist without competing
+
+113
+00:08:23,898 --> 00:08:27,246
+for the same resources. So if cpu limits are
+
+114
+00:08:27,268 --> 00:08:30,906
+removed, a single Runway container can disrupt the performance
+
+115
+00:08:30,938 --> 00:08:34,194
+and availability of your most critical services.
+
+116
+00:08:34,392 --> 00:08:38,510
+It might also make the Kubelet service unresponsive and effectively
+
+117
+00:08:38,590 --> 00:08:41,842
+remove the entire node from the cluster using
+
+118
+00:08:41,896 --> 00:08:45,718
+cpu limits. Is these best practice also recommended by Google?
+
+119
+00:08:45,884 --> 00:08:49,362
+Properly setting your cpu requests and limits is critical
+
+120
+00:08:49,426 --> 00:08:52,754
+to ensuring your Kubernetes cluster remains stable and efficient
+
+121
+00:08:52,802 --> 00:08:56,534
+over time. To ease the management of
+
+122
+00:08:56,572 --> 00:08:59,786
+limits and requests for many services, Kubernetes comes with
+
+123
+00:08:59,808 --> 00:09:03,526
+autoscaling. Let's discuss built in autoscaling
+
+124
+00:09:03,558 --> 00:09:06,954
+capabilities that are often considered as a way to automate this
+
+125
+00:09:06,992 --> 00:09:10,818
+process. In particular, the vertical pod autoscaler
+
+126
+00:09:10,854 --> 00:09:15,050
+or VPA provides recommended cpu and memory requests
+
+127
+00:09:15,130 --> 00:09:18,170
+based on the observed pod resource usage.
+
+128
+00:09:18,330 --> 00:09:21,818
+However, our experience with a VPA is mixed.
+
+129
+00:09:21,994 --> 00:09:25,482
+In this example, a Kubernetes microservice is serving a typical
+
+130
+00:09:25,546 --> 00:09:29,058
+dernel traffic pattern. The top left chart shows the
+
+131
+00:09:29,064 --> 00:09:32,638
+latency of this service and its service level objective,
+
+132
+00:09:32,814 --> 00:09:36,510
+while below you can see the resource request, cpu and memory,
+
+133
+00:09:36,590 --> 00:09:39,110
+and the corresponding resource utilization.
+
+134
+00:09:39,530 --> 00:09:43,234
+We let this service run for a couple of days with some initial resource
+
+135
+00:09:43,282 --> 00:09:47,126
+sizing, then activated the VPA and let it applied the new
+
+136
+00:09:47,148 --> 00:09:49,050
+recommended setting to the pod.
+
+137
+00:09:50,030 --> 00:09:53,626
+It's interesting to see that the VPA immediately decided to
+
+138
+00:09:53,648 --> 00:09:56,906
+reduce these assigned resources. In particularly, it cut in
+
+139
+00:09:56,928 --> 00:10:00,406
+half the cpu requests. This is likely due
+
+140
+00:10:00,438 --> 00:10:03,898
+to some apparent overprovisioning of these service as the cpu
+
+141
+00:10:03,914 --> 00:10:06,320
+utilization was below 50%.
+
+142
+00:10:07,090 --> 00:10:10,618
+However, with the new settings suggested by the VPA,
+
+143
+00:10:10,714 --> 00:10:15,230
+the latency of the microservice skyrocketed, breaching our slos.
+
+144
+00:10:16,050 --> 00:10:20,066
+What is the lesson heard here? Kubernetes autoscaling and
+
+145
+00:10:20,088 --> 00:10:23,666
+the VPA in particular is based on resource usage and
+
+146
+00:10:23,688 --> 00:10:27,718
+does not consider application level metrics like response time.
+
+147
+00:10:27,884 --> 00:10:31,686
+We need to evaluate the effect of the recommended settings as they
+
+148
+00:10:31,708 --> 00:10:35,570
+might be somewhat aggressive and cause severe service performance
+
+149
+00:10:35,650 --> 00:10:40,314
+or reliability degradations as
+
+150
+00:10:40,352 --> 00:10:44,710
+we've seen so far, optimizing microservice applications on Kubernetes
+
+151
+00:10:44,790 --> 00:10:47,318
+is quite tuning tasks for developers,
+
+152
+00:10:47,414 --> 00:10:51,330
+sres and performance engineers. Given the complexity of tuning
+
+153
+00:10:51,350 --> 00:10:54,734
+Kubernetes resources and the many moving facts we have
+
+154
+00:10:54,772 --> 00:10:58,346
+in modern applications, a new approach is required
+
+155
+00:10:58,378 --> 00:11:01,662
+to successfully solve this problem and this is where machine learning
+
+156
+00:11:01,716 --> 00:11:05,822
+can help. AI and machine learning have revolutionarized
+
+157
+00:11:05,886 --> 00:11:09,506
+entire industries and the good news is that ML can be
+
+158
+00:11:09,528 --> 00:11:13,006
+used also in the performance tuning process. ML can automate
+
+159
+00:11:13,038 --> 00:11:16,674
+the tuning of many parameters we have in the software stack with
+
+160
+00:11:16,712 --> 00:11:20,230
+the goal of optimized application performance, resiliency and cost.
+
+161
+00:11:20,380 --> 00:11:23,910
+In this section I would like to introduce you to this new methodology.
+
+162
+00:11:24,810 --> 00:11:28,034
+Real world case is about an european leader in accounting,
+
+163
+00:11:28,082 --> 00:11:32,134
+payroll and business management software. These Java cases microservice
+
+164
+00:11:32,182 --> 00:11:36,550
+applications are running either on Azure or AWS Kubernetes
+
+165
+00:11:36,630 --> 00:11:39,814
+services the target system of the optimization
+
+166
+00:11:39,942 --> 00:11:43,838
+is the b two b authorization service running on Azure. It's a
+
+167
+00:11:43,844 --> 00:11:47,418
+business critical service that interacts with all the applications powered
+
+168
+00:11:47,434 --> 00:11:49,840
+in the digital services provided by the company.
+
+169
+00:11:50,210 --> 00:11:53,746
+These challenge of the customer was to avoid overspending and
+
+170
+00:11:53,768 --> 00:11:57,886
+achieve the best cost efficiency possible by enabling development teams
+
+171
+00:11:57,918 --> 00:12:01,426
+to optimize their applications while keeping on releasing application
+
+172
+00:12:01,528 --> 00:12:05,054
+updates required to introduce new business functionalities and align
+
+173
+00:12:05,102 --> 00:12:08,330
+to new regulations. So what is the goal
+
+174
+00:12:08,350 --> 00:12:11,506
+of this optimization? In this scenario, the goal was to reduce
+
+175
+00:12:11,538 --> 00:12:15,762
+the cloud costs required to run the optic authentication service on Kubernetes.
+
+176
+00:12:15,906 --> 00:12:19,354
+At the same time, we also wanted to ensure that service would
+
+177
+00:12:19,392 --> 00:12:23,238
+always meet its reliability targets which are expressed as latency,
+
+178
+00:12:23,334 --> 00:12:27,386
+throughput and error rate slos. So how can we
+
+179
+00:12:27,408 --> 00:12:30,970
+leverage ML to achieve this high level business goal?
+
+180
+00:12:31,310 --> 00:12:34,382
+In our optimization methodology, DML changes
+
+181
+00:12:34,436 --> 00:12:38,634
+the parameters of the system to improve these metric that we have defined.
+
+182
+00:12:38,762 --> 00:12:42,560
+In this case, the goal is simply to optimize the application cost.
+
+183
+00:12:43,010 --> 00:12:46,818
+This is a metric that represents the cost we pay to run the application on
+
+184
+00:12:46,824 --> 00:12:51,278
+the cloud, which depends on these amount of cpu and memory resources
+
+185
+00:12:51,374 --> 00:12:55,390
+allocated to the containers. The ML power optimization
+
+186
+00:12:55,470 --> 00:12:58,914
+methodology also allows to set constraints to define
+
+187
+00:12:58,962 --> 00:13:02,870
+which configurations are acceptable. In this case, we state
+
+188
+00:13:02,940 --> 00:13:06,406
+that the system throughput, response times and error rate should
+
+189
+00:13:06,428 --> 00:13:09,770
+not degrade more than 10% with respect to the baseline.
+
+190
+00:13:11,950 --> 00:13:15,546
+Once we have defined the optimization goal, next step is
+
+191
+00:13:15,568 --> 00:13:18,858
+to define these parameters of these system that machine learning
+
+192
+00:13:18,944 --> 00:13:22,490
+can optimize to improve our goal. In these scenario,
+
+193
+00:13:22,570 --> 00:13:27,098
+nine tunable parameters were considered. In total, four parameters
+
+194
+00:13:27,194 --> 00:13:31,294
+are related to Kubernetes container sighting, cpu and memory request and
+
+195
+00:13:31,332 --> 00:13:35,002
+limits which play a big role in the overall service performance,
+
+196
+00:13:35,066 --> 00:13:38,846
+cost and reliability and five parameters are related
+
+197
+00:13:38,878 --> 00:13:43,486
+to these JVM, which is the runtime that runs within the container.
+
+198
+00:13:43,678 --> 00:13:47,070
+Here we included parameters like heap size, garbage collector,
+
+199
+00:13:47,150 --> 00:13:51,094
+the size of the regions of the heap, which are important options to improve the
+
+200
+00:13:51,132 --> 00:13:54,966
+performance of Java apps. It's worth noticing that
+
+201
+00:13:54,988 --> 00:13:59,002
+the ML optimizes the full stack by operating on all these
+
+202
+00:13:59,056 --> 00:14:02,586
+nine parameters at the same time, thereby ensuring that the
+
+203
+00:14:02,608 --> 00:14:05,706
+JVM is optimally configured to run within the
+
+204
+00:14:05,728 --> 00:14:09,674
+chosen container. Resource sightseeing let's now
+
+205
+00:14:09,712 --> 00:14:13,818
+see how the ML Tower optimization methodology works. In practice.
+
+206
+00:14:13,994 --> 00:14:17,150
+The process is fully automated and works in five
+
+207
+00:14:17,220 --> 00:14:21,066
+sres. The first step is to apply the new configurations suggested
+
+208
+00:14:21,098 --> 00:14:23,886
+by the ML algorithms to our target system.
+
+209
+00:14:24,068 --> 00:14:27,506
+This is typically done leveraging Kubernetes APIs to
+
+210
+00:14:27,528 --> 00:14:31,410
+set the new value to the parameters, for example the CPU request.
+
+211
+00:14:31,910 --> 00:14:35,218
+The second step is to apply a workload to the target system
+
+212
+00:14:35,304 --> 00:14:38,630
+in order to assess the performance of the new configuration.
+
+213
+00:14:38,970 --> 00:14:42,338
+This is usually done by leveraging performance testing tools.
+
+214
+00:14:42,434 --> 00:14:45,974
+In this case, we use a geneter test that was already available to
+
+215
+00:14:46,012 --> 00:14:48,810
+stress the application with a realistic workload.
+
+216
+00:14:49,550 --> 00:14:53,334
+The first step is to collect KPIs related to the target
+
+217
+00:14:53,382 --> 00:14:57,318
+system. The typical approach here is to leverage observability
+
+218
+00:14:57,414 --> 00:15:00,678
+tools. In this case, we integrated elastic APM,
+
+219
+00:15:00,774 --> 00:15:03,200
+which is the monitoring solution used by these customer.
+
+220
+00:15:03,730 --> 00:15:07,358
+The fourth step is to analyze the result of the performance test
+
+221
+00:15:07,444 --> 00:15:11,242
+and assign a score based on the specific goal that you have defined.
+
+222
+00:15:11,386 --> 00:15:14,866
+In this case, the score is simply the cost of running the application
+
+223
+00:15:14,968 --> 00:15:18,180
+containers. Considering the prices of azure cloud.
+
+224
+00:15:18,550 --> 00:15:22,162
+The last step is where the machine learning kicks in by taking
+
+225
+00:15:22,216 --> 00:15:25,986
+the score of the tested configurations as input and producing as
+
+226
+00:15:26,008 --> 00:15:29,286
+an output the most promising configuration to be tested in the
+
+227
+00:15:29,308 --> 00:15:32,806
+next iteration. In a relatively short amount of
+
+228
+00:15:32,828 --> 00:15:36,594
+time, the ML algorithm learns the dependencies between the configuration
+
+229
+00:15:36,642 --> 00:15:40,714
+parameters and the system behavior. Though identifying better and
+
+230
+00:15:40,752 --> 00:15:44,630
+better configurations. It's worth noticing that the whole optimization
+
+231
+00:15:44,710 --> 00:15:47,530
+process becomes completely automated.
+
+232
+00:15:49,070 --> 00:15:53,290
+So what are we getting as an output of the MLbase optimization?
+
+233
+00:15:53,970 --> 00:15:57,802
+The main result is the best configuration of the software stack parameters
+
+234
+00:15:57,866 --> 00:16:01,370
+that maximizing or minimize the goal we have defined.
+
+235
+00:16:01,530 --> 00:16:05,170
+These parameters can be then applied in production environments,
+
+236
+00:16:05,830 --> 00:16:09,522
+but the value this methodology can bring is actually much
+
+237
+00:16:09,576 --> 00:16:13,214
+higher. Amal will evaluate many different configurations
+
+238
+00:16:13,262 --> 00:16:17,202
+of the system, which can reveal important insights about the overall
+
+239
+00:16:17,266 --> 00:16:21,414
+system behavior in terms of other KPIs like cost, performance or
+
+240
+00:16:21,452 --> 00:16:25,206
+resiliency. These supports performance engineers and
+
+241
+00:16:25,228 --> 00:16:29,114
+developers in their decision on how to best configure these application to
+
+242
+00:16:29,152 --> 00:16:32,474
+maximizing the specific goals. So,
+
+243
+00:16:32,592 --> 00:16:36,326
+to assess the performance and cost efficiency of a new configuration suggested
+
+244
+00:16:36,358 --> 00:16:39,494
+by the ML optimizer. We stress the system with these load
+
+245
+00:16:39,542 --> 00:16:43,446
+test here you can see the load test scenario that we use just
+
+246
+00:16:43,488 --> 00:16:46,570
+designed according to the performance engineering best practices.
+
+247
+00:16:46,730 --> 00:16:50,186
+The traffic pattern mimicked the behavior seen in production,
+
+248
+00:16:50,298 --> 00:16:53,540
+including API call distribution and sync times.
+
+249
+00:16:54,470 --> 00:16:58,274
+Before looking at the results, it's worth commenting on the application
+
+250
+00:16:58,472 --> 00:17:01,986
+on how the application was initially configured by the customer.
+
+251
+00:17:02,168 --> 00:17:06,246
+We call this these baseline configuration. Let's look
+
+252
+00:17:06,268 --> 00:17:10,134
+at the Kubernetes settings first. The container powering these
+
+253
+00:17:10,172 --> 00:17:14,386
+application was configured with resource requests of 1.5 cpus
+
+254
+00:17:14,498 --> 00:17:18,070
+and 3.42gb of memory. The team also
+
+255
+00:17:18,140 --> 00:17:21,642
+specified resource limits of two cpus and
+
+256
+00:17:21,696 --> 00:17:25,226
+4.39gb of memory. Remember,
+
+257
+00:17:25,328 --> 00:17:28,726
+the requests are the guaranteed resource that kubernetes
+
+258
+00:17:28,838 --> 00:17:32,330
+will use for scheduling and capacity management of the cluster.
+
+259
+00:17:32,690 --> 00:17:36,010
+In this case, requests are lower than the limit.
+
+260
+00:17:36,170 --> 00:17:39,310
+This is a common approach to guarantee resources for the application
+
+261
+00:17:39,380 --> 00:17:43,378
+to run properly, but at the same time allow for some room
+
+262
+00:17:43,544 --> 00:17:45,330
+for unexpected growth.
+
+263
+00:17:46,710 --> 00:17:50,258
+Besides looking at the container settings, it's important to also see
+
+264
+00:17:50,344 --> 00:17:53,826
+how the application runtime is configured. The runtime is
+
+265
+00:17:53,848 --> 00:17:57,570
+what ultimately powers our application, and for Java apps
+
+266
+00:17:57,650 --> 00:18:01,302
+we know that JVM settings play a big role in app
+
+267
+00:18:01,356 --> 00:18:04,914
+performance, but the same happens for goaling applications.
+
+268
+00:18:04,962 --> 00:18:08,546
+For example, the JVM was configured with a minimum
+
+269
+00:18:08,578 --> 00:18:12,566
+cheap of half a gig and a max heap of 4gb.
+
+270
+00:18:12,678 --> 00:18:16,358
+Notice that the max heap is higher than the memory results,
+
+271
+00:18:16,454 --> 00:18:19,942
+which means that the JVM can use more memory than the amount
+
+272
+00:18:20,016 --> 00:18:23,806
+requested. As we're going to see, this configuration will have
+
+273
+00:18:23,828 --> 00:18:27,674
+an impact on how the application behaves under load and the associated
+
+274
+00:18:27,722 --> 00:18:29,550
+resiliency and costs.
+
+275
+00:18:31,410 --> 00:18:34,906
+It's worth noting that these customer also defined autoscaling
+
+276
+00:18:34,938 --> 00:18:38,446
+policies for this application, leveraging the Ka autoscaling
+
+277
+00:18:38,478 --> 00:18:42,222
+project for kubernetes in their environment,
+
+278
+00:18:42,286 --> 00:18:46,146
+both cpu and memory were defined as scalers with
+
+279
+00:18:46,168 --> 00:18:49,954
+a triggering threshold of 70% and 90% utilization,
+
+280
+00:18:50,002 --> 00:18:53,206
+respectively. What is important to keep in mind is
+
+281
+00:18:53,228 --> 00:18:56,930
+that such utilization percentage are related to the resource request,
+
+282
+00:18:57,010 --> 00:19:00,346
+not limits. So as you can see in the diagram on
+
+283
+00:19:00,368 --> 00:19:03,770
+the right can action to scale out the application will happen,
+
+284
+00:19:03,840 --> 00:19:07,242
+for example when the cpu usage will got above one
+
+285
+00:19:07,296 --> 00:19:10,634
+core. Okay, we've covered how the
+
+286
+00:19:10,672 --> 00:19:14,942
+application is configured. Let's now look at the behavior of the application when
+
+287
+00:19:14,996 --> 00:19:19,386
+subject to the load test we've shown before with the baseline configuration.
+
+288
+00:19:19,578 --> 00:19:23,246
+In this chart you can see the application throughput response time and the
+
+289
+00:19:23,268 --> 00:19:26,530
+number of replicas that were created by the autoscaling.
+
+290
+00:19:26,870 --> 00:19:31,406
+Two facts are important to notice. When the load increases, the autoscaling
+
+291
+00:19:31,438 --> 00:19:34,986
+triggers a scaleout event which creates a new replica.
+
+292
+00:19:35,118 --> 00:19:38,834
+This event causes a big spike on response time which impacts
+
+293
+00:19:38,882 --> 00:19:42,326
+service reliability and performance. This is due to the
+
+294
+00:19:42,348 --> 00:19:46,790
+high cpu usage and throttling during the JVM startup.
+
+295
+00:19:47,130 --> 00:19:50,762
+When the load drops, the number of replicas does not scale down.
+
+296
+00:19:50,896 --> 00:19:54,490
+Despite these, container cpu usage is idle.
+
+297
+00:19:54,830 --> 00:19:58,874
+It's interesting to understand why this is happening. This is
+
+298
+00:19:58,912 --> 00:20:02,346
+caused by the configuration of the container resource, the JVM
+
+299
+00:20:02,378 --> 00:20:06,206
+tuning inside, and these autoscaler policies in particular for the
+
+300
+00:20:06,228 --> 00:20:09,854
+memory resources. The autoscaler in this case
+
+301
+00:20:09,972 --> 00:20:13,950
+is not scaling down because the memory usage of the container is
+
+302
+00:20:14,020 --> 00:20:17,794
+higher than these configured threshold of 70% usage with
+
+303
+00:20:17,832 --> 00:20:21,454
+respect to the memory requests. These might be due to the JDM
+
+304
+00:20:21,502 --> 00:20:24,642
+Max heap being higher than the memory request we've seen
+
+305
+00:20:24,696 --> 00:20:27,798
+before, but it max also be due to a
+
+306
+00:20:27,804 --> 00:20:31,094
+change in the application memory footprint, for example due to a new
+
+307
+00:20:31,132 --> 00:20:34,726
+application release. This effect clearly impacts the
+
+308
+00:20:34,748 --> 00:20:38,282
+cloud build as more instances are up and running than
+
+309
+00:20:38,336 --> 00:20:42,278
+required. But slos that configuring Kubernetes apps
+
+310
+00:20:42,294 --> 00:20:45,900
+for reliability and cost efficiency is actually a tricky process.
+
+311
+00:20:46,670 --> 00:20:50,422
+Let's now have a look at the best configuration identified by ML
+
+312
+00:20:50,486 --> 00:20:53,466
+with respect to the defined cost efficiency goal.
+
+313
+00:20:53,658 --> 00:20:56,862
+This was found at experiment number 34 after
+
+314
+00:20:56,916 --> 00:21:00,654
+about 19 hours and almost half the cost of
+
+315
+00:21:00,692 --> 00:21:03,250
+running the application with respect to the baseline.
+
+316
+00:21:03,910 --> 00:21:06,978
+First of all, it's interesting to notice how our
+
+317
+00:21:07,064 --> 00:21:10,734
+MLbase optimization increased both memory and cpu
+
+318
+00:21:10,782 --> 00:21:14,274
+results and limits, which is not at all obvious and
+
+319
+00:21:14,312 --> 00:21:18,166
+may seem at first counterintuitive, especially as Kubernetes is
+
+320
+00:21:18,188 --> 00:21:21,554
+often considered well suited for small and highly scalable
+
+321
+00:21:21,602 --> 00:21:25,366
+applications. The other notable changes are related to the
+
+322
+00:21:25,388 --> 00:21:29,206
+JVM options. The max cheap size was increased by 20% and is
+
+323
+00:21:29,228 --> 00:21:32,326
+now well within the container memory request, which was increased
+
+324
+00:21:32,358 --> 00:21:35,674
+to five gigabyte. The min heap size has also
+
+325
+00:21:35,712 --> 00:21:39,606
+been adjusted to be almost equal to the max cheap, which is a configuration
+
+326
+00:21:39,638 --> 00:21:43,274
+that can avoid garbage collection cycles, especially in the startup
+
+327
+00:21:43,322 --> 00:21:46,926
+phase of JVM. So let's now see how
+
+328
+00:21:46,948 --> 00:21:50,842
+the application performs with the new configuration identified by ML
+
+329
+00:21:50,906 --> 00:21:55,290
+and how it compares with respect to the baseline. There are two important differences
+
+330
+00:21:55,370 --> 00:21:59,370
+here. Results time always remain within the Hasselo
+
+331
+00:21:59,450 --> 00:22:03,374
+and there are no more picks. So these configuration got only improves
+
+332
+00:22:03,422 --> 00:22:06,962
+on cost, but it's also beneficial in terms of performance
+
+333
+00:22:07,026 --> 00:22:10,614
+and resilience. Autoscaling is not triggering these
+
+334
+00:22:10,652 --> 00:22:14,514
+configuration as the full load is sustained by just one pod.
+
+335
+00:22:14,642 --> 00:22:17,826
+These is clearly beneficial in terms of costs.
+
+336
+00:22:18,018 --> 00:22:21,706
+Let's also compare in detail the best configuration with respect to
+
+337
+00:22:21,728 --> 00:22:25,718
+the baseline. These we can notice that the pod is significantly
+
+338
+00:22:25,814 --> 00:22:29,226
+larger in terms of both cpu and memory, especially for
+
+339
+00:22:29,248 --> 00:22:33,146
+the requests. This configuration has the effect of triggering the auto
+
+340
+00:22:33,178 --> 00:22:37,342
+scaler less often, as we have seen, but interestingly and
+
+341
+00:22:37,396 --> 00:22:40,558
+somewhat counterintuitively, while this implies a kind of a
+
+342
+00:22:40,564 --> 00:22:44,290
+fixed cost considering the prices of the container resource,
+
+343
+00:22:44,870 --> 00:22:49,006
+it turns out being much cheap than a configuration where autoscaling
+
+344
+00:22:49,038 --> 00:22:52,562
+is triggered, and this also avoids performance issues.
+
+345
+00:22:52,696 --> 00:22:56,558
+The container and runtime configuration are now better aligned.
+
+346
+00:22:56,654 --> 00:23:00,054
+The JVM max is now below the memory request and
+
+347
+00:23:00,092 --> 00:23:03,686
+has a beneficial effect as it also enables the scaled down
+
+348
+00:23:03,708 --> 00:23:07,918
+of the application should the scaling be triggered by higher loads.
+
+349
+00:23:08,034 --> 00:23:12,150
+Let's now have a look at another configuration found by ML
+
+350
+00:23:12,230 --> 00:23:15,930
+at experiment number 14. After about 8 hours
+
+351
+00:23:16,000 --> 00:23:20,042
+of automated optimization, we leveled this configuration high
+
+352
+00:23:20,096 --> 00:23:23,950
+reliability for a reason that we will be clear in a minute.
+
+353
+00:23:24,370 --> 00:23:28,746
+The score for this configuration, while not as good as the best configurations,
+
+354
+00:23:28,858 --> 00:23:31,706
+also provided about 60% cost reduction.
+
+355
+00:23:31,818 --> 00:23:34,926
+So this can be considered also an interesting configuration with
+
+356
+00:23:34,948 --> 00:23:39,150
+respect to the cost efficiency goal as regards to the parameters.
+
+357
+00:23:39,230 --> 00:23:42,446
+What is worth noticing is that this time ML picked
+
+358
+00:23:42,478 --> 00:23:46,202
+settings that significantly change the shape of the container.
+
+359
+00:23:46,366 --> 00:23:49,638
+It now has a much smaller cpu request with respect to the
+
+360
+00:23:49,644 --> 00:23:53,366
+baseline, but the memory is still pretty large, which is
+
+361
+00:23:53,388 --> 00:23:56,694
+pretty interesting. The JVM options were
+
+362
+00:23:56,732 --> 00:24:00,266
+also changed. In particular, the Galbridge collector was
+
+363
+00:24:00,288 --> 00:24:03,642
+switched to parallel, which is a collector that can be much
+
+364
+00:24:03,696 --> 00:24:07,050
+more efficient on the use of cpu and memory.
+
+365
+00:24:07,870 --> 00:24:11,734
+Let's compare the behavior of this configuration with respect to the baseline.
+
+366
+00:24:11,862 --> 00:24:15,226
+There are two important differences here. The peak on the response
+
+367
+00:24:15,258 --> 00:24:19,054
+time upon the scaling out is significantly lower. It's still
+
+368
+00:24:19,092 --> 00:24:22,474
+higher than the response time slo. However, the peak is
+
+369
+00:24:22,532 --> 00:24:25,550
+less than half the value of the baseline configuration.
+
+370
+00:24:25,710 --> 00:24:28,450
+This clearly improves the service resilience.
+
+371
+00:24:28,790 --> 00:24:32,462
+Autoscaling works properly after the high load phase
+
+372
+00:24:32,526 --> 00:24:36,546
+replicarves are scaled back to one. Its behavior is what we expect from
+
+373
+00:24:36,568 --> 00:24:40,214
+an autoscaling system that works properly. Notice the response time
+
+374
+00:24:40,252 --> 00:24:44,034
+picks could also be further reduced. It would simply
+
+375
+00:24:44,082 --> 00:24:47,746
+be a matter of creating a new optimization with the goal of minimizing
+
+376
+00:24:47,778 --> 00:24:50,954
+these response time matrix instead of the application cost.
+
+377
+00:24:51,152 --> 00:24:55,062
+Let's now also companies in detail the high resilience configuration
+
+378
+00:24:55,126 --> 00:24:57,942
+with respect to the baseline. Quite interestingly,
+
+379
+00:24:58,006 --> 00:25:02,170
+these configuration has a higher memory request and lower cpu results,
+
+380
+00:25:02,250 --> 00:25:05,838
+but higher limits than the baseline. As you may remember,
+
+381
+00:25:05,924 --> 00:25:09,726
+the lowest cost configuration instead had a higher cpu request than
+
+382
+00:25:09,748 --> 00:25:13,754
+the baseline. Without getting into much details in the analysis
+
+383
+00:25:13,802 --> 00:25:17,374
+of this specific configuration, what these facts show is
+
+384
+00:25:17,412 --> 00:25:21,166
+that as the optimization goal changes, cpu and memory
+
+385
+00:25:21,198 --> 00:25:24,654
+results and limits may need to be increased or decreased.
+
+386
+00:25:24,782 --> 00:25:28,322
+That multiple parameters at Kubernetes and JVM
+
+387
+00:25:28,386 --> 00:25:31,266
+levels also need to be tune accordingly.
+
+388
+00:25:31,458 --> 00:25:35,014
+This is a clear confirmation of the perceived complexity of
+
+389
+00:25:35,052 --> 00:25:37,640
+tuning Kubernetes microservices application,
+
+390
+00:25:38,090 --> 00:25:42,162
+as here we are just discussing one microservice out of hundreds
+
+391
+00:25:42,226 --> 00:25:46,378
+or more of today applications. There are many other interesting
+
+392
+00:25:46,464 --> 00:25:50,090
+configurations found by ML that we would like to discuss,
+
+393
+00:25:50,240 --> 00:25:53,230
+but I think it's time to conclude with our takeaways.
+
+394
+00:25:53,730 --> 00:25:57,242
+Our first takeaway is that when tuning the modern applications,
+
+395
+00:25:57,306 --> 00:26:01,674
+the interplay between different application layers and technologies require
+
+396
+00:26:01,722 --> 00:26:05,042
+tuning the full stack configuration to make sure
+
+397
+00:26:05,096 --> 00:26:08,274
+that both the optimization goal and slos are
+
+398
+00:26:08,312 --> 00:26:12,510
+matched, as we've seen in our real world example. A second takeaway
+
+399
+00:26:12,590 --> 00:26:16,454
+is that the complexity of this application under varied workloads and
+
+400
+00:26:16,492 --> 00:26:19,762
+in a context of frequent releases with agile practices
+
+401
+00:26:19,906 --> 00:26:23,794
+requires a continuous performance tuning process. Developers cannot
+
+402
+00:26:23,842 --> 00:26:27,554
+simply rely on manual tuning or utilization based autoscaling
+
+403
+00:26:27,602 --> 00:26:30,818
+mechanisms. Finally, in order to explore
+
+404
+00:26:30,914 --> 00:26:34,694
+the vastness of the space of possible configuration in a cost
+
+405
+00:26:34,732 --> 00:26:38,962
+and time efficient way, it's mandatory to leverage Mlbased methods
+
+406
+00:26:39,026 --> 00:26:43,326
+that can automatically converge to optimal configuration within hours
+
+407
+00:26:43,428 --> 00:26:47,290
+without requiring deep knowledge of all the underlying technologies.
+
+408
+00:26:47,450 --> 00:26:50,974
+Many thanks for your time. I hope you enjoyed the talk. Please reach
+
+409
+00:26:51,012 --> 00:26:54,254
+out to me if you have found this talk interesting. I would love to share
+
+410
+00:26:54,292 --> 00:26:56,938
+more details and hear your Kubernetes challenges.
+
