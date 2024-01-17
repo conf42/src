@@ -200,5 +200,10 @@ def extract_keywords(talk):
     ]
     # remove empties
     keywords = [word for word in keywords if word]
+    # cut out the words if any longer than 6
+    keywords = [
+        " ".join(word.split(" ")[:6])
+        for word in keywords
+    ]
     # deduplicate and only first 1000
     return sorted(list(set(keywords))[:1000])
