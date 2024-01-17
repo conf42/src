@@ -1,0 +1,1368 @@
+1
+00:00:26,050 --> 00:00:29,638
+My name is Moshe Zadka. My website is cobraism.com,
+
+2
+00:00:29,724 --> 00:00:32,898
+where you can find every way of getting in touch with me known to humankind.
+
+3
+00:00:32,994 --> 00:00:36,150
+And today I want to talk to you about Python sidecars.
+
+4
+00:00:36,570 --> 00:00:40,166
+I do want to start with an acknowledgement of country. I live in
+
+5
+00:00:40,188 --> 00:00:44,166
+Belmont in the San Francisco Bay Area peninsula, the ancestral homeland of
+
+6
+00:00:44,188 --> 00:00:46,040
+the two Sholoni people.
+
+7
+00:00:47,450 --> 00:00:50,698
+I want to start with a quick Kubernetes refresher, make sure that we're
+
+8
+00:00:50,714 --> 00:00:54,366
+on the same page. Kubernetes is pretty big, so this
+
+9
+00:00:54,388 --> 00:00:57,760
+is definitely not a comprehensive Kubernetes review.
+
+10
+00:00:59,650 --> 00:01:02,830
+So let's start with nodes and containers.
+
+11
+00:01:03,410 --> 00:01:07,230
+A pod is a basic execution unit. In Kubernetes
+
+12
+00:01:07,310 --> 00:01:11,106
+that's what we execute. It's usually not what we configure and that's going to be
+
+13
+00:01:11,208 --> 00:01:14,626
+really important both of these things later. A pod is made
+
+14
+00:01:14,648 --> 00:01:18,326
+of n containers. A pod can have more than one container. They're all going
+
+15
+00:01:18,348 --> 00:01:19,750
+to be in the same pod.
+
+16
+00:01:22,170 --> 00:01:25,910
+They do share a network space, which means for example
+
+17
+00:01:25,980 --> 00:01:29,306
+one twenty seven zero zero one is the same ip for
+
+18
+00:01:29,328 --> 00:01:32,874
+all of them. They might share the
+
+19
+00:01:32,912 --> 00:01:36,326
+process namespace. You can configure it on and off and we'll
+
+20
+00:01:36,438 --> 00:01:39,754
+talk a little bit, but this later they
+
+21
+00:01:39,792 --> 00:01:43,722
+can share volume mounts, so you can mount the same volume
+
+22
+00:01:43,786 --> 00:01:47,006
+into both of them and they will share that part
+
+23
+00:01:47,028 --> 00:01:50,586
+of the file system, but they never share the overall file
+
+24
+00:01:50,618 --> 00:01:54,538
+system. So this is like the
+
+25
+00:01:54,564 --> 00:01:57,714
+little bit of things that are going to be important later as we are talking
+
+26
+00:01:57,752 --> 00:02:00,210
+about how to operate your sidecars.
+
+27
+00:02:01,990 --> 00:02:05,234
+The other thing that's important in a pod is that
+
+28
+00:02:05,272 --> 00:02:09,254
+readiness. Readiness is kind of a weird thing that
+
+29
+00:02:09,292 --> 00:02:13,480
+is basically the criterion. Is the pod good?
+
+30
+00:02:14,250 --> 00:02:16,934
+Why do you need to know if the pod is good? We'll talk about this
+
+31
+00:02:16,972 --> 00:02:20,306
+later. This will become very important later. The usual
+
+32
+00:02:20,338 --> 00:02:23,434
+way to determine if the pod is good is do TCP or
+
+33
+00:02:23,472 --> 00:02:26,460
+HTTP check, which means you are sending in a TCP checks.
+
+34
+00:02:26,990 --> 00:02:30,170
+If it connects and does a TCP hand check, it's successful.
+
+35
+00:02:30,590 --> 00:02:34,414
+The more sophisticated checks that Kubernetes can configure is the HTTP check,
+
+36
+00:02:34,532 --> 00:02:38,030
+which will fail on any status that is not two xx.
+
+37
+00:02:39,010 --> 00:02:41,310
+You can also configure command checks.
+
+38
+00:02:42,690 --> 00:02:46,258
+Basically there's a whole raft of issues around them.
+
+39
+00:02:46,424 --> 00:02:49,858
+Usually I would not recommend them. And we'll talk about some of
+
+40
+00:02:49,864 --> 00:02:53,694
+the ways that writing sidecars
+
+41
+00:02:53,742 --> 00:02:57,250
+can alleviate the need to write command checks in Kubernetes.
+
+42
+00:02:58,470 --> 00:03:01,654
+The next thing that I want to make sure that we're all on the same
+
+43
+00:03:01,692 --> 00:03:05,350
+page in is deployed and services. There's many
+
+44
+00:03:05,420 --> 00:03:08,826
+other things that you would need a sidecars for that are not deployments and services.
+
+45
+00:03:08,928 --> 00:03:12,362
+But since these are the most common, let's focus
+
+46
+00:03:12,416 --> 00:03:16,234
+on them for this talk. So a deployment is
+
+47
+00:03:16,272 --> 00:03:20,650
+kind of a weird Kubernetes object because it's really just something
+
+48
+00:03:20,720 --> 00:03:24,318
+that will automatically configure a replica set and a service. So if
+
+49
+00:03:24,324 --> 00:03:27,754
+you understand those two, you also understand what deployment
+
+50
+00:03:27,802 --> 00:03:31,610
+is. A replica set is a collection of identityless pods.
+
+51
+00:03:31,690 --> 00:03:35,274
+And what I mean by identityless, there's no sense in this insurance
+
+52
+00:03:35,412 --> 00:03:38,898
+things. Pod is the fifth pod in the set.
+
+53
+00:03:39,064 --> 00:03:42,638
+If it's six pods, there's six pods.
+
+54
+00:03:42,654 --> 00:03:46,110
+But if two die, it will bring up two other nodes,
+
+55
+00:03:46,190 --> 00:03:49,634
+but it doesn't which one is like the true continuation
+
+56
+00:03:49,762 --> 00:03:53,762
+of the next pod. There is no sense that this would make a sensible
+
+57
+00:03:53,826 --> 00:03:57,462
+question. A service is something that can route to good
+
+58
+00:03:57,516 --> 00:04:00,726
+pods. There's many ways to route and
+
+59
+00:04:00,828 --> 00:04:04,186
+I will not go into them because for the most part they're not going to
+
+60
+00:04:04,208 --> 00:04:07,866
+affect our talk. But it's very important because if
+
+61
+00:04:07,888 --> 00:04:11,846
+you remember earlier, I said that radiance check is deciding what's
+
+62
+00:04:11,878 --> 00:04:15,118
+a good pod. The reason you need to know if a pod is good or
+
+63
+00:04:15,124 --> 00:04:18,254
+not is these service can know whether to route to it or not.
+
+64
+00:04:18,372 --> 00:04:21,438
+And again, all of these things are a
+
+65
+00:04:21,444 --> 00:04:25,060
+very important context because they will be important later.
+
+66
+00:04:27,590 --> 00:04:31,186
+Side cars, not an atomic thing in Kubernetes there
+
+67
+00:04:31,208 --> 00:04:35,990
+is no point where you will write in your Kubernetes YaMl configuration
+
+68
+00:04:36,570 --> 00:04:40,054
+sidecar. You can if you call
+
+69
+00:04:40,092 --> 00:04:43,682
+something a sidecar, but that's not a concept, that's not a type in Kubernetes,
+
+70
+00:04:43,746 --> 00:04:47,158
+but it is a pattern. And specifically in
+
+71
+00:04:47,164 --> 00:04:51,050
+Kubernetes, often when we say a pattern, what we mean is it's
+
+72
+00:04:51,390 --> 00:04:55,130
+a shape that a YAml file takes. And when the YaMl file takes
+
+73
+00:04:55,200 --> 00:04:59,686
+that shape, we'll call the resulting thing a side
+
+74
+00:04:59,878 --> 00:05:03,102
+cars. What does a sidecar pattern look like?
+
+75
+00:05:03,236 --> 00:05:07,722
+It looks like a container, a pod that has an extra container.
+
+76
+00:05:07,866 --> 00:05:11,246
+And usually it just needs a second container because usually you have
+
+77
+00:05:11,268 --> 00:05:14,880
+a main container that does the things that you
+
+78
+00:05:15,410 --> 00:05:18,080
+are doing with the pod, right?
+
+79
+00:05:18,610 --> 00:05:22,302
+If you think in terms of like a web application or a web API,
+
+80
+00:05:22,446 --> 00:05:25,634
+this is a thing that actually runs a web server, right? If you think
+
+81
+00:05:25,672 --> 00:05:28,998
+in terms of a queue consumer, this is a thing that consumes a
+
+82
+00:05:29,004 --> 00:05:32,920
+queue and does something with it, nodes processing and
+
+83
+00:05:33,610 --> 00:05:37,286
+takes it away. The idea of the sidecar is
+
+84
+00:05:37,308 --> 00:05:39,020
+that it takes care of the rest.
+
+85
+00:05:39,710 --> 00:05:43,354
+And obviously this is a pattern. So all
+
+86
+00:05:43,392 --> 00:05:46,874
+these definitions of sound fuzzy and
+
+87
+00:05:47,072 --> 00:05:50,742
+to be very honest, it's kind of not really a meaningful
+
+88
+00:05:50,806 --> 00:05:54,154
+debate to say whether a specific thing is a sidecar
+
+89
+00:05:54,202 --> 00:05:57,546
+or not. What's important is to know that this pattern
+
+90
+00:05:57,738 --> 00:06:01,706
+is a pattern that will be really useful when you're designing
+
+91
+00:06:01,738 --> 00:06:05,006
+a kubernetes installation. So you say, oh, well, what could be a
+
+92
+00:06:05,028 --> 00:06:08,322
+useful sidecar here, right? There's no reason
+
+93
+00:06:08,376 --> 00:06:12,046
+to get hung up on the definition of whether it's a true sidecar
+
+94
+00:06:12,078 --> 00:06:15,826
+or not. So here's like
+
+95
+00:06:15,848 --> 00:06:19,310
+an example of a sidecar. The main container writes a
+
+96
+00:06:19,320 --> 00:06:23,030
+web application, and then these application wants to cache to files.
+
+97
+00:06:23,530 --> 00:06:27,314
+Now, usually it's kind of awkward to also have the garbage
+
+98
+00:06:27,362 --> 00:06:31,782
+collector sitting in the same process, right? Because web
+
+99
+00:06:31,836 --> 00:06:35,210
+servers run in a specific framework that's got to manage
+
+100
+00:06:35,280 --> 00:06:39,030
+all of these things starting to shove like an extra thread
+
+101
+00:06:39,110 --> 00:06:42,362
+or spawning a process and then having to manage
+
+102
+00:06:42,416 --> 00:06:45,726
+what happens if process dies. That's why
+
+103
+00:06:45,748 --> 00:06:49,994
+we have kubernetes for, right? Like the whole point of kubernetes manages
+
+104
+00:06:50,042 --> 00:06:54,366
+that kind of stuff, right? If you wanted to manage that, you wouldn't be
+
+105
+00:06:54,388 --> 00:06:57,986
+using kubernetes in the first place. So what
+
+106
+00:06:58,008 --> 00:07:01,886
+you can do is you can have a sidekick container and that looks at files
+
+107
+00:07:01,918 --> 00:07:05,654
+that are like, say too old and removes them. So it
+
+108
+00:07:05,692 --> 00:07:09,330
+basically functions like the garbage collection thread
+
+109
+00:07:09,410 --> 00:07:12,914
+or process. But now Kubernetes is managing it. It's managing
+
+110
+00:07:12,962 --> 00:07:16,006
+a different container. And one
+
+111
+00:07:16,028 --> 00:07:19,942
+of the things that is a different container, it is
+
+112
+00:07:19,996 --> 00:07:23,686
+built separately, right? You build those containers into separate like CI
+
+113
+00:07:23,718 --> 00:07:26,886
+pipelines or whatever it is that you use to build containers.
+
+114
+00:07:26,998 --> 00:07:29,658
+And so you don't have to use the same base image, you don't have to
+
+115
+00:07:29,664 --> 00:07:32,170
+use the same platform, you don't have to use the same language.
+
+116
+00:07:33,310 --> 00:07:37,086
+So why I thought has useful. So first of
+
+117
+00:07:37,108 --> 00:07:40,910
+all, you can separate the resource limits,
+
+118
+00:07:41,570 --> 00:07:45,482
+meaning you can make sure that your web application can take only so much memory
+
+119
+00:07:45,546 --> 00:07:49,438
+and your sidecars does. A garbage collection can take so much memory
+
+120
+00:07:49,614 --> 00:07:52,866
+and you know how much memory you allocate to each. They can't kind of go
+
+121
+00:07:52,888 --> 00:07:56,706
+and steal from the other one's memory. And that's very useful
+
+122
+00:07:56,738 --> 00:08:00,834
+when you want to do very careful capacity
+
+123
+00:08:00,882 --> 00:08:03,560
+planning. At some point you will need to do.
+
+124
+00:08:04,090 --> 00:08:08,102
+They're also legible to Kubernetes dashboards, right? If you put
+
+125
+00:08:08,236 --> 00:08:11,818
+both of these things in the same container and they die and
+
+126
+00:08:11,824 --> 00:08:15,130
+they get restarted, you'll have to also
+
+127
+00:08:15,280 --> 00:08:18,886
+make sure that you keep track of that somehow to make it legible.
+
+128
+00:08:19,078 --> 00:08:21,310
+If you put them in separate containers,
+
+129
+00:08:21,650 --> 00:08:25,710
+Kubernetes knows if a container died, Kubernetes knows
+
+130
+00:08:27,170 --> 00:08:30,734
+to separate the container's logs and so on. So that's very
+
+131
+00:08:30,772 --> 00:08:34,462
+useful that you can, obviously there's like the native Kubernetes
+
+132
+00:08:34,526 --> 00:08:38,862
+dashboard and quite potentially like whatever cloud provider
+
+133
+00:08:39,006 --> 00:08:43,102
+has more stuff around kubernetes. So that's why I don't say the Kubernetes
+
+134
+00:08:43,166 --> 00:08:46,246
+dashboard, it's general Kubernetes dashboards, right? It might
+
+135
+00:08:46,268 --> 00:08:50,082
+be Prometheus grabbing data from Kubernetes.
+
+136
+00:08:50,146 --> 00:08:53,794
+Whatever way you have observability for kubernetes,
+
+137
+00:08:53,922 --> 00:08:56,200
+the sidecars will be legible to it.
+
+138
+00:08:57,450 --> 00:09:00,634
+But most importantly, it simplifies these container, right? Like if
+
+139
+00:09:00,672 --> 00:09:03,914
+we want to go with the model of a container, it's supposed to be
+
+140
+00:09:03,952 --> 00:09:08,122
+very simple. This is a way to offload the
+
+141
+00:09:08,256 --> 00:09:11,802
+complexity to Kubernetes. These you want it
+
+142
+00:09:11,936 --> 00:09:15,674
+and to have each of these containers, both the main container and the side container,
+
+143
+00:09:15,722 --> 00:09:19,914
+each be much simpler than if they would somehow have to be carefully
+
+144
+00:09:19,962 --> 00:09:23,570
+finagled to been the same container.
+
+145
+00:09:24,310 --> 00:09:28,034
+So obviously the reason I talked so much
+
+146
+00:09:28,072 --> 00:09:31,806
+about readiness earlier is that that's
+
+147
+00:09:31,838 --> 00:09:35,794
+going to be one example for why you would need a sidecar. So for
+
+148
+00:09:35,832 --> 00:09:39,358
+example, with a readiness sidecar, you can check that the file exists or
+
+149
+00:09:39,384 --> 00:09:42,818
+that the file is pretty new. You can check the contents
+
+150
+00:09:42,834 --> 00:09:45,718
+of an HTTP response. This is not something that's very easy to do with the
+
+151
+00:09:45,724 --> 00:09:49,410
+Kubernetes management, but you can easily send an HTTP
+
+152
+00:09:49,490 --> 00:09:53,194
+code, and now you write your own code. So you can write
+
+153
+00:09:53,232 --> 00:09:56,486
+it in a nicer language like Python. You can have an arbitrary
+
+154
+00:09:56,518 --> 00:10:00,694
+logic and you don't have to start shoving
+
+155
+00:10:00,742 --> 00:10:04,382
+in shell commands into Yaml and have them execute in these
+
+156
+00:10:04,436 --> 00:10:07,802
+kubernetes container and make sure that they properly
+
+157
+00:10:07,866 --> 00:10:11,070
+offer and stuff. And there's a whole thing. This is
+
+158
+00:10:11,220 --> 00:10:14,926
+easier, right? You can just write code in Python. Python is a nice language.
+
+159
+00:10:15,118 --> 00:10:18,498
+You can easily check the containers, do all kinds of
+
+160
+00:10:18,584 --> 00:10:21,700
+complicated logic. It's easy.
+
+161
+00:10:23,350 --> 00:10:26,710
+The other nice thing that you can do with side cars, collect metrics.
+
+162
+00:10:27,450 --> 00:10:31,586
+What if the original container wrote some code and that wasn't formatted
+
+163
+00:10:31,618 --> 00:10:35,378
+in the way that your metrics management, say Prometheus,
+
+164
+00:10:35,554 --> 00:10:39,642
+which most of them kind of are compatible with, can read well.
+
+165
+00:10:39,696 --> 00:10:43,146
+You can grab those metrics via whatever reformat them
+
+166
+00:10:43,168 --> 00:10:46,874
+into promotes. You can also do synthetic checks. You can
+
+167
+00:10:47,072 --> 00:10:50,634
+send a query to an API endpoint, measure how much
+
+168
+00:10:50,672 --> 00:10:54,122
+time that took, and that can be like a nice gauge or a histogram,
+
+169
+00:10:54,186 --> 00:10:58,014
+depending on exactly how you do that. You can even
+
+170
+00:10:58,212 --> 00:11:01,742
+scan a log file, check, say how many black lines are there.
+
+171
+00:11:01,796 --> 00:11:05,006
+And that can be your metric, right? Like how many lines were written in the
+
+172
+00:11:05,028 --> 00:11:09,646
+last minute. That's a useful metric
+
+173
+00:11:09,678 --> 00:11:13,106
+that you can expose. And so there's a bunch of stuff that you can do
+
+174
+00:11:13,128 --> 00:11:16,050
+that's like that, that you can just do in a sidecar.
+
+175
+00:11:17,510 --> 00:11:21,314
+You can also do scheduled tasks, right? Like I already gave these example of garbage
+
+176
+00:11:21,362 --> 00:11:24,950
+collection, or you can do some sort of a re indexing operation.
+
+177
+00:11:25,690 --> 00:11:30,978
+Again, like the sidecars shares all
+
+178
+00:11:31,004 --> 00:11:34,874
+the knowledge that the main container has. So it can directly go with
+
+179
+00:11:34,912 --> 00:11:37,466
+the API and kind of grab the data,
+
+180
+00:11:37,648 --> 00:11:40,986
+do whatever indexing you need on it, and then shove it back through the
+
+181
+00:11:41,008 --> 00:11:44,794
+API. Why write side
+
+182
+00:11:44,832 --> 00:11:48,606
+closing Python? So there's a lot of things that
+
+183
+00:11:48,628 --> 00:11:53,150
+make Python an ideal choice for sidecar.
+
+184
+00:11:53,670 --> 00:11:59,586
+So if you think about it out
+
+185
+00:11:59,608 --> 00:12:03,934
+of your examples, if you really knew that you needed that functionality
+
+186
+00:12:03,982 --> 00:12:07,186
+early in the development process, you would already kind of but it in
+
+187
+00:12:07,208 --> 00:12:10,598
+the design and made sure it fit right. The problem is retrofitting it.
+
+188
+00:12:10,604 --> 00:12:13,990
+That is hard, but that also means it's late in the development process.
+
+189
+00:12:14,060 --> 00:12:17,270
+You don't have a lot of time left in your schedule.
+
+190
+00:12:17,870 --> 00:12:22,362
+Luckily, Python is a great prototyping language. You can whip out something
+
+191
+00:12:22,416 --> 00:12:24,780
+that kind of works very fast.
+
+192
+00:12:26,270 --> 00:12:30,102
+So that rewards the ability of python to quickly
+
+193
+00:12:30,176 --> 00:12:33,440
+prototype. Now,
+
+194
+00:12:33,810 --> 00:12:37,390
+the main thing that the sidecars will do is to look
+
+195
+00:12:37,460 --> 00:12:41,198
+good in some sense on the dashboard, right? That means that
+
+196
+00:12:41,204 --> 00:12:43,810
+you want a very fast feedback loop.
+
+197
+00:12:44,470 --> 00:12:47,986
+Again, that gives you a lot of
+
+198
+00:12:48,008 --> 00:12:51,410
+reward for fast iteration speed, right? It's not just easy to write
+
+199
+00:12:51,480 --> 00:12:55,566
+the first version of Python programs, it's also really fast to iterate.
+
+200
+00:12:55,598 --> 00:12:58,886
+And Python has a lot of facilities that makes iteration a
+
+201
+00:12:58,908 --> 00:13:03,350
+lot faster and also
+
+202
+00:13:03,500 --> 00:13:07,014
+kind of the way politics in engineering works.
+
+203
+00:13:07,132 --> 00:13:11,062
+Often the sidecar will be built by slightly different people
+
+204
+00:13:11,116 --> 00:13:14,346
+than the people who build the main car, right? Like they might be know
+
+205
+00:13:14,368 --> 00:13:17,862
+kind of the deployment team or the infrastructure team or the SRE
+
+206
+00:13:17,926 --> 00:13:21,050
+team, people who kind of adapt to that, maybe an embedded SRE,
+
+207
+00:13:22,190 --> 00:13:25,546
+which means that the container will keep moving and the sidecar
+
+208
+00:13:25,578 --> 00:13:29,102
+needs to keep moving along with it. It's really nice if you have something
+
+209
+00:13:29,156 --> 00:13:32,878
+where you can adapt as changes in the container cause
+
+210
+00:13:32,964 --> 00:13:36,754
+whatever logic you had in the sidecar to go out of date to be
+
+211
+00:13:36,792 --> 00:13:40,766
+faster. So this means that if you can chase the container
+
+212
+00:13:40,798 --> 00:13:43,250
+code faster than the container code moves,
+
+213
+00:13:44,070 --> 00:13:47,574
+you're in an advantage. If you take longer for
+
+214
+00:13:47,612 --> 00:13:50,738
+your cycles to modify. When the container code moves,
+
+215
+00:13:50,834 --> 00:13:54,040
+you're perpetually going to be more and more behind.
+
+216
+00:13:54,970 --> 00:13:58,166
+So I think this is
+
+217
+00:13:58,188 --> 00:14:02,170
+kind of the fun part of the talk where I will give you an examples.
+
+218
+00:14:03,230 --> 00:14:07,130
+The challenge I gave to myself is to feed a sidecar on a slide.
+
+219
+00:14:08,270 --> 00:14:11,306
+That does mean that the code is optimized for the slides,
+
+220
+00:14:11,498 --> 00:14:14,782
+not best practices. This is not how I would actually
+
+221
+00:14:14,836 --> 00:14:19,054
+write this nodes. In practice it's mostly to show what
+
+222
+00:14:19,172 --> 00:14:23,834
+bits and pieces would make a sidecars work. And hopefully
+
+223
+00:14:23,882 --> 00:14:27,582
+they're going to be fun because you can kind of get all the details
+
+224
+00:14:27,726 --> 00:14:31,074
+in one slide. This also does mean the slides are going to be a bit
+
+225
+00:14:31,112 --> 00:14:34,286
+packed, so get ready for a fun journey.
+
+226
+00:14:34,478 --> 00:14:38,166
+So here's like a really quick
+
+227
+00:14:38,348 --> 00:14:41,400
+readiness sidecar. As you can see,
+
+228
+00:14:41,850 --> 00:14:45,542
+in order to raise an exception, I just divide one by
+
+229
+00:14:45,596 --> 00:14:49,626
+zero because that's literally the fastest code that will
+
+230
+00:14:49,728 --> 00:14:53,306
+these shortest code that will raise an exception in Python, just three
+
+231
+00:14:53,328 --> 00:14:57,046
+characters. So things means that I can grab
+
+232
+00:14:57,078 --> 00:15:00,170
+the data, compare it to, let's say five,
+
+233
+00:15:00,320 --> 00:15:03,994
+and then return the response okay, if it's not five, I raise an error.
+
+234
+00:15:04,122 --> 00:15:07,566
+Most web framework will automatically give
+
+235
+00:15:07,588 --> 00:15:10,814
+you 500. That complies with kubernetes. I have
+
+236
+00:15:10,852 --> 00:15:14,802
+just enough code to hook this function
+
+237
+00:15:14,856 --> 00:15:18,020
+into pyramid. I have routing, that's it.
+
+238
+00:15:18,950 --> 00:15:23,394
+Other than imports things is fully functional code that will give you
+
+239
+00:15:23,592 --> 00:15:27,254
+a readiness check. Assuming that you have a JSon that
+
+240
+00:15:27,452 --> 00:15:30,646
+has a key called value, that has to be five. So this
+
+241
+00:15:30,668 --> 00:15:33,590
+is fully functional readiness sidecar.
+
+242
+00:15:35,050 --> 00:15:38,746
+Here's a metric sidecar. It takes a little bit more code because I have
+
+243
+00:15:38,768 --> 00:15:42,934
+to integrate with the Prometheus
+
+244
+00:15:42,982 --> 00:15:46,214
+client library. So that means I have to build these collector registry
+
+245
+00:15:46,262 --> 00:15:49,050
+and I have to build a gauge for latency.
+
+246
+00:15:49,790 --> 00:15:53,370
+And then I basically send a synthetic request,
+
+247
+00:15:53,530 --> 00:15:56,894
+check how long it took, set the latency and
+
+248
+00:15:56,932 --> 00:16:01,402
+I generate the Prometheus
+
+249
+00:16:01,546 --> 00:16:05,026
+thing. And again, if you set everything up
+
+250
+00:16:05,048 --> 00:16:08,354
+in kubernetes correctly, set Prometheus up with the right
+
+251
+00:16:08,392 --> 00:16:12,418
+configuration. This will give you a gauge that shows
+
+252
+00:16:12,504 --> 00:16:15,570
+the latency of the application, which means if the application
+
+253
+00:16:15,640 --> 00:16:19,314
+is heavily loaded or it's like garbage collecting or something,
+
+254
+00:16:19,512 --> 00:16:22,930
+this will take longer and you will be able to see it on a dashboard
+
+255
+00:16:23,010 --> 00:16:26,034
+and you don't even have to count on the application actually measuring
+
+256
+00:16:26,082 --> 00:16:27,640
+itself at any point here.
+
+257
+00:16:29,610 --> 00:16:33,514
+Here's a simple example of a scheduler side cars.
+
+258
+00:16:33,552 --> 00:16:36,986
+All it takes care of just periodic making sure that the
+
+259
+00:16:37,008 --> 00:16:41,094
+application flashing bits queue. You might think, well, why not just put a Kubernetes
+
+260
+00:16:41,142 --> 00:16:44,826
+quant job? Well, a quant job is a job, which means it is a pod.
+
+261
+00:16:44,938 --> 00:16:48,494
+But let's say that you want this. Every single
+
+262
+00:16:48,612 --> 00:16:52,046
+container of the main application has its own kind of internal queue that you want
+
+263
+00:16:52,068 --> 00:16:55,806
+to flush once in a while to make sure that it flushes this
+
+264
+00:16:55,828 --> 00:16:59,026
+is fully functional code and it will actually do the job and
+
+265
+00:16:59,048 --> 00:17:03,154
+you actually don't have a much easier way to do that. So three
+
+266
+00:17:03,192 --> 00:17:06,290
+lines of python. This was very easy to fit on a slide.
+
+267
+00:17:07,350 --> 00:17:10,070
+So those are like some fun sidecars.
+
+268
+00:17:10,730 --> 00:17:14,066
+Now I'm going to fail in my challenge because the next sidecar
+
+269
+00:17:14,098 --> 00:17:17,414
+I have is going to be slightly longer than a slide, but we will break
+
+270
+00:17:17,452 --> 00:17:21,266
+it down to a few slides. So it's going to be my log analyzer
+
+271
+00:17:21,298 --> 00:17:24,954
+sidecar. To challenge myself, I gave myself
+
+272
+00:17:25,152 --> 00:17:27,638
+kind of like some fun parameters,
+
+273
+00:17:27,734 --> 00:17:31,626
+right? Like I said, you can actually mount a volume
+
+274
+00:17:31,738 --> 00:17:35,134
+and so share files natively. But let's say
+
+275
+00:17:35,172 --> 00:17:38,746
+for any kind of reason you don't want to do that, right. It just doesn't
+
+276
+00:17:38,778 --> 00:17:42,846
+fit your model. So there
+
+277
+00:17:42,868 --> 00:17:46,558
+can be all kind of permission issues and look, weird corner cases where it wouldn't
+
+278
+00:17:46,574 --> 00:17:49,794
+make sense. So the main container logs to valog something.
+
+279
+00:17:49,912 --> 00:17:54,046
+That valog something is inside the container's file
+
+280
+00:17:54,078 --> 00:17:57,314
+system, so it wouldn't be accessible naively to other
+
+281
+00:17:57,352 --> 00:18:01,238
+containers. And you wind these sidecar that processes has
+
+282
+00:18:01,244 --> 00:18:04,342
+a log in this example, I think it's going to count the lines, but obviously
+
+283
+00:18:04,396 --> 00:18:08,774
+in real life you'd do something slightly more interesting. But this
+
+284
+00:18:08,892 --> 00:18:12,458
+almost seems like an impossible challenge. So I think the fact that
+
+285
+00:18:12,544 --> 00:18:16,138
+I can't fit it in one slide is maybe, okay, I will fit it
+
+286
+00:18:16,144 --> 00:18:17,770
+in like a handful of slides.
+
+287
+00:18:19,070 --> 00:18:22,458
+So the first trick is that to configure the pod correctly.
+
+288
+00:18:22,554 --> 00:18:26,314
+So we need to share the process namespace. Process namespace.
+
+289
+00:18:26,362 --> 00:18:29,662
+That doesn't sound very useful. So the
+
+290
+00:18:29,716 --> 00:18:33,486
+first step is to find out why
+
+291
+00:18:33,508 --> 00:18:37,298
+do you have to know yourself? Because you can't know others unless you know yourself.
+
+292
+00:18:37,464 --> 00:18:40,654
+This sounds like a weird, like mystical philosophy,
+
+293
+00:18:40,702 --> 00:18:45,090
+but I promise you this is actually concrete technical advice,
+
+294
+00:18:46,250 --> 00:18:50,454
+because now we can look for another process which
+
+295
+00:18:50,492 --> 00:18:52,550
+has a different root than ours.
+
+296
+00:18:53,850 --> 00:18:58,050
+Now we managed to get to the other process roots,
+
+297
+00:18:58,130 --> 00:19:01,978
+right? Which means we already have access to the
+
+298
+00:19:02,144 --> 00:19:05,606
+peer Containers operating system. So that's
+
+299
+00:19:05,638 --> 00:19:09,158
+pretty cool. So now we have access to the file system that's
+
+300
+00:19:09,174 --> 00:19:12,606
+in the other container. Now we
+
+301
+00:19:12,628 --> 00:19:16,378
+can just read the log, sum the lines,
+
+302
+00:19:16,554 --> 00:19:20,122
+and then post it to some kind of push metrics collector,
+
+303
+00:19:20,186 --> 00:19:23,746
+let's say. And that's it, we're done. So it was a
+
+304
+00:19:23,768 --> 00:19:27,970
+bit more than a slide, but in three slides we did something that
+
+305
+00:19:28,120 --> 00:19:32,066
+most people would tell you is impossible. So I
+
+306
+00:19:32,088 --> 00:19:36,642
+think that is a pretty cool thing
+
+307
+00:19:36,696 --> 00:19:40,246
+about showing both the strengths of the kind of stuff you can do
+
+308
+00:19:40,268 --> 00:19:43,986
+with sidecars and the kind of power that you have with python.
+
+309
+00:19:44,098 --> 00:19:47,350
+That you can do the impossible in three slides,
+
+310
+00:19:47,710 --> 00:19:51,386
+not even full slides worth of code. So I think
+
+311
+00:19:51,408 --> 00:19:54,586
+that's kind of cool. So I want to leave
+
+312
+00:19:54,608 --> 00:19:57,610
+you with a few final thoughts about containers.
+
+313
+00:19:58,750 --> 00:20:02,154
+They're black nodes, right? You don't want to mush around
+
+314
+00:20:02,192 --> 00:20:05,406
+with a container. Like once the container has been tested, you want to keep it
+
+315
+00:20:05,428 --> 00:20:09,198
+as is throughout the deployment cycle. Then you
+
+316
+00:20:09,204 --> 00:20:11,950
+want to keep your container simple. The simpler the container is,
+
+317
+00:20:12,020 --> 00:20:15,380
+the easier it is going to be to manage.
+
+318
+00:20:18,310 --> 00:20:20,980
+But you will have to always add something.
+
+319
+00:20:21,830 --> 00:20:26,018
+Pods and equivalent things. On other frameworks
+
+320
+00:20:26,194 --> 00:20:30,102
+that run containers, what they do is they allow adding stuff
+
+321
+00:20:30,156 --> 00:20:33,522
+from the outside. At least it's a clear ish
+
+322
+00:20:33,586 --> 00:20:36,870
+separation of responsibilities. So that's pretty useful.
+
+323
+00:20:39,210 --> 00:20:42,794
+You can build the container to be more sidecar friendly. That's actually
+
+324
+00:20:42,832 --> 00:20:46,618
+more important than building a container, to not need a sidecar. And one
+
+325
+00:20:46,704 --> 00:20:50,358
+trick is to just have good APIs inside these container. You can,
+
+326
+00:20:50,384 --> 00:20:54,430
+for example, listen on a separate port that's not exposed
+
+327
+00:20:55,570 --> 00:20:59,454
+outside, so it's only going to be exposed to your peers, which means
+
+328
+00:20:59,492 --> 00:21:03,354
+you can do a lot less permission checking,
+
+329
+00:21:03,482 --> 00:21:07,234
+but still define a really well defined API. Which means
+
+330
+00:21:07,432 --> 00:21:11,598
+you don't care about security, but you do care about portability,
+
+331
+00:21:11,694 --> 00:21:15,074
+so that it's easier for the sidecar container to know
+
+332
+00:21:15,112 --> 00:21:16,660
+which API to expect.
+
+333
+00:21:18,550 --> 00:21:22,070
+So packaging stuff with containers is pretty good.
+
+334
+00:21:22,220 --> 00:21:26,470
+This is not a controversial statement. In 2022, everybody agrees
+
+335
+00:21:27,370 --> 00:21:30,886
+packaging stuff in separate containers is even better. You don't want to
+
+336
+00:21:30,908 --> 00:21:34,326
+shove a container that is like the everything container or you're back
+
+337
+00:21:34,348 --> 00:21:37,106
+to like, why even have a container?
+
+338
+00:21:37,298 --> 00:21:40,750
+So the more sidecars you have, the better
+
+339
+00:21:40,820 --> 00:21:44,014
+your packaging architecture is. And with that,
+
+340
+00:21:44,132 --> 00:21:47,726
+thank you so much for listening to my talk. I hope
+
+341
+00:21:47,748 --> 00:21:50,734
+you had fun, and I hope you're going to go and write a lot more
+
+342
+00:21:50,772 --> 00:21:51,658
+sidecars.
+

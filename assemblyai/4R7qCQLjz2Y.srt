@@ -1,0 +1,812 @@
+1
+00:00:25,970 --> 00:00:29,202
+Welcome to my talk about low overhead Python application profiling
+
+2
+00:00:29,266 --> 00:00:32,934
+with EBPF. Let's begin. Way about myself my
+
+3
+00:00:32,972 --> 00:00:36,534
+name is Yonatan Goldschmidt. I have six years of experience as an R D
+
+4
+00:00:36,572 --> 00:00:39,926
+specialist in the IDF. I like everything about computers and
+
+5
+00:00:39,948 --> 00:00:43,554
+software, and today I'm a team lead at Granulate's performance
+
+6
+00:00:43,602 --> 00:00:47,446
+research department. About Granulate we enable companies to
+
+7
+00:00:47,468 --> 00:00:51,710
+optimize their workloads, improve performance, and leverage that to reduce costs.
+
+8
+00:00:52,130 --> 00:00:55,070
+And I also like wine, especially in Italy.
+
+9
+00:00:56,610 --> 00:01:00,474
+So why is profiling amazing? It's not a new concept,
+
+10
+00:01:00,522 --> 00:01:04,206
+but it's definitely rising lately, so it's getting easier and easier
+
+11
+00:01:04,238 --> 00:01:07,090
+to apply and use. Even in production environments,
+
+12
+00:01:07,590 --> 00:01:10,766
+you gain visibility on which parts of your code consume
+
+13
+00:01:10,798 --> 00:01:14,206
+the most resources, and this helps you to expose
+
+14
+00:01:14,318 --> 00:01:18,374
+interesting performance improvement opportunities. Let's talk about
+
+15
+00:01:18,412 --> 00:01:21,554
+profile types and focus on Python profilers.
+
+16
+00:01:21,682 --> 00:01:25,330
+We start with deterministic profilers or tracing profilers.
+
+17
+00:01:25,490 --> 00:01:28,786
+They track your program's execution in a deterministic
+
+18
+00:01:28,818 --> 00:01:32,234
+way, for example by instrumenting all code paths to give
+
+19
+00:01:32,272 --> 00:01:35,734
+deterministic results. They are very common and many types
+
+20
+00:01:35,782 --> 00:01:39,274
+exist. Probably the most well known one is
+
+21
+00:01:39,312 --> 00:01:42,298
+c profilers, which is included in the Python standard library,
+
+22
+00:01:42,394 --> 00:01:46,346
+and to the right of this slide we can see the example outputs
+
+23
+00:01:46,378 --> 00:01:50,094
+of it. Now, determination profiles are very useful during
+
+24
+00:01:50,132 --> 00:01:54,046
+development, as they are very versatile and can give accurate
+
+25
+00:01:54,078 --> 00:01:56,850
+metrics on function and line of code level.
+
+26
+00:01:57,000 --> 00:02:00,466
+However, their intrusive design, the need to
+
+27
+00:02:00,488 --> 00:02:03,598
+insert instrumentations in code or in the interpreter,
+
+28
+00:02:03,774 --> 00:02:07,286
+makes them introduce, possibly introduce I lowoverhead to
+
+29
+00:02:07,308 --> 00:02:10,822
+the code execution. They also might require code changes, for example,
+
+30
+00:02:10,876 --> 00:02:14,920
+to enable or disable the profilers or require deployment changes.
+
+31
+00:02:15,690 --> 00:02:19,074
+For example, you need to start your application with the profilers
+
+32
+00:02:19,122 --> 00:02:22,966
+script. These reasons makes them less suitable for production
+
+33
+00:02:22,998 --> 00:02:27,034
+use because you do not want to introduce any overhead and you
+
+34
+00:02:27,072 --> 00:02:31,470
+preferably do not want to make any changes just for the sake of profiling.
+
+35
+00:02:32,450 --> 00:02:35,722
+Now, another profile type is statistical profiles.
+
+36
+00:02:35,866 --> 00:02:39,662
+These work by taking snapshots or samples of your application
+
+37
+00:02:39,796 --> 00:02:43,458
+every set interval, for example, every one millisecond or
+
+38
+00:02:43,624 --> 00:02:46,846
+every microsecond. Instead of continuously
+
+39
+00:02:46,878 --> 00:02:51,134
+tracking everything that's happening over enough time, the accumulated
+
+40
+00:02:51,182 --> 00:02:53,940
+samples portray an accurate image of your application.
+
+41
+00:02:54,630 --> 00:02:57,978
+One common example is Pyspy, which is sampling provides
+
+42
+00:02:58,014 --> 00:03:01,974
+written in rust. This image also shows one way
+
+43
+00:03:02,012 --> 00:03:05,334
+to visualize the output of Pyspy. It's called the flowing graph, and it
+
+44
+00:03:05,372 --> 00:03:08,662
+tells us the relative execution time of different functions and flows
+
+45
+00:03:08,726 --> 00:03:09,660
+in your application.
+
+46
+00:03:11,790 --> 00:03:15,210
+Now, since these samples can be taken externally,
+
+47
+00:03:15,550 --> 00:03:19,402
+therefore, these profiles can be made external to the applications, as in
+
+48
+00:03:19,456 --> 00:03:23,046
+not intrusive thus they do not
+
+49
+00:03:23,088 --> 00:03:26,490
+introduce any overhead to the application itself to some extent.
+
+50
+00:03:26,650 --> 00:03:29,678
+Now, the profile itself is a program running on the system,
+
+51
+00:03:29,764 --> 00:03:33,454
+so it does introduce some overhead to the system, and we'll talk about
+
+52
+00:03:33,492 --> 00:03:36,270
+that overhead when we finally reach EBPF.
+
+53
+00:03:36,630 --> 00:03:39,954
+Now, since it's not intrusive, we do not
+
+54
+00:03:39,992 --> 00:03:43,170
+need to make any changes to the code or deployment. For example,
+
+55
+00:03:43,240 --> 00:03:47,086
+Pyspy can start profiling any running Cpython process just by giving
+
+56
+00:03:47,128 --> 00:03:50,454
+it the process id, which is very convenient. For these
+
+57
+00:03:50,492 --> 00:03:54,466
+reasons, they are much more suitable and safe to use in production.
+
+58
+00:03:54,578 --> 00:03:58,374
+Now, deterministic profilers are generally more versatile in their abilities.
+
+59
+00:03:58,502 --> 00:04:02,186
+So for development environments, when you want
+
+60
+00:04:02,208 --> 00:04:05,754
+to accurately measure a specific functional module, you might want
+
+61
+00:04:05,792 --> 00:04:09,686
+to still use them. Now that's all for the pre EBPF
+
+62
+00:04:09,718 --> 00:04:13,290
+error. Now let's see what EBPF brings to the table of profilers.
+
+63
+00:04:14,030 --> 00:04:18,346
+A primer on EBPF. It's a technology that has evolved
+
+64
+00:04:18,378 --> 00:04:21,854
+from the old Berkeley packet filters, which is a mechanism in the kernel that
+
+65
+00:04:21,892 --> 00:04:25,246
+allows the user to define filter programs for sockets
+
+66
+00:04:25,358 --> 00:04:28,914
+like the one displayed on the screen. It was used
+
+67
+00:04:28,952 --> 00:04:33,246
+mostly for sniffing programs such as TCP dump. The filter program is essentially
+
+68
+00:04:33,358 --> 00:04:36,690
+a small virtual machine with a set of outputs and operations
+
+69
+00:04:36,850 --> 00:04:41,160
+that it can perform on packet data. For example, the program displayed here
+
+70
+00:04:42,170 --> 00:04:46,120
+checks if the packet source IP address or destination IP address
+
+71
+00:04:46,970 --> 00:04:50,726
+is the local host, and if the source portal dev support is
+
+72
+00:04:50,748 --> 00:04:54,294
+80, and you can certainly monitor the assembly
+
+73
+00:04:54,342 --> 00:04:57,420
+instructions, the VPF assembly instructions for that program.
+
+74
+00:04:57,870 --> 00:05:01,446
+Now, years forward, this simple interpreter for user
+
+75
+00:05:01,478 --> 00:05:05,142
+programs has been enhanced with many more APIs that are not limited
+
+76
+00:05:05,206 --> 00:05:08,366
+and more to package inspection. Also, the programs can now be
+
+77
+00:05:08,388 --> 00:05:11,934
+attached to virtually any logical point in the kernel, not just
+
+78
+00:05:11,972 --> 00:05:15,810
+to the entry of packets. Together, this makes
+
+79
+00:05:15,880 --> 00:05:20,526
+EVPF the most capable tracing or observability infrastructure
+
+80
+00:05:20,558 --> 00:05:24,194
+on Linux. Here's a short example. To the right
+
+81
+00:05:24,232 --> 00:05:27,534
+we have the code of an EVPF program called Opensnoop.
+
+82
+00:05:27,662 --> 00:05:31,606
+It's written in a language called BPFT trace, which is later compiled to
+
+83
+00:05:31,628 --> 00:05:35,298
+the same BPF assembly we saw earlier. You can read about EBPF
+
+84
+00:05:35,314 --> 00:05:38,754
+trace online. This program hooks onto the open
+
+85
+00:05:38,812 --> 00:05:43,146
+system call and thus intercepts all open calls throughout the system.
+
+86
+00:05:43,328 --> 00:05:46,714
+To the left you can see sample output from running it.
+
+87
+00:05:46,752 --> 00:05:50,298
+On my box you can see all sorts
+
+88
+00:05:50,314 --> 00:05:53,950
+of different pids and programs opening different files.
+
+89
+00:05:54,290 --> 00:05:58,622
+You can see how relatively easy it is to write
+
+90
+00:05:58,676 --> 00:06:02,622
+this simple code that attaches onto Cisco and traces all
+
+91
+00:06:02,676 --> 00:06:06,862
+calls with fraud system. And also, I didn't mention the negligible
+
+92
+00:06:06,926 --> 00:06:10,734
+performance effect, which is something that we just didn't
+
+93
+00:06:10,782 --> 00:06:14,194
+have before EBPF. This table describes the
+
+94
+00:06:14,232 --> 00:06:18,434
+difference between standard user code, kernel code, and EVPF.
+
+95
+00:06:18,562 --> 00:06:22,482
+The core thing you need to take from the app is that EBPF is safe.
+
+96
+00:06:22,546 --> 00:06:26,614
+By design, a verified mechanism exists which ensures that
+
+97
+00:06:26,652 --> 00:06:32,166
+only safe programs execute. It also means that EBPF
+
+98
+00:06:32,198 --> 00:06:35,178
+programs are not entitled to do anything they please. For example,
+
+99
+00:06:35,264 --> 00:06:39,414
+they are not able to call arbitrary system calls or perform arbitrary
+
+100
+00:06:39,462 --> 00:06:43,142
+writes to memory. On the other hand, EVPF programs have
+
+101
+00:06:43,216 --> 00:06:46,954
+fast access to opensource, such as memory. For example, they can access the memory
+
+102
+00:06:47,002 --> 00:06:50,554
+of the currently running Python application much faster than Pyspy,
+
+103
+00:06:50,682 --> 00:06:55,098
+which is an external applications that has to run
+
+104
+00:06:55,124 --> 00:06:58,386
+some system calls in order to read the memory of the Python application.
+
+105
+00:06:58,568 --> 00:07:02,766
+Now let's get back to cpython. We needed a lowoverhead sampling
+
+106
+00:07:02,798 --> 00:07:06,742
+profiler, which can sample at high frequency and
+
+107
+00:07:06,796 --> 00:07:10,200
+can easily profile all Python applications running on the system.
+
+108
+00:07:10,650 --> 00:07:14,342
+Plus we wanted it to be able to extract native stacks and
+
+109
+00:07:14,396 --> 00:07:17,986
+kernel stacks. Pyspy, when not introducing
+
+110
+00:07:18,018 --> 00:07:21,306
+overhead on the application itself, does have some overhead on
+
+111
+00:07:21,328 --> 00:07:24,566
+the system. As I said, it needs to access the Python memory
+
+112
+00:07:24,598 --> 00:07:28,122
+in order to extract factories, and it does
+
+113
+00:07:28,176 --> 00:07:31,818
+a lot of Cisco trying to do that, which take time
+
+114
+00:07:31,984 --> 00:07:35,578
+Byspace simply wasn't fast enough when we needed to profile
+
+115
+00:07:35,674 --> 00:07:38,686
+a large cpython application with hundreds of threads at
+
+116
+00:07:38,708 --> 00:07:42,138
+high frequency. So we started looking onto
+
+117
+00:07:42,234 --> 00:07:45,714
+the EBPF approach and quickly found Pyperf, which was
+
+118
+00:07:45,752 --> 00:07:49,342
+posted to BCC as a PoC of an EBPF
+
+119
+00:07:49,406 --> 00:07:52,962
+based Python profile. By the way, we also found a project called
+
+120
+00:07:53,016 --> 00:07:56,314
+Aviperf, which is like Pyperf for OBi,
+
+121
+00:07:56,382 --> 00:07:59,974
+but that's a different story. So we spent a while
+
+122
+00:08:00,012 --> 00:08:03,846
+and added many new features to Pyperf, trying to make it
+
+123
+00:08:04,028 --> 00:08:07,398
+the best Python sampling profile. So first of all,
+
+124
+00:08:07,484 --> 00:08:10,650
+we made sure it supports all currently available
+
+125
+00:08:10,720 --> 00:08:14,486
+Python versions. We made it a system wide
+
+126
+00:08:14,518 --> 00:08:18,038
+profile. That is, it profiles all running Python applications
+
+127
+00:08:18,054 --> 00:08:21,242
+on the system, unlike Pyspy, which works on a per
+
+128
+00:08:21,296 --> 00:08:24,746
+process basis. If I want to profile 50 Python applications,
+
+129
+00:08:24,778 --> 00:08:28,494
+I need to invoke 50 different PY spies, which then
+
+130
+00:08:28,532 --> 00:08:31,854
+introduce more overhead. With Pyperf, I need to add it just
+
+131
+00:08:31,892 --> 00:08:34,260
+once and this profilers the entire system.
+
+132
+00:08:34,870 --> 00:08:40,306
+Additionally, we have added logic to extract the native stacks such
+
+133
+00:08:40,328 --> 00:08:45,434
+as cpython extensions, for example JSon, Piccolo, numpy interpreter
+
+134
+00:08:45,502 --> 00:08:48,834
+code, and native libraries. And we also extract
+
+135
+00:08:48,882 --> 00:08:52,406
+kernel stacks, which can be, for example, the system calls your
+
+136
+00:08:52,428 --> 00:08:56,134
+application is making. These features were relatively easy
+
+137
+00:08:56,172 --> 00:09:00,182
+to add over EVPF because
+
+138
+00:09:00,236 --> 00:09:03,386
+Pyperf is EBPF based, and it would have been much harder if
+
+139
+00:09:03,408 --> 00:09:07,580
+not impossible, and it's been written non EVPF based.
+
+140
+00:09:08,990 --> 00:09:12,234
+So here's an example of how it looks. This is a simple,
+
+141
+00:09:12,352 --> 00:09:16,314
+uniform application, and in yellow
+
+142
+00:09:16,362 --> 00:09:19,886
+rectangles we can see the Python frames from the
+
+143
+00:09:19,908 --> 00:09:23,150
+Python applications. The purple frames are denoted.
+
+144
+00:09:23,910 --> 00:09:27,470
+The purple frames denote a native code, and the orange frames
+
+145
+00:09:27,550 --> 00:09:31,074
+denote kernel code. Together, the combinations of those three
+
+146
+00:09:31,192 --> 00:09:34,850
+portray a very accurate image of the application institution.
+
+147
+00:09:35,190 --> 00:09:38,660
+Now, I will be speaking a lot about native code,
+
+148
+00:09:39,670 --> 00:09:43,654
+which is something that many profilers overlook intentionally saying
+
+149
+00:09:43,692 --> 00:09:47,926
+that the developer should care about the Python code because they do not have control
+
+150
+00:09:48,028 --> 00:09:51,914
+about the native code anyway, so they should just focus on the Python code,
+
+151
+00:09:51,952 --> 00:09:55,850
+and the native frames and stacks are unwanted noise.
+
+152
+00:09:56,190 --> 00:09:59,754
+However, from our experience, we know that
+
+153
+00:09:59,792 --> 00:10:02,926
+taking the native profile into account is very important when you want to
+
+154
+00:10:02,948 --> 00:10:06,714
+truly understand what's going on and which operations on the cpython
+
+155
+00:10:06,762 --> 00:10:10,174
+level are taking the most cpu and time.
+
+156
+00:10:10,372 --> 00:10:14,094
+Therefore, we have invested in making this feature work perfectly
+
+157
+00:10:14,142 --> 00:10:18,510
+in Pyperf. So now we'll do a small exercise.
+
+158
+00:10:18,590 --> 00:10:20,660
+I have this function written here.
+
+159
+00:10:22,150 --> 00:10:25,746
+Can you read its code and guess which operations take the
+
+160
+00:10:25,768 --> 00:10:29,366
+most time? And I'll give you a minute to think and
+
+161
+00:10:29,388 --> 00:10:32,658
+then we will check out the results. And actually it's
+
+162
+00:10:32,674 --> 00:10:35,878
+recorded, so you can just pause and continue when you're ready.
+
+163
+00:10:35,964 --> 00:10:39,174
+I'll continue now. So here I've
+
+164
+00:10:39,302 --> 00:10:43,402
+cut out the relevant native profile of this function.
+
+165
+00:10:43,536 --> 00:10:46,890
+The bottommost frame is the Python function itself,
+
+166
+00:10:47,040 --> 00:10:51,482
+and all frames above it are the native functions
+
+167
+00:10:51,546 --> 00:10:54,926
+that our cpython function, funk I've named it,
+
+168
+00:10:55,108 --> 00:10:59,658
+is calling. I've added some arrows
+
+169
+00:10:59,834 --> 00:11:03,200
+to explain which is coming from where,
+
+170
+00:11:04,130 --> 00:11:08,142
+and we can see some things that I originally,
+
+171
+00:11:08,206 --> 00:11:11,586
+after I wrote this, I did not expect the profile to look like
+
+172
+00:11:11,608 --> 00:11:15,714
+that. For example, I did think
+
+173
+00:11:15,752 --> 00:11:19,874
+that the string concatenation, which we can see to the right, taking a relatively
+
+174
+00:11:20,002 --> 00:11:23,640
+large part of the profile. Actually, it was blanking first,
+
+175
+00:11:24,570 --> 00:11:28,102
+the string concatenation takes a large part. However,
+
+176
+00:11:28,156 --> 00:11:31,626
+I did not expect the cow calls to take a
+
+177
+00:11:31,648 --> 00:11:35,482
+large part of the profile. Also, the model operator takes a relatively large
+
+178
+00:11:35,536 --> 00:11:39,414
+part of the profile. And I only realized
+
+179
+00:11:39,462 --> 00:11:42,510
+that once I've looked at the native profile.
+
+180
+00:11:43,730 --> 00:11:47,454
+What I'm trying to tell you by that is that once we
+
+181
+00:11:47,492 --> 00:11:51,200
+observe the native profilers, even of a simple python function,
+
+182
+00:11:51,730 --> 00:11:55,246
+we can quickly devise ideas on how to improve the Python
+
+183
+00:11:55,278 --> 00:11:58,574
+code of it. For example, after viewing this profile,
+
+184
+00:11:58,622 --> 00:12:01,794
+I now know that the most important optimization to
+
+185
+00:12:01,832 --> 00:12:05,294
+use is to switch from string concatenation to use string
+
+186
+00:12:05,342 --> 00:12:08,866
+I. And after doing that, the next thing
+
+187
+00:12:08,968 --> 00:12:12,086
+I would do is probably to cache the results of car,
+
+188
+00:12:12,188 --> 00:12:15,666
+and after that I would try to avoid the model operator.
+
+189
+00:12:15,858 --> 00:12:19,080
+Now the comparison, which I was thinking,
+
+190
+00:12:19,690 --> 00:12:23,338
+I thought it would take a lot part of the profile. It actually takes
+
+191
+00:12:23,504 --> 00:12:27,180
+almost nothing. You can see it in the middle, it's actually rather small.
+
+192
+00:12:27,870 --> 00:12:30,766
+So you need to profile and you need to look at the native profile in
+
+193
+00:12:30,788 --> 00:12:34,346
+order to truly understand how even a simple cpython
+
+194
+00:12:34,378 --> 00:12:37,040
+function divides its execution time.
+
+195
+00:12:38,450 --> 00:12:41,822
+So that's it on Pyperf. I hope the last part was interesting.
+
+196
+00:12:41,956 --> 00:12:45,534
+Now, Pyperf is a part of gprofilo, which is
+
+197
+00:12:45,572 --> 00:12:49,402
+our system wide, contains profilers for production environments,
+
+198
+00:12:49,546 --> 00:12:53,754
+and it supports numerous times not only Python, but also Java
+
+199
+00:12:53,802 --> 00:12:56,710
+and go rust Obi.
+
+200
+00:12:57,290 --> 00:12:59,750
+So check it out, it's open source.
+
+201
+00:13:00,650 --> 00:13:04,146
+So thank you. Feel free to DM or connect on LinkedIn,
+
+202
+00:13:04,178 --> 00:13:08,326
+GitHub, whatever, and please try.
+
+203
+00:13:08,428 --> 00:13:12,020
+It's fun. Try flippofinic at deepofilo IO. Thank you.
+
