@@ -44,8 +44,19 @@ for i, (talk, video) in enumerate(missing_transcriptions):
     print(f"({i}/{len(missing_transcriptions)}) Processing video {video}")
 
     # get the audio to transcribe
-    audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)
-    print(f"Got audio: {audio_path}")
+    audio_path = None
+    retries = 10
+    for _ in range(retries):
+        try:
+            audio_path, _ = download_youtube_audio(video, DOWNLOAD_PATH)
+            print(f"Got audio: {audio_path}")
+            break
+        except Exception as ex:
+            print(f"({i}/{retries}) Error getting audio: {ex}")
+            pass
+    if not audio_path:
+        print("Couldn't get the video after")
+        continue
     
     # get the keywords
     keywords = extract_keywords(talk)
