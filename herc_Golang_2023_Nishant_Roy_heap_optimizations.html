@@ -348,6 +348,14 @@
 
 
 
+<style>
+.text-selected {
+  background-color: #42ba96!important;
+  color: white;
+}
+</style>
+	
+
     <!-- WELCOME -->
     <section class="py-5 py-md-10" style="background-color: #881E4B;">
 
@@ -435,6 +443,10 @@
             <div id="player" class="sticky"></div>
 
             <script>
+              
+              var transcript = [{"text": "Hi everyone. My name is Nishant Roy and I\u0027m excited", "timestamp": "00:00:19,930", "timestamp_s": 19.0}, {"text": "to be here today at 42 Golang 2023", "timestamp": "00:00:23,338", "timestamp_s": 23.0}, {"text": "to talk to you about heap optimizations for Go systems.", "timestamp": "00:00:26,796", "timestamp_s": 26.0}, {"text": "After this session, you should have a good idea of how to triage,", "timestamp": "00:00:30,098", "timestamp_s": 30.0}, {"text": "whether your application is being plagued by memory issues, how to", "timestamp": "00:00:33,106", "timestamp_s": 33.0}, {"text": "track down hotspots in your code, and how to go about optimizing", "timestamp": "00:00:36,684", "timestamp_s": 36.0}, {"text": "your application\u0027s performance.", "timestamp": "00:00:40,886", "timestamp_s": 40.0}, {"text": "Before we dive in, here\u0027s a little about myself.", "timestamp": "00:00:43,710", "timestamp_s": 43.0}, {"text": "I\u0027m the engineering manager for the ad serving platform team at Pinterest,", "timestamp": "00:00:47,310", "timestamp_s": 47.0}, {"text": "and our team owns multiple critical systems that help power Pinterest\u0027s $2 billion", "timestamp": "00:00:51,334", "timestamp_s": 51.0}, {"text": "a year over $2 billion a year ad delivery systems.", "timestamp": "00:00:55,818", "timestamp_s": 55.0}, {"text": "Our central ad serving platform itself is implemented in Go and", "timestamp": "00:00:59,570", "timestamp_s": 59.0}, {"text": "has really high performance requirements, which is why we spend a lot of time", "timestamp": "00:01:03,012", "timestamp_s": 63.0}, {"text": "thinking about how to scale our systems efficiently. And one", "timestamp": "00:01:06,372", "timestamp_s": 66.0}, {"text": "of the areas in particular that we spent a lot of time on is taming", "timestamp": "00:01:09,608", "timestamp_s": 69.0}, {"text": "the impact of the Go garbage collector to improve our system\u0027s performance.", "timestamp": "00:01:12,910", "timestamp_s": 72.0}, {"text": "So I\u0027m here to talk about what I\u0027ve learned from that experience.", "timestamp": "00:01:16,510", "timestamp_s": 76.0}, {"text": "So let\u0027s start with a really quick intro to memory management and how it works", "timestamp": "00:01:21,370", "timestamp_s": 81.0}, {"text": "in Go. Memory management at a high level refers to", "timestamp": "00:01:25,116", "timestamp_s": 85.0}, {"text": "allocating memory for an application upon request and then releasing it", "timestamp": "00:01:28,828", "timestamp_s": 88.0}, {"text": "for use by other applications once it\u0027s no longer needed.", "timestamp": "00:01:32,608", "timestamp_s": 92.0}, {"text": "The great part about Go is that it does not require users to perform any", "timestamp": "00:01:36,110", "timestamp_s": 96.0}, {"text": "manual memory management, so users do not need to manually allocate and", "timestamp": "00:01:39,408", "timestamp_s": 99.0}, {"text": "clear memory. Both these functionalities are abstracted away from", "timestamp": "00:01:43,332", "timestamp_s": 103.0}, {"text": "them, and the benefit of this is that it minimizes the chance of memory", "timestamp": "00:01:46,756", "timestamp_s": 106.0}, {"text": "leaks.", "timestamp": "00:01:50,298", "timestamp_s": 110.0}, {"text": "The Go garbage collector, in order to run it basically has a", "timestamp": "00:01:53,090", "timestamp_s": 113.0}, {"text": "threshold. So every time that the heap hits a certain target size,", "timestamp": "00:01:56,968", "timestamp_s": 116.0}, {"text": "which by default is whenever the heap grows by 100% since the", "timestamp": "00:02:00,616", "timestamp_s": 120.0}, {"text": "last time the garbage collector ran, the Go garbage collector is going", "timestamp": "00:02:04,488", "timestamp_s": 124.0}, {"text": "to run one more time. This setting is configurable through a config flag,", "timestamp": "00:02:07,704", "timestamp_s": 127.0}, {"text": "and there are more config flags that have been rolled out in recent versions", "timestamp": "00:02:11,538", "timestamp_s": 131.0}, {"text": "to make this tunable at a more granular level.", "timestamp": "00:02:14,946", "timestamp_s": 134.0}, {"text": "So the go garbage collector uses what is known as a tricolor algorithm", "timestamp": "00:02:20,510", "timestamp_s": 140.0}, {"text": "for marking the objects, which means it divides objects into three different", "timestamp": "00:02:24,598", "timestamp_s": 144.0}, {"text": "sets. Objects that are marked as white are collectible, since that", "timestamp": "00:02:28,176", "timestamp_s": 148.0}, {"text": "means that they\u0027re not in use in memory. Objects marked as", "timestamp": "00:02:31,728", "timestamp_s": 151.0}, {"text": "black are not collectible since they are definitely in use in memory, and then objects", "timestamp": "00:02:35,088", "timestamp_s": 155.0}, {"text": "that are marked as gray, which is the third color, means they may be collectible,", "timestamp": "00:02:38,634", "timestamp_s": 158.0}, {"text": "but it hasn\u0027t been determined yet. So by using this", "timestamp": "00:02:41,818", "timestamp_s": 161.0}, {"text": "tricolor algorithm, the Go garbage collector is", "timestamp": "00:02:45,128", "timestamp_s": 165.0}, {"text": "able to run concurrently with your main program without", "timestamp": "00:02:48,632", "timestamp_s": 168.0}, {"text": "using a stop the world pause similar to some other languages like Java famously", "timestamp": "00:02:52,936", "timestamp_s": 172.0}, {"text": "used to, which therefore minimizes", "timestamp": "00:02:56,978", "timestamp_s": 176.0}, {"text": "the impact of garbage collection on your main program itself.", "timestamp": "00:03:01,138", "timestamp_s": 181.0}, {"text": "So then the question is, how does garbage collection actually impact your", "timestamp": "00:03:06,170", "timestamp_s": 186.0}, {"text": "application\u0027s performance? The Go garbage collector", "timestamp": "00:03:09,872", "timestamp_s": 189.0}, {"text": "aims to use no more than 25% of the available cpu resources,", "timestamp": "00:03:13,894", "timestamp_s": 193.0}, {"text": "which obviously ideally minimizes the impact on your program\u0027s", "timestamp": "00:03:18,150", "timestamp_s": 198.0}, {"text": "performance and latency, et cetera. However,", "timestamp": "00:03:21,722", "timestamp_s": 201.0}, {"text": "as memory pressure starts to increase, which means", "timestamp": "00:03:24,164", "timestamp_s": 204.0}, {"text": "the heap size is really large, the garbage collector suddenly", "timestamp": "00:03:28,292", "timestamp_s": 208.0}, {"text": "needs a lot more cpu resources. So it starts to steal resources", "timestamp": "00:03:32,058", "timestamp_s": 212.0}, {"text": "from your main program, which can then really start to hinder the performance", "timestamp": "00:03:35,610", "timestamp_s": 215.0}, {"text": "of your program itself. So, for instance, if the rate of memory allocation is", "timestamp": "00:03:39,006", "timestamp_s": 219.0}, {"text": "really high, then the Go garbage collector is going to start stealing", "timestamp": "00:03:43,272", "timestamp_s": 223.0}, {"text": "Go routines or threads from your main program to assist with the marking phase", "timestamp": "00:03:47,358", "timestamp_s": 227.0}, {"text": "in order to quickly and efficiently scan all the objects", "timestamp": "00:03:50,882", "timestamp_s": 230.0}, {"text": "in the heap and determine what can be cleared up. This does", "timestamp": "00:03:54,418", "timestamp_s": 234.0}, {"text": "two things. Firstly, it allows us to ensure that the rate of memory allocation", "timestamp": "00:03:57,932", "timestamp_s": 237.0}, {"text": "is not greater than the rate of memory cleanup, preventing the heap from growing to", "timestamp": "00:04:02,118", "timestamp_s": 242.0}, {"text": "be very large. Secondly,", "timestamp": "00:04:05,504", "timestamp_s": 245.0}, {"text": "it slows down your main program itself,", "timestamp": "00:04:09,150", "timestamp_s": 249.0}, {"text": "which therefore reduces the rate of memory increase as well.", "timestamp": "00:04:12,868", "timestamp_s": 252.0}, {"text": "So what causes GC to actually run slower? What does memory pressure", "timestamp": "00:04:20,930", "timestamp_s": 260.0}, {"text": "mean? So, in order to determine what memory is", "timestamp": "00:04:24,762", "timestamp_s": 264.0}, {"text": "ready to be cleaned up, the garbage collector needs to scan every single", "timestamp": "00:04:28,008", "timestamp_s": 268.0}, {"text": "object in the heap to see if it is still in use or not.", "timestamp": "00:04:31,416", "timestamp_s": 271.0}, {"text": "So as the number of objects in the heap grows,", "timestamp": "00:04:34,584", "timestamp_s": 274.0}, {"text": "so does the amount of time spent scanning the entire heap.", "timestamp": "00:04:37,750", "timestamp_s": 277.0}, {"text": "Then the next question is, what is actually on the heap in the first place?", "timestamp": "00:04:41,530", "timestamp_s": 281.0}, {"text": "And the heap essentially is one of two areas that a computer", "timestamp": "00:04:45,610", "timestamp_s": 285.0}, {"text": "system uses for memory allocation. The first one is known", "timestamp": "00:04:49,276", "timestamp_s": 289.0}, {"text": "as a stack, which is a special area of the computer\u0027s memory which stores any", "timestamp": "00:04:52,774", "timestamp_s": 292.0}, {"text": "temporary variables or memory allocations that are created by", "timestamp": "00:04:56,192", "timestamp_s": 296.0}, {"text": "a function or method. Since each function stack is", "timestamp": "00:04:59,568", "timestamp_s": 299.0}, {"text": "then cleared once it\u0027s done executing. If the variables", "timestamp": "00:05:03,412", "timestamp_s": 303.0}, {"text": "within that function were not moved elsewhere, we would have no way of accessing", "timestamp": "00:05:07,290", "timestamp_s": 307.0}, {"text": "these variables later on. So that\u0027s where the heap comes in. The heap", "timestamp": "00:05:11,018", "timestamp_s": 311.0}, {"text": "is sort of a more free floating memory region used", "timestamp": "00:05:14,698", "timestamp_s": 314.0}, {"text": "to store global variables or variables that are referenced outside", "timestamp": "00:05:18,072", "timestamp_s": 318.0}, {"text": "the scope of function, shared between functions, between packages, et cetera.", "timestamp": "00:05:21,880", "timestamp_s": 321.0}, {"text": "So how does go determine what needs to go in the heap? There\u0027s this", "timestamp": "00:05:26,790", "timestamp_s": 326.0}, {"text": "process called escape analysis, which is beyond the scope of this talk, but at", "timestamp": "00:05:30,428", "timestamp_s": 330.0}, {"text": "a high level the way you can think about it is if an object is", "timestamp": "00:05:34,188", "timestamp_s": 334.0}, {"text": "only referenced within the scope of a certain function call, then we", "timestamp": "00:05:37,452", "timestamp_s": 337.0}, {"text": "can allocate it to the stack just for that function.", "timestamp": "00:05:41,164", "timestamp_s": 341.0}, {"text": "The stack will be cleared once that function is complete, and we\u0027ll lose that", "timestamp": "00:05:44,270", "timestamp_s": 344.0}, {"text": "object forever. So you don\u0027t need to worry about scanning it, cleaning it up later.", "timestamp": "00:05:47,728", "timestamp_s": 347.0}, {"text": "But if an object is accessed outside that function, then it needs", "timestamp": "00:05:52,290", "timestamp_s": 352.0}, {"text": "to be allocated to the heap in order", "timestamp": "00:05:55,988", "timestamp_s": 355.0}, {"text": "for it to be accessible later on. So that", "timestamp": "00:05:59,588", "timestamp_s": 359.0}, {"text": "is the essence of escape analysis.", "timestamp": "00:06:03,128", "timestamp_s": 363.0}, {"text": "So then how does one go about determining if garbage", "timestamp": "00:06:07,590", "timestamp_s": 367.0}, {"text": "collection is actually the problem for your application? So typically", "timestamp": "00:06:11,342", "timestamp_s": 371.0}, {"text": "the way this conversation starts is you see that your application is suffering from really", "timestamp": "00:06:15,598", "timestamp_s": 375.0}, {"text": "high latency issues. So that\u0027s your symptom, that\u0027s what you observe.", "timestamp": "00:06:19,452", "timestamp_s": 379.0}, {"text": "Intuition is really the first step towards figuring out if GC", "timestamp": "00:06:25,130", "timestamp_s": 385.0}, {"text": "is the problem. So typically, if garbage collection", "timestamp": "00:06:28,982", "timestamp_s": 388.0}, {"text": "is the reason for your application\u0027s performance suffering, you\u0027ll see really high tail", "timestamp": "00:06:33,590", "timestamp_s": 393.0}, {"text": "latency. And what that means is we have a small percentage of", "timestamp": "00:06:37,702", "timestamp_s": 397.0}, {"text": "requests to a system. So again, I\u0027m talking about large scale distributed", "timestamp": "00:06:41,508", "timestamp_s": 401.0}, {"text": "systems with really high volumes of traffic,", "timestamp": "00:06:45,578", "timestamp_s": 405.0}, {"text": "enough to get a decent percentile breakdown of latency,", "timestamp": "00:06:48,746", "timestamp_s": 408.0}, {"text": "which is what Pinterest systems are like, of course. So tail latency", "timestamp": "00:06:53,090", "timestamp_s": 413.0}, {"text": "means that we have a small percentage of requests coming into our system that result", "timestamp": "00:06:56,846", "timestamp_s": 416.0}, {"text": "in really slow responses. So we often talk about latency as", "timestamp": "00:07:00,456", "timestamp_s": 420.0}, {"text": "percentiles. So high tail latency here might refer to really", "timestamp": "00:07:04,152", "timestamp_s": 424.0}, {"text": "high values for p 99 latency or even p 90 latency.", "timestamp": "00:07:07,932", "timestamp_s": 427.0}, {"text": "Typically for Gc, what we\u0027ve seen is the p", "timestamp": "00:07:11,850", "timestamp_s": 431.0}, {"text": "99 latency is what really gets affected because of the infrequency of the", "timestamp": "00:07:15,212", "timestamp_s": 435.0}, {"text": "garbage collector. Running it only really affects that last", "timestamp": "00:07:19,168", "timestamp_s": 439.0}, {"text": "1% of requests. So if", "timestamp": "00:07:22,736", "timestamp_s": 442.0}, {"text": "you\u0027re also observing systems like this really high p 99 latency,", "timestamp": "00:07:27,008", "timestamp_s": 447.0}, {"text": "then there\u0027s a good chance that garbage collection pressure could be the", "timestamp": "00:07:30,710", "timestamp_s": 450.0}, {"text": "root cause. Especially if you already know that your program has pretty", "timestamp": "00:07:34,404", "timestamp_s": 454.0}, {"text": "high memory usage, which you can tell by just", "timestamp": "00:07:37,508", "timestamp_s": 457.0}, {"text": "observing various system metrics how much memory is being used on the host", "timestamp": "00:07:41,412", "timestamp_s": 461.0}, {"text": "that is running your application, et cetera, et cetera. So the next step is", "timestamp": "00:07:45,422", "timestamp_s": 465.0}, {"text": "to confirm your hypothesis. You can use this runtime", "timestamp": "00:07:49,576", "timestamp_s": 469.0}, {"text": "environment variable that go makes available, called go debug.", "timestamp": "00:07:53,262", "timestamp_s": 473.0}, {"text": "By setting it to go. Debug equals GC, trace equals one. As you can see", "timestamp": "00:07:56,430", "timestamp_s": 476.0}, {"text": "on the slide here, you\u0027ll force your program to output debug logs", "timestamp": "00:07:59,948", "timestamp_s": 479.0}, {"text": "for every single GC cycle. And this will also", "timestamp": "00:08:03,698", "timestamp_s": 483.0}, {"text": "include a detailed printout of the time spent in", "timestamp": "00:08:07,260", "timestamp_s": 487.0}, {"text": "the various phases of garbage collection. And then", "timestamp": "00:08:10,588", "timestamp_s": 490.0}, {"text": "the last step is to take what you measured and align it with your system", "timestamp": "00:08:14,352", "timestamp_s": 494.0}, {"text": "metrics. So the way we did this was we looked at the logs from", "timestamp": "00:08:17,696", "timestamp_s": 497.0}, {"text": "Gctrace and if we noticed that the system\u0027s", "timestamp": "00:08:21,584", "timestamp_s": 501.0}, {"text": "performance so there were spikes in latency that aligned with when", "timestamp": "00:08:25,658", "timestamp_s": 505.0}, {"text": "the GC cycles were occurring, that\u0027s a great way to", "timestamp": "00:08:29,268", "timestamp_s": 509.0}, {"text": "conclude that there\u0027s a good chance that GC is", "timestamp": "00:08:32,644", "timestamp_s": 512.0}, {"text": "the cause of your performance regression.", "timestamp": "00:08:35,848", "timestamp_s": 515.0}, {"text": "So here\u0027s an example of what GCT trace output looks like, with an", "timestamp": "00:08:40,150", "timestamp_s": 520.0}, {"text": "explanation with a detailed breakdown of every single component in there.", "timestamp": "00:08:43,288", "timestamp_s": 523.0}, {"text": "Credits to Arden Labs here. If you want to find the blog post, you can", "timestamp": "00:08:46,648", "timestamp_s": 526.0}, {"text": "just look up GCT trace Arden labs. That\u0027s how I found this screenshot.", "timestamp": "00:08:49,544", "timestamp_s": 529.0}, {"text": "So taking a quick look at this, we see that GCtrace gives us a", "timestamp": "00:08:53,074", "timestamp_s": 533.0}, {"text": "lot of information. It shows us how many GC cycles we\u0027ve", "timestamp": "00:08:56,524", "timestamp_s": 536.0}, {"text": "had so far since our application started,", "timestamp": "00:08:59,958", "timestamp_s": 539.0}, {"text": "how much of our program\u0027s total cpu has been spent on garbage", "timestamp": "00:09:03,550", "timestamp_s": 543.0}, {"text": "collection, how much wall clock and cpu time was", "timestamp": "00:09:07,238", "timestamp_s": 547.0}, {"text": "spent in the various phases of GC, what our memory users looks like", "timestamp": "00:09:11,312", "timestamp_s": 551.0}, {"text": "before and after garbage collection runs, et cetera. Et I\u0027m not", "timestamp": "00:09:14,628", "timestamp_s": 554.0}, {"text": "going to go too deep into these aspects, but check out the blog", "timestamp": "00:09:18,068", "timestamp_s": 558.0}, {"text": "post if you\u0027re looking for a detailed breakdown of all", "timestamp": "00:09:21,498", "timestamp_s": 561.0}, {"text": "of these GC components. What I found helpful is really just to", "timestamp": "00:09:25,172", "timestamp_s": 565.0}, {"text": "let GC trace run in the background. And I added a separate background", "timestamp": "00:09:28,468", "timestamp_s": 568.0}, {"text": "thread to print out certain key system metrics, things like p", "timestamp": "00:09:32,222", "timestamp_s": 572.0}, {"text": "90, p 99, n latency observed over like", "timestamp": "00:09:36,248", "timestamp_s": 576.0}, {"text": "a 1 minute to 32nd period. Print these", "timestamp": "00:09:40,028", "timestamp_s": 580.0}, {"text": "out in a regular interval and look for correlations between JC cycles occurring", "timestamp": "00:09:43,468", "timestamp_s": 583.0}, {"text": "and latency degradations.", "timestamp": "00:09:47,314", "timestamp_s": 587.0}, {"text": "So let\u0027s assume now that we have a reasonable amount of confidence", "timestamp": "00:09:51,630", "timestamp_s": 591.0}, {"text": "that garbage collection is the root cause for our application\u0027s", "timestamp": "00:09:55,462", "timestamp_s": 595.0}, {"text": "poor performance. How do we then go about profiling our heap", "timestamp": "00:09:58,966", "timestamp_s": 598.0}, {"text": "usage? So go has quite a few built in tools", "timestamp": "00:10:02,422", "timestamp_s": 602.0}, {"text": "to study our heap usage, and I\u0027m going to talk about two main ones here.", "timestamp": "00:10:05,994", "timestamp_s": 605.0}, {"text": "These are the two that I found really helpful. The first one is the", "timestamp": "00:10:08,980", "timestamp_s": 608.0}, {"text": "memstats library, and then the second one is the PPRF package.", "timestamp": "00:10:12,852", "timestamp_s": 612.0}, {"text": "So memstats is essentially this library that is built", "timestamp": "00:10:16,398", "timestamp_s": 616.0}, {"text": "into go runtime and provides you with statistics about the memory", "timestamp": "00:10:20,232", "timestamp_s": 620.0}, {"text": "allocator itself, things like how much memory has been allocated,", "timestamp": "00:10:23,518", "timestamp_s": 623.0}, {"text": "how much memory is requested from the system, how much memory has been", "timestamp": "00:10:27,022", "timestamp_s": 627.0}, {"text": "freed, GC metrics, et cetera, et cetera. I\u0027ll dive into", "timestamp": "00:10:30,348", "timestamp_s": 630.0}, {"text": "that a little bit more in a second, and the second one is pprof which", "timestamp": "00:10:33,900", "timestamp_s": 633.0}, {"text": "is a system profile visualizer, and we\u0027ll talk about that in a little bit more", "timestamp": "00:10:36,924", "timestamp_s": 636.0}, {"text": "detail as well. But these are really helpful to understand how your application", "timestamp": "00:10:40,128", "timestamp_s": 640.0}, {"text": "is managing memory and also visually", "timestamp": "00:10:43,920", "timestamp_s": 643.0}, {"text": "inspect your system\u0027s cpu data", "timestamp": "00:10:48,110", "timestamp_s": 648.0}, {"text": "or cpu usage, heap usage, et cetera.", "timestamp": "00:10:51,888", "timestamp_s": 651.0}, {"text": "So here\u0027s just a really short glimpse into what memstats gives", "timestamp": "00:10:56,130", "timestamp_s": 656.0}, {"text": "you. These are some stats that I found helpful. Like I said, it essentially exposes", "timestamp": "00:10:59,588", "timestamp_s": 659.0}, {"text": "these stats about the system\u0027s memory usage, garbage collector performance,", "timestamp": "00:11:03,178", "timestamp_s": 663.0}, {"text": "et cetera, et cetera. So we can use this library to monitor a", "timestamp": "00:11:07,242", "timestamp_s": 667.0}, {"text": "few different things. What I found helpful is to monitor the total number of objects", "timestamp": "00:11:10,648", "timestamp_s": 670.0}, {"text": "in the heap. We discussed this earlier, but as the number of objects in the", "timestamp": "00:11:14,398", "timestamp_s": 674.0}, {"text": "heap increases, it takes much longer for the garbage collector", "timestamp": "00:11:17,548", "timestamp_s": 677.0}, {"text": "to mark the entire heap to scan and mark the entire heap.", "timestamp": "00:11:21,794", "timestamp_s": 681.0}, {"text": "So if we notice this metric going up,", "timestamp": "00:11:25,026", "timestamp_s": 685.0}, {"text": "there\u0027s a good chance that GC pressure is going to increase.", "timestamp": "00:11:29,210", "timestamp_s": 689.0}, {"text": "Similarly, if that metric is going down, we made some good optimizations and", "timestamp": "00:11:32,590", "timestamp_s": 692.0}, {"text": "the impact of GC should be decreasing. So I used this", "timestamp": "00:11:36,816", "timestamp_s": 696.0}, {"text": "metric as one of my indicators for success. As I rolled out new", "timestamp": "00:11:40,288", "timestamp_s": 700.0}, {"text": "optimizations, this metric dropped and I noticed that the system\u0027s performance", "timestamp": "00:11:43,988", "timestamp_s": 703.0}, {"text": "started to improve. And the memsite", "timestamp": "00:11:48,074", "timestamp_s": 708.0}, {"text": "docs provide a really clear explanation of all the various statistics.", "timestamp": "00:11:51,994", "timestamp_s": 711.0}, {"text": "I think there\u0027s close to 20. These are the three that I use once again.", "timestamp": "00:11:56,450", "timestamp_s": 716.0}, {"text": "So heap objects number of allocated heap objects heap alloc", "timestamp": "00:12:00,312", "timestamp_s": 720.0}, {"text": "is actual bytes that are allocated to heap. This is helpful because", "timestamp": "00:12:03,598", "timestamp_s": 723.0}, {"text": "this is how the go runtime determines when to actually trigger GC.", "timestamp": "00:12:07,208", "timestamp_s": 727.0}, {"text": "So like we said before, it essentially by default triggers whenever your", "timestamp": "00:12:11,554", "timestamp_s": 731.0}, {"text": "heap grows by 100% since the last cycle. So that\u0027s", "timestamp": "00:12:15,228", "timestamp_s": 735.0}, {"text": "what heap alloc can be used for. And then lastly,", "timestamp": "00:12:18,994", "timestamp_s": 738.0}, {"text": "heap sys talks about the total bytes memory obtained from the OS.", "timestamp": "00:12:21,942", "timestamp_s": 741.0}, {"text": "So actually requesting memory from the operating system is a slightly", "timestamp": "00:12:25,782", "timestamp_s": 745.0}, {"text": "heavyweight process because it\u0027s essentially blocking.", "timestamp": "00:12:29,718", "timestamp_s": 749.0}, {"text": "So if you\u0027re seeing that this number is also continuously going", "timestamp": "00:12:33,250", "timestamp_s": 753.0}, {"text": "up, there\u0027s a good chance that you\u0027re continuously having", "timestamp": "00:12:36,452", "timestamp_s": 756.0}, {"text": "to request a lot of memory, which is also blocking threads and impacting", "timestamp": "00:12:39,988", "timestamp_s": 759.0}, {"text": "your system\u0027s performance. I don\u0027t have slides on this,", "timestamp": "00:12:43,934", "timestamp_s": 763.0}, {"text": "but one new cool feature that Go has rolled out", "timestamp": "00:12:47,192", "timestamp_s": 767.0}, {"text": "since I made these slides originally is another", "timestamp": "00:12:50,712", "timestamp_s": 770.0}, {"text": "runtime flag, which allows you to actually set a soft memory", "timestamp": "00:12:55,256", "timestamp_s": 775.0}, {"text": "limit. So rather than the default behavior", "timestamp": "00:12:58,818", "timestamp_s": 778.0}, {"text": "of GOGC triggering whenever your", "timestamp": "00:13:02,290", "timestamp_s": 782.0}, {"text": "heap grows by 100%, you can actually set a target saying only", "timestamp": "00:13:05,404", "timestamp_s": 785.0}, {"text": "trigger go Gc when my heap size hits x megabytes,", "timestamp": "00:13:09,228", "timestamp_s": 789.0}, {"text": "x gigabytes, whatever it is, which therefore lowers the number of", "timestamp": "00:13:13,158", "timestamp_s": 793.0}, {"text": "times GC needs to run, therefore lowering the impact of", "timestamp": "00:13:16,624", "timestamp_s": 796.0}, {"text": "GC in your application\u0027s performance. That\u0027s one way to go about", "timestamp": "00:13:20,208", "timestamp_s": 800.0}, {"text": "it, and can be an easy and dirty way to just tame", "timestamp": "00:13:23,664", "timestamp_s": 803.0}, {"text": "the impact. However, some of the steps we\u0027ll talk about here will really just", "timestamp": "00:13:27,242", "timestamp_s": 807.0}, {"text": "help you tune your actual heap usage itself,", "timestamp": "00:13:30,708", "timestamp_s": 810.0}, {"text": "which is likely well, one, it\u0027s a good practice,", "timestamp": "00:13:35,192", "timestamp_s": 815.0}, {"text": "and two, it\u0027s likely to give you more consistent and perhaps more significant wins", "timestamp": "00:13:38,350", "timestamp_s": 818.0}, {"text": "as well. So here\u0027s a quick program that", "timestamp": "00:13:42,238", "timestamp_s": 822.0}, {"text": "I put together on how to use memsats, so just wrote", "timestamp": "00:13:46,188", "timestamp_s": 826.0}, {"text": "this little method on the right here to read", "timestamp": "00:13:49,618", "timestamp_s": 829.0}, {"text": "memsats every however frequently you need it.", "timestamp": "00:13:53,996", "timestamp_s": 833.0}, {"text": "Print out number of heap objects allocated, number of bytes allocated", "timestamp": "00:13:57,180", "timestamp_s": 837.0}, {"text": "to heap, et cetera, as well as the number of GC cycles that have been", "timestamp": "00:14:01,298", "timestamp_s": 841.0}, {"text": "triggered. Since this can be really helpful to see how often and how frequently", "timestamp": "00:14:04,704", "timestamp_s": 844.0}, {"text": "GC is getting triggered. The example I did here", "timestamp": "00:14:08,262", "timestamp_s": 848.0}, {"text": "is essentially we\u0027re allocating this slice of integers", "timestamp": "00:14:11,508", "timestamp_s": 851.0}, {"text": "or this array of int slices,", "timestamp": "00:14:14,970", "timestamp_s": 854.0}, {"text": "and you can see how I\u0027ll", "timestamp": "00:14:18,130", "timestamp_s": 858.0}, {"text": "show you in the next slide. You can essentially see how the number of heap", "timestamp": "00:14:22,698", "timestamp_s": 862.0}, {"text": "objects and heap allocated bytes changes, as well as how the", "timestamp": "00:14:26,558", "timestamp_s": 866.0}, {"text": "GC counter increments as well.", "timestamp": "00:14:30,072", "timestamp_s": 870.0}, {"text": "So here\u0027s what we got when we ran it.", "timestamp": "00:14:33,190", "timestamp_s": 873.0}, {"text": "You can see that the heap objects drop whenever we", "timestamp": "00:14:36,250", "timestamp_s": 876.0}, {"text": "run GC, which is basically the penultimate", "timestamp": "00:14:39,692", "timestamp_s": 879.0}, {"text": "line in this slide. Otherwise, heap objects continue", "timestamp": "00:14:42,978", "timestamp_s": 882.0}, {"text": "to increase. You can see that on the last line we see num GC incremented", "timestamp": "00:14:46,540", "timestamp_s": 886.0}, {"text": "to one, and that\u0027s where heap objects dropped.", "timestamp": "00:14:50,514", "timestamp_s": 890.0}, {"text": "It\u0027s a clear indicator that things worked as expected. You can also see that heap", "timestamp": "00:14:53,414", "timestamp_s": 893.0}, {"text": "alloc dropped very significantly, almost to ten", "timestamp": "00:14:57,238", "timestamp_s": 897.0}, {"text": "or 11% of what it used to be. So GC did its job, and we", "timestamp": "00:15:01,408", "timestamp_s": 901.0}, {"text": "freed up a lot of space on the heat. This is a really", "timestamp": "00:15:05,188", "timestamp_s": 905.0}, {"text": "simple program, but you can use something very similar to essentially understand the memory", "timestamp": "00:15:08,452", "timestamp_s": 908.0}, {"text": "behavior of even more complex systems. So this is how memsats", "timestamp": "00:15:11,962", "timestamp_s": 911.0}, {"text": "can be really helpful.", "timestamp": "00:15:15,978", "timestamp_s": 915.0}, {"text": "The second package that I talked about is Pprof. It\u0027s a", "timestamp": "00:15:19,110", "timestamp_s": 919.0}, {"text": "built in package as well. It allows us to visualize several", "timestamp": "00:15:22,744", "timestamp_s": 922.0}, {"text": "different system profiles. It is CPU memory usage, heap, et cetera.", "timestamp": "00:15:26,238", "timestamp_s": 926.0}, {"text": "Here we\u0027re going to talk specifically about the heap profile.", "timestamp": "00:15:29,954", "timestamp_s": 929.0}, {"text": "So the tool comes with a bunch of options to investigate specific aspects", "timestamp": "00:15:32,994", "timestamp_s": 932.0}, {"text": "of the heap, and those are the ones listed here.", "timestamp": "00:15:36,498", "timestamp_s": 936.0}, {"text": "So if you were concerned about auto memory issues, you may be", "timestamp": "00:15:39,164", "timestamp_s": 939.0}, {"text": "interested in inspecting the actual amount of memory", "timestamp": "00:15:42,992", "timestamp_s": 942.0}, {"text": "used rather than objects, for instance. So you can use the right option accordingly.", "timestamp": "00:15:46,518", "timestamp_s": 946.0}, {"text": "In our case, we know that GC pressure is what we\u0027re investigating.", "timestamp": "00:15:50,278", "timestamp_s": 950.0}, {"text": "It\u0027s tied very closely to the number of objects in the heap. So the", "timestamp": "00:15:53,810", "timestamp_s": 953.0}, {"text": "inused objects or allocated objects, fields or options are more", "timestamp": "00:15:57,108", "timestamp_s": 957.0}, {"text": "useful to us here. So the first command shown here,", "timestamp": "00:16:00,932", "timestamp_s": 960.0}, {"text": "go tool pprof and input your options. Then pass in", "timestamp": "00:16:04,068", "timestamp_s": 964.0}, {"text": "the URL of wherever your application is running and pass in the", "timestamp": "00:16:08,950", "timestamp_s": 968.0}, {"text": "API endpoint that you want to hit, which is debug. PProf is going", "timestamp": "00:16:12,408", "timestamp_s": 972.0}, {"text": "to essentially download that profile data to your machine", "timestamp": "00:16:16,408", "timestamp_s": 976.0}, {"text": "and puts you in an interactive command line tool to start visualizing this data,", "timestamp": "00:16:20,370", "timestamp_s": 980.0}, {"text": "and it\u0027s really helpful. So one thing I forgot to mention is in order", "timestamp": "00:16:25,610", "timestamp_s": 985.0}, {"text": "to generate this profile, you do need to register this", "timestamp": "00:16:29,148", "timestamp_s": 989.0}, {"text": "HTTP endpoint upon application startup.", "timestamp": "00:16:32,912", "timestamp_s": 992.0}, {"text": "I don\u0027t have a slide for that either, but you can just quickly look up", "timestamp": "00:16:37,070", "timestamp_s": 997.0}, {"text": "the pprof docs on Go\u0027s main", "timestamp": "00:16:41,170", "timestamp_s": 1001.0}, {"text": "doc site and it\u0027s essentially one line to", "timestamp": "00:16:44,532", "timestamp_s": 1004.0}, {"text": "register this HTTP endpoint and generate your heap profiles.", "timestamp": "00:16:47,908", "timestamp_s": 1007.0}, {"text": "So like I said, when you run this, it\u0027ll put you in a command line", "timestamp": "00:16:52,930", "timestamp_s": 1012.0}, {"text": "interface to start playing around with the data. You can essentially run help in your", "timestamp": "00:16:56,452", "timestamp_s": 1016.0}, {"text": "command line tool and command line interface,", "timestamp": "00:16:59,688", "timestamp_s": 1019.0}, {"text": "and it\u0027ll show you all the available options to slice and dice this data.", "timestamp": "00:17:02,798", "timestamp_s": 1022.0}, {"text": "What I really like is to run a second command, the last one shown here,", "timestamp": "00:17:06,296", "timestamp_s": 1026.0}, {"text": "which is gotool pprof, pass in the port that you want to run", "timestamp": "00:17:09,832", "timestamp_s": 1029.0}, {"text": "the web UI on, and then the path to the actual profile", "timestamp": "00:17:12,972", "timestamp_s": 1032.0}, {"text": "data itself, and it\u0027ll open up an interactive web browser, which I", "timestamp": "00:17:16,898", "timestamp_s": 1036.0}, {"text": "find much easier and more helpful in inspecting heap usage.", "timestamp": "00:17:20,768", "timestamp_s": 1040.0}, {"text": "So to jump ahead and show you what that looks like,", "timestamp": "00:17:25,470", "timestamp_s": 1045.0}, {"text": "here is one of the visualizations that Pprof gives you.", "timestamp": "00:17:29,152", "timestamp_s": 1049.0}, {"text": "It lets you see the number of objects in use by various call", "timestamp": "00:17:32,720", "timestamp_s": 1052.0}, {"text": "stacks, which can be really helpful in narrowing down problematic code.", "timestamp": "00:17:35,972", "timestamp_s": 1055.0}, {"text": "So here it\u0027s showing you the entire call stack.", "timestamp": "00:17:39,156", "timestamp_s": 1059.0}, {"text": "The size of the box is roughly proportionate to", "timestamp": "00:17:42,290", "timestamp_s": 1062.0}, {"text": "whatever is allocated in the most number of objects, so it really helps you", "timestamp": "00:17:45,684", "timestamp_s": 1065.0}, {"text": "narrow down in this case if you see buff Iot new reader size is", "timestamp": "00:17:49,128", "timestamp_s": 1069.0}, {"text": "about 45% of our heap allocation. So we can", "timestamp": "00:17:53,256", "timestamp_s": 1073.0}, {"text": "conclude that that is one of the reasons for our heap allocation,", "timestamp": "00:17:56,760", "timestamp_s": 1076.0}, {"text": "or the number of objects in our heap being so high.", "timestamp": "00:18:00,882", "timestamp_s": 1080.0}, {"text": "Then we can trace through that stack and try and figure out what we can", "timestamp": "00:18:04,330", "timestamp_s": 1084.0}, {"text": "do to optimize this. Some options are not creating", "timestamp": "00:18:07,644", "timestamp_s": 1087.0}, {"text": "a new reader every single time we need to use it, perhaps reusing", "timestamp": "00:18:10,998", "timestamp_s": 1090.0}, {"text": "one, pooling them, et cetera, et cetera.", "timestamp": "00:18:14,838", "timestamp_s": 1094.0}, {"text": "This is another visualization that Pprof offers that I actually use really heavily.", "timestamp": "00:18:19,870", "timestamp_s": 1099.0}, {"text": "It lets you visualize heap usage as a flame graph. And this flame", "timestamp": "00:18:24,110", "timestamp_s": 1104.0}, {"text": "graph is also interactive, so you can click on any bar to focus in on", "timestamp": "00:18:27,514", "timestamp_s": 1107.0}, {"text": "it and the call stack below it, et cetera, et cetera. The depth", "timestamp": "00:18:30,484", "timestamp_s": 1110.0}, {"text": "of the call stack doesn\u0027t really matter here, but the width of the call stack", "timestamp": "00:18:33,818", "timestamp_s": 1113.0}, {"text": "is what represents the number of heap objects that are allocated.", "timestamp": "00:18:37,598", "timestamp_s": 1117.0}, {"text": "So essentially, the wider call stacks use a higher number of heap objects, at least", "timestamp": "00:18:41,086", "timestamp_s": 1121.0}, {"text": "when this profile was captured. So it\u0027s really easy to just jump", "timestamp": "00:18:44,632", "timestamp_s": 1124.0}, {"text": "in to certain hotspots and dig deeper into there to try", "timestamp": "00:18:48,622", "timestamp_s": 1128.0}, {"text": "and find the lowest hanging fruit and the biggest possible optimizations.", "timestamp": "00:18:52,668", "timestamp_s": 1132.0}, {"text": "So I\u0027m also going to show you what the CLI", "timestamp": "00:18:58,970", "timestamp_s": 1138.0}, {"text": "can be used for. So from the previous slide here,", "timestamp": "00:19:02,790", "timestamp_s": 1142.0}, {"text": "we can try and figure out which method or which call stack", "timestamp": "00:19:05,872", "timestamp_s": 1145.0}, {"text": "is allocating a large number of objects. And then through the CLI,", "timestamp": "00:19:09,542", "timestamp_s": 1149.0}, {"text": "you can use this list command, which is really cool to pass in", "timestamp": "00:19:12,982", "timestamp_s": 1152.0}, {"text": "a function name and see line by line which lines", "timestamp": "00:19:16,228", "timestamp_s": 1156.0}, {"text": "of that method are allocating how many objects. So in this one,", "timestamp": "00:19:20,490", "timestamp_s": 1160.0}, {"text": "this is a fake method. But let\u0027s say we have a method called create catalog", "timestamp": "00:19:24,196", "timestamp_s": 1164.0}, {"text": "map that is essentially creating this map of products that a particular seller", "timestamp": "00:19:27,102", "timestamp_s": 1167.0}, {"text": "has. We can jump in. We know", "timestamp": "00:19:30,558", "timestamp_s": 1170.0}, {"text": "that this method creates a large number of objects itself. Here we can go in", "timestamp": "00:19:34,168", "timestamp_s": 1174.0}, {"text": "and see line by line, exactly how many objects are allocated by each", "timestamp": "00:19:37,784", "timestamp_s": 1177.0}, {"text": "line in the object in the method, and figure out where to focus", "timestamp": "00:19:41,292", "timestamp_s": 1181.0}, {"text": "our efforts. So here you can see that lines", "timestamp": "00:19:44,860", "timestamp_s": 1184.0}, {"text": "233 and through 237 create a lot of new objects,", "timestamp": "00:19:48,834", "timestamp_s": 1188.0}, {"text": "which results in a large number of feeb allocations.", "timestamp": "00:19:52,166", "timestamp_s": 1192.0}, {"text": "And then line 241, surprisingly,", "timestamp": "00:19:55,470", "timestamp_s": 1195.0}, {"text": "is not actually creating new objects, but it\u0027s adding all those objects to a", "timestamp": "00:19:58,694", "timestamp_s": 1198.0}, {"text": "map, which is also causing a large number of feeb allocations. So that", "timestamp": "00:20:01,808", "timestamp_s": 1201.0}, {"text": "looks a little suspicious. We\u0027ll come back to that in a second.", "timestamp": "00:20:05,188", "timestamp_s": 1205.0}, {"text": "Let\u0027s first talk about how to lower or limit the impact of garbage collection on", "timestamp": "00:20:10,370", "timestamp_s": 1210.0}, {"text": "your system. First one we\u0027ve been talking about for a while, lower the", "timestamp": "00:20:14,132", "timestamp_s": 1214.0}, {"text": "number of objects in your heap. This is going to reduce the amount of", "timestamp": "00:20:18,088", "timestamp_s": 1218.0}, {"text": "time it takes a garbage collection to scan your heap and therefore lower its impact.", "timestamp": "00:20:21,848", "timestamp_s": 1221.0}, {"text": "The second one is to reduce the rate of object allocation. And then the third", "timestamp": "00:20:25,470", "timestamp_s": 1225.0}, {"text": "one is actually to optimize their data structures to minimize how much memory they", "timestamp": "00:20:29,132", "timestamp_s": 1229.0}, {"text": "use, which will therefore reduce the need for more frequent", "timestamp": "00:20:32,828", "timestamp_s": 1232.0}, {"text": "GC triggers. So these three are", "timestamp": "00:20:36,322", "timestamp_s": 1236.0}, {"text": "ways that we can use to mitigate the impact of garbage collection, make our application", "timestamp": "00:20:40,192", "timestamp_s": 1240.0}, {"text": "more lightweight, and free up more resources for our program to", "timestamp": "00:20:44,384", "timestamp_s": 1244.0}, {"text": "operate efficiently.", "timestamp": "00:20:48,144", "timestamp_s": 1248.0}, {"text": "So let\u0027s dive a little bit into the first one. How do we", "timestamp": "00:20:51,390", "timestamp_s": 1251.0}, {"text": "reduce objects in the heap? So really the", "timestamp": "00:20:54,772", "timestamp_s": 1254.0}, {"text": "question is, how do you reduce long living heap objects? Because these are objects", "timestamp": "00:20:58,148", "timestamp_s": 1258.0}, {"text": "that are essentially living in the heap for a long time, and we", "timestamp": "00:21:01,498", "timestamp_s": 1261.0}, {"text": "expect them to keep living there, which means every single time the garbage collector", "timestamp": "00:21:04,932", "timestamp_s": 1264.0}, {"text": "runs, it needs to scan these objects, determine that they\u0027re still in use,", "timestamp": "00:21:09,102", "timestamp_s": 1269.0}, {"text": "and they can\u0027t be cleaned up, et cetera, et cetera. So rather than having these", "timestamp": "00:21:12,472", "timestamp_s": 1272.0}, {"text": "objects live on the heap, they can be created as values rather", "timestamp": "00:21:16,248", "timestamp_s": 1276.0}, {"text": "than references on demand. So for instance, let\u0027s take", "timestamp": "00:21:19,692", "timestamp_s": 1279.0}, {"text": "the Pinterest ad system as an example. If every single time that", "timestamp": "00:21:23,388", "timestamp_s": 1283.0}, {"text": "we\u0027re determining which ads to show a user,", "timestamp": "00:21:26,988", "timestamp_s": 1286.0}, {"text": "let\u0027s say we need some data for each item in that user request.", "timestamp": "00:21:30,146", "timestamp_s": 1290.0}, {"text": "So every potential ad candidate has some data associated with it.", "timestamp": "00:21:33,638", "timestamp_s": 1293.0}, {"text": "Rather than pre computing that data and storing it in this long lived map,", "timestamp": "00:21:37,390", "timestamp_s": 1297.0}, {"text": "we could just compute it on a per request basis to", "timestamp": "00:21:41,110", "timestamp_s": 1301.0}, {"text": "reduce the number of objects in the heat. So what that is going to do", "timestamp": "00:21:44,208", "timestamp_s": 1304.0}, {"text": "is increase the amount of computation for", "timestamp": "00:21:47,316", "timestamp_s": 1307.0}, {"text": "each average request. However, it is going to reduce the sort", "timestamp": "00:21:50,596", "timestamp_s": 1310.0}, {"text": "of like tail latency problem, because you have a very reliable", "timestamp": "00:21:54,568", "timestamp_s": 1314.0}, {"text": "measure of how much compute is being used per request,", "timestamp": "00:21:57,854", "timestamp_s": 1317.0}, {"text": "and it\u0027s easier to essentially optimize a particular request", "timestamp": "00:22:01,678", "timestamp_s": 1321.0}, {"text": "rather than optimize this long tail latency.", "timestamp": "00:22:05,326", "timestamp_s": 1325.0}, {"text": "So that\u0027s one way to do it, create your objects in demand rather than storing", "timestamp": "00:22:08,970", "timestamp_s": 1328.0}, {"text": "them in a long lived map on the heap.", "timestamp": "00:22:12,194", "timestamp_s": 1332.0}, {"text": "The second and third are very related, but be mindful of", "timestamp": "00:22:16,330", "timestamp_s": 1336.0}, {"text": "where you\u0027re using pointers. Go makes it really easy to create and reference", "timestamp": "00:22:19,948", "timestamp_s": 1339.0}, {"text": "pointers. However, if we have a reference to an object and that object", "timestamp": "00:22:23,558", "timestamp_s": 1343.0}, {"text": "itself contains further pointers or further references within", "timestamp": "00:22:27,360", "timestamp_s": 1347.0}, {"text": "it, these are all going to be considered individual objects", "timestamp": "00:22:30,816", "timestamp_s": 1350.0}, {"text": "in the heap, even though they may be nested together. The reason for this is,", "timestamp": "00:22:34,234", "timestamp_s": 1354.0}, {"text": "if you think about it, I have a pointer to some object x,", "timestamp": "00:22:37,972", "timestamp_s": 1357.0}, {"text": "or let\u0027s say the object is a person is of type person.", "timestamp": "00:22:42,068", "timestamp_s": 1362.0}, {"text": "Each person has a name, each person has an age, et cetera. If I have", "timestamp": "00:22:46,550", "timestamp_s": 1366.0}, {"text": "a pointer to the person\u0027s name and it\u0027s referenced somewhere,", "timestamp": "00:22:50,312", "timestamp_s": 1370.0}, {"text": "there\u0027s a good chance that the name may be used even after the main person", "timestamp": "00:22:53,982", "timestamp_s": 1373.0}, {"text": "object ceases to exist. So the go memory allocator", "timestamp": "00:22:58,540", "timestamp_s": 1378.0}, {"text": "needs to store that object separately in memory, which means it\u0027s", "timestamp": "00:23:02,002", "timestamp_s": 1382.0}, {"text": "a whole second object that needs to be scanned by the garbage", "timestamp": "00:23:05,458", "timestamp_s": 1385.0}, {"text": "collector later on. So reducing the number of", "timestamp": "00:23:08,978", "timestamp_s": 1388.0}, {"text": "pointers that we use, reducing the number of nested pointers is going to", "timestamp": "00:23:12,464", "timestamp_s": 1392.0}, {"text": "reduce the number of objects that your garbage collector needs to scan.", "timestamp": "00:23:15,584", "timestamp_s": 1395.0}, {"text": "The third one is just sort of a gotcha.", "timestamp": "00:23:19,390", "timestamp_s": 1399.0}, {"text": "Strings and binaries are treated as pointers under the hood. So each", "timestamp": "00:23:22,990", "timestamp_s": 1402.0}, {"text": "one is going to be an object in the heap. So wherever possible,", "timestamp": "00:23:26,292", "timestamp_s": 1406.0}, {"text": "if you try and represent these as other non pointer values. So strings,", "timestamp": "00:23:30,196", "timestamp_s": 1410.0}, {"text": "perhaps you could represent as integers or floats if possible,", "timestamp": "00:23:33,918", "timestamp_s": 1413.0}, {"text": "hashing them for instance, or representing", "timestamp": "00:23:37,480", "timestamp_s": 1417.0}, {"text": "dates as actual time time objects, so on and", "timestamp": "00:23:41,166", "timestamp_s": 1421.0}, {"text": "so forth. Those are ways to reduce the number of strings you\u0027re using, and therefore", "timestamp": "00:23:44,344", "timestamp_s": 1424.0}, {"text": "reduce the number of pointers.", "timestamp": "00:23:47,522", "timestamp_s": 1427.0}, {"text": "So going back to our example, if we", "timestamp": "00:23:51,530", "timestamp_s": 1431.0}, {"text": "look at line, if we", "timestamp": "00:23:56,170", "timestamp_s": 1436.0}, {"text": "look at line 272 37, we\u0027re creating a new catalog listing", "timestamp": "00:23:59,484", "timestamp_s": 1439.0}, {"text": "each time. And then on line 241, we\u0027re assigning", "timestamp": "00:24:03,062", "timestamp_s": 1443.0}, {"text": "it to a map. So we\u0027re using this catalog listing", "timestamp": "00:24:07,014", "timestamp_s": 1447.0}, {"text": "key, which we\u0027re doing by encoding product id and", "timestamp": "00:24:10,938", "timestamp_s": 1450.0}, {"text": "seller id together. Let\u0027s say", "timestamp": "00:24:14,228", "timestamp_s": 1454.0}, {"text": "this catalog listing key is actually a string object.", "timestamp": "00:24:19,010", "timestamp_s": 1459.0}, {"text": "If we then change how we\u0027re creating the key to", "timestamp": "00:24:24,370", "timestamp_s": 1464.0}, {"text": "instead using a struct. So lines 239 to 241", "timestamp": "00:24:28,008", "timestamp_s": 1468.0}, {"text": "here show that we are starting to use a struct for the key instead,", "timestamp": "00:24:31,592", "timestamp_s": 1471.0}, {"text": "rather than using a string as previously, we can see that we", "timestamp": "00:24:34,504", "timestamp_s": 1474.0}, {"text": "reduce the number of heap objects by 26 million between", "timestamp": "00:24:37,768", "timestamp_s": 1477.0}, {"text": "these slides, which is around 20% of our heap usage. So we didn\u0027t actually change", "timestamp": "00:24:41,772", "timestamp_s": 1481.0}, {"text": "that much, we just changed how we\u0027re representing the exact same data,", "timestamp": "00:24:45,532", "timestamp_s": 1485.0}, {"text": "and we\u0027re able to significantly reduce the amount of work that our garbage", "timestamp": "00:24:48,572", "timestamp_s": 1488.0}, {"text": "collector needs to do. So here\u0027s one example of how a simple thing like", "timestamp": "00:24:52,038", "timestamp_s": 1492.0}, {"text": "removing strings can actually have a very significant impact on", "timestamp": "00:24:55,392", "timestamp_s": 1495.0}, {"text": "your application\u0027s heap usage, and therefore its performance.", "timestamp": "00:24:58,912", "timestamp_s": 1498.0}, {"text": "So the other thing you can think about is reducing the rate of allocation.", "timestamp": "00:25:04,850", "timestamp_s": 1504.0}, {"text": "So if your program tends to create a large number of short lived objects", "timestamp": "00:25:08,490", "timestamp_s": 1508.0}, {"text": "in bursts, object pooling is something that might benefit you,", "timestamp": "00:25:12,474", "timestamp_s": 1512.0}, {"text": "because you can use that to object pools can essentially be", "timestamp": "00:25:16,216", "timestamp_s": 1516.0}, {"text": "used to allocate in free memory blocks manually and reduce the number", "timestamp": "00:25:20,008", "timestamp_s": 1520.0}, {"text": "of GC, the amount of work that your garbage collector needs to do.", "timestamp": "00:25:23,608", "timestamp_s": 1523.0}, {"text": "Because object pools are expected to be retained for a longer scope, we don\u0027t", "timestamp": "00:25:27,720", "timestamp_s": 1527.0}, {"text": "need to keep allocating, clearing up these objects, and GC doesn\u0027t", "timestamp": "00:25:31,154", "timestamp_s": 1531.0}, {"text": "scan it over and over again. However, I will put", "timestamp": "00:25:35,026", "timestamp_s": 1535.0}, {"text": "out a warning here, because the garbage collector is not going", "timestamp": "00:25:38,572", "timestamp_s": 1538.0}, {"text": "to scan and clear up your object pool for you,", "timestamp": "00:25:42,032", "timestamp_s": 1542.0}, {"text": "it can lead to memory leaks if not used properly. So I\u0027d only recommend", "timestamp": "00:25:45,296", "timestamp_s": 1545.0}, {"text": "using this if you know what you\u0027re doing and if you\u0027ve exhausted all other options.", "timestamp": "00:25:49,248", "timestamp_s": 1549.0}, {"text": "For instance, if you\u0027re continuously allocating new objects", "timestamp": "00:25:53,890", "timestamp_s": 1553.0}, {"text": "rather than reusing objects from", "timestamp": "00:25:57,818", "timestamp_s": 1557.0}, {"text": "the pool, this could lead to a memory leak and cause your", "timestamp": "00:26:01,428", "timestamp_s": 1561.0}, {"text": "application to crash due to out of memory errors. A second potential problem", "timestamp": "00:26:04,804", "timestamp_s": 1564.0}, {"text": "here is if you\u0027re not properly sanitizing your objects before returning", "timestamp": "00:26:09,160", "timestamp_s": 1569.0}, {"text": "them to the pool, data may be persisted beyond its intended", "timestamp": "00:26:13,294", "timestamp_s": 1573.0}, {"text": "scope and could potentially be leaked to other scopes. So if we\u0027re storing some", "timestamp": "00:26:16,578", "timestamp_s": 1576.0}, {"text": "sensitive, personally identifiable information on", "timestamp": "00:26:20,636", "timestamp_s": 1580.0}, {"text": "a per request basis for each user, and we\u0027re", "timestamp": "00:26:24,508", "timestamp_s": 1584.0}, {"text": "using pools to represent the user object, if we", "timestamp": "00:26:28,018", "timestamp_s": 1588.0}, {"text": "don\u0027t sanitize that data, then there\u0027s a good chance that we could potentially leak", "timestamp": "00:26:31,408", "timestamp_s": 1591.0}, {"text": "data from one user\u0027s profile to another user\u0027s profile, which would", "timestamp": "00:26:34,822", "timestamp_s": 1594.0}, {"text": "obviously have really disastrous consequences,", "timestamp": "00:26:38,672", "timestamp_s": 1598.0}, {"text": "not only in terms of our application itself, but in terms of the user\u0027s privacy", "timestamp": "00:26:42,110", "timestamp_s": 1602.0}, {"text": "concerns, et cetera, et cetera. So these are the risks of object", "timestamp": "00:26:45,242", "timestamp_s": 1605.0}, {"text": "pooling, but it can be a really powerful tool to reduce the amount of", "timestamp": "00:26:48,356", "timestamp_s": 1608.0}, {"text": "work that your garbage collector needs to do and give you some more control over", "timestamp": "00:26:52,084", "timestamp_s": 1612.0}, {"text": "memory management yourself.", "timestamp": "00:26:55,704", "timestamp_s": 1615.0}, {"text": "The third thing that we talked about is thinking about how we organize and", "timestamp": "00:26:59,670", "timestamp_s": 1619.0}, {"text": "represent our data to reduce the amount of memory that", "timestamp": "00:27:03,368", "timestamp_s": 1623.0}, {"text": "it\u0027s using. So one way to do this is to clean up any unused", "timestamp": "00:27:06,808", "timestamp_s": 1626.0}, {"text": "data fields. Basic types in Go are going to have default values.", "timestamp": "00:27:09,998", "timestamp_s": 1629.0}, {"text": "For example, a boolean is going to default to false, an integer is going to", "timestamp": "00:27:13,458", "timestamp_s": 1633.0}, {"text": "default to zero, et cetera, et cetera. So even if you\u0027re not using these fields,", "timestamp": "00:27:16,799", "timestamp_s": 1636.0}, {"text": "the go memory allocator still needs to allocate space on", "timestamp": "00:27:20,086", "timestamp_s": 1640.0}, {"text": "the heap for these objects, and they\u0027re there for consuming memory.", "timestamp": "00:27:23,248", "timestamp_s": 1643.0}, {"text": "So fields I through L here are unused,", "timestamp": "00:27:27,150", "timestamp_s": 1647.0}, {"text": "but they\u0027re still taking on their default values. So if we remove those,", "timestamp": "00:27:30,934", "timestamp_s": 1650.0}, {"text": "we essentially went from 64 bytes to 40 bytes, which is a pretty significant", "timestamp": "00:27:34,544", "timestamp_s": 1654.0}, {"text": "win if you think about the number of objects that you might be storing on", "timestamp": "00:27:38,538", "timestamp_s": 1658.0}, {"text": "heap on a very large scale application.", "timestamp": "00:27:41,028", "timestamp_s": 1661.0}, {"text": "The other side benefit of this is that you\u0027re actually simplifying your code and making", "timestamp": "00:27:45,250", "timestamp_s": 1665.0}, {"text": "it easier to understand and reducing the amount of errors that might come up from", "timestamp": "00:27:49,048", "timestamp_s": 1669.0}, {"text": "someone who misunderstands what a field is in the future.", "timestamp": "00:27:52,648", "timestamp_s": 1672.0}, {"text": "This 1 may be a little familiar to folks coming from A-C-C plus plus background,", "timestamp": "00:27:58,230", "timestamp_s": 1678.0}, {"text": "but the ordering of your fields can actually really impact", "timestamp": "00:28:02,082", "timestamp_s": 1682.0}, {"text": "your memory usage as well. Stago memory allocator does", "timestamp": "00:28:05,938", "timestamp_s": 1685.0}, {"text": "not optimize for data structure alignment. So in this case", "timestamp": "00:28:09,628", "timestamp_s": 1689.0}, {"text": "we have two objects with completely identical fields. They\u0027re just ordered differently.", "timestamp": "00:28:13,312", "timestamp_s": 1693.0}, {"text": "The way the memory allocator works is it goes down the", "timestamp": "00:28:17,630", "timestamp_s": 1697.0}, {"text": "fields, allocates them one at a time. So in order to respect word", "timestamp": "00:28:21,504", "timestamp_s": 1701.0}, {"text": "alignment, it might need to add padding to the data in", "timestamp": "00:28:25,252", "timestamp_s": 1705.0}, {"text": "memory. So going through here, going to the bad object,", "timestamp": "00:28:28,468", "timestamp_s": 1708.0}, {"text": "starting with field a, it\u0027s a boolean, which is one byte. So it allocates one", "timestamp": "00:28:33,890", "timestamp_s": 1713.0}, {"text": "byte in memory, and then it needs to allocate eight bytes for field b,", "timestamp": "00:28:37,448", "timestamp_s": 1717.0}, {"text": "which is nn 64. Now, if it allocated", "timestamp": "00:28:41,272", "timestamp_s": 1721.0}, {"text": "those eight bytes right after, it would break the system\u0027s word alignment.", "timestamp": "00:28:44,782", "timestamp_s": 1724.0}, {"text": "So therefore, it needs to pad on seven bytes first, and then", "timestamp": "00:28:48,306", "timestamp_s": 1728.0}, {"text": "allocate the next eight bytes for field B.", "timestamp": "00:28:51,772", "timestamp_s": 1731.0}, {"text": "And you can see this goes on. So for field c, it allocates one byte,", "timestamp": "00:28:55,930", "timestamp_s": 1735.0}, {"text": "and then field d is an n 32, which means it needs four bytes.", "timestamp": "00:28:59,218", "timestamp_s": 1739.0}, {"text": "So it pads in three fields and then adds in field d, so on and", "timestamp": "00:29:02,550", "timestamp_s": 1742.0}, {"text": "so forth. If we simply reorder", "timestamp": "00:29:06,224", "timestamp_s": 1746.0}, {"text": "these, as we did in the good object on the right, you can see the", "timestamp": "00:29:09,398", "timestamp_s": 1749.0}, {"text": "memory allocation is much better aligned. And we", "timestamp": "00:29:13,172", "timestamp_s": 1753.0}, {"text": "went from having an object that consumes 40 bytes", "timestamp": "00:29:16,852", "timestamp_s": 1756.0}, {"text": "to an object that contains 24 bytes. So we did two", "timestamp": "00:29:20,298", "timestamp_s": 1760.0}, {"text": "things here. We just removed unused fields, which is great,", "timestamp": "00:29:23,988", "timestamp_s": 1763.0}, {"text": "and then we rearranged the remaining fields that we actually need, and we went", "timestamp": "00:29:27,896", "timestamp_s": 1767.0}, {"text": "from 64 bytes to 24 bytes, which is a 62%", "timestamp": "00:29:31,688", "timestamp_s": 1771.0}, {"text": "drop in the amount of memory used per object.", "timestamp": "00:29:35,240", "timestamp_s": 1775.0}, {"text": "Think about, again, a large scale system with thousands, millions, or even billions", "timestamp": "00:29:39,130", "timestamp_s": 1779.0}, {"text": "of such objects in use. This simple method could", "timestamp": "00:29:42,498", "timestamp_s": 1782.0}, {"text": "just really reduce your memory usage and", "timestamp": "00:29:46,108", "timestamp_s": 1786.0}, {"text": "improve your system\u0027s performance.", "timestamp": "00:29:49,392", "timestamp_s": 1789.0}, {"text": "So, to conclude, the Go garbage collector is", "timestamp": "00:29:53,790", "timestamp_s": 1793.0}, {"text": "highly optimized for most use cases. It\u0027s a fantastic piece of", "timestamp": "00:29:57,600", "timestamp_s": 1797.0}, {"text": "technology, and most developers do not need to worry about how it\u0027s", "timestamp": "00:30:01,024", "timestamp_s": 1801.0}, {"text": "implemented and don\u0027t need to worry about its performance. However,", "timestamp": "00:30:04,458", "timestamp_s": 1804.0}, {"text": "for some heavy, very large scale use cases, the garbage collector", "timestamp": "00:30:07,684", "timestamp_s": 1807.0}, {"text": "could cause pretty significant impact to your program\u0027s performance.", "timestamp": "00:30:12,058", "timestamp_s": 1812.0}, {"text": "And in this case, having an understanding of how the GC works,", "timestamp": "00:30:15,930", "timestamp_s": 1815.0}, {"text": "how memory management works, and then understanding some of the built", "timestamp": "00:30:19,816", "timestamp_s": 1819.0}, {"text": "in tools that the Go team provides, can be really, really important", "timestamp": "00:30:23,032", "timestamp_s": 1823.0}, {"text": "to understanding and reducing the problem.", "timestamp": "00:30:26,380", "timestamp_s": 1826.0}, {"text": "From there, we have a lot of options to actually optimize our system,", "timestamp": "00:30:30,810", "timestamp_s": 1830.0}, {"text": "improve performance, and have much happier users and", "timestamp": "00:30:34,780", "timestamp_s": 1834.0}, {"text": "much happier engineers. So three steps.", "timestamp": "00:30:38,064", "timestamp_s": 1838.0}, {"text": "Start with observing. We have some ways of knowing intuitively", "timestamp": "00:30:42,870", "timestamp_s": 1842.0}, {"text": "that there are certain systems, like really high tail latency,", "timestamp": "00:30:47,126", "timestamp_s": 1847.0}, {"text": "that might be caused by GC. From there, we go", "timestamp": "00:30:51,870", "timestamp_s": 1851.0}, {"text": "in and add some measurement. We can look at heap usage. We can look at", "timestamp": "00:30:54,928", "timestamp_s": 1854.0}, {"text": "GC trace output, et cetera, to try and narrow down whether GC", "timestamp": "00:30:57,588", "timestamp_s": 1857.0}, {"text": "actually is the problem. And then from there, we talked about a few different", "timestamp": "00:31:01,290", "timestamp_s": 1861.0}, {"text": "ways by which we can start to optimize our system.", "timestamp": "00:31:04,596", "timestamp_s": 1864.0}, {"text": "That\u0027s all I have for you today. Thank you all for listening. I hope this", "timestamp": "00:31:10,370", "timestamp_s": 1870.0}, {"text": "helped you understand how guard garbage collection works and go. And how you can go", "timestamp": "00:31:13,892", "timestamp_s": 1873.0}, {"text": "about optimizing your system to minimize the impact of the garbage collector.", "timestamp": "00:31:17,148", "timestamp_s": 1877.0}, {"text": "Thank you. And if you have any questions, feel free to reach out to me.", "timestamp": "00:31:21,210", "timestamp_s": 1881.0}, {"text": "Have a great day.", "timestamp": "00:31:24,508", "timestamp_s": 1884.0}];
+              
+
               var tag = document.createElement('script');
 
               tag.src = "https://www.youtube.com/iframe_api";
@@ -465,7 +477,48 @@
                   player.seekTo(sec, true);
                 }
                 player.playVideo();
+                highlightParagraph();
               }
+              // find the number of the paragraph
+              function findParagraph(sec){
+                for (var i = 1; i < transcript.length; i++) {
+                  if (transcript[i].timestamp_s > sec){
+                    return i - 1;
+                  }
+                }
+                return transcript.length - 1;
+              }
+              // move the video to the desired second
+              function seek(sec){
+                if(player){
+                  player.playVideo();
+                  player.seekTo(sec, true);
+                }
+                location.href = location.href.split("#")[0] + "#" + sec;
+                highlightParagraph(sec);
+              }
+              // highlight the right paragraph
+              var prevParagraph;
+              function highlightParagraph(sec) {
+                var currentTime = sec;
+                if (!currentTime && player) {
+                  currentTime = player.getCurrentTime();
+                }
+                if (!currentTime){
+                  console.log("No current time")
+                  return;
+                }
+                var currentParagraph = findParagraph(currentTime);
+                if (currentParagraph !== prevParagraph){
+                  prevParagraph = currentParagraph;
+                  Array.from(document.getElementsByClassName("transcript-chunks")).forEach((e) => {
+                    e.classList.remove('text-selected');
+                  });
+                  var body = document.getElementById("chunk-"+currentParagraph);
+                  body.classList.add('text-selected');
+                }
+              }
+              time_update_interval = setInterval(highlightParagraph, 1000);
             </script>
           </div>
         </div> <!-- / .row -->
@@ -500,6 +553,2087 @@
 <!-- End Text -->
           </div>
 
+          
+
+          <div class="col-12 mb-5">
+            <h3>
+              Summary
+            </h3>
+            <ul>
+              
+              <li>
+                Nishant Roy is the engineering manager for the ad serving platform team at Pinterest. He will talk to you about heap optimizations for Go systems. After this session, you should have a good idea of how to triage.
+
+              </li>
+              
+              <li>
+                Go does not require users to perform any manual memory management. The garbage collector is able to run concurrently with your main program without using a stop the world pause. As memory pressure starts to increase, the garbage collector suddenly needs a lot more resources. This can really hinder the performance of your program itself.
+
+              </li>
+              
+              <li>
+                So typically, if garbage collection is the reason for your application's performance suffering, you'll see really high tail latency. The next step is to confirm your hypothesis. Go has quite a few built in tools to study our heap usage.
+
+              </li>
+              
+              <li>
+                The second package that I talked about is Pprof. It allows us to visualize several different system profiles. It is CPU memory usage, heap, et cetera. PProf puts you in an interactive command line tool to start visualizing this data.
+
+              </li>
+              
+              <li>
+                Lower the number of objects in your heap. This will reduce the amount of time it takes a garbage collection to scan your heap and therefore lower its impact. The second one is to reduce the rate of object allocation. And then the third one is actually to optimize their data structures to minimize how much memory they use.
+
+              </li>
+              
+              <li>
+                The third thing that we talked about is how we organize and represent our data to reduce the amount of memory that it's using. One way to do this is to clean up any unused data fields. If we remove those, we essentially went from 64 bytes to 40 bytes.
+
+              </li>
+              
+              <li>
+                Stago memory allocator does not optimize for data structure alignment. If we simply reorder these, as we did in the good object on the right, the memory allocation is much better aligned. This simple method could just really reduce your memory usage and improve your system's performance.
+
+              </li>
+              
+              <li>
+                I hope this helped you understand how guard garbage collection works and go. And how you can go about optimizing your system to minimize the impact of the garbage collector. If you have any questions, feel free to reach out to me. Have a great day.
+              </li>
+              
+            </ul>
+          </div>
+
+          <div class="col-12 mb-5">
+            <h3>
+              Transcript
+            </h3>
+            <span class="text-muted">
+              This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/assemblyai/q1p4K5se3jc.srt" target="_blank">submit a PR</a>.
+            </span>
+            <div>
+            
+            <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:19,930'); seek(19.0)">
+              Hi everyone. My name is Nishant Roy and I'm excited
+            </span>
+            
+            <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:23,338'); seek(23.0)">
+              to be here today at 42 Golang 2023
+            </span>
+            
+            <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:26,796'); seek(26.0)">
+              to talk to you about heap optimizations for Go systems.
+            </span>
+            
+            <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:30,098'); seek(30.0)">
+              After this session, you should have a good idea of how to triage,
+            </span>
+            
+            <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:33,106'); seek(33.0)">
+              whether your application is being plagued by memory issues, how to
+            </span>
+            
+            <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:36,684'); seek(36.0)">
+              track down hotspots in your code, and how to go about optimizing
+            </span>
+            
+            <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:40,886'); seek(40.0)">
+              your application's performance.
+            </span>
+            
+            <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:43,710'); seek(43.0)">
+              Before we dive in, here's a little about myself.
+            </span>
+            
+            <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:47,310'); seek(47.0)">
+              I'm the engineering manager for the ad serving platform team at Pinterest,
+            </span>
+            
+            <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:00:51,334'); seek(51.0)">
+              and our team owns multiple critical systems that help power Pinterest's $2 billion
+            </span>
+            
+            <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:00:55,818'); seek(55.0)">
+              a year over $2 billion a year ad delivery systems.
+            </span>
+            
+            <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:00:59,570'); seek(59.0)">
+              Our central ad serving platform itself is implemented in Go and
+            </span>
+            
+            <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:01:03,012'); seek(63.0)">
+              has really high performance requirements, which is why we spend a lot of time
+            </span>
+            
+            <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:01:06,372'); seek(66.0)">
+              thinking about how to scale our systems efficiently. And one
+            </span>
+            
+            <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:01:09,608'); seek(69.0)">
+              of the areas in particular that we spent a lot of time on is taming
+            </span>
+            
+            <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:01:12,910'); seek(72.0)">
+              the impact of the Go garbage collector to improve our system's performance.
+            </span>
+            
+            <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:01:16,510'); seek(76.0)">
+              So I'm here to talk about what I've learned from that experience.
+            </span>
+            
+            <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:01:21,370'); seek(81.0)">
+              So let's start with a really quick intro to memory management and how it works
+            </span>
+            
+            <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:01:25,116'); seek(85.0)">
+              in Go. Memory management at a high level refers to
+            </span>
+            
+            <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:01:28,828'); seek(88.0)">
+              allocating memory for an application upon request and then releasing it
+            </span>
+            
+            <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:32,608'); seek(92.0)">
+              for use by other applications once it's no longer needed.
+            </span>
+            
+            <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:36,110'); seek(96.0)">
+              The great part about Go is that it does not require users to perform any
+            </span>
+            
+            <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:39,408'); seek(99.0)">
+              manual memory management, so users do not need to manually allocate and
+            </span>
+            
+            <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:43,332'); seek(103.0)">
+              clear memory. Both these functionalities are abstracted away from
+            </span>
+            
+            <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:46,756'); seek(106.0)">
+              them, and the benefit of this is that it minimizes the chance of memory
+            </span>
+            
+            <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:01:50,298'); seek(110.0)">
+              leaks.
+            </span>
+            
+            <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:01:53,090'); seek(113.0)">
+              The Go garbage collector, in order to run it basically has a
+            </span>
+            
+            <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:01:56,968'); seek(116.0)">
+              threshold. So every time that the heap hits a certain target size,
+            </span>
+            
+            <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:02:00,616'); seek(120.0)">
+              which by default is whenever the heap grows by 100% since the
+            </span>
+            
+            <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:02:04,488'); seek(124.0)">
+              last time the garbage collector ran, the Go garbage collector is going
+            </span>
+            
+            <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:02:07,704'); seek(127.0)">
+              to run one more time. This setting is configurable through a config flag,
+            </span>
+            
+            <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:02:11,538'); seek(131.0)">
+              and there are more config flags that have been rolled out in recent versions
+            </span>
+            
+            <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:02:14,946'); seek(134.0)">
+              to make this tunable at a more granular level.
+            </span>
+            
+            <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:02:20,510'); seek(140.0)">
+              So the go garbage collector uses what is known as a tricolor algorithm
+            </span>
+            
+            <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:02:24,598'); seek(144.0)">
+              for marking the objects, which means it divides objects into three different
+            </span>
+            
+            <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:02:28,176'); seek(148.0)">
+              sets. Objects that are marked as white are collectible, since that
+            </span>
+            
+            <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:31,728'); seek(151.0)">
+              means that they're not in use in memory. Objects marked as
+            </span>
+            
+            <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:35,088'); seek(155.0)">
+              black are not collectible since they are definitely in use in memory, and then objects
+            </span>
+            
+            <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:38,634'); seek(158.0)">
+              that are marked as gray, which is the third color, means they may be collectible,
+            </span>
+            
+            <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:41,818'); seek(161.0)">
+              but it hasn't been determined yet. So by using this
+            </span>
+            
+            <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:02:45,128'); seek(165.0)">
+              tricolor algorithm, the Go garbage collector is
+            </span>
+            
+            <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:02:48,632'); seek(168.0)">
+              able to run concurrently with your main program without
+            </span>
+            
+            <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:02:52,936'); seek(172.0)">
+              using a stop the world pause similar to some other languages like Java famously
+            </span>
+            
+            <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:02:56,978'); seek(176.0)">
+              used to, which therefore minimizes
+            </span>
+            
+            <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:03:01,138'); seek(181.0)">
+              the impact of garbage collection on your main program itself.
+            </span>
+            
+            <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:03:06,170'); seek(186.0)">
+              So then the question is, how does garbage collection actually impact your
+            </span>
+            
+            <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:03:09,872'); seek(189.0)">
+              application's performance? The Go garbage collector
+            </span>
+            
+            <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:03:13,894'); seek(193.0)">
+              aims to use no more than 25% of the available cpu resources,
+            </span>
+            
+            <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:03:18,150'); seek(198.0)">
+              which obviously ideally minimizes the impact on your program's
+            </span>
+            
+            <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:03:21,722'); seek(201.0)">
+              performance and latency, et cetera. However,
+            </span>
+            
+            <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:03:24,164'); seek(204.0)">
+              as memory pressure starts to increase, which means
+            </span>
+            
+            <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:03:28,292'); seek(208.0)">
+              the heap size is really large, the garbage collector suddenly
+            </span>
+            
+            <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:03:32,058'); seek(212.0)">
+              needs a lot more cpu resources. So it starts to steal resources
+            </span>
+            
+            <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:35,610'); seek(215.0)">
+              from your main program, which can then really start to hinder the performance
+            </span>
+            
+            <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:39,006'); seek(219.0)">
+              of your program itself. So, for instance, if the rate of memory allocation is
+            </span>
+            
+            <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:03:43,272'); seek(223.0)">
+              really high, then the Go garbage collector is going to start stealing
+            </span>
+            
+            <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:03:47,358'); seek(227.0)">
+              Go routines or threads from your main program to assist with the marking phase
+            </span>
+            
+            <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:03:50,882'); seek(230.0)">
+              in order to quickly and efficiently scan all the objects
+            </span>
+            
+            <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:03:54,418'); seek(234.0)">
+              in the heap and determine what can be cleared up. This does
+            </span>
+            
+            <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:03:57,932'); seek(237.0)">
+              two things. Firstly, it allows us to ensure that the rate of memory allocation
+            </span>
+            
+            <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:04:02,118'); seek(242.0)">
+              is not greater than the rate of memory cleanup, preventing the heap from growing to
+            </span>
+            
+            <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:04:05,504'); seek(245.0)">
+              be very large. Secondly,
+            </span>
+            
+            <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:04:09,150'); seek(249.0)">
+              it slows down your main program itself,
+            </span>
+            
+            <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:04:12,868'); seek(252.0)">
+              which therefore reduces the rate of memory increase as well.
+            </span>
+            
+            <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:04:20,930'); seek(260.0)">
+              So what causes GC to actually run slower? What does memory pressure
+            </span>
+            
+            <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:04:24,762'); seek(264.0)">
+              mean? So, in order to determine what memory is
+            </span>
+            
+            <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:04:28,008'); seek(268.0)">
+              ready to be cleaned up, the garbage collector needs to scan every single
+            </span>
+            
+            <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:04:31,416'); seek(271.0)">
+              object in the heap to see if it is still in use or not.
+            </span>
+            
+            <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:04:34,584'); seek(274.0)">
+              So as the number of objects in the heap grows,
+            </span>
+            
+            <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:04:37,750'); seek(277.0)">
+              so does the amount of time spent scanning the entire heap.
+            </span>
+            
+            <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:04:41,530'); seek(281.0)">
+              Then the next question is, what is actually on the heap in the first place?
+            </span>
+            
+            <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:04:45,610'); seek(285.0)">
+              And the heap essentially is one of two areas that a computer
+            </span>
+            
+            <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:04:49,276'); seek(289.0)">
+              system uses for memory allocation. The first one is known
+            </span>
+            
+            <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:04:52,774'); seek(292.0)">
+              as a stack, which is a special area of the computer's memory which stores any
+            </span>
+            
+            <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:04:56,192'); seek(296.0)">
+              temporary variables or memory allocations that are created by
+            </span>
+            
+            <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:04:59,568'); seek(299.0)">
+              a function or method. Since each function stack is
+            </span>
+            
+            <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:05:03,412'); seek(303.0)">
+              then cleared once it's done executing. If the variables
+            </span>
+            
+            <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:05:07,290'); seek(307.0)">
+              within that function were not moved elsewhere, we would have no way of accessing
+            </span>
+            
+            <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:05:11,018'); seek(311.0)">
+              these variables later on. So that's where the heap comes in. The heap
+            </span>
+            
+            <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:05:14,698'); seek(314.0)">
+              is sort of a more free floating memory region used
+            </span>
+            
+            <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:05:18,072'); seek(318.0)">
+              to store global variables or variables that are referenced outside
+            </span>
+            
+            <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:05:21,880'); seek(321.0)">
+              the scope of function, shared between functions, between packages, et cetera.
+            </span>
+            
+            <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:05:26,790'); seek(326.0)">
+              So how does go determine what needs to go in the heap? There's this
+            </span>
+            
+            <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:05:30,428'); seek(330.0)">
+              process called escape analysis, which is beyond the scope of this talk, but at
+            </span>
+            
+            <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:05:34,188'); seek(334.0)">
+              a high level the way you can think about it is if an object is
+            </span>
+            
+            <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:05:37,452'); seek(337.0)">
+              only referenced within the scope of a certain function call, then we
+            </span>
+            
+            <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:05:41,164'); seek(341.0)">
+              can allocate it to the stack just for that function.
+            </span>
+            
+            <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:05:44,270'); seek(344.0)">
+              The stack will be cleared once that function is complete, and we'll lose that
+            </span>
+            
+            <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:05:47,728'); seek(347.0)">
+              object forever. So you don't need to worry about scanning it, cleaning it up later.
+            </span>
+            
+            <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:05:52,290'); seek(352.0)">
+              But if an object is accessed outside that function, then it needs
+            </span>
+            
+            <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:05:55,988'); seek(355.0)">
+              to be allocated to the heap in order
+            </span>
+            
+            <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:05:59,588'); seek(359.0)">
+              for it to be accessible later on. So that
+            </span>
+            
+            <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:06:03,128'); seek(363.0)">
+              is the essence of escape analysis.
+            </span>
+            
+            <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:06:07,590'); seek(367.0)">
+              So then how does one go about determining if garbage
+            </span>
+            
+            <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:06:11,342'); seek(371.0)">
+              collection is actually the problem for your application? So typically
+            </span>
+            
+            <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:06:15,598'); seek(375.0)">
+              the way this conversation starts is you see that your application is suffering from really
+            </span>
+            
+            <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:06:19,452'); seek(379.0)">
+              high latency issues. So that's your symptom, that's what you observe.
+            </span>
+            
+            <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:06:25,130'); seek(385.0)">
+              Intuition is really the first step towards figuring out if GC
+            </span>
+            
+            <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:06:28,982'); seek(388.0)">
+              is the problem. So typically, if garbage collection
+            </span>
+            
+            <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:06:33,590'); seek(393.0)">
+              is the reason for your application's performance suffering, you'll see really high tail
+            </span>
+            
+            <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:06:37,702'); seek(397.0)">
+              latency. And what that means is we have a small percentage of
+            </span>
+            
+            <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:06:41,508'); seek(401.0)">
+              requests to a system. So again, I'm talking about large scale distributed
+            </span>
+            
+            <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:06:45,578'); seek(405.0)">
+              systems with really high volumes of traffic,
+            </span>
+            
+            <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:06:48,746'); seek(408.0)">
+              enough to get a decent percentile breakdown of latency,
+            </span>
+            
+            <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:06:53,090'); seek(413.0)">
+              which is what Pinterest systems are like, of course. So tail latency
+            </span>
+            
+            <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:06:56,846'); seek(416.0)">
+              means that we have a small percentage of requests coming into our system that result
+            </span>
+            
+            <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:07:00,456'); seek(420.0)">
+              in really slow responses. So we often talk about latency as
+            </span>
+            
+            <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:07:04,152'); seek(424.0)">
+              percentiles. So high tail latency here might refer to really
+            </span>
+            
+            <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:07:07,932'); seek(427.0)">
+              high values for p 99 latency or even p 90 latency.
+            </span>
+            
+            <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:07:11,850'); seek(431.0)">
+              Typically for Gc, what we've seen is the p
+            </span>
+            
+            <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:07:15,212'); seek(435.0)">
+              99 latency is what really gets affected because of the infrequency of the
+            </span>
+            
+            <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:07:19,168'); seek(439.0)">
+              garbage collector. Running it only really affects that last
+            </span>
+            
+            <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:07:22,736'); seek(442.0)">
+              1% of requests. So if
+            </span>
+            
+            <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:07:27,008'); seek(447.0)">
+              you're also observing systems like this really high p 99 latency,
+            </span>
+            
+            <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:07:30,710'); seek(450.0)">
+              then there's a good chance that garbage collection pressure could be the
+            </span>
+            
+            <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:07:34,404'); seek(454.0)">
+              root cause. Especially if you already know that your program has pretty
+            </span>
+            
+            <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:07:37,508'); seek(457.0)">
+              high memory usage, which you can tell by just
+            </span>
+            
+            <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:07:41,412'); seek(461.0)">
+              observing various system metrics how much memory is being used on the host
+            </span>
+            
+            <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:07:45,422'); seek(465.0)">
+              that is running your application, et cetera, et cetera. So the next step is
+            </span>
+            
+            <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:07:49,576'); seek(469.0)">
+              to confirm your hypothesis. You can use this runtime
+            </span>
+            
+            <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:07:53,262'); seek(473.0)">
+              environment variable that go makes available, called go debug.
+            </span>
+            
+            <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:07:56,430'); seek(476.0)">
+              By setting it to go. Debug equals GC, trace equals one. As you can see
+            </span>
+            
+            <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:07:59,948'); seek(479.0)">
+              on the slide here, you'll force your program to output debug logs
+            </span>
+            
+            <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:08:03,698'); seek(483.0)">
+              for every single GC cycle. And this will also
+            </span>
+            
+            <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:08:07,260'); seek(487.0)">
+              include a detailed printout of the time spent in
+            </span>
+            
+            <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:08:10,588'); seek(490.0)">
+              the various phases of garbage collection. And then
+            </span>
+            
+            <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:08:14,352'); seek(494.0)">
+              the last step is to take what you measured and align it with your system
+            </span>
+            
+            <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:08:17,696'); seek(497.0)">
+              metrics. So the way we did this was we looked at the logs from
+            </span>
+            
+            <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:08:21,584'); seek(501.0)">
+              Gctrace and if we noticed that the system's
+            </span>
+            
+            <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:08:25,658'); seek(505.0)">
+              performance so there were spikes in latency that aligned with when
+            </span>
+            
+            <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:08:29,268'); seek(509.0)">
+              the GC cycles were occurring, that's a great way to
+            </span>
+            
+            <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:08:32,644'); seek(512.0)">
+              conclude that there's a good chance that GC is
+            </span>
+            
+            <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:08:35,848'); seek(515.0)">
+              the cause of your performance regression.
+            </span>
+            
+            <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:08:40,150'); seek(520.0)">
+              So here's an example of what GCT trace output looks like, with an
+            </span>
+            
+            <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:08:43,288'); seek(523.0)">
+              explanation with a detailed breakdown of every single component in there.
+            </span>
+            
+            <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:08:46,648'); seek(526.0)">
+              Credits to Arden Labs here. If you want to find the blog post, you can
+            </span>
+            
+            <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:08:49,544'); seek(529.0)">
+              just look up GCT trace Arden labs. That's how I found this screenshot.
+            </span>
+            
+            <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:08:53,074'); seek(533.0)">
+              So taking a quick look at this, we see that GCtrace gives us a
+            </span>
+            
+            <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:08:56,524'); seek(536.0)">
+              lot of information. It shows us how many GC cycles we've
+            </span>
+            
+            <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:08:59,958'); seek(539.0)">
+              had so far since our application started,
+            </span>
+            
+            <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:09:03,550'); seek(543.0)">
+              how much of our program's total cpu has been spent on garbage
+            </span>
+            
+            <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:09:07,238'); seek(547.0)">
+              collection, how much wall clock and cpu time was
+            </span>
+            
+            <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:09:11,312'); seek(551.0)">
+              spent in the various phases of GC, what our memory users looks like
+            </span>
+            
+            <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:09:14,628'); seek(554.0)">
+              before and after garbage collection runs, et cetera. Et I'm not
+            </span>
+            
+            <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:09:18,068'); seek(558.0)">
+              going to go too deep into these aspects, but check out the blog
+            </span>
+            
+            <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:09:21,498'); seek(561.0)">
+              post if you're looking for a detailed breakdown of all
+            </span>
+            
+            <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:09:25,172'); seek(565.0)">
+              of these GC components. What I found helpful is really just to
+            </span>
+            
+            <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:09:28,468'); seek(568.0)">
+              let GC trace run in the background. And I added a separate background
+            </span>
+            
+            <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:09:32,222'); seek(572.0)">
+              thread to print out certain key system metrics, things like p
+            </span>
+            
+            <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:09:36,248'); seek(576.0)">
+              90, p 99, n latency observed over like
+            </span>
+            
+            <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:09:40,028'); seek(580.0)">
+              a 1 minute to 32nd period. Print these
+            </span>
+            
+            <span id="chunk-151" class="transcript-chunks" onclick="console.log('00:09:43,468'); seek(583.0)">
+              out in a regular interval and look for correlations between JC cycles occurring
+            </span>
+            
+            <span id="chunk-152" class="transcript-chunks" onclick="console.log('00:09:47,314'); seek(587.0)">
+              and latency degradations.
+            </span>
+            
+            <span id="chunk-153" class="transcript-chunks" onclick="console.log('00:09:51,630'); seek(591.0)">
+              So let's assume now that we have a reasonable amount of confidence
+            </span>
+            
+            <span id="chunk-154" class="transcript-chunks" onclick="console.log('00:09:55,462'); seek(595.0)">
+              that garbage collection is the root cause for our application's
+            </span>
+            
+            <span id="chunk-155" class="transcript-chunks" onclick="console.log('00:09:58,966'); seek(598.0)">
+              poor performance. How do we then go about profiling our heap
+            </span>
+            
+            <span id="chunk-156" class="transcript-chunks" onclick="console.log('00:10:02,422'); seek(602.0)">
+              usage? So go has quite a few built in tools
+            </span>
+            
+            <span id="chunk-157" class="transcript-chunks" onclick="console.log('00:10:05,994'); seek(605.0)">
+              to study our heap usage, and I'm going to talk about two main ones here.
+            </span>
+            
+            <span id="chunk-158" class="transcript-chunks" onclick="console.log('00:10:08,980'); seek(608.0)">
+              These are the two that I found really helpful. The first one is the
+            </span>
+            
+            <span id="chunk-159" class="transcript-chunks" onclick="console.log('00:10:12,852'); seek(612.0)">
+              memstats library, and then the second one is the PPRF package.
+            </span>
+            
+            <span id="chunk-160" class="transcript-chunks" onclick="console.log('00:10:16,398'); seek(616.0)">
+              So memstats is essentially this library that is built
+            </span>
+            
+            <span id="chunk-161" class="transcript-chunks" onclick="console.log('00:10:20,232'); seek(620.0)">
+              into go runtime and provides you with statistics about the memory
+            </span>
+            
+            <span id="chunk-162" class="transcript-chunks" onclick="console.log('00:10:23,518'); seek(623.0)">
+              allocator itself, things like how much memory has been allocated,
+            </span>
+            
+            <span id="chunk-163" class="transcript-chunks" onclick="console.log('00:10:27,022'); seek(627.0)">
+              how much memory is requested from the system, how much memory has been
+            </span>
+            
+            <span id="chunk-164" class="transcript-chunks" onclick="console.log('00:10:30,348'); seek(630.0)">
+              freed, GC metrics, et cetera, et cetera. I'll dive into
+            </span>
+            
+            <span id="chunk-165" class="transcript-chunks" onclick="console.log('00:10:33,900'); seek(633.0)">
+              that a little bit more in a second, and the second one is pprof which
+            </span>
+            
+            <span id="chunk-166" class="transcript-chunks" onclick="console.log('00:10:36,924'); seek(636.0)">
+              is a system profile visualizer, and we'll talk about that in a little bit more
+            </span>
+            
+            <span id="chunk-167" class="transcript-chunks" onclick="console.log('00:10:40,128'); seek(640.0)">
+              detail as well. But these are really helpful to understand how your application
+            </span>
+            
+            <span id="chunk-168" class="transcript-chunks" onclick="console.log('00:10:43,920'); seek(643.0)">
+              is managing memory and also visually
+            </span>
+            
+            <span id="chunk-169" class="transcript-chunks" onclick="console.log('00:10:48,110'); seek(648.0)">
+              inspect your system's cpu data
+            </span>
+            
+            <span id="chunk-170" class="transcript-chunks" onclick="console.log('00:10:51,888'); seek(651.0)">
+              or cpu usage, heap usage, et cetera.
+            </span>
+            
+            <span id="chunk-171" class="transcript-chunks" onclick="console.log('00:10:56,130'); seek(656.0)">
+              So here's just a really short glimpse into what memstats gives
+            </span>
+            
+            <span id="chunk-172" class="transcript-chunks" onclick="console.log('00:10:59,588'); seek(659.0)">
+              you. These are some stats that I found helpful. Like I said, it essentially exposes
+            </span>
+            
+            <span id="chunk-173" class="transcript-chunks" onclick="console.log('00:11:03,178'); seek(663.0)">
+              these stats about the system's memory usage, garbage collector performance,
+            </span>
+            
+            <span id="chunk-174" class="transcript-chunks" onclick="console.log('00:11:07,242'); seek(667.0)">
+              et cetera, et cetera. So we can use this library to monitor a
+            </span>
+            
+            <span id="chunk-175" class="transcript-chunks" onclick="console.log('00:11:10,648'); seek(670.0)">
+              few different things. What I found helpful is to monitor the total number of objects
+            </span>
+            
+            <span id="chunk-176" class="transcript-chunks" onclick="console.log('00:11:14,398'); seek(674.0)">
+              in the heap. We discussed this earlier, but as the number of objects in the
+            </span>
+            
+            <span id="chunk-177" class="transcript-chunks" onclick="console.log('00:11:17,548'); seek(677.0)">
+              heap increases, it takes much longer for the garbage collector
+            </span>
+            
+            <span id="chunk-178" class="transcript-chunks" onclick="console.log('00:11:21,794'); seek(681.0)">
+              to mark the entire heap to scan and mark the entire heap.
+            </span>
+            
+            <span id="chunk-179" class="transcript-chunks" onclick="console.log('00:11:25,026'); seek(685.0)">
+              So if we notice this metric going up,
+            </span>
+            
+            <span id="chunk-180" class="transcript-chunks" onclick="console.log('00:11:29,210'); seek(689.0)">
+              there's a good chance that GC pressure is going to increase.
+            </span>
+            
+            <span id="chunk-181" class="transcript-chunks" onclick="console.log('00:11:32,590'); seek(692.0)">
+              Similarly, if that metric is going down, we made some good optimizations and
+            </span>
+            
+            <span id="chunk-182" class="transcript-chunks" onclick="console.log('00:11:36,816'); seek(696.0)">
+              the impact of GC should be decreasing. So I used this
+            </span>
+            
+            <span id="chunk-183" class="transcript-chunks" onclick="console.log('00:11:40,288'); seek(700.0)">
+              metric as one of my indicators for success. As I rolled out new
+            </span>
+            
+            <span id="chunk-184" class="transcript-chunks" onclick="console.log('00:11:43,988'); seek(703.0)">
+              optimizations, this metric dropped and I noticed that the system's performance
+            </span>
+            
+            <span id="chunk-185" class="transcript-chunks" onclick="console.log('00:11:48,074'); seek(708.0)">
+              started to improve. And the memsite
+            </span>
+            
+            <span id="chunk-186" class="transcript-chunks" onclick="console.log('00:11:51,994'); seek(711.0)">
+              docs provide a really clear explanation of all the various statistics.
+            </span>
+            
+            <span id="chunk-187" class="transcript-chunks" onclick="console.log('00:11:56,450'); seek(716.0)">
+              I think there's close to 20. These are the three that I use once again.
+            </span>
+            
+            <span id="chunk-188" class="transcript-chunks" onclick="console.log('00:12:00,312'); seek(720.0)">
+              So heap objects number of allocated heap objects heap alloc
+            </span>
+            
+            <span id="chunk-189" class="transcript-chunks" onclick="console.log('00:12:03,598'); seek(723.0)">
+              is actual bytes that are allocated to heap. This is helpful because
+            </span>
+            
+            <span id="chunk-190" class="transcript-chunks" onclick="console.log('00:12:07,208'); seek(727.0)">
+              this is how the go runtime determines when to actually trigger GC.
+            </span>
+            
+            <span id="chunk-191" class="transcript-chunks" onclick="console.log('00:12:11,554'); seek(731.0)">
+              So like we said before, it essentially by default triggers whenever your
+            </span>
+            
+            <span id="chunk-192" class="transcript-chunks" onclick="console.log('00:12:15,228'); seek(735.0)">
+              heap grows by 100% since the last cycle. So that's
+            </span>
+            
+            <span id="chunk-193" class="transcript-chunks" onclick="console.log('00:12:18,994'); seek(738.0)">
+              what heap alloc can be used for. And then lastly,
+            </span>
+            
+            <span id="chunk-194" class="transcript-chunks" onclick="console.log('00:12:21,942'); seek(741.0)">
+              heap sys talks about the total bytes memory obtained from the OS.
+            </span>
+            
+            <span id="chunk-195" class="transcript-chunks" onclick="console.log('00:12:25,782'); seek(745.0)">
+              So actually requesting memory from the operating system is a slightly
+            </span>
+            
+            <span id="chunk-196" class="transcript-chunks" onclick="console.log('00:12:29,718'); seek(749.0)">
+              heavyweight process because it's essentially blocking.
+            </span>
+            
+            <span id="chunk-197" class="transcript-chunks" onclick="console.log('00:12:33,250'); seek(753.0)">
+              So if you're seeing that this number is also continuously going
+            </span>
+            
+            <span id="chunk-198" class="transcript-chunks" onclick="console.log('00:12:36,452'); seek(756.0)">
+              up, there's a good chance that you're continuously having
+            </span>
+            
+            <span id="chunk-199" class="transcript-chunks" onclick="console.log('00:12:39,988'); seek(759.0)">
+              to request a lot of memory, which is also blocking threads and impacting
+            </span>
+            
+            <span id="chunk-200" class="transcript-chunks" onclick="console.log('00:12:43,934'); seek(763.0)">
+              your system's performance. I don't have slides on this,
+            </span>
+            
+            <span id="chunk-201" class="transcript-chunks" onclick="console.log('00:12:47,192'); seek(767.0)">
+              but one new cool feature that Go has rolled out
+            </span>
+            
+            <span id="chunk-202" class="transcript-chunks" onclick="console.log('00:12:50,712'); seek(770.0)">
+              since I made these slides originally is another
+            </span>
+            
+            <span id="chunk-203" class="transcript-chunks" onclick="console.log('00:12:55,256'); seek(775.0)">
+              runtime flag, which allows you to actually set a soft memory
+            </span>
+            
+            <span id="chunk-204" class="transcript-chunks" onclick="console.log('00:12:58,818'); seek(778.0)">
+              limit. So rather than the default behavior
+            </span>
+            
+            <span id="chunk-205" class="transcript-chunks" onclick="console.log('00:13:02,290'); seek(782.0)">
+              of GOGC triggering whenever your
+            </span>
+            
+            <span id="chunk-206" class="transcript-chunks" onclick="console.log('00:13:05,404'); seek(785.0)">
+              heap grows by 100%, you can actually set a target saying only
+            </span>
+            
+            <span id="chunk-207" class="transcript-chunks" onclick="console.log('00:13:09,228'); seek(789.0)">
+              trigger go Gc when my heap size hits x megabytes,
+            </span>
+            
+            <span id="chunk-208" class="transcript-chunks" onclick="console.log('00:13:13,158'); seek(793.0)">
+              x gigabytes, whatever it is, which therefore lowers the number of
+            </span>
+            
+            <span id="chunk-209" class="transcript-chunks" onclick="console.log('00:13:16,624'); seek(796.0)">
+              times GC needs to run, therefore lowering the impact of
+            </span>
+            
+            <span id="chunk-210" class="transcript-chunks" onclick="console.log('00:13:20,208'); seek(800.0)">
+              GC in your application's performance. That's one way to go about
+            </span>
+            
+            <span id="chunk-211" class="transcript-chunks" onclick="console.log('00:13:23,664'); seek(803.0)">
+              it, and can be an easy and dirty way to just tame
+            </span>
+            
+            <span id="chunk-212" class="transcript-chunks" onclick="console.log('00:13:27,242'); seek(807.0)">
+              the impact. However, some of the steps we'll talk about here will really just
+            </span>
+            
+            <span id="chunk-213" class="transcript-chunks" onclick="console.log('00:13:30,708'); seek(810.0)">
+              help you tune your actual heap usage itself,
+            </span>
+            
+            <span id="chunk-214" class="transcript-chunks" onclick="console.log('00:13:35,192'); seek(815.0)">
+              which is likely well, one, it's a good practice,
+            </span>
+            
+            <span id="chunk-215" class="transcript-chunks" onclick="console.log('00:13:38,350'); seek(818.0)">
+              and two, it's likely to give you more consistent and perhaps more significant wins
+            </span>
+            
+            <span id="chunk-216" class="transcript-chunks" onclick="console.log('00:13:42,238'); seek(822.0)">
+              as well. So here's a quick program that
+            </span>
+            
+            <span id="chunk-217" class="transcript-chunks" onclick="console.log('00:13:46,188'); seek(826.0)">
+              I put together on how to use memsats, so just wrote
+            </span>
+            
+            <span id="chunk-218" class="transcript-chunks" onclick="console.log('00:13:49,618'); seek(829.0)">
+              this little method on the right here to read
+            </span>
+            
+            <span id="chunk-219" class="transcript-chunks" onclick="console.log('00:13:53,996'); seek(833.0)">
+              memsats every however frequently you need it.
+            </span>
+            
+            <span id="chunk-220" class="transcript-chunks" onclick="console.log('00:13:57,180'); seek(837.0)">
+              Print out number of heap objects allocated, number of bytes allocated
+            </span>
+            
+            <span id="chunk-221" class="transcript-chunks" onclick="console.log('00:14:01,298'); seek(841.0)">
+              to heap, et cetera, as well as the number of GC cycles that have been
+            </span>
+            
+            <span id="chunk-222" class="transcript-chunks" onclick="console.log('00:14:04,704'); seek(844.0)">
+              triggered. Since this can be really helpful to see how often and how frequently
+            </span>
+            
+            <span id="chunk-223" class="transcript-chunks" onclick="console.log('00:14:08,262'); seek(848.0)">
+              GC is getting triggered. The example I did here
+            </span>
+            
+            <span id="chunk-224" class="transcript-chunks" onclick="console.log('00:14:11,508'); seek(851.0)">
+              is essentially we're allocating this slice of integers
+            </span>
+            
+            <span id="chunk-225" class="transcript-chunks" onclick="console.log('00:14:14,970'); seek(854.0)">
+              or this array of int slices,
+            </span>
+            
+            <span id="chunk-226" class="transcript-chunks" onclick="console.log('00:14:18,130'); seek(858.0)">
+              and you can see how I'll
+            </span>
+            
+            <span id="chunk-227" class="transcript-chunks" onclick="console.log('00:14:22,698'); seek(862.0)">
+              show you in the next slide. You can essentially see how the number of heap
+            </span>
+            
+            <span id="chunk-228" class="transcript-chunks" onclick="console.log('00:14:26,558'); seek(866.0)">
+              objects and heap allocated bytes changes, as well as how the
+            </span>
+            
+            <span id="chunk-229" class="transcript-chunks" onclick="console.log('00:14:30,072'); seek(870.0)">
+              GC counter increments as well.
+            </span>
+            
+            <span id="chunk-230" class="transcript-chunks" onclick="console.log('00:14:33,190'); seek(873.0)">
+              So here's what we got when we ran it.
+            </span>
+            
+            <span id="chunk-231" class="transcript-chunks" onclick="console.log('00:14:36,250'); seek(876.0)">
+              You can see that the heap objects drop whenever we
+            </span>
+            
+            <span id="chunk-232" class="transcript-chunks" onclick="console.log('00:14:39,692'); seek(879.0)">
+              run GC, which is basically the penultimate
+            </span>
+            
+            <span id="chunk-233" class="transcript-chunks" onclick="console.log('00:14:42,978'); seek(882.0)">
+              line in this slide. Otherwise, heap objects continue
+            </span>
+            
+            <span id="chunk-234" class="transcript-chunks" onclick="console.log('00:14:46,540'); seek(886.0)">
+              to increase. You can see that on the last line we see num GC incremented
+            </span>
+            
+            <span id="chunk-235" class="transcript-chunks" onclick="console.log('00:14:50,514'); seek(890.0)">
+              to one, and that's where heap objects dropped.
+            </span>
+            
+            <span id="chunk-236" class="transcript-chunks" onclick="console.log('00:14:53,414'); seek(893.0)">
+              It's a clear indicator that things worked as expected. You can also see that heap
+            </span>
+            
+            <span id="chunk-237" class="transcript-chunks" onclick="console.log('00:14:57,238'); seek(897.0)">
+              alloc dropped very significantly, almost to ten
+            </span>
+            
+            <span id="chunk-238" class="transcript-chunks" onclick="console.log('00:15:01,408'); seek(901.0)">
+              or 11% of what it used to be. So GC did its job, and we
+            </span>
+            
+            <span id="chunk-239" class="transcript-chunks" onclick="console.log('00:15:05,188'); seek(905.0)">
+              freed up a lot of space on the heat. This is a really
+            </span>
+            
+            <span id="chunk-240" class="transcript-chunks" onclick="console.log('00:15:08,452'); seek(908.0)">
+              simple program, but you can use something very similar to essentially understand the memory
+            </span>
+            
+            <span id="chunk-241" class="transcript-chunks" onclick="console.log('00:15:11,962'); seek(911.0)">
+              behavior of even more complex systems. So this is how memsats
+            </span>
+            
+            <span id="chunk-242" class="transcript-chunks" onclick="console.log('00:15:15,978'); seek(915.0)">
+              can be really helpful.
+            </span>
+            
+            <span id="chunk-243" class="transcript-chunks" onclick="console.log('00:15:19,110'); seek(919.0)">
+              The second package that I talked about is Pprof. It's a
+            </span>
+            
+            <span id="chunk-244" class="transcript-chunks" onclick="console.log('00:15:22,744'); seek(922.0)">
+              built in package as well. It allows us to visualize several
+            </span>
+            
+            <span id="chunk-245" class="transcript-chunks" onclick="console.log('00:15:26,238'); seek(926.0)">
+              different system profiles. It is CPU memory usage, heap, et cetera.
+            </span>
+            
+            <span id="chunk-246" class="transcript-chunks" onclick="console.log('00:15:29,954'); seek(929.0)">
+              Here we're going to talk specifically about the heap profile.
+            </span>
+            
+            <span id="chunk-247" class="transcript-chunks" onclick="console.log('00:15:32,994'); seek(932.0)">
+              So the tool comes with a bunch of options to investigate specific aspects
+            </span>
+            
+            <span id="chunk-248" class="transcript-chunks" onclick="console.log('00:15:36,498'); seek(936.0)">
+              of the heap, and those are the ones listed here.
+            </span>
+            
+            <span id="chunk-249" class="transcript-chunks" onclick="console.log('00:15:39,164'); seek(939.0)">
+              So if you were concerned about auto memory issues, you may be
+            </span>
+            
+            <span id="chunk-250" class="transcript-chunks" onclick="console.log('00:15:42,992'); seek(942.0)">
+              interested in inspecting the actual amount of memory
+            </span>
+            
+            <span id="chunk-251" class="transcript-chunks" onclick="console.log('00:15:46,518'); seek(946.0)">
+              used rather than objects, for instance. So you can use the right option accordingly.
+            </span>
+            
+            <span id="chunk-252" class="transcript-chunks" onclick="console.log('00:15:50,278'); seek(950.0)">
+              In our case, we know that GC pressure is what we're investigating.
+            </span>
+            
+            <span id="chunk-253" class="transcript-chunks" onclick="console.log('00:15:53,810'); seek(953.0)">
+              It's tied very closely to the number of objects in the heap. So the
+            </span>
+            
+            <span id="chunk-254" class="transcript-chunks" onclick="console.log('00:15:57,108'); seek(957.0)">
+              inused objects or allocated objects, fields or options are more
+            </span>
+            
+            <span id="chunk-255" class="transcript-chunks" onclick="console.log('00:16:00,932'); seek(960.0)">
+              useful to us here. So the first command shown here,
+            </span>
+            
+            <span id="chunk-256" class="transcript-chunks" onclick="console.log('00:16:04,068'); seek(964.0)">
+              go tool pprof and input your options. Then pass in
+            </span>
+            
+            <span id="chunk-257" class="transcript-chunks" onclick="console.log('00:16:08,950'); seek(968.0)">
+              the URL of wherever your application is running and pass in the
+            </span>
+            
+            <span id="chunk-258" class="transcript-chunks" onclick="console.log('00:16:12,408'); seek(972.0)">
+              API endpoint that you want to hit, which is debug. PProf is going
+            </span>
+            
+            <span id="chunk-259" class="transcript-chunks" onclick="console.log('00:16:16,408'); seek(976.0)">
+              to essentially download that profile data to your machine
+            </span>
+            
+            <span id="chunk-260" class="transcript-chunks" onclick="console.log('00:16:20,370'); seek(980.0)">
+              and puts you in an interactive command line tool to start visualizing this data,
+            </span>
+            
+            <span id="chunk-261" class="transcript-chunks" onclick="console.log('00:16:25,610'); seek(985.0)">
+              and it's really helpful. So one thing I forgot to mention is in order
+            </span>
+            
+            <span id="chunk-262" class="transcript-chunks" onclick="console.log('00:16:29,148'); seek(989.0)">
+              to generate this profile, you do need to register this
+            </span>
+            
+            <span id="chunk-263" class="transcript-chunks" onclick="console.log('00:16:32,912'); seek(992.0)">
+              HTTP endpoint upon application startup.
+            </span>
+            
+            <span id="chunk-264" class="transcript-chunks" onclick="console.log('00:16:37,070'); seek(997.0)">
+              I don't have a slide for that either, but you can just quickly look up
+            </span>
+            
+            <span id="chunk-265" class="transcript-chunks" onclick="console.log('00:16:41,170'); seek(1001.0)">
+              the pprof docs on Go's main
+            </span>
+            
+            <span id="chunk-266" class="transcript-chunks" onclick="console.log('00:16:44,532'); seek(1004.0)">
+              doc site and it's essentially one line to
+            </span>
+            
+            <span id="chunk-267" class="transcript-chunks" onclick="console.log('00:16:47,908'); seek(1007.0)">
+              register this HTTP endpoint and generate your heap profiles.
+            </span>
+            
+            <span id="chunk-268" class="transcript-chunks" onclick="console.log('00:16:52,930'); seek(1012.0)">
+              So like I said, when you run this, it'll put you in a command line
+            </span>
+            
+            <span id="chunk-269" class="transcript-chunks" onclick="console.log('00:16:56,452'); seek(1016.0)">
+              interface to start playing around with the data. You can essentially run help in your
+            </span>
+            
+            <span id="chunk-270" class="transcript-chunks" onclick="console.log('00:16:59,688'); seek(1019.0)">
+              command line tool and command line interface,
+            </span>
+            
+            <span id="chunk-271" class="transcript-chunks" onclick="console.log('00:17:02,798'); seek(1022.0)">
+              and it'll show you all the available options to slice and dice this data.
+            </span>
+            
+            <span id="chunk-272" class="transcript-chunks" onclick="console.log('00:17:06,296'); seek(1026.0)">
+              What I really like is to run a second command, the last one shown here,
+            </span>
+            
+            <span id="chunk-273" class="transcript-chunks" onclick="console.log('00:17:09,832'); seek(1029.0)">
+              which is gotool pprof, pass in the port that you want to run
+            </span>
+            
+            <span id="chunk-274" class="transcript-chunks" onclick="console.log('00:17:12,972'); seek(1032.0)">
+              the web UI on, and then the path to the actual profile
+            </span>
+            
+            <span id="chunk-275" class="transcript-chunks" onclick="console.log('00:17:16,898'); seek(1036.0)">
+              data itself, and it'll open up an interactive web browser, which I
+            </span>
+            
+            <span id="chunk-276" class="transcript-chunks" onclick="console.log('00:17:20,768'); seek(1040.0)">
+              find much easier and more helpful in inspecting heap usage.
+            </span>
+            
+            <span id="chunk-277" class="transcript-chunks" onclick="console.log('00:17:25,470'); seek(1045.0)">
+              So to jump ahead and show you what that looks like,
+            </span>
+            
+            <span id="chunk-278" class="transcript-chunks" onclick="console.log('00:17:29,152'); seek(1049.0)">
+              here is one of the visualizations that Pprof gives you.
+            </span>
+            
+            <span id="chunk-279" class="transcript-chunks" onclick="console.log('00:17:32,720'); seek(1052.0)">
+              It lets you see the number of objects in use by various call
+            </span>
+            
+            <span id="chunk-280" class="transcript-chunks" onclick="console.log('00:17:35,972'); seek(1055.0)">
+              stacks, which can be really helpful in narrowing down problematic code.
+            </span>
+            
+            <span id="chunk-281" class="transcript-chunks" onclick="console.log('00:17:39,156'); seek(1059.0)">
+              So here it's showing you the entire call stack.
+            </span>
+            
+            <span id="chunk-282" class="transcript-chunks" onclick="console.log('00:17:42,290'); seek(1062.0)">
+              The size of the box is roughly proportionate to
+            </span>
+            
+            <span id="chunk-283" class="transcript-chunks" onclick="console.log('00:17:45,684'); seek(1065.0)">
+              whatever is allocated in the most number of objects, so it really helps you
+            </span>
+            
+            <span id="chunk-284" class="transcript-chunks" onclick="console.log('00:17:49,128'); seek(1069.0)">
+              narrow down in this case if you see buff Iot new reader size is
+            </span>
+            
+            <span id="chunk-285" class="transcript-chunks" onclick="console.log('00:17:53,256'); seek(1073.0)">
+              about 45% of our heap allocation. So we can
+            </span>
+            
+            <span id="chunk-286" class="transcript-chunks" onclick="console.log('00:17:56,760'); seek(1076.0)">
+              conclude that that is one of the reasons for our heap allocation,
+            </span>
+            
+            <span id="chunk-287" class="transcript-chunks" onclick="console.log('00:18:00,882'); seek(1080.0)">
+              or the number of objects in our heap being so high.
+            </span>
+            
+            <span id="chunk-288" class="transcript-chunks" onclick="console.log('00:18:04,330'); seek(1084.0)">
+              Then we can trace through that stack and try and figure out what we can
+            </span>
+            
+            <span id="chunk-289" class="transcript-chunks" onclick="console.log('00:18:07,644'); seek(1087.0)">
+              do to optimize this. Some options are not creating
+            </span>
+            
+            <span id="chunk-290" class="transcript-chunks" onclick="console.log('00:18:10,998'); seek(1090.0)">
+              a new reader every single time we need to use it, perhaps reusing
+            </span>
+            
+            <span id="chunk-291" class="transcript-chunks" onclick="console.log('00:18:14,838'); seek(1094.0)">
+              one, pooling them, et cetera, et cetera.
+            </span>
+            
+            <span id="chunk-292" class="transcript-chunks" onclick="console.log('00:18:19,870'); seek(1099.0)">
+              This is another visualization that Pprof offers that I actually use really heavily.
+            </span>
+            
+            <span id="chunk-293" class="transcript-chunks" onclick="console.log('00:18:24,110'); seek(1104.0)">
+              It lets you visualize heap usage as a flame graph. And this flame
+            </span>
+            
+            <span id="chunk-294" class="transcript-chunks" onclick="console.log('00:18:27,514'); seek(1107.0)">
+              graph is also interactive, so you can click on any bar to focus in on
+            </span>
+            
+            <span id="chunk-295" class="transcript-chunks" onclick="console.log('00:18:30,484'); seek(1110.0)">
+              it and the call stack below it, et cetera, et cetera. The depth
+            </span>
+            
+            <span id="chunk-296" class="transcript-chunks" onclick="console.log('00:18:33,818'); seek(1113.0)">
+              of the call stack doesn't really matter here, but the width of the call stack
+            </span>
+            
+            <span id="chunk-297" class="transcript-chunks" onclick="console.log('00:18:37,598'); seek(1117.0)">
+              is what represents the number of heap objects that are allocated.
+            </span>
+            
+            <span id="chunk-298" class="transcript-chunks" onclick="console.log('00:18:41,086'); seek(1121.0)">
+              So essentially, the wider call stacks use a higher number of heap objects, at least
+            </span>
+            
+            <span id="chunk-299" class="transcript-chunks" onclick="console.log('00:18:44,632'); seek(1124.0)">
+              when this profile was captured. So it's really easy to just jump
+            </span>
+            
+            <span id="chunk-300" class="transcript-chunks" onclick="console.log('00:18:48,622'); seek(1128.0)">
+              in to certain hotspots and dig deeper into there to try
+            </span>
+            
+            <span id="chunk-301" class="transcript-chunks" onclick="console.log('00:18:52,668'); seek(1132.0)">
+              and find the lowest hanging fruit and the biggest possible optimizations.
+            </span>
+            
+            <span id="chunk-302" class="transcript-chunks" onclick="console.log('00:18:58,970'); seek(1138.0)">
+              So I'm also going to show you what the CLI
+            </span>
+            
+            <span id="chunk-303" class="transcript-chunks" onclick="console.log('00:19:02,790'); seek(1142.0)">
+              can be used for. So from the previous slide here,
+            </span>
+            
+            <span id="chunk-304" class="transcript-chunks" onclick="console.log('00:19:05,872'); seek(1145.0)">
+              we can try and figure out which method or which call stack
+            </span>
+            
+            <span id="chunk-305" class="transcript-chunks" onclick="console.log('00:19:09,542'); seek(1149.0)">
+              is allocating a large number of objects. And then through the CLI,
+            </span>
+            
+            <span id="chunk-306" class="transcript-chunks" onclick="console.log('00:19:12,982'); seek(1152.0)">
+              you can use this list command, which is really cool to pass in
+            </span>
+            
+            <span id="chunk-307" class="transcript-chunks" onclick="console.log('00:19:16,228'); seek(1156.0)">
+              a function name and see line by line which lines
+            </span>
+            
+            <span id="chunk-308" class="transcript-chunks" onclick="console.log('00:19:20,490'); seek(1160.0)">
+              of that method are allocating how many objects. So in this one,
+            </span>
+            
+            <span id="chunk-309" class="transcript-chunks" onclick="console.log('00:19:24,196'); seek(1164.0)">
+              this is a fake method. But let's say we have a method called create catalog
+            </span>
+            
+            <span id="chunk-310" class="transcript-chunks" onclick="console.log('00:19:27,102'); seek(1167.0)">
+              map that is essentially creating this map of products that a particular seller
+            </span>
+            
+            <span id="chunk-311" class="transcript-chunks" onclick="console.log('00:19:30,558'); seek(1170.0)">
+              has. We can jump in. We know
+            </span>
+            
+            <span id="chunk-312" class="transcript-chunks" onclick="console.log('00:19:34,168'); seek(1174.0)">
+              that this method creates a large number of objects itself. Here we can go in
+            </span>
+            
+            <span id="chunk-313" class="transcript-chunks" onclick="console.log('00:19:37,784'); seek(1177.0)">
+              and see line by line, exactly how many objects are allocated by each
+            </span>
+            
+            <span id="chunk-314" class="transcript-chunks" onclick="console.log('00:19:41,292'); seek(1181.0)">
+              line in the object in the method, and figure out where to focus
+            </span>
+            
+            <span id="chunk-315" class="transcript-chunks" onclick="console.log('00:19:44,860'); seek(1184.0)">
+              our efforts. So here you can see that lines
+            </span>
+            
+            <span id="chunk-316" class="transcript-chunks" onclick="console.log('00:19:48,834'); seek(1188.0)">
+              233 and through 237 create a lot of new objects,
+            </span>
+            
+            <span id="chunk-317" class="transcript-chunks" onclick="console.log('00:19:52,166'); seek(1192.0)">
+              which results in a large number of feeb allocations.
+            </span>
+            
+            <span id="chunk-318" class="transcript-chunks" onclick="console.log('00:19:55,470'); seek(1195.0)">
+              And then line 241, surprisingly,
+            </span>
+            
+            <span id="chunk-319" class="transcript-chunks" onclick="console.log('00:19:58,694'); seek(1198.0)">
+              is not actually creating new objects, but it's adding all those objects to a
+            </span>
+            
+            <span id="chunk-320" class="transcript-chunks" onclick="console.log('00:20:01,808'); seek(1201.0)">
+              map, which is also causing a large number of feeb allocations. So that
+            </span>
+            
+            <span id="chunk-321" class="transcript-chunks" onclick="console.log('00:20:05,188'); seek(1205.0)">
+              looks a little suspicious. We'll come back to that in a second.
+            </span>
+            
+            <span id="chunk-322" class="transcript-chunks" onclick="console.log('00:20:10,370'); seek(1210.0)">
+              Let's first talk about how to lower or limit the impact of garbage collection on
+            </span>
+            
+            <span id="chunk-323" class="transcript-chunks" onclick="console.log('00:20:14,132'); seek(1214.0)">
+              your system. First one we've been talking about for a while, lower the
+            </span>
+            
+            <span id="chunk-324" class="transcript-chunks" onclick="console.log('00:20:18,088'); seek(1218.0)">
+              number of objects in your heap. This is going to reduce the amount of
+            </span>
+            
+            <span id="chunk-325" class="transcript-chunks" onclick="console.log('00:20:21,848'); seek(1221.0)">
+              time it takes a garbage collection to scan your heap and therefore lower its impact.
+            </span>
+            
+            <span id="chunk-326" class="transcript-chunks" onclick="console.log('00:20:25,470'); seek(1225.0)">
+              The second one is to reduce the rate of object allocation. And then the third
+            </span>
+            
+            <span id="chunk-327" class="transcript-chunks" onclick="console.log('00:20:29,132'); seek(1229.0)">
+              one is actually to optimize their data structures to minimize how much memory they
+            </span>
+            
+            <span id="chunk-328" class="transcript-chunks" onclick="console.log('00:20:32,828'); seek(1232.0)">
+              use, which will therefore reduce the need for more frequent
+            </span>
+            
+            <span id="chunk-329" class="transcript-chunks" onclick="console.log('00:20:36,322'); seek(1236.0)">
+              GC triggers. So these three are
+            </span>
+            
+            <span id="chunk-330" class="transcript-chunks" onclick="console.log('00:20:40,192'); seek(1240.0)">
+              ways that we can use to mitigate the impact of garbage collection, make our application
+            </span>
+            
+            <span id="chunk-331" class="transcript-chunks" onclick="console.log('00:20:44,384'); seek(1244.0)">
+              more lightweight, and free up more resources for our program to
+            </span>
+            
+            <span id="chunk-332" class="transcript-chunks" onclick="console.log('00:20:48,144'); seek(1248.0)">
+              operate efficiently.
+            </span>
+            
+            <span id="chunk-333" class="transcript-chunks" onclick="console.log('00:20:51,390'); seek(1251.0)">
+              So let's dive a little bit into the first one. How do we
+            </span>
+            
+            <span id="chunk-334" class="transcript-chunks" onclick="console.log('00:20:54,772'); seek(1254.0)">
+              reduce objects in the heap? So really the
+            </span>
+            
+            <span id="chunk-335" class="transcript-chunks" onclick="console.log('00:20:58,148'); seek(1258.0)">
+              question is, how do you reduce long living heap objects? Because these are objects
+            </span>
+            
+            <span id="chunk-336" class="transcript-chunks" onclick="console.log('00:21:01,498'); seek(1261.0)">
+              that are essentially living in the heap for a long time, and we
+            </span>
+            
+            <span id="chunk-337" class="transcript-chunks" onclick="console.log('00:21:04,932'); seek(1264.0)">
+              expect them to keep living there, which means every single time the garbage collector
+            </span>
+            
+            <span id="chunk-338" class="transcript-chunks" onclick="console.log('00:21:09,102'); seek(1269.0)">
+              runs, it needs to scan these objects, determine that they're still in use,
+            </span>
+            
+            <span id="chunk-339" class="transcript-chunks" onclick="console.log('00:21:12,472'); seek(1272.0)">
+              and they can't be cleaned up, et cetera, et cetera. So rather than having these
+            </span>
+            
+            <span id="chunk-340" class="transcript-chunks" onclick="console.log('00:21:16,248'); seek(1276.0)">
+              objects live on the heap, they can be created as values rather
+            </span>
+            
+            <span id="chunk-341" class="transcript-chunks" onclick="console.log('00:21:19,692'); seek(1279.0)">
+              than references on demand. So for instance, let's take
+            </span>
+            
+            <span id="chunk-342" class="transcript-chunks" onclick="console.log('00:21:23,388'); seek(1283.0)">
+              the Pinterest ad system as an example. If every single time that
+            </span>
+            
+            <span id="chunk-343" class="transcript-chunks" onclick="console.log('00:21:26,988'); seek(1286.0)">
+              we're determining which ads to show a user,
+            </span>
+            
+            <span id="chunk-344" class="transcript-chunks" onclick="console.log('00:21:30,146'); seek(1290.0)">
+              let's say we need some data for each item in that user request.
+            </span>
+            
+            <span id="chunk-345" class="transcript-chunks" onclick="console.log('00:21:33,638'); seek(1293.0)">
+              So every potential ad candidate has some data associated with it.
+            </span>
+            
+            <span id="chunk-346" class="transcript-chunks" onclick="console.log('00:21:37,390'); seek(1297.0)">
+              Rather than pre computing that data and storing it in this long lived map,
+            </span>
+            
+            <span id="chunk-347" class="transcript-chunks" onclick="console.log('00:21:41,110'); seek(1301.0)">
+              we could just compute it on a per request basis to
+            </span>
+            
+            <span id="chunk-348" class="transcript-chunks" onclick="console.log('00:21:44,208'); seek(1304.0)">
+              reduce the number of objects in the heat. So what that is going to do
+            </span>
+            
+            <span id="chunk-349" class="transcript-chunks" onclick="console.log('00:21:47,316'); seek(1307.0)">
+              is increase the amount of computation for
+            </span>
+            
+            <span id="chunk-350" class="transcript-chunks" onclick="console.log('00:21:50,596'); seek(1310.0)">
+              each average request. However, it is going to reduce the sort
+            </span>
+            
+            <span id="chunk-351" class="transcript-chunks" onclick="console.log('00:21:54,568'); seek(1314.0)">
+              of like tail latency problem, because you have a very reliable
+            </span>
+            
+            <span id="chunk-352" class="transcript-chunks" onclick="console.log('00:21:57,854'); seek(1317.0)">
+              measure of how much compute is being used per request,
+            </span>
+            
+            <span id="chunk-353" class="transcript-chunks" onclick="console.log('00:22:01,678'); seek(1321.0)">
+              and it's easier to essentially optimize a particular request
+            </span>
+            
+            <span id="chunk-354" class="transcript-chunks" onclick="console.log('00:22:05,326'); seek(1325.0)">
+              rather than optimize this long tail latency.
+            </span>
+            
+            <span id="chunk-355" class="transcript-chunks" onclick="console.log('00:22:08,970'); seek(1328.0)">
+              So that's one way to do it, create your objects in demand rather than storing
+            </span>
+            
+            <span id="chunk-356" class="transcript-chunks" onclick="console.log('00:22:12,194'); seek(1332.0)">
+              them in a long lived map on the heap.
+            </span>
+            
+            <span id="chunk-357" class="transcript-chunks" onclick="console.log('00:22:16,330'); seek(1336.0)">
+              The second and third are very related, but be mindful of
+            </span>
+            
+            <span id="chunk-358" class="transcript-chunks" onclick="console.log('00:22:19,948'); seek(1339.0)">
+              where you're using pointers. Go makes it really easy to create and reference
+            </span>
+            
+            <span id="chunk-359" class="transcript-chunks" onclick="console.log('00:22:23,558'); seek(1343.0)">
+              pointers. However, if we have a reference to an object and that object
+            </span>
+            
+            <span id="chunk-360" class="transcript-chunks" onclick="console.log('00:22:27,360'); seek(1347.0)">
+              itself contains further pointers or further references within
+            </span>
+            
+            <span id="chunk-361" class="transcript-chunks" onclick="console.log('00:22:30,816'); seek(1350.0)">
+              it, these are all going to be considered individual objects
+            </span>
+            
+            <span id="chunk-362" class="transcript-chunks" onclick="console.log('00:22:34,234'); seek(1354.0)">
+              in the heap, even though they may be nested together. The reason for this is,
+            </span>
+            
+            <span id="chunk-363" class="transcript-chunks" onclick="console.log('00:22:37,972'); seek(1357.0)">
+              if you think about it, I have a pointer to some object x,
+            </span>
+            
+            <span id="chunk-364" class="transcript-chunks" onclick="console.log('00:22:42,068'); seek(1362.0)">
+              or let's say the object is a person is of type person.
+            </span>
+            
+            <span id="chunk-365" class="transcript-chunks" onclick="console.log('00:22:46,550'); seek(1366.0)">
+              Each person has a name, each person has an age, et cetera. If I have
+            </span>
+            
+            <span id="chunk-366" class="transcript-chunks" onclick="console.log('00:22:50,312'); seek(1370.0)">
+              a pointer to the person's name and it's referenced somewhere,
+            </span>
+            
+            <span id="chunk-367" class="transcript-chunks" onclick="console.log('00:22:53,982'); seek(1373.0)">
+              there's a good chance that the name may be used even after the main person
+            </span>
+            
+            <span id="chunk-368" class="transcript-chunks" onclick="console.log('00:22:58,540'); seek(1378.0)">
+              object ceases to exist. So the go memory allocator
+            </span>
+            
+            <span id="chunk-369" class="transcript-chunks" onclick="console.log('00:23:02,002'); seek(1382.0)">
+              needs to store that object separately in memory, which means it's
+            </span>
+            
+            <span id="chunk-370" class="transcript-chunks" onclick="console.log('00:23:05,458'); seek(1385.0)">
+              a whole second object that needs to be scanned by the garbage
+            </span>
+            
+            <span id="chunk-371" class="transcript-chunks" onclick="console.log('00:23:08,978'); seek(1388.0)">
+              collector later on. So reducing the number of
+            </span>
+            
+            <span id="chunk-372" class="transcript-chunks" onclick="console.log('00:23:12,464'); seek(1392.0)">
+              pointers that we use, reducing the number of nested pointers is going to
+            </span>
+            
+            <span id="chunk-373" class="transcript-chunks" onclick="console.log('00:23:15,584'); seek(1395.0)">
+              reduce the number of objects that your garbage collector needs to scan.
+            </span>
+            
+            <span id="chunk-374" class="transcript-chunks" onclick="console.log('00:23:19,390'); seek(1399.0)">
+              The third one is just sort of a gotcha.
+            </span>
+            
+            <span id="chunk-375" class="transcript-chunks" onclick="console.log('00:23:22,990'); seek(1402.0)">
+              Strings and binaries are treated as pointers under the hood. So each
+            </span>
+            
+            <span id="chunk-376" class="transcript-chunks" onclick="console.log('00:23:26,292'); seek(1406.0)">
+              one is going to be an object in the heap. So wherever possible,
+            </span>
+            
+            <span id="chunk-377" class="transcript-chunks" onclick="console.log('00:23:30,196'); seek(1410.0)">
+              if you try and represent these as other non pointer values. So strings,
+            </span>
+            
+            <span id="chunk-378" class="transcript-chunks" onclick="console.log('00:23:33,918'); seek(1413.0)">
+              perhaps you could represent as integers or floats if possible,
+            </span>
+            
+            <span id="chunk-379" class="transcript-chunks" onclick="console.log('00:23:37,480'); seek(1417.0)">
+              hashing them for instance, or representing
+            </span>
+            
+            <span id="chunk-380" class="transcript-chunks" onclick="console.log('00:23:41,166'); seek(1421.0)">
+              dates as actual time time objects, so on and
+            </span>
+            
+            <span id="chunk-381" class="transcript-chunks" onclick="console.log('00:23:44,344'); seek(1424.0)">
+              so forth. Those are ways to reduce the number of strings you're using, and therefore
+            </span>
+            
+            <span id="chunk-382" class="transcript-chunks" onclick="console.log('00:23:47,522'); seek(1427.0)">
+              reduce the number of pointers.
+            </span>
+            
+            <span id="chunk-383" class="transcript-chunks" onclick="console.log('00:23:51,530'); seek(1431.0)">
+              So going back to our example, if we
+            </span>
+            
+            <span id="chunk-384" class="transcript-chunks" onclick="console.log('00:23:56,170'); seek(1436.0)">
+              look at line, if we
+            </span>
+            
+            <span id="chunk-385" class="transcript-chunks" onclick="console.log('00:23:59,484'); seek(1439.0)">
+              look at line 272 37, we're creating a new catalog listing
+            </span>
+            
+            <span id="chunk-386" class="transcript-chunks" onclick="console.log('00:24:03,062'); seek(1443.0)">
+              each time. And then on line 241, we're assigning
+            </span>
+            
+            <span id="chunk-387" class="transcript-chunks" onclick="console.log('00:24:07,014'); seek(1447.0)">
+              it to a map. So we're using this catalog listing
+            </span>
+            
+            <span id="chunk-388" class="transcript-chunks" onclick="console.log('00:24:10,938'); seek(1450.0)">
+              key, which we're doing by encoding product id and
+            </span>
+            
+            <span id="chunk-389" class="transcript-chunks" onclick="console.log('00:24:14,228'); seek(1454.0)">
+              seller id together. Let's say
+            </span>
+            
+            <span id="chunk-390" class="transcript-chunks" onclick="console.log('00:24:19,010'); seek(1459.0)">
+              this catalog listing key is actually a string object.
+            </span>
+            
+            <span id="chunk-391" class="transcript-chunks" onclick="console.log('00:24:24,370'); seek(1464.0)">
+              If we then change how we're creating the key to
+            </span>
+            
+            <span id="chunk-392" class="transcript-chunks" onclick="console.log('00:24:28,008'); seek(1468.0)">
+              instead using a struct. So lines 239 to 241
+            </span>
+            
+            <span id="chunk-393" class="transcript-chunks" onclick="console.log('00:24:31,592'); seek(1471.0)">
+              here show that we are starting to use a struct for the key instead,
+            </span>
+            
+            <span id="chunk-394" class="transcript-chunks" onclick="console.log('00:24:34,504'); seek(1474.0)">
+              rather than using a string as previously, we can see that we
+            </span>
+            
+            <span id="chunk-395" class="transcript-chunks" onclick="console.log('00:24:37,768'); seek(1477.0)">
+              reduce the number of heap objects by 26 million between
+            </span>
+            
+            <span id="chunk-396" class="transcript-chunks" onclick="console.log('00:24:41,772'); seek(1481.0)">
+              these slides, which is around 20% of our heap usage. So we didn't actually change
+            </span>
+            
+            <span id="chunk-397" class="transcript-chunks" onclick="console.log('00:24:45,532'); seek(1485.0)">
+              that much, we just changed how we're representing the exact same data,
+            </span>
+            
+            <span id="chunk-398" class="transcript-chunks" onclick="console.log('00:24:48,572'); seek(1488.0)">
+              and we're able to significantly reduce the amount of work that our garbage
+            </span>
+            
+            <span id="chunk-399" class="transcript-chunks" onclick="console.log('00:24:52,038'); seek(1492.0)">
+              collector needs to do. So here's one example of how a simple thing like
+            </span>
+            
+            <span id="chunk-400" class="transcript-chunks" onclick="console.log('00:24:55,392'); seek(1495.0)">
+              removing strings can actually have a very significant impact on
+            </span>
+            
+            <span id="chunk-401" class="transcript-chunks" onclick="console.log('00:24:58,912'); seek(1498.0)">
+              your application's heap usage, and therefore its performance.
+            </span>
+            
+            <span id="chunk-402" class="transcript-chunks" onclick="console.log('00:25:04,850'); seek(1504.0)">
+              So the other thing you can think about is reducing the rate of allocation.
+            </span>
+            
+            <span id="chunk-403" class="transcript-chunks" onclick="console.log('00:25:08,490'); seek(1508.0)">
+              So if your program tends to create a large number of short lived objects
+            </span>
+            
+            <span id="chunk-404" class="transcript-chunks" onclick="console.log('00:25:12,474'); seek(1512.0)">
+              in bursts, object pooling is something that might benefit you,
+            </span>
+            
+            <span id="chunk-405" class="transcript-chunks" onclick="console.log('00:25:16,216'); seek(1516.0)">
+              because you can use that to object pools can essentially be
+            </span>
+            
+            <span id="chunk-406" class="transcript-chunks" onclick="console.log('00:25:20,008'); seek(1520.0)">
+              used to allocate in free memory blocks manually and reduce the number
+            </span>
+            
+            <span id="chunk-407" class="transcript-chunks" onclick="console.log('00:25:23,608'); seek(1523.0)">
+              of GC, the amount of work that your garbage collector needs to do.
+            </span>
+            
+            <span id="chunk-408" class="transcript-chunks" onclick="console.log('00:25:27,720'); seek(1527.0)">
+              Because object pools are expected to be retained for a longer scope, we don't
+            </span>
+            
+            <span id="chunk-409" class="transcript-chunks" onclick="console.log('00:25:31,154'); seek(1531.0)">
+              need to keep allocating, clearing up these objects, and GC doesn't
+            </span>
+            
+            <span id="chunk-410" class="transcript-chunks" onclick="console.log('00:25:35,026'); seek(1535.0)">
+              scan it over and over again. However, I will put
+            </span>
+            
+            <span id="chunk-411" class="transcript-chunks" onclick="console.log('00:25:38,572'); seek(1538.0)">
+              out a warning here, because the garbage collector is not going
+            </span>
+            
+            <span id="chunk-412" class="transcript-chunks" onclick="console.log('00:25:42,032'); seek(1542.0)">
+              to scan and clear up your object pool for you,
+            </span>
+            
+            <span id="chunk-413" class="transcript-chunks" onclick="console.log('00:25:45,296'); seek(1545.0)">
+              it can lead to memory leaks if not used properly. So I'd only recommend
+            </span>
+            
+            <span id="chunk-414" class="transcript-chunks" onclick="console.log('00:25:49,248'); seek(1549.0)">
+              using this if you know what you're doing and if you've exhausted all other options.
+            </span>
+            
+            <span id="chunk-415" class="transcript-chunks" onclick="console.log('00:25:53,890'); seek(1553.0)">
+              For instance, if you're continuously allocating new objects
+            </span>
+            
+            <span id="chunk-416" class="transcript-chunks" onclick="console.log('00:25:57,818'); seek(1557.0)">
+              rather than reusing objects from
+            </span>
+            
+            <span id="chunk-417" class="transcript-chunks" onclick="console.log('00:26:01,428'); seek(1561.0)">
+              the pool, this could lead to a memory leak and cause your
+            </span>
+            
+            <span id="chunk-418" class="transcript-chunks" onclick="console.log('00:26:04,804'); seek(1564.0)">
+              application to crash due to out of memory errors. A second potential problem
+            </span>
+            
+            <span id="chunk-419" class="transcript-chunks" onclick="console.log('00:26:09,160'); seek(1569.0)">
+              here is if you're not properly sanitizing your objects before returning
+            </span>
+            
+            <span id="chunk-420" class="transcript-chunks" onclick="console.log('00:26:13,294'); seek(1573.0)">
+              them to the pool, data may be persisted beyond its intended
+            </span>
+            
+            <span id="chunk-421" class="transcript-chunks" onclick="console.log('00:26:16,578'); seek(1576.0)">
+              scope and could potentially be leaked to other scopes. So if we're storing some
+            </span>
+            
+            <span id="chunk-422" class="transcript-chunks" onclick="console.log('00:26:20,636'); seek(1580.0)">
+              sensitive, personally identifiable information on
+            </span>
+            
+            <span id="chunk-423" class="transcript-chunks" onclick="console.log('00:26:24,508'); seek(1584.0)">
+              a per request basis for each user, and we're
+            </span>
+            
+            <span id="chunk-424" class="transcript-chunks" onclick="console.log('00:26:28,018'); seek(1588.0)">
+              using pools to represent the user object, if we
+            </span>
+            
+            <span id="chunk-425" class="transcript-chunks" onclick="console.log('00:26:31,408'); seek(1591.0)">
+              don't sanitize that data, then there's a good chance that we could potentially leak
+            </span>
+            
+            <span id="chunk-426" class="transcript-chunks" onclick="console.log('00:26:34,822'); seek(1594.0)">
+              data from one user's profile to another user's profile, which would
+            </span>
+            
+            <span id="chunk-427" class="transcript-chunks" onclick="console.log('00:26:38,672'); seek(1598.0)">
+              obviously have really disastrous consequences,
+            </span>
+            
+            <span id="chunk-428" class="transcript-chunks" onclick="console.log('00:26:42,110'); seek(1602.0)">
+              not only in terms of our application itself, but in terms of the user's privacy
+            </span>
+            
+            <span id="chunk-429" class="transcript-chunks" onclick="console.log('00:26:45,242'); seek(1605.0)">
+              concerns, et cetera, et cetera. So these are the risks of object
+            </span>
+            
+            <span id="chunk-430" class="transcript-chunks" onclick="console.log('00:26:48,356'); seek(1608.0)">
+              pooling, but it can be a really powerful tool to reduce the amount of
+            </span>
+            
+            <span id="chunk-431" class="transcript-chunks" onclick="console.log('00:26:52,084'); seek(1612.0)">
+              work that your garbage collector needs to do and give you some more control over
+            </span>
+            
+            <span id="chunk-432" class="transcript-chunks" onclick="console.log('00:26:55,704'); seek(1615.0)">
+              memory management yourself.
+            </span>
+            
+            <span id="chunk-433" class="transcript-chunks" onclick="console.log('00:26:59,670'); seek(1619.0)">
+              The third thing that we talked about is thinking about how we organize and
+            </span>
+            
+            <span id="chunk-434" class="transcript-chunks" onclick="console.log('00:27:03,368'); seek(1623.0)">
+              represent our data to reduce the amount of memory that
+            </span>
+            
+            <span id="chunk-435" class="transcript-chunks" onclick="console.log('00:27:06,808'); seek(1626.0)">
+              it's using. So one way to do this is to clean up any unused
+            </span>
+            
+            <span id="chunk-436" class="transcript-chunks" onclick="console.log('00:27:09,998'); seek(1629.0)">
+              data fields. Basic types in Go are going to have default values.
+            </span>
+            
+            <span id="chunk-437" class="transcript-chunks" onclick="console.log('00:27:13,458'); seek(1633.0)">
+              For example, a boolean is going to default to false, an integer is going to
+            </span>
+            
+            <span id="chunk-438" class="transcript-chunks" onclick="console.log('00:27:16,799'); seek(1636.0)">
+              default to zero, et cetera, et cetera. So even if you're not using these fields,
+            </span>
+            
+            <span id="chunk-439" class="transcript-chunks" onclick="console.log('00:27:20,086'); seek(1640.0)">
+              the go memory allocator still needs to allocate space on
+            </span>
+            
+            <span id="chunk-440" class="transcript-chunks" onclick="console.log('00:27:23,248'); seek(1643.0)">
+              the heap for these objects, and they're there for consuming memory.
+            </span>
+            
+            <span id="chunk-441" class="transcript-chunks" onclick="console.log('00:27:27,150'); seek(1647.0)">
+              So fields I through L here are unused,
+            </span>
+            
+            <span id="chunk-442" class="transcript-chunks" onclick="console.log('00:27:30,934'); seek(1650.0)">
+              but they're still taking on their default values. So if we remove those,
+            </span>
+            
+            <span id="chunk-443" class="transcript-chunks" onclick="console.log('00:27:34,544'); seek(1654.0)">
+              we essentially went from 64 bytes to 40 bytes, which is a pretty significant
+            </span>
+            
+            <span id="chunk-444" class="transcript-chunks" onclick="console.log('00:27:38,538'); seek(1658.0)">
+              win if you think about the number of objects that you might be storing on
+            </span>
+            
+            <span id="chunk-445" class="transcript-chunks" onclick="console.log('00:27:41,028'); seek(1661.0)">
+              heap on a very large scale application.
+            </span>
+            
+            <span id="chunk-446" class="transcript-chunks" onclick="console.log('00:27:45,250'); seek(1665.0)">
+              The other side benefit of this is that you're actually simplifying your code and making
+            </span>
+            
+            <span id="chunk-447" class="transcript-chunks" onclick="console.log('00:27:49,048'); seek(1669.0)">
+              it easier to understand and reducing the amount of errors that might come up from
+            </span>
+            
+            <span id="chunk-448" class="transcript-chunks" onclick="console.log('00:27:52,648'); seek(1672.0)">
+              someone who misunderstands what a field is in the future.
+            </span>
+            
+            <span id="chunk-449" class="transcript-chunks" onclick="console.log('00:27:58,230'); seek(1678.0)">
+              This 1 may be a little familiar to folks coming from A-C-C plus plus background,
+            </span>
+            
+            <span id="chunk-450" class="transcript-chunks" onclick="console.log('00:28:02,082'); seek(1682.0)">
+              but the ordering of your fields can actually really impact
+            </span>
+            
+            <span id="chunk-451" class="transcript-chunks" onclick="console.log('00:28:05,938'); seek(1685.0)">
+              your memory usage as well. Stago memory allocator does
+            </span>
+            
+            <span id="chunk-452" class="transcript-chunks" onclick="console.log('00:28:09,628'); seek(1689.0)">
+              not optimize for data structure alignment. So in this case
+            </span>
+            
+            <span id="chunk-453" class="transcript-chunks" onclick="console.log('00:28:13,312'); seek(1693.0)">
+              we have two objects with completely identical fields. They're just ordered differently.
+            </span>
+            
+            <span id="chunk-454" class="transcript-chunks" onclick="console.log('00:28:17,630'); seek(1697.0)">
+              The way the memory allocator works is it goes down the
+            </span>
+            
+            <span id="chunk-455" class="transcript-chunks" onclick="console.log('00:28:21,504'); seek(1701.0)">
+              fields, allocates them one at a time. So in order to respect word
+            </span>
+            
+            <span id="chunk-456" class="transcript-chunks" onclick="console.log('00:28:25,252'); seek(1705.0)">
+              alignment, it might need to add padding to the data in
+            </span>
+            
+            <span id="chunk-457" class="transcript-chunks" onclick="console.log('00:28:28,468'); seek(1708.0)">
+              memory. So going through here, going to the bad object,
+            </span>
+            
+            <span id="chunk-458" class="transcript-chunks" onclick="console.log('00:28:33,890'); seek(1713.0)">
+              starting with field a, it's a boolean, which is one byte. So it allocates one
+            </span>
+            
+            <span id="chunk-459" class="transcript-chunks" onclick="console.log('00:28:37,448'); seek(1717.0)">
+              byte in memory, and then it needs to allocate eight bytes for field b,
+            </span>
+            
+            <span id="chunk-460" class="transcript-chunks" onclick="console.log('00:28:41,272'); seek(1721.0)">
+              which is nn 64. Now, if it allocated
+            </span>
+            
+            <span id="chunk-461" class="transcript-chunks" onclick="console.log('00:28:44,782'); seek(1724.0)">
+              those eight bytes right after, it would break the system's word alignment.
+            </span>
+            
+            <span id="chunk-462" class="transcript-chunks" onclick="console.log('00:28:48,306'); seek(1728.0)">
+              So therefore, it needs to pad on seven bytes first, and then
+            </span>
+            
+            <span id="chunk-463" class="transcript-chunks" onclick="console.log('00:28:51,772'); seek(1731.0)">
+              allocate the next eight bytes for field B.
+            </span>
+            
+            <span id="chunk-464" class="transcript-chunks" onclick="console.log('00:28:55,930'); seek(1735.0)">
+              And you can see this goes on. So for field c, it allocates one byte,
+            </span>
+            
+            <span id="chunk-465" class="transcript-chunks" onclick="console.log('00:28:59,218'); seek(1739.0)">
+              and then field d is an n 32, which means it needs four bytes.
+            </span>
+            
+            <span id="chunk-466" class="transcript-chunks" onclick="console.log('00:29:02,550'); seek(1742.0)">
+              So it pads in three fields and then adds in field d, so on and
+            </span>
+            
+            <span id="chunk-467" class="transcript-chunks" onclick="console.log('00:29:06,224'); seek(1746.0)">
+              so forth. If we simply reorder
+            </span>
+            
+            <span id="chunk-468" class="transcript-chunks" onclick="console.log('00:29:09,398'); seek(1749.0)">
+              these, as we did in the good object on the right, you can see the
+            </span>
+            
+            <span id="chunk-469" class="transcript-chunks" onclick="console.log('00:29:13,172'); seek(1753.0)">
+              memory allocation is much better aligned. And we
+            </span>
+            
+            <span id="chunk-470" class="transcript-chunks" onclick="console.log('00:29:16,852'); seek(1756.0)">
+              went from having an object that consumes 40 bytes
+            </span>
+            
+            <span id="chunk-471" class="transcript-chunks" onclick="console.log('00:29:20,298'); seek(1760.0)">
+              to an object that contains 24 bytes. So we did two
+            </span>
+            
+            <span id="chunk-472" class="transcript-chunks" onclick="console.log('00:29:23,988'); seek(1763.0)">
+              things here. We just removed unused fields, which is great,
+            </span>
+            
+            <span id="chunk-473" class="transcript-chunks" onclick="console.log('00:29:27,896'); seek(1767.0)">
+              and then we rearranged the remaining fields that we actually need, and we went
+            </span>
+            
+            <span id="chunk-474" class="transcript-chunks" onclick="console.log('00:29:31,688'); seek(1771.0)">
+              from 64 bytes to 24 bytes, which is a 62%
+            </span>
+            
+            <span id="chunk-475" class="transcript-chunks" onclick="console.log('00:29:35,240'); seek(1775.0)">
+              drop in the amount of memory used per object.
+            </span>
+            
+            <span id="chunk-476" class="transcript-chunks" onclick="console.log('00:29:39,130'); seek(1779.0)">
+              Think about, again, a large scale system with thousands, millions, or even billions
+            </span>
+            
+            <span id="chunk-477" class="transcript-chunks" onclick="console.log('00:29:42,498'); seek(1782.0)">
+              of such objects in use. This simple method could
+            </span>
+            
+            <span id="chunk-478" class="transcript-chunks" onclick="console.log('00:29:46,108'); seek(1786.0)">
+              just really reduce your memory usage and
+            </span>
+            
+            <span id="chunk-479" class="transcript-chunks" onclick="console.log('00:29:49,392'); seek(1789.0)">
+              improve your system's performance.
+            </span>
+            
+            <span id="chunk-480" class="transcript-chunks" onclick="console.log('00:29:53,790'); seek(1793.0)">
+              So, to conclude, the Go garbage collector is
+            </span>
+            
+            <span id="chunk-481" class="transcript-chunks" onclick="console.log('00:29:57,600'); seek(1797.0)">
+              highly optimized for most use cases. It's a fantastic piece of
+            </span>
+            
+            <span id="chunk-482" class="transcript-chunks" onclick="console.log('00:30:01,024'); seek(1801.0)">
+              technology, and most developers do not need to worry about how it's
+            </span>
+            
+            <span id="chunk-483" class="transcript-chunks" onclick="console.log('00:30:04,458'); seek(1804.0)">
+              implemented and don't need to worry about its performance. However,
+            </span>
+            
+            <span id="chunk-484" class="transcript-chunks" onclick="console.log('00:30:07,684'); seek(1807.0)">
+              for some heavy, very large scale use cases, the garbage collector
+            </span>
+            
+            <span id="chunk-485" class="transcript-chunks" onclick="console.log('00:30:12,058'); seek(1812.0)">
+              could cause pretty significant impact to your program's performance.
+            </span>
+            
+            <span id="chunk-486" class="transcript-chunks" onclick="console.log('00:30:15,930'); seek(1815.0)">
+              And in this case, having an understanding of how the GC works,
+            </span>
+            
+            <span id="chunk-487" class="transcript-chunks" onclick="console.log('00:30:19,816'); seek(1819.0)">
+              how memory management works, and then understanding some of the built
+            </span>
+            
+            <span id="chunk-488" class="transcript-chunks" onclick="console.log('00:30:23,032'); seek(1823.0)">
+              in tools that the Go team provides, can be really, really important
+            </span>
+            
+            <span id="chunk-489" class="transcript-chunks" onclick="console.log('00:30:26,380'); seek(1826.0)">
+              to understanding and reducing the problem.
+            </span>
+            
+            <span id="chunk-490" class="transcript-chunks" onclick="console.log('00:30:30,810'); seek(1830.0)">
+              From there, we have a lot of options to actually optimize our system,
+            </span>
+            
+            <span id="chunk-491" class="transcript-chunks" onclick="console.log('00:30:34,780'); seek(1834.0)">
+              improve performance, and have much happier users and
+            </span>
+            
+            <span id="chunk-492" class="transcript-chunks" onclick="console.log('00:30:38,064'); seek(1838.0)">
+              much happier engineers. So three steps.
+            </span>
+            
+            <span id="chunk-493" class="transcript-chunks" onclick="console.log('00:30:42,870'); seek(1842.0)">
+              Start with observing. We have some ways of knowing intuitively
+            </span>
+            
+            <span id="chunk-494" class="transcript-chunks" onclick="console.log('00:30:47,126'); seek(1847.0)">
+              that there are certain systems, like really high tail latency,
+            </span>
+            
+            <span id="chunk-495" class="transcript-chunks" onclick="console.log('00:30:51,870'); seek(1851.0)">
+              that might be caused by GC. From there, we go
+            </span>
+            
+            <span id="chunk-496" class="transcript-chunks" onclick="console.log('00:30:54,928'); seek(1854.0)">
+              in and add some measurement. We can look at heap usage. We can look at
+            </span>
+            
+            <span id="chunk-497" class="transcript-chunks" onclick="console.log('00:30:57,588'); seek(1857.0)">
+              GC trace output, et cetera, to try and narrow down whether GC
+            </span>
+            
+            <span id="chunk-498" class="transcript-chunks" onclick="console.log('00:31:01,290'); seek(1861.0)">
+              actually is the problem. And then from there, we talked about a few different
+            </span>
+            
+            <span id="chunk-499" class="transcript-chunks" onclick="console.log('00:31:04,596'); seek(1864.0)">
+              ways by which we can start to optimize our system.
+            </span>
+            
+            <span id="chunk-500" class="transcript-chunks" onclick="console.log('00:31:10,370'); seek(1870.0)">
+              That's all I have for you today. Thank you all for listening. I hope this
+            </span>
+            
+            <span id="chunk-501" class="transcript-chunks" onclick="console.log('00:31:13,892'); seek(1873.0)">
+              helped you understand how guard garbage collection works and go. And how you can go
+            </span>
+            
+            <span id="chunk-502" class="transcript-chunks" onclick="console.log('00:31:17,148'); seek(1877.0)">
+              about optimizing your system to minimize the impact of the garbage collector.
+            </span>
+            
+            <span id="chunk-503" class="transcript-chunks" onclick="console.log('00:31:21,210'); seek(1881.0)">
+              Thank you. And if you have any questions, feel free to reach out to me.
+            </span>
+            
+            <span id="chunk-504" class="transcript-chunks" onclick="console.log('00:31:24,508'); seek(1884.0)">
+              Have a great day.
+            </span>
+            
+            </div>
+          </div>
           
 
           
