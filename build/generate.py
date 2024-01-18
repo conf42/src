@@ -292,7 +292,7 @@ for event in context.get("events"):
 print(DIVIDER)
 print("Generating speaker pages")
 for speaker, items in speakers.items():
-    print(f"Templating out {speaker}")
+    #print(f"Templating out {speaker}")
     url = generate_speaker_url(speaker)
     with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
         template = env.get_template("speaker.html")
