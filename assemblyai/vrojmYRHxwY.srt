@@ -1,0 +1,1108 @@
+1
+00:00:25,570 --> 00:00:29,410
+Hello everyone. How are you doing? I hope you're enjoying comfort. Two python
+
+2
+00:00:29,490 --> 00:00:32,886
+and all its good content. My name is Gaspar and I work for
+
+3
+00:00:32,908 --> 00:00:36,566
+the CI CD in an autonomous driving project, and today I'm going
+
+4
+00:00:36,588 --> 00:00:40,354
+to talk about reproducible builds with Python and beta.
+
+5
+00:00:40,482 --> 00:00:43,862
+If you run two builds with the same sources code and the same
+
+6
+00:00:43,916 --> 00:00:47,078
+commit, but on two different machines, do you expect
+
+7
+00:00:47,164 --> 00:00:50,686
+to get the same result? Well, in most of the cases you
+
+8
+00:00:50,708 --> 00:00:54,442
+will not. Today we will go through sources of nondeterminism.
+
+9
+00:00:54,506 --> 00:00:57,914
+In most build processes, we will look at how Bazel
+
+10
+00:00:57,962 --> 00:01:01,242
+can be used to create reproducible hermetic
+
+11
+00:01:01,306 --> 00:01:04,542
+builds. Then we will apply these concepts
+
+12
+00:01:04,606 --> 00:01:07,826
+to create a reproducible python environment and a
+
+13
+00:01:07,848 --> 00:01:11,810
+flask application that can be built with Bazel so that
+
+14
+00:01:11,880 --> 00:01:16,338
+the Python interpreter and all dependencies are hermetical.
+
+15
+00:01:16,514 --> 00:01:20,102
+According to the reproducible Builds project, a build
+
+16
+00:01:20,156 --> 00:01:24,402
+is reproducible if given the same source code, build environment
+
+17
+00:01:24,466 --> 00:01:28,490
+and build instructions. Any party can recreate bit by bit
+
+18
+00:01:28,560 --> 00:01:32,006
+identical copies of all specified artifacts.
+
+19
+00:01:32,118 --> 00:01:35,354
+This means that to achieve a reproducible build,
+
+20
+00:01:35,472 --> 00:01:39,014
+you must remove all sources of nondeterminism.
+
+21
+00:01:39,142 --> 00:01:42,254
+Although this can be difficult, there are several benefits.
+
+22
+00:01:42,452 --> 00:01:45,674
+Reproducible code is more secure and reduces
+
+23
+00:01:45,722 --> 00:01:49,354
+the surface for attackers. You can determine the binary
+
+24
+00:01:49,402 --> 00:01:52,542
+origin of an artifact like what sources it was built
+
+25
+00:01:52,596 --> 00:01:55,938
+from, and it can drastically speed up the build time
+
+26
+00:01:56,024 --> 00:01:59,522
+thanks to caching of intermediate build artifacts in large
+
+27
+00:01:59,576 --> 00:02:03,586
+build graphs. This is not trivial for big projects, and if your build is
+
+28
+00:02:03,608 --> 00:02:07,046
+reproducible, you can guarantee safe machines. To obtain a
+
+29
+00:02:07,068 --> 00:02:11,154
+reproducible build, you need to tackle sources of nondeterminism.
+
+30
+00:02:11,282 --> 00:02:14,966
+One of the most common causes of nondeterminism are inputs to
+
+31
+00:02:14,988 --> 00:02:18,234
+the build. With that, I mean everything that is not
+
+32
+00:02:18,272 --> 00:02:21,686
+source code, compilers, build tools, third party
+
+33
+00:02:21,718 --> 00:02:25,114
+libraries, and any other inputs that might influence the
+
+34
+00:02:25,152 --> 00:02:28,394
+build. All references must be unambiguous for
+
+35
+00:02:28,432 --> 00:02:32,362
+your build to be arithmetic, either as a fully resolved version,
+
+36
+00:02:32,426 --> 00:02:36,046
+numbers or ashes. When you get to such a situation,
+
+37
+00:02:36,228 --> 00:02:39,406
+you can say you have arithmetic build. Your build
+
+38
+00:02:39,508 --> 00:02:43,242
+is insensitive to the libraries and other software installed
+
+39
+00:02:43,306 --> 00:02:47,074
+on the build machine to be arithmetic. You can start checking in
+
+40
+00:02:47,112 --> 00:02:51,042
+all the information needed by your build as part of the source code.
+
+41
+00:02:51,176 --> 00:02:54,846
+Hermetic builds enable also cherry picking let's
+
+42
+00:02:54,878 --> 00:02:58,814
+say you want to fix a bug in an older release that's running in production.
+
+43
+00:02:58,942 --> 00:03:03,154
+If you have armetic build process, you can check out the old revision,
+
+44
+00:03:03,282 --> 00:03:06,822
+fix the but, and then rebuild the code. Thanks to
+
+45
+00:03:06,876 --> 00:03:10,326
+arithmeticity, all the build tools are versioned in the source
+
+46
+00:03:10,358 --> 00:03:13,834
+code repository. So a project built two months
+
+47
+00:03:13,872 --> 00:03:17,478
+ago will not use today's version of the compiler
+
+48
+00:03:17,574 --> 00:03:20,966
+because it can be incompatible with a two months old source
+
+49
+00:03:20,998 --> 00:03:24,606
+code. This is very important. So you are now thinking why to
+
+50
+00:03:24,628 --> 00:03:28,122
+be so strict with my build? Well, it may sound painful,
+
+51
+00:03:28,186 --> 00:03:32,042
+but know which depends on what will pay off in the long term,
+
+52
+00:03:32,106 --> 00:03:36,146
+and we will see that later on. Internal randomness is an
+
+53
+00:03:36,168 --> 00:03:39,746
+issue you have to tackle before you can achieve a reproducible build,
+
+54
+00:03:39,848 --> 00:03:43,342
+which can be a sneaky thing to fix. There are many sources
+
+55
+00:03:43,406 --> 00:03:46,790
+of internal randomness, but timestamps are a common
+
+56
+00:03:46,860 --> 00:03:50,246
+one. They are often used to keep track of when the
+
+57
+00:03:50,268 --> 00:03:54,082
+build was done. Get rid of them. With reproducible builds,
+
+58
+00:03:54,146 --> 00:03:57,858
+timestamps are irrelevant since you are already tracking your
+
+59
+00:03:57,884 --> 00:04:01,466
+build environment with source control for the languages that
+
+60
+00:04:01,488 --> 00:04:05,014
+don't initialize values, you need to do it explicitly.
+
+61
+00:04:05,142 --> 00:04:08,694
+Avoid randomness in your build due to capturing random
+
+62
+00:04:08,742 --> 00:04:11,950
+bytes from memory, there's no easy way around it.
+
+63
+00:04:12,020 --> 00:04:15,278
+You must inspect your code. All this may sound a
+
+64
+00:04:15,284 --> 00:04:19,438
+bit overwhelming, I know, but it's actually not as complex as it sounds.
+
+65
+00:04:19,604 --> 00:04:23,018
+Bazel makes this process much easier.
+
+66
+00:04:23,194 --> 00:04:27,262
+Bazel is a fast, scalable, multi language and extensible
+
+67
+00:04:27,326 --> 00:04:30,690
+build system. As stated on the official Google website,
+
+68
+00:04:30,840 --> 00:04:33,858
+Bazel can help you to achieve a reproducible build,
+
+69
+00:04:33,944 --> 00:04:37,274
+providing off the shelf support for arithmeticity.
+
+70
+00:04:37,422 --> 00:04:40,946
+One of the key concepts behind Bazel is sandboxing
+
+71
+00:04:41,058 --> 00:04:44,966
+Bazel file system sandbox will run processes in
+
+72
+00:04:44,988 --> 00:04:49,286
+a working directory that only contains known inputs,
+
+73
+00:04:49,398 --> 00:04:52,682
+such that compilers and other tools can
+
+74
+00:04:52,736 --> 00:04:56,138
+even see sources files they should not access.
+
+75
+00:04:56,304 --> 00:05:00,202
+This means that you must specify all the inputs or your
+
+76
+00:05:00,256 --> 00:05:03,814
+build will fail. As a consequence of hermeticity,
+
+77
+00:05:03,942 --> 00:05:07,786
+Bazel allows you to encapsulate your build targets,
+
+78
+00:05:07,898 --> 00:05:11,022
+meaning that you can hide the internals and
+
+79
+00:05:11,076 --> 00:05:14,830
+be sure that no one can implicitly depend on your target.
+
+80
+00:05:14,910 --> 00:05:18,450
+Another great feature of Bazel is its caching system,
+
+81
+00:05:18,600 --> 00:05:22,386
+which can make your repeated build 50 times
+
+82
+00:05:22,488 --> 00:05:25,986
+faster. There are a few key concepts for Bazel that we
+
+83
+00:05:26,008 --> 00:05:29,254
+need to cover before jumping to the code. The directory that
+
+84
+00:05:29,292 --> 00:05:33,186
+contains the source file of the project is called workspace,
+
+85
+00:05:33,298 --> 00:05:37,014
+and it must contain a text file called workspace as
+
+86
+00:05:37,052 --> 00:05:40,902
+well. A workspace file is where I define all the reference
+
+87
+00:05:40,966 --> 00:05:44,714
+to the external dependencies required by the build. Here,
+
+88
+00:05:44,832 --> 00:05:48,518
+external dependencies can be anything, kernel libraries,
+
+89
+00:05:48,614 --> 00:05:52,346
+git repositories, phaser rules, or any other thing you
+
+90
+00:05:52,368 --> 00:05:56,030
+may require in your build. Phaser rule specifies the relationship
+
+91
+00:05:56,180 --> 00:05:59,662
+between inputs, outputs, and the steps needed.
+
+92
+00:05:59,716 --> 00:06:03,534
+Two, build the outputs and is specific to the programming language you
+
+93
+00:06:03,572 --> 00:06:07,086
+use. In our case, we will use Python rules to
+
+94
+00:06:07,108 --> 00:06:10,850
+tell Bazel how to create an executable Python program
+
+95
+00:06:11,000 --> 00:06:14,626
+starting from some PY files. The code
+
+96
+00:06:14,728 --> 00:06:17,894
+is organized in packages and each package is
+
+97
+00:06:17,932 --> 00:06:21,650
+a collection of targets. A package is defined as a directory
+
+98
+00:06:21,730 --> 00:06:25,778
+containing a file named build build files describe
+
+99
+00:06:25,874 --> 00:06:29,126
+how source code can be built. Basically, when you want
+
+100
+00:06:29,148 --> 00:06:32,442
+to build your code, you can specify the package and
+
+101
+00:06:32,496 --> 00:06:36,298
+which target you want to build, like in the example here. As I
+
+102
+00:06:36,304 --> 00:06:40,138
+mentioned before, today we will apply the concept of reproducible build
+
+103
+00:06:40,224 --> 00:06:44,158
+in Python. We will create a reproducible local environment using
+
+104
+00:06:44,244 --> 00:06:47,934
+Python three eight three that
+
+105
+00:06:47,972 --> 00:06:51,246
+we will build from scratch. We will write a test to make
+
+106
+00:06:51,268 --> 00:06:54,526
+sure we are using the right Python binary to build our code.
+
+107
+00:06:54,628 --> 00:06:58,062
+We'll be able to reuse the local environment the foundation
+
+108
+00:06:58,126 --> 00:07:02,066
+to develop your next Python project. Later on we will create a
+
+109
+00:07:02,088 --> 00:07:05,554
+flask application and this will allow us two understand how
+
+110
+00:07:05,592 --> 00:07:09,158
+to manage dependencies in Python in aromatic way.
+
+111
+00:07:09,244 --> 00:07:12,726
+So let's jump to the code. So this is what our
+
+112
+00:07:12,748 --> 00:07:16,102
+workspace looks like. You need to assign a name to it.
+
+113
+00:07:16,156 --> 00:07:19,794
+Here we just call my flask app. We define
+
+114
+00:07:19,842 --> 00:07:23,206
+a new variable. This is a variable called compute
+
+115
+00:07:23,238 --> 00:07:26,906
+Python based on OS, which is the command we need to execute to
+
+116
+00:07:26,928 --> 00:07:30,458
+compile Python from scratch. We will use it later on.
+
+117
+00:07:30,544 --> 00:07:34,046
+Note that here we need to make a distinction if we are running this example
+
+118
+00:07:34,148 --> 00:07:37,342
+in macOS. So here we can see our
+
+119
+00:07:37,396 --> 00:07:40,890
+first Bazel rule. This is HTTP archive,
+
+120
+00:07:40,970 --> 00:07:44,474
+which is a basic rule that allow us to download a compressed archive
+
+121
+00:07:44,522 --> 00:07:48,146
+file, compress it and use it. In our project
+
+122
+00:07:48,328 --> 00:07:51,358
+we use HTTP archive to fetch
+
+123
+00:07:51,454 --> 00:07:54,626
+and build from scratch python. With this we
+
+124
+00:07:54,648 --> 00:07:57,954
+can be sure two have control over the Python binary inversion.
+
+125
+00:07:58,082 --> 00:08:01,778
+Remember, you don't want to use the Python version installed
+
+126
+00:08:01,794 --> 00:08:05,074
+on the os machine or your build will not be reproducible.
+
+127
+00:08:05,202 --> 00:08:08,754
+The hermeticity here is ensured by the URLs
+
+128
+00:08:08,802 --> 00:08:12,426
+field which tell Bazel where to find the dependency and
+
+129
+00:08:12,448 --> 00:08:16,134
+the shot 156 field which is the unique identifier
+
+130
+00:08:16,182 --> 00:08:20,630
+for it. Every build will use the same unambiguous Python version.
+
+131
+00:08:20,710 --> 00:08:24,286
+Another important field is the patch commands that we use to
+
+132
+00:08:24,308 --> 00:08:27,566
+define a sequence of batch commands to execute. We use it
+
+133
+00:08:27,588 --> 00:08:31,626
+to run the build command for Python using the configured Python
+
+134
+00:08:31,658 --> 00:08:34,670
+Bazel analyze variable that we defined earlier.
+
+135
+00:08:34,830 --> 00:08:38,606
+Once we run this HTTP archive rule,
+
+136
+00:08:38,798 --> 00:08:42,526
+this will fetch Python pin version
+
+137
+00:08:42,638 --> 00:08:46,530
+of Python and build it and we will have our three
+
+138
+00:08:46,600 --> 00:08:50,194
+data, three version of Python to use in our next
+
+139
+00:08:50,312 --> 00:08:53,846
+we need the Python Bazel rules to create the build and
+
+140
+00:08:53,868 --> 00:08:57,154
+test target. Since those rules don't come with Bazel,
+
+141
+00:08:57,202 --> 00:09:00,786
+we need to fetch them using HTTP archive like
+
+142
+00:09:00,828 --> 00:09:04,810
+this. And here again we use the SHA 256
+
+143
+00:09:04,960 --> 00:09:08,586
+as identifier, the version of the so we said that we want
+
+144
+00:09:08,608 --> 00:09:12,186
+to compile code written in Python using the Python binary we defined
+
+145
+00:09:12,218 --> 00:09:15,466
+early on. To do that, we need to define a new Bazel
+
+146
+00:09:15,498 --> 00:09:19,182
+tool chain. Bazel tool chains are defined in build
+
+147
+00:09:19,236 --> 00:09:22,586
+files. Here pyramtime is used from
+
+148
+00:09:22,628 --> 00:09:26,206
+the Python rules that we fetched before we define Python
+
+149
+00:09:26,238 --> 00:09:29,940
+three runtime using the Python interpreter. We found Python before,
+
+150
+00:09:30,950 --> 00:09:34,046
+and then we use py runtime pair,
+
+151
+00:09:34,158 --> 00:09:37,686
+which wraps up to two Python runtimes, one for Python three and
+
+152
+00:09:37,708 --> 00:09:41,990
+one for Python two. Since we only want to support the three eight
+
+153
+00:09:42,140 --> 00:09:45,954
+three version, we don't define any Py two runtime,
+
+154
+00:09:46,082 --> 00:09:49,394
+then use the pyramtime pair to define our toolchain,
+
+155
+00:09:49,442 --> 00:09:52,826
+the Py three toolchain that we can use in our project.
+
+156
+00:09:53,008 --> 00:09:56,906
+But to use toolchain in Bazel, you need to register them
+
+157
+00:09:57,008 --> 00:10:01,002
+and you do that at the end of the workspace file with
+
+158
+00:10:01,056 --> 00:10:04,506
+this line. Remember, the registered tool chains
+
+159
+00:10:04,538 --> 00:10:07,610
+must always be at the end of the workspace file.
+
+160
+00:10:07,770 --> 00:10:11,738
+Nice. You now have arithmetic Bazel build environment set up, but don't
+
+161
+00:10:11,754 --> 00:10:15,502
+just take my word for it. Let's write a test. For writing
+
+162
+00:10:15,566 --> 00:10:18,786
+tests in Python, we will need Pytest. So let's add
+
+163
+00:10:18,808 --> 00:10:21,970
+the requirement txt file like this,
+
+164
+00:10:22,120 --> 00:10:26,542
+and along with Pytest we need all its child dependencies.
+
+165
+00:10:26,686 --> 00:10:29,906
+This is a normal requirement file that use daily
+
+166
+00:10:29,938 --> 00:10:33,362
+in Python. But since we want to be arithmetic, we need to pin
+
+167
+00:10:33,426 --> 00:10:37,154
+the versions and ash as an identifier for arithmeticity.
+
+168
+00:10:37,282 --> 00:10:40,954
+This means that when Bazel will try two build the test, he will
+
+169
+00:10:40,992 --> 00:10:44,570
+look for the exact version of the dependency we want to use.
+
+170
+00:10:44,640 --> 00:10:48,934
+This example if Bazel can find a library called Python
+
+171
+00:10:48,982 --> 00:10:53,170
+with version five four one with this exact edge,
+
+172
+00:10:53,270 --> 00:10:56,734
+the build will fail due to a missing dependency. Okay,
+
+173
+00:10:56,772 --> 00:11:00,474
+now we can modify the workspace again. We add pip
+
+174
+00:11:00,522 --> 00:11:04,686
+install. A pip install is a rule friendly dependencies. It allows
+
+175
+00:11:04,718 --> 00:11:07,934
+importing Pip dependencies from a requirement TxT file,
+
+176
+00:11:07,982 --> 00:11:12,194
+but by default it uses the Python interpreter that
+
+177
+00:11:12,232 --> 00:11:15,486
+is in the OS machine. We can override
+
+178
+00:11:15,518 --> 00:11:18,562
+this behavior by passing the Python interpreter
+
+179
+00:11:18,626 --> 00:11:22,040
+target, the interpreter that we just built from scratch before.
+
+180
+00:11:22,410 --> 00:11:26,086
+Cool. Now everything is ready to write the test. Let's create a new
+
+181
+00:11:26,108 --> 00:11:30,838
+folder called test and a file called compilerversion test Py.
+
+182
+00:11:31,014 --> 00:11:35,366
+This is a very simple test that will check that the Python
+
+183
+00:11:35,558 --> 00:11:39,210
+executable is present and that the version is correct,
+
+184
+00:11:39,360 --> 00:11:42,986
+and to include the test in the build process. Two, add a build file
+
+185
+00:11:43,018 --> 00:11:46,794
+so we add it to the test folder. Here we define
+
+186
+00:11:46,922 --> 00:11:51,246
+Pytest target pytest is just a
+
+187
+00:11:51,268 --> 00:11:55,450
+way to say to Bazel that we want to create test that is using Python.
+
+188
+00:11:55,610 --> 00:11:59,682
+We need to specify a name for that. We use compiler version test
+
+189
+00:11:59,816 --> 00:12:02,882
+and the source files needed to compile and execute the test.
+
+190
+00:12:02,936 --> 00:12:06,422
+In this case it's just compilerversion test py. We also
+
+191
+00:12:06,476 --> 00:12:09,958
+need two define the dependencies that are needed for the test.
+
+192
+00:12:10,124 --> 00:12:14,610
+We load dependencies using the requirement function which maps
+
+193
+00:12:14,770 --> 00:12:18,006
+a piP package name to a label and avoids our
+
+194
+00:12:18,028 --> 00:12:21,814
+code a dependency name into the piP file. Dependency management
+
+195
+00:12:21,862 --> 00:12:26,278
+in Bazel is very straightforward. You don't need to create any virtual environment,
+
+196
+00:12:26,374 --> 00:12:30,178
+you don't need to run any PiP install or any other eggy
+
+197
+00:12:30,214 --> 00:12:34,266
+thing. Just list dependencies under the depths field and you're
+
+198
+00:12:34,298 --> 00:12:37,790
+done. Note that up to this point everything
+
+199
+00:12:37,860 --> 00:12:41,166
+is explicit, so this will ensure reproducibility of
+
+200
+00:12:41,188 --> 00:12:44,590
+the build. Okay, we can now run our first bezelized Python test.
+
+201
+00:12:44,660 --> 00:12:48,946
+So from the project root this
+
+202
+00:12:48,968 --> 00:12:51,906
+is the way that we're using Bazel to run test,
+
+203
+00:12:52,008 --> 00:12:55,298
+and we need to specify which test we want.
+
+204
+00:12:55,384 --> 00:13:00,310
+So run the package test. The target is called compiler
+
+205
+00:13:00,650 --> 00:13:01,590
+version.
+
+206
+00:13:03,530 --> 00:13:07,078
+Okay, so this runs the test.
+
+207
+00:13:07,164 --> 00:13:11,162
+So as you can see, the test is passing. This means that we are using
+
+208
+00:13:11,216 --> 00:13:14,806
+the right version of the Python executable.
+
+209
+00:13:14,998 --> 00:13:20,486
+You can notice here that it says cached. This is because I executed
+
+210
+00:13:20,518 --> 00:13:23,646
+this test before, so now it doesn't execute it again.
+
+211
+00:13:23,748 --> 00:13:26,862
+Since I didn't modify anything in the test, it's just using
+
+212
+00:13:26,916 --> 00:13:30,670
+the cache resulted in radius. Up to this point
+
+213
+00:13:30,740 --> 00:13:34,010
+we went through the foundation of a baseline environment using Python,
+
+214
+00:13:34,090 --> 00:13:37,474
+but let's see something more complex and close to a real use
+
+215
+00:13:37,512 --> 00:13:41,326
+case. We can create a new folder called Src with a new file
+
+216
+00:13:41,358 --> 00:13:44,446
+flask app py and this is a simple flask
+
+217
+00:13:44,478 --> 00:13:47,986
+application that will show the binary path and the
+
+218
+00:13:48,008 --> 00:13:51,906
+python version of the OS machine along with the one used by Bazel.
+
+219
+00:13:52,018 --> 00:13:54,774
+We can then check that the two paths are different.
+
+220
+00:13:54,972 --> 00:13:58,234
+To build it, we need a build file. So let's add a build
+
+221
+00:13:58,272 --> 00:14:01,740
+file under the SrC folder, and this time
+
+222
+00:14:02,590 --> 00:14:07,514
+we are creating a binary. So we just say py binary again.
+
+223
+00:14:07,552 --> 00:14:11,178
+We need to specify a name less cap the source that are needed,
+
+224
+00:14:11,264 --> 00:14:14,334
+less cap PI and we load the dependencies here.
+
+225
+00:14:14,372 --> 00:14:18,494
+We need to extend the requirement 60 with the flux dependencies and all
+
+226
+00:14:18,532 --> 00:14:21,726
+the child dependencies as well, and just reload them using the
+
+227
+00:14:21,748 --> 00:14:25,298
+requirement function again. Okay, so now we can run the application.
+
+228
+00:14:25,464 --> 00:14:29,314
+This time we use Bazel run. Bazel run first
+
+229
+00:14:29,432 --> 00:14:33,186
+compile and then execute the application. So let's do it.
+
+230
+00:14:33,288 --> 00:14:38,258
+Bazel run it is SRC less.
+
+231
+00:14:38,424 --> 00:14:42,150
+Okay, so this is compiling and executing the application.
+
+232
+00:14:42,300 --> 00:14:46,018
+And as you can see it runs and it's running on the ost
+
+233
+00:14:46,114 --> 00:14:49,962
+on the local lost. So if we open the browser and
+
+234
+00:14:50,016 --> 00:14:52,410
+navigate to localost,
+
+235
+00:14:52,910 --> 00:14:56,230
+we can see as expected, the bazel is using Python version
+
+236
+00:14:56,310 --> 00:14:59,994
+three eight three that we compiled from scratch and
+
+237
+00:15:00,032 --> 00:15:03,162
+not python three eight five that I have
+
+238
+00:15:03,216 --> 00:15:07,402
+on my YoS machine. Are we sure that the build is reproducible?
+
+239
+00:15:07,546 --> 00:15:11,534
+We can do a quick test. We run a build two times and check
+
+240
+00:15:11,572 --> 00:15:15,658
+the output binaries for any differences by comparing the MD five ashes.
+
+241
+00:15:15,754 --> 00:15:19,378
+Here we computed the ash of the binary that we just built. Clean all the
+
+242
+00:15:19,384 --> 00:15:22,626
+build artifacts and dependencies with bezel clean,
+
+243
+00:15:22,728 --> 00:15:26,274
+and then run a build again. The new binary is identical two the old
+
+244
+00:15:26,312 --> 00:15:29,400
+one. So we have a reproducible build, right?
+
+245
+00:15:29,770 --> 00:15:33,286
+Well, actually it's not fully reproducible and let me show you
+
+246
+00:15:33,308 --> 00:15:37,014
+why. If we go back to the workspace file, we are
+
+247
+00:15:37,052 --> 00:15:41,654
+trying to build python inside Bazel to achieve full reproducibility.
+
+248
+00:15:41,782 --> 00:15:45,754
+However, using HTTP machines patch commands means
+
+249
+00:15:45,792 --> 00:15:49,594
+that Python is built using the compiler of the OS machine that
+
+250
+00:15:49,632 --> 00:15:52,954
+runs the build the Python interpreter, which is pin two. A precise
+
+251
+00:15:53,002 --> 00:15:56,954
+version will depend on the machine's GCC and system libraries
+
+252
+00:15:57,002 --> 00:16:00,606
+that are not pinned or controlled in any way. In other words,
+
+253
+00:16:00,708 --> 00:16:03,290
+the build is not fully reproducible,
+
+254
+00:16:03,450 --> 00:16:07,138
+but there are solutions for that. You can run Bazel build from a
+
+255
+00:16:07,144 --> 00:16:10,514
+docker container with a pin GCC version and then check
+
+256
+00:16:10,552 --> 00:16:14,894
+in the docker information within your project. This is a common approach
+
+257
+00:16:15,022 --> 00:16:19,006
+in CI systems. Instead of compiling Python
+
+258
+00:16:19,038 --> 00:16:22,546
+from scratch, you can use a precompiled binary executable,
+
+259
+00:16:22,658 --> 00:16:25,862
+check it in the source control, and pin it on the build.
+
+260
+00:16:25,996 --> 00:16:29,538
+Or you can use a different approach and use a tool like Nix,
+
+261
+00:16:29,634 --> 00:16:33,042
+which allows importing thematically external dependencies
+
+262
+00:16:33,106 --> 00:16:36,538
+into like system packages, and you can find a link in
+
+263
+00:16:36,544 --> 00:16:39,782
+the presentation. To summarize the biggest takeaways.
+
+264
+00:16:39,926 --> 00:16:43,850
+From now on, don't take for granted that your build is reproducible,
+
+265
+00:16:43,930 --> 00:16:47,274
+since most probably is not. Arithmeticity enables
+
+266
+00:16:47,322 --> 00:16:51,018
+cherry picking and can save you from uncomfortable situations.
+
+267
+00:16:51,114 --> 00:16:54,334
+Impulse to the build must be versioned with source code or
+
+268
+00:16:54,372 --> 00:16:58,602
+you will not have any control over them. Internal randomness
+
+269
+00:16:58,666 --> 00:17:01,854
+can be sneaky, but must be removed. You now
+
+270
+00:17:01,892 --> 00:17:05,522
+have a working python environment that is hermetic thanks to Bazel,
+
+271
+00:17:05,586 --> 00:17:08,742
+and that you can reuse for your next Python project.
+
+272
+00:17:08,876 --> 00:17:12,834
+You have seen how to compile a flask application in a reproducible
+
+273
+00:17:12,882 --> 00:17:16,562
+way, and how to manage dependencies automatically. The following
+
+274
+00:17:16,626 --> 00:17:19,974
+link you will find the code I presented today. Feel free
+
+275
+00:17:20,012 --> 00:17:23,334
+to reuse it. Thank you very much. If you want to connect here,
+
+276
+00:17:23,372 --> 00:17:27,078
+you can find my contacts. Reach out and let me know your thoughts. Enjoy the
+
+277
+00:17:27,084 --> 00:17:28,820
+rest of the conference and talk to you soon.
+

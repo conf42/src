@@ -1,0 +1,1712 @@
+1
+00:00:28,050 --> 00:00:31,506
+Hi, thanks so much for listening to my talk how to stop breaking other people's
+
+2
+00:00:31,538 --> 00:00:35,058
+things. I really hope you enjoy it. I'm Lisa Karlin Curtis,
+
+3
+00:00:35,154 --> 00:00:38,786
+born and bred in London, and I'm a software engineer at Gocardless.
+
+4
+00:00:38,898 --> 00:00:42,470
+I currently work in our core banking team and I'm going to be talking about
+
+5
+00:00:42,540 --> 00:00:46,418
+how we can help stop breaking other people's things. So we're
+
+6
+00:00:46,434 --> 00:00:49,798
+going to start with a sad story. A developer notices that
+
+7
+00:00:49,804 --> 00:00:52,906
+they have an endpoint that has a really high latency compared to what they'd
+
+8
+00:00:52,938 --> 00:00:56,894
+expect. They find a performance issue in the code, which is essentially an
+
+9
+00:00:56,932 --> 00:01:00,922
+exacerbated m plus one problem, and they deploy a fix. The latency
+
+10
+00:01:00,986 --> 00:01:04,158
+on the endpoint goes down by a half, and the developer stares at
+
+11
+00:01:04,164 --> 00:01:08,386
+the beautiful graph with the lovely cliff shape and feels good about themselves and
+
+12
+00:01:08,408 --> 00:01:11,874
+then moves on somewhere else in the world. Another developer gets
+
+13
+00:01:11,912 --> 00:01:15,534
+paged. Their database cpu usage has spiked and it's struggling
+
+14
+00:01:15,582 --> 00:01:18,818
+to handle the load. They start investigating, but there's
+
+15
+00:01:18,834 --> 00:01:21,414
+no obvious cause, no werent changes.
+
+16
+00:01:21,532 --> 00:01:25,286
+Request volume is pretty much the same. They start scaling down
+
+17
+00:01:25,308 --> 00:01:29,186
+their queues to relieve the pressure. And that solves the immediate issue. The database
+
+18
+00:01:29,218 --> 00:01:32,230
+seems to have recovered. Then they notice something strange.
+
+19
+00:01:32,390 --> 00:01:35,706
+They've suddenly started processing webhooks much more quickly than they
+
+20
+00:01:35,728 --> 00:01:38,874
+used to. So what actually happened here? It turns out
+
+21
+00:01:38,912 --> 00:01:42,246
+that our integrator had a webhook handler, which would receive
+
+22
+00:01:42,278 --> 00:01:45,534
+a webhook from us and then make a request back to find
+
+23
+00:01:45,572 --> 00:01:49,102
+the status of that resource. And this was the endpoint that we'd actually
+
+24
+00:01:49,156 --> 00:01:53,034
+fixed earlier that day. By the way, I'm going to use the word integrations
+
+25
+00:01:53,082 --> 00:01:56,974
+a lot. And what I mean is people who are integrating against the API
+
+26
+00:01:57,022 --> 00:02:00,754
+that you are maintaining, so that might be inside your company or that might
+
+27
+00:02:00,792 --> 00:02:04,626
+be like a customer that you're serving your API to. So back to the
+
+28
+00:02:04,648 --> 00:02:08,306
+story. That Webhook Handler, it turns out, spent most of
+
+29
+00:02:08,328 --> 00:02:12,066
+its time waiting for our response, and when it got the response
+
+30
+00:02:12,098 --> 00:02:15,458
+from our endpoint, it would then go and update its own database. And it's
+
+31
+00:02:15,474 --> 00:02:19,330
+worth noting here that our webhooks are often a result of batch processes,
+
+32
+00:02:19,410 --> 00:02:22,602
+so they're really spiky. We tend to spend lots of them in a very short
+
+33
+00:02:22,656 --> 00:02:26,454
+space of time, a couple of times a day. So as the endpoint got faster
+
+34
+00:02:26,582 --> 00:02:30,154
+during those spikes, the webhook handler started to apply more and more
+
+35
+00:02:30,192 --> 00:02:33,566
+load to the database to such an extent that an engineer actually
+
+36
+00:02:33,588 --> 00:02:36,682
+got paged to resolve the service degradation.
+
+37
+00:02:36,826 --> 00:02:40,538
+The fix here is fairly simple. Scale down the webhook handlers.
+
+38
+00:02:40,554 --> 00:02:44,362
+So these process fewer webhooks and the database usage returns to normal,
+
+39
+00:02:44,426 --> 00:02:47,522
+or alternatively beef up your database. But this shows
+
+40
+00:02:47,576 --> 00:02:50,866
+us just how easy it is to accidentally break someone else's thing,
+
+41
+00:02:50,968 --> 00:02:54,334
+even if you're trying to do right by your integrators. Lots of us deliver
+
+42
+00:02:54,382 --> 00:02:58,126
+software in different ways. We might deliver a package like a node module
+
+43
+00:02:58,158 --> 00:03:01,922
+or a ruby gem, which is included at build time, or potentially
+
+44
+00:03:01,986 --> 00:03:05,126
+software, whether that's like an on prem software or a SaaS product.
+
+45
+00:03:05,228 --> 00:03:08,798
+And then we have the Internet, which is a little bit hard to define.
+
+46
+00:03:08,834 --> 00:03:12,534
+But what I really mean here is like a public API or HTTP
+
+47
+00:03:12,582 --> 00:03:16,186
+endpoint that your integrators or your consumers hit
+
+48
+00:03:16,288 --> 00:03:19,898
+in order to process your product. We're going
+
+49
+00:03:19,904 --> 00:03:23,322
+to be mainly talking in terms of that third use case, partly because it's what
+
+50
+00:03:23,376 --> 00:03:26,414
+I do in my day to day, but also because I think it's the most
+
+51
+00:03:26,452 --> 00:03:30,126
+challenging of the three. As an integrator you have no control over when
+
+52
+00:03:30,148 --> 00:03:33,946
+a change is applied, and as an API maintainer it's really natural to roll
+
+53
+00:03:33,978 --> 00:03:37,554
+out changes to everyone at once. But many of the principles remain the same across
+
+54
+00:03:37,592 --> 00:03:40,754
+the board, particularly when we start talking about how to understand
+
+55
+00:03:40,872 --> 00:03:43,918
+whether something might be breaking or not. So to set the scene,
+
+56
+00:03:44,014 --> 00:03:47,262
+here are some examples of changes that have broken code in the past.
+
+57
+00:03:47,416 --> 00:03:50,486
+Traditional API changes. So adding a mandatory field,
+
+58
+00:03:50,588 --> 00:03:54,018
+removing an endpoint, entirely changing your validation logic.
+
+59
+00:03:54,114 --> 00:03:57,430
+I think we're all kind of comfortable with this, and this is quite well
+
+60
+00:03:57,500 --> 00:04:00,838
+established in the industry about what this looks like, but then we
+
+61
+00:04:00,844 --> 00:04:04,218
+can move on to things like introducing a rate limit. Docker did
+
+62
+00:04:04,224 --> 00:04:07,802
+this recently, and I think they communicated really clearly, but it obviously
+
+63
+00:04:07,856 --> 00:04:11,434
+impacted a lot of their integrators. And the same if you're going to change
+
+64
+00:04:11,472 --> 00:04:15,006
+your rate limiting logic, changing an error string. So I
+
+65
+00:04:15,028 --> 00:04:18,714
+was unlucky enough to discover that some software I maintained was regexing
+
+66
+00:04:18,762 --> 00:04:22,046
+to determine what error message to display in the UX. And when
+
+67
+00:04:22,068 --> 00:04:25,326
+the error string changed, we started displaying the wrong information to the
+
+68
+00:04:25,348 --> 00:04:29,454
+user. And then similarly at Gocardless we actually found a but where we werent
+
+69
+00:04:29,502 --> 00:04:32,958
+respecting the accept language header on a few of our endpoints.
+
+70
+00:04:33,054 --> 00:04:36,446
+So we were returning english errors when there was an accept language
+
+71
+00:04:36,478 --> 00:04:40,066
+header of Fr, for example. And so we dutifully went and fixed
+
+72
+00:04:40,098 --> 00:04:43,746
+the bug, and then one of our integrators raised the ticket saying that we'd broken
+
+73
+00:04:43,778 --> 00:04:48,050
+their software. And it turned out they were relying on that incorrect behavior,
+
+74
+00:04:48,130 --> 00:04:51,546
+I. E. They were breaking on us to not translate that particular error on
+
+75
+00:04:51,568 --> 00:04:55,226
+that particular endpoint because they knew, because they'd observed that
+
+76
+00:04:55,248 --> 00:04:58,774
+we always replied in English. Breaking apart a database transaction.
+
+77
+00:04:58,902 --> 00:05:02,326
+This might seem obvious in some ways when we think about our own systems,
+
+78
+00:05:02,358 --> 00:05:05,486
+we know that internal consistency is really important, but it can
+
+79
+00:05:05,508 --> 00:05:09,450
+get a bit more complicated when you have certain models that you expose to integrators.
+
+80
+00:05:09,530 --> 00:05:13,274
+So the example we have for this at Gocardless is that we have resources,
+
+81
+00:05:13,322 --> 00:05:17,730
+and then those resources have effectively a state machine. So they transition between states,
+
+82
+00:05:17,880 --> 00:05:21,666
+and we create an event when we transition them between states.
+
+83
+00:05:21,768 --> 00:05:24,926
+And that lets our integrators kind of get a bit more detail about what's
+
+84
+00:05:24,958 --> 00:05:28,534
+happened and the history of a particular resource. And it's quite easy for
+
+85
+00:05:28,572 --> 00:05:31,874
+us internally to distinguish between those two concepts,
+
+86
+00:05:31,922 --> 00:05:35,526
+right? We do the state transition and then separately we create that event.
+
+87
+00:05:35,628 --> 00:05:38,546
+Historically, we've always done that in a database transaction,
+
+88
+00:05:38,658 --> 00:05:41,250
+and that's now important for us to maintain,
+
+89
+00:05:41,410 --> 00:05:45,046
+because our integrations could be relying on the fact that if a resource
+
+90
+00:05:45,078 --> 00:05:48,358
+is in a failed state, I can find an event that tells
+
+91
+00:05:48,374 --> 00:05:51,694
+me why it failed. And so it's just worth thinking when you do try
+
+92
+00:05:51,732 --> 00:05:55,354
+and maybe you're starting to split up your monolith and start distributing
+
+93
+00:05:55,402 --> 00:05:59,182
+stuff into microservices or start throwing everything through
+
+94
+00:05:59,236 --> 00:06:02,846
+some sort of magic cloud platform, it's very difficult to
+
+95
+00:06:02,868 --> 00:06:06,286
+maintain those transactional guarantees. And so you just have to think quite
+
+96
+00:06:06,308 --> 00:06:09,586
+carefully about whether that's going to be surfaced to integrators and then what you can
+
+97
+00:06:09,608 --> 00:06:12,850
+do about it. Changing the timing of your batch processing.
+
+98
+00:06:13,350 --> 00:06:16,674
+So we can see from our logs that certain integrators create
+
+99
+00:06:16,712 --> 00:06:20,402
+lots of their payments just in time, I e. Just before our daily payment
+
+100
+00:06:20,456 --> 00:06:23,366
+run. So we have a cutoff once a day. And if you don't create them
+
+101
+00:06:23,388 --> 00:06:26,374
+in time, then we have to roll forward to the next day. So we know
+
+102
+00:06:26,412 --> 00:06:29,702
+that if we change our timings without communicating with them, it would cause
+
+103
+00:06:29,756 --> 00:06:33,754
+significant issues because our system would stop behaving the way that they expect.
+
+104
+00:06:33,872 --> 00:06:36,874
+And then these last one here is reducing the latency on an API call,
+
+105
+00:06:36,912 --> 00:06:40,246
+which is the story that we told right at the beginning. I'm going to define
+
+106
+00:06:40,278 --> 00:06:44,126
+a breaking change as something where I, as the API developer, do a
+
+107
+00:06:44,148 --> 00:06:47,806
+thing and someone's integration breaks. And that happens because an
+
+108
+00:06:47,828 --> 00:06:51,182
+assumption that's been made by that integrator is no longer correct.
+
+109
+00:06:51,316 --> 00:06:54,814
+When this happens, it's easy to criticize the engineer who made
+
+110
+00:06:54,852 --> 00:06:58,002
+the assumption, but there are a couple of things that we should bear in mind.
+
+111
+00:06:58,136 --> 00:07:01,282
+First of all, assumptions are inevitable. You literally cannot write
+
+112
+00:07:01,336 --> 00:07:05,054
+any code ever without making hundreds of assumptions wherever
+
+113
+00:07:05,102 --> 00:07:09,282
+you look. And then the second point is, it may indeed be their fault,
+
+114
+00:07:09,346 --> 00:07:13,458
+but it's often your problem. Maybe if you're Google or you're AWS,
+
+115
+00:07:13,554 --> 00:07:17,106
+you can get away with it. But for most companies, if your integrators are feeling
+
+116
+00:07:17,138 --> 00:07:20,698
+pain, then you'll feel it too, particularly if it's one of your most important
+
+117
+00:07:20,784 --> 00:07:24,518
+customers. Obviously, if it's AWS and it's slack that you've broken,
+
+118
+00:07:24,614 --> 00:07:27,850
+you're still probably going to care. There are a few different ways
+
+119
+00:07:27,920 --> 00:07:31,786
+that assumptions can develop, and some of them are explicit. So an
+
+120
+00:07:31,808 --> 00:07:35,502
+integrator is asking a question, getting an answer, and then building
+
+121
+00:07:35,556 --> 00:07:39,002
+their system based on that answer. So if we start with documentation,
+
+122
+00:07:39,066 --> 00:07:42,650
+that's obviously your first step. When you're building against somebody else's API,
+
+123
+00:07:42,730 --> 00:07:46,426
+you look at the API reference. It's worth noting that people often skip
+
+124
+00:07:46,458 --> 00:07:50,002
+to the examples and don't actually read all of the text that you've slaved over.
+
+125
+00:07:50,056 --> 00:07:52,386
+So you do need to be a little bit careful about the way that you
+
+126
+00:07:52,408 --> 00:07:55,646
+give them that information. And then we can talk about support articles
+
+127
+00:07:55,678 --> 00:07:59,150
+and blog posts, or some people might call them cookbooks or guides.
+
+128
+00:07:59,310 --> 00:08:02,614
+And lots of people like these guides, particularly if they're trying to set something up
+
+129
+00:08:02,652 --> 00:08:06,338
+quite quickly in a prototyping these, or if there's quite a lot of boilerplate,
+
+130
+00:08:06,434 --> 00:08:09,906
+maybe this is something that you've published, or maybe it's something that a third party
+
+131
+00:08:09,938 --> 00:08:13,622
+has published on something like medium, and then we have ad hoc communication.
+
+132
+00:08:13,686 --> 00:08:17,094
+And what I mean by this is basically the random other backwards
+
+133
+00:08:17,142 --> 00:08:21,142
+and back and forth that an integrator might have with somebody in your organization,
+
+134
+00:08:21,286 --> 00:08:24,358
+whether that's a presales team, whether that's solutions engineers,
+
+135
+00:08:24,454 --> 00:08:27,678
+or potentially it's like a support ticket that they've raised. If you
+
+136
+00:08:27,684 --> 00:08:31,134
+get really unlucky, they might have emailed the friend they have that still works there,
+
+137
+00:08:31,172 --> 00:08:34,446
+or indeed used to work there. But these are all different ways in which
+
+138
+00:08:34,468 --> 00:08:37,770
+an integrator can explicitly ask a question, and then there
+
+139
+00:08:37,780 --> 00:08:41,086
+are other assumptions that an integrator makes that are a bit more implicit.
+
+140
+00:08:41,198 --> 00:08:44,546
+So the first thing to talk about here is industry standards. If you send
+
+141
+00:08:44,568 --> 00:08:47,822
+me a JSON response, you're going to give me an application JSON header,
+
+142
+00:08:47,886 --> 00:08:51,142
+and I'm going to assume that won't change, even though in your docs you never
+
+143
+00:08:51,196 --> 00:08:54,662
+specifically tell me that that's going to be true. Another example
+
+144
+00:08:54,716 --> 00:08:58,406
+of this is I assume that if you tell me something is secret, you will
+
+145
+00:08:58,428 --> 00:09:01,658
+keep my secret safe. And that means that I can assume that I am the
+
+146
+00:09:01,664 --> 00:09:05,258
+only person who has my secret. Generally speaking, this is okay,
+
+147
+00:09:05,344 --> 00:09:08,038
+but in some cases you can find yourself in trouble,
+
+148
+00:09:08,134 --> 00:09:11,626
+particularly if these standards change over time. So we had quite
+
+149
+00:09:11,648 --> 00:09:14,810
+a bad incident at Gocardless where we upgraded our Ha
+
+150
+00:09:14,880 --> 00:09:17,966
+proxy version. And it turned out the new versioning was
+
+151
+00:09:17,988 --> 00:09:21,806
+observing a new industry standard, which proceeded to downcase all
+
+152
+00:09:21,828 --> 00:09:25,982
+of our outgoing HTTP headers. So that meant our HTTP header
+
+153
+00:09:26,046 --> 00:09:29,358
+response headers, rather than having capital letters at the beginning
+
+154
+00:09:29,374 --> 00:09:32,562
+of each word, were now totally lowercase by the book.
+
+155
+00:09:32,696 --> 00:09:36,414
+HTTP response headers should not be treated as case sensitive.
+
+156
+00:09:36,542 --> 00:09:40,134
+But a couple of key integrators have been relying on the previous behavior and
+
+157
+00:09:40,172 --> 00:09:43,606
+had a significant outage. And that outage was made a lot worse by the fact
+
+158
+00:09:43,628 --> 00:09:47,094
+that their requests were being successfully processed, but they actually
+
+159
+00:09:47,132 --> 00:09:50,774
+couldn't process our response. And then we move on to observed
+
+160
+00:09:50,822 --> 00:09:55,030
+behavior, which is probably the most interesting of all of this slide.
+
+161
+00:09:55,110 --> 00:09:58,586
+So as an integrator you want the engineers who run
+
+162
+00:09:58,608 --> 00:10:01,834
+the services you use to be constantly improving it and adding new
+
+163
+00:10:01,872 --> 00:10:05,326
+features, but in a way you also want them to not touch it at
+
+164
+00:10:05,348 --> 00:10:08,558
+all so that you can be sure its behavior won't change. As soon as a
+
+165
+00:10:08,564 --> 00:10:12,186
+developer sees something. Whether that's an undocumented header on an HTTP
+
+166
+00:10:12,218 --> 00:10:15,666
+response, a batch process that happens at the same time every day,
+
+167
+00:10:15,768 --> 00:10:19,614
+or even a particular API latency, they assume it's reliable
+
+168
+00:10:19,662 --> 00:10:22,770
+and they build their systems accordingly. And humans pattern match
+
+169
+00:10:22,840 --> 00:10:26,974
+really, really aggressively. We find it very easy to convince ourselves that correlation
+
+170
+00:10:27,022 --> 00:10:30,406
+equals causation. And that means, particularly if we can come up with
+
+171
+00:10:30,428 --> 00:10:33,334
+an explanation of why a always means b.
+
+172
+00:10:33,452 --> 00:10:36,726
+However convoluted it might seem to somebody else, we're quick to
+
+173
+00:10:36,748 --> 00:10:40,054
+accept and rely on it. When you start to think about it, this is quite
+
+174
+00:10:40,092 --> 00:10:43,466
+bizarre. Given that we are all engineers and we're all
+
+175
+00:10:43,488 --> 00:10:46,874
+employed to be making changes to our own systems, we should
+
+176
+00:10:46,912 --> 00:10:50,374
+understand that they are constantly in flux. We also all encounter
+
+177
+00:10:50,422 --> 00:10:53,994
+interesting edge cases every day. And we know that just because something is true
+
+178
+00:10:54,032 --> 00:10:57,102
+99% of the time in our system, it won't always be.
+
+179
+00:10:57,156 --> 00:11:00,702
+And yet we assume thats everybody else's stuff is going to stay exactly the same
+
+180
+00:11:00,756 --> 00:11:04,126
+forever. Now, as much as it would be great if our integrators didn't behave like
+
+181
+00:11:04,148 --> 00:11:07,086
+this, I think the reality is that this is something that's shared by all of
+
+182
+00:11:07,108 --> 00:11:09,794
+us as a community, so we kind of have to face up to it.
+
+183
+00:11:09,912 --> 00:11:13,374
+None of this stuff is new. So a great example of this is MS
+
+184
+00:11:13,422 --> 00:11:17,094
+DOS. So Microsoft released MSDOs and they
+
+185
+00:11:17,132 --> 00:11:21,106
+released some documentation alongside it, which basically listed
+
+186
+00:11:21,138 --> 00:11:24,870
+some interrupts and calls and hooks that you could use to make the operating system
+
+187
+00:11:24,940 --> 00:11:28,454
+do interesting things. But early application developers quickly found
+
+188
+00:11:28,492 --> 00:11:32,054
+that they weren't able to achieve everything that they wanted. And this was made worse
+
+189
+00:11:32,102 --> 00:11:35,366
+because Microsoft would actually use those undocumented calls
+
+190
+00:11:35,398 --> 00:11:38,586
+in their own software. So it was impossible to compete using what was
+
+191
+00:11:38,608 --> 00:11:42,382
+only in the documentation. So like all good engineers, they started
+
+192
+00:11:42,436 --> 00:11:46,640
+decompiling the operating system and writing lists of undocumented information.
+
+193
+00:11:47,090 --> 00:11:50,846
+So one of the famous ones was called Ralph Brown's interrupt list, and this
+
+194
+00:11:50,868 --> 00:11:53,966
+information was shared really widely. And so using those
+
+195
+00:11:53,988 --> 00:11:57,666
+undocumented features became totally widespread. And it got to
+
+196
+00:11:57,688 --> 00:12:01,138
+a point where Microsoft couldn't really changes anything about the internals of
+
+197
+00:12:01,144 --> 00:12:04,642
+their system without breaking all of these applications that people used
+
+198
+00:12:04,696 --> 00:12:08,370
+every day. Now obviously the value proposition of an operating system is
+
+199
+00:12:08,440 --> 00:12:12,054
+completely tied up with all of the applications that run on it. And so they
+
+200
+00:12:12,092 --> 00:12:15,318
+just got to this point where they couldn't really develop the operating system in the
+
+201
+00:12:15,324 --> 00:12:19,382
+way that they wanted. We can think of that interrupt list being analogous to somebody
+
+202
+00:12:19,436 --> 00:12:22,726
+writing a blog on medium called ten things you didn't know that someone's
+
+203
+00:12:22,758 --> 00:12:26,470
+API could do. Some of these assumptions are also unconscious.
+
+204
+00:12:26,630 --> 00:12:30,186
+Once something's stable for a while, we sort of just assume it will
+
+205
+00:12:30,208 --> 00:12:34,346
+never break. We also usually make resourcing choices
+
+206
+00:12:34,378 --> 00:12:38,410
+based on previous data, as napkin math is always a bit haphazard.
+
+207
+00:12:38,570 --> 00:12:41,758
+So we sort of give it a bit of memory and give it a bit
+
+208
+00:12:41,764 --> 00:12:44,894
+of cpu and start it and kind of hope
+
+209
+00:12:44,932 --> 00:12:48,580
+that it's fine. And some examples where this can go a bit wrong.
+
+210
+00:12:49,430 --> 00:12:53,282
+One thing that I've seen was we had a service that we used actually,
+
+211
+00:12:53,336 --> 00:12:56,686
+so we were the integrator and they started suddenly adding lots
+
+212
+00:12:56,718 --> 00:13:00,114
+more events to each webhook. And so our workers
+
+213
+00:13:00,162 --> 00:13:03,746
+started trying to load all this data and basically they started getting even killed
+
+214
+00:13:03,778 --> 00:13:06,950
+very very frequently. And we can also think about our first try
+
+215
+00:13:07,020 --> 00:13:10,978
+here, right, where speeding up an API increased the load on the database.
+
+216
+00:13:11,074 --> 00:13:14,746
+So we need to be careful about things where we're changing the behavior of our
+
+217
+00:13:14,768 --> 00:13:18,234
+system, even if the behavior is maybe kind of a bit
+
+218
+00:13:18,272 --> 00:13:21,466
+like what would be called non functional requirements, as opposed to just the
+
+219
+00:13:21,488 --> 00:13:24,942
+exact data that we're returning or the business logic that we apply.
+
+220
+00:13:25,076 --> 00:13:28,574
+So if we want to stop breaking other people's things, we need to help our
+
+221
+00:13:28,612 --> 00:13:32,490
+integrators stop making bad assumptions. So when it comes to docs,
+
+222
+00:13:32,570 --> 00:13:36,286
+we want to document edge cases. When someone raises a support ticket
+
+223
+00:13:36,318 --> 00:13:39,454
+about an edge case, always be asking, can we get this into the docs,
+
+224
+00:13:39,502 --> 00:13:43,486
+how do we make this discoverable? Faqs can be useful,
+
+225
+00:13:43,678 --> 00:13:46,946
+but it's really all about discoverability. So you want to think,
+
+226
+00:13:46,968 --> 00:13:50,562
+but both search within your doc site, but also SEO,
+
+227
+00:13:50,626 --> 00:13:54,518
+right? We're all developers, we all Google things like 400 times a day.
+
+228
+00:13:54,604 --> 00:13:57,926
+If your docs don't show up when they get googled, they're going to be
+
+229
+00:13:57,948 --> 00:14:01,114
+using some third parties and they're not going to be right. And then the other
+
+230
+00:14:01,152 --> 00:14:04,330
+important thing here is do not semver deliberately not
+
+231
+00:14:04,400 --> 00:14:07,674
+document something. And I've heard this argument a lot of times which
+
+232
+00:14:07,712 --> 00:14:10,874
+says oh well, we're not sure that weve going to keep it,
+
+233
+00:14:10,912 --> 00:14:14,266
+so we're just going to not tell the integrations. If it's subject to
+
+234
+00:14:14,288 --> 00:14:16,954
+change, you really want to call it out so there's no ambiguity,
+
+235
+00:14:17,082 --> 00:14:20,270
+particularly if it's something that is visible to the integrator.
+
+236
+00:14:20,610 --> 00:14:23,566
+Because if you don't do that, then you end up in this position where the
+
+237
+00:14:23,588 --> 00:14:28,142
+integrator, all they get is the observed behavior and there's no associated documentation.
+
+238
+00:14:28,286 --> 00:14:31,586
+And what they're going to do, as we've already discussed, is assume that
+
+239
+00:14:31,608 --> 00:14:34,946
+it's not going to change. So if you don't document something, you can end
+
+240
+00:14:34,968 --> 00:14:38,546
+up just as locked in as if you do. So the best is
+
+241
+00:14:38,568 --> 00:14:42,470
+to call it out and be like very, very clearly this is going to change.
+
+242
+00:14:42,620 --> 00:14:45,846
+Please don't rely on this. Thank you very much. When it comes to
+
+243
+00:14:45,868 --> 00:14:49,206
+support articles and blog posts, you obviously want to keep your own
+
+244
+00:14:49,228 --> 00:14:51,838
+religiously up to date and again searchable.
+
+245
+00:14:52,034 --> 00:14:55,206
+Make sure that if a guide's like against a particular API version,
+
+246
+00:14:55,238 --> 00:14:58,966
+that that's called out really clearly. And if you do have third party party
+
+247
+00:14:58,998 --> 00:15:02,506
+blogs that are incorrect, try contacting the author or commenting with
+
+248
+00:15:02,528 --> 00:15:06,266
+a fix needed to make it work. Or alternatively, point them at an equivalent
+
+249
+00:15:06,298 --> 00:15:09,866
+page that you've written on your own site. If you get unlucky, that third party
+
+250
+00:15:09,898 --> 00:15:12,926
+content can become the equivalent of Ralph Brown's interrupt list.
+
+251
+00:15:13,028 --> 00:15:16,434
+Ad hoc communication is one of the hardest things to solve. In my
+
+252
+00:15:16,472 --> 00:15:20,318
+experience, many b, two b software companies end up emailing random pdfs
+
+253
+00:15:20,334 --> 00:15:24,046
+around all over these place or even creating shared slack channels.
+
+254
+00:15:24,158 --> 00:15:28,066
+Now things might sound great, right? We're talking to our integrators,
+
+255
+00:15:28,098 --> 00:15:31,794
+we're giving them loads of information. But if all of this stuff isn't
+
+256
+00:15:31,842 --> 00:15:35,302
+accessible to engineers, that means that engineers have no chance
+
+257
+00:15:35,356 --> 00:15:38,566
+of working out what assumptions might have been made as a result.
+
+258
+00:15:38,668 --> 00:15:42,314
+So in order to combat that, you want to make sure thats everyone has access
+
+259
+00:15:42,432 --> 00:15:45,974
+to all of that information that you send out, ideally in a really searchable
+
+260
+00:15:46,022 --> 00:15:49,846
+format, and try and avoid having large materials that aren't centrally
+
+261
+00:15:49,878 --> 00:15:52,922
+controlled. They don't all have to be public. But if everybody
+
+262
+00:15:52,976 --> 00:15:56,446
+is using the same docs and singing from the same hymn cheat, that means thats
+
+263
+00:15:56,468 --> 00:15:59,978
+your integrator's behavior will be more consistent and it will be easier
+
+264
+00:16:00,074 --> 00:16:03,326
+to make sure that you're not going to break their stuff when it comes to
+
+265
+00:16:03,348 --> 00:16:06,994
+industry standards. Just follow them where you can flag really
+
+266
+00:16:07,032 --> 00:16:10,798
+loudly where you cant, or particularly where the industry hasn't yet settled.
+
+267
+00:16:10,894 --> 00:16:13,902
+And then there's quite a lot to think about with observed behavior.
+
+268
+00:16:14,046 --> 00:16:17,646
+So naming is really important, particularly given that developers don't
+
+269
+00:16:17,678 --> 00:16:21,254
+read the docs and they just look at the examples. So one
+
+270
+00:16:21,292 --> 00:16:24,690
+instance of this is we have a field on our bank accounts endpoint
+
+271
+00:16:24,770 --> 00:16:28,710
+which is account number ending. And it turns out in Australia account
+
+272
+00:16:28,780 --> 00:16:32,298
+numbers occasionally have letters in them. We do send it as a
+
+273
+00:16:32,304 --> 00:16:36,006
+string, but that does still surprise people and you end up with the odd
+
+274
+00:16:36,038 --> 00:16:39,818
+ticket asking us what's going on. We do document it as clearly as we can,
+
+275
+00:16:39,904 --> 00:16:43,246
+but because we've called it account number ending, people do kind
+
+276
+00:16:43,268 --> 00:16:46,542
+of reasonably assume thats it's a number. Another example is numbers
+
+277
+00:16:46,596 --> 00:16:49,962
+that begin with zeros, so those often get truncated.
+
+278
+00:16:50,026 --> 00:16:53,726
+So things like company registration number. If you have a
+
+279
+00:16:53,748 --> 00:16:56,926
+number type in your database, then those zeros are going to go in once and
+
+280
+00:16:56,948 --> 00:17:00,414
+they're never coming back. If stuff is already named badly and you can't
+
+281
+00:17:00,462 --> 00:17:03,762
+change it, try to draw attention to it in the docs as much as possible.
+
+282
+00:17:03,896 --> 00:17:07,826
+You can even include an example. You can include the edge case in
+
+283
+00:17:07,848 --> 00:17:11,686
+your kind of normal example, just as a super clear flag that
+
+284
+00:17:11,788 --> 00:17:15,314
+this looks like a number, but it isn't. So let's say you had an API
+
+285
+00:17:15,362 --> 00:17:18,658
+that returns a company registration number. Just make sure that that starts
+
+286
+00:17:18,674 --> 00:17:22,566
+with a zero. And that's a really easy way of signposting the slightly strange behavior.
+
+287
+00:17:22,678 --> 00:17:26,438
+You cant to use documentation and communication to combat pattern matching.
+
+288
+00:17:26,534 --> 00:17:29,978
+So we've already talked about making sure that you document things that might change.
+
+289
+00:17:30,064 --> 00:17:33,226
+So if you know that you could change your batch timings, call that out
+
+290
+00:17:33,248 --> 00:17:36,014
+in the docs like we currently run it once a day at 11:00 a.m.
+
+291
+00:17:36,052 --> 00:17:39,482
+But this is likely to change and then expose information on your API
+
+292
+00:17:39,546 --> 00:17:42,654
+that you might cant to change. It's a really good flag and even if under
+
+293
+00:17:42,692 --> 00:17:45,726
+the hood it's just pointing at a constant and nothing ever happens to
+
+294
+00:17:45,748 --> 00:17:48,978
+it. Bit means that an integrator is at least going to think about what are
+
+295
+00:17:48,984 --> 00:17:52,514
+they going to do if that doesn't return what they expect. And then the last
+
+296
+00:17:52,552 --> 00:17:55,874
+thing here is to restrict your own behavior and then document those
+
+297
+00:17:55,912 --> 00:17:59,026
+restrictions. So as an example here, we were
+
+298
+00:17:59,048 --> 00:18:02,534
+talking about the number of events in a webhook, right? That's not something that
+
+299
+00:18:02,572 --> 00:18:06,486
+should just happen by accident, because if it does, then what that means is
+
+300
+00:18:06,508 --> 00:18:09,750
+in the future a developer might come back and find
+
+301
+00:18:09,820 --> 00:18:14,090
+some performance optimization, and now all of a sudden, you've got 550
+
+302
+00:18:14,160 --> 00:18:17,306
+times as many events per webhook. So instead, what you want
+
+303
+00:18:17,328 --> 00:18:20,746
+to do is document the limit, even if that limit seems kind of
+
+304
+00:18:20,848 --> 00:18:24,334
+unreasonable to you in terms of like that you'll never hit bit. And then
+
+305
+00:18:24,372 --> 00:18:28,106
+make sure that you actually restrict the behavior in the code to match the documented
+
+306
+00:18:28,138 --> 00:18:31,610
+limit. And any external behavior should have clearly defined limits.
+
+307
+00:18:31,690 --> 00:18:35,326
+So that's things like payload size, but also potentially the
+
+308
+00:18:35,348 --> 00:18:39,154
+rate at which you send requests to integrations for complex products.
+
+309
+00:18:39,272 --> 00:18:42,862
+It's very unlikely that all your integrators will have avoided bad assumptions.
+
+310
+00:18:43,006 --> 00:18:46,562
+So we also need to find strategies to mitigate the impact of our changes.
+
+311
+00:18:46,696 --> 00:18:50,226
+These first thing to remember is that a change isn't just either breaking
+
+312
+00:18:50,258 --> 00:18:54,134
+or not. If an integrator has done something strange enough, and believe me,
+
+313
+00:18:54,172 --> 00:18:57,842
+they will, almost anything can be breaking. This binary
+
+314
+00:18:57,906 --> 00:19:01,094
+was historically used to assign blame. If it's not breaking,
+
+315
+00:19:01,142 --> 00:19:05,222
+then it's the integrator's fault. But as we discussed earlier, it may not be technically
+
+316
+00:19:05,286 --> 00:19:08,346
+your fault, but it's probably still your problem if your
+
+317
+00:19:08,368 --> 00:19:12,086
+biggest customer's integration breaks. The fact that you didn't break the official rules
+
+318
+00:19:12,118 --> 00:19:15,466
+will be little consolation to the engineers who are up all night trying to resolve
+
+319
+00:19:15,498 --> 00:19:19,466
+it. And the attitude just isn't productive. You can't always blame the developer
+
+320
+00:19:19,498 --> 00:19:22,494
+at the other end, as it's not possible for them to write code without making
+
+321
+00:19:22,532 --> 00:19:25,614
+assumptions. And lots of this stuff is really easy to get wrong.
+
+322
+00:19:25,732 --> 00:19:29,266
+So instead of thinking about it as a yes no question, we should think about
+
+323
+00:19:29,288 --> 00:19:32,718
+it in terms of probabilities. How likely is it that someones is relying
+
+324
+00:19:32,734 --> 00:19:36,434
+on this behavior? Not all breaking changes are equal, right? So some
+
+325
+00:19:36,472 --> 00:19:39,958
+changes are 100% breaking. So if you kill an endpoint, it's going
+
+326
+00:19:39,964 --> 00:19:43,350
+to break everybody's stuff, but many are neither 0%
+
+327
+00:19:43,420 --> 00:19:47,126
+nor 100. Try to empathize with your integrators about what
+
+328
+00:19:47,148 --> 00:19:51,250
+assumptions these might have made, and particularly try and use people in your organization
+
+329
+00:19:51,330 --> 00:19:54,794
+who are less familiar with the specifics than you are, to rub a duck if
+
+330
+00:19:54,832 --> 00:19:58,394
+possible. Also, obviously try and talk to your integrations, as that will really
+
+331
+00:19:58,432 --> 00:20:02,394
+help you empathize and understand which bits of your system they understand and
+
+332
+00:20:02,432 --> 00:20:05,902
+which bits they perhaps don't really have the same mental model as you do.
+
+333
+00:20:06,036 --> 00:20:10,138
+If you can find ways to dog food your APIs to find tripwires,
+
+334
+00:20:10,234 --> 00:20:13,006
+I think a really effective tool here is to have it as part of an
+
+335
+00:20:13,028 --> 00:20:16,974
+onboarding process for new engineers to try and integrate against your API.
+
+336
+00:20:17,022 --> 00:20:20,946
+I think it's a really good way of both introducing your engineers to the
+
+337
+00:20:20,968 --> 00:20:24,818
+idea of how to empathize with integrations, introducing them to your product and the
+
+338
+00:20:24,824 --> 00:20:28,034
+core concept from an integrator point of view, and also
+
+339
+00:20:28,072 --> 00:20:31,094
+trying to make sure that you keep your docs in line and you can ask
+
+340
+00:20:31,132 --> 00:20:34,450
+them to raise anything that they find surprising or unusual.
+
+341
+00:20:34,530 --> 00:20:37,526
+And then you can edit the docs accordingly. And then finally,
+
+342
+00:20:37,628 --> 00:20:40,886
+sometimes you can even measure it. So add observability to
+
+343
+00:20:40,908 --> 00:20:44,486
+help you look for people who are relying on some undocumented behavior.
+
+344
+00:20:44,598 --> 00:20:48,342
+So for us, we can see this big spike in payment, create requests
+
+345
+00:20:48,406 --> 00:20:51,898
+every day just before our payment run. So we're really confident that
+
+346
+00:20:51,904 --> 00:20:55,658
+we're going to break loads of stuff if we change that payment runtime. And you'd
+
+347
+00:20:55,674 --> 00:20:58,622
+be surprised that if you really think about it, there are lots of different ways
+
+348
+00:20:58,676 --> 00:21:01,982
+in which you can kind of observe and measure that, particularly after
+
+349
+00:21:02,036 --> 00:21:05,498
+the fact as well, right? If you're
+
+350
+00:21:05,514 --> 00:21:09,362
+looking at the webhooks that you send out, you can monitor the error response rate
+
+351
+00:21:09,496 --> 00:21:12,754
+and then potentially you might be able to see that something's gone wrong in someone
+
+352
+00:21:12,792 --> 00:21:16,546
+else's integration because they're just 500 ing back to you. And that's new.
+
+353
+00:21:16,648 --> 00:21:20,466
+You want to be able to scale your release approach depending on how many integrators
+
+354
+00:21:20,498 --> 00:21:24,278
+have made the bad assumption. So we need to have different strategies that we
+
+355
+00:21:24,284 --> 00:21:27,718
+can employ at different levels. If we over communicate, we get into a
+
+356
+00:21:27,724 --> 00:21:31,254
+boy who cried wolf situation where no one reads anything that you send
+
+357
+00:21:31,292 --> 00:21:34,726
+them and then their stuff ends up breaking anyway. And the fact that you emailed
+
+358
+00:21:34,758 --> 00:21:38,026
+them doesn't seem to make them feel any better. We all receive loads of
+
+359
+00:21:38,048 --> 00:21:41,626
+emails and we all ignore lots and lots of emails. So we
+
+360
+00:21:41,648 --> 00:21:45,146
+really do have to be quite thoughtful here. So start at pullcoms,
+
+361
+00:21:45,258 --> 00:21:49,118
+whether that's just updating your docs, hopefully you've got like a change log.
+
+362
+00:21:49,284 --> 00:21:52,766
+And this is really useful to help integrators recover after they've found an
+
+363
+00:21:52,788 --> 00:21:56,302
+issue, right? So they see some problem, they then turn
+
+364
+00:21:56,356 --> 00:22:00,162
+up, they go to your API docs, they see the change log. Okay, I now
+
+365
+00:22:00,216 --> 00:22:03,874
+understand that a b and know I need to make this change
+
+366
+00:22:03,912 --> 00:22:07,426
+because Gocardless have done this, everybody's good and you can then upgrade to
+
+367
+00:22:07,448 --> 00:22:11,522
+pushcoms. So whether that's like a newsletter or an email that you send to integrations,
+
+368
+00:22:11,586 --> 00:22:14,726
+and it is really difficult to get this right because you really cant to make
+
+369
+00:22:14,748 --> 00:22:18,806
+sure that the only people you're contacting are kind of care,
+
+370
+00:22:18,908 --> 00:22:22,018
+because the more you tell people about things they don't care about, the less they're
+
+371
+00:22:22,034 --> 00:22:25,034
+going to break everything you send them. So if you can try and filter your
+
+372
+00:22:25,072 --> 00:22:28,986
+comms to only the integrators that you believe will be affected, particularly if
+
+373
+00:22:29,008 --> 00:22:32,666
+a change only affects a particular group. And it can
+
+374
+00:22:32,688 --> 00:22:36,720
+be really, really tempting to use that email for kind of marketing content.
+
+375
+00:22:37,090 --> 00:22:40,590
+And I think it's really important to keep those as separate as you can,
+
+376
+00:22:40,740 --> 00:22:44,078
+because as soon as people see marketing content, they kind of switch off and they
+
+377
+00:22:44,084 --> 00:22:47,774
+think it's not important. And then the last one, if you're really worried, is explicitly
+
+378
+00:22:47,822 --> 00:22:51,582
+acknowledged comms and it's unlikely you'd want to do this for all your integrators,
+
+379
+00:22:51,646 --> 00:22:55,346
+but potentially for like a few key integrators, this can be
+
+380
+00:22:55,368 --> 00:22:59,374
+a really useful approach before rolling out a change. Things is particularly
+
+381
+00:22:59,422 --> 00:23:03,218
+good if you've kind of observed and measured and found a couple of integrations
+
+382
+00:23:03,234 --> 00:23:06,738
+that you specifically think are going to have problems with things change. And then I'd
+
+383
+00:23:06,754 --> 00:23:10,626
+also say make breaking changes. Often all of this comms is like a muscle
+
+384
+00:23:10,658 --> 00:23:14,554
+that you need to practice, and if you don't do it for a very long
+
+385
+00:23:14,592 --> 00:23:18,646
+time, you get scared and you forget how and you also lose the infrastructure
+
+386
+00:23:18,678 --> 00:23:21,946
+to do it. So as an example, it's really important that you have
+
+387
+00:23:21,968 --> 00:23:25,406
+an up to date list of emails, or at least a way of
+
+388
+00:23:25,428 --> 00:23:29,374
+contacting your integrators. And if you don't contact them ever, then what you discover is
+
+389
+00:23:29,412 --> 00:23:33,406
+that list very quickly gets out of date. We can also mitigate the impact of
+
+390
+00:23:33,428 --> 00:23:37,374
+a breaking change by releasing it in different ways. Making changes incrementally
+
+391
+00:23:37,422 --> 00:23:41,262
+is the best approach. It helps give early warning signs to your integrators.
+
+392
+00:23:41,406 --> 00:23:45,282
+So that might be applying the change to like a percentage of requests or
+
+393
+00:23:45,336 --> 00:23:48,566
+perhaps slowly increasing the number of events per webhook to
+
+394
+00:23:48,588 --> 00:23:51,910
+avoid. This will help integrators, sorry,
+
+395
+00:23:51,980 --> 00:23:55,234
+avoid performance cliffs, and it could turn a potential outage
+
+396
+00:23:55,282 --> 00:23:59,286
+into a minor service degradation. Many integrators will have near minds
+
+397
+00:23:59,308 --> 00:24:02,566
+alerting to help them identify problems before they cause any significant
+
+398
+00:24:02,598 --> 00:24:05,786
+damage. Alternatively, if you've got like a test or
+
+399
+00:24:05,808 --> 00:24:09,370
+a sandbox environment that can also be a great candidate for this stuff.
+
+400
+00:24:09,520 --> 00:24:13,494
+Making the change there, obviously, assuming that integrators are actively
+
+401
+00:24:13,542 --> 00:24:16,926
+using it, can act as the canary in the coal mine to help alert you
+
+402
+00:24:16,948 --> 00:24:19,706
+of who you need to talk to before rolling it, but to production.
+
+403
+00:24:19,818 --> 00:24:23,754
+And then the final point is about rolling back. If your biggest integrator
+
+404
+00:24:23,802 --> 00:24:27,198
+phones you and tells you that you've broken these stuff, it's really nice to have
+
+405
+00:24:27,204 --> 00:24:30,462
+a kill switch in your back pocket. You also want to be able to identify
+
+406
+00:24:30,526 --> 00:24:33,746
+the point of no return of particular changes so you can really quickly and
+
+407
+00:24:33,768 --> 00:24:38,638
+effectively communicate when you do get into those kind of high pressure incident scenarios.
+
+408
+00:24:38,814 --> 00:24:42,086
+The only way to truly avoid breaking other people's things is to
+
+409
+00:24:42,108 --> 00:24:45,526
+not change anything at all, and often even that is not possible.
+
+410
+00:24:45,708 --> 00:24:48,418
+So instead we need to think about managing risk.
+
+411
+00:24:48,514 --> 00:24:52,198
+We've talked about ways of preventing these issues by helping your integrators
+
+412
+00:24:52,214 --> 00:24:55,658
+make good assumptions in the first place and how important it is to build and
+
+413
+00:24:55,664 --> 00:24:59,402
+maintain a capability to communicate when you're making these kind of changes,
+
+414
+00:24:59,536 --> 00:25:02,870
+which massively helps mitigate the impact. But you aren't a
+
+415
+00:25:02,880 --> 00:25:06,670
+mind reader, and integrators are sometimes careless just like you.
+
+416
+00:25:06,820 --> 00:25:09,966
+So be cautious. Assume that your integrators didn't read the
+
+417
+00:25:09,988 --> 00:25:13,326
+docs perfectly and may have cut corners or been under pressure. They may
+
+418
+00:25:13,348 --> 00:25:17,186
+not have the observability of their systems that you might hope or expect. So you
+
+419
+00:25:17,208 --> 00:25:21,182
+need to find the balance between caution and product delivery that's right for your organization.
+
+420
+00:25:21,326 --> 00:25:24,674
+For all the modern talk of move fast and break things, it's still
+
+421
+00:25:24,712 --> 00:25:27,778
+painful when stuff breaks, and it can take a lot of time and energy to
+
+422
+00:25:27,784 --> 00:25:31,126
+recover. Building trust with your integrations is critical to the success of
+
+423
+00:25:31,148 --> 00:25:34,998
+a product, but so is delivering features. We may not be able to completely
+
+424
+00:25:35,084 --> 00:25:38,822
+stop breaking other people's things, but we can definitely make it much less
+
+425
+00:25:38,876 --> 00:25:42,038
+likely if we put the effort in. I really hope you've enjoyed the talk.
+
+426
+00:25:42,124 --> 00:25:45,618
+Thanks so much for listening. Please find me on Twitter at Pat Prakati
+
+427
+00:25:45,634 --> 00:25:48,646
+Underscore Eng if you'd like to. Thats about anything that we've covered today,
+
+428
+00:25:48,748 --> 00:25:49,780
+and I hope you have a great day.
+

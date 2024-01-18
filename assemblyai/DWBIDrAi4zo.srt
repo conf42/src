@@ -1,0 +1,2608 @@
+1
+00:00:27,650 --> 00:00:31,314
+Hello everyone, welcome to our presentation today. I'm Ranjan, a software
+
+2
+00:00:31,362 --> 00:00:34,498
+developer, and I'm Sylvia, my student at Carleton University.
+
+3
+00:00:34,594 --> 00:00:38,134
+Today we'll be taking a session on debugging JVM performance issues.
+
+4
+00:00:38,252 --> 00:00:42,354
+The goal of this presentation is to provide an overview of performance
+
+5
+00:00:42,402 --> 00:00:45,766
+issues that we have encountered over the past few years in the
+
+6
+00:00:45,788 --> 00:00:49,234
+context of Java applications and how to go about debugging
+
+7
+00:00:49,282 --> 00:00:53,006
+them. A few disclaimers before we proceed this is a fragment of
+
+8
+00:00:53,028 --> 00:00:56,766
+our experience. It's not meant to be a comprehensive guide, at least not yet.
+
+9
+00:00:56,868 --> 00:01:00,046
+It covers a brief overview of the memory layout and
+
+10
+00:01:00,068 --> 00:01:03,598
+the garbage collection process, followed by the triage process for the
+
+11
+00:01:03,604 --> 00:01:07,026
+performance issues and aspects of the tools that
+
+12
+00:01:07,048 --> 00:01:10,926
+are used in the triage process. What it does not cover are detailed
+
+13
+00:01:10,958 --> 00:01:14,594
+instructions on how to use those tools. Links are provided for that
+
+14
+00:01:14,632 --> 00:01:18,210
+purpose, followed by fine tuning the JVM performance
+
+15
+00:01:18,290 --> 00:01:22,022
+nor fixing the performance issue. Those are topics for another
+
+16
+00:01:22,076 --> 00:01:25,330
+day. The agenda of the presentation can be broadly classified
+
+17
+00:01:25,410 --> 00:01:29,206
+into three portions. The first part is about a
+
+18
+00:01:29,228 --> 00:01:32,694
+JVM internals recap, followed by the performance issues
+
+19
+00:01:32,812 --> 00:01:36,106
+that we'd be mentioning and talking about as to how to go
+
+20
+00:01:36,128 --> 00:01:40,454
+about triage. And then we'd be wrapping it up and concluding in the JVM internal
+
+21
+00:01:40,502 --> 00:01:44,366
+section. Sylvia will be talking about the memory layout followed by
+
+22
+00:01:44,468 --> 00:01:47,722
+the garbage collection process, and then she'll
+
+23
+00:01:47,786 --> 00:01:51,754
+move on to the performance issue section where she'll be talking about a high cpu
+
+24
+00:01:51,802 --> 00:01:55,230
+usage and a high garbage collection activity scenario.
+
+25
+00:01:55,390 --> 00:01:59,246
+And then I'll take over and we'll be talking about a high memory usage
+
+26
+00:01:59,358 --> 00:02:03,054
+and an application crash scenario. Then we'll summarize the triage
+
+27
+00:02:03,102 --> 00:02:06,846
+process for the aforementioned performance issues, followed by the
+
+28
+00:02:06,888 --> 00:02:10,466
+future work we have on our mind. There's a question slide
+
+29
+00:02:10,578 --> 00:02:13,894
+which contains links to wikipages that talk
+
+30
+00:02:13,932 --> 00:02:17,446
+about all the topics mentioned in the slides in much more detail,
+
+31
+00:02:17,548 --> 00:02:20,982
+as well as the open source library that we'll be talking about in this
+
+32
+00:02:21,036 --> 00:02:24,554
+presentation. So any questions, any concerns at that point of time, feel free
+
+33
+00:02:24,592 --> 00:02:28,058
+to reach out to us. Our email addresses will be provided at the description of
+
+34
+00:02:28,064 --> 00:02:30,906
+the video, so we would appreciate questions,
+
+35
+00:02:31,008 --> 00:02:34,686
+feedback, or any other comments that you may have. Now, I'll hand it over
+
+36
+00:02:34,708 --> 00:02:38,126
+to Sylvia to start with the JVM internals recap. So thank
+
+37
+00:02:38,148 --> 00:02:41,866
+you Ranjan for the introduction. I know many of you already know what JVM
+
+38
+00:02:41,898 --> 00:02:44,926
+is and how its memory is divided into. For those who don't know,
+
+39
+00:02:44,948 --> 00:02:48,878
+I'll give you guys a brief explanation on what it is. JVM stands for Java
+
+40
+00:02:48,894 --> 00:02:52,334
+virtual machine. It's a lightweight virtual machine that runs Java applications.
+
+41
+00:02:52,382 --> 00:02:56,162
+Its memory is divided into five sections, so the first section is the prom
+
+42
+00:02:56,216 --> 00:03:00,118
+counter or pc register, and this is where we store the address of
+
+43
+00:03:00,124 --> 00:03:03,522
+the current instruction being executed. Next we have the stack,
+
+44
+00:03:03,586 --> 00:03:07,462
+and in the stack we have the stack frames. When a method is called
+
+45
+00:03:07,516 --> 00:03:11,670
+a new stack frame will be created for that method, and each stack frame contains
+
+46
+00:03:11,750 --> 00:03:15,130
+the local variables and the local variables are stored in an order
+
+47
+00:03:15,200 --> 00:03:18,922
+set and depending on its type, it's going to be stored into
+
+48
+00:03:18,976 --> 00:03:22,666
+one entry onto two entries. So for example, if it's going to be an
+
+49
+00:03:22,688 --> 00:03:26,118
+integer, it's going to be stored into one entry, but if
+
+50
+00:03:26,144 --> 00:03:28,682
+it's a long or a double, it's going to be stored into two entries.
+
+51
+00:03:28,746 --> 00:03:31,934
+And inside the stack frame we also have the operand stack and as
+
+52
+00:03:31,972 --> 00:03:35,418
+its name suggests it's a stack and this is where the intermediate
+
+53
+00:03:35,434 --> 00:03:38,818
+operations are going to be stored. Finally, we have the frame data, and the
+
+54
+00:03:38,824 --> 00:03:42,626
+frame data contains the references to the constant pool and the
+
+55
+00:03:42,648 --> 00:03:46,900
+exception table. So the constant pool is a table that contains information about
+
+56
+00:03:48,310 --> 00:03:51,282
+the values of the constants and as well as their types.
+
+57
+00:03:51,346 --> 00:03:54,726
+And the exception table is a table that allows the
+
+58
+00:03:54,748 --> 00:03:57,926
+JVM to know where an exception can be thrown and where
+
+59
+00:03:57,948 --> 00:04:01,246
+it can be handled. Then we also have the native method stack, and the native
+
+60
+00:04:01,298 --> 00:04:05,206
+method stack is similar to a stack, but it will behave differently depending
+
+61
+00:04:05,238 --> 00:04:09,174
+on the native language. So if the native language is c, then the native
+
+62
+00:04:09,222 --> 00:04:13,226
+method stack will behave like a c stack. Inside the Javier memory
+
+63
+00:04:13,418 --> 00:04:16,638
+we also have the method area, and the method area
+
+64
+00:04:16,724 --> 00:04:20,314
+contains class level information, so that includes the static
+
+65
+00:04:20,362 --> 00:04:23,866
+fields as well as the code method. And this is where the constant pool
+
+66
+00:04:23,898 --> 00:04:27,502
+is going to be located. The method area is logically part of the heap,
+
+67
+00:04:27,566 --> 00:04:31,214
+and the heap is where we store the Java application objects. It is divided
+
+68
+00:04:31,262 --> 00:04:34,766
+into three sections. The first section is the joint generation, and the joint
+
+69
+00:04:34,798 --> 00:04:37,970
+generation contains objects that are newly created.
+
+70
+00:04:38,390 --> 00:04:42,214
+It has two parts. The first part is Eden, and Eden is
+
+71
+00:04:42,252 --> 00:04:45,526
+where the newly created objects are going to be located. And then we have the
+
+72
+00:04:45,548 --> 00:04:49,014
+survivor spaces, and the survivor spaces contains objects that have
+
+73
+00:04:49,052 --> 00:04:53,222
+survived at least one DC cycle or garbage collection
+
+74
+00:04:53,286 --> 00:04:56,506
+cycle. Inside the heap we also have the old generation, and the
+
+75
+00:04:56,528 --> 00:05:00,662
+old generation is where the objects that have survived
+
+76
+00:05:00,806 --> 00:05:04,326
+multiple GC cycles are stored.
+
+77
+00:05:04,518 --> 00:05:07,902
+Then we also have the metaspace, and the metaspace is
+
+78
+00:05:07,956 --> 00:05:11,726
+where we store class level information. And this is where the method area is
+
+79
+00:05:11,748 --> 00:05:15,262
+located. When the hue runs on memory we need to have a process that would
+
+80
+00:05:15,316 --> 00:05:19,010
+allocate and use objects, and this is where the garbage collector comes into play.
+
+81
+00:05:19,080 --> 00:05:22,606
+So the garbage collector is a tool that collects and use Java
+
+82
+00:05:22,638 --> 00:05:25,950
+objects. It works by first marking and then collecting.
+
+83
+00:05:26,030 --> 00:05:29,666
+When the garbage collector marks, it will try to find all the reference objects
+
+84
+00:05:29,698 --> 00:05:33,814
+and then mark them as alive. It will start looking from
+
+85
+00:05:33,852 --> 00:05:37,526
+the easy roads, and the easy roads are objects that
+
+86
+00:05:37,548 --> 00:05:41,114
+are referenced by the JVM at that specific moment.
+
+87
+00:05:41,232 --> 00:05:44,598
+So that includes the static objects. Once the garbage collector
+
+88
+00:05:44,694 --> 00:05:48,134
+finds all the reference objects, it will try to collect all the unreferenced
+
+89
+00:05:48,182 --> 00:05:51,818
+objects. And there's three main ways in which the garbage collector can
+
+90
+00:05:51,824 --> 00:05:55,566
+do it. The first way is by sweep. So when the
+
+91
+00:05:55,588 --> 00:05:59,466
+garbage collector swips, then we just deallocate the memory. So that can cause heap
+
+92
+00:05:59,498 --> 00:06:03,470
+fragmentation. And hip fragmentation occurs when we deallocate memory.
+
+93
+00:06:03,890 --> 00:06:07,314
+And that can lead to small gaps of free memory in between used
+
+94
+00:06:07,352 --> 00:06:10,866
+memory. And this is a huge issue for the performance of the
+
+95
+00:06:10,888 --> 00:06:14,258
+application. So a way to prevent this, the garbage collateral can also sweep and
+
+96
+00:06:14,264 --> 00:06:17,922
+compact. So after
+
+97
+00:06:17,976 --> 00:06:22,280
+reallocated the unused object, you can just compact the reference object
+
+98
+00:06:22,810 --> 00:06:26,066
+into a contiguous block. Another way to prevent hue
+
+99
+00:06:26,098 --> 00:06:29,670
+fermentation is by copying. So when the garbage
+
+100
+00:06:30,270 --> 00:06:35,174
+copies, it will copy all the reference objects internal
+
+101
+00:06:35,222 --> 00:06:39,158
+region and then it will delete the old region. So the garbage
+
+102
+00:06:39,174 --> 00:06:43,174
+collector can process different parts of the heap and depending on where it process,
+
+103
+00:06:43,312 --> 00:06:46,862
+it can be called by different names. So the
+
+104
+00:06:46,916 --> 00:06:50,574
+recruiter can be called minor GC if it process the
+
+105
+00:06:50,612 --> 00:06:54,154
+joint generation. So the minor GC
+
+106
+00:06:54,202 --> 00:06:59,186
+is triggered whenever the joint generation runs out of memory. And this
+
+107
+00:06:59,208 --> 00:07:02,802
+is the most frequently called GC. And that comes from the idea
+
+108
+00:07:02,856 --> 00:07:06,580
+that the most objects have a short lifespan, so it will be
+
+109
+00:07:07,030 --> 00:07:10,594
+more effective for the application that
+
+110
+00:07:10,632 --> 00:07:14,358
+the minor GC is run more frequently compared to the old gcs. Then we have
+
+111
+00:07:14,364 --> 00:07:18,274
+the major DC, and the major DC occurs in the old generation.
+
+112
+00:07:18,402 --> 00:07:21,910
+This can be triggered when the old generation runs out of memory,
+
+113
+00:07:22,250 --> 00:07:25,418
+or it can also be triggered by the minor DC. Then finally we
+
+114
+00:07:25,424 --> 00:07:29,094
+have the full DC, and this occurs when the garbage collector process the entire heap.
+
+115
+00:07:29,142 --> 00:07:32,470
+So before I continue with a different implementation of the garbage collector,
+
+116
+00:07:32,550 --> 00:07:35,726
+I have to talk about what stop the word pause is. So stop the
+
+117
+00:07:35,748 --> 00:07:39,802
+word pause is triggered by the GC, and when that occurs,
+
+118
+00:07:39,946 --> 00:07:45,266
+all the Java application threads will be frozen so
+
+119
+00:07:45,288 --> 00:07:49,122
+they won't be run. So the garbage collector can process
+
+120
+00:07:49,176 --> 00:07:52,558
+the heap without worrying about any change made by the Java
+
+121
+00:07:52,574 --> 00:07:55,794
+application. Now that we're going to discuss about
+
+122
+00:07:55,832 --> 00:07:59,686
+the different implementations of the garbage collector here, we're going to
+
+123
+00:07:59,708 --> 00:08:03,190
+discuss about the four most important ones.
+
+124
+00:08:03,260 --> 00:08:06,786
+So the first one that we're going to look into is zero garbage collector.
+
+125
+00:08:06,898 --> 00:08:10,386
+So this is a single thread garbage collector that creates a stopped wordpause
+
+126
+00:08:10,418 --> 00:08:14,118
+when marking and collecting. Looking at this example, we have three Java
+
+127
+00:08:14,134 --> 00:08:19,306
+application threads that are running and once the heap runs out of memory the
+
+128
+00:08:19,328 --> 00:08:23,142
+zero garbage collector will start and this will trigger stop the word pause
+
+129
+00:08:23,206 --> 00:08:27,018
+and after the GC thread terminates,
+
+130
+00:08:27,114 --> 00:08:30,638
+then the Java application thread will resume their execution. Then we
+
+131
+00:08:30,644 --> 00:08:34,282
+have the parallel GC and this is similar to the zero GC,
+
+132
+00:08:34,426 --> 00:08:37,678
+but it is different in the sense that instead of being single thread,
+
+133
+00:08:37,774 --> 00:08:41,010
+it's going to be multi thread GC. Looking at this example,
+
+134
+00:08:41,080 --> 00:08:44,498
+we have three Java application threads that are running. Once the Hebrew runs out of
+
+135
+00:08:44,504 --> 00:08:48,006
+memory, the parallel GC is going to
+
+136
+00:08:48,028 --> 00:08:52,582
+start and this will trigger stop the work pause. And once
+
+137
+00:08:52,636 --> 00:08:56,546
+all the GC threads finish, then the Java application threads
+
+138
+00:08:56,578 --> 00:09:00,166
+will resume the execution. Another implementation of the garbage collector is
+
+139
+00:09:00,188 --> 00:09:03,878
+a concurrent mark and sweep, or CMS for short. So this is a multi thread
+
+140
+00:09:03,894 --> 00:09:07,754
+concurrent marking and sweeping GC look in this example we have three
+
+141
+00:09:07,792 --> 00:09:11,354
+Java application threads that are running and when the CMS is
+
+142
+00:09:11,392 --> 00:09:14,954
+triggered it will trigger a stop the word pulse for initial
+
+143
+00:09:15,002 --> 00:09:19,006
+marking. So during the initial marking, the garbage code will mark
+
+144
+00:09:19,188 --> 00:09:22,926
+all the easy routes. So as I explained before, the easy routes are objects that
+
+145
+00:09:22,948 --> 00:09:26,758
+are referenced by the JVM at a specific moment and that includes
+
+146
+00:09:26,794 --> 00:09:30,606
+the static objects. Once the initial marking is done, then the application thread
+
+147
+00:09:30,638 --> 00:09:34,450
+will resume, while at the same time the easy threads for marking
+
+148
+00:09:35,510 --> 00:09:39,730
+are also executed. After a period of time. Then the CMS
+
+149
+00:09:40,070 --> 00:09:43,654
+will trigger stop the word pause for the final marking, and during the final
+
+150
+00:09:43,692 --> 00:09:47,574
+marking the etC will ensure that all the changes made during
+
+151
+00:09:47,612 --> 00:09:51,338
+the concurrent marketing are also detected. Once the final marking is done,
+
+152
+00:09:51,424 --> 00:09:55,014
+then the application thread will resume the execution,
+
+153
+00:09:55,142 --> 00:09:58,906
+but at the same time the ETC threads will sweep the
+
+154
+00:09:58,928 --> 00:10:03,178
+heat. One of the main downsides of the CMS is
+
+155
+00:10:03,264 --> 00:10:06,686
+that it's not very good at preventing heat fermentation. So when
+
+156
+00:10:06,708 --> 00:10:10,286
+that occurs, the CMS needs to trigger stop the work pause for
+
+157
+00:10:10,308 --> 00:10:14,586
+compacting, and during compacting the CMS will compact all the reference
+
+158
+00:10:14,618 --> 00:10:18,206
+objects into a contiguous block and after compacting, the Niger application thread
+
+159
+00:10:18,238 --> 00:10:21,774
+will resume the execution. So as I trained before, the concurrent market suite
+
+160
+00:10:21,822 --> 00:10:25,086
+is not very good at preventing fermentation.
+
+161
+00:10:25,278 --> 00:10:29,286
+So in this next implementation of the garbage code it
+
+162
+00:10:29,308 --> 00:10:32,150
+will prevent memory fermentation.
+
+163
+00:10:32,890 --> 00:10:36,434
+So garbage first is a multitrack concurrent market and copying GC
+
+164
+00:10:36,482 --> 00:10:39,706
+that collects the garbage first. So what this means is that
+
+165
+00:10:39,728 --> 00:10:43,302
+the garbage first will process the regions
+
+166
+00:10:43,446 --> 00:10:47,258
+that has more garbage or unreferenced objects first.
+
+167
+00:10:47,344 --> 00:10:50,954
+One difference between this GC compared to the previous ones is
+
+168
+00:10:50,992 --> 00:10:54,622
+that it divides the heap into regions of equal sizes while
+
+169
+00:10:54,676 --> 00:10:58,634
+also maintaining the old generation and the joint generation. Looking at this picture,
+
+170
+00:10:58,682 --> 00:11:02,026
+this is how the garbage first look at the heap.
+
+171
+00:11:02,218 --> 00:11:06,302
+In this example, we want to process these
+
+172
+00:11:06,356 --> 00:11:09,586
+three highlighted regions. What does the garbage first will do? It will
+
+173
+00:11:09,608 --> 00:11:13,490
+copy all the reference objects in those regions and then move them into
+
+174
+00:11:13,560 --> 00:11:17,170
+where the arrow is pointed. So to the blue region, and once all the
+
+175
+00:11:17,240 --> 00:11:21,346
+reference objects are copied, then the old regions will be deleted.
+
+176
+00:11:21,458 --> 00:11:25,446
+Looking at this other example, we have three Java application threads that are running and
+
+177
+00:11:25,468 --> 00:11:28,534
+when the garbage first starts it will trigger stop the word pause for
+
+178
+00:11:28,572 --> 00:11:32,234
+the initial marking, and after initial marking. Then the Java application threads will
+
+179
+00:11:32,272 --> 00:11:37,114
+resume their execution while at the same time the garbage first thread will
+
+180
+00:11:37,152 --> 00:11:40,858
+stop, concurrently marking, and after a period of time the garbage first will trigger a
+
+181
+00:11:40,864 --> 00:11:44,446
+stop the word pause for the final marking, and once the final marking is
+
+182
+00:11:44,468 --> 00:11:47,566
+done, then the garbage first will copy at the
+
+183
+00:11:47,588 --> 00:11:51,646
+same time the Java application
+
+184
+00:11:51,828 --> 00:11:55,438
+will run. So now that I've talked about the
+
+185
+00:11:55,444 --> 00:11:58,946
+different implementation of the garbage collector as well as how the JVM memory is
+
+186
+00:11:58,968 --> 00:12:02,430
+divided to now we're going to look at some performance
+
+187
+00:12:02,510 --> 00:12:05,666
+issues that we think are very common. So the
+
+188
+00:12:05,688 --> 00:12:09,534
+first scenarios that we're going to look into is when there's a thread that consists
+
+189
+00:12:09,582 --> 00:12:13,126
+more cpu compared to other threads in the same application. So for this
+
+190
+00:12:13,148 --> 00:12:16,978
+scenarios, we have created a multitread program with a thread that consumes
+
+191
+00:12:16,994 --> 00:12:20,822
+a lot of cpu compared to other threads in the same application. In this code
+
+192
+00:12:20,876 --> 00:12:24,506
+sample, we have the thread that will consume the most cpu, and this
+
+193
+00:12:24,528 --> 00:12:27,926
+thread will increase the counter continuously. In this order sample
+
+194
+00:12:27,958 --> 00:12:31,174
+code we have the normal thread and its behavior
+
+195
+00:12:31,222 --> 00:12:34,698
+is similar to a cpu hover thread, but instead of increasing
+
+196
+00:12:34,714 --> 00:12:38,346
+the counter continuously, it will slip in between iterations.
+
+197
+00:12:38,458 --> 00:12:42,106
+We will be using the normal thread as a baseline to compare to a cpu
+
+198
+00:12:42,138 --> 00:12:45,486
+hover thread. For this scenarios, we have created three normal threads
+
+199
+00:12:45,518 --> 00:12:49,314
+and one cpu hover thread. One way to debug this scenario is by using
+
+200
+00:12:49,352 --> 00:12:52,978
+jstack. So jstack is a command line tool that gets information
+
+201
+00:12:53,064 --> 00:12:56,682
+about the running threads. It's included
+
+202
+00:12:56,846 --> 00:13:00,774
+in Oracle, JDK, and OpenJDK. We have retrieved three samples using
+
+203
+00:13:00,812 --> 00:13:04,194
+jstack, and each sample was retrieved every 30 seconds.
+
+204
+00:13:04,242 --> 00:13:07,426
+So the first sample that we have collected,
+
+205
+00:13:07,618 --> 00:13:10,914
+we have collected it at the 11 seconds
+
+206
+00:13:10,962 --> 00:13:14,082
+mark. Then we have calculated the normal first
+
+207
+00:13:14,236 --> 00:13:17,866
+average cpu time and the cpu hover cpu time. Just by looking
+
+208
+00:13:17,888 --> 00:13:21,158
+at this data, the cpu hover cpu time is much higher than the normal threads
+
+209
+00:13:21,174 --> 00:13:24,606
+average the second sample we have collected is at conf
+
+210
+00:13:24,628 --> 00:13:28,686
+fourty two seconds mark. And by looking at the data from in
+
+211
+00:13:28,708 --> 00:13:32,074
+the second sample we have calculated the normal thread average
+
+212
+00:13:32,122 --> 00:13:34,800
+cpu time as well as cpu horizon time.
+
+213
+00:13:35,410 --> 00:13:39,006
+And still the cpu horizon time is still much higher than the normal thread
+
+214
+00:13:39,038 --> 00:13:42,946
+average. The third sample we have collected it at the 72 seconds mark.
+
+215
+00:13:43,048 --> 00:13:46,546
+And just by looking at the cpu time for a normal thread compared
+
+216
+00:13:46,578 --> 00:13:50,774
+to a cpu hover, the cpu hover is still much higher than
+
+217
+00:13:50,812 --> 00:13:54,454
+a normal thread. And yes, by looking at
+
+218
+00:13:54,572 --> 00:13:58,086
+the data collected throughout the whole samples, we can clearly see
+
+219
+00:13:58,108 --> 00:14:01,306
+that a cpu hover is a thread that consumes the most
+
+220
+00:14:01,328 --> 00:14:04,534
+cpu. Another way to trash this scenario
+
+221
+00:14:04,582 --> 00:14:07,894
+is by using visual VM. So visual VM is a visual
+
+222
+00:14:07,942 --> 00:14:11,834
+tool that allows you to get information about the
+
+223
+00:14:11,872 --> 00:14:15,662
+Java applications that are running. So looking at this screenshot, we can see
+
+224
+00:14:15,796 --> 00:14:19,082
+the running time of the cpu horror thread
+
+225
+00:14:19,146 --> 00:14:23,358
+and the normal threads. And the cpu horror thread has a
+
+226
+00:14:23,364 --> 00:14:26,386
+longer running time than the normal threads and this can be
+
+227
+00:14:26,408 --> 00:14:29,454
+screened by the state of the thread throughout the sampling.
+
+228
+00:14:29,502 --> 00:14:34,078
+So the cpu hover thread has been running continuously, which is denoted
+
+229
+00:14:34,174 --> 00:14:37,430
+by the green bar, while the normal threads have been sleeping
+
+230
+00:14:37,930 --> 00:14:41,638
+throughout the whole sampling which is denoted by the purple bar.
+
+231
+00:14:41,724 --> 00:14:45,286
+Another way to try this scenario is facing the
+
+232
+00:14:45,308 --> 00:14:48,886
+Java fly recorder and mission control. Java Fly recorder is a tool
+
+233
+00:14:48,988 --> 00:14:52,950
+that allows you to get information about the Java applications in the JVM.
+
+234
+00:14:53,030 --> 00:14:56,906
+A mission control is a visual tool that allows you to see the output from
+
+235
+00:14:56,928 --> 00:15:00,762
+the Java fly recorder. We have used Java fly recorder to record
+
+236
+00:15:00,816 --> 00:15:04,458
+the first 60 seconds on the application, and on the right side of the screenshot
+
+237
+00:15:04,474 --> 00:15:08,506
+we can see the state of the normal thread and also of the cpu
+
+238
+00:15:08,538 --> 00:15:12,190
+hover throughout the first 60 seconds. While the normal threads
+
+239
+00:15:12,610 --> 00:15:16,130
+have been throughout most of the sampling,
+
+240
+00:15:17,190 --> 00:15:20,660
+the cpu hover has been
+
+241
+00:15:21,430 --> 00:15:25,294
+running continuously. Another way to try this scenarios
+
+242
+00:15:25,342 --> 00:15:29,110
+is based in Jwadia. So Jwadia is an open source library that gets information
+
+243
+00:15:29,180 --> 00:15:33,186
+about the JVM, and in this sample code we're
+
+244
+00:15:33,218 --> 00:15:36,178
+getting information from Jwadia about the threads,
+
+245
+00:15:36,274 --> 00:15:39,570
+and then we print that information as shown in the sample output.
+
+246
+00:15:39,650 --> 00:15:43,542
+I also need to mention that Jwadia can get more information about the threads,
+
+247
+00:15:43,606 --> 00:15:47,622
+but for the purposes of this presentation, we're only showing a portion
+
+248
+00:15:47,686 --> 00:15:51,510
+of the data. But if you want to know what other threat information jy
+
+249
+00:15:51,590 --> 00:15:55,210
+can get, you can just look into the link at the end of this presentation
+
+250
+00:15:55,290 --> 00:15:58,702
+or at the description of this video. The second
+
+251
+00:15:58,756 --> 00:16:02,686
+scenarios that we're going to look into is whether is a high gc activity or
+
+252
+00:16:02,708 --> 00:16:06,106
+a high garbage collection activity. So for this scenarios
+
+253
+00:16:06,138 --> 00:16:09,490
+we have created a program that will create a large number
+
+254
+00:16:09,560 --> 00:16:12,926
+of objects and a portion of those objects are going to be referenced
+
+255
+00:16:12,958 --> 00:16:16,306
+and the other portions are going to be unreferenced. So the object that
+
+256
+00:16:16,328 --> 00:16:20,066
+we're going to create is called number and is around 16 bytes
+
+257
+00:16:20,098 --> 00:16:23,462
+in size. In this sample code we're creating a large number of number
+
+258
+00:16:23,516 --> 00:16:26,726
+objects and then we're only adding one fifth of them
+
+259
+00:16:26,828 --> 00:16:30,186
+to a list. So the reason that we're doing this is because we want
+
+260
+00:16:30,208 --> 00:16:33,562
+to see the difference between the minor GC versus the major
+
+261
+00:16:33,616 --> 00:16:37,434
+GC. For this scenario we have created 500 million
+
+262
+00:16:37,632 --> 00:16:41,306
+number objects. We have also used JSTA to get information
+
+263
+00:16:41,408 --> 00:16:45,386
+about the etc activity. We have collected a total of three samples,
+
+264
+00:16:45,418 --> 00:16:48,794
+and each sample we have collected it every 30 seconds.
+
+265
+00:16:48,842 --> 00:16:52,766
+The first sample we have collected it at 25 seconds mark. And if we only
+
+266
+00:16:52,788 --> 00:16:56,490
+focus on one EC thread, in this case the EC thread number zero,
+
+267
+00:16:56,580 --> 00:17:00,270
+we calculate the cpu time as well as tp usage.
+
+268
+00:17:00,350 --> 00:17:03,714
+So the second sample we have collected is at the 32 seconds mark.
+
+269
+00:17:03,752 --> 00:17:07,474
+It has been around 32 seconds since the last retrieval. So if we focus
+
+270
+00:17:07,512 --> 00:17:11,138
+on the EC three number zero, we can see that the cpu time has increased
+
+271
+00:17:11,234 --> 00:17:14,406
+as well as the cpu usage. So the third sample we have
+
+272
+00:17:14,428 --> 00:17:18,514
+collected is IB 89 seconds mark. It has been around 31 seconds
+
+273
+00:17:18,562 --> 00:17:21,978
+since the last retrieval. And if we focus on the etc three number zero,
+
+274
+00:17:22,064 --> 00:17:25,878
+the cpu time and the cpu usage have increased,
+
+275
+00:17:25,974 --> 00:17:29,606
+but the cpu usage is slowly starting to maintain
+
+276
+00:17:29,638 --> 00:17:33,034
+around 96%. We also can use visual
+
+277
+00:17:33,082 --> 00:17:36,766
+vm to get information about the etc activity. So on
+
+278
+00:17:36,788 --> 00:17:40,714
+the left side of the screenshot we can see the CPU usage
+
+279
+00:17:40,762 --> 00:17:43,826
+as well as the eTC activity. And on the right side we can see the
+
+280
+00:17:43,848 --> 00:17:47,154
+memory allocation. So if we use these two
+
+281
+00:17:47,192 --> 00:17:50,850
+graphs we can see that as more memory is used,
+
+282
+00:17:51,000 --> 00:17:54,962
+the EC activity will be steady but it will lower after
+
+283
+00:17:55,016 --> 00:17:58,878
+completing the etc cycle. We also use the Java
+
+284
+00:17:58,894 --> 00:18:02,626
+flight recorder and mission control to get information about the DC activity.
+
+285
+00:18:02,738 --> 00:18:06,706
+We have recorded the first 6 seconds of the application and look at this screenshot
+
+286
+00:18:06,738 --> 00:18:10,554
+of the javafly recorder. We can see the memory allocation which
+
+287
+00:18:10,592 --> 00:18:13,658
+is denoted by the purple lines, and we can
+
+288
+00:18:13,664 --> 00:18:17,466
+see the etC activity which is denoted by
+
+289
+00:18:17,488 --> 00:18:21,500
+the orange region. And by looking at this data we can see that
+
+290
+00:18:22,110 --> 00:18:25,354
+as more memory is allocated, the longer the
+
+291
+00:18:25,392 --> 00:18:28,606
+etC activity is but the less frequent it is. We can
+
+292
+00:18:28,628 --> 00:18:31,594
+also use Jwadia to get information about the eTC activity.
+
+293
+00:18:31,722 --> 00:18:35,134
+We have used this code sample to get information about the
+
+294
+00:18:35,172 --> 00:18:38,546
+EtC threat. Using Jwadia with the information we have
+
+295
+00:18:38,568 --> 00:18:42,334
+divided it based on if it's going to be in the young generation versus
+
+296
+00:18:42,382 --> 00:18:45,714
+the old generation. And using this data, we have plotted this graph
+
+297
+00:18:45,762 --> 00:18:49,286
+of collection count versus timestamp. And by comparing the
+
+298
+00:18:49,308 --> 00:18:52,642
+minor EC versus a major EC,
+
+299
+00:18:52,786 --> 00:18:56,450
+we can see that while the minor EC has increased continuously,
+
+300
+00:18:56,610 --> 00:19:00,234
+the major DC maintains at around zero during
+
+301
+00:19:00,272 --> 00:19:03,946
+the first half, but is also increased from the second half.
+
+302
+00:19:04,048 --> 00:19:07,574
+We also have plotted the speed time versus timestamp using the data retrieved
+
+303
+00:19:07,622 --> 00:19:11,098
+from Jwadia, and by comparing the minor EC versus the
+
+304
+00:19:11,104 --> 00:19:14,686
+major, etc. We can see that the behavior for both of them
+
+305
+00:19:14,708 --> 00:19:18,586
+is very different, but the minor EC has increased continuously until it reaches
+
+306
+00:19:18,618 --> 00:19:22,382
+a maximum 5 seconds. The major EC maintains at around 0
+
+307
+00:19:22,436 --> 00:19:25,786
+second during the first half and it starts to increase
+
+308
+00:19:25,818 --> 00:19:28,942
+from the second half until reaching a maximum of 43 seconds.
+
+309
+00:19:29,006 --> 00:19:32,622
+And the reason of this behavior for both the previous
+
+310
+00:19:32,686 --> 00:19:36,290
+graph and this graph for the major TC is mostly because
+
+311
+00:19:36,360 --> 00:19:39,950
+the old generation is running out of memory. So the major
+
+312
+00:19:40,120 --> 00:19:44,006
+is triggered in this region. So now I will give the presentation back to
+
+313
+00:19:44,028 --> 00:19:48,098
+Vania so he can spray to the next scenarios. Thank you Sylvia.
+
+314
+00:19:48,194 --> 00:19:51,618
+So moving on to scenario three, a high memory usage.
+
+315
+00:19:51,794 --> 00:19:55,034
+Please take a look at this snippet of code. Try to pause and see
+
+316
+00:19:55,072 --> 00:19:58,266
+if you can find out what's wrong or what is causing the issue in this
+
+317
+00:19:58,288 --> 00:20:02,026
+piece of code. There are two key aspects over here. One is we
+
+318
+00:20:02,048 --> 00:20:05,418
+have a method that generates a random string of a specified length,
+
+319
+00:20:05,514 --> 00:20:09,274
+followed by a main method which calls it and generates a string,
+
+320
+00:20:09,322 --> 00:20:12,686
+a random string of a 32 million characters in
+
+321
+00:20:12,708 --> 00:20:16,410
+count. So in Java, since we know that each character takes four bytes,
+
+322
+00:20:16,490 --> 00:20:19,586
+we can make an estimation saying that, okay, if we were
+
+323
+00:20:19,608 --> 00:20:23,266
+to generate 32 million characters, it'll take at least 32
+
+324
+00:20:23,288 --> 00:20:27,006
+million into four, which is 128 megabytes. So that's the minimum amount
+
+325
+00:20:27,048 --> 00:20:31,030
+of memory it would take. We still haven't considered all the local
+
+326
+00:20:31,100 --> 00:20:34,642
+variables or helper variables or other memory locations
+
+327
+00:20:34,706 --> 00:20:38,594
+used for calculation as a part of this. So we can say with confidence
+
+328
+00:20:38,642 --> 00:20:42,298
+that at least 128 mb will be needed. What happens
+
+329
+00:20:42,464 --> 00:20:46,042
+if we run the same program with an XMX value
+
+330
+00:20:46,096 --> 00:20:49,814
+of 64 megs? So we're saying that, okay, the maximum allocatable
+
+331
+00:20:49,862 --> 00:20:53,014
+heap space is 64 megs. Based on our calculation,
+
+332
+00:20:53,062 --> 00:20:56,286
+we know for a fact that at least 128 megabytes are needed.
+
+333
+00:20:56,388 --> 00:20:59,562
+So what do you think will happen? The JVM will just go boom.
+
+334
+00:20:59,706 --> 00:21:03,406
+It'll cite an out of memory error and it will say that hey, I'm not
+
+335
+00:21:03,428 --> 00:21:06,786
+able to allocate the necessary memory to do what you asked me to
+
+336
+00:21:06,808 --> 00:21:10,194
+do. So there are several ways to go about trialing this one
+
+337
+00:21:10,232 --> 00:21:13,966
+such way is to use a tool called JMAP, as mentioned by Sylvia
+
+338
+00:21:14,158 --> 00:21:17,858
+that's included with the jdks. And as long as we know
+
+339
+00:21:17,864 --> 00:21:21,218
+the process id of the Java application that has a high memory usage,
+
+340
+00:21:21,314 --> 00:21:24,822
+we can use the Jmap command and generate a heap dumps from it,
+
+341
+00:21:24,876 --> 00:21:28,566
+which is nothing but a snapshot of the heap memory at
+
+342
+00:21:28,588 --> 00:21:32,230
+that point in time. A word of caution, whenever a heap dump is generated,
+
+343
+00:21:32,310 --> 00:21:35,894
+the JVM will be haunted, as in all the threads will be suspended
+
+344
+00:21:35,942 --> 00:21:39,178
+so that the state of the heap memory can be copied over to a
+
+345
+00:21:39,184 --> 00:21:42,798
+binary file. So sometimes all the time
+
+346
+00:21:42,884 --> 00:21:46,766
+this causes a slight lapse in application availability. Sometimes it
+
+347
+00:21:46,788 --> 00:21:50,394
+may take a bit longer than anticipated. So using a heap
+
+348
+00:21:50,442 --> 00:21:54,158
+dump generation through any means or any tools should be done with a
+
+349
+00:21:54,164 --> 00:21:57,874
+bit of caution. Once the heap dump is generated, you will see a H Prof.
+
+350
+00:21:57,912 --> 00:22:01,486
+File which denotes the generated heap dump that can be opened
+
+351
+00:22:01,518 --> 00:22:04,834
+with tools like memory analyzer, eclipse memory analyzer to
+
+352
+00:22:04,872 --> 00:22:08,594
+see what it contains, how the memory heap memory looked at looked like
+
+353
+00:22:08,632 --> 00:22:11,922
+at that point in time. So you could see what objects occupied
+
+354
+00:22:11,986 --> 00:22:15,170
+most of the memory, what threads are referencing those objects,
+
+355
+00:22:15,250 --> 00:22:18,786
+and then go to those code parts and see if you could make any optimizations
+
+356
+00:22:18,818 --> 00:22:22,214
+to make it use lesser memory. Another approach is to use a tool called
+
+357
+00:22:22,252 --> 00:22:25,942
+visual JVM. This is a tool that connects to the Java process and
+
+358
+00:22:25,996 --> 00:22:29,526
+gives you live thread and memory usage information.
+
+359
+00:22:29,628 --> 00:22:32,414
+So what you could do is when the memory usage is high, you could try
+
+360
+00:22:32,452 --> 00:22:35,646
+connecting to the process and see what threads are running at that point and try
+
+361
+00:22:35,668 --> 00:22:38,654
+to correlate. So when you know what threads are running at that point,
+
+362
+00:22:38,692 --> 00:22:41,674
+you could look at the stack traces of the thread, what is a code path
+
+363
+00:22:41,722 --> 00:22:45,406
+that the thread is following, and investigate that to see what could
+
+364
+00:22:45,428 --> 00:22:48,338
+have caused a high memory usage over there. And if you want to go a
+
+365
+00:22:48,344 --> 00:22:51,406
+bit deeper where the memory usage is high, you could also generate
+
+366
+00:22:51,438 --> 00:22:54,546
+a heap dump by a click of a button in the store and analyze that
+
+367
+00:22:54,568 --> 00:22:58,422
+heap dump to look at objects that are hugging the memory or threads that
+
+368
+00:22:58,476 --> 00:23:01,958
+are referencing the objects that are hugging the memory. So another situation
+
+369
+00:23:02,044 --> 00:23:05,558
+over here for triaging this particular scenario is by using the
+
+370
+00:23:05,564 --> 00:23:08,906
+flight recorder and mission control. As Sylvia had mentioned before,
+
+371
+00:23:09,008 --> 00:23:12,838
+the flight recorder can be enabled in the JVM by adding
+
+372
+00:23:12,854 --> 00:23:16,794
+a few VM options, by specifying what duration and things
+
+373
+00:23:16,832 --> 00:23:20,854
+like that. So once it finishes recording the additional instrumentation
+
+374
+00:23:20,902 --> 00:23:24,506
+or debug information, it generates a JFR file where it dumps
+
+375
+00:23:24,538 --> 00:23:28,366
+all that information and collected, and that JFR file can be opened in
+
+376
+00:23:28,388 --> 00:23:31,726
+tools like mission control, where we can take a look
+
+377
+00:23:31,748 --> 00:23:35,342
+at how the memory usage threads usage and
+
+378
+00:23:35,396 --> 00:23:39,038
+so and so all the instrumentation data for that application in that duration.
+
+379
+00:23:39,134 --> 00:23:42,846
+So consider a scenario where we generate one string, one random
+
+380
+00:23:42,878 --> 00:23:46,526
+string of 32 million characters, and we maintain the same string throughout
+
+381
+00:23:46,558 --> 00:23:49,790
+the lifetime of the program. We don't dispose of it, we don't
+
+382
+00:23:49,870 --> 00:23:53,362
+create any other objects, but we just have a single string that we keep referencing
+
+383
+00:23:53,426 --> 00:23:56,678
+till the end of the program. In such a scenarios, how do you think the
+
+384
+00:23:56,684 --> 00:24:00,438
+memory usage trend would look like? It would basically be a gradual rise
+
+385
+00:24:00,454 --> 00:24:03,994
+in memory usage that denotes the portion of the code where
+
+386
+00:24:04,032 --> 00:24:07,622
+we generate the random string as random characters are being generated.
+
+387
+00:24:07,766 --> 00:24:11,466
+The peak of that slope indicates the point where
+
+388
+00:24:11,488 --> 00:24:15,146
+the string has been generated, and then we see a dip, a dip
+
+389
+00:24:15,178 --> 00:24:19,002
+over there. That dip basically denotes the time frame
+
+390
+00:24:19,066 --> 00:24:22,606
+when the string has been generated. All the additional memory that
+
+391
+00:24:22,628 --> 00:24:26,462
+has been used to generate the string is no longer referenced. So garbage collector
+
+392
+00:24:26,526 --> 00:24:29,698
+kicks in, it cleans up all of that, and then throughout the
+
+393
+00:24:29,704 --> 00:24:33,246
+rest of the duration of the program, we see the memory usage stagnant.
+
+394
+00:24:33,358 --> 00:24:36,498
+So that denotes that that's the memory needed for
+
+395
+00:24:36,504 --> 00:24:39,814
+the program to not only run, but also for the generated string to be
+
+396
+00:24:39,852 --> 00:24:43,522
+stored throughout the duration of the program. And by looking at the garbage collection
+
+397
+00:24:43,586 --> 00:24:47,126
+activity in that time frame, it is evident that that dip in
+
+398
+00:24:47,148 --> 00:24:51,026
+memory usage is signified by an orange block, which denotes
+
+399
+00:24:51,058 --> 00:24:53,738
+that garbage collection activity took place at that point in time.
+
+400
+00:24:53,824 --> 00:24:57,222
+So a slight variation in that scenario where we're not generating
+
+401
+00:24:57,286 --> 00:25:00,602
+just one string and maintaining it throughout the duration of the program.
+
+402
+00:25:00,736 --> 00:25:03,850
+Instead, we're constantly generating strings
+
+403
+00:25:03,930 --> 00:25:07,374
+and not using them anywhere. In such a scenario, strings are
+
+404
+00:25:07,412 --> 00:25:10,762
+generated and dereferenced generated dereferenced.
+
+405
+00:25:10,906 --> 00:25:14,862
+So the garbage collection should kick in and dispose of all
+
+406
+00:25:14,916 --> 00:25:18,706
+the dereferenced or unreferenced strings. So let's see how the graph would look
+
+407
+00:25:18,728 --> 00:25:22,254
+like. We see a gradual increase denoting the string generation
+
+408
+00:25:22,302 --> 00:25:25,698
+process, and then we see a sharp drop from the
+
+409
+00:25:25,704 --> 00:25:29,246
+peak, which denotes that garbage collection kicked in. Realize that the string
+
+410
+00:25:29,278 --> 00:25:33,254
+that was generated recently is not referenced anywhere, and it can be cleaned up
+
+411
+00:25:33,292 --> 00:25:36,594
+and it cleans it. And that is what we see as a shout drop.
+
+412
+00:25:36,642 --> 00:25:39,862
+Since we constantly keep generating and then dereferencing,
+
+413
+00:25:39,926 --> 00:25:43,738
+generating dereferencing, after which the garbage collector sweeps it,
+
+414
+00:25:43,824 --> 00:25:47,094
+we see a sawtooth like waveform. And in this scenario,
+
+415
+00:25:47,142 --> 00:25:50,726
+if you notice, just like the mission control graphs earlier, the peak
+
+416
+00:25:50,758 --> 00:25:54,634
+sound of the same size. This is indicative that garbage collection doesn't kick
+
+417
+00:25:54,682 --> 00:25:58,526
+immediately. As soon as an object is dereferenced that would tell us
+
+418
+00:25:58,548 --> 00:26:02,714
+a lot of things, right? So it's not necessary that the garbage collection is periodic
+
+419
+00:26:02,762 --> 00:26:06,122
+or immediate to act at all scenarios. There may be a lot of things
+
+420
+00:26:06,196 --> 00:26:10,046
+preventing it from acting immediately when an object is dereferenced.
+
+421
+00:26:10,078 --> 00:26:13,378
+It could be a sheer cpu thread contention, as in a lot
+
+422
+00:26:13,384 --> 00:26:16,802
+of other threads are running, so the garbage collection threads don't have cpu time.
+
+423
+00:26:16,856 --> 00:26:19,922
+Or it's just that the sheer garbage collection mechanism is like that,
+
+424
+00:26:19,976 --> 00:26:23,046
+where it takes a bit of time to kick in in some scenarios. So if
+
+425
+00:26:23,068 --> 00:26:26,194
+you look at the garbage collection activity over here, we can see thick
+
+426
+00:26:26,242 --> 00:26:30,102
+orange lines corresponding to the drop in memory usage. This is indicated
+
+427
+00:26:30,166 --> 00:26:34,086
+that garbage collection has kicked in at that point and cleaned up all the dereference
+
+428
+00:26:34,118 --> 00:26:38,134
+strings. Now, moving on to triaging with Jydir
+
+429
+00:26:38,182 --> 00:26:41,386
+for this particular scenario, with just about four or five lines of
+
+430
+00:26:41,408 --> 00:26:44,794
+code, we can generate a heap dump, and this is in the runtime
+
+431
+00:26:44,842 --> 00:26:48,026
+of the program. You could add code to your application to generate a heap
+
+432
+00:26:48,058 --> 00:26:51,374
+dump if a memory usage exceeds a particular threshold, or if
+
+433
+00:26:51,412 --> 00:26:54,926
+the user puts a particular input. So this is pretty useful as you
+
+434
+00:26:54,948 --> 00:26:58,914
+don't need any other application to connect to it or to
+
+435
+00:26:58,952 --> 00:27:02,386
+basically attach to it and generate a heap dump through
+
+436
+00:27:02,408 --> 00:27:06,114
+that. You could just use your application as is to generate heap dumps when
+
+437
+00:27:06,152 --> 00:27:09,714
+needed. This will also end up generating HProf file, which can be analyzed
+
+438
+00:27:09,762 --> 00:27:13,126
+using the eclipse memory analyzer tool. A word of caution again,
+
+439
+00:27:13,228 --> 00:27:17,010
+generating the heap dump halts the VM. It causes a momentary lapse
+
+440
+00:27:17,090 --> 00:27:20,970
+in the availability of the application, so it should be used
+
+441
+00:27:21,040 --> 00:27:25,146
+with caution. Heap dumps should be generated with caution another
+
+442
+00:27:25,248 --> 00:27:28,794
+aspect of information that we can get using Jwyder is
+
+443
+00:27:28,832 --> 00:27:32,890
+basically the memory usage trend. We can see how the committed used
+
+444
+00:27:32,960 --> 00:27:36,222
+and the maximum memory values have fluctuated over time,
+
+445
+00:27:36,276 --> 00:27:39,658
+not only for the heap memory, but also for the non heap memory.
+
+446
+00:27:39,754 --> 00:27:43,694
+This is also useful in observing what kind of fluctuations are happening at what time
+
+447
+00:27:43,732 --> 00:27:47,634
+it has hit the peaks, and then we could look at other logs in
+
+448
+00:27:47,672 --> 00:27:51,426
+that time frame to see what has been running at that point in
+
+449
+00:27:51,448 --> 00:27:54,734
+order to see what would have contributed to such a high memory
+
+450
+00:27:54,782 --> 00:27:58,018
+usage. So for the scenarios where we are
+
+451
+00:27:58,024 --> 00:28:01,046
+generating one string and maintaining it throughout the lifetime of the program,
+
+452
+00:28:01,148 --> 00:28:05,026
+as we can see over here, the memory usage is constant, which is denoting
+
+453
+00:28:05,058 --> 00:28:08,338
+that the single string is occupying a constant memory throughout.
+
+454
+00:28:08,434 --> 00:28:12,026
+No other memory is allocated or dereferenced for the garbage collector to
+
+455
+00:28:12,048 --> 00:28:15,386
+clean. So the memory usage is constant compared to the
+
+456
+00:28:15,408 --> 00:28:18,694
+graph in mission control where we saw a gradual rise,
+
+457
+00:28:18,742 --> 00:28:22,694
+a small bump and then a constant memory usage.
+
+458
+00:28:22,822 --> 00:28:26,126
+We don't see that slope or the small bump here simply because the
+
+459
+00:28:26,148 --> 00:28:29,934
+time frame of this is much larger than what we saw in mission control.
+
+460
+00:28:30,052 --> 00:28:33,850
+Because of that, the rapid rise in memory and the small drop
+
+461
+00:28:33,930 --> 00:28:37,442
+is not as evident over here. Now moving on to the second
+
+462
+00:28:37,496 --> 00:28:41,106
+variation in that scenarios where we say we're not generating one
+
+463
+00:28:41,128 --> 00:28:44,542
+string and maintaining it throughout, instead we're generating dereferencing.
+
+464
+00:28:44,606 --> 00:28:48,166
+Generating dereferencing. The graph is very, very similar to what
+
+465
+00:28:48,188 --> 00:28:51,570
+we saw in mission control. Keep in mind all these graphs are generated
+
+466
+00:28:51,650 --> 00:28:55,014
+by values taken from JydR, and in this
+
+467
+00:28:55,052 --> 00:28:58,754
+scenario we can see it hit peaks and then it drops down when garbage
+
+468
+00:28:58,802 --> 00:29:02,106
+collection kicks in. And as I mentioned before, all the
+
+469
+00:29:02,128 --> 00:29:05,990
+peaks aren't of the same height, simply because of the fact that garbage collection
+
+470
+00:29:06,070 --> 00:29:09,354
+doesn't always kick in when the Maheep memory has
+
+471
+00:29:09,392 --> 00:29:12,474
+an unreferenced object. Sometimes it may take a bit more time to kick in.
+
+472
+00:29:12,512 --> 00:29:15,418
+Moving on to scenario number four, or the application crash,
+
+473
+00:29:15,514 --> 00:29:19,294
+please take a look at the snippet of code and try to pause and see
+
+474
+00:29:19,332 --> 00:29:22,830
+if you can identify the reason for the crash. It does two main things.
+
+475
+00:29:22,980 --> 00:29:26,914
+One is it tries to access a private variable within the unsafe class
+
+476
+00:29:27,032 --> 00:29:30,434
+called the unsafe. And this variable can be
+
+477
+00:29:30,472 --> 00:29:34,046
+accessed through reflection. That is the exact reason why we say f dot
+
+478
+00:29:34,078 --> 00:29:38,146
+set accessible to true, which means that, okay, even if it's a private entity,
+
+479
+00:29:38,258 --> 00:29:41,750
+let me access it through reflection. Once we do, we basically
+
+480
+00:29:41,820 --> 00:29:45,446
+use that and we try to write to an invalid or
+
+481
+00:29:45,468 --> 00:29:49,286
+inaccessible memory location. And that is what causes the JVM to
+
+482
+00:29:49,308 --> 00:29:52,982
+go boom. It says, hey, I'm not able to access this memory location
+
+483
+00:29:53,126 --> 00:29:56,666
+and I'm not able to do what you're asking me to do. So it
+
+484
+00:29:56,688 --> 00:29:59,590
+doesn't know how to proceed with it, so it just goes and crashes.
+
+485
+00:29:59,670 --> 00:30:03,514
+It produces a segmentation fault and it crashes. So whenever
+
+486
+00:30:03,562 --> 00:30:07,374
+a java application crashes like this, it generates gist of
+
+487
+00:30:07,412 --> 00:30:10,734
+the crash. And that gist is written to std out
+
+488
+00:30:10,772 --> 00:30:14,334
+or STDR. And if you have redirected those streams to any
+
+489
+00:30:14,372 --> 00:30:18,130
+file, you would find it in those files. A gist of a crash would look
+
+490
+00:30:18,200 --> 00:30:21,346
+like this. It contains four key things. One,
+
+491
+00:30:21,448 --> 00:30:24,686
+the reason for the crash, which in this case is a segmentation fault,
+
+492
+00:30:24,718 --> 00:30:28,162
+or a SIG segvi, followed by the Java version that was running
+
+493
+00:30:28,296 --> 00:30:31,846
+when in the Java version that the application was
+
+494
+00:30:31,868 --> 00:30:35,426
+running in when it crashed, followed by if a code dump
+
+495
+00:30:35,458 --> 00:30:38,118
+was generated. If so, where it can be found,
+
+496
+00:30:38,284 --> 00:30:41,938
+and last but not least, where the crash log or the error report
+
+497
+00:30:42,044 --> 00:30:45,226
+can be found. Now to dig in further to
+
+498
+00:30:45,248 --> 00:30:48,538
+understand what part of the code might have caused the crash, we can look at
+
+499
+00:30:48,544 --> 00:30:52,218
+the crash log, and we are interested in a very, very particular
+
+500
+00:30:52,304 --> 00:30:56,158
+portion of the crash log. The crash log contains a lot of information.
+
+501
+00:30:56,324 --> 00:30:59,358
+It's not only the JVM or the thread related information,
+
+502
+00:30:59,444 --> 00:31:03,134
+but also system information, information on the system in
+
+503
+00:31:03,172 --> 00:31:06,366
+which the application crashed. So we're going to look at
+
+504
+00:31:06,388 --> 00:31:10,110
+two key aspects over here. The first aspect is basically the stack triage
+
+505
+00:31:10,190 --> 00:31:13,714
+of the thread that caused the crash, followed by what threads were
+
+506
+00:31:13,752 --> 00:31:16,706
+running at the time of the crash. When we look at the stack trace of
+
+507
+00:31:16,728 --> 00:31:19,782
+the thread that caused the crash, we can clearly see that hey,
+
+508
+00:31:19,836 --> 00:31:23,266
+crash main was called which ended up calling crash crash,
+
+509
+00:31:23,378 --> 00:31:26,662
+which ended up calling a method with an unsafe, to be specific put
+
+510
+00:31:26,716 --> 00:31:30,186
+address, and after which it ended up calling a sequence of
+
+511
+00:31:30,208 --> 00:31:33,270
+native methods which caused a crash.
+
+512
+00:31:33,350 --> 00:31:36,666
+So considering this, it is easier for us to go and dig into
+
+513
+00:31:36,688 --> 00:31:40,266
+the code to see hey in this particular call stack, what could
+
+514
+00:31:40,288 --> 00:31:43,902
+have gone wrong. Let's see what code was there, what would have happened
+
+515
+00:31:43,956 --> 00:31:47,326
+before that code got executed, and what values could have caused this
+
+516
+00:31:47,348 --> 00:31:51,070
+crash. So that is a very vital piece of information over here.
+
+517
+00:31:51,140 --> 00:31:54,962
+Aside that we also have the list of running threads during
+
+518
+00:31:55,016 --> 00:31:58,580
+the time of the crash. This is very, very useful because sometimes
+
+519
+00:31:59,030 --> 00:32:02,242
+what happens is it's not necessarily that
+
+520
+00:32:02,376 --> 00:32:05,666
+that thread that caused the call that made the crash was
+
+521
+00:32:05,688 --> 00:32:09,814
+responsible for it. Some other threads that might have been running concurrently could
+
+522
+00:32:09,852 --> 00:32:13,094
+have also caused a state change or some
+
+523
+00:32:13,132 --> 00:32:16,722
+other value change which would have caused this thread
+
+524
+00:32:16,786 --> 00:32:20,534
+to crash, to initiate the crash. So it's very useful to also know
+
+525
+00:32:20,572 --> 00:32:24,106
+what threads were running at the same time or concurrently at the time
+
+526
+00:32:24,128 --> 00:32:27,354
+of the crash. So using all this information, we investigate the code
+
+527
+00:32:27,392 --> 00:32:31,078
+base and we see hey, okay, this is the path that triggered the crash,
+
+528
+00:32:31,174 --> 00:32:34,974
+and what are the values that could have triggered this? And then we go about
+
+529
+00:32:35,092 --> 00:32:38,398
+failing gracefully or writing code that
+
+530
+00:32:38,404 --> 00:32:41,562
+would end up avoiding the crash. Or we make a conscious decision
+
+531
+00:32:41,626 --> 00:32:45,354
+saying hey, okay, we want the application to crash in such scenarios.
+
+532
+00:32:45,482 --> 00:32:48,842
+Now, now that we are done with this, let's summarize
+
+533
+00:32:48,906 --> 00:32:52,026
+the triage process for all the previously discussed performance
+
+534
+00:32:52,058 --> 00:32:55,414
+issues. It can be done so as follows. There three
+
+535
+00:32:55,452 --> 00:32:58,786
+primary symptoms, a high memory usage or a high cpu usage,
+
+536
+00:32:58,818 --> 00:33:02,546
+or an application crash where the application of rupee starts.
+
+537
+00:33:02,738 --> 00:33:06,754
+So in a high memory usage scenario, we are interested in the memory usage
+
+538
+00:33:06,802 --> 00:33:10,658
+trend along with the thread information. Thread information of the threads
+
+539
+00:33:10,674 --> 00:33:13,866
+that have been running the trend on that. So the
+
+540
+00:33:13,888 --> 00:33:17,254
+steps to triage that would be to first look at the XMX for the maximum
+
+541
+00:33:17,302 --> 00:33:20,698
+allocatable heap size. And if based on our application
+
+542
+00:33:20,784 --> 00:33:24,846
+design, we also have to understand whether for that load that
+
+543
+00:33:24,868 --> 00:33:28,990
+the user is putting on it or the sheer data
+
+544
+00:33:29,060 --> 00:33:32,638
+that we feed into the application is putting on it, that XMX value is a
+
+545
+00:33:32,644 --> 00:33:36,062
+reasonable amount or not. If it is not a reasonable amount,
+
+546
+00:33:36,116 --> 00:33:39,026
+and we know for a fact that hey, the load is very high and we
+
+547
+00:33:39,048 --> 00:33:42,142
+are expecting this memory to be used for this kind of an input load,
+
+548
+00:33:42,206 --> 00:33:45,390
+then we go ahead and increase the amount of heap that's allocatable.
+
+549
+00:33:45,470 --> 00:33:48,626
+If that's not the case and we say hey, it shouldn't be occupying so much
+
+550
+00:33:48,648 --> 00:33:52,294
+of memory for this load, then we go into that investigation mode. We try
+
+551
+00:33:52,332 --> 00:33:55,862
+to correlate to see what threads are running when the memory usage is high,
+
+552
+00:33:55,996 --> 00:33:59,446
+or if we get a heap dump. Even better, we look at what objects are
+
+553
+00:33:59,468 --> 00:34:02,658
+occupying most of the memory and then we try to correlate it to threads that
+
+554
+00:34:02,684 --> 00:34:06,106
+are referencing those objects. Once we are able to do that, then it's only
+
+555
+00:34:06,128 --> 00:34:09,674
+a matter of code investigation. We have the path of the code that are key
+
+556
+00:34:09,712 --> 00:34:13,046
+contributors to the memory usage. Then we look at those parts
+
+557
+00:34:13,078 --> 00:34:16,206
+of the code to say hey, how do we reduce the memory usage of this
+
+558
+00:34:16,228 --> 00:34:19,534
+area and come out of the possible fix? The other symptom is a high
+
+559
+00:34:19,572 --> 00:34:22,734
+cpu usage where we are primarily interested in the
+
+560
+00:34:22,772 --> 00:34:25,806
+thread information trend. And one
+
+561
+00:34:25,828 --> 00:34:29,186
+of the first things we check is if the high cpu usage is
+
+562
+00:34:29,208 --> 00:34:32,866
+caused by a garbage collection thread, one or more garbage collection threads. If it
+
+563
+00:34:32,888 --> 00:34:36,618
+is, then we take the high memory usage route simply
+
+564
+00:34:36,654 --> 00:34:39,926
+because an increase in memory usage is what triggers the
+
+565
+00:34:39,948 --> 00:34:43,814
+garbage collection thread. And if no luck is
+
+566
+00:34:43,932 --> 00:34:48,322
+yielded from that route, then we look at other potential garbage collection mechanisms.
+
+567
+00:34:48,386 --> 00:34:52,134
+For example, if the application is using a concurrent mark suite,
+
+568
+00:34:52,182 --> 00:34:55,386
+then we could think of possibly moving it to a g one to get
+
+569
+00:34:55,408 --> 00:34:59,226
+a much much better garbage collection approach and lower the
+
+570
+00:34:59,248 --> 00:35:02,422
+cpu usage. If it's not a garbage collection thread,
+
+571
+00:35:02,486 --> 00:35:05,646
+then what we do is we look at the threads that have been causing the
+
+572
+00:35:05,668 --> 00:35:08,986
+high cpu usage and what was the stack
+
+573
+00:35:09,018 --> 00:35:12,122
+trace at that point of time when it was causing the high cpu usage?
+
+574
+00:35:12,186 --> 00:35:15,566
+We investigate that code path and we try to optimize it so that
+
+575
+00:35:15,588 --> 00:35:19,282
+it doesn't take up as much cpu time or it is bumped to a lower
+
+576
+00:35:19,336 --> 00:35:22,990
+priority if it is not meant to hog the cpu.
+
+577
+00:35:23,070 --> 00:35:26,334
+Now that's done, let's move to the third and final symptom,
+
+578
+00:35:26,382 --> 00:35:29,606
+which is an application crash. The symptom of this is that the application of
+
+579
+00:35:29,628 --> 00:35:32,802
+rupee stops and is accompanied by a gist of the crash,
+
+580
+00:35:32,866 --> 00:35:36,406
+a core dump, and or a crash log. So in the
+
+581
+00:35:36,428 --> 00:35:39,846
+crash log, when we take a look, we have so much of information, not only
+
+582
+00:35:39,868 --> 00:35:42,826
+the thread that caused the crash, all the threads that were running during the time
+
+583
+00:35:42,848 --> 00:35:46,074
+of the crash, information on the system in which it crashed, and so on.
+
+584
+00:35:46,112 --> 00:35:49,770
+So we have provided a link that you could use in order to understand
+
+585
+00:35:49,840 --> 00:35:53,470
+more as to how to use the crash log to triage this particular
+
+586
+00:35:53,540 --> 00:35:57,054
+symptom. One other important thing I would like to mention over here is high
+
+587
+00:35:57,092 --> 00:36:00,446
+garbage collection activity often manifests itself as
+
+588
+00:36:00,468 --> 00:36:04,314
+one of two symptoms, either a high memory usage or a high cpu
+
+589
+00:36:04,362 --> 00:36:07,822
+usage. Because only when the memory usage is increasing,
+
+590
+00:36:07,886 --> 00:36:11,762
+garbage collection kicks in and tries to clean. And for some reason
+
+591
+00:36:11,816 --> 00:36:15,166
+it's not able to clean because of a cpu contention
+
+592
+00:36:15,278 --> 00:36:18,398
+or because of the fact that all the memory used are referenced.
+
+593
+00:36:18,494 --> 00:36:22,114
+Then it'll try to be a bit more aggressive and it will spawn more threads
+
+594
+00:36:22,162 --> 00:36:25,494
+and try to garbage collect more frequently. So that will cause
+
+595
+00:36:25,532 --> 00:36:28,822
+a high garbage collection activity which will show symptoms of
+
+596
+00:36:28,876 --> 00:36:32,290
+high memory usage or a high cpu usage. That's the reason why it
+
+597
+00:36:32,300 --> 00:36:35,194
+doesn't have a separate row over here as it falls into one of those two
+
+598
+00:36:35,232 --> 00:36:38,614
+rows. Now that we have summarized the triage process for the previously
+
+599
+00:36:38,662 --> 00:36:41,786
+discussed performance issues, let's talk a bit about the
+
+600
+00:36:41,808 --> 00:36:45,054
+current work that we have done so far, followed by the future work
+
+601
+00:36:45,092 --> 00:36:48,446
+that we have planned. So right now we have summarized all the
+
+602
+00:36:48,468 --> 00:36:51,866
+performance issues that we have encountered and identified root
+
+603
+00:36:51,898 --> 00:36:55,634
+causes for them, and also documented the process of root cause. Even now
+
+604
+00:36:55,672 --> 00:36:59,486
+that was done, we went ahead and created an open source library
+
+605
+00:36:59,598 --> 00:37:03,294
+that lets us get all the information or metrics or diagnostic
+
+606
+00:37:03,342 --> 00:37:07,182
+information we need to make that root cause much more easier,
+
+607
+00:37:07,326 --> 00:37:11,290
+the root causing process much more easier, and that library is called JVide.
+
+608
+00:37:11,390 --> 00:37:14,678
+The third milestone which we'll be embarking on is fine tuning the
+
+609
+00:37:14,684 --> 00:37:18,294
+JVM and looking into actually fixing the performance issues. Not only
+
+610
+00:37:18,332 --> 00:37:21,894
+fine tuning to be very specific, but also adding
+
+611
+00:37:21,942 --> 00:37:25,642
+JVM options so that we get additional debug, logging or more
+
+612
+00:37:25,696 --> 00:37:29,434
+information that will make milestone one much more easier and
+
+613
+00:37:29,472 --> 00:37:32,846
+quicker. After this, we also want to investigate other reasons for the
+
+614
+00:37:32,868 --> 00:37:36,154
+application crash. So some people may debate
+
+615
+00:37:36,202 --> 00:37:38,910
+that application crashes aren't a performance issue,
+
+616
+00:37:38,980 --> 00:37:42,478
+but it can also be counterargued, saying that it causes a
+
+617
+00:37:42,484 --> 00:37:46,386
+lapse in availability when the application goes down. So in
+
+618
+00:37:46,408 --> 00:37:50,238
+a way, you are degrading the performance of your application cluster.
+
+619
+00:37:50,334 --> 00:37:53,582
+That's the reason why we have included that as a scenario for this presentation.
+
+620
+00:37:53,646 --> 00:37:57,018
+So investigating other reasons for crash, such as out of memory error
+
+621
+00:37:57,134 --> 00:38:00,290
+or garbage collection, overhead limit exceeded error,
+
+622
+00:38:00,370 --> 00:38:04,422
+or so many other variety of reasons for which an application could crash, would be
+
+623
+00:38:04,476 --> 00:38:08,086
+our next milestone. Last but not the least, we would want to make our
+
+624
+00:38:08,108 --> 00:38:11,738
+open source library a bit smarter. The sheer amount of diagnostic information
+
+625
+00:38:11,824 --> 00:38:15,754
+that this library can generate can easily surpass several hundred
+
+626
+00:38:15,792 --> 00:38:19,674
+megabytes in a few minutes, so continuously transmitting that
+
+627
+00:38:19,712 --> 00:38:23,022
+information over a network or storing it on the disk can become
+
+628
+00:38:23,076 --> 00:38:26,494
+very expensive very quickly. So we want to make the library a bit
+
+629
+00:38:26,532 --> 00:38:30,574
+smarter so that it only generates diagnostic information when
+
+630
+00:38:30,612 --> 00:38:34,506
+it's needed. For example, when the cpu usage of certain threads
+
+631
+00:38:34,538 --> 00:38:38,290
+exceed a threshold, say 70%, then we would want to store
+
+632
+00:38:38,360 --> 00:38:41,650
+all the information on those threads onto a log,
+
+633
+00:38:41,720 --> 00:38:44,818
+or onto a file, or transmit it over a network. Or if the
+
+634
+00:38:44,824 --> 00:38:48,018
+memory usage exceeds a particular threshold, then we want to look at the
+
+635
+00:38:48,024 --> 00:38:51,218
+memory usage trend, or the garbage collection trend,
+
+636
+00:38:51,314 --> 00:38:54,786
+or even generate a heat down. So by making it a bit smarter
+
+637
+00:38:54,818 --> 00:38:57,926
+in this aspect, we are saving quite a bit of data,
+
+638
+00:38:58,028 --> 00:39:01,282
+collecting unnecessary information, as some of the
+
+639
+00:39:01,356 --> 00:39:05,354
+detail of information are useful only when we want to triage performance issues.
+
+640
+00:39:05,472 --> 00:39:09,386
+Now that's done, we are in the questions section of our presentation. Since this
+
+641
+00:39:09,408 --> 00:39:12,986
+is a recorded video, we would greatly appreciate if you
+
+642
+00:39:13,008 --> 00:39:16,794
+have any questions or feedback to reach out to us using the email addresses
+
+643
+00:39:16,922 --> 00:39:20,446
+provided in the description below. And we have also provided links in
+
+644
+00:39:20,468 --> 00:39:24,526
+this presentation to the Wikipages which talk in much more detail
+
+645
+00:39:24,628 --> 00:39:28,650
+about the topics that we have mentioned in this presentation,
+
+646
+00:39:28,810 --> 00:39:32,058
+along with the open source library JyBL,
+
+647
+00:39:32,154 --> 00:39:35,974
+which we have created with the intention of collection of
+
+648
+00:39:36,012 --> 00:39:39,638
+diagnostic data. So now that's done,
+
+649
+00:39:39,724 --> 00:39:43,846
+we are officially finished with the presentation. Thank you so much for your time
+
+650
+00:39:43,948 --> 00:39:47,218
+and patience. We would love to see you now in the presentation
+
+651
+00:39:47,314 --> 00:39:50,546
+and hear from you if you have any questions or queries.
+
+652
+00:39:50,658 --> 00:39:52,180
+Thank you. Yeah, thank you.
+

@@ -1,0 +1,1128 @@
+1
+00:00:25,570 --> 00:00:29,634
+Hey everyone, today we are going to see how to build productionready distributed
+
+2
+00:00:29,682 --> 00:00:32,818
+task queue system queue management system with celery.
+
+3
+00:00:32,914 --> 00:00:36,098
+When I say production ready, I mean which is highly efficient,
+
+4
+00:00:36,194 --> 00:00:39,794
+which is scalable, which is transparent and which is resilient.
+
+5
+00:00:39,922 --> 00:00:43,366
+So in this talk we are going to cover what are task queues and
+
+6
+00:00:43,388 --> 00:00:46,998
+why we need them, what is and why celery building a
+
+7
+00:00:47,004 --> 00:00:50,126
+distributed task queuing system productionready distributed task queue system the
+
+8
+00:00:50,148 --> 00:00:53,662
+system for better efficiency, adding resiliency to the system,
+
+9
+00:00:53,796 --> 00:00:56,762
+what to do in times of SOS or emergencies,
+
+10
+00:00:56,906 --> 00:01:00,570
+monitoring the system we build or keeping an eye on it, and most importantly,
+
+11
+00:01:00,650 --> 00:01:04,186
+bad jokes. So I've tried to make this talk as descriptive
+
+12
+00:01:04,218 --> 00:01:07,646
+as possible, but still there are some prerequisites, like some basic knowledge
+
+13
+00:01:07,678 --> 00:01:10,994
+of python, some basic knowledge of web development, worked or
+
+14
+00:01:11,032 --> 00:01:14,754
+heard about celery before. And the most important one is a sense of humor and
+
+15
+00:01:14,792 --> 00:01:18,546
+love for chips. So why task use? So let's assume I
+
+16
+00:01:18,568 --> 00:01:21,586
+own a mall and I want to keep track of how many people are entering
+
+17
+00:01:21,618 --> 00:01:24,882
+in my mall. So I installed a small IoT sensor at my entrance
+
+18
+00:01:24,946 --> 00:01:28,930
+and whenever someone enters my mall it shoots an API request to my web server.
+
+19
+00:01:29,010 --> 00:01:32,518
+Then the request goes to the database and increments a counter. And at the
+
+20
+00:01:32,524 --> 00:01:34,970
+end of the day I can just check my database and see the count.
+
+21
+00:01:35,040 --> 00:01:38,358
+This system was working pretty well for me, so one day I thought I'll stream
+
+22
+00:01:38,374 --> 00:01:41,174
+a football match in my mall. So a lot of people came to the mall.
+
+23
+00:01:41,222 --> 00:01:44,666
+I was really excited to see the numbers in my database. But when I checked
+
+24
+00:01:44,698 --> 00:01:48,494
+my database, the number I observed was relatively low and
+
+25
+00:01:48,532 --> 00:01:52,142
+I knew something was not right. So I investigated and figured out
+
+26
+00:01:52,196 --> 00:01:55,294
+when a lot of people entered my mall. For each person an
+
+27
+00:01:55,332 --> 00:01:58,786
+API request was made to my web server and there were a lot of
+
+28
+00:01:58,808 --> 00:02:02,514
+concurrent requests trying to talk to the database. And due to the atomicity and
+
+29
+00:02:02,552 --> 00:02:06,398
+locking at my database, many requests were timed out and that's
+
+30
+00:02:06,414 --> 00:02:10,118
+why the low counted the database. So there's got to be a better way.
+
+31
+00:02:10,204 --> 00:02:13,590
+And there is. Task queues come to rescue. So let's see,
+
+32
+00:02:13,660 --> 00:02:17,046
+what are task queues? If someone asked me this question when I was giving
+
+33
+00:02:17,068 --> 00:02:20,406
+my university examinations, I would have answered, task queue is
+
+34
+00:02:20,428 --> 00:02:23,546
+a queue of tasks and that is exactly what it is. I don't know why
+
+35
+00:02:23,568 --> 00:02:26,614
+teachers don't like those answers, but yeah, it fits
+
+36
+00:02:26,662 --> 00:02:30,154
+perfectly here. So now in the new architecture, when we
+
+37
+00:02:30,192 --> 00:02:33,974
+get a request from my web server, instead of going and trying to increment
+
+38
+00:02:34,022 --> 00:02:37,294
+the counter in the database, it puts it into the task queue and return
+
+39
+00:02:37,332 --> 00:02:40,686
+the 200 response. And now the DB can consume the request from
+
+40
+00:02:40,708 --> 00:02:44,254
+the task queue at its own pace. So now we moved from a more real
+
+41
+00:02:44,292 --> 00:02:48,194
+time approach to a more eventually consistent type of approach. And that is
+
+42
+00:02:48,232 --> 00:02:51,378
+okay for us because I only needed to see the count at the end of
+
+43
+00:02:51,384 --> 00:02:54,946
+the day. So what is and why salary? You must have heard
+
+44
+00:02:54,968 --> 00:02:58,306
+a lot about task queues. There are a bunch of them available like Amazon
+
+45
+00:02:58,338 --> 00:03:01,346
+sqs, Amazon MQ, Redis, RabbitMQ.
+
+46
+00:03:01,458 --> 00:03:04,966
+But building a consumption and publishing mechanism for those
+
+47
+00:03:04,988 --> 00:03:07,910
+task queues is not that straightforward. To help us with that,
+
+48
+00:03:07,980 --> 00:03:11,414
+celery gives us a plug and play task queue management framework with
+
+49
+00:03:11,452 --> 00:03:14,858
+which we can manage our distributed task queues with ease. In this talk we
+
+50
+00:03:14,864 --> 00:03:18,474
+are going to use some keywords, so let's just iterate over them once we
+
+51
+00:03:18,512 --> 00:03:21,866
+know what task queues are from our previous example. But we'll just say
+
+52
+00:03:21,888 --> 00:03:25,274
+it again. Task queue are queue of tasks. Then there is task.
+
+53
+00:03:25,322 --> 00:03:28,618
+A task is the basic unit of work of a task
+
+54
+00:03:28,634 --> 00:03:32,378
+queue and a task queue can contain n number of tasks.
+
+55
+00:03:32,474 --> 00:03:36,206
+Then here comes the worker. Worker is the basic unit of
+
+56
+00:03:36,228 --> 00:03:39,934
+computation which lies outside your application and where a task is processed.
+
+57
+00:03:39,982 --> 00:03:43,506
+Then in line is broken in layman language helps us with picking an
+
+58
+00:03:43,528 --> 00:03:47,506
+offloaded task, putting it into the task queue, and then delivering the task to
+
+59
+00:03:47,528 --> 00:03:51,158
+the worker from the task queue whenever the worker wants to process it. And the
+
+60
+00:03:51,164 --> 00:03:54,918
+last one is result backend. It is a highly available database which
+
+61
+00:03:54,924 --> 00:03:58,434
+is used by celery to keep track of all the tasks and their results,
+
+62
+00:03:58,482 --> 00:04:01,734
+along with storing all kinds of metadata for celery. Some examples for
+
+63
+00:04:01,772 --> 00:04:04,946
+result backend could be redis, meme, cache et
+
+64
+00:04:04,978 --> 00:04:08,378
+celery. So okay, before we start building the system,
+
+65
+00:04:08,464 --> 00:04:12,458
+one question arises which broker to choose. There are a bunch of brokers available
+
+66
+00:04:12,544 --> 00:04:15,946
+like RabbitMQ, redis, etc. They all are great pieces
+
+67
+00:04:15,978 --> 00:04:19,566
+of software, but works best for their own specific use cases. So for
+
+68
+00:04:19,588 --> 00:04:22,682
+example, I'll cover the most common ones, RabbitMQ and redis.
+
+69
+00:04:22,746 --> 00:04:26,142
+If you're looking for a highly efficient broker which supports several workers
+
+70
+00:04:26,206 --> 00:04:29,906
+consuming from different queues and also offers some kind
+
+71
+00:04:29,928 --> 00:04:33,166
+of persistence of tasks when it's shut down, then no doubt RabbitMQ
+
+72
+00:04:33,198 --> 00:04:36,498
+is the way to go, but RabbitMQ is a little time consuming to set up
+
+73
+00:04:36,504 --> 00:04:40,030
+and maintain. On the other hand, if you just want to use your broker as
+
+74
+00:04:40,040 --> 00:04:43,526
+a quick messaging system, Redis is the way to go as it works really well
+
+75
+00:04:43,548 --> 00:04:47,190
+for quick tasks and is very easy to set up too. Let's start building
+
+76
+00:04:47,260 --> 00:04:50,886
+the system. Let's think of an e commerce warehouse to build. There are
+
+77
+00:04:50,988 --> 00:04:54,986
+going to be three things which happen there. Picking of the products, packing of the
+
+78
+00:04:55,008 --> 00:04:58,246
+products, and delivery of the order. So the most basic
+
+79
+00:04:58,278 --> 00:05:02,042
+kind of architecture for my warehouse would be something like this. I have
+
+80
+00:05:02,096 --> 00:05:05,374
+one boy who picks up the products, packs the products and
+
+81
+00:05:05,412 --> 00:05:08,446
+delivers them. And this worked for me for some time.
+
+82
+00:05:08,548 --> 00:05:11,726
+But now the orders are increasing and I want to scale my
+
+83
+00:05:11,748 --> 00:05:14,730
+setup. So I also employed a girl in the warehouse.
+
+84
+00:05:14,810 --> 00:05:18,686
+Now they both are parallel picking, packing and delivering
+
+85
+00:05:18,718 --> 00:05:22,514
+the products. Now this is fine as when more order will start coming in,
+
+86
+00:05:22,552 --> 00:05:25,746
+I'll just add more people in the warehouse. But I think I can improve it
+
+87
+00:05:25,768 --> 00:05:29,362
+a bit further as I know that these two people are really good at picking,
+
+88
+00:05:29,426 --> 00:05:33,266
+but they are lousy at packing and they don't even have celery bikes to deliver.
+
+89
+00:05:33,378 --> 00:05:36,982
+So what if we break this work into smaller fragments and
+
+90
+00:05:37,036 --> 00:05:40,738
+get specialized people to do what they do best? So now those two
+
+91
+00:05:40,764 --> 00:05:44,134
+people are just doing the picking. I added an experienced packer
+
+92
+00:05:44,182 --> 00:05:47,894
+who has its own packaging station and everything. And I added
+
+93
+00:05:47,942 --> 00:05:51,242
+people with delivery bikes to deliver more efficiently. So this way,
+
+94
+00:05:51,296 --> 00:05:55,370
+we had one big task. We broke it down into smaller tasks
+
+95
+00:05:55,450 --> 00:05:58,714
+and executed them in order. And now in our further slides,
+
+96
+00:05:58,762 --> 00:06:02,250
+we will call this our pipeline. So, should we use pipelines?
+
+97
+00:06:02,330 --> 00:06:05,422
+There are a bunch of advantages we get while using
+
+98
+00:06:05,476 --> 00:06:08,658
+pipelines. Let's go by them one by one. First,
+
+99
+00:06:08,744 --> 00:06:12,078
+it gives us the ability to see bottlenecks and scale smaller
+
+100
+00:06:12,094 --> 00:06:15,250
+components of the system instead of the whole system, for example.
+
+101
+00:06:15,400 --> 00:06:18,526
+So now if I see that there are a lot of orders
+
+102
+00:06:18,558 --> 00:06:22,086
+pending to be packed, I can just add more people in the packing worker and
+
+103
+00:06:22,108 --> 00:06:25,206
+scale the packing operations instead of scaling the whole pipeline like
+
+104
+00:06:25,228 --> 00:06:28,966
+we did earlier. Second, this will give the ability to give different kind
+
+105
+00:06:28,988 --> 00:06:32,202
+of machines to different tasks, as per in our example,
+
+106
+00:06:32,336 --> 00:06:35,846
+we can see that packing worker needs packaging station, but a delivery
+
+107
+00:06:35,878 --> 00:06:39,114
+worker needs a celery bike. The same thing happened with the tech system.
+
+108
+00:06:39,232 --> 00:06:43,114
+Different tasks need different kind of infrastructure. Some might need
+
+109
+00:06:43,152 --> 00:06:46,506
+more cpu, others might need more memory. Third, it helps
+
+110
+00:06:46,538 --> 00:06:49,854
+us keep track of the status of the task and will add some kind of
+
+111
+00:06:49,892 --> 00:06:53,310
+resiliency to the system by enabling retries at every step.
+
+112
+00:06:53,380 --> 00:06:56,442
+So now if a task fails, it will not retry from the beginning,
+
+113
+00:06:56,506 --> 00:06:59,566
+but will get retried from the last checkpoint or last succeeded task
+
+114
+00:06:59,598 --> 00:07:03,202
+in the pipeline. So now let's assume we have a sale going on and
+
+115
+00:07:03,256 --> 00:07:06,578
+we have a lot of orders pouring in. Our warehouse is already full and
+
+116
+00:07:06,584 --> 00:07:09,378
+we can't even add more people to the warehouse. So we got two ways.
+
+117
+00:07:09,464 --> 00:07:13,154
+First thing we can do is to buy a bigger warehouse, move all the operations
+
+118
+00:07:13,202 --> 00:07:16,614
+to the bigger warehouse and add more people in it. In tech terms we
+
+119
+00:07:16,652 --> 00:07:20,022
+call it vertical scaling. On the other hand, we can purchase another
+
+120
+00:07:20,076 --> 00:07:24,374
+makeshift warehouse of the same size, add more people there, and run these two warehouses
+
+121
+00:07:24,422 --> 00:07:27,514
+in parallel whilst the operations inside them are
+
+122
+00:07:27,552 --> 00:07:30,874
+concurrent. In tech terms we call it horizontal scaling. In my
+
+123
+00:07:30,912 --> 00:07:34,662
+case, horizontal scaling makes more sense as the number of orders are variable
+
+124
+00:07:34,726 --> 00:07:37,854
+and after the sale ends, one warehouse would be able to cater all of them
+
+125
+00:07:37,892 --> 00:07:41,118
+along. So code of our application would look something like this.
+
+126
+00:07:41,204 --> 00:07:45,086
+We have an order receiver API which receives an order and offloads it to
+
+127
+00:07:45,108 --> 00:07:48,270
+the picking worker, which is the entry point in our pipeline.
+
+128
+00:07:48,350 --> 00:07:51,806
+And the code for our pipeline is something like this. It starts with the picking
+
+129
+00:07:51,838 --> 00:07:55,374
+worker which picks up stuff from the aisle and passes it to the packing worker.
+
+130
+00:07:55,422 --> 00:07:58,878
+The packing worker packs the stuff and passes it to the celery worker,
+
+131
+00:07:58,974 --> 00:08:02,438
+and in the last, the delivery worker delivers the stuff in time and makes the
+
+132
+00:08:02,444 --> 00:08:06,054
+customer happy. So we have built our salary system,
+
+133
+00:08:06,172 --> 00:08:09,286
+but we don't know how well it performs. So first things first.
+
+134
+00:08:09,388 --> 00:08:12,794
+It is always better to benchmark before moving to any
+
+135
+00:08:12,832 --> 00:08:16,106
+further optimization because in my experience I have seen if we go
+
+136
+00:08:16,128 --> 00:08:19,926
+by intuition, either we end up over optimizing the system or optimizing
+
+137
+00:08:19,958 --> 00:08:23,258
+wrong parts of the architecture. So for example, in our pipeline, when I ran a
+
+138
+00:08:23,264 --> 00:08:27,002
+load test, I saw the number of tasks were queued at the picking worker
+
+139
+00:08:27,066 --> 00:08:30,398
+were much higher than any other worker. So I knew from where I have to
+
+140
+00:08:30,404 --> 00:08:34,106
+start optimizing. Can we use batching? So let's assume
+
+141
+00:08:34,218 --> 00:08:37,566
+what happens in the picking task here. In the picking task,
+
+142
+00:08:37,598 --> 00:08:41,346
+a person is assigned an order, he or she goes
+
+143
+00:08:41,368 --> 00:08:44,862
+to the aisle, picks up that order and passes it to the packing worker.
+
+144
+00:08:44,926 --> 00:08:48,354
+Now assume you have a lot of orders coming in and to cater them you
+
+145
+00:08:48,392 --> 00:08:52,422
+added a lot of people in the picking worker, and everyone is trying to get
+
+146
+00:08:52,476 --> 00:08:56,598
+something from the aisle. As lots of people are crowding the aisle and
+
+147
+00:08:56,684 --> 00:08:59,846
+there will be some kind of wait time for everyone to pick their order,
+
+148
+00:08:59,948 --> 00:09:03,526
+the exact same thing happens in our concurrent systems. The aisle acts
+
+149
+00:09:03,558 --> 00:09:07,398
+as our database and people acts as our concurrent threads. To solve
+
+150
+00:09:07,414 --> 00:09:10,726
+this problem, we can introduce batching. So instead of one person picking
+
+151
+00:09:10,758 --> 00:09:14,074
+up one order, we can make one person pick up ten orders. This way
+
+152
+00:09:14,112 --> 00:09:17,758
+we are decreasing our trips to the aisle or our database by ten times.
+
+153
+00:09:17,844 --> 00:09:21,086
+But as we know, every good thing also comes with
+
+154
+00:09:21,108 --> 00:09:25,086
+a trade off. So now your retries and failures also happen at batch level.
+
+155
+00:09:25,188 --> 00:09:28,738
+So if 9th order failed for some reason in a batch of ten,
+
+156
+00:09:28,824 --> 00:09:31,666
+still the whole batch of ten will be retried. So if you are okay with
+
+157
+00:09:31,688 --> 00:09:34,866
+this trade off, you can definitely decrease the load at your database. There's not
+
+158
+00:09:34,888 --> 00:09:38,146
+much change in the code for our application, but instead of offloading it
+
+159
+00:09:38,168 --> 00:09:41,366
+to the picking worker like before, we will now offload it to the
+
+160
+00:09:41,388 --> 00:09:44,950
+order aggregator worker, and in the pipeline is also pretty much the same.
+
+161
+00:09:45,020 --> 00:09:48,418
+Just one more task named order aggregator is added which contains
+
+162
+00:09:48,434 --> 00:09:51,926
+the order chunking logic, and instead of passing just one order to the picking
+
+163
+00:09:51,958 --> 00:09:55,910
+worker, it passes a chunk of orders to the picking worker. Next optimization
+
+164
+00:09:55,990 --> 00:09:59,334
+would be always split your task into iobound
+
+165
+00:09:59,382 --> 00:10:03,346
+and cpu bound tasks. Iobound tasks are tasks in which thread
+
+166
+00:10:03,398 --> 00:10:06,826
+blocks the cpu and waits until an input or output
+
+167
+00:10:06,858 --> 00:10:10,046
+is received. This makes the cpu unusable for the time it
+
+168
+00:10:10,068 --> 00:10:13,818
+is just waiting. These kind of tasks can be optimized with the help of gvent
+
+169
+00:10:13,834 --> 00:10:17,342
+or eventlet pools, which helps us enable a non blocking IO approach
+
+170
+00:10:17,406 --> 00:10:20,718
+in which the thread goes to the cpu, registers its request,
+
+171
+00:10:20,814 --> 00:10:24,366
+does not block the cpu, and whenever its input or output
+
+172
+00:10:24,398 --> 00:10:27,426
+is ready, the CPU raises a callback and
+
+173
+00:10:27,448 --> 00:10:31,106
+the thread goes and collects it. This way our cpu is never blocked
+
+174
+00:10:31,138 --> 00:10:34,626
+by concurrent IU processes. On the other hand, a CPU bound
+
+175
+00:10:34,658 --> 00:10:37,910
+task is a task which uses the cpu for crunching numbers or doing
+
+176
+00:10:37,980 --> 00:10:41,030
+other cpu intensive tasks. For these kinds of tasks we
+
+177
+00:10:41,100 --> 00:10:44,918
+should use a pre fork pool, as it is based on Python's multi
+
+178
+00:10:44,934 --> 00:10:48,166
+processing module and helps running parallel processes on multiple
+
+179
+00:10:48,198 --> 00:10:51,018
+cores. It is very easy to set up too. You just need to pass the
+
+180
+00:10:51,024 --> 00:10:54,574
+pool name and the desired concurrency needed in the following command and
+
+181
+00:10:54,612 --> 00:10:58,094
+you will spin up a new worker with the provided configuration in no
+
+182
+00:10:58,132 --> 00:11:01,374
+time. So use of air optimization when
+
+183
+00:11:01,412 --> 00:11:05,114
+possible. This is quite interesting. So the default approach
+
+184
+00:11:05,162 --> 00:11:08,654
+salary uses is round robin approach to distribute tasks among
+
+185
+00:11:08,702 --> 00:11:12,174
+distributed systems. If you have a set of tasks that take varying
+
+186
+00:11:12,222 --> 00:11:15,822
+amount of time to complete, either deliberately or due to unpredictable
+
+187
+00:11:15,886 --> 00:11:18,982
+network conditions, this will cause unexpected delays in total
+
+188
+00:11:19,036 --> 00:11:22,374
+execution time for tasks in the queue, as you might
+
+189
+00:11:22,412 --> 00:11:26,402
+end up having tasks queued at some worker whilst some workers are idle.
+
+190
+00:11:26,466 --> 00:11:29,514
+To solve this problem, you can use of air optimization which
+
+191
+00:11:29,552 --> 00:11:33,226
+distributes tasks according to the availability of workers instead of number of
+
+192
+00:11:33,248 --> 00:11:36,762
+workers available. This option comes with coordination cost
+
+193
+00:11:36,816 --> 00:11:40,234
+penalty, but results in a much more predictable behavior if
+
+194
+00:11:40,272 --> 00:11:43,706
+your tasks have varying execution times, as most iobound
+
+195
+00:11:43,738 --> 00:11:47,322
+tasks will, so keeping track of results
+
+196
+00:11:47,386 --> 00:11:50,766
+only if you need them as I told you, but the result backend which
+
+197
+00:11:50,788 --> 00:11:54,538
+stores all the metadata and statuses of result and results of salary.
+
+198
+00:11:54,634 --> 00:11:58,306
+If you know you are not going to use them anywhere in your application,
+
+199
+00:11:58,488 --> 00:12:02,238
+you can decrease the amount of network calls to your highly available database,
+
+200
+00:12:02,334 --> 00:12:06,686
+and it can give you some amount of optimization. So now we'll
+
+201
+00:12:06,718 --> 00:12:09,878
+see how to add some kind of resiliency to the system
+
+202
+00:12:09,964 --> 00:12:13,654
+or self healing capabilities to the system. So I think we all agree
+
+203
+00:12:13,692 --> 00:12:17,890
+with what Sentry iOS tagline is. Software errors are inevitable.
+
+204
+00:12:17,970 --> 00:12:21,446
+Chaos is not. The most basic version of resiliency is
+
+205
+00:12:21,468 --> 00:12:24,714
+to enable autoretries in times of failure. You can also add
+
+206
+00:12:24,752 --> 00:12:28,122
+circuit breaking elements. For example, I have added five as
+
+207
+00:12:28,176 --> 00:12:31,674
+the number of maximum retries, and if a task is retired five
+
+208
+00:12:31,712 --> 00:12:35,454
+times and still failed, it will be ignored. To make it more resilient, we can
+
+209
+00:12:35,492 --> 00:12:39,166
+add exponential backup. For example, the task is dependent on
+
+210
+00:12:39,188 --> 00:12:42,766
+another service and the service is down. And let's assume the
+
+211
+00:12:42,788 --> 00:12:46,062
+time between consecutive retries is 10 seconds. So if my service
+
+212
+00:12:46,116 --> 00:12:49,346
+is down, my first retry will happen at 10 seconds, the second one
+
+213
+00:12:49,368 --> 00:12:53,374
+at 20 seconds, the third one at 30 seconds, the fourth one at 40 seconds,
+
+214
+00:12:53,422 --> 00:12:56,926
+and the last one at 50 seconds. So in this case, I gave 50 seconds
+
+215
+00:12:56,958 --> 00:13:00,226
+building time to the other service to come back up so that I don't lose
+
+216
+00:13:00,258 --> 00:13:04,002
+my task. To increase the amount of breathing room, we can use exponential backup,
+
+217
+00:13:04,066 --> 00:13:07,414
+which means the first retrace will happen at 10 seconds, the second one at
+
+218
+00:13:07,452 --> 00:13:10,726
+20 seconds, the third one at 40 seconds, the fourth one at
+
+219
+00:13:10,748 --> 00:13:14,554
+80 seconds, and the last one at 160 seconds. So now the breathing time
+
+220
+00:13:14,592 --> 00:13:18,474
+is increased from 50 seconds to 160 seconds. And if you want more
+
+221
+00:13:18,512 --> 00:13:21,398
+breathing time, you can just change the exponential backup.
+
+222
+00:13:21,494 --> 00:13:25,242
+Axelate is equal to true. This means late acknowledgment.
+
+223
+00:13:25,306 --> 00:13:29,210
+So by default, a broker marks a task as acknowledged
+
+224
+00:13:29,290 --> 00:13:32,986
+when it delivers it to the worker. But if a worker goes down and restarts,
+
+225
+00:13:33,018 --> 00:13:36,926
+it loses that task. So to make the system resilient towards worker
+
+226
+00:13:36,958 --> 00:13:40,850
+failures or infrastructure failures, we can use axlate is equal to true,
+
+227
+00:13:40,920 --> 00:13:44,334
+which means until and unless the task is processed by the worker,
+
+228
+00:13:44,382 --> 00:13:47,602
+it will not be marked acknowledged. So even if the worker goes down,
+
+229
+00:13:47,656 --> 00:13:51,122
+the broker delivers the same task to it as it was still stored
+
+230
+00:13:51,186 --> 00:13:54,786
+in the broker and was unacknowledged. The last argument is redis
+
+231
+00:13:54,818 --> 00:13:58,406
+jitter is equal to true. This param is used to
+
+232
+00:13:58,508 --> 00:14:02,266
+some kind of randomness to the system. So let's assume we have a
+
+233
+00:14:02,288 --> 00:14:05,786
+concurrent system, and there are chances that two tasks are trying to
+
+234
+00:14:05,808 --> 00:14:09,098
+access the same database resource. When they execute, they'll form a
+
+235
+00:14:09,104 --> 00:14:13,146
+deadlock and they'll fail. We have our automatic retries enabled they'll get
+
+236
+00:14:13,168 --> 00:14:16,686
+retried at the same time, form a deadlock and fail again, and this
+
+237
+00:14:16,708 --> 00:14:19,518
+will repeat till the circuit breaks. In situations like this,
+
+238
+00:14:19,604 --> 00:14:23,006
+we want some kind of randomness to the retries so that they do
+
+239
+00:14:23,028 --> 00:14:26,266
+not get retried again and again at the same time. That is why retry
+
+240
+00:14:26,298 --> 00:14:29,618
+jitter is helpful. And if you want to keep track of your task of
+
+241
+00:14:29,624 --> 00:14:33,470
+your circuit break failures, you can use a DLQ or a dead litter queue
+
+242
+00:14:33,550 --> 00:14:36,726
+to store your failed tasks. Okay, so when your system is
+
+243
+00:14:36,748 --> 00:14:40,038
+down, the first thing you should do is check your cpu and
+
+244
+00:14:40,044 --> 00:14:43,718
+memory utilization. If your cpu utilization is high,
+
+245
+00:14:43,804 --> 00:14:47,714
+then horizontally or vertically scale according to your infrastructure.
+
+246
+00:14:47,842 --> 00:14:51,494
+But if your memory utilization is high and you know
+
+247
+00:14:51,532 --> 00:14:54,554
+for a fact that your code is not using that kind of memory, there are
+
+248
+00:14:54,592 --> 00:14:57,626
+chances that there is some kind of memory leak in your code. You might be
+
+249
+00:14:57,648 --> 00:15:00,906
+wondering memory leak in Python that is impossible. And I'm with
+
+250
+00:15:00,928 --> 00:15:03,846
+you. If you're working with core python, that is impossible.
+
+251
+00:15:03,958 --> 00:15:07,946
+But when many of the libraries you are using are built with cpython
+
+252
+00:15:07,978 --> 00:15:11,662
+or anything else, there are chances that there is some kind of memory leak happening
+
+253
+00:15:11,716 --> 00:15:15,006
+under the hood which is not in your hands. So to solve that problem,
+
+254
+00:15:15,108 --> 00:15:18,942
+celery provides two thresholds, max memory per child and max
+
+255
+00:15:19,006 --> 00:15:22,786
+task per child. With the help of these commands, you can set thresholds either on
+
+256
+00:15:22,808 --> 00:15:26,094
+the number of tasks executed by a process or the amount of memory
+
+257
+00:15:26,142 --> 00:15:29,746
+being used by the process. And when any of these threshold is reached, it rotates
+
+258
+00:15:29,778 --> 00:15:33,414
+the process and clears out the style length memory. When you're running something
+
+259
+00:15:33,452 --> 00:15:36,806
+in production, you should always have the capability to keep an
+
+260
+00:15:36,828 --> 00:15:39,942
+eye on it. And flower works really well with just running
+
+261
+00:15:39,996 --> 00:15:43,942
+one command. You can set up a full fledged monitoring tool for your salary setup.
+
+262
+00:15:44,006 --> 00:15:47,574
+It gives you the capabilities like purging queues, view acknowledgement rates
+
+263
+00:15:47,622 --> 00:15:50,870
+view and modify queue worker instances view scheduled tasks.
+
+264
+00:15:51,030 --> 00:15:54,718
+It also has an HTTP API for all the data points so that
+
+265
+00:15:54,724 --> 00:15:58,494
+you can integrate it with your own monitoring dashboards as well, and also
+
+266
+00:15:58,612 --> 00:16:02,094
+using those endpoints to configure alerts so that you know if your
+
+267
+00:16:02,132 --> 00:16:05,274
+system is going down beforehand. If you're using RabbitMQ as your broker,
+
+268
+00:16:05,322 --> 00:16:08,946
+and you are more comfortable with RabbitMQ instead of flower, you can use
+
+269
+00:16:08,968 --> 00:16:12,558
+RabbitMQ admin panel too to monitor your system at the broker
+
+270
+00:16:12,574 --> 00:16:15,566
+level itself. It also gives you features such as purging,
+
+271
+00:16:15,598 --> 00:16:18,726
+deleting and monitoring queues. So to conclude, in this talk we
+
+272
+00:16:18,748 --> 00:16:22,626
+understood why pipelines are better how to tune your salary config
+
+273
+00:16:22,658 --> 00:16:26,482
+to get maximum performance, how to make your setup resilient
+
+274
+00:16:26,546 --> 00:16:29,814
+or self healing, what to do when unknown things
+
+275
+00:16:29,852 --> 00:16:33,218
+are hogging up on memory resources, and how to keep an eye
+
+276
+00:16:33,234 --> 00:16:36,710
+on your system. So if we follow all these steps while
+
+277
+00:16:36,780 --> 00:16:39,950
+building our system, we will be facing a lot less issues.
+
+278
+00:16:40,060 --> 00:16:43,658
+Our system will be productionready and we will sleep
+
+279
+00:16:43,754 --> 00:16:47,662
+soundly. So that is it from me. If you have any questions
+
+280
+00:16:47,716 --> 00:16:51,326
+or feedback, I'd be happy to work on it. Also, if you didn't like the
+
+281
+00:16:51,348 --> 00:16:54,622
+presentation, I'm also open to take virtual tomatoes. Yeah,
+
+282
+00:16:54,676 --> 00:16:56,300
+that is it from me. Have a good day.
+
