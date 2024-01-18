@@ -104,8 +104,6 @@ def get_enriched_metadata(base_folder):
             talks = []
         event["talks_raw"] = talks
 
-        print("%s %s /%s (%d talks)" % (event.get("date"), event.get("name"), event.get("short_url"), len(talks)))
-
         # check and pick the picture
         event["thumbnail_path"] = pick_picture_file(base_folder + "/", event["thumbnail_path"])
 
@@ -119,7 +117,7 @@ def get_enriched_metadata(base_folder):
         ]
 
         #counts
-        print("%d normal %s keynotes %d panels" % (len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
+        print("%s %s /%s (%d talks, %d keynotes, %d panels)" % (event.get("date"), event.get("name"), event.get("short_url"), len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
 
         # extract and store the tracks
         tracks_ordered = []
@@ -157,7 +155,7 @@ def get_enriched_metadata(base_folder):
         event["talks_start"] = start
         event["talks_end"] = end
         event["talks_end_offset"] = (end - start).total_seconds()/60
-        print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
+        #print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
 
         # enrich the talks
         for talk in talks:
