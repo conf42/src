@@ -4,6 +4,8 @@ import assemblyai as aai
 
 CACHE_PATH = "./assemblyai"
 
+aai.settings.api_key = os.environ.get("ASSEMBLYAI_KEY")
+
 from .transcript import (
     parse_srt,
 )
@@ -20,7 +22,6 @@ def check_transcript_exists(yt_id):
 
 def get_transcript(audio_path, keywords):
     print(f"Getting transcript for audio {audio_path} with keywords {keywords}")
-    aai.settings.api_key = os.environ.get("ASSEMBLYAI_KEY")
     transcriber = aai.Transcriber()
     config = aai.TranscriptionConfig(
         summarization=True,
@@ -55,7 +56,7 @@ def write_transcript(yt_id, transcript):
     #    f.write(transcript.export_subtitles_vtt())
     with open(get_transcript_path(yt_id, extension=".srt"), "w") as f:
         f.write(transcript.export_subtitles_srt())
-    
+
 def read_transcript(yt_id):
     transcript = dict(chunks=[])
     # read the json
@@ -80,3 +81,40 @@ def read_transcript(yt_id):
     except:
         pass
     return transcript
+
+def get_summary(talk, transcript):
+    print(f"Getting summary for {talk['Title']}")
+    transcript = aai.Transcript.get_by_id(transcript["metadata"]["id"])
+    if transcript.status == aai.TranscriptStatus.error:
+        print(f"Transcription failed: {transcript.error}")
+        return False
+    
+    prompt = "Provide a summary. Do not provide preambule."
+    summary = transcript.lemur.task(
+        prompt,
+        final_model=aai.LemurModel.mistral7b,
+    )
+    return summary.response
+
+def write_summary(yt_id, summary):
+    with open(get_transcript_path(yt_id, extension="-summary.txt"), "w") as f:
+        f.write(summary)
+
+def get_article(talk, transcript):
+    print(f"Generating an article for {talk['Title']}")
+    transcript = aai.Transcript.get_by_id(transcript["metadata"]["id"])
+    if transcript.status == aai.TranscriptStatus.error:
+        print(f"Transcription failed: {transcript.error}")
+        return False
+    
+    prompt = "Write an article. Use markdown. Do not provide preambule."
+    summary = transcript.lemur.task(
+        prompt,
+        final_model=aai.LemurModel.default,
+        max_output_size=4000,
+    )
+    return summary.response
+
+def write_article(yt_id, text):
+    with open(get_transcript_path(yt_id, extension=".md"), "w") as f:
+        f.write(text)

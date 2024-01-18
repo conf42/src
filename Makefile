@@ -10,6 +10,9 @@ generate:
 transcribe:
 	python -m build.transcribe
 
+summarize:
+	python -m build.summarize
+
 verify:
 	CHECK_REMOTE=true python -m build.generate
 
@@ -22,4 +25,4 @@ clean:
 env:
 	python3 -m venv env
 
-all: deps jpeg generate transcribe verify
+all: deps jpeg generate transcribe summarize verify
