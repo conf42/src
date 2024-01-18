@@ -1,0 +1,1184 @@
+1
+00:00:41,010 --> 00:00:44,754
+Hi folks, and welcome to this session as part of the Comp 42 Cloud Native
+
+2
+00:00:44,802 --> 00:00:48,034
+Conference. In this session today we're going to be talking about how we can improve
+
+3
+00:00:48,082 --> 00:00:51,294
+reliability using health checks and dependency management within
+
+4
+00:00:51,332 --> 00:00:55,006
+our applications and our workload. So let's get stuck into it
+
+5
+00:00:55,028 --> 00:00:58,206
+then. Before we go any further, quick background on
+
+6
+00:00:58,228 --> 00:01:01,354
+myself. My name is Andrew Robinson. I'm a principal solutions architect
+
+7
+00:01:01,402 --> 00:01:05,134
+at Amazon Web Services and part of the AWS wellarchitected
+
+8
+00:01:05,182 --> 00:01:08,990
+team team that I'm in. We work with our customers and our partners
+
+9
+00:01:09,070 --> 00:01:12,046
+to help them build secure, high performing,
+
+10
+00:01:12,158 --> 00:01:15,954
+resilient and efficient infrastructure that they can run their applications and
+
+11
+00:01:15,992 --> 00:01:19,442
+workloads on. I've worked in the technology industry for the last 14
+
+12
+00:01:19,506 --> 00:01:22,994
+years and my background is mainly in infrastructure and reliability.
+
+13
+00:01:23,122 --> 00:01:26,438
+Also spent some time in data management as well. The workload that we're going
+
+14
+00:01:26,444 --> 00:01:29,894
+to be looking at for the purpose of this is a web
+
+15
+00:01:29,932 --> 00:01:33,498
+application. This web application works as a recommendation engine.
+
+16
+00:01:33,584 --> 00:01:37,158
+Let's just have a quick look then at the data flow of how users
+
+17
+00:01:37,174 --> 00:01:40,266
+would walk through this application. So first of all, we start with
+
+18
+00:01:40,288 --> 00:01:43,738
+our users up here. They connect in through can Internet gateway,
+
+19
+00:01:43,834 --> 00:01:47,662
+which is our public facing endpoint. This then tends them to
+
+20
+00:01:47,716 --> 00:01:51,086
+an elastic load balancer. This load balancer will take those
+
+21
+00:01:51,108 --> 00:01:54,494
+incoming connections and distribute them out across a pool of servers,
+
+22
+00:01:54,542 --> 00:01:58,126
+or in this case Amazon EC two instances. You'll note
+
+23
+00:01:58,158 --> 00:02:01,694
+that we have three separate EC two instances,
+
+24
+00:02:01,822 --> 00:02:05,118
+and each one of these is running in a separate availability
+
+25
+00:02:05,214 --> 00:02:08,578
+zone. We've got multiple instances so that in the event of a failure of
+
+26
+00:02:08,584 --> 00:02:11,858
+one of those instances, we can still service user requests and they're
+
+27
+00:02:11,874 --> 00:02:15,730
+in different availability zones. That way we've got some level of separation.
+
+28
+00:02:15,810 --> 00:02:19,686
+If you're not familiar with an availability zone in AWS, think of it as akin
+
+29
+00:02:19,718 --> 00:02:23,174
+to a data center or a collection of data centers that are joined
+
+30
+00:02:23,222 --> 00:02:26,662
+together using high throughput, low latency links
+
+31
+00:02:26,726 --> 00:02:30,266
+to provide you with different geographical areas that you could
+
+32
+00:02:30,288 --> 00:02:33,962
+deploy that workload into within a single AWS region.
+
+33
+00:02:34,026 --> 00:02:37,786
+You'll note that the instances are in can auto scaling group this auto
+
+34
+00:02:37,818 --> 00:02:41,262
+scaling group allows us to scale up and scale down to meet
+
+35
+00:02:41,316 --> 00:02:44,702
+demand, improving reliability because we're able to better
+
+36
+00:02:44,756 --> 00:02:48,574
+handle user requests by making sure we've got the appropriate number of resources
+
+37
+00:02:48,622 --> 00:02:52,574
+available. But also it provides us with the ability to replace a failed
+
+38
+00:02:52,622 --> 00:02:56,226
+instance. So if one of these instances has an issue, maybe there's a failure of
+
+39
+00:02:56,248 --> 00:03:00,022
+underlying hardware, maybe there's a configuration issue and that instance goes
+
+40
+00:03:00,076 --> 00:03:03,478
+offline or becomes unavailable, or as we may see later,
+
+41
+00:03:03,564 --> 00:03:07,762
+fails a health check. We then have the ability to replace that instance automatically
+
+42
+00:03:07,826 --> 00:03:11,226
+to continue serving user requests. I mentioned that this is a
+
+43
+00:03:11,248 --> 00:03:14,906
+recommendation engine and the actual recommendation engine that we use is
+
+44
+00:03:14,928 --> 00:03:18,310
+an external API call. So we have a recommendation
+
+45
+00:03:18,390 --> 00:03:21,754
+service that sits external to our application and
+
+46
+00:03:21,792 --> 00:03:25,518
+this is where our recommendations come from. In our case we're using
+
+47
+00:03:25,604 --> 00:03:29,322
+Amazon DynamodB as a NoSQL key value pair database
+
+48
+00:03:29,386 --> 00:03:32,746
+and this stores our recommendation. But this could be any external
+
+49
+00:03:32,778 --> 00:03:36,490
+services to the workload or application. It could be an external company,
+
+50
+00:03:36,580 --> 00:03:39,810
+maybe a payment provider, or it could be an external service
+
+51
+00:03:39,880 --> 00:03:43,874
+within your own organization that you're calling. Just as a final point, you will
+
+52
+00:03:43,912 --> 00:03:48,194
+also notice that we have these Nat gateways. These provide our EC
+
+53
+00:03:48,242 --> 00:03:51,906
+two instances or servers with external Internet
+
+54
+00:03:51,938 --> 00:03:55,970
+connectivity. This is needed in our case to be able to call our recommendation
+
+55
+00:03:56,050 --> 00:03:59,574
+service. Let's dive a little bit deeper then into some best practices for
+
+56
+00:03:59,612 --> 00:04:03,194
+how the infrastructure of this has been built, and then we'll dive into the
+
+57
+00:04:03,232 --> 00:04:06,906
+code that's running on those instances and show you how we can implement some
+
+58
+00:04:06,928 --> 00:04:10,694
+of those health checks and dependency monitoring that we mentioned. So some best practices
+
+59
+00:04:10,742 --> 00:04:14,810
+to get us started. High availability on network connectivity
+
+60
+00:04:14,890 --> 00:04:18,362
+at AWS we take care of some of this for you. At the physical
+
+61
+00:04:18,426 --> 00:04:21,614
+level, we make sure that there's multiple connections going into our
+
+62
+00:04:21,652 --> 00:04:24,602
+different data centers that make up our availability zones.
+
+63
+00:04:24,746 --> 00:04:28,446
+However, at the logical level you will still need to do some implementation.
+
+64
+00:04:28,558 --> 00:04:31,778
+As you could see from earlier, we've got nat gateways that
+
+65
+00:04:31,784 --> 00:04:34,994
+we use here. We've got multiple Nat gateways. So in the event
+
+66
+00:04:35,032 --> 00:04:38,018
+of a network failure in one of our availability zones,
+
+67
+00:04:38,114 --> 00:04:41,686
+we can still route traffic through another Nat gateway in
+
+68
+00:04:41,708 --> 00:04:44,866
+another availability zone. So that instance can still communicate
+
+69
+00:04:44,898 --> 00:04:48,994
+with our external API service. We also want to deploy to multiple
+
+70
+00:04:49,042 --> 00:04:53,126
+locations. This helps give us a smaller fault domain or a smaller
+
+71
+00:04:53,158 --> 00:04:56,698
+blast radius for errors that may occur, and also means that in
+
+72
+00:04:56,704 --> 00:05:00,266
+the event of a failure in one of those areas, we can still continue to
+
+73
+00:05:00,288 --> 00:05:04,090
+services our application. We do have this done at the availability
+
+74
+00:05:04,170 --> 00:05:08,046
+zone level in this case, and as I mentioned earlier, an availability zone is
+
+75
+00:05:08,068 --> 00:05:11,902
+a collection of data centers or a single data center that has low
+
+76
+00:05:11,956 --> 00:05:15,758
+latency, high throughput connectivity to other data centers in
+
+77
+00:05:15,764 --> 00:05:18,962
+the same availability zone. So you could think of it as akin to a single
+
+78
+00:05:19,016 --> 00:05:22,350
+fault domain if you need to. For workload purposes.
+
+79
+00:05:22,430 --> 00:05:25,790
+You may want to look at deploying this to multiple geographic regions
+
+80
+00:05:25,870 --> 00:05:28,962
+across the globe, maybe to service users in different areas,
+
+81
+00:05:29,026 --> 00:05:32,646
+but also that can help to improve reliability. But it
+
+82
+00:05:32,668 --> 00:05:36,194
+does come with some additional management overheads because you then have multiple
+
+83
+00:05:36,242 --> 00:05:39,306
+AWS regions that you're managing your workload within.
+
+84
+00:05:39,488 --> 00:05:42,854
+Finally making sure that we're using loosely coupled dependencies.
+
+85
+00:05:42,982 --> 00:05:46,502
+We've done this in this scenario by placing our API
+
+86
+00:05:46,566 --> 00:05:49,914
+call for our recommendation engine external to
+
+87
+00:05:49,952 --> 00:05:53,758
+the actual application that's running. On our instances we could
+
+88
+00:05:53,844 --> 00:05:57,610
+go further and use systems like queuing or dataflows
+
+89
+00:05:57,690 --> 00:06:01,246
+to be able to stream data in some way, and that
+
+90
+00:06:01,268 --> 00:06:04,654
+would then help create additional loose coupling that we need within there.
+
+91
+00:06:04,692 --> 00:06:08,106
+But for this purpose, we're just making an external API call. So let's
+
+92
+00:06:08,138 --> 00:06:11,482
+jump into the code that's running on these applications.
+
+93
+00:06:11,546 --> 00:06:15,126
+And if you're not a developer, I'm not either. Please don't worry, we're not
+
+94
+00:06:15,148 --> 00:06:17,638
+going to be going through all the code on here. We're just going to be
+
+95
+00:06:17,644 --> 00:06:21,078
+looking at some extracts and I'll be explaining what all of this nodes does.
+
+96
+00:06:21,164 --> 00:06:24,434
+The coding question here is all written in Python. This is the language
+
+97
+00:06:24,482 --> 00:06:27,670
+that I'm the most familiar with, which is the reason that I chose it.
+
+98
+00:06:27,740 --> 00:06:31,298
+You can achieve the same thing in multiple other different languages,
+
+99
+00:06:31,394 --> 00:06:34,806
+but for the purpose of this, I've just chosen Python. I find it the easiest
+
+100
+00:06:34,838 --> 00:06:38,650
+one to explain, and hopefully that will make it easier for everybody to understand
+
+101
+00:06:38,720 --> 00:06:42,058
+what we're trying to achieve here. So our first basic health check that
+
+102
+00:06:42,064 --> 00:06:45,546
+we're doing with our load balancer, we can have a path
+
+103
+00:06:45,578 --> 00:06:49,054
+that we specify in our load balancer that the load balancer uses to
+
+104
+00:06:49,092 --> 00:06:52,586
+checks the health of those servers or instances it's connecting
+
+105
+00:06:52,618 --> 00:06:56,270
+to. In this case, this is on the health checkpath.
+
+106
+00:06:56,350 --> 00:06:59,742
+So we're looking for any connections coming in on that slash
+
+107
+00:06:59,806 --> 00:07:03,314
+health checkpath, and if they do come in, we're sending a
+
+108
+00:07:03,352 --> 00:07:06,222
+200 lessons a HTTP 200 response,
+
+109
+00:07:06,286 --> 00:07:09,894
+which is a success. That means that when our load balancer does
+
+110
+00:07:09,932 --> 00:07:13,446
+its health check routinely, which we can specify what period that
+
+111
+00:07:13,468 --> 00:07:16,610
+happens on every 30 seconds, every 60 seconds.
+
+112
+00:07:16,770 --> 00:07:20,278
+If it then successfully connects to this URL with the
+
+113
+00:07:20,364 --> 00:07:24,090
+health check path for that instance, we'll get a 200 response back.
+
+114
+00:07:24,160 --> 00:07:27,914
+So that gives us some idea that the instance and the application
+
+115
+00:07:28,032 --> 00:07:31,242
+is running. But this is a fairly simple health check,
+
+116
+00:07:31,296 --> 00:07:34,358
+and it only tells us that what could we do to make this a little
+
+117
+00:07:34,384 --> 00:07:38,026
+bit more meaningful? So we could look at doing deeper health checks,
+
+118
+00:07:38,058 --> 00:07:41,358
+and that's what we'll have a look at here with this here. We're still looking
+
+119
+00:07:41,444 --> 00:07:44,922
+on our health check path for any health check connections
+
+120
+00:07:44,986 --> 00:07:48,274
+coming in from our load balancer. What we're doing is we're setting this
+
+121
+00:07:48,312 --> 00:07:51,646
+variable called is healthy immediately to false,
+
+122
+00:07:51,758 --> 00:07:55,474
+and we do that as you'll see later on. That way, if anything goes wrong
+
+123
+00:07:55,512 --> 00:07:58,814
+with our health check process, the load balancer will get an error.
+
+124
+00:07:58,862 --> 00:08:02,326
+In return, it will get an error code from the instance and
+
+125
+00:08:02,348 --> 00:08:05,606
+that means it knows the instance isn't healthy. What we actually then do is we
+
+126
+00:08:05,628 --> 00:08:09,346
+use a try statement to make our call. So we're
+
+127
+00:08:09,378 --> 00:08:12,586
+making our get recommendation call as part of
+
+128
+00:08:12,608 --> 00:08:15,706
+our health check. So our health check is now going to be checking on the
+
+129
+00:08:15,728 --> 00:08:18,954
+health of our dependency AWS, well as the health
+
+130
+00:08:18,992 --> 00:08:22,666
+of the actual application itself. So we're just looking then for
+
+131
+00:08:22,688 --> 00:08:25,758
+a response. And as I mentioned, we're looking for a tv show and a
+
+132
+00:08:25,764 --> 00:08:28,762
+username for our recommendation engine that it provides.
+
+133
+00:08:28,906 --> 00:08:32,382
+If we get this back, we set our is healthy to test
+
+134
+00:08:32,436 --> 00:08:35,854
+values so that we've now no longer got that false value that's set
+
+135
+00:08:35,892 --> 00:08:39,566
+there. And then we just have an exception clause that just catches
+
+136
+00:08:39,598 --> 00:08:42,818
+any errors that we've got and provides us with a traceback error code that
+
+137
+00:08:42,824 --> 00:08:46,642
+we can use. Carrying on still wrapped here in the same health check
+
+138
+00:08:46,696 --> 00:08:49,938
+statement is we just have an if and an else statement.
+
+139
+00:08:50,034 --> 00:08:53,906
+So our if looks at is healthy and if there's
+
+140
+00:08:53,938 --> 00:08:58,182
+a value that that's been set to, we send a 200 lessons content
+
+141
+00:08:58,236 --> 00:09:01,946
+type is HTML and we set a message as success
+
+142
+00:09:02,048 --> 00:09:05,930
+and send some metadata. So that means that we're not only checks that our
+
+143
+00:09:06,000 --> 00:09:09,706
+application and therefore our instance is healthy, we're now also checking that we
+
+144
+00:09:09,728 --> 00:09:12,906
+can successfully call that external API, meaning that that
+
+145
+00:09:12,928 --> 00:09:16,538
+external API is healthy because it's providing us with a valid response.
+
+146
+00:09:16,634 --> 00:09:19,758
+We then just have an else statement. So if anything else happens,
+
+147
+00:09:19,844 --> 00:09:23,034
+we send a 503 error and we then include
+
+148
+00:09:23,082 --> 00:09:26,334
+that exception error message from previously so that we
+
+149
+00:09:26,372 --> 00:09:30,306
+know what this error is. In this case, we'll be sending that 503
+
+150
+00:09:30,328 --> 00:09:34,158
+error back to our load balancer and our load balancer will then mark this instance
+
+151
+00:09:34,254 --> 00:09:37,986
+or server AWS being unhealthy and won't send any
+
+152
+00:09:38,008 --> 00:09:41,666
+traffic to it. I mentioned there that it won't send traffic to this instance.
+
+153
+00:09:41,778 --> 00:09:45,126
+This is a behavior that we call fail closed. This means
+
+154
+00:09:45,148 --> 00:09:49,074
+that in the event of that instance using unhealthy, the load balancer
+
+155
+00:09:49,122 --> 00:09:52,426
+will no longer send any traffic to it. So you can see here
+
+156
+00:09:52,448 --> 00:09:56,394
+that this instance is marked now as being unhealthy and health
+
+157
+00:09:56,432 --> 00:10:00,506
+checks failed with a code 503. The two other instances are still
+
+158
+00:10:00,528 --> 00:10:04,278
+showing AWS healthy, so any users connecting in will be sent to those two
+
+159
+00:10:04,384 --> 00:10:07,470
+instances and they'll still be able to use the application as before.
+
+160
+00:10:07,540 --> 00:10:11,114
+But the load balancer will not send any traffic to that instance,
+
+161
+00:10:11,242 --> 00:10:14,698
+we then have a choice. We can either choose to replace that instance,
+
+162
+00:10:14,794 --> 00:10:18,366
+or we could have a countdown timer for the number of failed health checks
+
+163
+00:10:18,398 --> 00:10:21,906
+before we decide to replace it. If we replace it straight away, that of
+
+164
+00:10:21,928 --> 00:10:25,154
+course means that the instance is taken out of service and then a new one
+
+165
+00:10:25,192 --> 00:10:28,950
+will be built to replace it. However, if we wait until the
+
+166
+00:10:29,020 --> 00:10:32,466
+instance is back healthy again, we could then resume sending
+
+167
+00:10:32,498 --> 00:10:36,262
+traffic to it. What happens, though, if all the instances within
+
+168
+00:10:36,316 --> 00:10:39,318
+our load balancer fail? So in this case,
+
+169
+00:10:39,404 --> 00:10:43,402
+we revert to a behavior called failopen. And this
+
+170
+00:10:43,456 --> 00:10:46,854
+means that requests will be sent to all targets.
+
+171
+00:10:46,902 --> 00:10:50,154
+Because all targets are unhealthy, it means all
+
+172
+00:10:50,192 --> 00:10:53,886
+of them have failed their health check. But because of the fact that
+
+173
+00:10:53,908 --> 00:10:57,642
+our load balancer is configured to do fail open, we will route
+
+174
+00:10:57,706 --> 00:11:01,518
+those requests to all targets. Now sometimes
+
+175
+00:11:01,684 --> 00:11:05,430
+that's helpful. For example, if you have an external dependencies that you're
+
+176
+00:11:05,450 --> 00:11:09,662
+making a call on, which may be slow to respond, you may have instances
+
+177
+00:11:09,726 --> 00:11:13,198
+that flap in and out of being healthy or unhealthy.
+
+178
+00:11:13,294 --> 00:11:16,706
+Now, as those instances are flapping, that might not trigger the
+
+179
+00:11:16,728 --> 00:11:19,958
+threshold to be able to take that single
+
+180
+00:11:20,044 --> 00:11:23,618
+instance out, and you may end up with all of the instances
+
+181
+00:11:23,714 --> 00:11:26,902
+flapping at the same time, all go unhealthy at the same time,
+
+182
+00:11:26,956 --> 00:11:30,790
+and then your application isn't available. We have this standard behavior AWS
+
+183
+00:11:30,860 --> 00:11:35,238
+fail open. We need to make sure that we're testing our dependencies.
+
+184
+00:11:35,334 --> 00:11:38,438
+We need to make sure that we're doing partial testing as well, so that we're
+
+185
+00:11:38,454 --> 00:11:42,154
+testing both a standard health check and also the deeper health check
+
+186
+00:11:42,192 --> 00:11:45,706
+as well, so that we've got a real true idea of what those instances
+
+187
+00:11:45,738 --> 00:11:49,278
+are doing and what the application state is. Next we'll have
+
+188
+00:11:49,284 --> 00:11:52,602
+a look at dependencies. As we mentioned earlier,
+
+189
+00:11:52,666 --> 00:11:56,154
+we've got a dependency within our application, which is our external API
+
+190
+00:11:56,202 --> 00:11:59,522
+that we're making a call to to get our recommendations from. In our code
+
+191
+00:11:59,576 --> 00:12:03,022
+here. When we get a request that comes in from a user,
+
+192
+00:12:03,166 --> 00:12:06,322
+we're making a call to this get recommendation engine,
+
+193
+00:12:06,456 --> 00:12:10,246
+and then we're parsing the value of those responses from a
+
+194
+00:12:10,268 --> 00:12:13,878
+tv show and a username that we get back from our recommendation engine.
+
+195
+00:12:13,964 --> 00:12:17,282
+Now this is called a hard dependency because if this dependency
+
+196
+00:12:17,346 --> 00:12:20,966
+call fails, users will get a HTTP 502
+
+197
+00:12:20,988 --> 00:12:24,966
+or 503 error. That means that they can't actually get anywhere
+
+198
+00:12:24,998 --> 00:12:28,106
+with our application. It doesn't work, it won't do what they
+
+199
+00:12:28,128 --> 00:12:31,562
+need it to. What we can do is change this into
+
+200
+00:12:31,616 --> 00:12:35,054
+a soft dependency. So we would have a try statement and
+
+201
+00:12:35,092 --> 00:12:38,874
+in here, we'd have that same code that we just had on our previous slide
+
+202
+00:12:38,922 --> 00:12:42,446
+that would try to make that recommendation call, but this time we add an
+
+203
+00:12:42,468 --> 00:12:46,138
+exception clause. What this means is if that call fails for
+
+204
+00:12:46,164 --> 00:12:50,334
+any reason, we would provide the customer with a static response,
+
+205
+00:12:50,382 --> 00:12:54,146
+and we'd recommend the tv show I love Lucy to them. Now, we would then
+
+206
+00:12:54,168 --> 00:12:57,710
+also provide them with some diagnostic information on their browser,
+
+207
+00:12:57,790 --> 00:13:01,286
+which would just say we can't provide you with a personalized recommendation at the
+
+208
+00:13:01,308 --> 00:13:04,486
+moment. If this problem persists, please contact us and then
+
+209
+00:13:04,508 --> 00:13:07,778
+we'd provide them with details of the error code. Now, yes, this does mean they're
+
+210
+00:13:07,794 --> 00:13:11,338
+not going to get a personalized recommendation, but it does mean that they'll still be
+
+211
+00:13:11,344 --> 00:13:15,210
+able to access that application. And if this application forms part of a
+
+212
+00:13:15,280 --> 00:13:18,778
+larger app that you're building, the whole application will still continue
+
+213
+00:13:18,864 --> 00:13:22,122
+to function. The recommendation engine just might not recommend them
+
+214
+00:13:22,176 --> 00:13:26,346
+exactly what they want, but they'd know that, and we'd be giving them a predefined
+
+215
+00:13:26,458 --> 00:13:30,126
+static response, meaning that they can still continue to do what they need to
+
+216
+00:13:30,148 --> 00:13:34,266
+do. So having a look then, at some of these best practices from our
+
+217
+00:13:34,388 --> 00:13:38,894
+previous slides that we went through here. So when component dependencies
+
+218
+00:13:38,942 --> 00:13:41,922
+are unhealthy, the component should still function,
+
+219
+00:13:42,056 --> 00:13:45,694
+but in a degraded manner. As we saw in our previous example. If you can't
+
+220
+00:13:45,742 --> 00:13:50,130
+provide a dynamic response, use a predetermined static response
+
+221
+00:13:50,210 --> 00:13:53,814
+so that you can still provide your customers and users with something.
+
+222
+00:13:53,932 --> 00:13:57,890
+We should continuously monitor all components that make up our workload
+
+223
+00:13:57,970 --> 00:14:01,350
+to detect failures, and then use some type of automated
+
+224
+00:14:01,430 --> 00:14:05,274
+system to be able to become aware of that degradation and take
+
+225
+00:14:05,312 --> 00:14:09,046
+appropriate action. In our case, that's our load balancer. Our load balancer
+
+226
+00:14:09,078 --> 00:14:12,934
+detects that an instance has become unhealthy and then removes that instance
+
+227
+00:14:12,982 --> 00:14:16,538
+from being able to have traffic sent to it. We also use our load balancer
+
+228
+00:14:16,554 --> 00:14:20,058
+to make sure that if we have an unhealthy or a failed resource,
+
+229
+00:14:20,154 --> 00:14:24,170
+we have healthy resources available that we can continue to serve requests,
+
+230
+00:14:24,250 --> 00:14:28,274
+and our autoscaling group helps to provide those resources that our load balancer can
+
+231
+00:14:28,312 --> 00:14:32,222
+then send the traffic to. You'll note the health check that we had earlier operates
+
+232
+00:14:32,286 --> 00:14:35,822
+on the application layers or the data plane. This indicates
+
+233
+00:14:35,886 --> 00:14:39,730
+the capability of the application rather than the underlying infrastructure.
+
+234
+00:14:39,810 --> 00:14:42,854
+We want to make sure that our application is running
+
+235
+00:14:42,972 --> 00:14:46,418
+rather than focusing our health checks on the underlying infrastructure.
+
+236
+00:14:46,514 --> 00:14:49,538
+A health check URL, as you saw in our examples earlier,
+
+237
+00:14:49,634 --> 00:14:53,066
+should be configured, but to be used by the load balancer so
+
+238
+00:14:53,088 --> 00:14:56,746
+that we can check the health status of the application. We should also look
+
+239
+00:14:56,768 --> 00:14:59,974
+at having processes that can be automatically
+
+240
+00:15:00,022 --> 00:15:03,402
+and rapidly brought in to mitigate the availability
+
+241
+00:15:03,466 --> 00:15:07,198
+impact that our workload has. It should remove the cognitive burden that
+
+242
+00:15:07,204 --> 00:15:11,098
+we place on our engineers so that when we're looking at these errors,
+
+243
+00:15:11,194 --> 00:15:14,654
+we have enough information to go on to make an informed decision about
+
+244
+00:15:14,692 --> 00:15:17,806
+what the problem is. An example of how we can do this is by providing
+
+245
+00:15:17,838 --> 00:15:21,406
+that static lessons and including the exception traceback
+
+246
+00:15:21,438 --> 00:15:24,962
+errors in any error messages that we provide so that we have more
+
+247
+00:15:25,016 --> 00:15:28,486
+detail on what the application issue is. We should also look
+
+248
+00:15:28,508 --> 00:15:32,162
+at fail open and fail close behaviors. When an individual services
+
+249
+00:15:32,226 --> 00:15:35,602
+fails a health check, the load balancer should stop sending traffic
+
+250
+00:15:35,666 --> 00:15:38,854
+immediately to that services or instance. But when all
+
+251
+00:15:38,892 --> 00:15:42,794
+servers fail, we should revert back to a fail open and
+
+252
+00:15:42,832 --> 00:15:46,186
+allow traffic to all services. As I mentioned, there were some
+
+253
+00:15:46,208 --> 00:15:49,434
+caveats around this, and making sure that we're testing the
+
+254
+00:15:49,472 --> 00:15:53,066
+different failure modes on the health check of the dependencies
+
+255
+00:15:53,178 --> 00:15:56,558
+so that we can see exactly what's going on within our application.
+
+256
+00:15:56,724 --> 00:16:00,234
+To wrap up and some conclusions, you will find servers
+
+257
+00:16:00,282 --> 00:16:04,350
+and software fail for very different and very weird reasons.
+
+258
+00:16:04,430 --> 00:16:08,190
+Physical servers will have hardware failures. Software will have bugs.
+
+259
+00:16:08,270 --> 00:16:11,698
+Having multiple layers of checks, from lightweight to
+
+260
+00:16:11,784 --> 00:16:15,490
+passive monitoring to deeper health checks, are needed
+
+261
+00:16:15,560 --> 00:16:19,106
+to catch the different types of unexpected errors that we can see.
+
+262
+00:16:19,208 --> 00:16:23,046
+When a failure happens, we should detect it, take the affected server out
+
+263
+00:16:23,068 --> 00:16:26,594
+of service as quickly as we can do, and make sure that we're sending traffic
+
+264
+00:16:26,642 --> 00:16:30,118
+just to those healthy instances. Doing this level of automation
+
+265
+00:16:30,214 --> 00:16:34,006
+against an entire fleet of servers does come with some caveats.
+
+266
+00:16:34,118 --> 00:16:37,606
+We should use rate limited thresholds or circuit breaks
+
+267
+00:16:37,638 --> 00:16:41,178
+to turn off automation and bring humans into the decision making
+
+268
+00:16:41,264 --> 00:16:45,354
+process. That's as the example where we use fail open, we're providing
+
+269
+00:16:45,402 --> 00:16:48,526
+that safety net that we could then bring a human in
+
+270
+00:16:48,548 --> 00:16:52,350
+to help us with the diagnosis of this. So using these fail open
+
+271
+00:16:52,420 --> 00:16:56,434
+behaviors when we have all servers in a pool unhealthy can
+
+272
+00:16:56,472 --> 00:17:00,082
+really help to provide that additional safety net that we could need here
+
+273
+00:17:00,136 --> 00:17:04,098
+to make sure that we're able to correctly diagnose this issue
+
+274
+00:17:04,184 --> 00:17:07,362
+and therefore return our application to a healthy state.
+
+275
+00:17:07,496 --> 00:17:10,886
+So finally, a couple of call to actions, folks. So if
+
+276
+00:17:10,908 --> 00:17:14,134
+you've heard anything in today's session that interests you,
+
+277
+00:17:14,252 --> 00:17:17,714
+I'd recommend going and having a look at the Amazon Builders Library
+
+278
+00:17:17,762 --> 00:17:21,162
+and this specific article on implementing health checks. It goes into
+
+279
+00:17:21,216 --> 00:17:24,054
+much more detail than what I've covered in this session,
+
+280
+00:17:24,182 --> 00:17:28,310
+and talks through a little bit more about how Amazon uses some of these technologies
+
+281
+00:17:28,390 --> 00:17:31,946
+to improve the reliability of the workloads that our customers
+
+282
+00:17:32,048 --> 00:17:36,218
+use. There's also a collection of multiple other articles on the Builders library
+
+283
+00:17:36,314 --> 00:17:39,882
+that will help you with understanding how Amazon and AWS
+
+284
+00:17:39,946 --> 00:17:43,358
+implement some of these best practices. The actual architecture that
+
+285
+00:17:43,364 --> 00:17:46,754
+I went through today and the code is all available as part of a
+
+286
+00:17:46,792 --> 00:17:50,078
+series of AWS well architected labs that we've published.
+
+287
+00:17:50,174 --> 00:17:53,598
+The specific lab for this session is available following
+
+288
+00:17:53,614 --> 00:17:57,574
+this link, but there's a collection of over 100 labs covering all
+
+289
+00:17:57,612 --> 00:18:00,534
+of the different areas of reliability, security,
+
+290
+00:18:00,732 --> 00:18:04,290
+cost optimization, performance efficiency, and operational
+
+291
+00:18:04,370 --> 00:18:07,446
+excellence that you can go and access. The labs are all
+
+292
+00:18:07,468 --> 00:18:10,838
+open sourced on GitHub, so you can take the code and you
+
+293
+00:18:10,844 --> 00:18:14,166
+can use it to help yourself learn with that, I'd like to thank you all
+
+294
+00:18:14,188 --> 00:18:17,622
+for your time tending this session today. I really hope you do enjoy
+
+295
+00:18:17,676 --> 00:18:21,486
+the rest of the Comp 42 cloud native conference and look forward to
+
+296
+00:18:21,508 --> 00:18:23,866
+seeing you at the next one. Thanks again everybody, and bye.
+

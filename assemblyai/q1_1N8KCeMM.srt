@@ -1,0 +1,1160 @@
+1
+00:00:41,010 --> 00:00:45,394
+Hello everybody, thank you very much for attending the webinar. My name is Quiz
+
+2
+00:00:45,442 --> 00:00:49,122
+and it's not going to be easy Omega's experience with serverless Cli CD
+
+3
+00:00:49,186 --> 00:00:52,558
+in Omega we are 100% serverless in production, hundreds of
+
+4
+00:00:52,564 --> 00:00:56,046
+millions of lambda invocations per month. And of course, serverless is
+
+5
+00:00:56,068 --> 00:00:58,906
+not only lambdas, we are heavy users of Dynamodb,
+
+6
+00:00:59,018 --> 00:01:02,154
+SQS, SNS, S three, Athena, Kinesis,
+
+7
+00:01:02,202 --> 00:01:05,982
+Eventbridge and I'm sure I missed something. We are really the poster child
+
+8
+00:01:06,036 --> 00:01:09,922
+of serverless in AWS. Not only that, we are also 100%
+
+9
+00:01:10,056 --> 00:01:13,566
+of serverless CLI CD flow tens of deployments per week. We don't
+
+10
+00:01:13,598 --> 00:01:17,534
+have a single server that we manage to drive our flow. Everything is outsourced
+
+11
+00:01:17,582 --> 00:01:21,246
+either to AWS or external service provider. In this session you
+
+12
+00:01:21,288 --> 00:01:24,566
+learn how we drive our CLi CD flow in Omego, how to make
+
+13
+00:01:24,588 --> 00:01:28,054
+the entire flow robust enough, and I'll share some tips on how we cut
+
+14
+00:01:28,092 --> 00:01:31,866
+our Cli CD time flow by two thirds and we'll talk about a
+
+15
+00:01:31,888 --> 00:01:35,782
+unique flow for phase deployments we implemented internally. Across the session
+
+16
+00:01:35,846 --> 00:01:38,710
+you'll see many links to blog posts we wrote on the subject.
+
+17
+00:01:38,790 --> 00:01:41,878
+As a preparation for this session I gathered some ethics so you'll
+
+18
+00:01:41,894 --> 00:01:45,710
+better understand the CICD numbers Lumigo is facing. We have around
+
+19
+00:01:45,780 --> 00:01:49,006
+20,000 individual integration tests we run per month,
+
+20
+00:01:49,108 --> 00:01:52,366
+around 30 deployments to production per week. And the
+
+21
+00:01:52,388 --> 00:01:55,886
+pain points, I'll also talk about them. During the talk is the time
+
+22
+00:01:55,908 --> 00:01:58,786
+it takes us to deploy the test and run them. By the way, we are
+
+23
+00:01:58,808 --> 00:02:02,146
+trying to be metrics driven and we gather quite a lot of information about the
+
+24
+00:02:02,168 --> 00:02:05,294
+quality and performance of our continuous deployment and development.
+
+25
+00:02:05,342 --> 00:02:08,926
+I'll share with you some of our dashboards, a couple of words about me and
+
+26
+00:02:08,968 --> 00:02:12,262
+AWS serverless hero I'm leading the development of Lumigo's R and D.
+
+27
+00:02:12,316 --> 00:02:15,554
+I've been using serverless in the past four years, mostly with Python.
+
+28
+00:02:15,602 --> 00:02:18,882
+I'm obsessed with serverless testing and serverless development flows.
+
+29
+00:02:18,946 --> 00:02:22,426
+I wrote a couple of blogs and have a couple of sessions on the
+
+30
+00:02:22,448 --> 00:02:26,022
+subject. 15 years in the industry, working mainly with backend,
+
+31
+00:02:26,086 --> 00:02:30,054
+mobile application, various verticals. On my spare time I like to play card games,
+
+32
+00:02:30,102 --> 00:02:33,810
+although most of the time I lose a couple of words about omego.
+
+33
+00:02:33,910 --> 00:02:37,306
+It is a SaaS platform for AWS monitoring and observability,
+
+34
+00:02:37,418 --> 00:02:41,166
+heavily focused on serverless workloads. So the agenda we are going to
+
+35
+00:02:41,188 --> 00:02:44,318
+talk about the famous Infinity loop and see how to adapt it to a
+
+36
+00:02:44,324 --> 00:02:48,110
+serverless CLi CD flow, talk about our best practices and unfortunately,
+
+37
+00:02:48,190 --> 00:02:51,922
+here we won't have any time for Q A, but you are more than welcome
+
+38
+00:02:51,976 --> 00:02:55,074
+to contact me either through Twitter or through my email address,
+
+39
+00:02:55,192 --> 00:02:58,846
+which is going to appear at the end. Service is different. It affects
+
+40
+00:02:58,878 --> 00:03:02,182
+the way CLI CD is conducted. It's distributed with maybe
+
+41
+00:03:02,236 --> 00:03:06,342
+hundreds of components. Therefore, the orchestration of building
+
+42
+00:03:06,396 --> 00:03:09,302
+a serverless environment from scratch each time is difficult.
+
+43
+00:03:09,436 --> 00:03:12,650
+Many components usually means that frequent deployments are the norm,
+
+44
+00:03:12,720 --> 00:03:16,502
+and for many of the components you can't run them on a regular Linux machine.
+
+45
+00:03:16,566 --> 00:03:19,626
+SQS SNS kinesis are AWS services.
+
+46
+00:03:19,728 --> 00:03:23,446
+We don't have their container, only their mocks, so they have to run
+
+47
+00:03:23,488 --> 00:03:27,354
+on a dedicated environment in order to test the real behavior. The infinity
+
+48
+00:03:27,402 --> 00:03:31,342
+loop starts with a plan, goes to code, then to a build process.
+
+49
+00:03:31,476 --> 00:03:34,942
+By the way, in Lumigo we use python, therefore the build process
+
+50
+00:03:34,996 --> 00:03:38,130
+is skip, but in other runtimes like Java net,
+
+51
+00:03:38,200 --> 00:03:42,030
+you actually have to create a running artifact. From there we move to testing
+
+52
+00:03:42,110 --> 00:03:45,394
+both unit testing, integration testing, and end to end
+
+53
+00:03:45,432 --> 00:03:48,806
+testing when everything passes, and elaborate later what it
+
+54
+00:03:48,828 --> 00:03:52,726
+does mean by everything. We're releasing our artifacts and deploy them
+
+55
+00:03:52,748 --> 00:03:56,306
+to production and start monitoring them. Before starting the flow,
+
+56
+00:03:56,338 --> 00:04:00,154
+I want to go over a couple of guidelines we have internally in Lumigo that
+
+57
+00:04:00,192 --> 00:04:04,454
+affect our process. Each of our developers have an AWS
+
+58
+00:04:04,502 --> 00:04:07,786
+environment on their name. We're using organization to manage it
+
+59
+00:04:07,808 --> 00:04:11,014
+and consolidate the billing for us. If the code is not tested
+
+60
+00:04:11,062 --> 00:04:14,270
+on a real AWS environment, then it's not considered ready.
+
+61
+00:04:14,340 --> 00:04:17,966
+Originally we had a shared environment with different name prefixes for
+
+62
+00:04:17,988 --> 00:04:21,310
+each, resources for each developing. But very quickly
+
+63
+00:04:21,380 --> 00:04:24,686
+we started stepping on each other's toes and decided to separate the
+
+64
+00:04:24,708 --> 00:04:28,654
+environment. But we still have a single environment. For CLi CD driven integration
+
+65
+00:04:28,702 --> 00:04:32,354
+tests, we are serverless first, which means we will always prefer to choose
+
+66
+00:04:32,392 --> 00:04:35,278
+a serverless service instead of managing it by ourselves.
+
+67
+00:04:35,374 --> 00:04:39,282
+And by serverless I mean true serverless and not the management.
+
+68
+00:04:39,426 --> 00:04:43,410
+We don't want to handle sizing operation and pay for unused capacity.
+
+69
+00:04:43,490 --> 00:04:46,706
+By serverless we mean across the technology step, things like CLI,
+
+70
+00:04:46,738 --> 00:04:50,318
+CD, code, quality, and so on. I'm not talking only on serverless
+
+71
+00:04:50,354 --> 00:04:54,218
+in production, we don't want servers. We prefer to outsource everything
+
+72
+00:04:54,304 --> 00:04:57,414
+that is not in the core of our product. No dedicated QA
+
+73
+00:04:57,462 --> 00:05:01,226
+and Ops, which means everything is being done by the developers from
+
+74
+00:05:01,248 --> 00:05:05,194
+start to finish. The infinity loop that you saw earlier, same developer
+
+75
+00:05:05,242 --> 00:05:08,494
+takes the ticket across all states. No QA and
+
+76
+00:05:08,532 --> 00:05:12,206
+no ops means we invest heavily in automation. Across the
+
+77
+00:05:12,228 --> 00:05:15,746
+board. We've talked about environments, and these are the environments we have in
+
+78
+00:05:15,768 --> 00:05:19,650
+Lumigo. Each developer has its own personal laptop and the personal
+
+79
+00:05:19,720 --> 00:05:23,026
+AWS environment where they can run their code. We do have
+
+80
+00:05:23,048 --> 00:05:26,302
+a couple of shared integration environments that are part of the automated
+
+81
+00:05:26,366 --> 00:05:30,422
+CI CD process. We have production environments which are composed from
+
+82
+00:05:30,476 --> 00:05:34,370
+an environment our customer use and a monitoring environment that trams
+
+83
+00:05:34,450 --> 00:05:37,894
+our own product that monitoring our production. We are eating our own
+
+84
+00:05:37,932 --> 00:05:42,026
+dog food extensively, which helps us both to find potential issues ahead of
+
+85
+00:05:42,048 --> 00:05:45,834
+time and to sharpen our product. Our technology stack to drive
+
+86
+00:05:45,872 --> 00:05:49,046
+the CLI CD, we're using Circleci. We even wrote a joint blog
+
+87
+00:05:49,078 --> 00:05:52,586
+on how we use them for our deployment. We use the serverless framework. Most of
+
+88
+00:05:52,608 --> 00:05:55,946
+our code is written in Python, but we do have some services that are written
+
+89
+00:05:55,978 --> 00:05:59,994
+in node JS. So let's start with the infinity loop. So when omega
+
+90
+00:06:00,042 --> 00:06:03,614
+started and we were small, we used Kanban to drive
+
+91
+00:06:03,652 --> 00:06:06,990
+our workflow. We had a long list of tasks prioritized.
+
+92
+00:06:07,070 --> 00:06:10,766
+Each developer picked the top one. But as we grew, the Apple
+
+93
+00:06:10,798 --> 00:06:14,254
+management wanted more visibility, so we moved to a more detailed scrum.
+
+94
+00:06:14,302 --> 00:06:17,630
+Each of our sprints are a week long. We keep them short on purpose
+
+95
+00:06:17,710 --> 00:06:21,266
+to create the feeling of things moving fast, but we don't
+
+96
+00:06:21,298 --> 00:06:24,614
+want to wait for the end of the sprint to deliver. We are very
+
+97
+00:06:24,652 --> 00:06:28,646
+continuous, delivery oriented. When a piece of code passes through all of
+
+98
+00:06:28,668 --> 00:06:32,310
+our gates, it's being pushed to production again. A lot of responsibility
+
+99
+00:06:32,390 --> 00:06:35,818
+falls on the developer's shoulders. Originally we used Trello as
+
+100
+00:06:35,824 --> 00:06:39,414
+a ticket tracker, but as the team grew and the complexity of the task grew
+
+101
+00:06:39,462 --> 00:06:42,954
+as well, we moved to GM. I can't say that I'm satisfied with the move,
+
+102
+00:06:42,992 --> 00:06:46,126
+but that's what we have and we live with it. We're using
+
+103
+00:06:46,148 --> 00:06:49,566
+GitHub to store our code and using the GitHub flow in
+
+104
+00:06:49,588 --> 00:06:53,114
+which you have only master and feature benches. Each bench from a feature
+
+105
+00:06:53,162 --> 00:06:56,674
+bench to master means deployment to production again, and it's going
+
+106
+00:06:56,712 --> 00:07:00,878
+to come back over and over again by putting a lot of responsibility
+
+107
+00:07:00,974 --> 00:07:04,686
+on the developer. At the beginning, we had a very heated discussion regarding
+
+108
+00:07:04,718 --> 00:07:08,770
+mono versus Multireepo. We chose a multi because it was most suited
+
+109
+00:07:08,850 --> 00:07:12,226
+for services deployment. That is, each change in the repo
+
+110
+00:07:12,258 --> 00:07:15,766
+means deployment and it coerces the developing to
+
+111
+00:07:15,788 --> 00:07:19,414
+think in a more service oriented way. You don't read directly from
+
+112
+00:07:19,452 --> 00:07:23,114
+a Dynamodb table that does not belong to your service only because you can
+
+113
+00:07:23,152 --> 00:07:26,762
+import a dial or call functions directly. Instead, use common
+
+114
+00:07:26,816 --> 00:07:29,590
+practices to access remote resources, API gateway,
+
+115
+00:07:29,670 --> 00:07:33,546
+lambdas, queues, and so on. Run the lastly post on the never ending battle
+
+116
+00:07:33,578 --> 00:07:37,226
+between mono and repo you can find it in our blog.
+
+117
+00:07:37,418 --> 00:07:41,534
+In one of slides I mentioned that each one of our developer has their
+
+118
+00:07:41,572 --> 00:07:45,266
+own AWS environment. Right now we have around 20 services we need
+
+119
+00:07:45,288 --> 00:07:48,942
+to orchestrate the deployments of these services so our developers can update
+
+120
+00:07:49,006 --> 00:07:52,126
+or install them into their environment. We've created
+
+121
+00:07:52,158 --> 00:07:55,666
+an internal orchestration tool in Python which we call the
+
+122
+00:07:55,688 --> 00:07:59,414
+uber deploy. Not related to Uber by the way, that does
+
+123
+00:07:59,452 --> 00:08:02,706
+the following pulls relevant code from git depending on the branch
+
+124
+00:08:02,738 --> 00:08:06,310
+you choose, installs relevant requirements for each service and
+
+125
+00:08:06,380 --> 00:08:09,934
+installs in parallel the various services according to predefined
+
+126
+00:08:10,002 --> 00:08:14,006
+order. The Uber deploy tool enables our developers to easily
+
+127
+00:08:14,038 --> 00:08:17,434
+install these services in their environment, so no one needs
+
+128
+00:08:17,472 --> 00:08:21,066
+to know the various dependencies and the order of deployment, and it does it
+
+129
+00:08:21,088 --> 00:08:24,334
+faster than manual. By the way, we use this tool only in the
+
+130
+00:08:24,372 --> 00:08:27,982
+developer and integration environments. In production, each service
+
+131
+00:08:28,036 --> 00:08:31,306
+is being deployed on update. This is purely a development
+
+132
+00:08:31,338 --> 00:08:35,670
+tool. We believe in automated testing without QA. It's mandatory.
+
+133
+00:08:35,770 --> 00:08:38,974
+We can't skip it. We have three types of tests, unit tests,
+
+134
+00:08:39,022 --> 00:08:42,866
+which the developer runs locally integration tests, which the developer runs on
+
+135
+00:08:42,888 --> 00:08:46,830
+their AWS environment and are also being ran as part of the CLI
+
+136
+00:08:46,910 --> 00:08:50,370
+flow in a dedicated environment, and end to end testing
+
+137
+00:08:50,450 --> 00:08:54,578
+with cypress, which again being ran on an AWS environment.
+
+138
+00:08:54,674 --> 00:08:58,466
+Because testing in the cloud is slower than testing locally, we prefer
+
+139
+00:08:58,498 --> 00:09:01,734
+to detect as many issues as possible before pushing it remote.
+
+140
+00:09:01,782 --> 00:09:05,194
+We use git precommit hooks to automatically run test
+
+141
+00:09:05,232 --> 00:09:09,478
+and linting. For python we use precommit and for node we use ASCII.
+
+142
+00:09:09,654 --> 00:09:13,494
+One of the hardest things when running tests is adding external
+
+143
+00:09:13,542 --> 00:09:16,718
+services. People usually ask me, why are we running
+
+144
+00:09:16,804 --> 00:09:20,126
+our integration test in the cloud? Use mocks there are a lot of
+
+145
+00:09:20,148 --> 00:09:23,182
+mocks that mimic the behavior of the various AWS services.
+
+146
+00:09:23,316 --> 00:09:26,590
+Well, we tried it and it didn't work well. Couple of reasons.
+
+147
+00:09:26,670 --> 00:09:30,178
+Some services that we use don't have good mocks. They don't really mimic the
+
+148
+00:09:30,184 --> 00:09:33,506
+true behavior of the service and don't always include the
+
+149
+00:09:33,528 --> 00:09:37,182
+latest API. Some mocks infrastructure like local stack
+
+150
+00:09:37,246 --> 00:09:41,174
+are complicated. There's a lot of rocks surrounding them. I prefer to waste my time
+
+151
+00:09:41,212 --> 00:09:44,374
+on real testing. Some of these mocks have bugs, and it happened
+
+152
+00:09:44,412 --> 00:09:47,734
+to us more than once that things didn't work well. Later to find
+
+153
+00:09:47,772 --> 00:09:51,690
+out that they work perfectly when running on AWS, I prefer
+
+154
+00:09:52,110 --> 00:09:55,578
+not to waste my time on debugging mocks. So as a rule of
+
+155
+00:09:55,584 --> 00:09:59,130
+thumb, we don't use services mocks for integration testing. We always
+
+156
+00:09:59,200 --> 00:10:02,974
+run things in AWS environment. So this is
+
+157
+00:10:03,012 --> 00:10:06,650
+our testing stack. We use black and fleck, eight for Python
+
+158
+00:10:06,730 --> 00:10:10,154
+and prettier and dslint for node. We use static analysis
+
+159
+00:10:10,202 --> 00:10:13,294
+for Python, although I'll be honest, it helps us more with
+
+160
+00:10:13,332 --> 00:10:17,602
+readability and less in actual caching type errors, although it does sometimes
+
+161
+00:10:17,736 --> 00:10:21,566
+succeed in catching the issues. And for unit testing we use Pytest,
+
+162
+00:10:21,678 --> 00:10:25,182
+mocha and Jest. We have two types of integration
+
+163
+00:10:25,246 --> 00:10:28,934
+lets very thorough API based testing in which our test is
+
+164
+00:10:28,972 --> 00:10:32,738
+driven only by API calls no UI interaction, using node
+
+165
+00:10:32,754 --> 00:10:36,434
+js and mocha to drive the flow very specific critical
+
+166
+00:10:36,482 --> 00:10:40,634
+flows that are end to end, which include also the UI flows like
+
+167
+00:10:40,672 --> 00:10:43,994
+onboarding, logging and so on. Within Cypress and
+
+168
+00:10:44,032 --> 00:10:47,578
+jest we have two main problems when running our test. We have 20 services
+
+169
+00:10:47,664 --> 00:10:51,126
+with around 200 lambdas, multiple dynamodb tables
+
+170
+00:10:51,158 --> 00:10:54,574
+and kinesis. Deployment takes a lot of time. By a lot of time
+
+171
+00:10:54,612 --> 00:10:58,714
+I mean around 1 hour. Tests themselves are also slow. There are many synchronous
+
+172
+00:10:58,762 --> 00:11:02,462
+asynchronous flows. The test originally took us around hour and a half
+
+173
+00:11:02,516 --> 00:11:05,902
+to run. These numbers are not good. They don't allow us to quickly
+
+174
+00:11:05,956 --> 00:11:09,506
+deliver our features and above all get quick feedback in case
+
+175
+00:11:09,528 --> 00:11:12,642
+of a failure. So first, we've tackled the second
+
+176
+00:11:12,696 --> 00:11:16,110
+problem of running the test. We are using the power of parallelism.
+
+177
+00:11:16,190 --> 00:11:19,474
+We've duplicated our integration test of AWS environment.
+
+178
+00:11:19,522 --> 00:11:22,994
+Each time we do a deployment for testing, we actually deploy
+
+179
+00:11:23,042 --> 00:11:26,326
+our code to three environments, and we're running each of
+
+180
+00:11:26,348 --> 00:11:30,454
+our tests in a different environment so the tests don't interfere with one another
+
+181
+00:11:30,572 --> 00:11:34,202
+and we can run them in parallel. The nice part here is because
+
+182
+00:11:34,256 --> 00:11:37,366
+we are serverless, it does not cost us any extra money except
+
+183
+00:11:37,398 --> 00:11:40,522
+for kinesis, which is quite a painful point.
+
+184
+00:11:40,576 --> 00:11:43,946
+Kinesis requires at least one shard to operate, so we do pay for it.
+
+185
+00:11:43,968 --> 00:11:47,406
+By using this parallel flow, we managed to reduce the integration test time
+
+186
+00:11:47,428 --> 00:11:51,102
+from hour and a half to around 40 minutes half of the time. The nice
+
+187
+00:11:51,156 --> 00:11:54,894
+part about it is that it's fully scalable. More lets means adding more
+
+188
+00:11:54,932 --> 00:11:58,606
+AWS environments another change we did just recently
+
+189
+00:11:58,638 --> 00:12:02,782
+is the ability to use existing stacks after deployment. We pinned the latest
+
+190
+00:12:02,846 --> 00:12:06,338
+hash of the repo as a tag in the cloud formation stack. So when the
+
+191
+00:12:06,344 --> 00:12:09,686
+Uber deploy runs, it checks whether the code changes. And in case it
+
+192
+00:12:09,708 --> 00:12:13,170
+didn't, it skip the deployment of that specific service. It reduces
+
+193
+00:12:13,250 --> 00:12:17,142
+the redeployment time from around 30 minutes to 5 minutes.
+
+194
+00:12:17,276 --> 00:12:20,290
+Right now our biggest obstacle is the initial deployment,
+
+195
+00:12:20,370 --> 00:12:23,914
+but it unfortunately takes quite a lot of time and we are trying
+
+196
+00:12:23,952 --> 00:12:28,134
+to tackle this issue. AWS well, another flow that we've developing internally
+
+197
+00:12:28,262 --> 00:12:31,706
+is a staging flow. One of our components is SDK which is
+
+198
+00:12:31,728 --> 00:12:35,662
+embedded by our customers. The SDK is very delicate and a bug there
+
+199
+00:12:35,716 --> 00:12:39,486
+means a lambda will crash. So we wanted first to deploy the
+
+200
+00:12:39,508 --> 00:12:43,006
+SDK on our system. As I mentioned, we are dog fooding our own platform,
+
+201
+00:12:43,108 --> 00:12:46,190
+so we created a flow that at first a step release
+
+202
+00:12:46,270 --> 00:12:50,226
+an alpha version to NPM. Alpha is not seen by our customers. It then
+
+203
+00:12:50,248 --> 00:12:53,762
+deploys the alpha version to our environment and triggers a step function
+
+204
+00:12:53,816 --> 00:12:57,282
+which automatically, in case no issues are found in the staging environment,
+
+205
+00:12:57,346 --> 00:13:00,614
+releases the final version. At the moment we are able to
+
+206
+00:13:00,652 --> 00:13:03,926
+stop the step function like a red button in case we
+
+207
+00:13:03,948 --> 00:13:07,858
+find an issue in the SDK. Integration metrics
+
+208
+00:13:07,874 --> 00:13:11,514
+are important and they give us the ability to pinpoint potential issues.
+
+209
+00:13:11,632 --> 00:13:14,582
+We are feeding the results of our test to elastic.
+
+210
+00:13:14,646 --> 00:13:17,866
+At the top we are able to aggregate metrics like the number of
+
+211
+00:13:17,888 --> 00:13:21,450
+failures or succeeded tests. The really interesting part
+
+212
+00:13:21,520 --> 00:13:25,066
+is the distribution of failed lets. We can see a breakdown of the various
+
+213
+00:13:25,098 --> 00:13:29,066
+lets according to the branches that ran them. If we see a test that fails
+
+214
+00:13:29,098 --> 00:13:33,006
+in multiple branches, it's a hint for us that something is not working well in
+
+215
+00:13:33,028 --> 00:13:36,546
+the test and requires a fix. The idea is that some branches might
+
+216
+00:13:36,568 --> 00:13:39,986
+have bugs in them. That's why some tests might fail. But if the
+
+217
+00:13:40,008 --> 00:13:44,002
+same test fails many times in multiple branches probably means the test
+
+218
+00:13:44,056 --> 00:13:47,906
+has an issue. Another metric we are gathering is the deployment problems.
+
+219
+00:13:48,008 --> 00:13:51,778
+The deployments are not bulletproof. For example, a deployment
+
+220
+00:13:51,874 --> 00:13:55,810
+might fail because we are trying to provision multiple event bridges
+
+221
+00:13:55,890 --> 00:13:59,398
+at the same time and the AWS has limitation on it. Although we
+
+222
+00:13:59,404 --> 00:14:02,922
+do have internal retries, it doesn't always work. So this
+
+223
+00:14:02,976 --> 00:14:06,934
+overview gives us the visibility on the number of failures that happen due to deployment
+
+224
+00:14:06,982 --> 00:14:10,586
+issues. At the end of the day, we are cleaning our environments for
+
+225
+00:14:10,608 --> 00:14:14,954
+two main reasons. Some services like in essence cost money and AWS
+
+226
+00:14:15,002 --> 00:14:18,526
+environment has limitation in the number of resources you are allowed to
+
+227
+00:14:18,548 --> 00:14:22,046
+provision. So cleaning is mandatory and it's hard.
+
+228
+00:14:22,148 --> 00:14:25,674
+We still haven't found a good process for it. We're using a combination
+
+229
+00:14:25,722 --> 00:14:29,534
+of AWS Nook and omega Cli right now. It's very slow.
+
+230
+00:14:29,582 --> 00:14:32,030
+It takes a couple of hours to clean an environment.
+
+231
+00:14:32,110 --> 00:14:36,190
+Unfortunately, right now I don't have any good and fast solution
+
+232
+00:14:36,270 --> 00:14:40,082
+for this problem. So we are ready to release.
+
+233
+00:14:40,226 --> 00:14:43,814
+We have a couple of release gates. Some are manual, but most are
+
+234
+00:14:43,852 --> 00:14:48,358
+automatic. Code review is manual and the rest of the steps are automated.
+
+235
+00:14:48,454 --> 00:14:52,694
+When gates pass, the developer clicks on merge and the deploy begins.
+
+236
+00:14:52,822 --> 00:14:57,130
+Here you can see the various gates we're using. GitHub checks for gating.
+
+237
+00:15:00,340 --> 00:15:03,840
+So that's it. Everything is in production now. What's next?
+
+238
+00:15:03,910 --> 00:15:07,188
+Monitoring. Of course, monitoring is hard in serverless for
+
+239
+00:15:07,194 --> 00:15:11,236
+a couple of reasons. Many microservices you need to see the full story.
+
+240
+00:15:11,338 --> 00:15:14,884
+The root cause might be somewhere down the stack in various services,
+
+241
+00:15:15,002 --> 00:15:18,856
+no service to SSH to. It's hard to collect the relevant details to
+
+242
+00:15:18,878 --> 00:15:22,324
+better help you understand what's going on. A lot of new technologies,
+
+243
+00:15:22,372 --> 00:15:25,656
+suddenly this space and cpu does not play a role. A lot
+
+244
+00:15:25,678 --> 00:15:29,528
+of new metrics and new jargon to learn. So we are using
+
+245
+00:15:29,614 --> 00:15:33,004
+our own product in Lumigo to monitor and to do
+
+246
+00:15:33,042 --> 00:15:36,236
+root cause analysis. As I mentioned earlier, we are eating our own
+
+247
+00:15:36,258 --> 00:15:39,496
+dog food and I do want to show you a quick demo of how Lumigo
+
+248
+00:15:39,528 --> 00:15:42,640
+looks like and how we use it on a daily and a weekly basis.
+
+249
+00:15:43,060 --> 00:15:46,512
+Okay, so Lomigo is an observability and troubleshooting platform
+
+250
+00:15:46,646 --> 00:15:50,812
+aimed mainly for serverless workloads. It fuses data for multiple resources
+
+251
+00:15:50,876 --> 00:15:54,272
+and combines it into a coherent view. Right now we use logs,
+
+252
+00:15:54,336 --> 00:15:57,248
+specifically AWS, Cloudwatch, AWS API,
+
+253
+00:15:57,344 --> 00:16:01,028
+and an SDK that the user can embed with zero effort in
+
+254
+00:16:01,034 --> 00:16:04,832
+their code which collect more telemetry data on the compute instances.
+
+255
+00:16:04,896 --> 00:16:08,744
+We have two major production flows, slack alerts, which indicates that we
+
+256
+00:16:08,782 --> 00:16:12,004
+have an issue and we should handle immediately, and it's being monitored
+
+257
+00:16:12,052 --> 00:16:16,244
+by an R D developer. We are defining the alerts to the alert configuration,
+
+258
+00:16:16,372 --> 00:16:20,604
+and when alerts is received, you are able to configure it to work against
+
+259
+00:16:20,722 --> 00:16:24,652
+slack, against pagerduty, or against an email. In addition, we have also
+
+260
+00:16:24,706 --> 00:16:28,744
+a lot of other integration you can work with. We also have a weekly meeting
+
+261
+00:16:28,792 --> 00:16:32,012
+in which we go over a list of issues which occur during the last
+
+262
+00:16:32,066 --> 00:16:35,424
+seven days. So we have a real time flow where an issue is
+
+263
+00:16:35,462 --> 00:16:39,056
+arriving through Slack, and we have a weekly meeting where we
+
+264
+00:16:39,078 --> 00:16:42,848
+go over a list of issues and try to better understand what issues
+
+265
+00:16:42,934 --> 00:16:47,104
+happened and whether they affected specific customers that we want to handle.
+
+266
+00:16:47,152 --> 00:16:50,256
+One of the nice things that Lumigo platform enables
+
+267
+00:16:50,288 --> 00:16:53,910
+you to do is to drill down into each type, into each issue,
+
+268
+00:16:54,520 --> 00:16:58,024
+and to better understand the entire story of what
+
+269
+00:16:58,062 --> 00:17:01,880
+happened, why something ran the way it ran. You're actually able
+
+270
+00:17:01,950 --> 00:17:05,396
+to zoom into each one of your lambdas and the resources
+
+271
+00:17:05,428 --> 00:17:09,528
+that you use actually read the return value, the event details.
+
+272
+00:17:09,624 --> 00:17:13,576
+You can actually see the external request that you are doing in guest external
+
+273
+00:17:13,688 --> 00:17:17,900
+resources. For example, here you can see a DynamoDB request,
+
+274
+00:17:18,400 --> 00:17:21,676
+you can see the actual query and the response. And above
+
+275
+00:17:21,708 --> 00:17:25,296
+all, we can actually detect issues in your lambda show the
+
+276
+00:17:25,318 --> 00:17:28,924
+stack trace, you actually can see the various variables
+
+277
+00:17:28,972 --> 00:17:32,832
+that various variables that were defined and to better debug
+
+278
+00:17:32,896 --> 00:17:36,528
+the issues that you've encountered. So this is Lumigo.
+
+279
+00:17:36,624 --> 00:17:40,592
+I want to quickly go and summarize
+
+280
+00:17:40,656 --> 00:17:44,304
+what we have right now. So to summarize, use the power of serverless
+
+281
+00:17:44,352 --> 00:17:47,664
+to parallel your testing, which reduce costs, prefer integration
+
+282
+00:17:47,712 --> 00:17:52,048
+tests with real resources and not mocks, and allow easy orchestration
+
+283
+00:17:52,144 --> 00:17:55,152
+for your developers. And before finishing,
+
+284
+00:17:55,216 --> 00:17:59,016
+I want to tell you about a nice open source tool developed by Lumigo.
+
+285
+00:17:59,048 --> 00:18:02,024
+It's a swiss knife for serverless. Many useful commands,
+
+286
+00:18:02,072 --> 00:18:05,448
+for example, commands that enable you to switch between AWS environments,
+
+287
+00:18:05,544 --> 00:18:09,212
+ability to clear your account, televent bridge, and the list goes
+
+288
+00:18:09,266 --> 00:18:12,444
+on. Give it a try. That's it. Thank you very much. Again,
+
+289
+00:18:12,482 --> 00:18:16,428
+if you have any questions, you're more than welcome to email me or
+
+290
+00:18:16,514 --> 00:18:19,400
+ping me through Twitter. Thank you very much and bye.
+

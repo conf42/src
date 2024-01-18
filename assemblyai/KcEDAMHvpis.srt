@@ -1,0 +1,2076 @@
+1
+00:00:25,410 --> 00:00:28,534
+You. Hello everyone,
+
+2
+00:00:28,652 --> 00:00:32,178
+and thanks for tuning in to my talk at this year's
+
+3
+00:00:32,274 --> 00:00:35,910
+Conf 42 Java conference. Today I will talk about
+
+4
+00:00:35,980 --> 00:00:39,122
+benchmarking the warmer performance of hotspot VM,
+
+5
+00:00:39,186 --> 00:00:42,934
+crawl VM and OpenJ nine. Let's get started.
+
+6
+00:00:43,132 --> 00:00:46,994
+So, my name is Frank Kriegl. I live in Heidelberg,
+
+7
+00:00:47,042 --> 00:00:51,360
+Germany, and I've been working as a Java developer since
+
+8
+00:00:51,810 --> 00:00:56,106
+almost four years, and currently I'm also finishing
+
+9
+00:00:56,218 --> 00:00:59,946
+my master of science in parallel to my regular employment,
+
+10
+00:01:00,058 --> 00:01:03,282
+which is also where this talk originates from.
+
+11
+00:01:03,416 --> 00:01:07,060
+Recently I had to write research paper
+
+12
+00:01:07,510 --> 00:01:11,042
+and I was simply curious to learn more about
+
+13
+00:01:11,096 --> 00:01:14,718
+jvms in general and saw this as a chance to deepen
+
+14
+00:01:14,734 --> 00:01:18,226
+my knowledge. And that's why this talk's subtitle
+
+15
+00:01:18,258 --> 00:01:22,710
+is also a learner's journey. So here's today's agenda.
+
+16
+00:01:23,210 --> 00:01:27,026
+First, I will start with a brief introduction.
+
+17
+00:01:27,138 --> 00:01:30,706
+Then I will set the baseline with some information bits
+
+18
+00:01:30,738 --> 00:01:33,834
+about JVM internals. Next I will talk
+
+19
+00:01:33,872 --> 00:01:37,862
+about my learnings when I try to compare the warmup performance
+
+20
+00:01:37,926 --> 00:01:41,742
+of the three different JVM. So I will spend
+
+21
+00:01:41,796 --> 00:01:45,870
+some words on the pitfalls of creating good or
+
+22
+00:01:46,020 --> 00:01:47,950
+bad benchmark tests.
+
+23
+00:01:48,850 --> 00:01:52,506
+Next I will describe my test adapt
+
+24
+00:01:52,538 --> 00:01:56,420
+for benchmarking the warmup performance, and also
+
+25
+00:01:56,790 --> 00:02:00,466
+mention some configurations I made for the
+
+26
+00:02:00,488 --> 00:02:03,954
+jvms on the test. Finally, I'd like to present you
+
+27
+00:02:03,992 --> 00:02:07,554
+my test results and for sure also give some interpretation
+
+28
+00:02:07,602 --> 00:02:10,738
+on them. In the end, I will draw a short conclusion.
+
+29
+00:02:10,834 --> 00:02:15,030
+The goal of my talk is actually to motivate you to
+
+30
+00:02:15,180 --> 00:02:18,470
+start with java micro benchmarking on your own. So I hope
+
+31
+00:02:18,540 --> 00:02:21,766
+that in the end of this presentation you will have a basic
+
+32
+00:02:21,798 --> 00:02:25,482
+understanding of JVMs and are ready to get started with
+
+33
+00:02:25,536 --> 00:02:29,286
+your own java or JVM benchmark measurements. So let's
+
+34
+00:02:29,318 --> 00:02:33,760
+talk about the what and why. What is warmup actually?
+
+35
+00:02:34,290 --> 00:02:38,366
+Usually, warmup is defined as the number of iterations the
+
+36
+00:02:38,388 --> 00:02:41,822
+JVM needs to increase the speed of method execution between
+
+37
+00:02:41,876 --> 00:02:44,994
+the first and the nth invocation by
+
+38
+00:02:45,032 --> 00:02:49,394
+applying JIT compiler optimizations on the bytecode. Okay, that's the
+
+39
+00:02:49,512 --> 00:02:53,394
+definition, and now let me show you what it actually means. So in this
+
+40
+00:02:53,432 --> 00:02:56,822
+chart you see on the vertical axis the time
+
+41
+00:02:56,876 --> 00:03:00,326
+per operation, and on the horizontal axis the number of
+
+42
+00:03:00,348 --> 00:03:03,702
+iterations and warmup is the part
+
+43
+00:03:03,756 --> 00:03:07,526
+here. From the first iteration, it takes quite long to
+
+44
+00:03:07,628 --> 00:03:11,482
+complete one operation for the JVM one method execution, and over
+
+45
+00:03:11,536 --> 00:03:15,414
+time it's getting faster. So after 200 iterations
+
+46
+00:03:15,542 --> 00:03:18,358
+it's much faster than the first iteration.
+
+47
+00:03:18,534 --> 00:03:21,562
+And this decline in execution time is called
+
+48
+00:03:21,616 --> 00:03:25,054
+warm up. Next, I'd like to answer the question why?
+
+49
+00:03:25,092 --> 00:03:29,290
+I would like to compare this. So mainly out of curiosity,
+
+50
+00:03:29,370 --> 00:03:33,230
+to be honest. But there are for sure also some actual
+
+51
+00:03:33,300 --> 00:03:37,074
+reasons. Like I was searching on the Internet and I
+
+52
+00:03:37,112 --> 00:03:40,642
+only found little research in this area. So the most
+
+53
+00:03:40,696 --> 00:03:44,226
+interesting article I found was don't get caught in the
+
+54
+00:03:44,248 --> 00:03:48,134
+cold warmup your jvm and it's but hot
+
+55
+00:03:48,172 --> 00:03:51,494
+tub which is a new JVM implementation to
+
+56
+00:03:51,532 --> 00:03:55,026
+use pre cared JVM to avoid the warmup
+
+57
+00:03:55,058 --> 00:03:59,194
+overhead. And so I thought, okay, why not doing my own research? I just
+
+58
+00:03:59,232 --> 00:04:03,066
+wanted to see how much the jvms I wanted to
+
+59
+00:04:03,088 --> 00:04:07,654
+test how they differ in the method, warmup speed, and eventually
+
+60
+00:04:07,782 --> 00:04:11,774
+if there is a difference. Well, there is a difference and
+
+61
+00:04:11,892 --> 00:04:15,706
+what it looks like between JIt compilers and Aot compilers,
+
+62
+00:04:15,738 --> 00:04:19,454
+and the code they produce. Okay, next it's about
+
+63
+00:04:19,492 --> 00:04:22,914
+setting the baseline. So on this slide you
+
+64
+00:04:22,952 --> 00:04:26,462
+see a picture of the Java heap structure.
+
+65
+00:04:26,606 --> 00:04:30,238
+The example is for the hotspot VM, and the Java
+
+66
+00:04:30,254 --> 00:04:33,582
+heap is actually separated into several parts.
+
+67
+00:04:33,646 --> 00:04:37,430
+So you see here there is the young generation and
+
+68
+00:04:37,500 --> 00:04:41,330
+the old generation. And the young generation itself consists
+
+69
+00:04:41,410 --> 00:04:44,882
+of Eden space and two survivor spaces.
+
+70
+00:04:45,026 --> 00:04:48,718
+So how does memory allocation happen in the JVM?
+
+71
+00:04:48,834 --> 00:04:52,922
+New memory is always allocated in the Eden space,
+
+72
+00:04:53,056 --> 00:04:56,490
+and as soon as just before the Eden space
+
+73
+00:04:56,560 --> 00:04:59,906
+fills up, some minor garbage collection occurs
+
+74
+00:05:00,038 --> 00:05:03,658
+and the objects are transferred into survivor spaces.
+
+75
+00:05:03,754 --> 00:05:06,942
+One survivor space is always free and the other one
+
+76
+00:05:06,996 --> 00:05:10,218
+is occupied. And if one survivor
+
+77
+00:05:10,234 --> 00:05:13,714
+space is running full, minor garbage collection will
+
+78
+00:05:13,752 --> 00:05:17,886
+just swap these spaces, clear up unused objects
+
+79
+00:05:17,918 --> 00:05:21,538
+or unreferenced objects, and the survivors will stay there.
+
+80
+00:05:21,624 --> 00:05:24,986
+If there are long living objects that survive several minor
+
+81
+00:05:25,038 --> 00:05:29,110
+garbage collection cycles, it could actually happen that some
+
+82
+00:05:29,180 --> 00:05:32,546
+major garbage collection occurs and these objects
+
+83
+00:05:32,578 --> 00:05:36,278
+are then transferred into the old generation space,
+
+84
+00:05:36,444 --> 00:05:40,410
+also called tenured space. Next, and I already mentioned it,
+
+85
+00:05:40,480 --> 00:05:43,302
+I briefly touched the topic of garbage collection.
+
+86
+00:05:43,446 --> 00:05:47,494
+So meanwhile there exists, I think, seven garbage
+
+87
+00:05:47,542 --> 00:05:50,986
+collection algorithms, at least in the version of Java
+
+88
+00:05:51,018 --> 00:05:54,382
+eleven. Thing is that garbage collection can have
+
+89
+00:05:54,436 --> 00:05:57,866
+unwanted side effects in performance testing,
+
+90
+00:05:58,058 --> 00:06:01,486
+so you better try to eliminate that.
+
+91
+00:06:01,588 --> 00:06:06,862
+Luckily, there's the Java enhancement proposal 318,
+
+92
+00:06:07,006 --> 00:06:10,798
+which is about epsilon, a no op garbage collector.
+
+93
+00:06:10,974 --> 00:06:14,146
+I linked it here, can read the details if you
+
+94
+00:06:14,168 --> 00:06:18,262
+like. And that's actually a garbage collection algorithm which will
+
+95
+00:06:18,316 --> 00:06:21,702
+always allocate memory but never freed up again.
+
+96
+00:06:21,836 --> 00:06:25,730
+Next, it's about JIT versus Aot compilation.
+
+97
+00:06:25,890 --> 00:06:30,010
+So as you might know, Java code is pre compiled to
+
+98
+00:06:30,080 --> 00:06:33,530
+Java bytecode, which will then be run on any
+
+99
+00:06:33,600 --> 00:06:37,258
+JVM. The JIT compiler, just in time compiler is
+
+100
+00:06:37,344 --> 00:06:41,486
+first doing some profiling on the bytecode and
+
+101
+00:06:41,668 --> 00:06:44,990
+then it will apply optimizations like
+
+102
+00:06:45,060 --> 00:06:48,862
+method inlining, branch prediction, loop unrolling, dead code
+
+103
+00:06:48,916 --> 00:06:51,566
+elimination, and many more.
+
+104
+00:06:51,668 --> 00:06:55,214
+And it will also only compile parts of
+
+105
+00:06:55,252 --> 00:06:59,006
+the bytecode to machine code because it has to decide which parts
+
+106
+00:06:59,038 --> 00:07:02,946
+of the code need to be optimized. Then on the other hand, there's the head
+
+107
+00:07:02,968 --> 00:07:06,802
+of time compiler, which will just directly compile
+
+108
+00:07:06,866 --> 00:07:10,626
+all the bytecode to machine code when JVM starts
+
+109
+00:07:10,658 --> 00:07:13,778
+up. So for the jig compiler
+
+110
+00:07:13,954 --> 00:07:17,754
+since JDK eight, there are actually five
+
+111
+00:07:17,792 --> 00:07:21,466
+levels of tit compilation. At least that's what applies for
+
+112
+00:07:21,488 --> 00:07:25,494
+the hotspot VM. The first level is just about interpreting
+
+113
+00:07:25,542 --> 00:07:29,494
+bytecode, so it's level zero, and the JVM
+
+114
+00:07:29,622 --> 00:07:33,246
+will not compile anything at all, but just run as
+
+115
+00:07:33,268 --> 00:07:37,226
+an interpreter. And after a few iterations the chit
+
+116
+00:07:37,258 --> 00:07:41,182
+compiler will make use of its first compiler. It's the C one
+
+117
+00:07:41,236 --> 00:07:43,918
+compiler, also called client compiler,
+
+118
+00:07:44,014 --> 00:07:47,342
+and produce some simple c one compile
+
+119
+00:07:47,406 --> 00:07:50,834
+code. So we talk about level one, two three
+
+120
+00:07:50,872 --> 00:07:54,318
+compilations, which are all done by this C one compiler.
+
+121
+00:07:54,414 --> 00:07:58,150
+After about 10,000 invocations, code will
+
+122
+00:07:58,220 --> 00:08:01,254
+eventually become marked as hot,
+
+123
+00:08:01,372 --> 00:08:04,774
+and then it will become subject to level
+
+124
+00:08:04,812 --> 00:08:08,102
+four compilations, which is then done by the c two compiler.
+
+125
+00:08:08,166 --> 00:08:11,882
+This is cared a server compiler and it will do some
+
+126
+00:08:11,936 --> 00:08:15,482
+much better optimization with your Java bytecode. Okay,
+
+127
+00:08:15,616 --> 00:08:19,702
+next we continue with Java micro benchmarking. My lessons
+
+128
+00:08:19,766 --> 00:08:23,354
+learned so I was not sure in the beginning
+
+129
+00:08:23,402 --> 00:08:26,618
+how to start my learners journey.
+
+130
+00:08:26,714 --> 00:08:30,826
+I searched on the Internet and found that there are existing benchmark
+
+131
+00:08:30,858 --> 00:08:34,370
+suites like spec JVM 2008,
+
+132
+00:08:34,520 --> 00:08:38,078
+which is from 2008, and the Decapo
+
+133
+00:08:38,094 --> 00:08:41,778
+benchmark suite, which was first released in 2009.
+
+134
+00:08:41,864 --> 00:08:45,902
+While the last maintenance release of the cared benchmark
+
+135
+00:08:45,966 --> 00:08:49,782
+suite is almost two years ago, which was eight months
+
+136
+00:08:49,836 --> 00:08:53,462
+before the release of JDK eleven, for me they felt quite
+
+137
+00:08:53,516 --> 00:08:56,870
+outdated, so I didn't want to use them for that reason.
+
+138
+00:08:57,020 --> 00:09:00,618
+Also, not all benchmark tests were working with the
+
+139
+00:09:00,624 --> 00:09:04,186
+targeted Java version eleven, so I was actually trying to use them,
+
+140
+00:09:04,288 --> 00:09:07,594
+but failed. And finally the
+
+141
+00:09:07,632 --> 00:09:11,766
+output format. The measurement units did not suit
+
+142
+00:09:11,958 --> 00:09:15,946
+or run it in a suitable format, which I could use for further analyzing
+
+143
+00:09:15,978 --> 00:09:19,742
+the collected data. So simply using some
+
+144
+00:09:19,796 --> 00:09:23,246
+out of the box benchmark suites did not work for me.
+
+145
+00:09:23,348 --> 00:09:27,182
+So I came up with the idea of writing my own benchmark.
+
+146
+00:09:27,246 --> 00:09:30,482
+You have to know, writing a good benchmark is not easy.
+
+147
+00:09:30,616 --> 00:09:34,622
+There are two fault categories. On the one hand, there are conceptual
+
+148
+00:09:34,686 --> 00:09:38,130
+flaws when designing a micro benchmark, which I will show you an example
+
+149
+00:09:38,200 --> 00:09:42,054
+in a minute, and on the other hand, there are contextual effects when
+
+150
+00:09:42,092 --> 00:09:45,010
+running it. Here is an example for a conceptual flaw.
+
+151
+00:09:45,090 --> 00:09:48,578
+On the left hand side we have the method create arrayupto
+
+152
+00:09:48,674 --> 00:09:52,266
+and the method that code elimination, which will
+
+153
+00:09:52,368 --> 00:09:56,298
+invoke the first method to create an array with the length of 21,000
+
+154
+00:09:56,384 --> 00:10:00,134
+containing values from one to 21,000. The array is
+
+155
+00:10:00,192 --> 00:10:03,690
+then processed and all the values are accumulated
+
+156
+00:10:03,770 --> 00:10:07,806
+into the result variable, but this variable is actually
+
+157
+00:10:07,908 --> 00:10:11,406
+never returned, so the calculation result is not used at
+
+158
+00:10:11,428 --> 00:10:14,990
+all. If we then execute this for like
+
+159
+00:10:15,060 --> 00:10:18,334
+18,000 times, invoke system current time
+
+160
+00:10:18,372 --> 00:10:21,934
+millies before and after the method invocation, we could calculate
+
+161
+00:10:21,982 --> 00:10:25,586
+the duration it takes to execute that code elimination
+
+162
+00:10:25,618 --> 00:10:29,718
+method by subtract the start value from the end value.
+
+163
+00:10:29,804 --> 00:10:33,734
+But here's the issue. When running the code, the JVM will
+
+164
+00:10:33,772 --> 00:10:37,922
+first just interpret your method and eventually collect
+
+165
+00:10:37,986 --> 00:10:41,594
+some profiling data on it and figure out that the
+
+166
+00:10:41,632 --> 00:10:44,922
+result of the method is actually never used because
+
+167
+00:10:44,976 --> 00:10:48,614
+it's never returned. So at some point in time the JVM
+
+168
+00:10:48,662 --> 00:10:52,446
+will just eliminate this invocation and you'll see that
+
+169
+00:10:52,548 --> 00:10:55,934
+in your output that at some point in time the
+
+170
+00:10:55,972 --> 00:11:00,234
+execution time will just drop to almost zero milliseconds
+
+171
+00:11:00,282 --> 00:11:04,414
+because what you measure is just the time between invoking
+
+172
+00:11:04,542 --> 00:11:08,018
+system current time release the first time and the second time.
+
+173
+00:11:08,104 --> 00:11:12,126
+But there is JMH to the rescue, so conceptual flaws
+
+174
+00:11:12,158 --> 00:11:15,662
+can mostly be avoided by using frameworks like JMH.
+
+175
+00:11:15,806 --> 00:11:19,510
+JMH is the Java benchmarking house,
+
+176
+00:11:19,660 --> 00:11:23,222
+and it is a tool that was created with the intention to help
+
+177
+00:11:23,276 --> 00:11:26,582
+developers in avoiding common pitfalls when writing and
+
+178
+00:11:26,636 --> 00:11:30,002
+executing Java benchmarks. So it's actually
+
+179
+00:11:30,076 --> 00:11:34,006
+quite handy to use it. But also you have to be careful what you're
+
+180
+00:11:34,038 --> 00:11:38,118
+doing. And here you can see one of my first tries
+
+181
+00:11:38,294 --> 00:11:42,154
+where I was using JMH to write my own benchmark. I actually
+
+182
+00:11:42,192 --> 00:11:45,450
+asked for some feedback on Twitter and got none,
+
+183
+00:11:45,530 --> 00:11:48,698
+but didn't stop me from continuing my learning journey.
+
+184
+00:11:48,794 --> 00:11:52,254
+You can see there are two things I'd like to point out here. One thing
+
+185
+00:11:52,292 --> 00:11:55,598
+is that JMH provides you with black holes,
+
+186
+00:11:55,694 --> 00:11:59,138
+which you can use to consume some objects in
+
+187
+00:11:59,144 --> 00:12:03,246
+your benchmark. So this will make sure that the code is not eliminated
+
+188
+00:12:03,278 --> 00:12:06,962
+by the JVM. You could also just return that or print it to
+
+189
+00:12:07,016 --> 00:12:10,710
+system out that will have the same effect, but there are black holes then.
+
+190
+00:12:10,780 --> 00:12:14,790
+Second is that you should also consider warm up and
+
+191
+00:12:14,860 --> 00:12:18,026
+there's an annotation at fork and you can specify the
+
+192
+00:12:18,048 --> 00:12:21,818
+number of forks which you want to execute. So how often
+
+193
+00:12:21,984 --> 00:12:25,382
+the benchmark test should be executed in standalone
+
+194
+00:12:25,446 --> 00:12:29,654
+jvms and also warmup iterations to actually avoid
+
+195
+00:12:29,702 --> 00:12:33,246
+warmup when benchmarking your code. But in my case I wanted to
+
+196
+00:12:33,268 --> 00:12:36,746
+measure warmup, so I set this to zero to get some observation.
+
+197
+00:12:36,858 --> 00:12:40,670
+I tried several different approaches to write some
+
+198
+00:12:40,740 --> 00:12:45,134
+good benchmark tests. I tried to reuse existing benchmark tests
+
+199
+00:12:45,182 --> 00:12:48,850
+from the Dakarpo or spec JVM suite, but that all
+
+200
+00:12:48,920 --> 00:12:52,846
+didn't work out for me. But in the end I ended
+
+201
+00:12:52,878 --> 00:12:56,766
+up with a sudoku backdracking algorithm, which turned
+
+202
+00:12:56,798 --> 00:13:00,086
+out to be working quite well for my case. So you can find
+
+203
+00:13:00,108 --> 00:13:03,606
+that code on GitHub. I will not go into details there,
+
+204
+00:13:03,708 --> 00:13:07,438
+but this is the code I used to benchmark the JVM warmup
+
+205
+00:13:07,474 --> 00:13:10,982
+performance. So here's my test environment.
+
+206
+00:13:11,126 --> 00:13:14,598
+I did all the benchmarking on a virtual machine,
+
+207
+00:13:14,694 --> 00:13:17,786
+which is not optimal, but I tried to
+
+208
+00:13:17,808 --> 00:13:21,034
+compensate that with multiple test runs. See that in a minute.
+
+209
+00:13:21,082 --> 00:13:25,774
+So the operating system is a Ubuntu version 2064
+
+210
+00:13:25,812 --> 00:13:30,062
+bits, and I had eight virtual cpu cores based
+
+211
+00:13:30,116 --> 00:13:33,454
+on AMD Opturam processor. There were eight
+
+212
+00:13:33,492 --> 00:13:37,434
+gigs of ram available, no swap configured, and a storage
+
+213
+00:13:37,482 --> 00:13:40,510
+of eight gig hard drive disk. My test setup
+
+214
+00:13:40,590 --> 00:13:44,846
+I decided to execute my benchmark tests with
+
+215
+00:13:44,968 --> 00:13:48,582
+21,000 iterations to also see some
+
+216
+00:13:48,636 --> 00:13:51,926
+effect when a method gets marked as hot.
+
+217
+00:13:52,028 --> 00:13:56,562
+Every one consisted of 20 forks, which means that JMH
+
+218
+00:13:56,626 --> 00:13:59,958
+will spawn up 20 independent jvms
+
+219
+00:14:00,054 --> 00:14:03,622
+to not accidentally make use of already pre cared
+
+220
+00:14:03,686 --> 00:14:07,430
+code. Then I executed twelve runs
+
+221
+00:14:07,510 --> 00:14:11,070
+at different days and daytimes to eliminate these
+
+222
+00:14:11,140 --> 00:14:14,986
+contextual effects I would face in a virtual environment.
+
+223
+00:14:15,098 --> 00:14:18,586
+When you multiply all these numbers, 21,000 iterations
+
+224
+00:14:18,698 --> 00:14:22,574
+in 20 forks and twelve runs, you get
+
+225
+00:14:22,692 --> 00:14:26,526
+5.4 million sudoku solved per JVM.
+
+226
+00:14:26,638 --> 00:14:30,142
+Always the same sudoku though the JVM parameters.
+
+227
+00:14:30,286 --> 00:14:33,298
+I did not touch much because I wanted
+
+228
+00:14:33,384 --> 00:14:36,578
+to take the approach of simulating a
+
+229
+00:14:36,584 --> 00:14:40,166
+daily user who would just throw code the JVM at the JVM and
+
+230
+00:14:40,188 --> 00:14:43,782
+run it. Besides two exceptions, the one is that I was using
+
+231
+00:14:43,916 --> 00:14:47,794
+the no operation garbage collector epsilon or
+
+232
+00:14:47,852 --> 00:14:51,398
+respective other ones for the other jvms,
+
+233
+00:14:51,494 --> 00:14:55,018
+and also the pretouch memory option, which I will explain in
+
+234
+00:14:55,024 --> 00:14:58,650
+a minute. So here are my jvms under test I
+
+235
+00:14:58,720 --> 00:15:02,266
+decided for the tried and trusted hotspot VM
+
+236
+00:15:02,378 --> 00:15:05,550
+where I used an OpenJDK 64 bit
+
+237
+00:15:05,620 --> 00:15:09,038
+build from adopt OpenjDK. And as you
+
+238
+00:15:09,044 --> 00:15:13,134
+can see I also configured some alias for every jvm which
+
+239
+00:15:13,172 --> 00:15:16,674
+I could use later and just shorten the amount
+
+240
+00:15:16,712 --> 00:15:20,078
+of text on my slides. So secondly,
+
+241
+00:15:20,174 --> 00:15:23,838
+I went for GraalVM, which is a polyglode VM.
+
+242
+00:15:23,934 --> 00:15:28,066
+I used the community edition for my benchmark testing in version
+
+243
+00:15:28,178 --> 00:15:31,718
+22. And last but not least,
+
+244
+00:15:31,804 --> 00:15:35,350
+Opengenine as an enterprise JVM, which actually
+
+245
+00:15:35,420 --> 00:15:39,426
+promises to have better performance on its website than hotspot
+
+246
+00:15:39,458 --> 00:15:43,482
+VM. We'll talk about that later. Yeah, with this test
+
+247
+00:15:43,536 --> 00:15:47,514
+setup, I started my measurements. So let's take a look at
+
+248
+00:15:47,552 --> 00:15:51,130
+the runtime flex which I used to execute my benchmark.
+
+249
+00:15:51,210 --> 00:15:54,846
+This one is for hotspot VM, and let's go through the
+
+250
+00:15:54,868 --> 00:15:58,282
+lines step by step. So here I specify
+
+251
+00:15:58,426 --> 00:16:02,378
+the benchmark target, which is my backtracking algorithm,
+
+252
+00:16:02,474 --> 00:16:06,254
+and this is just some syntax given by JMH.
+
+253
+00:16:06,382 --> 00:16:10,254
+The next line I will have to provide some JVM
+
+254
+00:16:10,302 --> 00:16:13,842
+arguments for JMH that it will use for every
+
+255
+00:16:13,896 --> 00:16:16,978
+fork it spawns up to execute the benchmark.
+
+256
+00:16:17,154 --> 00:16:21,090
+I used a configuration of 5gb of heap
+
+257
+00:16:21,170 --> 00:16:24,342
+and also provided the flag heap dump on
+
+258
+00:16:24,396 --> 00:16:27,574
+out of memory error to just show me if my
+
+259
+00:16:27,612 --> 00:16:30,854
+JVM crashes. Next you see some double
+
+260
+00:16:30,902 --> 00:16:34,490
+x flags like unlock experimental VM options, which I need
+
+261
+00:16:34,560 --> 00:16:37,866
+to make use of the Epsilon garbage collector, which I
+
+262
+00:16:37,888 --> 00:16:41,498
+mentioned earlier to avoid garbage collection interrupting
+
+263
+00:16:41,514 --> 00:16:45,118
+my measurements. And then there's also the always pre touch
+
+264
+00:16:45,204 --> 00:16:48,586
+option which will claim physical memory
+
+265
+00:16:48,618 --> 00:16:52,222
+from the operating system right at the beginning rather
+
+266
+00:16:52,276 --> 00:16:56,346
+than on the fly. So this would also eliminate
+
+267
+00:16:56,458 --> 00:16:59,874
+some interference by the JVM when it would find
+
+268
+00:16:59,912 --> 00:17:04,030
+out that it needs more memory. This flag will just tell JMH
+
+269
+00:17:04,110 --> 00:17:07,922
+where to store the measurement output and in which format,
+
+270
+00:17:07,986 --> 00:17:11,702
+so it can output things in adjacent format and also
+
+271
+00:17:11,756 --> 00:17:15,206
+others. And last line, I specify the number
+
+272
+00:17:15,228 --> 00:17:19,018
+of iterations, which is 21,000 per fork. I run
+
+273
+00:17:19,104 --> 00:17:22,298
+20 forks and the timeout is just
+
+274
+00:17:22,464 --> 00:17:26,794
+set to 360 minutes, which is very high,
+
+275
+00:17:26,912 --> 00:17:30,506
+but just didn't want to let JMH time but
+
+276
+00:17:30,528 --> 00:17:34,270
+and abort my measurements. Okay, and the last line I just wanted
+
+277
+00:17:34,340 --> 00:17:37,806
+to collect the output of my program into a
+
+278
+00:17:37,828 --> 00:17:41,134
+log file. The runtime flags for GraalVM look quite
+
+279
+00:17:41,172 --> 00:17:43,866
+similar. For one small exception,
+
+280
+00:17:43,978 --> 00:17:47,834
+I did not find any no operation garbage collection algorithm
+
+281
+00:17:47,882 --> 00:17:51,218
+for GraalVM in this version. So I made use of a
+
+282
+00:17:51,224 --> 00:17:55,034
+workaround. I set the max new size parameter
+
+283
+00:17:55,102 --> 00:17:58,726
+for libcall compiler to a number which
+
+284
+00:17:58,748 --> 00:18:02,370
+is higher than the actually available memory for the heap,
+
+285
+00:18:02,450 --> 00:18:06,102
+which makes the JVM create a huge young
+
+286
+00:18:06,156 --> 00:18:09,702
+generation, but no old generation space in the heap.
+
+287
+00:18:09,766 --> 00:18:13,798
+So what would occur here is that actually no garbage collection
+
+288
+00:18:13,894 --> 00:18:17,142
+can occur, or before it would occur, the JVM
+
+289
+00:18:17,206 --> 00:18:20,622
+would run out of memory. So it's important to have
+
+290
+00:18:20,676 --> 00:18:24,734
+enough memory for your benchmark tests available. Opengen nine
+
+291
+00:18:24,772 --> 00:18:28,762
+has also a slight difference here. I unfortunately
+
+292
+00:18:28,906 --> 00:18:32,190
+found that the Linux version of Openj nine
+
+293
+00:18:32,260 --> 00:18:35,822
+does not offer a pretouch option. So this
+
+294
+00:18:35,876 --> 00:18:39,026
+one will claim memory on the fly if it needs more from
+
+295
+00:18:39,048 --> 00:18:42,322
+the operating system. Okay, that was the setup. And now
+
+296
+00:18:42,376 --> 00:18:45,846
+I would already like to share some test results. Here you
+
+297
+00:18:45,868 --> 00:18:49,046
+see the overall chart which I generated out
+
+298
+00:18:49,068 --> 00:18:52,242
+of the collected data from the benchmarking
+
+299
+00:18:52,306 --> 00:18:55,842
+of hotspot vm. It's on the vertical axis,
+
+300
+00:18:55,906 --> 00:18:59,410
+again the time per operation in nanoseconds.
+
+301
+00:18:59,490 --> 00:19:03,162
+And on the horizontal axis, the number of iterations up to
+
+302
+00:19:03,216 --> 00:19:06,506
+21,000. If we now zoom in a little,
+
+303
+00:19:06,608 --> 00:19:10,474
+you can see that there is a light red colored background
+
+304
+00:19:10,522 --> 00:19:14,634
+of the warmup graph. And I call this light colored graph
+
+305
+00:19:14,682 --> 00:19:18,954
+the scatter shade because this actually represents the scattering
+
+306
+00:19:19,002 --> 00:19:22,062
+of the different fox individual data
+
+307
+00:19:22,116 --> 00:19:25,502
+points of any given time slice. So they are
+
+308
+00:19:25,556 --> 00:19:28,674
+the interquartile ranges, q one to q three,
+
+309
+00:19:28,792 --> 00:19:32,338
+and the red line is the median value of
+
+310
+00:19:32,344 --> 00:19:35,938
+the execution time. So on this slide, I again
+
+311
+00:19:36,024 --> 00:19:39,746
+zoomed in to the first thousand executions.
+
+312
+00:19:39,858 --> 00:19:43,762
+And here you can actually see that there's already in the beginning
+
+313
+00:19:43,826 --> 00:19:47,526
+a significant drop in the execution time. There are several things we
+
+314
+00:19:47,548 --> 00:19:50,634
+can observe here. First of all, we see that the
+
+315
+00:19:50,672 --> 00:19:54,538
+scatter shade is tightly following the median curve and
+
+316
+00:19:54,624 --> 00:19:58,314
+also narrowing over time. So that shows that the
+
+317
+00:19:58,352 --> 00:20:01,358
+execution time is generally declining. Next,
+
+318
+00:20:01,444 --> 00:20:04,794
+the median curve is also tending
+
+319
+00:20:04,842 --> 00:20:08,474
+to be at lower bound of the interquartile ranges of the scatter shade.
+
+320
+00:20:08,522 --> 00:20:11,774
+Which allows the conclusion that data points between
+
+321
+00:20:11,812 --> 00:20:15,454
+the median and q three quartile under spread
+
+322
+00:20:15,502 --> 00:20:19,778
+compared to the range from q one to the median. Which makes absolutely
+
+323
+00:20:19,864 --> 00:20:23,358
+sense because there's a physical lower bound when executing
+
+324
+00:20:23,454 --> 00:20:27,470
+and this behavior and the scatter shades can also be observed
+
+325
+00:20:27,550 --> 00:20:31,394
+for the other JVM charts for GraalVM and Openj
+
+326
+00:20:31,442 --> 00:20:35,190
+nine. Here we have the chart for GraalVM for the
+
+327
+00:20:35,260 --> 00:20:39,294
+first thousand benchmark iterations. Both GraalVM
+
+328
+00:20:39,362 --> 00:20:43,014
+and hotspot actually have this sudden
+
+329
+00:20:43,062 --> 00:20:47,034
+decline at around 100 executions where the
+
+330
+00:20:47,072 --> 00:20:50,654
+execution time significantly drops. There's not
+
+331
+00:20:50,692 --> 00:20:54,494
+only in the median curve, but also in the scatter shade this
+
+332
+00:20:54,532 --> 00:20:58,014
+significant decline. And we also see
+
+333
+00:20:58,132 --> 00:21:01,866
+that at this point, the q three boundary.
+
+334
+00:21:01,898 --> 00:21:05,102
+So the upper part of the scatter shade will eventually fall
+
+335
+00:21:05,156 --> 00:21:08,402
+below the q one boundary of previous data points.
+
+336
+00:21:08,456 --> 00:21:12,258
+So I tried to visualize that with this red bar. You see that
+
+337
+00:21:12,344 --> 00:21:15,782
+here the under bound of the scatter shade is below the lower
+
+338
+00:21:15,836 --> 00:21:19,362
+bound. That's another view on the GraalVM warmup
+
+339
+00:21:19,426 --> 00:21:22,038
+chart between iteration 6000,
+
+340
+00:21:22,124 --> 00:21:25,682
+406,800 GraalVM
+
+341
+00:21:25,746 --> 00:21:29,334
+actually shows this bump. And I did not dig
+
+342
+00:21:29,372 --> 00:21:32,806
+into details here because I didn't have a good profile
+
+343
+00:21:32,838 --> 00:21:36,874
+at hand. However, I think it would be definitely interesting to investigate this
+
+344
+00:21:36,912 --> 00:21:40,554
+anomaly. If you have any guess what this bump is about,
+
+345
+00:21:40,672 --> 00:21:44,878
+please let me know. So the blue chart is for openj nine.
+
+346
+00:21:44,964 --> 00:21:49,134
+Again, we look at the first thousand iterations for
+
+347
+00:21:49,172 --> 00:21:52,746
+this benchmark. You can already see that the warmup chart of openj
+
+348
+00:21:52,778 --> 00:21:55,746
+nine looks somewhat different than the others.
+
+349
+00:21:55,848 --> 00:21:59,586
+So first of all, there is no sudden decline at
+
+350
+00:21:59,608 --> 00:22:02,946
+the mark of 100 iterations, but instead there are some
+
+351
+00:22:02,968 --> 00:22:06,286
+spikes in the execution time for single iterations.
+
+352
+00:22:06,398 --> 00:22:10,102
+You see that here are some spikes, and also later on
+
+353
+00:22:10,236 --> 00:22:13,878
+they're getting less over time, but they are always present.
+
+354
+00:22:13,964 --> 00:22:17,506
+I was thinking, okay, maybe these spikes could be cared
+
+355
+00:22:17,538 --> 00:22:20,906
+by the missing pretouch option, which is not available
+
+356
+00:22:21,008 --> 00:22:24,822
+in open gen nine for Linux. To find out if this behavior
+
+357
+00:22:24,886 --> 00:22:28,262
+could be, or the spikes could be attributed to the missing pretouch
+
+358
+00:22:28,326 --> 00:22:32,042
+option. I would have expected to observe
+
+359
+00:22:32,106 --> 00:22:35,694
+similar behavior for the other two jvms when I disabled the
+
+360
+00:22:35,732 --> 00:22:39,582
+always pretouch option for them. So therefore I made
+
+361
+00:22:39,636 --> 00:22:43,930
+another measurement series with GraalVM and hotspot
+
+362
+00:22:44,010 --> 00:22:46,874
+having the always pretouch option disabled.
+
+363
+00:22:47,002 --> 00:22:50,866
+But the warmup charts looked the same. There were no spikes for
+
+364
+00:22:50,968 --> 00:22:54,034
+GraalVM or hotspot. There were no hints for my
+
+365
+00:22:54,072 --> 00:22:57,906
+suspicion, which leads to the conclusion that in my test setup,
+
+366
+00:22:58,018 --> 00:23:01,638
+fetching actual memory from the operating system had only
+
+367
+00:23:01,724 --> 00:23:05,554
+minor or even no effect on the measurement series.
+
+368
+00:23:05,682 --> 00:23:09,574
+And these spikes in the warmup graph of
+
+369
+00:23:09,612 --> 00:23:13,046
+opengenine cannot directly be attributed to the fetching
+
+370
+00:23:13,078 --> 00:23:17,002
+memory from the operating system. Okay, so up to now we just had a look
+
+371
+00:23:17,056 --> 00:23:20,346
+at each JVM individually. Now I'd like to
+
+372
+00:23:20,368 --> 00:23:23,950
+continue to compare them. To get started, I just talk about
+
+373
+00:23:24,020 --> 00:23:28,346
+the average execution times. So on the left hand side you see a histogram
+
+374
+00:23:28,458 --> 00:23:31,630
+which includes the execution times
+
+375
+00:23:31,700 --> 00:23:34,966
+for opengen nine, hotspot and GraalVM,
+
+376
+00:23:35,018 --> 00:23:38,942
+all in JIT compiler mode. You can see that the histogram
+
+377
+00:23:39,006 --> 00:23:43,582
+for hotspot and GraalVM looks quite similar, and opengenine
+
+378
+00:23:43,646 --> 00:23:47,510
+describes a rather different curve. However, they all have this tail to the right.
+
+379
+00:23:47,580 --> 00:23:51,190
+The average execution time for hotspot and GraalVM is
+
+380
+00:23:51,260 --> 00:23:54,726
+around 0.4 milliseconds. Graalvm seems to be
+
+381
+00:23:54,748 --> 00:23:58,486
+a little bit faster, and Openj nine is following
+
+382
+00:23:58,518 --> 00:24:02,310
+tightly at almost 0.5 milliseconds.
+
+383
+00:24:02,390 --> 00:24:05,594
+Then I also made some measurements where I enabled the
+
+384
+00:24:05,632 --> 00:24:09,558
+Aot compiler for opengenine, and this one turned
+
+385
+00:24:09,574 --> 00:24:13,194
+out to be faster than opengenine in Jit code,
+
+386
+00:24:13,242 --> 00:24:17,130
+but still slower on average than GraalVM
+
+387
+00:24:17,210 --> 00:24:20,766
+or hotspot. So that's also what you see here on the right
+
+388
+00:24:20,868 --> 00:24:24,634
+hand side in the chart. Purple curve is opengenine
+
+389
+00:24:24,682 --> 00:24:28,718
+in Aot mode. It's faster than OpenJ nine in Jit mode
+
+390
+00:24:28,814 --> 00:24:32,226
+overall. Okay, let's dig deeper. One interesting
+
+391
+00:24:32,328 --> 00:24:35,762
+thing to observe in the warmup charts is the amount
+
+392
+00:24:35,816 --> 00:24:39,062
+of time, the number of iterations it takes to speed up
+
+393
+00:24:39,116 --> 00:24:43,142
+the method execution from five milliseconds to 0.5
+
+394
+00:24:43,196 --> 00:24:46,114
+milliseconds. I'm talking in the unit of milliseconds,
+
+395
+00:24:46,162 --> 00:24:49,926
+because that's easier to pronounce. But just don't get confused
+
+396
+00:24:49,958 --> 00:24:53,226
+by the scales here. It's still nanoseconds on
+
+397
+00:24:53,248 --> 00:24:56,890
+the chart. The first red bar is at five
+
+398
+00:24:56,960 --> 00:25:01,722
+milliseconds, the second one is at 2.5 milliseconds,
+
+399
+00:25:01,786 --> 00:25:05,626
+and the third one is at 0.5 milliseconds.
+
+400
+00:25:05,738 --> 00:25:09,434
+So for this blue chart, which represents openj
+
+401
+00:25:09,482 --> 00:25:13,082
+nine, it takes 150 iterations
+
+402
+00:25:13,226 --> 00:25:17,250
+to gain a 90% performance improvement within
+
+403
+00:25:17,320 --> 00:25:21,170
+the first iterations of the benchmark test. So in
+
+404
+00:25:21,240 --> 00:25:25,294
+numbers, this means that for every next
+
+405
+00:25:25,432 --> 00:25:31,078
+execution, the JVM can execute the method 0.3
+
+406
+00:25:31,164 --> 00:25:34,226
+nanoseconds faster than the previous operation.
+
+407
+00:25:34,338 --> 00:25:37,954
+If we take a look for this KPI at hotspot,
+
+408
+00:25:38,002 --> 00:25:41,622
+we see that the negative slope is
+
+409
+00:25:41,756 --> 00:25:45,354
+not as steep as in open G nine, and we can also
+
+410
+00:25:45,392 --> 00:25:48,106
+prove that by calculating it. So,
+
+411
+00:25:48,208 --> 00:25:52,778
+reaching the lower bound of 0.5 milliseconds
+
+412
+00:25:52,874 --> 00:25:56,250
+from the beginning, where we start at five milliseconds,
+
+413
+00:25:56,330 --> 00:26:00,378
+takes around 700 executions of the benchmark method.
+
+414
+00:26:00,474 --> 00:26:04,110
+So we can say that with every
+
+415
+00:26:04,260 --> 00:26:08,386
+next execution, the JVM or hotspot can
+
+416
+00:26:08,488 --> 00:26:12,100
+speed up the method execution by zero point
+
+417
+00:26:13,110 --> 00:26:16,610
+63 nanoseconds per operation compared
+
+418
+00:26:16,690 --> 00:26:20,054
+to the previous operation. Which means that during the first few
+
+419
+00:26:20,092 --> 00:26:24,614
+iterations where warmup takes place, hotspot Vm is 4.6
+
+420
+00:26:24,652 --> 00:26:28,282
+times slower than open gen nine. If we compare all
+
+421
+00:26:28,336 --> 00:26:32,166
+the three jvms together, you will see that Opengen
+
+422
+00:26:32,198 --> 00:26:36,090
+nine will only win the race within the first few hundred
+
+423
+00:26:36,160 --> 00:26:39,834
+iterations. But if we compare that after
+
+424
+00:26:39,952 --> 00:26:43,422
+around 600 iterations, we'll see that
+
+425
+00:26:43,556 --> 00:26:47,114
+the blue chart is above the green and red chart
+
+426
+00:26:47,162 --> 00:26:50,622
+of hotspot and gravm, which means that in the end,
+
+427
+00:26:50,676 --> 00:26:54,514
+Openj nine will be slower than its opponents. But just right
+
+428
+00:26:54,552 --> 00:26:58,942
+at the beginning, it's warming up faster. I also promised to shortly
+
+429
+00:26:59,006 --> 00:27:02,174
+talk about JIT compilers versus Aot compilers,
+
+430
+00:27:02,222 --> 00:27:05,886
+and for that I made some measurements with OpenJ nine jit mode,
+
+431
+00:27:05,918 --> 00:27:09,302
+which is the blue graph again. And in AOT mode, which is
+
+432
+00:27:09,356 --> 00:27:13,366
+the purple graph here you can see the flags you need to provide
+
+433
+00:27:13,468 --> 00:27:17,706
+to enable the Aot mode on open genine, and you
+
+434
+00:27:17,728 --> 00:27:20,778
+can easily spot that right from the beginning. The Open
+
+435
+00:27:20,864 --> 00:27:24,454
+Geni Aot compiler starts at its maximum
+
+436
+00:27:24,502 --> 00:27:28,106
+performance and executes the code always in the same
+
+437
+00:27:28,208 --> 00:27:32,430
+speed, while the jig compiler will take up on that
+
+438
+00:27:32,500 --> 00:27:36,382
+after a few hundred executions again. So having all
+
+439
+00:27:36,436 --> 00:27:39,678
+these nice looking charts is quite cool actually.
+
+440
+00:27:39,764 --> 00:27:42,414
+But I also wanted to know what's actually happening there.
+
+441
+00:27:42,532 --> 00:27:45,738
+Why is the warm up as it is, and what's
+
+442
+00:27:45,754 --> 00:27:49,554
+causing it? So for that I found ditchwatch which is
+
+443
+00:27:49,592 --> 00:27:53,262
+a block analyzer and visualizer for the hotspot jig compiler,
+
+444
+00:27:53,326 --> 00:27:57,010
+and it's a really cool tool actually. You can enable it with
+
+445
+00:27:57,080 --> 00:28:00,338
+these flags if you provide these runtime flags on your jvm.
+
+446
+00:28:00,434 --> 00:28:03,686
+However, you have to know that this will have a
+
+447
+00:28:03,708 --> 00:28:06,774
+negative impact on performance, so do not do that during
+
+448
+00:28:06,812 --> 00:28:09,718
+your benchmarking, but just afterwards to investigate.
+
+449
+00:28:09,814 --> 00:28:13,670
+And the output file, which is a XML log file
+
+450
+00:28:13,750 --> 00:28:17,766
+you can just load into jitwatch afterwards. Then jitwatch
+
+451
+00:28:17,798 --> 00:28:21,866
+will show you the compilations for every single method. So here's
+
+452
+00:28:21,898 --> 00:28:25,210
+an example for compilation list of the method
+
+453
+00:28:25,290 --> 00:28:28,714
+solve integer array, which is one of the methods
+
+454
+00:28:28,842 --> 00:28:32,706
+in my Sudoku benchmark tests. You see actually that there
+
+455
+00:28:32,728 --> 00:28:36,354
+are some c one compilations happen and happening, and also some
+
+456
+00:28:36,392 --> 00:28:39,570
+c two compilations also on stack replacements,
+
+457
+00:28:40,070 --> 00:28:43,518
+but all only after 20 seconds,
+
+458
+00:28:43,614 --> 00:28:47,686
+which is actually like half of the time the
+
+459
+00:28:47,708 --> 00:28:51,302
+benchmark test runs. So this is way beyond the
+
+460
+00:28:51,356 --> 00:28:55,126
+initial warm up we saw, and actually they do
+
+461
+00:28:55,148 --> 00:28:58,646
+not have a lot of effect on the execution time anymore. So I
+
+462
+00:28:58,668 --> 00:29:02,142
+was wondering what else would then cause the warmup
+
+463
+00:29:02,226 --> 00:29:05,850
+in the initial 1000 iterations if
+
+464
+00:29:05,920 --> 00:29:09,834
+all these compilations shown by Jitbotch kick in much later.
+
+465
+00:29:09,952 --> 00:29:13,646
+So while Jitbotch is a useful tool to visualize the
+
+466
+00:29:13,668 --> 00:29:17,626
+actions of the JIT compiler, I encountered discrepancy
+
+467
+00:29:17,738 --> 00:29:20,826
+between the compilations shown by Jitbotch and the JIT
+
+468
+00:29:20,858 --> 00:29:25,022
+compiler actions locked on the terminal by providing the runtime
+
+469
+00:29:25,086 --> 00:29:28,206
+flex print compilation and print inlining.
+
+470
+00:29:28,318 --> 00:29:32,254
+So the terminal lock output showed several inlining
+
+471
+00:29:32,302 --> 00:29:36,274
+operations taking place already during the first iterations of the benchmark
+
+472
+00:29:36,322 --> 00:29:40,466
+execution. These inlining operations also fit to the warmup
+
+473
+00:29:40,498 --> 00:29:44,054
+charts where we see a steep decline over
+
+474
+00:29:44,092 --> 00:29:47,854
+the first few hundred or thousand iterations. So these inland
+
+475
+00:29:47,922 --> 00:29:51,430
+operations cared probably the main driver for the fast decline
+
+476
+00:29:51,510 --> 00:29:55,098
+in the warm up graphs we've just seen. The difference between
+
+477
+00:29:55,184 --> 00:29:58,902
+the XML compilation log file used by Jitwatch
+
+478
+00:29:58,966 --> 00:30:02,730
+and the compilation log output on the terminal
+
+479
+00:30:02,810 --> 00:30:06,362
+can actually be explained by the fact that there's a limitation
+
+480
+00:30:06,426 --> 00:30:10,046
+in the log compilation option, which leads to
+
+481
+00:30:10,068 --> 00:30:13,706
+the fact that these inline decisions made by the c one
+
+482
+00:30:13,748 --> 00:30:17,442
+compiler early on are not included in the XML log
+
+483
+00:30:17,496 --> 00:30:21,742
+file which is used by Jitwatch. You can read the details
+
+484
+00:30:21,886 --> 00:30:25,778
+here where I provided a link to the OpenJDK wiki.
+
+485
+00:30:25,874 --> 00:30:29,634
+Okay, now I'd like to draw short conclusion
+
+486
+00:30:29,682 --> 00:30:33,362
+and also have some additional remarks to my benchmark
+
+487
+00:30:33,426 --> 00:30:37,522
+measurements. First of all, all the benchmark measurements I made
+
+488
+00:30:37,596 --> 00:30:41,706
+were done for JDK version eleven for all the mentioned
+
+489
+00:30:41,808 --> 00:30:45,162
+jvms. I did not perform measurements in any other
+
+490
+00:30:45,216 --> 00:30:48,406
+JDK version. Secondly, the benchmark
+
+491
+00:30:48,438 --> 00:30:52,126
+measurements I conducted in October and November 2020.
+
+492
+00:30:52,228 --> 00:30:55,578
+So meanwhile there are new versions of the jvms,
+
+493
+00:30:55,674 --> 00:30:59,518
+so it would be interesting to also take a look at them. Yeah,
+
+494
+00:30:59,604 --> 00:31:03,358
+and here are also my final thoughts. As just said,
+
+495
+00:31:03,444 --> 00:31:06,926
+graalvm version 21 was recently released.
+
+496
+00:31:07,118 --> 00:31:10,306
+It now comes with the espresso JVM, which is a
+
+497
+00:31:10,328 --> 00:31:13,806
+JVM fully written in Java. It's Java on truffle,
+
+498
+00:31:13,838 --> 00:31:17,334
+if you know what that means. Yeah, maybe I find the time
+
+499
+00:31:17,372 --> 00:31:21,046
+to also do some warm up performance benchmarking on the
+
+500
+00:31:21,068 --> 00:31:24,486
+espresso JVM. The second thought that comes to my
+
+501
+00:31:24,508 --> 00:31:28,070
+mind is that Opengenine's benefit is definitely
+
+502
+00:31:28,140 --> 00:31:31,830
+its Aot mode. So it's performing better in Aot mode,
+
+503
+00:31:31,990 --> 00:31:35,978
+at least in my measurements. But I'm asking myself,
+
+504
+00:31:36,144 --> 00:31:39,754
+why don't they make this the default configuration if they
+
+505
+00:31:39,792 --> 00:31:43,178
+also advertise with it that they are faster than the hotspot
+
+506
+00:31:43,194 --> 00:31:46,862
+VM? Last but not least, I think there are many other JVM that
+
+507
+00:31:46,916 --> 00:31:50,750
+also deserve to be benchmark on warmup performance because they
+
+508
+00:31:50,820 --> 00:31:54,906
+become more and more important in the world of different JDK
+
+509
+00:31:54,938 --> 00:31:59,334
+releases. For example, the Amazon Krata JVM or Alibaba Dragonwell.
+
+510
+00:31:59,402 --> 00:32:02,626
+All right, that was my presentation. I hope you
+
+511
+00:32:02,648 --> 00:32:05,842
+like it. It was the first talk I ever
+
+512
+00:32:05,896 --> 00:32:09,286
+held in public, and if you want to check out
+
+513
+00:32:09,308 --> 00:32:12,278
+my references or take a look at the source code,
+
+514
+00:32:12,444 --> 00:32:15,894
+you can find many more details on my blog post about
+
+515
+00:32:15,932 --> 00:32:19,478
+that topic, which is linked here. If you have any questions
+
+516
+00:32:19,564 --> 00:32:22,754
+about my measurements, my talk, my learnings,
+
+517
+00:32:22,802 --> 00:32:26,086
+or want to discuss something, yeah, just send me an
+
+518
+00:32:26,108 --> 00:32:30,190
+email. Here's my contact information and thank you for tuning in.
+
+519
+00:32:30,300 --> 00:32:30,620
+See you.
+

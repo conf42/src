@@ -1,0 +1,1548 @@
+1
+00:00:41,090 --> 00:00:44,534
+Hi, I'm Eduardo Janicas and I'm a solutions architect at
+
+2
+00:00:44,572 --> 00:00:48,006
+AWS. I've been here for over two and a half years, and I
+
+3
+00:00:48,028 --> 00:00:51,166
+have a background in networking and opera questions I'm going
+
+4
+00:00:51,188 --> 00:00:54,958
+to talk about how AWS achieves static stability using
+
+5
+00:00:55,044 --> 00:00:58,958
+availability zones at Amazon. The services we build
+
+6
+00:00:59,044 --> 00:01:02,058
+must meet extremely high availability targets.
+
+7
+00:01:02,154 --> 00:01:05,502
+It means that we think carefully about the dependencies
+
+8
+00:01:05,566 --> 00:01:08,658
+that our systems take. We design our systems to
+
+9
+00:01:08,664 --> 00:01:12,398
+stay resilient, even when those dependencies are impaired.
+
+10
+00:01:12,494 --> 00:01:15,934
+In this talk, we're going to define a pattern that we use called
+
+11
+00:01:15,992 --> 00:01:19,698
+static stability to achieve this level of resilience.
+
+12
+00:01:19,794 --> 00:01:23,526
+We'll show you how you apply this concept to availability zones, which are
+
+13
+00:01:23,548 --> 00:01:26,674
+a key infrastructure building block in AWS,
+
+14
+00:01:26,802 --> 00:01:30,874
+and therefore they are a bedrock dependency on which all
+
+15
+00:01:30,912 --> 00:01:34,394
+of our services are built. We will describe how we
+
+16
+00:01:34,432 --> 00:01:37,894
+built Amazon elastic compute clouds, or EC
+
+17
+00:01:37,942 --> 00:01:42,302
+two, to be statically stable. Then we're going to provide two
+
+18
+00:01:42,356 --> 00:01:45,742
+statically stable example architectures that we found
+
+19
+00:01:45,796 --> 00:01:49,322
+useful for building highly availability in regional
+
+20
+00:01:49,386 --> 00:01:52,702
+systems on top of availability zones. And finally,
+
+21
+00:01:52,836 --> 00:01:56,878
+we're going to go a bit deeper into some of the design philosophy
+
+22
+00:01:56,974 --> 00:02:00,814
+behind Amazon EC two, including how it is architected
+
+23
+00:02:00,862 --> 00:02:05,202
+to provide availability zones independence at the software level.
+
+24
+00:02:05,336 --> 00:02:08,662
+In addition, we're going to discuss some of the tradeoffs that
+
+25
+00:02:08,716 --> 00:02:12,774
+come with building a service with this choice of architecture built.
+
+26
+00:02:12,812 --> 00:02:17,074
+First, let's explore and understand the AWS cloud infrastructure.
+
+27
+00:02:17,202 --> 00:02:20,906
+A region is a physical location in the world where we
+
+28
+00:02:20,928 --> 00:02:24,886
+have multiple availability zones. Availability zones,
+
+29
+00:02:24,998 --> 00:02:28,490
+or AWS, consist of one or more discrete data
+
+30
+00:02:28,560 --> 00:02:31,422
+centers, each with redundant power,
+
+31
+00:02:31,556 --> 00:02:35,274
+networking and connectivity housed in separate
+
+32
+00:02:35,322 --> 00:02:38,542
+facilities. Availability zones exist on
+
+33
+00:02:38,596 --> 00:02:41,530
+isolated fault lines, floodplains,
+
+34
+00:02:41,610 --> 00:02:45,470
+networks and electrical grids to substantially
+
+35
+00:02:45,550 --> 00:02:49,246
+reduce the chance of simultaneous failure. It provides
+
+36
+00:02:49,278 --> 00:02:53,346
+the resilience of performing real time data replication and
+
+37
+00:02:53,368 --> 00:02:56,866
+the reliability of multiple physical locations.
+
+38
+00:02:57,058 --> 00:03:01,478
+AWS has the largest global infrastructure footprint with
+
+39
+00:03:01,564 --> 00:03:05,222
+25 regions, 80 availability zones with
+
+40
+00:03:05,276 --> 00:03:09,290
+one or more data centers, and over 230
+
+41
+00:03:09,360 --> 00:03:12,934
+points of presence with 218 edge
+
+42
+00:03:12,982 --> 00:03:16,774
+locations, and this footprint is constantly increasing
+
+43
+00:03:16,822 --> 00:03:20,702
+at a significant rate. Each AWS region has
+
+44
+00:03:20,756 --> 00:03:24,538
+multiple availability zones. Each availability zone
+
+45
+00:03:24,634 --> 00:03:28,698
+has multiple physically separated data centers.
+
+46
+00:03:28,794 --> 00:03:33,342
+Each region also has two independent, fully redundant
+
+47
+00:03:33,406 --> 00:03:36,514
+transit centers that allow traffic to cross the
+
+48
+00:03:36,552 --> 00:03:40,066
+AWS network, enabling regions to connect to the
+
+49
+00:03:40,088 --> 00:03:43,922
+global network. Further, we don't use other
+
+50
+00:03:43,976 --> 00:03:47,094
+backbone providers for AWS traffic once
+
+51
+00:03:47,132 --> 00:03:50,850
+it hits our backbone. Now, each availability zone
+
+52
+00:03:50,930 --> 00:03:54,514
+is a fully isolated partition of the AWS global
+
+53
+00:03:54,562 --> 00:03:58,278
+infrastructure. This means that it is physically separate
+
+54
+00:03:58,374 --> 00:04:02,134
+from any other availability zones by a meaningful distance,
+
+55
+00:04:02,262 --> 00:04:05,946
+such as many kilometers. Each availability zone has
+
+56
+00:04:05,968 --> 00:04:10,022
+its own power infrastructure, thus availability zones
+
+57
+00:04:10,086 --> 00:04:13,846
+give customers the ability to operate production applications
+
+58
+00:04:13,878 --> 00:04:16,846
+and databases that are more highly available,
+
+59
+00:04:17,028 --> 00:04:20,702
+fault tolerant, and scalable than it would be possible from
+
+60
+00:04:20,756 --> 00:04:24,002
+a single data center. All availability zones are
+
+61
+00:04:24,056 --> 00:04:28,078
+interconnected with high bandwidth, low latency networking
+
+62
+00:04:28,174 --> 00:04:32,414
+over fully redundant dedicated metro fiber. This provides
+
+63
+00:04:32,462 --> 00:04:36,546
+high throughput, low latency networking between availability
+
+64
+00:04:36,658 --> 00:04:40,262
+zones when interacting with an AWS service that
+
+65
+00:04:40,316 --> 00:04:44,146
+provisions cloud infrastructure instead of an Amazon virtual
+
+66
+00:04:44,258 --> 00:04:48,534
+private cloud or VPC. Many of these services require
+
+67
+00:04:48,582 --> 00:04:52,266
+the called to specify not only a region but also an
+
+68
+00:04:52,288 --> 00:04:56,038
+availability zone. The availability zone is often specified
+
+69
+00:04:56,134 --> 00:04:59,826
+implicitly in a required subnet argument,
+
+70
+00:04:59,958 --> 00:05:02,426
+for example, when launching an EC two instance,
+
+71
+00:05:02,538 --> 00:05:06,202
+provisioning an Amazon relational database or RDS
+
+72
+00:05:06,266 --> 00:05:10,138
+database, or creating an Amazon elastic cache cluster.
+
+73
+00:05:10,234 --> 00:05:14,558
+Although it's common to have multiple subnets in an availability zone,
+
+74
+00:05:14,654 --> 00:05:18,462
+a single subnet lives entirely within an availability zone,
+
+75
+00:05:18,526 --> 00:05:21,566
+and so by providing a subnet argument, the caller
+
+76
+00:05:21,598 --> 00:05:25,106
+is also implicitly providing an availability zone to
+
+77
+00:05:25,128 --> 00:05:29,042
+use to better illustrate the property of static stability,
+
+78
+00:05:29,186 --> 00:05:33,106
+let's look at Amazon EC two, which is itself designed according
+
+79
+00:05:33,138 --> 00:05:37,554
+to those principles. When building systems on top of availability zones,
+
+80
+00:05:37,682 --> 00:05:41,238
+one lesson we have learned is to be ready for impairments
+
+81
+00:05:41,334 --> 00:05:45,142
+before they happen. A less effective approach might be to deploy
+
+82
+00:05:45,206 --> 00:05:48,714
+multiple availability zones with the expectation that
+
+83
+00:05:48,832 --> 00:05:52,298
+should there be an impairment within one availability zone,
+
+84
+00:05:52,394 --> 00:05:56,282
+the service will scale up, perhaps using AWS
+
+85
+00:05:56,346 --> 00:06:00,506
+auto scaling in other availability zones, and be restored
+
+86
+00:06:00,538 --> 00:06:04,382
+to full health. This approach is less effective
+
+87
+00:06:04,526 --> 00:06:08,322
+because it relies on reacting to impairments as
+
+88
+00:06:08,376 --> 00:06:12,110
+they happen, rather than being prepared for those impairments
+
+89
+00:06:12,190 --> 00:06:16,050
+before they happen. In other words, it lacks static stability.
+
+90
+00:06:16,210 --> 00:06:20,230
+In contrast, a more effective, statically stable service
+
+91
+00:06:20,380 --> 00:06:24,262
+would over provision its infrastructure to the point where it
+
+92
+00:06:24,316 --> 00:06:27,714
+would continue operating correctly without having
+
+93
+00:06:27,772 --> 00:06:31,846
+to launch any new EC two instances. Even if an availability
+
+94
+00:06:31,958 --> 00:06:35,254
+zone were to become impaired, the Amazon
+
+95
+00:06:35,302 --> 00:06:39,210
+EC two service consists of a control plane and a data
+
+96
+00:06:39,280 --> 00:06:42,782
+plane. Control plane and data plane are
+
+97
+00:06:42,836 --> 00:06:46,446
+terms of art from networking built. We use them all over the
+
+98
+00:06:46,468 --> 00:06:50,122
+place. In AWS, a control plane is the machinery
+
+99
+00:06:50,186 --> 00:06:54,318
+involved in making changes to a system, adding resources,
+
+100
+00:06:54,414 --> 00:06:57,838
+deleting resources, modifying resources,
+
+101
+00:06:57,934 --> 00:07:01,506
+and getting those changes propagated to wherever they need
+
+102
+00:07:01,528 --> 00:07:05,166
+to go to take effect. A data plane, in contrast,
+
+103
+00:07:05,278 --> 00:07:09,094
+is the daily business of those resources. That is what it takes
+
+104
+00:07:09,132 --> 00:07:12,390
+for them to function. In Amazon EC two, the control
+
+105
+00:07:12,460 --> 00:07:16,226
+plan is everything that happens when EC two launches
+
+106
+00:07:16,258 --> 00:07:19,606
+a new instance. The logic of the control plan pulls
+
+107
+00:07:19,638 --> 00:07:23,606
+together everything needed for a new EC two instance
+
+108
+00:07:23,718 --> 00:07:28,086
+by performing numerous tasks. The following are a few example it binds
+
+109
+00:07:28,198 --> 00:07:32,874
+physical server for the compute while respecting
+
+110
+00:07:32,922 --> 00:07:36,922
+placement groups and VPC tenancy requirements. It allocates
+
+111
+00:07:36,986 --> 00:07:40,698
+a network interface out of the VPC subnet.
+
+112
+00:07:40,794 --> 00:07:45,338
+It prepares an EBS volume, generates IAM
+
+113
+00:07:45,434 --> 00:07:49,294
+role credentials, installs security groups, stores the
+
+114
+00:07:49,332 --> 00:07:53,380
+result in the data stores of the various downstream services,
+
+115
+00:07:53,830 --> 00:07:57,446
+propagates the needed configurations to the server in
+
+116
+00:07:57,468 --> 00:08:00,646
+the VPC, and to the network edge. But in
+
+117
+00:08:00,668 --> 00:08:04,354
+contrast, the Amazon EC two data plane keeps
+
+118
+00:08:04,402 --> 00:08:08,350
+existing EC two instances humming along as expected,
+
+119
+00:08:08,450 --> 00:08:12,166
+performing tasks such as routing packets according
+
+120
+00:08:12,198 --> 00:08:15,894
+to VPC route tables, reading and writing from evs
+
+121
+00:08:15,942 --> 00:08:19,834
+volumes, and so on. As it's usually the case with data planes in
+
+122
+00:08:19,872 --> 00:08:23,194
+control planes, the Amazon EC two data plane
+
+123
+00:08:23,242 --> 00:08:27,006
+is far simpler than the control plane. As a result of
+
+124
+00:08:27,028 --> 00:08:31,022
+this relative simplicity, the EC two data plane design
+
+125
+00:08:31,156 --> 00:08:35,170
+targets a higher availability than that of the EC two control
+
+126
+00:08:35,240 --> 00:08:38,562
+plane. But the concept of control
+
+127
+00:08:38,616 --> 00:08:42,958
+planes, data planes, and static stability are broadly applicable
+
+128
+00:08:43,054 --> 00:08:46,866
+even beyond Amazon EC two. Being able to decompose a
+
+129
+00:08:46,888 --> 00:08:50,166
+system into its control plane and data plane can
+
+130
+00:08:50,188 --> 00:08:54,374
+be a helpful conceptual tool for designing highly available services.
+
+131
+00:08:54,492 --> 00:08:57,906
+For a number of reasons, it's typical for the availability
+
+132
+00:08:58,018 --> 00:09:01,914
+of the data plane to be even more critical to the
+
+133
+00:09:01,952 --> 00:09:05,494
+success of customers than the control plan. For instance,
+
+134
+00:09:05,622 --> 00:09:09,366
+the continued availability and correct functioning of an EC
+
+135
+00:09:09,398 --> 00:09:13,214
+two instance after it is running is even more important
+
+136
+00:09:13,332 --> 00:09:16,714
+to most of you than the ability to launch
+
+137
+00:09:16,762 --> 00:09:20,314
+a new EC two instance. It's typical for the data plane
+
+138
+00:09:20,362 --> 00:09:24,638
+to operate at a higher volume, often by orders of magnitudes,
+
+139
+00:09:24,734 --> 00:09:28,750
+than its control plane, and as it's better to keep them separate
+
+140
+00:09:28,830 --> 00:09:33,054
+so that each can be scaled accordingly to its own relevant
+
+141
+00:09:33,102 --> 00:09:36,994
+scaling dimensions. And we found that over the years, a system's
+
+142
+00:09:37,042 --> 00:09:40,742
+control plane tends to have more moving parts than its data
+
+143
+00:09:40,796 --> 00:09:44,626
+plane, so it's statistically more likely to become impaired
+
+144
+00:09:44,658 --> 00:09:48,950
+for that reason alone. So putting those considerations altogether,
+
+145
+00:09:49,110 --> 00:09:52,422
+our best practice is to separate systems
+
+146
+00:09:52,486 --> 00:09:56,326
+along the control plane and data plane boundary. To achieve
+
+147
+00:09:56,358 --> 00:10:00,562
+this separation. In practice, we apply principles of static stability.
+
+148
+00:10:00,726 --> 00:10:04,458
+A data plane typically depends on data that arrives
+
+149
+00:10:04,554 --> 00:10:08,746
+from the control plane. However, to achieve a higher availability
+
+150
+00:10:08,858 --> 00:10:12,446
+target, the data plane maintains its existing state
+
+151
+00:10:12,548 --> 00:10:16,542
+and continues working even in the face of a control plane
+
+152
+00:10:16,606 --> 00:10:20,146
+impairment. The data plane might not get updates during the
+
+153
+00:10:20,168 --> 00:10:24,286
+period of impairment built. Everything that had been working before continues
+
+154
+00:10:24,318 --> 00:10:28,066
+to work. Earlier, we noted that a scheme that requires
+
+155
+00:10:28,098 --> 00:10:31,494
+the replacement of an EC two instance in response to an
+
+156
+00:10:31,532 --> 00:10:35,010
+availability zones impairment is a less effective approach.
+
+157
+00:10:35,090 --> 00:10:38,690
+It's not because we won't be able to launch the new EC two instance,
+
+158
+00:10:38,770 --> 00:10:42,474
+it's because in response to an impairment, the system has to take
+
+159
+00:10:42,512 --> 00:10:46,346
+an immediate dependency for the recovery path on the
+
+160
+00:10:46,368 --> 00:10:50,262
+Amazon EC two control plan plus all of the application specific
+
+161
+00:10:50,416 --> 00:10:53,614
+systems that are necessary for a new instance to
+
+162
+00:10:53,652 --> 00:10:56,846
+start performing useful work. Depending on the application,
+
+163
+00:10:57,028 --> 00:11:01,162
+these dependencies could include steps such as downloading runtime
+
+164
+00:11:01,226 --> 00:11:05,234
+configuration, registering the instance with discovery services,
+
+165
+00:11:05,352 --> 00:11:09,550
+acquiring credentials, et cetera. The control plane systems
+
+166
+00:11:09,630 --> 00:11:13,326
+are necessarily more complex than those in the data plane,
+
+167
+00:11:13,358 --> 00:11:16,626
+and they have a greater chance of not behaving correctly
+
+168
+00:11:16,738 --> 00:11:20,710
+when the overall system is impaired. Several AWS services
+
+169
+00:11:20,860 --> 00:11:24,546
+are internally composed of a horizontally scalable,
+
+170
+00:11:24,658 --> 00:11:28,742
+stateless fleet of EC two instances or Amazon
+
+171
+00:11:28,806 --> 00:11:32,038
+elastic container service or ECS containers.
+
+172
+00:11:32,134 --> 00:11:35,946
+We run these services in an auto scaling group across
+
+173
+00:11:36,048 --> 00:11:40,374
+three or more availability zones. Additionally, these services
+
+174
+00:11:40,512 --> 00:11:44,618
+over provision capacity so that even if an entire availability
+
+175
+00:11:44,714 --> 00:11:48,506
+zones were impaired, the service in the remaining availability
+
+176
+00:11:48,618 --> 00:11:52,442
+zones could carry the load. For example, when you use three
+
+177
+00:11:52,516 --> 00:11:56,162
+availability zones, we over provision by 50%.
+
+178
+00:11:56,296 --> 00:12:00,254
+Put another way, we over provision such that each availability
+
+179
+00:12:00,382 --> 00:12:03,634
+zone is operating at only 66%
+
+180
+00:12:03,752 --> 00:12:07,154
+of the level for which we have load tested it. The most
+
+181
+00:12:07,192 --> 00:12:11,190
+common example is a load balanced HTTPs service.
+
+182
+00:12:11,340 --> 00:12:15,186
+The following diagram shows a public facing application load
+
+183
+00:12:15,218 --> 00:12:18,602
+balancer providing an HTTPs service
+
+184
+00:12:18,736 --> 00:12:22,326
+across three availability zones. The target of the load
+
+185
+00:12:22,358 --> 00:12:25,622
+balancer is an autoscaling group that spans
+
+186
+00:12:25,686 --> 00:12:29,574
+the three availability zones in the EUS one region.
+
+187
+00:12:29,702 --> 00:12:33,318
+This is an example of an active active high availability
+
+188
+00:12:33,494 --> 00:12:37,514
+using availability zones in the event of an availability zone
+
+189
+00:12:37,562 --> 00:12:42,170
+impairment, the architecture shown in the preceding diagram requires
+
+190
+00:12:42,250 --> 00:12:45,774
+no action. The EC two instances in the impaired
+
+191
+00:12:45,822 --> 00:12:49,506
+availability zone will start failing health checks and
+
+192
+00:12:49,528 --> 00:12:53,282
+the application load balancer will shift traffic away from
+
+193
+00:12:53,336 --> 00:12:57,234
+them. In fact, the elastic load balancer service is designed
+
+194
+00:12:57,282 --> 00:13:01,186
+according to this principle. It has provisioned enough load
+
+195
+00:13:01,218 --> 00:13:04,802
+balancing capacity to withstand an availability zone
+
+196
+00:13:04,866 --> 00:13:08,934
+impairment without needing to scale up. We also use this pattern
+
+197
+00:13:09,062 --> 00:13:12,698
+even when there is no load balancer or HTTPs service.
+
+198
+00:13:12,784 --> 00:13:16,694
+For instance, a fleet of EC two instances that processes
+
+199
+00:13:16,742 --> 00:13:20,602
+messages from an Amazon simple queue service or
+
+200
+00:13:20,656 --> 00:13:24,458
+SQs queue can follow this pattern too. The instances
+
+201
+00:13:24,554 --> 00:13:28,458
+are deployed in an out of scaling group across multiple availability
+
+202
+00:13:28,554 --> 00:13:32,302
+zones appropriately over provisioned. In the event
+
+203
+00:13:32,356 --> 00:13:36,414
+of an impaired availability zone, the service does nothing, the impaired
+
+204
+00:13:36,462 --> 00:13:39,982
+instances stop doing their work and others pick up the block.
+
+205
+00:13:40,126 --> 00:13:43,394
+Some services we built are stateful and
+
+206
+00:13:43,432 --> 00:13:47,186
+require a single primary or leader node to coordinate
+
+207
+00:13:47,218 --> 00:13:50,290
+the work. An example of this service is a relational
+
+208
+00:13:50,370 --> 00:13:54,130
+database such as Amazon RDS with a MysQL
+
+209
+00:13:54,210 --> 00:13:57,966
+or postgres database engine. A typical high availability
+
+210
+00:13:58,098 --> 00:14:02,262
+setup for this kind of relational database has a primary
+
+211
+00:14:02,326 --> 00:14:05,722
+instance which is the one which all writes must
+
+212
+00:14:05,776 --> 00:14:09,482
+go to and a standby candidate. We might also have
+
+213
+00:14:09,536 --> 00:14:13,098
+additional read replicas which are not shown in this diagram.
+
+214
+00:14:13,194 --> 00:14:16,734
+When we work with stateful infrastructure like this, there will
+
+215
+00:14:16,772 --> 00:14:20,026
+be a warm standby node in a different availability
+
+216
+00:14:20,138 --> 00:14:24,046
+zone from that of the primary nodes. The following diagram
+
+217
+00:14:24,158 --> 00:14:27,826
+shows an Amazon RDS database when we provision a
+
+218
+00:14:27,848 --> 00:14:31,614
+database with Amazon RDS, it requires a subnet
+
+219
+00:14:31,662 --> 00:14:35,354
+group. A subnet group is a set of subnets spanning
+
+220
+00:14:35,422 --> 00:14:39,602
+multiple availability zones into which the database instances
+
+221
+00:14:39,666 --> 00:14:43,810
+will be provisioned. Amazon RDS puts the standby candidate
+
+222
+00:14:43,890 --> 00:14:47,330
+in a different availability zone from the primary node.
+
+223
+00:14:47,410 --> 00:14:51,370
+This is an example of active standby high availability using
+
+224
+00:14:51,440 --> 00:14:54,838
+availability zones, as was the case with the stateless
+
+225
+00:14:54,934 --> 00:14:58,566
+active active example. When the availability zone
+
+226
+00:14:58,598 --> 00:15:02,126
+with a primary node becomes impaired, the stateful service
+
+227
+00:15:02,228 --> 00:15:05,994
+does nothing with the infrastructure. For services that use Amazon
+
+228
+00:15:06,042 --> 00:15:09,274
+RDS, RDS will manage the failover
+
+229
+00:15:09,402 --> 00:15:13,314
+and repoint the DNS name to the new primary in the
+
+230
+00:15:13,352 --> 00:15:17,202
+working availability zone. This pattern also applies to
+
+231
+00:15:17,256 --> 00:15:20,642
+other active standby setups, even if they do not
+
+232
+00:15:20,696 --> 00:15:24,930
+use a relational database. In particular, we apply this
+
+233
+00:15:25,000 --> 00:15:29,042
+to systems with a cluster architecture that has a leader node.
+
+234
+00:15:29,106 --> 00:15:32,534
+We deploy these clusters across availability zones and
+
+235
+00:15:32,572 --> 00:15:36,150
+elect a new leader node from a standby candidate instead
+
+236
+00:15:36,220 --> 00:15:39,914
+of launching a replacement just in time. What these
+
+237
+00:15:39,952 --> 00:15:44,374
+two patterns have in common is that both of them have already provisioned
+
+238
+00:15:44,422 --> 00:15:48,134
+the capacity they need in the event of an availability zone
+
+239
+00:15:48,182 --> 00:15:51,466
+impairment well in advance of any impairment.
+
+240
+00:15:51,578 --> 00:15:55,642
+In neither of these cases is a service taking any deliberate
+
+241
+00:15:55,786 --> 00:15:59,134
+control plane dependencies, such as provisioning new
+
+242
+00:15:59,172 --> 00:16:02,838
+infrastructure or making modifications in response
+
+243
+00:16:02,874 --> 00:16:06,830
+to an availability zone issue. This final section
+
+244
+00:16:06,910 --> 00:16:10,562
+of the talk will go one level deeper into
+
+245
+00:16:10,616 --> 00:16:14,306
+resilient availability zone architectures, covering some of
+
+246
+00:16:14,328 --> 00:16:18,482
+the ways in which we follow the availability zone independence principle
+
+247
+00:16:18,546 --> 00:16:22,194
+in Amazon. EC two. Understanding some of this concept
+
+248
+00:16:22,242 --> 00:16:26,022
+is helpful when we build a service that not only needs
+
+249
+00:16:26,076 --> 00:16:29,210
+to be highly available itself, but also needs
+
+250
+00:16:29,280 --> 00:16:32,506
+to provide infrastructure on which others can be
+
+251
+00:16:32,528 --> 00:16:35,834
+highly available. EC two as a provider of low
+
+252
+00:16:35,872 --> 00:16:39,722
+level AWS infrastructure is the infrastructure that
+
+253
+00:16:39,776 --> 00:16:43,342
+applications can use to be highly available. There are times
+
+254
+00:16:43,396 --> 00:16:46,714
+when other systems might wish to adopt that strategy
+
+255
+00:16:46,762 --> 00:16:50,618
+as well. We follow the availability zone independence principle
+
+256
+00:16:50,714 --> 00:16:53,518
+in EC two in our deployment practices.
+
+257
+00:16:53,694 --> 00:16:57,774
+In EC two, software is deployed to the physical servers
+
+258
+00:16:57,902 --> 00:17:01,278
+hosting EC two instances, edge devices,
+
+259
+00:17:01,454 --> 00:17:05,238
+DNS resolvers, control plane components in
+
+260
+00:17:05,244 --> 00:17:09,138
+the EC two instance launch path, and many other components
+
+261
+00:17:09,234 --> 00:17:13,170
+upon which EC two instances depend. These deployments
+
+262
+00:17:13,250 --> 00:17:16,774
+follow a zonal deployment calendar. This means that two
+
+263
+00:17:16,812 --> 00:17:19,942
+availability zones in the same region will
+
+264
+00:17:19,996 --> 00:17:22,950
+receive a given deployment on different days.
+
+265
+00:17:23,100 --> 00:17:26,742
+Cross AWS, we use a phase rollout of deployment.
+
+266
+00:17:26,806 --> 00:17:30,574
+For instance, we follow the best practice regardless of the type
+
+267
+00:17:30,612 --> 00:17:34,590
+of service to which we deploy, of first deploying a one box
+
+268
+00:17:34,740 --> 00:17:38,138
+and then one by end of servers,
+
+269
+00:17:38,234 --> 00:17:42,506
+et cetera. However, in the specific case of services like
+
+270
+00:17:42,548 --> 00:17:46,590
+those on Amazon EC two, our deployments go one step further
+
+271
+00:17:46,670 --> 00:17:50,686
+and are deliberately aligned to availability zone boundary
+
+272
+00:17:50,798 --> 00:17:55,226
+their way. A problem with a deployment affects one availability
+
+273
+00:17:55,358 --> 00:17:59,014
+zone and it's rollback and fixed. It doesn't affect any
+
+274
+00:17:59,052 --> 00:18:03,106
+other availability zones, which continue functioning as normal.
+
+275
+00:18:03,298 --> 00:18:07,458
+Another way we use the principle of independent availability zones
+
+276
+00:18:07,554 --> 00:18:11,366
+when we build in Amazon EC two is to design all packet
+
+277
+00:18:11,398 --> 00:18:15,034
+flows to stay within the availability zone rather
+
+278
+00:18:15,152 --> 00:18:18,902
+than crossing boundaries. The second point, that network
+
+279
+00:18:18,966 --> 00:18:22,218
+traffic is kept local to the availability zone,
+
+280
+00:18:22,314 --> 00:18:26,298
+is worth exploring in more detail. An interesting illustration
+
+281
+00:18:26,394 --> 00:18:30,138
+of how we think differently when building a regional,
+
+282
+00:18:30,234 --> 00:18:33,534
+highly available system. That is, a consumer
+
+283
+00:18:33,582 --> 00:18:38,094
+independent availability zones. That is, it uses guarantees
+
+284
+00:18:38,142 --> 00:18:42,082
+of availability zone independence as a foundation for
+
+285
+00:18:42,136 --> 00:18:45,654
+building a high available service, as opposed to when
+
+286
+00:18:45,692 --> 00:18:48,994
+we provide availability zones independent infrastructure
+
+287
+00:18:49,042 --> 00:18:52,134
+to others that will allow them to use for high
+
+288
+00:18:52,172 --> 00:18:56,054
+availability. The following diagram illustrates a highly available
+
+289
+00:18:56,172 --> 00:18:59,834
+external service, shown in orange that depends on
+
+290
+00:18:59,872 --> 00:19:03,194
+another internal service shown in green.
+
+291
+00:19:03,312 --> 00:19:06,698
+A straightforward design treats both of these services
+
+292
+00:19:06,864 --> 00:19:10,418
+AWS consumers of independent TC two availability
+
+293
+00:19:10,534 --> 00:19:14,254
+zones. Each of the orange and green services is
+
+294
+00:19:14,292 --> 00:19:17,390
+fronted by an application load balancer, and each
+
+295
+00:19:17,460 --> 00:19:20,954
+service has a well provisioned fleet of backend hosts
+
+296
+00:19:21,002 --> 00:19:24,894
+spread across three availability zones. One highly
+
+297
+00:19:24,942 --> 00:19:28,974
+available regional service calls another highly available regional
+
+298
+00:19:29,022 --> 00:19:32,734
+service. This is a simple design for many of the services we've
+
+299
+00:19:32,782 --> 00:19:37,078
+built. It is a good design. But suppose, however, that the green
+
+300
+00:19:37,164 --> 00:19:40,534
+service is a foundational service. That is,
+
+301
+00:19:40,652 --> 00:19:44,486
+suppose it is intended not only to be highly available,
+
+302
+00:19:44,668 --> 00:19:48,262
+but also itself to services as a building block
+
+303
+00:19:48,326 --> 00:19:52,186
+for providing availability zones independence. In that case,
+
+304
+00:19:52,288 --> 00:19:56,106
+we might instead design it AWS three instances of a
+
+305
+00:19:56,128 --> 00:20:00,098
+zone local service on which we follow availability zone
+
+306
+00:20:00,134 --> 00:20:03,786
+aware deployment practices the following diagram illustrates
+
+307
+00:20:03,818 --> 00:20:07,374
+the design in which a highly available regional service
+
+308
+00:20:07,492 --> 00:20:10,814
+calls a highly available zonal service.
+
+309
+00:20:11,012 --> 00:20:14,830
+The reasons why we design our building block
+
+310
+00:20:14,910 --> 00:20:18,302
+services to be availability zone independent
+
+311
+00:20:18,366 --> 00:20:22,286
+come down to simple arithmetic. Let's say an availability zone
+
+312
+00:20:22,318 --> 00:20:26,274
+is impaired for black and white failures, the application load
+
+313
+00:20:26,322 --> 00:20:30,274
+balancer will automatically fail away from the affected
+
+314
+00:20:30,322 --> 00:20:34,102
+nodes. However, not all failures are so obvious.
+
+315
+00:20:34,236 --> 00:20:37,990
+There can be grave failures, such as bugs in the software,
+
+316
+00:20:38,070 --> 00:20:41,322
+which the load balancer won't be able to see in its health
+
+317
+00:20:41,376 --> 00:20:45,450
+checks and cleanly handle. In this example, where one
+
+318
+00:20:45,520 --> 00:20:49,338
+highly available regional service, called another
+
+319
+00:20:49,424 --> 00:20:53,422
+highly available regional service, if a request is
+
+320
+00:20:53,476 --> 00:20:57,034
+sent through the system, then with some simplifying
+
+321
+00:20:57,082 --> 00:21:00,906
+assumptions, the chance of the request avoiding
+
+322
+00:21:00,938 --> 00:21:04,654
+the impaired availability zone is two divided
+
+323
+00:21:04,702 --> 00:21:08,194
+by three times two divided by three, so it's four divided by
+
+324
+00:21:08,232 --> 00:21:12,018
+nine. That is, the request has worse than
+
+325
+00:21:12,104 --> 00:21:16,802
+even odds of steering clear of the event. In contrast,
+
+326
+00:21:16,946 --> 00:21:20,934
+if we built the green service to be a zonal service as
+
+327
+00:21:20,972 --> 00:21:24,610
+in the current example, then the hosts in the orange
+
+328
+00:21:24,690 --> 00:21:28,806
+service can call the green endpoint in the same availability
+
+329
+00:21:28,918 --> 00:21:32,358
+zone. So with this architecture, the chances
+
+330
+00:21:32,454 --> 00:21:36,154
+of avoiding the impaired availability zones are only
+
+331
+00:21:36,192 --> 00:21:39,260
+two divided by three. If N services
+
+332
+00:21:39,630 --> 00:21:43,374
+are a part of this call path, then these numbers
+
+333
+00:21:43,492 --> 00:21:47,422
+generalize to two divided by three to the power of N for
+
+334
+00:21:47,476 --> 00:21:51,466
+N regional services versus remain constant
+
+335
+00:21:51,578 --> 00:21:55,618
+at two divided by three for N zonal services
+
+336
+00:21:55,784 --> 00:21:59,442
+it is for this region that we built
+
+337
+00:21:59,576 --> 00:22:03,138
+Amazon EC two Nat gateway as
+
+338
+00:22:03,224 --> 00:22:06,726
+a zonal service. So Nat Gateway is
+
+339
+00:22:06,748 --> 00:22:10,914
+an Amazon EC two feature that allows for outbound Internet
+
+340
+00:22:10,962 --> 00:22:15,062
+traffic from a private subnet and appears not
+
+341
+00:22:15,116 --> 00:22:18,666
+as a regional VPC wide gateway, but as a
+
+342
+00:22:18,688 --> 00:22:22,406
+zonal resource that customers instantiate separately
+
+343
+00:22:22,518 --> 00:22:25,562
+per availability zone. As shown on this
+
+344
+00:22:25,616 --> 00:22:29,450
+diagram, the nut gateway sits in the path of
+
+345
+00:22:29,520 --> 00:22:33,386
+the Internet connectivity for the VPC and
+
+346
+00:22:33,408 --> 00:22:36,782
+is therefore part of the data plan of any c two
+
+347
+00:22:36,836 --> 00:22:40,462
+instance within that VPC. If there is
+
+348
+00:22:40,516 --> 00:22:43,918
+a connectivity impairment in one availability zones,
+
+349
+00:22:44,014 --> 00:22:47,602
+we want to keep that impairment inside that
+
+350
+00:22:47,656 --> 00:22:50,766
+availability zone only, rather than spreading
+
+351
+00:22:50,798 --> 00:22:54,514
+it to other zones. In the end, we want a customer who
+
+352
+00:22:54,552 --> 00:22:58,198
+built an architecture similar to the one that we mentioned
+
+353
+00:22:58,284 --> 00:23:01,942
+earlier. That is like providing a fleet across three
+
+354
+00:23:01,996 --> 00:23:05,574
+availability zones with enough capacity in
+
+355
+00:23:05,612 --> 00:23:09,194
+any two to carry the full load to know that the
+
+356
+00:23:09,232 --> 00:23:12,742
+other availability zones will be completely unaffected
+
+357
+00:23:12,806 --> 00:23:16,310
+by anything going on on the impaired availability zone.
+
+358
+00:23:16,390 --> 00:23:19,574
+The only way for us to do this is to ensure
+
+359
+00:23:19,622 --> 00:23:22,874
+that all foundational components like the Nat
+
+360
+00:23:22,922 --> 00:23:26,426
+gateway really do stay within one availability
+
+361
+00:23:26,538 --> 00:23:30,446
+zone. So some lessons learned when designing a service
+
+362
+00:23:30,548 --> 00:23:33,886
+oriented architecture that will run on AWS,
+
+363
+00:23:33,998 --> 00:23:37,998
+we have learned to use one of these patterns,
+
+364
+00:23:38,094 --> 00:23:42,302
+or a combination of both. The simpler pattern regional,
+
+365
+00:23:42,366 --> 00:23:46,418
+called regional. This is often the best choice for
+
+366
+00:23:46,504 --> 00:23:50,102
+external facing services and appropriate for most
+
+367
+00:23:50,156 --> 00:23:52,882
+internal services as well. For instance,
+
+368
+00:23:53,026 --> 00:23:57,058
+when building higher level application services in AWS
+
+369
+00:23:57,154 --> 00:24:00,710
+such as Amazon API Gateway and AWS
+
+370
+00:24:00,790 --> 00:24:04,794
+services technologies, we use this pattern to provide high
+
+371
+00:24:04,832 --> 00:24:09,446
+availability even in the face of an availability zones impairment.
+
+372
+00:24:09,558 --> 00:24:12,474
+The more complex patterns are regional,
+
+373
+00:24:12,522 --> 00:24:16,570
+called zonal or zones coral zones. When designing
+
+374
+00:24:16,650 --> 00:24:21,002
+internal and in some cases external data plane components
+
+375
+00:24:21,066 --> 00:24:25,310
+within Amazon EC two, for instance, network appliance
+
+376
+00:24:25,390 --> 00:24:28,786
+or other infrastructure that sits directly in
+
+377
+00:24:28,808 --> 00:24:32,354
+the critical data path, we follow the pattern of
+
+378
+00:24:32,392 --> 00:24:36,102
+availability zone independence and use instances that are
+
+379
+00:24:36,156 --> 00:24:40,354
+siloed in availability zones so that network traffic
+
+380
+00:24:40,482 --> 00:24:44,354
+remains in its same availability zone. This pattern
+
+381
+00:24:44,482 --> 00:24:47,842
+not only helps keep impairments isolated
+
+382
+00:24:47,906 --> 00:24:51,442
+to an availability zone, but also has favorable network
+
+383
+00:24:51,506 --> 00:24:55,446
+traffic cost characteristics in AWS. Thank you
+
+384
+00:24:55,468 --> 00:24:59,206
+for listening to my talk and I hope you find it useful. If this
+
+385
+00:24:59,228 --> 00:25:02,954
+topic interests you, you can find more dive deep articles
+
+386
+00:25:03,002 --> 00:25:06,494
+on the Amazon Building library, which you can find in the
+
+387
+00:25:06,532 --> 00:25:09,340
+public AWS website. Have a great day.
+
