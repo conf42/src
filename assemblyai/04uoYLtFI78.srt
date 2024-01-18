@@ -1,0 +1,1904 @@
+1
+00:00:00,250 --> 00:00:01,630
+Are youre an SRE,
+
+2
+00:00:03,570 --> 00:00:07,358
+a developer, a quality
+
+3
+00:00:07,444 --> 00:00:11,162
+engineer who wants to tackle the challenge of improving reliability
+
+4
+00:00:11,226 --> 00:00:15,294
+in your DevOps? You can enable your DevOps for reliability with
+
+5
+00:00:15,332 --> 00:00:19,114
+chaos native. Create your free account at Chaos
+
+6
+00:00:19,162 --> 00:01:17,622
+native Litmus Cloud hello
+
+7
+00:01:17,676 --> 00:01:19,878
+everyone, glad to be here at SRE 2021.
+
+8
+00:01:19,884 --> 00:01:23,794
+And today I'd like to share with you the journey that led
+
+9
+00:01:23,842 --> 00:01:27,314
+us to start using distributed tracing in handling performance
+
+10
+00:01:27,362 --> 00:01:31,334
+issues in our system. And I'd like to give you some practical
+
+11
+00:01:31,382 --> 00:01:34,666
+tips on how you can start with distributed tracing and how to
+
+12
+00:01:34,688 --> 00:01:38,170
+effectively use it in your performance investigations.
+
+13
+00:01:40,270 --> 00:01:43,674
+Word about myself my name is Dotan Horovits. I'm a developer
+
+14
+00:01:43,722 --> 00:01:47,326
+advocate at Logs IO. I've been around as a
+
+15
+00:01:47,348 --> 00:01:50,878
+developer solutions architect product guy.
+
+16
+00:01:51,044 --> 00:01:54,414
+I'm an advocate of open youre and communities in
+
+17
+00:01:54,452 --> 00:01:58,660
+general and the CNCF, the Cloud Native Computing foundation in particular.
+
+18
+00:01:59,030 --> 00:02:02,446
+I organize a local CNCF chapter in Tel
+
+19
+00:02:02,478 --> 00:02:05,926
+Aviv, so if youre around, do come and visit one of our
+
+20
+00:02:05,948 --> 00:02:09,062
+monthly meetups. I run the open
+
+21
+00:02:09,116 --> 00:02:12,982
+observability Talks podcast, check it out and in general
+
+22
+00:02:13,036 --> 00:02:16,338
+you can find me everywhere at Horowitz. So if you're
+
+23
+00:02:16,354 --> 00:02:19,686
+tweeting something interesting out of this talk, feel free to tag
+
+24
+00:02:19,718 --> 00:02:24,250
+me and about
+
+25
+00:02:24,320 --> 00:02:28,426
+us we pride ourselves in being the
+
+26
+00:02:28,528 --> 00:02:31,562
+masters of observability logs,
+
+27
+00:02:31,626 --> 00:02:34,640
+metrics traces all around.
+
+28
+00:02:36,130 --> 00:02:40,090
+But we weren't always observability masters.
+
+29
+00:02:40,250 --> 00:02:44,034
+So let's rewind a couple of years back before
+
+30
+00:02:44,072 --> 00:02:45,250
+we had the tracing.
+
+31
+00:02:47,670 --> 00:02:51,262
+Back then we were the best. We were the masters
+
+32
+00:02:51,326 --> 00:02:54,594
+of logs and metrics. Our system is
+
+33
+00:02:54,632 --> 00:02:58,082
+instrumented inside and out around logging and metrics.
+
+34
+00:02:58,226 --> 00:03:02,070
+We're talking about the system in microservices arch
+
+35
+00:03:02,490 --> 00:03:06,214
+multi cloud, on AWS and on youre and
+
+36
+00:03:06,252 --> 00:03:10,090
+multi region multi tenant running at high scale.
+
+37
+00:03:10,670 --> 00:03:17,034
+And we felt we had it all figured out until
+
+38
+00:03:17,152 --> 00:03:18,810
+the performance alert.
+
+39
+00:03:20,690 --> 00:03:24,814
+So it was a UI performance issues coming
+
+40
+00:03:24,852 --> 00:03:28,894
+from the metrics. Obviously. Looking into the metrics we
+
+41
+00:03:28,932 --> 00:03:32,458
+started seeing the application started loading a
+
+42
+00:03:32,484 --> 00:03:36,626
+little slower with many requests taking longer
+
+43
+00:03:36,728 --> 00:03:40,610
+to respond. And now, as anyone
+
+44
+00:03:40,680 --> 00:03:45,060
+here in the audience, SRE, DevOps, dev, whoever know
+
+45
+00:03:45,690 --> 00:03:48,760
+youre need to figure out where it comes from.
+
+46
+00:03:49,530 --> 00:03:53,094
+And our service handles thousands of requests per minute with
+
+47
+00:03:53,132 --> 00:03:56,354
+a serious amount of internal server communications.
+
+48
+00:03:56,482 --> 00:04:00,730
+So this is the conditions that we needed to investigate.
+
+49
+00:04:02,590 --> 00:04:05,946
+And the first attempt, as always, is to
+
+50
+00:04:05,968 --> 00:04:08,250
+turn to the logs for answers.
+
+51
+00:04:09,310 --> 00:04:12,574
+But this time it wasn't that easy. First of all,
+
+52
+00:04:12,612 --> 00:04:15,360
+we had tons of identical data,
+
+53
+00:04:16,530 --> 00:04:20,094
+but worse, it seemed to be
+
+54
+00:04:20,132 --> 00:04:23,762
+like a random decreasing performance issues in different
+
+55
+00:04:23,816 --> 00:04:27,650
+flows all around our application. It was really hard
+
+56
+00:04:27,720 --> 00:04:31,186
+to point to one thing in particular,
+
+57
+00:04:31,368 --> 00:04:35,140
+and even harder to connect the problem to a specific service.
+
+58
+00:04:36,950 --> 00:04:40,326
+What made it more difficult to investigate through the logs is
+
+59
+00:04:40,348 --> 00:04:43,174
+that the request sequences were pretty long.
+
+60
+00:04:43,292 --> 00:04:47,014
+It was really hard to get the details from the logs and
+
+61
+00:04:47,052 --> 00:04:50,506
+figuring out what called which and how
+
+62
+00:04:50,528 --> 00:04:54,678
+the flow goes. Bottom line, youre logs
+
+63
+00:04:54,774 --> 00:04:57,370
+weren't enough for this investigation.
+
+64
+00:05:00,290 --> 00:05:03,914
+So the second attempt was to enhance
+
+65
+00:05:03,962 --> 00:05:07,790
+the logs. The idea was to add a
+
+66
+00:05:07,860 --> 00:05:11,326
+request id to each and every one of the logs, so that we
+
+67
+00:05:11,348 --> 00:05:15,266
+can look at all the logs and visualize the
+
+68
+00:05:15,288 --> 00:05:19,486
+logs of all of the same request in Kibana.
+
+69
+00:05:19,678 --> 00:05:22,914
+So if before, we couldn't really understand
+
+70
+00:05:23,032 --> 00:05:26,334
+which logs belong to this specific problematic request,
+
+71
+00:05:26,382 --> 00:05:29,490
+and some requests are good, some requests behaved oddly.
+
+72
+00:05:29,650 --> 00:05:32,742
+This is a way to bucket it, and it sounds pretty simple,
+
+73
+00:05:32,796 --> 00:05:36,754
+right? Add the request id, then visualize based on request
+
+74
+00:05:36,802 --> 00:05:40,634
+id in cabal. So it
+
+75
+00:05:40,672 --> 00:05:43,914
+wasn't that simple. First of all,
+
+76
+00:05:43,952 --> 00:05:46,986
+it was very difficult to handle the propagation of
+
+77
+00:05:47,008 --> 00:05:50,206
+the request id. We needed to go into each
+
+78
+00:05:50,228 --> 00:05:54,638
+and every piece of code service
+
+79
+00:05:54,724 --> 00:05:57,966
+microservices that we suspected has to do
+
+80
+00:05:57,988 --> 00:06:01,246
+with this request, and add an
+
+81
+00:06:01,268 --> 00:06:04,554
+incoming parameter to propagate, to bring in the request id,
+
+82
+00:06:04,612 --> 00:06:08,770
+then obviously put the request id as part of the logs, but also
+
+83
+00:06:08,920 --> 00:06:12,690
+then send it downstream, in any downstream call
+
+84
+00:06:12,760 --> 00:06:16,166
+from that service to any others service or any other operations of
+
+85
+00:06:16,188 --> 00:06:20,626
+the same service. So we needed to handle all this request id propagation.
+
+86
+00:06:20,738 --> 00:06:24,066
+A big headache. So that's
+
+87
+00:06:24,098 --> 00:06:27,814
+in the coding. And then on the visualization side, it was pretty
+
+88
+00:06:27,852 --> 00:06:31,850
+painful to visualize traces using kibana. Essentially what we got
+
+89
+00:06:31,920 --> 00:06:35,334
+is a bucket of all the logs that share the request
+
+90
+00:06:35,382 --> 00:06:38,938
+id, which is nice, but you can't really understand
+
+91
+00:06:39,104 --> 00:06:43,054
+the relationship and which invoked which and
+
+92
+00:06:43,172 --> 00:06:46,382
+the relationship between them. And also
+
+93
+00:06:46,516 --> 00:06:50,154
+it was pretty limited in context, so we had the context
+
+94
+00:06:50,202 --> 00:06:53,794
+of all of them belonging to request id to the same
+
+95
+00:06:53,832 --> 00:06:57,220
+request id, but not much more than that.
+
+96
+00:06:58,230 --> 00:07:01,842
+What you really needed to see was the communication between
+
+97
+00:07:01,896 --> 00:07:05,130
+the microservices. So we needed better visualization
+
+98
+00:07:05,230 --> 00:07:09,014
+options to tricky a request and analyze it
+
+99
+00:07:09,052 --> 00:07:11,110
+throughout the request flow.
+
+100
+00:07:12,570 --> 00:07:16,102
+On the coding side, we also needed easier instrumentation because
+
+101
+00:07:16,156 --> 00:07:19,286
+it was a real, real pain for us, and there was
+
+102
+00:07:19,308 --> 00:07:22,714
+no chance that we'd be able to convince other teams in charge of other
+
+103
+00:07:22,752 --> 00:07:26,534
+microservices to go along this path and start adding these parameters
+
+104
+00:07:26,582 --> 00:07:30,380
+and handling this request id propagation. So definitely
+
+105
+00:07:30,930 --> 00:07:33,390
+easier instrumentation is another challenge.
+
+106
+00:07:35,010 --> 00:07:37,470
+And then we reach the third attempt.
+
+107
+00:07:37,810 --> 00:07:40,922
+In fact, strike those is a charm.
+
+108
+00:07:41,066 --> 00:07:44,674
+We reach the realization that we need proper
+
+109
+00:07:44,792 --> 00:07:46,210
+distributed tracing.
+
+110
+00:07:48,150 --> 00:07:51,490
+Distributed tracing is in fact those tool for
+
+111
+00:07:51,560 --> 00:07:55,890
+pinpointing where failures occur and what causes poor performance.
+
+112
+00:07:56,470 --> 00:08:00,562
+And then you can ask questions, where did the error occur?
+
+113
+00:08:00,626 --> 00:08:04,034
+Where did the performance degradation occur? Where's the critical
+
+114
+00:08:04,082 --> 00:08:07,458
+path? Those sorts of questions are exactly what distributed tracing is meant
+
+115
+00:08:07,474 --> 00:08:11,514
+to answer and how does it work?
+
+116
+00:08:11,712 --> 00:08:14,838
+For those in the audience that are not fluent in distributed
+
+117
+00:08:14,854 --> 00:08:18,538
+tracing, the way it works is that each
+
+118
+00:08:18,704 --> 00:08:22,570
+call in those call chain creates and emits
+
+119
+00:08:22,650 --> 00:08:26,090
+a span for that specific service and operation.
+
+120
+00:08:26,250 --> 00:08:29,726
+You can think of it as a structured log for that matter.
+
+121
+00:08:29,908 --> 00:08:33,514
+And this span includes a context, the trace
+
+122
+00:08:33,562 --> 00:08:37,470
+id, the start time and the duration of that specific span,
+
+123
+00:08:37,550 --> 00:08:41,502
+the parent span that called it and so on. And this context
+
+124
+00:08:41,566 --> 00:08:45,214
+propagates between the calls in the trace through those
+
+125
+00:08:45,272 --> 00:08:48,482
+system. And that's thanks to client libraries,
+
+126
+00:08:48,546 --> 00:08:52,374
+sdks, traces has they're known that
+
+127
+00:08:52,412 --> 00:08:55,782
+take care of that. So if you look at on the screen
+
+128
+00:08:55,836 --> 00:08:59,986
+on the left hand side in this tree graph,
+
+129
+00:09:00,178 --> 00:09:03,846
+ABCDe are all spans or service and operation.
+
+130
+00:09:03,958 --> 00:09:06,906
+And then we can see a is the root span, the one that got those
+
+131
+00:09:06,928 --> 00:09:10,474
+client request, and then a calls b, then b
+
+132
+00:09:10,512 --> 00:09:13,962
+calls c and then d, and then getting
+
+133
+00:09:14,016 --> 00:09:17,454
+back to a, a calls e. So that's in the context propagates from
+
+134
+00:09:17,492 --> 00:09:21,402
+a to b to c and so on. So this is the context propagation.
+
+135
+00:09:21,546 --> 00:09:25,220
+And each such span, ABC and so on
+
+136
+00:09:25,590 --> 00:09:29,650
+emits at the end, when it ends, it then emits the span
+
+137
+00:09:30,630 --> 00:09:34,334
+outbound, and then there's the back end that collects all these spans
+
+138
+00:09:34,382 --> 00:09:38,194
+that my application emits and reconstructs the trace
+
+139
+00:09:38,322 --> 00:09:41,814
+according to causality and then
+
+140
+00:09:41,852 --> 00:09:45,618
+visualizes it. And the typical visualization is the famous
+
+141
+00:09:45,714 --> 00:09:49,560
+timeline view or gun chart. You can see an example here
+
+142
+00:09:50,010 --> 00:09:53,990
+on the right hand side of the screen, the same ABCDe
+
+143
+00:09:54,150 --> 00:09:57,946
+on a timeline you can see. So a, the root span obviously takes the
+
+144
+00:09:57,968 --> 00:10:01,814
+those time from beginning to end because this is the full request.
+
+145
+00:10:01,942 --> 00:10:05,406
+But then a called b, B called C and
+
+146
+00:10:05,428 --> 00:10:09,358
+then called D, and then when D is finished, when B finished, then battling
+
+147
+00:10:09,444 --> 00:10:12,598
+e and then going back to a and finishing the entire request.
+
+148
+00:10:12,634 --> 00:10:16,146
+So it's very easy and very clear to see that from
+
+149
+00:10:16,168 --> 00:10:20,770
+a timeline view. And this is why it's a preferred view for investigating
+
+150
+00:10:21,190 --> 00:10:23,060
+performance issues in the system.
+
+151
+00:10:24,630 --> 00:10:28,678
+So we realize that we need distributed tracing, which is great.
+
+152
+00:10:28,844 --> 00:10:32,338
+Now the question is which distributed tracing
+
+153
+00:10:32,434 --> 00:10:34,040
+tool are we going to use?
+
+154
+00:10:36,170 --> 00:10:39,526
+And we are open source advocates. We use the elk
+
+155
+00:10:39,558 --> 00:10:43,114
+stack for logging and Prometheus for metrics and so on.
+
+156
+00:10:43,152 --> 00:10:46,902
+And obviously we turned to open source for tracing
+
+157
+00:10:46,966 --> 00:10:50,698
+as well. We looked into Yeager
+
+158
+00:10:50,794 --> 00:10:54,030
+and Zipkin, two open source candidates.
+
+159
+00:10:54,370 --> 00:10:58,350
+In fact we started using both of them, but ultimately
+
+160
+00:10:59,090 --> 00:11:02,850
+we chose Yeager. We still have Zipkin somewhere in our system.
+
+161
+00:11:02,920 --> 00:11:06,690
+But the main path is Yeager,
+
+162
+00:11:07,430 --> 00:11:11,266
+which needed to be the leading choice. And also today,
+
+163
+00:11:11,448 --> 00:11:14,914
+recent surveys still show that Jaeger is by
+
+164
+00:11:14,952 --> 00:11:19,026
+far the leading choice. Here youre can see on the screen from DevOps
+
+165
+00:11:19,058 --> 00:11:23,430
+path 2020. It's a yearly survey we run around the DevOps
+
+166
+00:11:23,850 --> 00:11:28,534
+and you can see that 33% or more from
+
+167
+00:11:28,572 --> 00:11:31,350
+those using tracing use Jaeger.
+
+168
+00:11:32,330 --> 00:11:36,134
+So Yeager is those choice? And what's
+
+169
+00:11:36,182 --> 00:11:39,482
+Yeager? Just in a nutshell, Yeager was
+
+170
+00:11:39,536 --> 00:11:43,120
+built by Uber and then
+
+171
+00:11:44,290 --> 00:11:47,882
+they open sourced it, sorry, and contributed to the CNCF
+
+172
+00:11:47,946 --> 00:11:52,394
+in 2017. And then it reached
+
+173
+00:11:52,442 --> 00:11:56,018
+production of the CNCF by 2019. So it's a
+
+174
+00:11:56,024 --> 00:11:59,300
+pretty mature project used in production by
+
+175
+00:11:59,670 --> 00:12:03,006
+quite a few companies and organizations.
+
+176
+00:12:03,198 --> 00:12:06,726
+I won't go into lots of details about Yeager here, but if you
+
+177
+00:12:06,748 --> 00:12:10,226
+are interested, I had the privilege of hosting Yurish
+
+178
+00:12:10,258 --> 00:12:13,634
+Kuro, the creator of Jaeger, on this month's
+
+179
+00:12:13,762 --> 00:12:17,394
+episode of Open Observability Talk. So it was a fascinating
+
+180
+00:12:17,442 --> 00:12:21,782
+talk. So do check it out, the September 2021 episode
+
+181
+00:12:21,846 --> 00:12:25,306
+for the latest on the Jaeger project on
+
+182
+00:12:25,328 --> 00:12:29,302
+distributed tracing in general, including some very advanced
+
+183
+00:12:29,366 --> 00:12:32,780
+use cases for tracing that people usually don't consider.
+
+184
+00:12:33,630 --> 00:12:38,110
+So Jaeger tracing is the choice. And now what
+
+185
+00:12:38,180 --> 00:12:41,514
+we need to do is before we can start investigating with tracing,
+
+186
+00:12:41,562 --> 00:12:44,894
+we need our application to actually generate trace
+
+187
+00:12:44,942 --> 00:12:48,580
+data. So let's instrument our application.
+
+188
+00:12:50,310 --> 00:12:53,922
+And we realized that we can't instrument everything from day one,
+
+189
+00:12:54,056 --> 00:12:58,146
+and especially since we have a burning issue to handle
+
+190
+00:12:58,178 --> 00:13:01,446
+the performance investigation. So we
+
+191
+00:13:01,548 --> 00:13:04,950
+took baby steps and started with two
+
+192
+00:13:05,100 --> 00:13:08,380
+front end services, node JS services.
+
+193
+00:13:08,830 --> 00:13:12,250
+We used Jaeger's tracer for Node JS,
+
+194
+00:13:12,990 --> 00:13:16,982
+if you remember again, Yeager has a tracer SDK
+
+195
+00:13:17,046 --> 00:13:21,282
+per language. So we took the one for node JS, we used open tracing
+
+196
+00:13:21,366 --> 00:13:24,494
+API for the code, and we
+
+197
+00:13:24,532 --> 00:13:28,366
+instrumented all our node JS HTTP layer with tracing as
+
+198
+00:13:28,388 --> 00:13:31,854
+well has the node JS frameworks that we use. Happy and
+
+199
+00:13:31,892 --> 00:13:35,522
+exprs a word about open
+
+200
+00:13:35,576 --> 00:13:39,666
+tracing API. It's another open source project under the
+
+201
+00:13:39,688 --> 00:13:44,082
+CNCF that is essentially an open and
+
+202
+00:13:44,216 --> 00:13:47,554
+vendor neutral API. It's not part of
+
+203
+00:13:47,592 --> 00:13:51,334
+Yeager, it's another project. And the advantage is that since
+
+204
+00:13:51,372 --> 00:13:55,014
+it's standard API, it means
+
+205
+00:13:55,052 --> 00:13:58,790
+that if later down the road we decide to switch
+
+206
+00:13:58,950 --> 00:14:03,878
+the backends from Jaeger to another type of instrumented,
+
+207
+00:14:03,974 --> 00:14:08,310
+sorry, another type of investigation and analytics backends,
+
+208
+00:14:08,470 --> 00:14:12,602
+it should be pretty simple to replace
+
+209
+00:14:12,666 --> 00:14:16,830
+just replacing the tracer library or the auto instrumentation agent,
+
+210
+00:14:16,900 --> 00:14:21,358
+and that's about it. So we shouldn't be having too much coding changes to do.
+
+211
+00:14:21,524 --> 00:14:25,810
+So going with an open standard is a recommendation.
+
+212
+00:14:26,390 --> 00:14:30,386
+It is important to note that today or these days,
+
+213
+00:14:30,488 --> 00:14:33,986
+open tracing is actually deprecated. Open tracing was
+
+214
+00:14:34,008 --> 00:14:37,490
+merged with open sensors to create open telemetry.
+
+215
+00:14:37,650 --> 00:14:41,750
+So open telemetry is the future path for instrumented. If you
+
+216
+00:14:41,820 --> 00:14:45,814
+start today, I'll talk about it later. But back when
+
+217
+00:14:45,852 --> 00:14:49,062
+we were there, the mature API
+
+218
+00:14:49,126 --> 00:14:51,260
+was open tracing and we went with that.
+
+219
+00:14:52,510 --> 00:14:55,942
+And once we have the application emitting
+
+220
+00:14:56,006 --> 00:14:59,466
+spans generating trace data, we can go
+
+221
+00:14:59,488 --> 00:15:02,030
+ahead and start investigating our traces.
+
+222
+00:15:02,610 --> 00:15:06,254
+And we opened the Yeager UI and
+
+223
+00:15:06,292 --> 00:15:10,638
+at first glance it immediately gave away two
+
+224
+00:15:10,724 --> 00:15:14,386
+major issues that have long been in our code, but we
+
+225
+00:15:14,408 --> 00:15:18,146
+didn't see them until now. It was astonishing to
+
+226
+00:15:18,168 --> 00:15:20,660
+actually see them, and I want to go over that with you.
+
+227
+00:15:21,910 --> 00:15:25,254
+The first thing we saw was what youre
+
+228
+00:15:25,292 --> 00:15:29,718
+can see here on the screen. This is the Jaeger Ui's timeline view
+
+229
+00:15:29,884 --> 00:15:34,040
+and you can see here this sort of staircase type of
+
+230
+00:15:34,970 --> 00:15:39,094
+pattern. This is an
+
+231
+00:15:39,132 --> 00:15:42,962
+obvious pattern that indicates a serial
+
+232
+00:15:43,026 --> 00:15:46,854
+call sequence. Call a then when it ends call b,
+
+233
+00:15:46,892 --> 00:15:50,974
+then it ends, call C happening sequentially. It but
+
+234
+00:15:51,012 --> 00:15:54,574
+in our case, in our system, there was no real need
+
+235
+00:15:54,612 --> 00:15:58,430
+for it to be sequential. We could easily turn it into
+
+236
+00:15:58,580 --> 00:16:01,950
+running concurrently and reduce the overall latency.
+
+237
+00:16:02,530 --> 00:16:06,146
+So we went ahead and made this change. It was very very easy to
+
+238
+00:16:06,168 --> 00:16:09,746
+do. And the result has a significant application
+
+239
+00:16:09,848 --> 00:16:13,780
+performance improvement. Right, but the bat so really
+
+240
+00:16:14,230 --> 00:16:17,334
+amazing. But this,
+
+241
+00:16:17,532 --> 00:16:21,190
+despite the improvement, wasn't the root cause of the,
+
+242
+00:16:21,260 --> 00:16:24,760
+if you remember the spike that we talked about before.
+
+243
+00:16:25,130 --> 00:16:29,066
+So we needed to carry on with our investigation to look for the
+
+244
+00:16:29,088 --> 00:16:33,014
+root cause of what triggered the original performance
+
+245
+00:16:33,062 --> 00:16:36,474
+issues in the UI. So we went
+
+246
+00:16:36,512 --> 00:16:40,502
+ahead and filtered the results according to the minimum execution
+
+247
+00:16:40,566 --> 00:16:43,974
+duration, which brought up another performance
+
+248
+00:16:44,022 --> 00:16:48,186
+issue. We saw one request that fetched user
+
+249
+00:16:48,218 --> 00:16:51,434
+data, but its duration
+
+250
+00:16:51,562 --> 00:16:55,202
+varied significantly. Some cases it was has short as
+
+251
+00:16:55,256 --> 00:16:59,518
+100 milliseconds and sometimes it was almost 10 seconds long. So two orders
+
+252
+00:16:59,534 --> 00:17:03,634
+of magnitude. We couldn't really figure out why it changes so
+
+253
+00:17:03,672 --> 00:17:07,358
+much between invocations, but one thing
+
+254
+00:17:07,384 --> 00:17:11,174
+for sure is that this request executes from the browser and had to
+
+255
+00:17:11,212 --> 00:17:14,354
+finish before we could render the screen to the user.
+
+256
+00:17:14,482 --> 00:17:17,850
+So that led to loading time that took
+
+257
+00:17:17,920 --> 00:17:22,106
+even several seconds. Definitely something unacceptable for
+
+258
+00:17:22,128 --> 00:17:25,706
+Ux, for user experience. So this is something that
+
+259
+00:17:25,728 --> 00:17:29,610
+we needed to investigate as part of the root cause analysis.
+
+260
+00:17:30,210 --> 00:17:34,190
+And looking at this request, we saw that this request triggers
+
+261
+00:17:34,930 --> 00:17:39,034
+concurrent requests to fetch all the relevant user data from various
+
+262
+00:17:39,082 --> 00:17:42,534
+endpoints, where each of those requests
+
+263
+00:17:42,602 --> 00:17:45,390
+goes through several other microservices.
+
+264
+00:17:45,550 --> 00:17:49,374
+So it was pretty elaborate. And some of these downstream microservices
+
+265
+00:17:49,422 --> 00:17:53,394
+were not even instrumented yet, reaching the back end code and
+
+266
+00:17:53,592 --> 00:17:57,254
+Java and the database and so on. And what
+
+267
+00:17:57,292 --> 00:18:00,454
+we found was one key that is
+
+268
+00:18:00,492 --> 00:18:03,862
+read for some user requests which was
+
+269
+00:18:03,916 --> 00:18:07,602
+mistakenly not cached. And this triggered a call
+
+270
+00:18:07,676 --> 00:18:11,114
+to the database to retrieve it, causing the latency only on the
+
+271
+00:18:11,152 --> 00:18:14,140
+calls requiring this particular key.
+
+272
+00:18:15,470 --> 00:18:19,254
+This is why the behavior was so erratic
+
+273
+00:18:19,302 --> 00:18:23,934
+and inconsistent and tricky to put the finger on without
+
+274
+00:18:24,052 --> 00:18:28,266
+tracing. So that was a real aha
+
+275
+00:18:28,298 --> 00:18:28,880
+moment.
+
+276
+00:18:31,090 --> 00:18:34,434
+One side benefit that we got, but of it that we didn't even
+
+277
+00:18:34,472 --> 00:18:38,580
+plan on, is that we realized that
+
+278
+00:18:39,030 --> 00:18:42,850
+Yeager actually provides us with live system
+
+279
+00:18:42,920 --> 00:18:46,598
+diagram. We don't need to maintain a
+
+280
+00:18:46,604 --> 00:18:50,498
+sequence diagram anymore and update it every couple of weeks. Jaeger Auto
+
+281
+00:18:50,514 --> 00:18:55,042
+detects the calls between the microservices
+
+282
+00:18:55,186 --> 00:18:58,954
+and generates a live system diagram. It's always
+
+283
+00:18:58,992 --> 00:19:02,922
+up to date, so that's a definite side
+
+284
+00:19:02,976 --> 00:19:06,806
+benefit. That convinced a lot of our engineers and the architects
+
+285
+00:19:06,838 --> 00:19:10,570
+and anyone else in the company to adopt tracing
+
+286
+00:19:10,730 --> 00:19:14,730
+finally to understand how our microservice architecture works and the interconnect
+
+287
+00:19:14,810 --> 00:19:16,240
+and everything around it.
+
+288
+00:19:20,130 --> 00:19:23,342
+It was love at first sight. Since then,
+
+289
+00:19:23,396 --> 00:19:27,154
+tracing has become a standard practice in those company, not just
+
+290
+00:19:27,192 --> 00:19:30,514
+on the front end and node js, but also on back end
+
+291
+00:19:30,552 --> 00:19:34,066
+and Java code and database and
+
+292
+00:19:34,168 --> 00:19:35,700
+frameworks that we use.
+
+293
+00:19:37,990 --> 00:19:41,090
+We realize that it's crucial tracing.
+
+294
+00:19:41,170 --> 00:19:43,830
+This is where the tracing is crucial for observability.
+
+295
+00:19:44,730 --> 00:19:48,330
+And considering ourselves or wanting to be the
+
+296
+00:19:48,400 --> 00:19:51,594
+masters of observability, we started offering it
+
+297
+00:19:51,632 --> 00:19:53,210
+to our own users.
+
+298
+00:19:55,710 --> 00:19:59,274
+So I'd like to move from our
+
+299
+00:19:59,312 --> 00:20:02,846
+own experience to some useful tips on how youre can
+
+300
+00:20:02,868 --> 00:20:06,094
+get started with distributed tracing, both on
+
+301
+00:20:06,132 --> 00:20:10,218
+how to instrument and how to investigate
+
+302
+00:20:10,394 --> 00:20:13,280
+and find common patterns to watch out for.
+
+303
+00:20:14,230 --> 00:20:16,130
+Let's start with the instrumentation.
+
+304
+00:20:17,830 --> 00:20:20,866
+Don't try to instrument every part of your system from
+
+305
+00:20:20,888 --> 00:20:25,386
+day one. If you have even a modest microservices arch,
+
+306
+00:20:25,438 --> 00:20:27,270
+it will be too complex.
+
+307
+00:20:28,010 --> 00:20:32,006
+Prioritize the critical services where you need observability the most
+
+308
+00:20:32,108 --> 00:20:35,990
+and grow the coverage over time. It is very common
+
+309
+00:20:36,140 --> 00:20:40,106
+to start with request endpoints in the front end and then work the
+
+310
+00:20:40,128 --> 00:20:43,606
+way to the back end according to the sequence.
+
+311
+00:20:43,638 --> 00:20:47,382
+But it really depends on your architecture and what's
+
+312
+00:20:47,446 --> 00:20:49,420
+critical in your system.
+
+313
+00:20:51,250 --> 00:20:53,550
+So prioritize your instrumentation.
+
+314
+00:20:54,930 --> 00:20:58,702
+And the next tip on instrumentation is use
+
+315
+00:20:58,836 --> 00:21:01,870
+open telemetry and onto instrumentation.
+
+316
+00:21:03,030 --> 00:21:06,978
+As I said before, open tracing that we used back then
+
+317
+00:21:07,064 --> 00:21:10,642
+was merged into open telemetry. So now open
+
+318
+00:21:10,696 --> 00:21:14,066
+telemetry, or Otel as it's severely called, is the
+
+319
+00:21:14,088 --> 00:21:17,974
+standard. And open telemetry is an
+
+320
+00:21:18,012 --> 00:21:20,370
+observability framework. It providers,
+
+321
+00:21:20,530 --> 00:21:24,198
+libraries, agents, collectors, other components that
+
+322
+00:21:24,204 --> 00:21:27,706
+you need to capture telemetry from
+
+323
+00:21:27,728 --> 00:21:31,386
+your services. And it's not just for traces, it's also
+
+324
+00:21:31,408 --> 00:21:35,414
+for metrics and logs. So all the different telemetry
+
+325
+00:21:35,462 --> 00:21:38,970
+signals are under open telemetry framework.
+
+326
+00:21:39,310 --> 00:21:42,986
+So it generates, it collects, and then
+
+327
+00:21:43,008 --> 00:21:46,670
+you can send it to any backend of your choice you want to monitor with
+
+328
+00:21:46,740 --> 00:21:50,634
+Prometheus, you can send it to Prometheus. You want to use Jaeger or Zipkin
+
+329
+00:21:50,682 --> 00:21:54,954
+or other, it's fine. So it's really agnostic to what backend analytics
+
+330
+00:21:55,002 --> 00:21:59,006
+tool you use. My company, for example, logs IO offers
+
+331
+00:21:59,038 --> 00:22:02,766
+a service that can get open telemetry
+
+332
+00:22:02,798 --> 00:22:07,106
+data from the collector and use it. It really doesn't
+
+333
+00:22:07,138 --> 00:22:11,206
+matter. The most important thing is that you have a single API and
+
+334
+00:22:11,228 --> 00:22:14,994
+a single SDK per language for traces,
+
+335
+00:22:15,122 --> 00:22:18,966
+logs and metrics, and also a unified
+
+336
+00:22:18,998 --> 00:22:22,326
+protocol OTLP that ultimately
+
+337
+00:22:22,358 --> 00:22:26,060
+will become the de facto standard also for transmitting those
+
+338
+00:22:26,590 --> 00:22:30,358
+telemetry. So use open telemetry. And the
+
+339
+00:22:30,384 --> 00:22:33,834
+second tip is on this is use auto instrumentation
+
+340
+00:22:33,882 --> 00:22:39,486
+to ease the coding. You want to do as little coding as possible to
+
+341
+00:22:39,508 --> 00:22:42,560
+get the instrumentation done and you have
+
+342
+00:22:43,110 --> 00:22:46,130
+instrumentation existing for many languages.
+
+343
+00:22:46,630 --> 00:22:50,386
+Java Ruby in fact, I just wrote a blog post on
+
+344
+00:22:50,408 --> 00:22:54,622
+auto instrumented with Ruby. With open telemetry.
+
+345
+00:22:54,686 --> 00:22:58,834
+You're more than welcome to check it out in node js. We also use the
+
+346
+00:22:58,952 --> 00:23:02,918
+auto instrumentation that plugs into the frameworks that we work with
+
+347
+00:23:03,004 --> 00:23:07,074
+like happy and Express. But you have for other languages like for Java,
+
+348
+00:23:07,202 --> 00:23:10,554
+spring and log four j and others.
+
+349
+00:23:10,592 --> 00:23:14,806
+So it's very common and it reduces significantly
+
+350
+00:23:14,838 --> 00:23:18,940
+the amount of coding you need to do in order to generate the span data.
+
+351
+00:23:21,570 --> 00:23:25,070
+Sorry, if you're new to open telemetry or instrumentation,
+
+352
+00:23:25,410 --> 00:23:29,866
+I wrote a quick guide on open telemetry. Just Google Open Telemetry
+
+353
+00:23:29,898 --> 00:23:33,566
+guide or click the URL here on the screen and I think
+
+354
+00:23:33,588 --> 00:23:37,362
+it'd be a very good entry point to understanding how Otel works
+
+355
+00:23:37,416 --> 00:23:40,190
+and getting the links to all the necessary libraries,
+
+356
+00:23:40,270 --> 00:23:43,140
+instrumentation and sdks that you need for your system.
+
+357
+00:23:44,070 --> 00:23:47,726
+So use open telemetry, use open instrumentation. Youre covered
+
+358
+00:23:47,758 --> 00:23:51,720
+on the instrumented side. Now let's move on to tips for
+
+359
+00:23:53,530 --> 00:23:56,950
+investigating performance issues. And the first,
+
+360
+00:23:57,100 --> 00:24:00,854
+seemingly very basic but many people don't use it well
+
+361
+00:24:00,892 --> 00:24:04,922
+enough, is to use the minimum duration filtering to hone in
+
+362
+00:24:04,976 --> 00:24:08,614
+on problematic traces that you need to look into. Youre have a simple filter,
+
+363
+00:24:08,662 --> 00:24:14,654
+you just ask. Please show me only the traces that take longer than 300
+
+364
+00:24:14,692 --> 00:24:18,442
+milliseconds to execute and you see only the problematic
+
+365
+00:24:18,506 --> 00:24:22,366
+ones. You can take it further and implement smart tagging on
+
+366
+00:24:22,388 --> 00:24:25,970
+your spans and then you can also filter by tags
+
+367
+00:24:26,790 --> 00:24:29,858
+or some auto instrumentation agents also
+
+368
+00:24:29,944 --> 00:24:33,506
+add and reach the spans with useful tags that you
+
+369
+00:24:33,528 --> 00:24:37,560
+can filter by. So working with the filters will help you
+
+370
+00:24:37,930 --> 00:24:42,550
+flush out the problematic span traces very easily.
+
+371
+00:24:44,570 --> 00:24:47,966
+Next, combine and correlate
+
+372
+00:24:48,098 --> 00:24:51,354
+traces with logs. Logs together with
+
+373
+00:24:51,392 --> 00:24:55,738
+traces are extremely powerful and logs contain a lot of
+
+374
+00:24:55,824 --> 00:24:59,146
+more context that can augment what you see from those
+
+375
+00:24:59,168 --> 00:25:02,682
+traces. And the best practice is to
+
+376
+00:25:02,816 --> 00:25:06,526
+add the trace id to the logs. Very similar to what
+
+377
+00:25:06,548 --> 00:25:09,646
+we did with the request id. But you don't need to take care
+
+378
+00:25:09,668 --> 00:25:13,246
+of generating and propagating it, you just need to take it and use it
+
+379
+00:25:13,268 --> 00:25:17,134
+in your logs because you have those tracer the instrumentation
+
+380
+00:25:17,182 --> 00:25:20,754
+library that taking care of it the trace id.
+
+381
+00:25:20,792 --> 00:25:24,466
+So just embed the trace id as part of your logs and make it very
+
+382
+00:25:24,488 --> 00:25:28,086
+easy to correlate your logs the traces with
+
+383
+00:25:28,108 --> 00:25:31,606
+the logs and
+
+384
+00:25:31,628 --> 00:25:34,854
+the last advice around investigation is to look
+
+385
+00:25:34,892 --> 00:25:39,210
+for common patterns sorry in your timeline.
+
+386
+00:25:40,190 --> 00:25:43,546
+So this is really the last part of this
+
+387
+00:25:43,568 --> 00:25:47,850
+talk. I would like to look into a few common patterns
+
+388
+00:25:48,350 --> 00:25:51,950
+to look for when inspecting your traces
+
+389
+00:25:52,530 --> 00:25:56,266
+in the timeline view, whether in yeager or any other distributed
+
+390
+00:25:56,298 --> 00:25:59,120
+tracing backend tool.
+
+391
+00:26:01,010 --> 00:26:05,054
+The first one we saw that also from our own case is the staircase
+
+392
+00:26:05,102 --> 00:26:08,814
+pattern which often indicates a sequence of serial
+
+393
+00:26:08,862 --> 00:26:11,934
+calls. When you see this pattern,
+
+394
+00:26:12,062 --> 00:26:15,502
+you are more than likely want to check
+
+395
+00:26:15,656 --> 00:26:18,962
+if it can be paralyzed, something that can run in parallel.
+
+396
+00:26:19,026 --> 00:26:22,646
+Or maybe you can use some bulk queries or joins on a
+
+397
+00:26:22,668 --> 00:26:27,350
+database or something to reduce this sequence
+
+398
+00:26:27,710 --> 00:26:30,810
+invocation and reduce the overall latency.
+
+399
+00:26:32,190 --> 00:26:35,786
+It could be an issue in those implementation in the
+
+400
+00:26:35,808 --> 00:26:39,930
+code. It could be just a matter of misconfiguration like a thread pool configuration.
+
+401
+00:26:40,450 --> 00:26:44,686
+So staircase pattern is very common and
+
+402
+00:26:44,868 --> 00:26:48,126
+easy to resolve, but definitely can take a
+
+403
+00:26:48,148 --> 00:26:50,590
+lot of those latency.
+
+404
+00:26:52,470 --> 00:26:56,786
+Second one is span spike pattern and
+
+405
+00:26:56,808 --> 00:27:00,450
+this is the pattern of long spans, especially ones that vary
+
+406
+00:27:01,030 --> 00:27:04,900
+significantly between executions like the one we saw on our case.
+
+407
+00:27:05,290 --> 00:27:09,654
+And this may indicate either slow queries or
+
+408
+00:27:09,772 --> 00:27:13,480
+caching issues as weve in our case or similar issues.
+
+409
+00:27:15,930 --> 00:27:19,514
+It also helps to focus where you
+
+410
+00:27:19,552 --> 00:27:22,634
+want to put your investigation and efforts into.
+
+411
+00:27:22,752 --> 00:27:26,262
+So when you go about investigating,
+
+412
+00:27:26,326 --> 00:27:30,826
+you want to inspect and optimize the longest span on the critical path
+
+413
+00:27:31,018 --> 00:27:34,206
+and reducing this is likely to
+
+414
+00:27:34,228 --> 00:27:37,386
+produce the largest benefit on the overall request
+
+415
+00:27:37,418 --> 00:27:41,406
+latency. So this pattern also helped focusing the
+
+416
+00:27:41,428 --> 00:27:45,502
+efforts on where you'll see the most benefits in optimizing
+
+417
+00:27:45,646 --> 00:27:49,394
+latency. The next
+
+418
+00:27:49,432 --> 00:27:53,426
+pattern is gap between spans and
+
+419
+00:27:53,448 --> 00:27:56,520
+such a gap can indicate, like you can see here on those screen,
+
+420
+00:27:57,290 --> 00:28:00,390
+slow interservice communication
+
+421
+00:28:01,530 --> 00:28:05,062
+that contributes to the latency. Or it can also be
+
+422
+00:28:05,116 --> 00:28:09,020
+a service missing instrumentation. For example, it could be that
+
+423
+00:28:09,870 --> 00:28:13,382
+you send a query to the database, but the database driver
+
+424
+00:28:13,446 --> 00:28:16,522
+is not instrumented. So in
+
+425
+00:28:16,576 --> 00:28:20,346
+such a case you may want to go ahead and instrument
+
+426
+00:28:20,378 --> 00:28:23,802
+the database driver to get more instrumentation.
+
+427
+00:28:23,946 --> 00:28:27,342
+By the way, it's very interesting actually just this
+
+428
+00:28:27,396 --> 00:28:30,670
+month, a couple of weeks ago, only Google
+
+429
+00:28:30,740 --> 00:28:33,934
+contributed SQL commenter open
+
+430
+00:28:33,972 --> 00:28:38,406
+youre to open telemetry. So now within open telemetry
+
+431
+00:28:38,458 --> 00:28:41,602
+there's now an open youre piece
+
+432
+00:28:41,736 --> 00:28:45,140
+that can automatically generate application
+
+433
+00:28:46,490 --> 00:28:50,390
+driven metadata to enrich the
+
+434
+00:28:50,540 --> 00:28:54,360
+queries so that you can correlate database queries to application
+
+435
+00:28:54,970 --> 00:28:58,426
+logic much easier. So check it
+
+436
+00:28:58,448 --> 00:29:02,410
+out. The next pattern is spans
+
+437
+00:29:03,070 --> 00:29:06,940
+finishing at the same time like you can see here on the screen.
+
+438
+00:29:07,310 --> 00:29:10,486
+And this may indicate connectivity issue that is
+
+439
+00:29:10,528 --> 00:29:14,122
+causing timeouts or errors or some other artificial
+
+440
+00:29:14,186 --> 00:29:16,720
+constraint like locking issues.
+
+441
+00:29:17,490 --> 00:29:21,114
+Several requests waiting on a specific lock, and once the lock is released,
+
+442
+00:29:21,162 --> 00:29:24,858
+then all of them finish quickly. So in
+
+443
+00:29:24,884 --> 00:29:29,022
+this case we may want to tune the timeout parameter or investigate
+
+444
+00:29:29,086 --> 00:29:33,106
+why things are taking longer than the timeout that you
+
+445
+00:29:33,128 --> 00:29:35,380
+expected them to take or things like that.
+
+446
+00:29:37,450 --> 00:29:41,174
+Another important note here about instrumentation is that when you
+
+447
+00:29:41,212 --> 00:29:45,670
+see such cases, it may also call
+
+448
+00:29:45,740 --> 00:29:49,618
+for enhancing those instrumentation around the shared resources. So if it is
+
+449
+00:29:49,724 --> 00:29:53,146
+indeed a lock or, I don't know, call to a database or
+
+450
+00:29:53,168 --> 00:29:56,730
+something like that, you may want to increase the instrumentation there
+
+451
+00:29:56,800 --> 00:30:00,150
+to get better observability into what's happening
+
+452
+00:30:00,240 --> 00:30:03,870
+there and also what prevents those execution.
+
+453
+00:30:05,810 --> 00:30:09,326
+So that was
+
+454
+00:30:09,348 --> 00:30:12,880
+the last pattern. And just to summarize what weve seen,
+
+455
+00:30:14,230 --> 00:30:18,146
+distributed tracing for us was the
+
+456
+00:30:18,328 --> 00:30:22,018
+missing piece in our puzzle for battling performance issues
+
+457
+00:30:22,104 --> 00:30:26,382
+and for observability in general. And if you operate
+
+458
+00:30:26,526 --> 00:30:30,802
+microservices and cloud native system, you are more than likely
+
+459
+00:30:30,946 --> 00:30:35,126
+can benefit from it too. If you're looking into
+
+460
+00:30:35,228 --> 00:30:39,446
+how to go about it, then Yeager is a great open source option
+
+461
+00:30:39,628 --> 00:30:43,290
+for the tracing analytics backend and
+
+462
+00:30:43,360 --> 00:30:46,906
+for instrumented. Highly recommended to go with
+
+463
+00:30:46,928 --> 00:30:50,870
+those open telemetry. That's those future proofed path
+
+464
+00:30:51,030 --> 00:30:54,366
+standard way for instrumentation, by the way,
+
+465
+00:30:54,388 --> 00:30:57,690
+not just for tracing as I said, also for logs and metrics.
+
+466
+00:30:57,770 --> 00:31:01,294
+So definitely look into that and explore as much
+
+467
+00:31:01,332 --> 00:31:05,630
+as possible auto instrumentation to make your instrumentation
+
+468
+00:31:05,710 --> 00:31:08,100
+as smooth and easy as possible.
+
+469
+00:31:08,710 --> 00:31:12,786
+So try and enjoy. If you have any questions
+
+470
+00:31:12,888 --> 00:31:16,434
+or comments, do feel free to reach
+
+471
+00:31:16,472 --> 00:31:19,880
+out to me here on the chat Q and A.
+
+472
+00:31:20,810 --> 00:31:25,026
+Whichever, you can, just reach out to me on Twitter Dotan horovits
+
+473
+00:31:25,058 --> 00:31:29,126
+H-O-R-O-V-I-T-S whichever way I'd be youre than happy to
+
+474
+00:31:29,228 --> 00:31:33,186
+answer questions, hear comments, and get your feedback
+
+475
+00:31:33,218 --> 00:31:37,346
+and your experience about this. I'm Dotan Horovits
+
+476
+00:31:37,378 --> 00:31:38,930
+and thank you very much for listening.
+

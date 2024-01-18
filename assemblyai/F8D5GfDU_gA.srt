@@ -1,0 +1,1416 @@
+1
+00:00:00,250 --> 00:00:01,630
+Are you an SRE,
+
+2
+00:00:03,570 --> 00:00:07,358
+a developer, a quality
+
+3
+00:00:07,444 --> 00:00:11,162
+engineer who wants to tackle the challenge of improving reliability
+
+4
+00:00:11,226 --> 00:00:14,970
+in your DevOps? You can enable your developers for reliability
+
+5
+00:00:15,050 --> 00:00:19,114
+with chaos native. Create your free account at Chaos
+
+6
+00:00:19,162 --> 00:01:17,654
+native. Litmus Cloud hello,
+
+7
+00:01:17,772 --> 00:01:21,362
+welcome to conf 42 site reliability engineering
+
+8
+00:01:21,426 --> 00:01:25,634
+Edition. My name is Ricardo Castro and I'm a senior site reliability engineer
+
+9
+00:01:25,682 --> 00:01:29,830
+at Farfetch. And today we're going to talk a little bit about Gitops.
+
+10
+00:01:30,330 --> 00:01:33,894
+So what we'll be covering today, we're going to cover what Gitops
+
+11
+00:01:33,942 --> 00:01:37,002
+is, some of the things that Gitops can do for us.
+
+12
+00:01:37,136 --> 00:01:40,390
+We're going to see Gitops implementation in terms of software
+
+13
+00:01:40,470 --> 00:01:44,670
+agents focused on delivery of applications to Kubernetes agents.
+
+14
+00:01:44,820 --> 00:01:48,042
+We're going to see a demo of one of those agents in practice
+
+15
+00:01:48,106 --> 00:01:51,280
+and if we have some time we're going to see some access.
+
+16
+00:01:52,210 --> 00:01:56,640
+So let us start with the story. It is a beautiful day.
+
+17
+00:01:57,010 --> 00:02:00,478
+I decided to do a change on our production environment so it's
+
+18
+00:02:00,494 --> 00:02:03,826
+a little bit tricky. So as usual I submit my
+
+19
+00:02:03,848 --> 00:02:07,334
+pull request and my colleague Joe decides to take a look and see
+
+20
+00:02:07,372 --> 00:02:10,120
+if everything is supposed to work okay.
+
+21
+00:02:10,730 --> 00:02:14,342
+He looks in attentively, he looks around, seems fine.
+
+22
+00:02:14,396 --> 00:02:18,460
+So everything's good, right? We click enter
+
+23
+00:02:19,310 --> 00:02:22,870
+some pipeline triggers and all hell broke loose.
+
+24
+00:02:22,950 --> 00:02:26,902
+So we had a Kubernetes cluster that suddenly
+
+25
+00:02:27,046 --> 00:02:30,554
+disappeared. So at this point this is us,
+
+26
+00:02:30,592 --> 00:02:34,266
+right? So we had some production cluster that suddenly vanished.
+
+27
+00:02:34,298 --> 00:02:37,626
+We had applications running there. We have clients that are already complaining
+
+28
+00:02:37,658 --> 00:02:40,766
+whats can't access our services. So we're in the
+
+29
+00:02:40,788 --> 00:02:44,094
+midst of a big confusion. Of course this
+
+30
+00:02:44,132 --> 00:02:47,826
+story has a second part, so thankfully we
+
+31
+00:02:47,848 --> 00:02:51,026
+have everything in terraform. So we just need to relaunch the cluster and we're back
+
+32
+00:02:51,048 --> 00:02:54,590
+to square one, right? So cool, we relaunched the cluster.
+
+33
+00:02:54,750 --> 00:02:57,986
+So now we need to get that part that we need to figure out.
+
+34
+00:02:58,008 --> 00:03:01,366
+So we launched the cluster. So we need somehow to deploy our
+
+35
+00:03:01,388 --> 00:03:04,486
+applications and configure everything in there. But because we
+
+36
+00:03:04,508 --> 00:03:08,390
+have a pipeline for mostly everything, we just need to trigger those pipelines.
+
+37
+00:03:09,050 --> 00:03:12,730
+Long story short, we started uncovering some
+
+38
+00:03:12,800 --> 00:03:16,186
+things that weren't supposed to be like that. So we have a pipeline that
+
+39
+00:03:16,208 --> 00:03:20,522
+was deactivated. We have no idea why. So we need to go into tasks
+
+40
+00:03:20,576 --> 00:03:24,506
+with a particular team to find out why was that. Also we
+
+41
+00:03:24,528 --> 00:03:28,606
+have another pipeline that said it was successful but the application
+
+42
+00:03:28,788 --> 00:03:32,160
+actually doesn't work. So we don't have any idea. So we need to talk
+
+43
+00:03:33,090 --> 00:03:36,418
+to a specific team. Someone suddenly remembers that there were
+
+44
+00:03:36,424 --> 00:03:39,954
+some manual changes that were done there that were needed for the application
+
+45
+00:03:40,152 --> 00:03:43,522
+to actually work. So yeah, long story short,
+
+46
+00:03:43,576 --> 00:03:47,302
+the idea is that everything wasn't fine, so we had
+
+47
+00:03:47,436 --> 00:03:50,662
+infrastructure as code, but there were some pieces here that actually
+
+48
+00:03:50,716 --> 00:03:54,934
+didn't fit our motto. So what
+
+49
+00:03:54,972 --> 00:03:58,642
+is Gitops and how will it help us in these kinds of situations?
+
+50
+00:03:58,706 --> 00:04:02,406
+So the idea for Gitops is whats the entire system is described,
+
+51
+00:04:02,438 --> 00:04:05,850
+declarative. What does this mean? So Kubernetes is just
+
+52
+00:04:05,920 --> 00:04:10,262
+one example of many modern cloud native tools that are declarative
+
+53
+00:04:10,406 --> 00:04:14,090
+and treat everything as code. So declarative
+
+54
+00:04:14,170 --> 00:04:18,206
+means that the configuration is guaranteed by a set of facts instead of
+
+55
+00:04:18,228 --> 00:04:21,406
+a set of instructions. So this means that instead of
+
+56
+00:04:21,428 --> 00:04:24,738
+me saying that launch this server, put this package here,
+
+57
+00:04:24,824 --> 00:04:27,300
+start this service, I just declare state.
+
+58
+00:04:28,550 --> 00:04:32,046
+And because we have everything declared in Git, we have a single source
+
+59
+00:04:32,078 --> 00:04:35,586
+of truth. So our apps can easily be deployed and roll back
+
+60
+00:04:35,608 --> 00:04:39,366
+to and from a Kubernetes cluster. And even more importantly, when we
+
+61
+00:04:39,388 --> 00:04:43,478
+have a disaster like the one that we just described, our cluster infrastructure can
+
+62
+00:04:43,564 --> 00:04:47,110
+also be independently deployed and quickly
+
+63
+00:04:47,180 --> 00:04:51,094
+reproduced. Another advantage of Gitops is that the
+
+64
+00:04:51,132 --> 00:04:54,870
+canonical desired state of the system is version in git.
+
+65
+00:04:55,030 --> 00:04:58,410
+With the declaration of our system stored in a version control system
+
+66
+00:04:58,480 --> 00:05:02,714
+and serving as our canonical source of truth, we have a single source
+
+67
+00:05:02,842 --> 00:05:06,826
+from which everything is derived and driven. This trivializes
+
+68
+00:05:06,858 --> 00:05:10,490
+rollbacks. We can use Git revert to go back to a previous
+
+69
+00:05:10,570 --> 00:05:14,842
+application state, and because of Git's excellent security guarantees,
+
+70
+00:05:14,906 --> 00:05:18,562
+we can also use SSH Git to sign commits and enforce strong
+
+71
+00:05:18,616 --> 00:05:21,906
+security guarantees about the authorship and provenance of
+
+72
+00:05:21,928 --> 00:05:25,454
+our code. Also, approved changes can be automatically
+
+73
+00:05:25,502 --> 00:05:29,202
+applied to the system. So once we have a state declared
+
+74
+00:05:29,266 --> 00:05:32,806
+and kept in git, the next step is to allow those changes
+
+75
+00:05:32,988 --> 00:05:36,274
+to be automatically applied to the system. What's significant
+
+76
+00:05:36,322 --> 00:05:40,106
+about this is that we don't need cluster credentials to make a change with
+
+77
+00:05:40,128 --> 00:05:43,882
+Gitops, we can have specific agents that looks and
+
+78
+00:05:43,936 --> 00:05:47,514
+interprets a desired state and knows what to do in that
+
+79
+00:05:47,552 --> 00:05:51,882
+particular system. And those are those
+
+80
+00:05:51,936 --> 00:05:55,850
+software agents. Whats will ensure the correctness and alert on divergence.
+
+81
+00:05:56,210 --> 00:05:59,406
+Once the state of our system is kept under version control,
+
+82
+00:05:59,508 --> 00:06:03,058
+those software agents can inform us whenever the reality that
+
+83
+00:06:03,064 --> 00:06:05,970
+is described doesn't match the operations.
+
+84
+00:06:07,990 --> 00:06:11,874
+Those agents can alert us on something like slack and then
+
+85
+00:06:11,912 --> 00:06:15,060
+go the extra mile of actually reconciling the state.
+
+86
+00:06:15,830 --> 00:06:19,686
+So on a day to day basis, what can Gitops do for us so
+
+87
+00:06:19,708 --> 00:06:22,966
+it can increase productivity. So continuous deployments, automation with
+
+88
+00:06:22,988 --> 00:06:26,706
+an integrated feedback control loop, speed ups time to deployment.
+
+89
+00:06:26,818 --> 00:06:30,106
+This means that our teams can ship a lot lot faster and
+
+90
+00:06:30,128 --> 00:06:33,798
+more and more changes and increases our overall output
+
+91
+00:06:33,974 --> 00:06:37,686
+for several times. Also, we have an enhanced
+
+92
+00:06:37,798 --> 00:06:41,230
+developer experience, so we push code, not containers.
+
+93
+00:06:41,810 --> 00:06:46,026
+Developers can use familiar tools like git to manage updates
+
+94
+00:06:46,138 --> 00:06:49,374
+and features to Kubernetes clusters more rapidly and without
+
+95
+00:06:49,492 --> 00:06:51,994
+having to know the internals of kubernetes,
+
+96
+00:06:52,122 --> 00:06:56,062
+so newly onboarded developers can get up to speed
+
+97
+00:06:56,126 --> 00:07:00,414
+and be productive within days instead of months. We also gain
+
+98
+00:07:00,462 --> 00:07:04,114
+improved stability when we use git workflows to manage our
+
+99
+00:07:04,152 --> 00:07:07,314
+clusters, we automatically gain a convenient way to
+
+100
+00:07:07,352 --> 00:07:11,266
+have audit logs of all the changes that were applied to a Kubernetes cluster.
+
+101
+00:07:11,378 --> 00:07:14,534
+An audit trail of who did what and when to
+
+102
+00:07:14,572 --> 00:07:19,050
+a cluster can be used to meet compliance requirements.
+
+103
+00:07:19,470 --> 00:07:23,110
+We also gain higher reliability. So with git
+
+104
+00:07:23,270 --> 00:07:26,150
+capability to revert or roll back or even fork,
+
+105
+00:07:26,230 --> 00:07:29,366
+we gain stable and reproducible rollbacks.
+
+106
+00:07:29,478 --> 00:07:33,118
+Because our entire system is versioned in git, we have a
+
+107
+00:07:33,124 --> 00:07:37,018
+single source of truth from which to recover after a meltdown,
+
+108
+00:07:37,194 --> 00:07:40,682
+and that reduces our meantime to recover. We also gain
+
+109
+00:07:40,746 --> 00:07:44,146
+consistency and standardization. This means that because
+
+110
+00:07:44,248 --> 00:07:47,742
+Gitops provides one model for making infrastructure
+
+111
+00:07:47,806 --> 00:07:51,470
+changes, apps and Kubernetes add ons, we have a consistent
+
+112
+00:07:51,550 --> 00:07:54,686
+end to end workflow for the entire organization.
+
+113
+00:07:54,878 --> 00:07:58,674
+Not only are our continuous integration and continuous deployments pipelines
+
+114
+00:07:58,722 --> 00:08:02,454
+all driven by pull requests, but our operation tasks also are
+
+115
+00:08:02,492 --> 00:08:06,806
+fully reproducible through Git. We also gain strong security
+
+116
+00:08:06,908 --> 00:08:10,982
+guarantees, so git strong correctness and security guarantees
+
+117
+00:08:11,046 --> 00:08:14,586
+backed by the strong cryptography used to track and manage changes,
+
+118
+00:08:14,688 --> 00:08:18,426
+as well as the ability to sign those changes to prove authorship and
+
+119
+00:08:18,448 --> 00:08:21,994
+the origin is key to a secure definition of the desired state
+
+120
+00:08:22,112 --> 00:08:25,514
+of the cluster. And of course, with all of this we gain easier
+
+121
+00:08:25,562 --> 00:08:29,086
+compliance and auditing. Since changes are tracked and logged in
+
+122
+00:08:29,108 --> 00:08:32,586
+a secure manner, compliance and auditing are made trivial.
+
+123
+00:08:32,698 --> 00:08:36,146
+We can use tools like Kubediv, teradif or ansible diff to
+
+124
+00:08:36,168 --> 00:08:39,394
+alert that something isn't actually the state
+
+125
+00:08:39,432 --> 00:08:43,682
+that is described in git. And then agents can go the extra step and actually
+
+126
+00:08:43,816 --> 00:08:47,558
+apply those changes. So now that we are going to focus a
+
+127
+00:08:47,564 --> 00:08:51,282
+little bit on the delivery of software agents to Kubernetes
+
+128
+00:08:51,346 --> 00:08:54,966
+clusters, what do those agents need to have to
+
+129
+00:08:54,988 --> 00:08:58,678
+actually work? So they need to be declarative, so they need to actually
+
+130
+00:08:58,764 --> 00:09:02,166
+find a git repository and understand some syntax
+
+131
+00:09:02,198 --> 00:09:05,862
+that is there that describes state. They also need to have to operate
+
+132
+00:09:05,926 --> 00:09:09,254
+automated, so whenever they see a change on a Kubernetes
+
+133
+00:09:09,302 --> 00:09:12,714
+cluster, they can alert on the change. But we need to actually have a way
+
+134
+00:09:12,752 --> 00:09:16,138
+to, if we want to make them apply those changes automatically,
+
+135
+00:09:16,234 --> 00:09:19,582
+they also need to be auditable so we need to have a way
+
+136
+00:09:19,636 --> 00:09:24,314
+to actually track what changes were applied to the Kubernetes and then trace
+
+137
+00:09:24,362 --> 00:09:27,778
+that back to the changes that were in git. For our particular use case.
+
+138
+00:09:27,864 --> 00:09:31,138
+We needed to be designed for Kubernetes because that's where we
+
+139
+00:09:31,144 --> 00:09:34,862
+are going to focus on. Also, it needs to have out of the box integrations.
+
+140
+00:09:34,926 --> 00:09:38,018
+We don't want to be reinventing the wheel every time we want to
+
+141
+00:09:38,024 --> 00:09:41,586
+do something, but of course we all have specific use cases
+
+142
+00:09:41,618 --> 00:09:45,382
+on our infrastructure, so those tools need to provide a way for us to actually
+
+143
+00:09:45,436 --> 00:09:49,030
+add our custom things particular to our infrastructure.
+
+144
+00:09:49,190 --> 00:09:52,934
+So one of the first tools for Gitops continuous
+
+145
+00:09:52,982 --> 00:09:56,394
+deployments tools is flux. So Flux was
+
+146
+00:09:56,432 --> 00:10:00,438
+developed by the company that coined the term Gitops, which is webworks. And Flux
+
+147
+00:10:00,534 --> 00:10:04,106
+is a tool for keeping Kubernetes clusters in sync with sources of
+
+148
+00:10:04,128 --> 00:10:07,722
+configuration, like git for example, and automatically updates
+
+149
+00:10:07,786 --> 00:10:11,230
+configurations when there is a new code to deploy. So basically
+
+150
+00:10:11,380 --> 00:10:15,050
+Flux will be looking at one or more git repositories.
+
+151
+00:10:15,130 --> 00:10:18,594
+It whats a particular syntax that it knows how to interpret, and then it will
+
+152
+00:10:18,632 --> 00:10:21,730
+know how to interact with the Kubernetes API to make deployments.
+
+153
+00:10:22,150 --> 00:10:26,482
+Flux knows how to interact with both customize
+
+154
+00:10:26,546 --> 00:10:30,646
+and helm, so we can use our usual workflows to actually manage
+
+155
+00:10:30,828 --> 00:10:34,646
+that kind of workflows. Another tool that
+
+156
+00:10:34,668 --> 00:10:38,390
+is gaining a lot of traction recently is Argo, and Argo is
+
+157
+00:10:38,460 --> 00:10:41,558
+a declarative Gitops continuous delivery tool for Kubernetes.
+
+158
+00:10:41,654 --> 00:10:45,226
+So on a very high level it works similarly to the
+
+159
+00:10:45,248 --> 00:10:48,634
+way that Flux works. So it knows how to look to one or
+
+160
+00:10:48,672 --> 00:10:52,986
+more git repositories and then knows how to interact with the Kubernetes cluster
+
+161
+00:10:53,018 --> 00:10:56,618
+to actually make those changes in a git repository a reality.
+
+162
+00:10:56,714 --> 00:11:01,726
+It also has support for
+
+163
+00:11:01,748 --> 00:11:05,262
+both helm and customize, and it has a lot of
+
+164
+00:11:05,316 --> 00:11:08,914
+other features that Flux doesn't have, things like it has a nice
+
+165
+00:11:08,952 --> 00:11:12,402
+UI and has a lot of more integrations that it comes out of the box
+
+166
+00:11:12,456 --> 00:11:15,922
+with. And last but not least, we have Jenkins.
+
+167
+00:11:15,986 --> 00:11:19,394
+So Jenkins has had a bad rep for several
+
+168
+00:11:19,442 --> 00:11:23,458
+years, and Jenkins X is the next evolution
+
+169
+00:11:23,634 --> 00:11:27,286
+of Jenkins, which was built with cloud
+
+170
+00:11:27,388 --> 00:11:30,918
+in mind and with a Gitops approach. So it's essentially
+
+171
+00:11:31,014 --> 00:11:34,870
+a pipelines automation built with GitHub, built on top of Gitops
+
+172
+00:11:34,950 --> 00:11:39,020
+and previews environments to help teams collaborate and accelerate their
+
+173
+00:11:39,550 --> 00:11:42,922
+software delivery at any scale. So again, on a very high level,
+
+174
+00:11:42,976 --> 00:11:46,686
+it works very similarly to the other two tools that we've just seen.
+
+175
+00:11:46,788 --> 00:11:50,654
+So it knows how to look to a git Repository, knows how to interpret those
+
+176
+00:11:50,692 --> 00:11:54,894
+changes and then knows how to apply those changes to
+
+177
+00:11:54,932 --> 00:11:57,700
+a Kubernetes cluster. So on a very high level,
+
+178
+00:11:58,470 --> 00:12:01,854
+these are just three tools that we can use to quickly get up to speed
+
+179
+00:12:01,902 --> 00:12:05,694
+on a Gitops automation workflow to deliver applications to Kubernetes
+
+180
+00:12:05,742 --> 00:12:09,350
+cluster. So how would Gitops pipeline work?
+
+181
+00:12:09,420 --> 00:12:13,366
+So imagine we have a sample application, we do some
+
+182
+00:12:13,388 --> 00:12:17,458
+changes, we do a pr, someone reviews that code and merges the request.
+
+183
+00:12:17,634 --> 00:12:21,558
+Some pipelines will actually see that change will produce
+
+184
+00:12:21,734 --> 00:12:25,094
+container image and will put that on a container registry.
+
+185
+00:12:25,222 --> 00:12:29,094
+Then some tool that could be running inside the Kubernetes
+
+186
+00:12:29,142 --> 00:12:33,126
+cluster or outside will automatically do a commit into a git
+
+187
+00:12:33,158 --> 00:12:36,846
+repository with whats particular can saying that there is
+
+188
+00:12:36,868 --> 00:12:39,966
+a new version to be deployed and then some agent that
+
+189
+00:12:39,988 --> 00:12:43,530
+will run inside a Kubernetes cluster will pick up that change eventually
+
+190
+00:12:43,610 --> 00:12:46,866
+and know okay, so now I have a new application to deploy. I know what
+
+191
+00:12:46,888 --> 00:12:51,358
+to do. The version is x. So I'm going to deploy this application automatically.
+
+192
+00:12:51,454 --> 00:12:54,834
+So let's see some of this in practice with
+
+193
+00:12:54,872 --> 00:12:58,438
+a demo. So we're going to be using a
+
+194
+00:12:58,444 --> 00:13:02,054
+git repository that has a sample application. We're going to do a quick
+
+195
+00:13:02,092 --> 00:13:05,782
+overview of what's inside, what this tool
+
+196
+00:13:05,836 --> 00:13:09,046
+will be using. So we're going to use flux to deploy
+
+197
+00:13:09,078 --> 00:13:12,970
+an application called pod info. So it is an application that is
+
+198
+00:13:13,040 --> 00:13:16,282
+widely available on the Internet. That application
+
+199
+00:13:16,416 --> 00:13:20,342
+has customized files to actually deploy
+
+200
+00:13:20,406 --> 00:13:24,154
+applications and we're going to make use of that. So inside flux
+
+201
+00:13:24,202 --> 00:13:28,238
+there's one component called the customized controller that we are going to use
+
+202
+00:13:28,404 --> 00:13:32,254
+that is going to be used to actually look at these customizations and
+
+203
+00:13:32,292 --> 00:13:36,558
+know what to do with them. So let's start by creating a cluster
+
+204
+00:13:36,734 --> 00:13:39,940
+that is going to be used to deploy our service.
+
+205
+00:13:40,390 --> 00:13:44,018
+So this just creates a Kubernetes cluster that's going to
+
+206
+00:13:44,024 --> 00:13:47,478
+be run locally and is using K actually deploy that application
+
+207
+00:13:47,564 --> 00:13:51,010
+to be the deployment of that cluster.
+
+208
+00:13:51,090 --> 00:13:54,774
+So it's just going to take a few seconds. So should
+
+209
+00:13:54,812 --> 00:13:58,870
+be running. Now we're just going to get the kubeconfig.
+
+210
+00:13:59,370 --> 00:14:02,746
+So if we do Kubectl get nodes, we should
+
+211
+00:14:02,768 --> 00:14:06,666
+have a Kubernetes cluster running. Okay, so we're almost there.
+
+212
+00:14:06,848 --> 00:14:09,580
+In a few minutes we should have everything up and running.
+
+213
+00:14:11,070 --> 00:14:14,522
+So next we're going to export a few variables
+
+214
+00:14:14,586 --> 00:14:17,994
+just to have access to our cluster.
+
+215
+00:14:18,122 --> 00:14:21,918
+I have done that already. So we're going to start and see all of
+
+216
+00:14:21,924 --> 00:14:25,634
+this in action. So this first command, what it will
+
+217
+00:14:25,672 --> 00:14:29,582
+do is that it will deploy the flux agent to the cluster.
+
+218
+00:14:29,646 --> 00:14:32,834
+It will tasks those variables so that the flux agent
+
+219
+00:14:32,952 --> 00:14:36,466
+can actually find the
+
+220
+00:14:36,488 --> 00:14:39,474
+code and know what to do. So we're telling Flux to look at the master
+
+221
+00:14:39,522 --> 00:14:43,586
+branch to a folder called staging cluster and that's
+
+222
+00:14:43,618 --> 00:14:47,202
+it. So before we deploy that, let's see what exists
+
+223
+00:14:47,266 --> 00:14:50,858
+inside this staging cluster. So inside this folder we have
+
+224
+00:14:50,864 --> 00:14:54,346
+a few files. This folder here is just something that Fluxus uses to
+
+225
+00:14:54,368 --> 00:14:58,394
+store some state if it requires. So let's start by seeing
+
+226
+00:14:58,432 --> 00:15:02,426
+what this web app source is. So inside web
+
+227
+00:15:02,448 --> 00:15:05,690
+app source we are declaring something that is called a git repository.
+
+228
+00:15:05,770 --> 00:15:09,402
+And we are pointing to a git repository in GitHub,
+
+229
+00:15:09,466 --> 00:15:12,250
+which is the application that we've just seen that we are going to deploy.
+
+230
+00:15:12,330 --> 00:15:15,722
+So we're just telling flux that there is a git repository,
+
+231
+00:15:15,786 --> 00:15:19,154
+that it is at this location. Next we have
+
+232
+00:15:19,192 --> 00:15:22,610
+something called web app common. So it makes sense that we look at this first.
+
+233
+00:15:22,680 --> 00:15:26,450
+So here we're declaring that we have a customization so that flux can
+
+234
+00:15:26,520 --> 00:15:30,898
+look at it. And we're saying that it will use that git repository.
+
+235
+00:15:31,074 --> 00:15:34,674
+And inside that git repository it should look at deploy
+
+236
+00:15:34,722 --> 00:15:38,018
+web app common. So let's go at that repository and see what we have.
+
+237
+00:15:38,124 --> 00:15:41,946
+Deploy web app common. So if
+
+238
+00:15:41,968 --> 00:15:45,734
+we come here we start to see that we have normal
+
+239
+00:15:45,862 --> 00:15:49,386
+Kubernetes files. So here
+
+240
+00:15:49,408 --> 00:15:53,322
+we have the declaration of a namespace, here we have a declaration of a service
+
+241
+00:15:53,376 --> 00:15:57,098
+account and so forth. If we go back and look at the other files,
+
+242
+00:15:57,194 --> 00:16:00,622
+we see that we have something here called back end. So inside
+
+243
+00:16:00,676 --> 00:16:04,410
+the back end we once again have a customization.
+
+244
+00:16:04,570 --> 00:16:07,518
+We're again pointing at this repository,
+
+245
+00:16:07,614 --> 00:16:10,866
+but now we're looking at a different folder. One curious thing
+
+246
+00:16:10,888 --> 00:16:14,402
+to look here at here is that we can specify a depends on.
+
+247
+00:16:14,456 --> 00:16:18,354
+So we're saying that we just want to deploy this customization once web
+
+248
+00:16:18,392 --> 00:16:21,622
+app common actually has already finished doing it.
+
+249
+00:16:21,676 --> 00:16:24,994
+So if we go here inside web app, we go into backend,
+
+250
+00:16:25,042 --> 00:16:28,322
+and here we see that we have regular
+
+251
+00:16:28,466 --> 00:16:31,702
+kubernetes manifests. So if we look at here we have a deployment,
+
+252
+00:16:31,766 --> 00:16:35,606
+it's going to deploy a specific application. We have here the container
+
+253
+00:16:35,638 --> 00:16:40,166
+image that we want and a bunch of other applications. And as expected,
+
+254
+00:16:40,358 --> 00:16:43,534
+we have here a web app front end and that web app front end,
+
+255
+00:16:43,572 --> 00:16:47,226
+exactly the same thing. Looking at the specific git repository,
+
+256
+00:16:47,338 --> 00:16:50,634
+it is looking at the front end folder.
+
+257
+00:16:50,682 --> 00:16:54,494
+And at that front end folder we have something called depends on. And this one
+
+258
+00:16:54,532 --> 00:16:58,034
+depends on the back end. Again, just very quickly we
+
+259
+00:16:58,072 --> 00:17:01,262
+look at front end and again same thing, a deployment,
+
+260
+00:17:01,406 --> 00:17:04,578
+horizontal polytoscaler and a service so let's see all
+
+261
+00:17:04,584 --> 00:17:08,610
+of this in practice. So here we're going to bootstrap
+
+262
+00:17:08,770 --> 00:17:12,946
+flux. Here we go. So flux is connecting to GitLab,
+
+263
+00:17:13,138 --> 00:17:17,046
+it has already cloned the repository, it's installing components in
+
+264
+00:17:17,148 --> 00:17:21,174
+flux namespace. So because we didn't say what components, whats we
+
+265
+00:17:21,212 --> 00:17:24,874
+want, it's going to basically install all of those. So it's going to install
+
+266
+00:17:24,992 --> 00:17:28,646
+the source controller which is a component that actually pulls git repository
+
+267
+00:17:28,678 --> 00:17:32,570
+and see if there are changes. And then we have other components like the helm
+
+268
+00:17:32,650 --> 00:17:36,030
+controller, the customized controller and the notification controller.
+
+269
+00:17:36,690 --> 00:17:40,026
+The only one that is being to be used is the customized controller because it's
+
+270
+00:17:40,058 --> 00:17:43,114
+the one that understands what is inside
+
+271
+00:17:43,252 --> 00:17:47,854
+that brigitte repository. So we're going to watch for customizations,
+
+272
+00:17:47,982 --> 00:17:51,570
+we're going to watch for the logs for that particular component
+
+273
+00:17:51,990 --> 00:17:55,554
+and we're going to see applications just showing up. So here
+
+274
+00:17:55,592 --> 00:17:59,574
+we can see that at this point we don't have anything yet,
+
+275
+00:17:59,692 --> 00:18:03,094
+but Flux has already recognized that it needs to deploy something called web
+
+276
+00:18:03,132 --> 00:18:06,194
+app common, web app backend and webex frontend.
+
+277
+00:18:06,322 --> 00:18:10,826
+And as we see it has already been
+
+278
+00:18:10,848 --> 00:18:14,186
+done with the web app common. If we remember the web app
+
+279
+00:18:14,208 --> 00:18:17,978
+common was creating a namespace, was creating a
+
+280
+00:18:17,984 --> 00:18:21,414
+service account. Next it passes to the next component
+
+281
+00:18:21,462 --> 00:18:24,906
+which is web app back end. We can see here that the reconciliation
+
+282
+00:18:24,938 --> 00:18:28,922
+is in process and here we can see the log that it actually is applying.
+
+283
+00:18:29,066 --> 00:18:33,006
+Eventually it finished, the back end is actually deployed and
+
+284
+00:18:33,028 --> 00:18:36,450
+then it will start in a few seconds. The front end again,
+
+285
+00:18:36,520 --> 00:18:40,306
+the same thing being the same thing doing the reconciliation. We can
+
+286
+00:18:40,328 --> 00:18:43,858
+see that it's already trying to apply front end
+
+287
+00:18:43,944 --> 00:18:46,774
+and front end application. It's almost up,
+
+288
+00:18:46,972 --> 00:18:51,158
+should take just a few seconds to be up and it is already
+
+289
+00:18:51,244 --> 00:18:55,640
+up. So if we do here a port forward
+
+290
+00:18:56,250 --> 00:18:59,594
+and we go to our browser, we can see that we
+
+291
+00:18:59,632 --> 00:19:03,338
+actually have our applications, we see that it is working,
+
+292
+00:19:03,504 --> 00:19:06,986
+it has a metrics endpoint, we can see
+
+293
+00:19:07,008 --> 00:19:10,474
+that it exports metrics for Prometheus. So just by pointing
+
+294
+00:19:10,522 --> 00:19:14,602
+flux at a particular cluster, we actually deployed namespaces
+
+295
+00:19:14,666 --> 00:19:18,234
+inside a Kubernetes cluster. We deployments
+
+296
+00:19:18,282 --> 00:19:22,110
+several applications with dependencies among them. So it's quite easy
+
+297
+00:19:22,180 --> 00:19:26,714
+to, if we have a scenario of disaster recovery, just spinning up kubernetes
+
+298
+00:19:26,762 --> 00:19:30,894
+cluster with the configurations that we want, pointing to a specific git
+
+299
+00:19:30,942 --> 00:19:33,860
+repository, and it will do everything for us.
+
+300
+00:19:34,630 --> 00:19:38,440
+So now that we have our demo concluded, we have
+
+301
+00:19:39,050 --> 00:19:42,182
+a few extras here to talk about. So a question
+
+302
+00:19:42,236 --> 00:19:46,150
+that usually arises is about secrets. So people
+
+303
+00:19:46,300 --> 00:19:49,438
+usually come. Okay, so that's all. Well and good, I have everything in git,
+
+304
+00:19:49,474 --> 00:19:53,226
+but now I actually need secrets. So if we
+
+305
+00:19:53,248 --> 00:19:56,906
+are not fetching secrets directly from the application from
+
+306
+00:19:56,928 --> 00:20:00,854
+somewhere, we need somehow to inject those secrets. So there are several projects
+
+307
+00:20:00,982 --> 00:20:04,766
+that actually deal with it. One is filled secrets and the other
+
+308
+00:20:04,788 --> 00:20:08,798
+one is SOP. So they work on a high level on a very similar
+
+309
+00:20:08,884 --> 00:20:12,734
+way. So we encrypt those secrets and put them alongside our
+
+310
+00:20:12,772 --> 00:20:16,574
+code. They are encrypted. And then an agent that lives inside the cluster,
+
+311
+00:20:16,622 --> 00:20:20,430
+once it receives that encrypted
+
+312
+00:20:20,510 --> 00:20:24,242
+secret, knows how to decrypt that and knows what application it
+
+313
+00:20:24,296 --> 00:20:27,598
+actually needs to deliver that secret to.
+
+314
+00:20:27,704 --> 00:20:31,634
+Another option is the vault agent sidecar injector. So it's a vault
+
+315
+00:20:31,682 --> 00:20:35,126
+agent that could run alongside our applications that knows how to
+
+316
+00:20:35,148 --> 00:20:39,082
+fetch secrets from vault and actually deploy them to
+
+317
+00:20:39,136 --> 00:20:42,746
+specific applications. So there are several options to actually deal with this.
+
+318
+00:20:42,928 --> 00:20:46,458
+Another question that usually arises is
+
+319
+00:20:46,544 --> 00:20:50,410
+Gitops versus infrastructure s code. So the idea
+
+320
+00:20:50,560 --> 00:20:54,658
+of one of the main differences between infrastructure as code is Gitops
+
+321
+00:20:54,694 --> 00:20:58,362
+is that the use of immutable containers, whats deployable
+
+322
+00:20:58,426 --> 00:21:02,202
+artifacts that can be converged on by a suitable orchestration
+
+323
+00:21:02,266 --> 00:21:06,034
+tool. For example kubernetes, as we've seen in the example, so all
+
+324
+00:21:06,072 --> 00:21:09,874
+the desired state is kept under source control. This isn't always
+
+325
+00:21:09,912 --> 00:21:13,406
+the case with some infrastructure code tools. So some infrastructure
+
+326
+00:21:13,438 --> 00:21:16,918
+Xcode implementations vary and sometimes the
+
+327
+00:21:16,924 --> 00:21:20,194
+source of truth is split between a git repository, a database,
+
+328
+00:21:20,242 --> 00:21:23,334
+and sometimes spread between weekly linked union of
+
+329
+00:21:23,372 --> 00:21:26,534
+multiple git reptiles. While infrastructure as code is
+
+330
+00:21:26,572 --> 00:21:29,994
+usually used to manage only
+
+331
+00:21:30,032 --> 00:21:34,310
+infrastructure, it doesn't manage the whole cloud native stack
+
+332
+00:21:34,390 --> 00:21:37,926
+Gitops. Here we've just seen the use case of deploying
+
+333
+00:21:37,958 --> 00:21:41,662
+an application, but we can go a step further and use
+
+334
+00:21:41,716 --> 00:21:45,360
+the principle, the Gitops principle to actually do this
+
+335
+00:21:46,050 --> 00:21:48,570
+for all the stack.
+
+336
+00:21:48,730 --> 00:21:51,882
+And another question that usually arises
+
+337
+00:21:51,946 --> 00:21:56,034
+is between push and pull. So we usually push changes, for example
+
+338
+00:21:56,072 --> 00:21:59,986
+to a Kubernetes cluster. So say deploy this application. But with
+
+339
+00:22:00,008 --> 00:22:03,278
+a Gitops approach we are actually on a tools
+
+340
+00:22:03,374 --> 00:22:07,110
+based approach. We do some change to a kubernetes,
+
+341
+00:22:07,450 --> 00:22:12,546
+to a git repository that then an agent pulls
+
+342
+00:22:12,578 --> 00:22:16,006
+that change down and applies. That has some advantages in terms
+
+343
+00:22:16,028 --> 00:22:20,090
+of security because now we don't have to actually open the cluster
+
+344
+00:22:22,910 --> 00:22:26,214
+to an outside tool or an outside person to do a deployment.
+
+345
+00:22:26,342 --> 00:22:29,514
+And that comes with those benefits in terms of security.
+
+346
+00:22:29,712 --> 00:22:33,882
+And that's all for my part. I hope this tasks was informative
+
+347
+00:22:33,946 --> 00:22:37,994
+for all of you. It was a gentle introduction to what Gitops
+
+348
+00:22:38,042 --> 00:22:41,626
+is. It also showed
+
+349
+00:22:41,658 --> 00:22:45,354
+a few tools and showed one actually in practice doing deployment.
+
+350
+00:22:45,482 --> 00:22:48,986
+You can find me at those addresses. And don't
+
+351
+00:22:49,018 --> 00:22:52,410
+hesitate to being me if you want to discuss this topic further
+
+352
+00:22:52,490 --> 00:22:56,514
+and get into more detail of how these tools
+
+353
+00:22:56,562 --> 00:23:00,326
+work. So thank you very much and thank you for being here and assisting to
+
+354
+00:23:00,348 --> 00:23:00,580
+my talk.
+

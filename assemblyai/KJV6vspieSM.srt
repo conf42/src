@@ -1,0 +1,1296 @@
+1
+00:00:25,410 --> 00:00:28,982
+Hello. Today I'm going to talk about
+
+2
+00:00:29,116 --> 00:00:32,706
+how we implemented complex and long running processes
+
+3
+00:00:32,818 --> 00:00:36,690
+using the domain model and finite state machines to organize
+
+4
+00:00:36,770 --> 00:00:40,546
+the logic within them. You will learn what state machines
+
+5
+00:00:40,578 --> 00:00:44,146
+are and why they are useful for backend development,
+
+6
+00:00:44,258 --> 00:00:47,554
+how to use domains to organize complex business logic,
+
+7
+00:00:47,682 --> 00:00:51,454
+how to implement parallel processes based on
+
+8
+00:00:51,492 --> 00:00:54,640
+state machines, and how to deal with common problems.
+
+9
+00:00:55,010 --> 00:00:58,346
+My name Ilya Kaznacheev and I am a technical
+
+10
+00:00:58,378 --> 00:01:02,170
+lead leader at container managed Kubernetes service in MTS
+
+11
+00:01:02,250 --> 00:01:05,582
+cloud. I'm also a consulting cloud architect.
+
+12
+00:01:05,726 --> 00:01:08,754
+So if you want to move to the cloud or to
+
+13
+00:01:08,792 --> 00:01:12,222
+design a suitable architecture and set up processes,
+
+14
+00:01:12,366 --> 00:01:16,070
+feel free to contact me. I'm a founder of several local
+
+15
+00:01:16,140 --> 00:01:20,002
+communication, host of a podcast and a conference
+
+16
+00:01:20,066 --> 00:01:23,414
+and meetup organizer. So what is
+
+17
+00:01:23,452 --> 00:01:26,934
+a finite state machine? If you haven't worked with
+
+18
+00:01:26,972 --> 00:01:30,970
+it, you probably met it at university or
+
+19
+00:01:31,040 --> 00:01:34,666
+in computer science literature. A state machine is a
+
+20
+00:01:34,688 --> 00:01:38,314
+behavior model. It consists of finite number of
+
+21
+00:01:38,352 --> 00:01:41,614
+states and transition rules between them.
+
+22
+00:01:41,812 --> 00:01:45,470
+I often see mentions of state machine in context of
+
+23
+00:01:45,540 --> 00:01:49,034
+front end or embedded, but rarely
+
+24
+00:01:49,082 --> 00:01:52,534
+see examples of backend application logic implementation.
+
+25
+00:01:52,682 --> 00:01:56,114
+Today I will tell you how we did it.
+
+26
+00:01:56,312 --> 00:01:59,730
+So what is managed Kubernetes service?
+
+27
+00:01:59,880 --> 00:02:03,934
+In simple words, the user wants to get a Kubernetes cluster
+
+28
+00:02:03,982 --> 00:02:07,894
+in the cloud. Then magic happens and
+
+29
+00:02:07,932 --> 00:02:11,734
+then the client gets access to the cluster. In our
+
+30
+00:02:11,772 --> 00:02:16,146
+case, we had a service at the MVP states whose
+
+31
+00:02:16,178 --> 00:02:19,602
+architecture did not meet our production requirements.
+
+32
+00:02:19,746 --> 00:02:23,194
+A thmoose refactoring process begun during which we
+
+33
+00:02:23,232 --> 00:02:27,078
+did what I am going to talk about today. As a cloud provider,
+
+34
+00:02:27,174 --> 00:02:31,722
+we can just create a cluster in
+
+35
+00:02:31,856 --> 00:02:35,406
+via terraform. We need much more control over the
+
+36
+00:02:35,428 --> 00:02:38,346
+process to ensure speed and resilience.
+
+37
+00:02:38,538 --> 00:02:42,410
+We control the process at a lower level, which means a lot
+
+38
+00:02:42,500 --> 00:02:45,586
+of granular operations. So what
+
+39
+00:02:45,608 --> 00:02:49,054
+we had in the beginning, complete cluster
+
+40
+00:02:49,102 --> 00:02:52,206
+creation, was done in just three steps,
+
+41
+00:02:52,318 --> 00:02:55,474
+separated by messages. In Kafka. The code structure
+
+42
+00:02:55,522 --> 00:02:58,918
+didn't allow us to implement good practices and
+
+43
+00:02:59,004 --> 00:03:02,870
+the application was not fault tolerant.
+
+44
+00:03:03,530 --> 00:03:06,786
+A crash or restart interrupted the loan
+
+45
+00:03:06,818 --> 00:03:10,794
+process of cluster creation without any possibility to
+
+46
+00:03:10,832 --> 00:03:14,186
+recover. First, we decided to divide the
+
+47
+00:03:14,208 --> 00:03:17,782
+cluster creation process into a set of steps
+
+48
+00:03:17,926 --> 00:03:21,280
+combined into a pipeline. Each step
+
+49
+00:03:21,810 --> 00:03:25,626
+is performed in a separate session and the sequence
+
+50
+00:03:25,658 --> 00:03:28,894
+of steps is controlled over kafka. If an
+
+51
+00:03:28,932 --> 00:03:33,086
+error occurs at any step, the process can be repeated again,
+
+52
+00:03:33,268 --> 00:03:37,470
+the same application, the same appliance to fault tolerance
+
+53
+00:03:37,630 --> 00:03:40,926
+if the service crashes. Another instance reads
+
+54
+00:03:40,958 --> 00:03:45,050
+the message from Kafka and handles it. It looked very good in theory,
+
+55
+00:03:45,230 --> 00:03:49,266
+but in practice there were many difficulties.
+
+56
+00:03:49,458 --> 00:03:52,914
+Some steps consisted of a set of parallel
+
+57
+00:03:52,962 --> 00:03:56,422
+operations which also had to be managed for many
+
+58
+00:03:56,476 --> 00:04:00,630
+steps. The logic consisted of a complex chain of operations
+
+59
+00:04:00,790 --> 00:04:04,454
+that depended on the various cluster components.
+
+60
+00:04:04,582 --> 00:04:08,102
+The more complex the logic became, the worse
+
+61
+00:04:08,246 --> 00:04:12,046
+it fit into the existing model. So after a
+
+62
+00:04:12,068 --> 00:04:16,222
+while we decided to go further, dive deeper into
+
+63
+00:04:16,356 --> 00:04:20,394
+domain driven design. This is a simplified domain
+
+64
+00:04:20,442 --> 00:04:24,830
+model of the cluster. It is actually more complicated
+
+65
+00:04:24,990 --> 00:04:28,274
+by I removed some of the elements for
+
+66
+00:04:28,312 --> 00:04:31,822
+the presentation. So in the Kubernetes
+
+67
+00:04:31,886 --> 00:04:35,974
+cluster, it has a cluster domain itself,
+
+68
+00:04:36,172 --> 00:04:40,322
+a set of load balancers, a set of models,
+
+69
+00:04:40,466 --> 00:04:44,262
+and a set of node groups. In terms
+
+70
+00:04:44,316 --> 00:04:47,682
+of domain driven design, domains that change
+
+71
+00:04:47,756 --> 00:04:51,222
+together are combined into a domain aggregate.
+
+72
+00:04:51,366 --> 00:04:54,954
+The overall context of changes is described by
+
+73
+00:04:54,992 --> 00:04:58,474
+the aggregate boundary. A cluster is
+
+74
+00:04:58,512 --> 00:05:02,030
+an aggregate route. This means that there will
+
+75
+00:05:02,100 --> 00:05:06,234
+always be one cluster for one aggregate,
+
+76
+00:05:06,362 --> 00:05:10,414
+and it can be referred to by cluster id.
+
+77
+00:05:10,612 --> 00:05:13,730
+Node can be master or worker. The group
+
+78
+00:05:13,800 --> 00:05:17,950
+of workers is combined into a node group, while the master
+
+79
+00:05:18,030 --> 00:05:21,458
+exists independently. This is an example
+
+80
+00:05:21,544 --> 00:05:25,194
+of a domain aggregate instance, a real cluster,
+
+81
+00:05:25,342 --> 00:05:28,530
+a cluster with three masters and five worker nodes,
+
+82
+00:05:28,610 --> 00:05:32,818
+which are combined into two groups with different configurations.
+
+83
+00:05:32,994 --> 00:05:36,594
+This module covered the need for complex logic,
+
+84
+00:05:36,722 --> 00:05:40,854
+as the logic of each entity is encapsulated
+
+85
+00:05:40,982 --> 00:05:44,934
+in a separate domain. This solved the problem of parallel
+
+86
+00:05:44,982 --> 00:05:48,678
+operations, because now each domain was responsible
+
+87
+00:05:48,774 --> 00:05:52,202
+for its own processes and it was easier
+
+88
+00:05:52,266 --> 00:05:55,486
+to implement parallel steps. But some of the
+
+89
+00:05:55,508 --> 00:05:59,422
+steps actually consisted of their own set
+
+90
+00:05:59,476 --> 00:06:03,266
+of systems. Let's take a close look at
+
+91
+00:06:03,288 --> 00:06:07,278
+the worker node creation process. Each node
+
+92
+00:06:07,374 --> 00:06:11,374
+is created in four steps, creating a virtual machine,
+
+93
+00:06:11,502 --> 00:06:15,382
+launching the operation system, configuring the environment and
+
+94
+00:06:15,436 --> 00:06:18,898
+applications, and finally running. Moreover,
+
+95
+00:06:19,074 --> 00:06:22,454
+an error can occur at any step. In this
+
+96
+00:06:22,492 --> 00:06:26,198
+case, different error handling may be required. In the
+
+97
+00:06:26,204 --> 00:06:30,138
+case of an error, while starting the operation system, you must either
+
+98
+00:06:30,224 --> 00:06:34,710
+perform a restart or delete the vm for a full rollback.
+
+99
+00:06:34,870 --> 00:06:38,486
+In case of a configuration error, you may need to repeat
+
+100
+00:06:38,518 --> 00:06:41,966
+the setup. In the case of an error, when starting the
+
+101
+00:06:41,988 --> 00:06:45,002
+application, another processing may be required,
+
+102
+00:06:45,146 --> 00:06:48,782
+and these errors can happen in parallel at different
+
+103
+00:06:48,836 --> 00:06:52,550
+states for different models, which makes it practically
+
+104
+00:06:52,650 --> 00:06:56,050
+impossible to manage this process from one
+
+105
+00:06:56,120 --> 00:07:00,062
+single place, as we assumed in the first implementation
+
+106
+00:07:00,126 --> 00:07:03,426
+with the pipeline. So at this point
+
+107
+00:07:03,528 --> 00:07:07,126
+we realized that it was impossible to cover the
+
+108
+00:07:07,148 --> 00:07:10,614
+logic of the entities. Domain aggregate with a
+
+109
+00:07:10,652 --> 00:07:14,550
+single state machine. Each domain needs its
+
+110
+00:07:14,620 --> 00:07:18,374
+own state machine describing states and transitions
+
+111
+00:07:18,422 --> 00:07:22,438
+between them just for that only domain.
+
+112
+00:07:22,614 --> 00:07:25,974
+Let's check this out with a state machine
+
+113
+00:07:26,022 --> 00:07:29,846
+example for a node. So node
+
+114
+00:07:29,958 --> 00:07:33,006
+has an initial state with which it is created in the
+
+115
+00:07:33,028 --> 00:07:36,526
+database. The state machine accepts a success
+
+116
+00:07:36,628 --> 00:07:40,846
+event which will be handled depending on the current state
+
+117
+00:07:40,948 --> 00:07:44,206
+of the domain. This can actually be different events
+
+118
+00:07:44,238 --> 00:07:48,210
+for different situations, but for simplicity, I have combined all
+
+119
+00:07:48,280 --> 00:07:52,466
+success situations into one event. Transition to the next state
+
+120
+00:07:52,568 --> 00:07:56,034
+will send a request to create a virtual machine.
+
+121
+00:07:56,162 --> 00:07:59,766
+When the virtual machine is created, the transition to the
+
+122
+00:07:59,788 --> 00:08:03,254
+next states happens with the request to start the
+
+123
+00:08:03,292 --> 00:08:07,502
+operation system. When it's okay, the next step states
+
+124
+00:08:07,586 --> 00:08:11,814
+with transition to a relevant state. When the configuration
+
+125
+00:08:11,862 --> 00:08:15,802
+is done, the node goes into the running state with no
+
+126
+00:08:15,856 --> 00:08:18,886
+additional actions performed. Similarly,
+
+127
+00:08:18,998 --> 00:08:22,298
+we can describe the process of the node removal.
+
+128
+00:08:22,474 --> 00:08:25,774
+Right now it looks like just two
+
+129
+00:08:25,812 --> 00:08:29,082
+pipelines joined for creation and deletion.
+
+130
+00:08:29,146 --> 00:08:33,854
+Or, if you like, it looks like a saga.
+
+131
+00:08:33,982 --> 00:08:38,110
+However, unlike pipelines and sagas, the state machine
+
+132
+00:08:38,190 --> 00:08:41,598
+allows you to solve one very important task,
+
+133
+00:08:41,694 --> 00:08:45,462
+error handling. Remember that an error can
+
+134
+00:08:45,516 --> 00:08:49,414
+happen at any step. For simplicity, I also have
+
+135
+00:08:49,452 --> 00:08:53,522
+combined the different types of errors into a single error
+
+136
+00:08:53,586 --> 00:08:57,206
+event. I don't include retrievable errors since
+
+137
+00:08:57,308 --> 00:09:00,554
+they can be handled automatically. Here are the
+
+138
+00:09:00,592 --> 00:09:04,490
+errors that cannot be fixed by repetition.
+
+139
+00:09:04,910 --> 00:09:08,106
+Note that the error handling actions are
+
+140
+00:09:08,128 --> 00:09:11,490
+different depending on the current state of the domain.
+
+141
+00:09:11,590 --> 00:09:14,974
+The case where the application will handle an error that
+
+142
+00:09:15,012 --> 00:09:19,082
+does not match the current state, for example, if it was received late
+
+143
+00:09:19,146 --> 00:09:22,866
+from a message queue, is eliminated. Back to
+
+144
+00:09:22,888 --> 00:09:26,914
+the domain model. For each domain, we add its own
+
+145
+00:09:27,032 --> 00:09:30,850
+state machine, which describes the logic for that
+
+146
+00:09:30,920 --> 00:09:34,814
+particular domain. In this way, we can independently implement
+
+147
+00:09:34,862 --> 00:09:38,578
+the logic of parts of the system as complex
+
+148
+00:09:38,674 --> 00:09:42,194
+as we want. In case of certain cluster,
+
+149
+00:09:42,322 --> 00:09:46,754
+a state field is added to each element, which defines
+
+150
+00:09:46,802 --> 00:09:50,886
+its position on the state diagram of the corresponding
+
+151
+00:09:50,918 --> 00:09:54,038
+domain. Thus, the state of each item
+
+152
+00:09:54,134 --> 00:09:57,866
+of the cluster is stored in the database between
+
+153
+00:09:57,968 --> 00:10:01,786
+event handlings. Any entity in the domain aggregate
+
+154
+00:10:01,898 --> 00:10:05,326
+has a clearly defined state at any point
+
+155
+00:10:05,428 --> 00:10:09,520
+in time. Let's now see how it all works.
+
+156
+00:10:10,050 --> 00:10:14,078
+Suppose we have a cluster, also a simplified cluster
+
+157
+00:10:14,174 --> 00:10:18,386
+in creation process. When one node group is ready
+
+158
+00:10:18,488 --> 00:10:22,942
+and other is still using created worker node, one receives
+
+159
+00:10:23,006 --> 00:10:26,674
+a success message and its state changes to running.
+
+160
+00:10:26,872 --> 00:10:30,618
+The node then escalates an event about its state's
+
+161
+00:10:30,654 --> 00:10:34,230
+change to its parent domain, the node group.
+
+162
+00:10:34,380 --> 00:10:38,094
+The node group then performs state transition validation.
+
+163
+00:10:38,242 --> 00:10:42,218
+The validation condition is that all nodes in
+
+164
+00:10:42,224 --> 00:10:45,686
+the group have states running, but one node
+
+165
+00:10:45,718 --> 00:10:49,238
+is still in the state setup pending,
+
+166
+00:10:49,334 --> 00:10:53,226
+so the transition will not take place. Next worker
+
+167
+00:10:53,258 --> 00:10:57,406
+node two receives a success message and its states changing to
+
+168
+00:10:57,428 --> 00:11:01,390
+running. The node then escalates an event about
+
+169
+00:11:01,460 --> 00:11:05,294
+its state change to the node group. The node group performs
+
+170
+00:11:05,342 --> 00:11:09,326
+the state transition validation. Now all child nodes
+
+171
+00:11:09,438 --> 00:11:13,346
+are in state running, so the node group will change
+
+172
+00:11:13,448 --> 00:11:17,074
+the state to running too, and then it escalates
+
+173
+00:11:17,202 --> 00:11:20,786
+an event about its state change to the cluster domain,
+
+174
+00:11:20,818 --> 00:11:24,274
+its parent. The cluster checks if all node
+
+175
+00:11:24,322 --> 00:11:28,166
+groups are in running state. As soon as the condition
+
+176
+00:11:28,198 --> 00:11:31,546
+is met, it also changes state to running.
+
+177
+00:11:31,728 --> 00:11:35,514
+So the logic of each domain domains within that
+
+178
+00:11:35,552 --> 00:11:39,590
+domain itself. The logic that affects multiple domains
+
+179
+00:11:39,670 --> 00:11:43,098
+is propagated within the domains. Aggregate aggregate
+
+180
+00:11:43,194 --> 00:11:47,246
+through events let's take a look at what happens
+
+181
+00:11:47,348 --> 00:11:51,134
+in case of an error. For example, we have
+
+182
+00:11:51,172 --> 00:11:54,866
+the same cluster in the same state, but then one
+
+183
+00:11:54,888 --> 00:11:58,638
+of the nodes receives an error message which is handled
+
+184
+00:11:58,734 --> 00:12:02,386
+as an event. The node starts the error process
+
+185
+00:12:02,488 --> 00:12:06,046
+matching the error process matching
+
+186
+00:12:06,078 --> 00:12:09,442
+its current state. As we saw in the state diagram
+
+187
+00:12:09,506 --> 00:12:12,754
+before. At the same time the node cannot
+
+188
+00:12:12,802 --> 00:12:16,162
+decide what to do with other nodes. A node domain
+
+189
+00:12:16,226 --> 00:12:19,654
+can only control its own state, so the node
+
+190
+00:12:19,702 --> 00:12:22,954
+escalates the error event to its parent,
+
+191
+00:12:23,072 --> 00:12:26,474
+the node group domains. The node group then
+
+192
+00:12:26,592 --> 00:12:30,694
+has enough information about nodes in group to make
+
+193
+00:12:30,832 --> 00:12:34,142
+an appropriate decision. For example, it might try
+
+194
+00:12:34,196 --> 00:12:38,154
+to create a new node to replace a bad one or delete
+
+195
+00:12:38,202 --> 00:12:41,530
+the other nodes in the group for full rollback.
+
+196
+00:12:41,690 --> 00:12:45,186
+However, this may not be enough, in which case
+
+197
+00:12:45,288 --> 00:12:49,134
+the node group escalates the error even higher to cluster
+
+198
+00:12:49,182 --> 00:12:52,946
+level. In this case, the decision on error handling will
+
+199
+00:12:52,968 --> 00:12:56,326
+be made at the entire cluster level, where it
+
+200
+00:12:56,348 --> 00:13:00,310
+is possible to analyze the situation at all levels.
+
+201
+00:13:00,730 --> 00:13:04,210
+The logic for each domain is still encapsulated
+
+202
+00:13:04,290 --> 00:13:07,666
+within the domain. After the decision is made,
+
+203
+00:13:07,788 --> 00:13:11,114
+the domains will tell the child domains what to
+
+204
+00:13:11,152 --> 00:13:14,060
+do by triggering the relevant event.
+
+205
+00:13:14,910 --> 00:13:18,074
+So during the refactoring process we
+
+206
+00:13:18,112 --> 00:13:21,440
+faced technical and architectural problems.
+
+207
+00:13:21,810 --> 00:13:26,110
+Next, I will mention some interesting problems and their
+
+208
+00:13:26,180 --> 00:13:29,946
+solutions. As soon as parts of processes
+
+209
+00:13:30,058 --> 00:13:33,774
+become parallel, there is a danger of race condition.
+
+210
+00:13:33,902 --> 00:13:37,630
+In concurrent event processing, different entities
+
+211
+00:13:37,790 --> 00:13:41,022
+in the same domain aggregate may conflict
+
+212
+00:13:41,086 --> 00:13:44,020
+for resources or for process control.
+
+213
+00:13:44,470 --> 00:13:48,114
+To avoid this, we use database level root
+
+214
+00:13:48,162 --> 00:13:51,974
+lock. Any change to domain aggregate data
+
+215
+00:13:52,092 --> 00:13:55,782
+happens in a single AC transaction, so any
+
+216
+00:13:55,836 --> 00:13:59,194
+conflicts are eliminated. No matter which
+
+217
+00:13:59,232 --> 00:14:02,282
+domain handles the event, the log is
+
+218
+00:14:02,336 --> 00:14:05,866
+always set to the root element, in our case the
+
+219
+00:14:05,888 --> 00:14:09,274
+cluster domain. However, this leads to
+
+220
+00:14:09,312 --> 00:14:13,022
+lower performance in parallel processes. This is not a problem
+
+221
+00:14:13,076 --> 00:14:16,270
+in our case, but could be a problem in yours.
+
+222
+00:14:16,770 --> 00:14:20,014
+In this case, you can set the lock not
+
+223
+00:14:20,052 --> 00:14:23,902
+to the root domain, but to the processes domain
+
+224
+00:14:24,046 --> 00:14:27,906
+or its parent. Here applies the bottom
+
+225
+00:14:28,008 --> 00:14:31,886
+to up rule. You can put the log on the parent domain
+
+226
+00:14:31,998 --> 00:14:36,070
+but not on the child. Otherwise you might get a deadlock.
+
+227
+00:14:36,650 --> 00:14:40,134
+Another problem is inconsistency in
+
+228
+00:14:40,172 --> 00:14:43,430
+asynchronous messaging. We use secure s
+
+229
+00:14:43,500 --> 00:14:47,938
+and all comments are executed asynchronously.
+
+230
+00:14:48,114 --> 00:14:51,734
+When protesting an event, the state transition logic
+
+231
+00:14:51,782 --> 00:14:55,722
+can send messages to Kafka. Then the domain state changes,
+
+232
+00:14:55,856 --> 00:14:59,562
+which is persisted in postgres, but entire
+
+233
+00:14:59,696 --> 00:15:03,950
+event processing takes place in a single AC transaction.
+
+234
+00:15:04,450 --> 00:15:07,850
+So what happens in case of error?
+
+235
+00:15:08,010 --> 00:15:11,658
+Domain changes will not be saved in the database
+
+236
+00:15:11,754 --> 00:15:15,442
+because of the transaction rollback, but elements would
+
+237
+00:15:15,496 --> 00:15:19,726
+already be sent to Kafka, which would lead to inconsistency
+
+238
+00:15:19,838 --> 00:15:23,934
+in the data model. The service database expects the domain
+
+239
+00:15:23,982 --> 00:15:27,846
+to be in a state before the comment is sent, so the
+
+240
+00:15:27,868 --> 00:15:31,686
+state before transaction begins, but in fact
+
+241
+00:15:31,788 --> 00:15:35,654
+the comment has already been sent, which corresponds to a
+
+242
+00:15:35,692 --> 00:15:39,614
+different domains state. To avoid this, we adopt
+
+243
+00:15:39,682 --> 00:15:43,254
+the outbox pattern. The messages are first stored
+
+244
+00:15:43,302 --> 00:15:46,566
+in the database within the same transaction
+
+245
+00:15:46,678 --> 00:15:50,438
+as the rest of the changes. A separate job
+
+246
+00:15:50,544 --> 00:15:54,382
+then reads the data from the outbox table and send
+
+247
+00:15:54,436 --> 00:15:57,290
+it to Kafka. In case of an error.
+
+248
+00:15:57,370 --> 00:16:01,114
+No messages from this transaction will be saved
+
+249
+00:16:01,162 --> 00:16:05,026
+in the database, so the job will not read them from the
+
+250
+00:16:05,048 --> 00:16:08,270
+outbox table and send them to kafka.
+
+251
+00:16:08,430 --> 00:16:11,934
+Next, some operations, such as virtual
+
+252
+00:16:11,982 --> 00:16:16,006
+machine creation, are not always practical to do
+
+253
+00:16:16,108 --> 00:16:20,402
+one at a time. There may be dozens of virtual machines
+
+254
+00:16:20,466 --> 00:16:23,766
+in the same cluster, and the creating them one at a
+
+255
+00:16:23,788 --> 00:16:27,558
+time reduces the availability of infrastructure for
+
+256
+00:16:27,644 --> 00:16:30,700
+other services and makes the processes longer.
+
+257
+00:16:31,070 --> 00:16:34,470
+This can be fixed by introducing batch operations,
+
+258
+00:16:34,630 --> 00:16:38,394
+the rest of the logic domains the same, but the moment the
+
+259
+00:16:38,432 --> 00:16:41,822
+process reaches a batch operation, instead of an event
+
+260
+00:16:41,876 --> 00:16:45,358
+trigger for each domain in the group, there is a special
+
+261
+00:16:45,444 --> 00:16:48,874
+event trigger for batch processing.
+
+262
+00:16:49,002 --> 00:16:52,554
+The same changes are made, but messages to other
+
+263
+00:16:52,612 --> 00:16:55,842
+systems are not sent directly, but are
+
+264
+00:16:55,896 --> 00:17:00,094
+sent in a different method as a batch. In this implementation,
+
+265
+00:17:00,222 --> 00:17:03,826
+the domains logic encapsulation begins to leak a
+
+266
+00:17:03,848 --> 00:17:07,122
+little bit. The business logic remains within the domain,
+
+267
+00:17:07,266 --> 00:17:10,562
+but the logic for sending messages is moved
+
+268
+00:17:10,626 --> 00:17:13,926
+out of the single domain to the domain list level.
+
+269
+00:17:14,108 --> 00:17:17,670
+But this is a tradeoff for batch operations,
+
+270
+00:17:18,110 --> 00:17:21,782
+and the last problem that the state machines solves
+
+271
+00:17:21,846 --> 00:17:25,254
+especially well is the complex error handling.
+
+272
+00:17:25,382 --> 00:17:28,806
+I call it state matched error processing.
+
+273
+00:17:28,998 --> 00:17:32,254
+Assume an error event comes into a system.
+
+274
+00:17:32,372 --> 00:17:36,126
+This can be some general event or more specific
+
+275
+00:17:36,228 --> 00:17:39,626
+one. In any case, we need to handle the error.
+
+276
+00:17:39,738 --> 00:17:43,482
+Normally, we would have identified the type of error
+
+277
+00:17:43,546 --> 00:17:47,122
+and handled it accordingly. However, it could happen
+
+278
+00:17:47,176 --> 00:17:50,626
+that the error messages get mixed up or the
+
+279
+00:17:50,648 --> 00:17:54,610
+message arrived later because of a slow queue.
+
+280
+00:17:54,950 --> 00:17:59,014
+There may be a bug in the application sending the error that
+
+281
+00:17:59,052 --> 00:18:02,182
+causes the wrong type of message to be sent.
+
+282
+00:18:02,316 --> 00:18:06,054
+This would normally result in error handling that does
+
+283
+00:18:06,092 --> 00:18:08,540
+not correspond to the actual state.
+
+284
+00:18:08,910 --> 00:18:12,566
+But now, in the case of state matched error processing,
+
+285
+00:18:12,678 --> 00:18:16,218
+when we use the state machine, error handling is always
+
+286
+00:18:16,304 --> 00:18:19,850
+matched to the state of the domain that is
+
+287
+00:18:19,920 --> 00:18:23,834
+handling the error at the same time. Different errors
+
+288
+00:18:23,882 --> 00:18:27,086
+can be handled differently within the same state,
+
+289
+00:18:27,268 --> 00:18:30,718
+but the processing will always be relevant to the
+
+290
+00:18:30,724 --> 00:18:34,050
+current state of the domain and not to any other.
+
+291
+00:18:34,200 --> 00:18:38,446
+If the current state does not consider any error handling,
+
+292
+00:18:38,558 --> 00:18:42,626
+then the event will simply be ignored. So the
+
+293
+00:18:42,648 --> 00:18:46,534
+error processing be always matched with
+
+294
+00:18:46,652 --> 00:18:50,374
+current domain state. And if it was some
+
+295
+00:18:50,412 --> 00:18:53,250
+kind of false error or errors,
+
+296
+00:18:53,410 --> 00:18:57,254
+that doesn't mean anything for the current state, it will
+
+297
+00:18:57,292 --> 00:19:01,210
+just be ignored. You also can log it, you also can add it to
+
+298
+00:19:01,360 --> 00:19:06,262
+tracing, et cetera, but it will not disturb
+
+299
+00:19:06,326 --> 00:19:09,638
+the data with the fells error processes.
+
+300
+00:19:09,814 --> 00:19:13,342
+So today, the domain model with state machine based
+
+301
+00:19:13,396 --> 00:19:17,754
+logic works very well within our hexagonal
+
+302
+00:19:17,802 --> 00:19:21,838
+services. The approach performed very well and fit into
+
+303
+00:19:21,924 --> 00:19:25,502
+our CQRS communication model with synchronous
+
+304
+00:19:25,566 --> 00:19:29,042
+queries and asynchronous comments it's quite
+
+305
+00:19:29,096 --> 00:19:32,482
+simple to implement in Golem. We just use
+
+306
+00:19:32,616 --> 00:19:36,466
+long switch cases to describe each state machine.
+
+307
+00:19:36,578 --> 00:19:40,082
+It's easy to read and easy to troubleshoot,
+
+308
+00:19:40,226 --> 00:19:43,778
+but there is still a room for improvement.
+
+309
+00:19:43,954 --> 00:19:47,698
+In the future, we want to further refine our approach
+
+310
+00:19:47,794 --> 00:19:51,302
+to implemented distributed transactions based
+
+311
+00:19:51,356 --> 00:19:54,810
+on domains with the state machines. This already
+
+312
+00:19:54,880 --> 00:19:58,474
+works in some parts of our infrastructure, but the
+
+313
+00:19:58,512 --> 00:20:02,250
+formal approach has not yet been described.
+
+314
+00:20:02,410 --> 00:20:05,950
+We also want to generate state diagrams based
+
+315
+00:20:06,020 --> 00:20:09,226
+on code. Right now we use mermaid
+
+316
+00:20:09,258 --> 00:20:13,514
+js to describe state diagrams in the service documentation,
+
+317
+00:20:13,642 --> 00:20:16,240
+but we want to automate the process.
+
+318
+00:20:16,690 --> 00:20:20,254
+So that's all for you today. I look forward to talking
+
+319
+00:20:20,292 --> 00:20:23,950
+with you. Send me your questions and ideas. Also,
+
+320
+00:20:24,100 --> 00:20:27,526
+don't forget that if you want to run your services in the cloud,
+
+321
+00:20:27,628 --> 00:20:31,874
+I can help with that. Feel free to contact me with any questions related
+
+322
+00:20:31,922 --> 00:20:35,526
+to cloud architecture and process organization related to
+
+323
+00:20:35,628 --> 00:20:37,830
+development in the cloud environment.
+
+324
+00:20:38,730 --> 00:20:41,250
+Thank you for your attention and goodbye.
+
