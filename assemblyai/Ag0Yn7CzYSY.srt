@@ -1,0 +1,912 @@
+1
+00:00:00,250 --> 00:00:04,830
+Are you an SRE, a developer?
+
+2
+00:00:06,610 --> 00:00:10,014
+A quality engineer who wants to tackle the challenge of
+
+3
+00:00:10,052 --> 00:00:14,026
+improving reliability in your DevOps? You can enable your DevOps
+
+4
+00:00:14,058 --> 00:00:16,510
+for reliability with chaos native.
+
+5
+00:00:16,930 --> 00:00:20,800
+Create your free account at Chaos native Litmus Cloud
+
+6
+00:01:16,730 --> 00:01:20,838
+hi folks, and welcome to this session as part of the Comp 42 online
+
+7
+00:01:20,924 --> 00:01:24,034
+conference. My name is Andrew Robinson and in this session
+
+8
+00:01:24,082 --> 00:01:28,070
+we're going to be looking at fault isolation using shuffle sharding.
+
+9
+00:01:28,810 --> 00:01:32,346
+Before we get into that quick bit of background on who I am, I'm a
+
+10
+00:01:32,368 --> 00:01:36,422
+principal solutions architect at Amazon Web Services, part of the AWS
+
+11
+00:01:36,486 --> 00:01:40,006
+well architected team. My day job is helping
+
+12
+00:01:40,038 --> 00:01:43,290
+our customers and our partners to build secure, high performing,
+
+13
+00:01:43,370 --> 00:01:46,746
+resilient and efficient infrastructure for their workloads.
+
+14
+00:01:46,858 --> 00:01:50,446
+I've been working in the technology field for the last 14 years and most
+
+15
+00:01:50,468 --> 00:01:54,242
+of my focus has been on infrastructure reliability and data
+
+16
+00:01:54,296 --> 00:01:58,078
+management. So getting into this session
+
+17
+00:01:58,174 --> 00:02:01,522
+I think it's always worth quickly defining, first of all,
+
+18
+00:02:01,656 --> 00:02:04,370
+what we're talking about when we mean reliability,
+
+19
+00:02:05,510 --> 00:02:08,770
+just so that we're all set on the same page here. So reliability
+
+20
+00:02:08,850 --> 00:02:12,678
+is the ability of a workload to perform its required function
+
+21
+00:02:12,764 --> 00:02:16,066
+correctly and consistently over an expected period
+
+22
+00:02:16,098 --> 00:02:19,686
+of time. One of the quotes that I really
+
+23
+00:02:19,708 --> 00:02:23,258
+like to use here is we need to build systems that embrace failure as a
+
+24
+00:02:23,264 --> 00:02:27,190
+natural occurrence, which is from Werner Vogels, the CTO of Amazon.
+
+25
+00:02:27,350 --> 00:02:30,302
+So what we need to do is adapt the way that we think about building
+
+26
+00:02:30,356 --> 00:02:33,834
+these systems so that we embrace the potential failures
+
+27
+00:02:33,882 --> 00:02:37,166
+that are going to happen and include that as
+
+28
+00:02:37,188 --> 00:02:41,070
+being a natural occurrence within our systems.
+
+29
+00:02:42,050 --> 00:02:45,346
+A couple of resources just to mention before we go into this, which I will
+
+30
+00:02:45,368 --> 00:02:48,926
+be referring to. The first of these is the Amazon Builders library,
+
+31
+00:02:49,038 --> 00:02:52,654
+and this provides articles and video guides on how Amazon
+
+32
+00:02:52,702 --> 00:02:56,046
+has implemented different best practices across our architecture
+
+33
+00:02:56,078 --> 00:03:00,038
+and software delivery. In short, it's sharing what we've learned over the
+
+34
+00:03:00,044 --> 00:03:03,270
+last 20 years with our customers and our partners.
+
+35
+00:03:04,490 --> 00:03:08,210
+I'd also like to talk about the AWS well architected labs.
+
+36
+00:03:08,290 --> 00:03:11,734
+There's a collection of over 60 labs here helping you to get hands on
+
+37
+00:03:11,772 --> 00:03:15,226
+with some of the best practices that I'm going to be speaking about. All the
+
+38
+00:03:15,248 --> 00:03:19,206
+labs come with detailed walkthroughs and the content is all available on the linked
+
+39
+00:03:19,238 --> 00:03:23,198
+to GitHub repo if you'd like to contribute or provide feedback on them.
+
+40
+00:03:23,284 --> 00:03:26,366
+So I'll be referring to both of those aws we talk through what
+
+41
+00:03:26,388 --> 00:03:27,630
+I'm going to be covering.
+
+42
+00:03:30,290 --> 00:03:34,234
+So the main topic to cover here is on sharding of workloads,
+
+43
+00:03:34,362 --> 00:03:37,998
+and we'll start out with this as a concept, and then we'll dive
+
+44
+00:03:38,014 --> 00:03:41,106
+into a little bit more about what shuffle sharding means and how we can go
+
+45
+00:03:41,128 --> 00:03:44,766
+about implementing it. So think of sharding
+
+46
+00:03:44,798 --> 00:03:48,534
+a workload similar to how you would shard a database for one
+
+47
+00:03:48,572 --> 00:03:51,778
+entire workload. We'll shard the overall capacity
+
+48
+00:03:51,874 --> 00:03:55,798
+and segment it so that each shard is responsible for a subset of
+
+49
+00:03:55,804 --> 00:03:59,598
+those customers. By minimizing the number of components
+
+50
+00:03:59,634 --> 00:04:03,482
+that a single customer can interact with, we can limit the impact of any
+
+51
+00:04:03,536 --> 00:04:06,922
+potential issues. If we had a workload without
+
+52
+00:04:06,976 --> 00:04:11,090
+any shuffle sharding, where any worker could handle any request,
+
+53
+00:04:11,270 --> 00:04:15,210
+a poisonous request, or a flood of requests from one single user
+
+54
+00:04:15,290 --> 00:04:17,850
+could spread through your entire fleet.
+
+55
+00:04:18,010 --> 00:04:22,074
+So in short, the scope of the impact could be related
+
+56
+00:04:22,122 --> 00:04:25,946
+to the number of customers divided by the number of sharding.
+
+57
+00:04:26,058 --> 00:04:28,686
+So we can help to limit the scope of impact.
+
+58
+00:04:28,798 --> 00:04:32,622
+As the number of customers increase, we can increase the number of shards,
+
+59
+00:04:32,686 --> 00:04:36,366
+which will then help to scope the impact that that potential failures
+
+60
+00:04:36,398 --> 00:04:39,606
+could have down to a more manageable level,
+
+61
+00:04:39,708 --> 00:04:43,430
+meaning that it's going to have less of an impact on customers using our systems.
+
+62
+00:04:44,170 --> 00:04:47,414
+So let's talk through an example here of what
+
+63
+00:04:47,452 --> 00:04:50,742
+this sharding can look like. So let's imagine
+
+64
+00:04:50,806 --> 00:04:54,202
+we have a horizontally scalable system. In this case,
+
+65
+00:04:54,256 --> 00:04:57,974
+it's made up of eight worker nodes. Each worker node receives
+
+66
+00:04:58,022 --> 00:05:02,010
+requests that come in, maybe through a load balancer. There's no sharding,
+
+67
+00:05:02,090 --> 00:05:05,262
+so each worker can handle any request that happens
+
+68
+00:05:05,316 --> 00:05:09,326
+to come into the system. Now, if one
+
+69
+00:05:09,348 --> 00:05:12,746
+of those worker fails, the other seven can absorb
+
+70
+00:05:12,778 --> 00:05:16,882
+the work. Only a small amount of slack capacity is needed within
+
+71
+00:05:16,936 --> 00:05:19,060
+this system for it to be able to function.
+
+72
+00:05:19,670 --> 00:05:23,918
+However, what happens if we get a poisonous or a bad request?
+
+73
+00:05:24,014 --> 00:05:27,286
+Maybe a denial of service, which causes a
+
+74
+00:05:27,308 --> 00:05:31,174
+cascading failures that has an impact across all of those
+
+75
+00:05:31,212 --> 00:05:35,474
+worker nodes. In this scenario, the failure
+
+76
+00:05:35,522 --> 00:05:39,226
+is everything and everyone, the whole service goes down
+
+77
+00:05:39,328 --> 00:05:42,250
+and every customer using it is impacted.
+
+78
+00:05:43,230 --> 00:05:46,794
+So what we could look at then doing is to sharding that
+
+79
+00:05:46,832 --> 00:05:49,990
+workload. In this case,
+
+80
+00:05:50,160 --> 00:05:54,302
+one customer only uses one specific shard or set
+
+81
+00:05:54,356 --> 00:05:57,566
+of sharded resources. We can limit the
+
+82
+00:05:57,588 --> 00:06:01,374
+impact of that poisonous request, as it would only impact that
+
+83
+00:06:01,412 --> 00:06:05,086
+one customer. So in this example, you can see that we've now sharding
+
+84
+00:06:05,118 --> 00:06:08,706
+this workload into orange, blue, green and red.
+
+85
+00:06:08,888 --> 00:06:12,258
+And because the orange shards are the ones that have
+
+86
+00:06:12,264 --> 00:06:15,090
+been impacted by perhaps this poisonous requests,
+
+87
+00:06:15,590 --> 00:06:18,738
+only those sharding have been impacted.
+
+88
+00:06:18,834 --> 00:06:22,006
+The other shards that exist within our workload, and therefore the
+
+89
+00:06:22,028 --> 00:06:25,686
+other customers using those haven't been impacted. So we've been
+
+90
+00:06:25,708 --> 00:06:29,334
+able to reduce the impact of the failure here from 100% to
+
+91
+00:06:29,372 --> 00:06:32,746
+just 25%. Now, of course, this does mean we need
+
+92
+00:06:32,768 --> 00:06:36,122
+to have more slack capacity within each of those
+
+93
+00:06:36,176 --> 00:06:40,266
+sharding in case we had a single node failure. In this example,
+
+94
+00:06:40,448 --> 00:06:43,846
+if we did have that, we would lose 50% of our capacity.
+
+95
+00:06:43,958 --> 00:06:47,358
+So it might be that we need more preprovisioned capacity, or we need to be
+
+96
+00:06:47,364 --> 00:06:51,178
+able to scale more quickly to be able to account for changes in load.
+
+97
+00:06:51,274 --> 00:06:55,278
+But it does mean that we'll be able to limit the impact of that failure
+
+98
+00:06:55,374 --> 00:06:59,234
+from affecting 100% of our customers to just 25%
+
+99
+00:06:59,272 --> 00:07:01,140
+of our customers using this system.
+
+100
+00:07:02,150 --> 00:07:05,782
+Now, we can evolve this further by using this mechanism called
+
+101
+00:07:05,836 --> 00:07:09,080
+shuffle sharding. Now, how this works.
+
+102
+00:07:10,410 --> 00:07:13,942
+Fairly similar scenario. So we've got eight worker nodes, and we've got eight
+
+103
+00:07:13,996 --> 00:07:18,622
+customers represented by the letters AbCDefG
+
+104
+00:07:18,706 --> 00:07:22,182
+and H. So eight workers,
+
+105
+00:07:22,246 --> 00:07:26,186
+eight customers. This time, we'll virtually sharding up each
+
+106
+00:07:26,208 --> 00:07:29,482
+of those worker nodes so that every customer is split between
+
+107
+00:07:29,536 --> 00:07:33,550
+two of them. So, as with the previous example, all customers have access
+
+108
+00:07:33,620 --> 00:07:37,502
+to two worker nodes. Each customer
+
+109
+00:07:37,556 --> 00:07:41,214
+is represented by a different letter. And for the purpose of this example,
+
+110
+00:07:41,332 --> 00:07:45,282
+we're going to focus on customer a and customer B.
+
+111
+00:07:45,416 --> 00:07:49,362
+So, customer a, you can see, is using this
+
+112
+00:07:49,416 --> 00:07:53,538
+first sharding. And they're sharing that with customer
+
+113
+00:07:53,624 --> 00:07:57,670
+B. They're also sharing the
+
+114
+00:07:57,740 --> 00:08:01,080
+fourth shard with customer F.
+
+115
+00:08:02,490 --> 00:08:06,118
+Customer B is sharing this first shard with customer
+
+116
+00:08:06,204 --> 00:08:10,246
+a. And they're also sharing the 8th sharding
+
+117
+00:08:10,358 --> 00:08:12,060
+with customer G.
+
+118
+00:08:13,230 --> 00:08:16,762
+So what would happen in this scenario if we had that
+
+119
+00:08:16,816 --> 00:08:21,100
+same failure? So that customer a
+
+120
+00:08:21,970 --> 00:08:25,674
+submits a poisonous request, or maybe there's a flood of requests, or possibly
+
+121
+00:08:25,722 --> 00:08:27,680
+some kind of denial of service attack.
+
+122
+00:08:28,610 --> 00:08:31,738
+That problem will impact the virtual shards
+
+123
+00:08:31,754 --> 00:08:35,474
+that that customer has access to. So shard one and
+
+124
+00:08:35,512 --> 00:08:39,806
+shard four. But it won't impact any of the shards
+
+125
+00:08:39,838 --> 00:08:43,122
+that other customers are working on. So customers on those
+
+126
+00:08:43,176 --> 00:08:46,418
+remaining sharding continue to operate as normal.
+
+127
+00:08:46,514 --> 00:08:49,560
+They don't suffer from any interruption to their service.
+
+128
+00:08:50,250 --> 00:08:53,426
+Now, that's great, but what about those customers who are sharing
+
+129
+00:08:53,538 --> 00:08:56,520
+those shards? Customer B and customer f,
+
+130
+00:08:56,970 --> 00:09:00,726
+what do they do? Well, because we've shuffle sharded,
+
+131
+00:09:00,838 --> 00:09:04,970
+those customers also have access to other sharding.
+
+132
+00:09:05,310 --> 00:09:08,886
+So although both customer B and customer f share shards
+
+133
+00:09:08,918 --> 00:09:12,574
+with customer a, because their other shuffle shards are
+
+134
+00:09:12,612 --> 00:09:15,838
+different, they can continue to operate, but albeit at a
+
+135
+00:09:15,844 --> 00:09:19,274
+reduced capacity. This was a smaller
+
+136
+00:09:19,322 --> 00:09:23,390
+example for the purpose of keeping it to fit on a slide easier.
+
+137
+00:09:23,550 --> 00:09:27,102
+But as you grow out, the level of potential impact
+
+138
+00:09:27,166 --> 00:09:30,366
+drops significantly with eight workers.
+
+139
+00:09:30,478 --> 00:09:34,114
+There are 28 unique combinatorial of those two, of two
+
+140
+00:09:34,152 --> 00:09:38,066
+different workers. So 28 possible shuffle
+
+141
+00:09:38,098 --> 00:09:42,118
+shards. So the scope of impact here is just 120
+
+142
+00:09:42,204 --> 00:09:45,234
+8th, which is seven times better than what that regular
+
+143
+00:09:45,282 --> 00:09:48,922
+sharding would offer you. So distributing those
+
+144
+00:09:48,976 --> 00:09:52,326
+customer requests that are coming in using a shuffle sharding
+
+145
+00:09:52,358 --> 00:09:55,894
+mechanism means that if you do have a failure,
+
+146
+00:09:56,022 --> 00:10:00,154
+poisonous request or a denial of service that takes out
+
+147
+00:10:00,192 --> 00:10:04,474
+those shards, the impact that that has is going to be greatly reduced.
+
+148
+00:10:04,602 --> 00:10:08,078
+Now, customer a still has the problem of
+
+149
+00:10:08,164 --> 00:10:11,854
+they've lost access to their resources. But for the
+
+150
+00:10:11,892 --> 00:10:15,266
+rest of the customers, we're maintaining access to the system
+
+151
+00:10:15,368 --> 00:10:19,426
+so they can still do what they need to do, limiting the
+
+152
+00:10:19,448 --> 00:10:23,314
+impact that that actually has. So that's great in
+
+153
+00:10:23,352 --> 00:10:26,482
+theory, but what could that look like in practice?
+
+154
+00:10:26,546 --> 00:10:29,830
+And how could you actually get hands on and see how this really
+
+155
+00:10:29,900 --> 00:10:33,782
+works? So one quick resource to talk about
+
+156
+00:10:33,836 --> 00:10:37,598
+here is using shuffle sharding with Amazon Route
+
+157
+00:10:37,634 --> 00:10:40,986
+53. For those who aren't familiar, Amazon Route 53 is a
+
+158
+00:10:41,008 --> 00:10:43,980
+highly available and scalable DNS web service.
+
+159
+00:10:44,830 --> 00:10:48,726
+And Amazon has built an Infirma library
+
+160
+00:10:48,838 --> 00:10:52,270
+which is available for the AWS Java SDK.
+
+161
+00:10:52,850 --> 00:10:56,974
+So this uses the theory of shuffle sharding that we just talked about to
+
+162
+00:10:57,012 --> 00:11:00,314
+compartmentalize your endpoints and then bake
+
+163
+00:11:00,362 --> 00:11:03,690
+in the decision tree logic to remove failed endpoints,
+
+164
+00:11:03,770 --> 00:11:07,970
+which can help with isolating denial of service or poison pill requests.
+
+165
+00:11:08,710 --> 00:11:12,206
+As that decision tree logic is prebaked, it means route
+
+166
+00:11:12,238 --> 00:11:15,482
+53 can react quickly to any endpoint failures.
+
+167
+00:11:15,646 --> 00:11:19,734
+Combined with that compartmentalization through shuffle sharding means
+
+168
+00:11:19,772 --> 00:11:23,254
+that we can handle failures of any subservice serving that
+
+169
+00:11:23,292 --> 00:11:26,978
+endpoint. So it allows us to isolate those requests.
+
+170
+00:11:27,074 --> 00:11:30,290
+And by having a pre built decision tree for
+
+171
+00:11:30,460 --> 00:11:34,694
+which endpoints we're going to remove, once those endpoints fail,
+
+172
+00:11:34,822 --> 00:11:38,646
+we can quickly remove them from our DNS service. And that means that we're
+
+173
+00:11:38,678 --> 00:11:42,526
+not going to be routing customer requests to those anymore. So this
+
+174
+00:11:42,548 --> 00:11:46,074
+actually takes that theory of how to shuffle shard those requests
+
+175
+00:11:46,122 --> 00:11:49,438
+coming into different endpoints and actually bakes that into
+
+176
+00:11:49,524 --> 00:11:52,846
+an easy to use Java library that you can
+
+177
+00:11:52,868 --> 00:11:56,642
+use with the AWS Java SDK and the Amazon Route 53 service
+
+178
+00:11:56,776 --> 00:11:59,620
+to actually get hands on and test this out with.
+
+179
+00:12:00,870 --> 00:12:04,514
+So I know this is quite theoretical, but there is actually
+
+180
+00:12:04,552 --> 00:12:07,320
+an opportunity here to get hands on with that as well.
+
+181
+00:12:08,330 --> 00:12:11,686
+So to conclude with this, using sharding is a
+
+182
+00:12:11,708 --> 00:12:15,670
+great way to help limit impact by distributing different
+
+183
+00:12:15,740 --> 00:12:19,046
+requests to different endpoints. It means that if we
+
+184
+00:12:19,068 --> 00:12:22,506
+have a poison pill or we have a denial of service from a specific
+
+185
+00:12:22,608 --> 00:12:26,170
+customer, it's only going to impact those specific
+
+186
+00:12:26,320 --> 00:12:29,498
+endpoints that they have access to. And the rest of
+
+187
+00:12:29,504 --> 00:12:32,554
+our customers are still going to be able to access the resources that they need
+
+188
+00:12:32,592 --> 00:12:35,994
+to. That helps us to reduce that impact
+
+189
+00:12:36,042 --> 00:12:39,838
+down. In the example we saw, we went from 100% to 25%.
+
+190
+00:12:40,004 --> 00:12:42,910
+As you scale out and add more worker nodes,
+
+191
+00:12:43,810 --> 00:12:46,206
+you'll be still be looking at a similar percentage,
+
+192
+00:12:46,318 --> 00:12:50,020
+but that can then have an impact on much fewer customers.
+
+193
+00:12:50,870 --> 00:12:54,814
+We can then use shuffle sharding to exponentially limit that impact
+
+194
+00:12:54,862 --> 00:12:59,622
+further. Remember in the example that we had, we were talking about 128
+
+195
+00:12:59,756 --> 00:13:03,126
+impact that this would have on customers. And as you
+
+196
+00:13:03,148 --> 00:13:05,958
+then scale that out with more worker nodes and more customers,
+
+197
+00:13:06,124 --> 00:13:09,986
+that impact exponentially decreases. So sharding
+
+198
+00:13:10,018 --> 00:13:13,846
+is a great place to start here. And then looking at moving on to shuffle
+
+199
+00:13:13,878 --> 00:13:17,290
+sharding can then help to exponentially limit that impact.
+
+200
+00:13:18,190 --> 00:13:21,350
+As I mentioned, there's the route 53 Infirma library,
+
+201
+00:13:21,430 --> 00:13:24,686
+which can help you manage this yourself and allows you to
+
+202
+00:13:24,708 --> 00:13:28,480
+get some hands on experience with what this could look like in the real world.
+
+203
+00:13:29,010 --> 00:13:32,574
+This example was done with the Amazon Route 53
+
+204
+00:13:32,612 --> 00:13:35,938
+service, but you could achieve similar with other DNS services,
+
+205
+00:13:36,104 --> 00:13:39,346
+or even using your own type of load balancer as well to
+
+206
+00:13:39,368 --> 00:13:43,090
+distribute those requests and remove any of the
+
+207
+00:13:43,160 --> 00:13:46,658
+failed endpoints. So if
+
+208
+00:13:46,664 --> 00:13:50,534
+you'd like to learn a little bit more about this, there is an article in
+
+209
+00:13:50,572 --> 00:13:54,338
+the Amazon Builders library on workload isolation using shuffle sharding,
+
+210
+00:13:54,354 --> 00:13:57,174
+which goes into much more depth than what I've been able to cover in this
+
+211
+00:13:57,212 --> 00:14:01,686
+session and actually explains a little bit more technical detail about how Amazon's
+
+212
+00:14:01,718 --> 00:14:05,066
+built this technology. Also an opportunity
+
+213
+00:14:05,168 --> 00:14:08,746
+to get hands on with the AWS well architected labs in
+
+214
+00:14:08,768 --> 00:14:12,106
+the reliability pillar. There's a lab on there for fault isolation
+
+215
+00:14:12,138 --> 00:14:16,074
+with shuffle sharding, where it goes through AWS, an example and talks
+
+216
+00:14:16,122 --> 00:14:20,078
+through and allows you to get hands on with building this using
+
+217
+00:14:20,164 --> 00:14:23,866
+AWS resources, including our load balancers.
+
+218
+00:14:24,058 --> 00:14:27,378
+And then of course there was the route 53 Infirma library. If you
+
+219
+00:14:27,384 --> 00:14:30,434
+want to get a little bit more hands on with some code parts of this,
+
+220
+00:14:30,632 --> 00:14:34,558
+you can go and grab that from the AWS Labs GitHub repository.
+
+221
+00:14:34,734 --> 00:14:38,094
+As I mentioned, it works with the AWS Java SDK.
+
+222
+00:14:38,222 --> 00:14:42,038
+It's based on Maven, so it was fairly straightforward to deploy. You can
+
+223
+00:14:42,044 --> 00:14:44,120
+get started in that in just a matter of minutes.
+
+224
+00:14:45,690 --> 00:14:49,186
+So that concludes the session on fault isolation
+
+225
+00:14:49,218 --> 00:14:52,374
+using shuffle sharding. I hope that's been useful for everybody.
+
+226
+00:14:52,572 --> 00:14:56,166
+Thank you ever so much for watching this session and hope you
+
+227
+00:14:56,188 --> 00:14:59,966
+enjoy the rest of the comp 42 conference thanks, folks, and stay
+
+228
+00:15:00,028 --> 00:15:00,250
+safe.
+
