@@ -89,7 +89,7 @@ def get_summary(talk, transcript):
         print(f"Transcription failed: {transcript.error}")
         return False
     
-    prompt = "Provide a summary. Do not provide preambule."
+    prompt = "Provide a summary. Do not provide a preambule."
     summary = transcript.lemur.task(
         prompt,
         final_model=aai.LemurModel.mistral7b,
@@ -107,7 +107,7 @@ def get_article(talk, transcript):
         print(f"Transcription failed: {transcript.error}")
         return False
     
-    prompt = "Write an article. Use markdown. Do not provide preambule."
+    prompt = "Write an article. Use markdown. Do not provide a preambule."
     summary = transcript.lemur.task(
         prompt,
         final_model=aai.LemurModel.default,
