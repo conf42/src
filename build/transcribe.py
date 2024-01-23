@@ -26,7 +26,7 @@ context.get("events").sort(key=lambda x: x.get("date"), reverse=True)
 
 # find all talk videos
 for event in context.get("events"):
-    for talk in event.get("talks", []):
+    for talk in event.get("talks_raw", []):
         video = talk.get("YouTube")
         if video:
             video_queue.append((talk, video))
