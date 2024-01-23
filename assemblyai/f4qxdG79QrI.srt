@@ -1,0 +1,1576 @@
+1
+00:00:27,330 --> 00:00:31,078
+Hi everyone. Today I'm going to talk about how we scaled multi cluster kubernetes at
+
+2
+00:00:31,084 --> 00:00:35,046
+teleport cloud. So what is teleport? So, if you don't know, teleport is
+
+3
+00:00:35,068 --> 00:00:38,454
+an open source infrastructure access platform that makes use of
+
+4
+00:00:38,492 --> 00:00:42,198
+reverse tunnels, like for example SSH tunnels, to provide
+
+5
+00:00:42,284 --> 00:00:45,986
+audited access to infrastructure for developers, also for CI
+
+6
+00:00:46,018 --> 00:00:49,346
+CD systems or other use cases like Internet
+
+7
+00:00:49,378 --> 00:00:53,210
+of things. And so Teleport provides access to Kubernetes
+
+8
+00:00:53,290 --> 00:00:56,960
+SSH database, like postgres, for example,
+
+9
+00:00:57,330 --> 00:01:01,470
+web application and Windows desktop resources.
+
+10
+00:01:02,210 --> 00:01:05,954
+It understands the different protocols behind those
+
+11
+00:01:05,992 --> 00:01:10,386
+resource types so that it can provide application
+
+12
+00:01:10,488 --> 00:01:13,854
+level auditing, right? It understands what Kubernetes
+
+13
+00:01:13,902 --> 00:01:16,582
+commands look like, what SSH commands look like,
+
+14
+00:01:16,716 --> 00:01:20,920
+to be able to audit the connections to those different
+
+15
+00:01:21,930 --> 00:01:26,082
+resources that you might be wrong. And so if you look at teleport's architecture,
+
+16
+00:01:26,226 --> 00:01:30,106
+the kind of key components that run on the server side are the
+
+17
+00:01:30,128 --> 00:01:33,446
+teleport proxy, which provides connectivity,
+
+18
+00:01:33,638 --> 00:01:37,046
+like for instance, managing reverse tunnels. And the Teleport
+
+19
+00:01:37,078 --> 00:01:40,250
+auth server, which does authentication and authorization,
+
+20
+00:01:40,670 --> 00:01:44,554
+manages like user roles, provides the kind of back
+
+21
+00:01:44,592 --> 00:01:48,686
+end logic. And so if
+
+22
+00:01:48,708 --> 00:01:51,966
+you might imagine what a client connection to a resource that's managed by
+
+23
+00:01:51,988 --> 00:01:55,294
+teleport would look like, say you're connecting to a Kubernetes cluster,
+
+24
+00:01:55,342 --> 00:01:59,374
+you might run Kubecontrol get pods, and you're
+
+25
+00:01:59,422 --> 00:02:03,154
+not connected to directly to a Kubernetes cluster, but instead you're pointed at
+
+26
+00:02:03,272 --> 00:02:06,550
+a teleport proxy through an mtls connection.
+
+27
+00:02:06,970 --> 00:02:10,594
+And then the teleport proxy also has a reverse tunnel
+
+28
+00:02:10,642 --> 00:02:14,306
+coming from that Kubernetes cluster egressing
+
+29
+00:02:14,338 --> 00:02:18,806
+out through a firewall. And the
+
+30
+00:02:18,828 --> 00:02:22,118
+connection is coming from a teleport agent that's running in a pod in that cluster.
+
+31
+00:02:22,214 --> 00:02:26,166
+And so your Kubecontroll
+
+32
+00:02:26,198 --> 00:02:29,366
+get pods command goes through the proxy through the reverse tunnel
+
+33
+00:02:29,398 --> 00:02:32,974
+and reaches the cluster on the other end to provide access. And so
+
+34
+00:02:33,092 --> 00:02:37,066
+Teleport cloud is a kind of hosted
+
+35
+00:02:37,178 --> 00:02:41,258
+version of teleport that's offered by teleport
+
+36
+00:02:41,274 --> 00:02:44,434
+as a company. And for teleport cloud,
+
+37
+00:02:44,472 --> 00:02:47,682
+we run a dedicated instance of teleport for every
+
+38
+00:02:47,736 --> 00:02:51,010
+customer. And so that means we're running a deployment of teleport,
+
+39
+00:02:51,750 --> 00:02:53,490
+many deployments of teleport,
+
+40
+00:02:56,250 --> 00:03:00,262
+where we're operating over 10,000 pods, we're operating over 100,000
+
+41
+00:03:00,316 --> 00:03:04,726
+reverse tunnels at a given time. And this
+
+42
+00:03:04,828 --> 00:03:08,070
+happens across six regions to provide global availability
+
+43
+00:03:08,590 --> 00:03:12,698
+anytime any of those tunnels are disrupted, that would
+
+44
+00:03:12,864 --> 00:03:17,420
+disrupt access to the underlying resources. And so it's really, really important that
+
+45
+00:03:18,030 --> 00:03:21,294
+we provide a very stable network stack for this
+
+46
+00:03:21,332 --> 00:03:25,518
+platform. Another kind
+
+47
+00:03:25,524 --> 00:03:29,118
+of important detail here is that those proxies, they're running each of
+
+48
+00:03:29,124 --> 00:03:31,550
+those separate kubernetes clusters in each region,
+
+49
+00:03:32,370 --> 00:03:36,130
+peered connections. So a client might connect to a proxy in one region,
+
+50
+00:03:37,190 --> 00:03:41,010
+and a peered GRPC connection between the proxy
+
+51
+00:03:41,750 --> 00:03:45,170
+from that proxy to a proxy that the resource they're trying to access
+
+52
+00:03:45,240 --> 00:03:49,074
+is running in happens, and then the connection
+
+53
+00:03:49,122 --> 00:03:52,774
+goes through the reverse tunnels to that resource. For a long
+
+54
+00:03:52,812 --> 00:03:56,642
+time we ran teleport cloud on gravity. We've recently switched to eks,
+
+55
+00:03:56,786 --> 00:04:01,254
+where we have an eks cluster in each of the regions that we provide connectivity
+
+56
+00:04:01,302 --> 00:04:04,618
+for. And so if you break down the kind
+
+57
+00:04:04,624 --> 00:04:08,860
+of major needs that we had when putting together this platform,
+
+58
+00:04:09,630 --> 00:04:12,560
+I'll just kind of focus on three really important things.
+
+59
+00:04:13,330 --> 00:04:16,986
+Ingress. So maintaining
+
+60
+00:04:17,018 --> 00:04:20,506
+highly available, ultra long lived reverse tunnels to the resources
+
+61
+00:04:20,538 --> 00:04:24,260
+that people need access to is a top thing.
+
+62
+00:04:24,950 --> 00:04:28,926
+It was really important that we be able to do coordinated rollouts across these regional
+
+63
+00:04:28,958 --> 00:04:33,378
+clusters. And so we
+
+64
+00:04:33,464 --> 00:04:37,350
+often want to update auth servers when we do an upgrade of teleport first,
+
+65
+00:04:37,420 --> 00:04:40,934
+and then upgrade the proxies because of
+
+66
+00:04:41,052 --> 00:04:44,886
+how the Auth servers cache proxy heartbeats, or we
+
+67
+00:04:44,908 --> 00:04:48,362
+might want to not roll the proxies in every single region. At the same time,
+
+68
+00:04:48,416 --> 00:04:52,342
+we might need a more coordinated deployment strategies
+
+69
+00:04:52,406 --> 00:04:56,010
+for some different customer
+
+70
+00:04:56,080 --> 00:04:59,574
+use cases. And finally, container networking.
+
+71
+00:04:59,622 --> 00:05:02,550
+All these clusters have to speak to each other. The proxies need to peer.
+
+72
+00:05:02,710 --> 00:05:06,218
+Everything needs connectivity to auth servers, but AutH servers don't
+
+73
+00:05:06,234 --> 00:05:09,520
+run in every region. And so just focusing on ingress first,
+
+74
+00:05:09,970 --> 00:05:14,034
+I'll kind of go through a journey of things. We tried for all of these
+
+75
+00:05:14,232 --> 00:05:20,546
+and how we arrived at the architecture that we have
+
+76
+00:05:20,568 --> 00:05:24,162
+today. So first we tried anycast, actually,
+
+77
+00:05:24,296 --> 00:05:26,680
+and you might imagine how this went.
+
+78
+00:05:27,370 --> 00:05:30,674
+Anycast, we really liked any cast. We tried out anycast
+
+79
+00:05:30,722 --> 00:05:33,746
+through AWS global accelerator.
+
+80
+00:05:33,858 --> 00:05:39,894
+We liked it because it provided really stable ip
+
+81
+00:05:39,942 --> 00:05:44,122
+addresses. DNS never had to change. We could give everybody in the world a single
+
+82
+00:05:44,176 --> 00:05:47,546
+ip address for teleport cloud,
+
+83
+00:05:47,648 --> 00:05:51,066
+and they'd be able to really reliably connect to that. But at the
+
+84
+00:05:51,088 --> 00:05:54,394
+same time, as you might imagine, anycast didn't quite provide stable
+
+85
+00:05:54,442 --> 00:05:57,994
+enough routing. I think there have been a lot of success stories
+
+86
+00:05:58,042 --> 00:06:00,990
+with anycast and streaming video,
+
+87
+00:06:01,140 --> 00:06:05,202
+like kind of long lived TCP connections in that context. But we found that
+
+88
+00:06:05,256 --> 00:06:08,818
+even with a lot of logic, that would resume reverse tunnels quickly if
+
+89
+00:06:08,824 --> 00:06:12,062
+they dropped. It really just wasn't stable
+
+90
+00:06:12,126 --> 00:06:14,930
+enough to provide really consistent,
+
+91
+00:06:16,710 --> 00:06:19,810
+really highly available connectivity.
+
+92
+00:06:20,390 --> 00:06:24,534
+And so any cast didn't work out for us. We also tried
+
+93
+00:06:24,732 --> 00:06:30,266
+open source Nginx as a kind
+
+94
+00:06:30,288 --> 00:06:33,770
+of ingress routing layer in each of the clusters.
+
+95
+00:06:34,350 --> 00:06:39,494
+And we really liked Nginx because it supported ALPN
+
+96
+00:06:39,542 --> 00:06:42,826
+routing. So Nginx
+
+97
+00:06:42,858 --> 00:06:47,678
+will let you route connections from different clients using.
+
+98
+00:06:47,764 --> 00:06:51,578
+So ALPN is kind of similar to SNI. It's some metadata
+
+99
+00:06:51,674 --> 00:06:55,506
+in a TLS connection that'll let you make decisions about how to route that
+
+100
+00:06:55,528 --> 00:06:59,566
+connection without terminating
+
+101
+00:06:59,598 --> 00:07:03,234
+it, without decrypting it. And so the ingress stack could
+
+102
+00:07:03,432 --> 00:07:07,714
+separate client connections from agent connections and route to the correct proxies
+
+103
+00:07:07,842 --> 00:07:11,558
+using that metadata. And Nginx did
+
+104
+00:07:11,564 --> 00:07:15,474
+a great job with that, but it had no in process configuration reloading.
+
+105
+00:07:15,522 --> 00:07:18,802
+And so anytime we'd need to make a change to these routes,
+
+106
+00:07:18,946 --> 00:07:22,854
+we'd need to start a new instance of NginX. And eventually the memory usage
+
+107
+00:07:22,902 --> 00:07:26,554
+got really high. It just didn't work well for
+
+108
+00:07:26,592 --> 00:07:30,438
+how often we needed to change the ingress configuration. And so
+
+109
+00:07:30,624 --> 00:07:34,046
+we didn't go with Nginx either. And so now I'll talk about what we did
+
+110
+00:07:34,068 --> 00:07:38,350
+do. So our ingress stack
+
+111
+00:07:39,730 --> 00:07:43,774
+at the DNF level, we used route 53 latency records
+
+112
+00:07:43,822 --> 00:07:47,140
+with the external DNS operator. And so
+
+113
+00:07:47,750 --> 00:07:51,198
+the external DNS operator would publish latency records
+
+114
+00:07:51,214 --> 00:07:55,640
+to route 53 based on the
+
+115
+00:07:56,810 --> 00:08:01,074
+nlbs that separate
+
+116
+00:08:01,122 --> 00:08:03,910
+network load balancers that would sit in each region.
+
+117
+00:08:04,330 --> 00:08:07,586
+And we use network load balancers instead of
+
+118
+00:08:07,628 --> 00:08:10,570
+any cast because they're kind of stateless.
+
+119
+00:08:12,030 --> 00:08:16,410
+So when there are changes to them underneath, they don't necessarily drop connections.
+
+120
+00:08:17,070 --> 00:08:21,258
+And they let us provide really stable reverse
+
+121
+00:08:21,274 --> 00:08:24,862
+tunnels. Instead of NgINX, we went with
+
+122
+00:08:24,916 --> 00:08:28,410
+envoy proxy, which also supports ALPN routing,
+
+123
+00:08:28,490 --> 00:08:32,422
+which is great. And we configuration it using Gateway API,
+
+124
+00:08:32,506 --> 00:08:36,082
+which is a kind of new set of APIs for
+
+125
+00:08:36,136 --> 00:08:41,038
+ingress in Kubernetes that aims
+
+126
+00:08:41,054 --> 00:08:45,358
+to replace ingress resources
+
+127
+00:08:45,374 --> 00:08:49,078
+that have existed in the past. And we used our
+
+128
+00:08:49,084 --> 00:08:53,174
+own fork of envoy gateway that had some. For one,
+
+129
+00:08:53,212 --> 00:08:56,658
+it supports using annotations to do ALPN routing
+
+130
+00:08:56,674 --> 00:09:00,086
+on TLS routes, but we also made some kind of stabilizing
+
+131
+00:09:00,118 --> 00:09:02,570
+changes there that we're working to get upstream.
+
+132
+00:09:03,390 --> 00:09:07,830
+And finally we have a little hack for doing zero downtime deployments
+
+133
+00:09:07,990 --> 00:09:11,118
+using min ready seconds on top of deployments that
+
+134
+00:09:11,124 --> 00:09:13,950
+I'll talk. And so, to kind of break down what this looks like,
+
+135
+00:09:14,100 --> 00:09:18,426
+imagine you're
+
+136
+00:09:18,458 --> 00:09:22,894
+trying to connect to your Kubernetes cluster using Kubecontrol and
+
+137
+00:09:23,012 --> 00:09:26,670
+the teleport agents running in the Kubernetes cluster, which is behind a firewall.
+
+138
+00:09:26,830 --> 00:09:30,206
+So the relevant pieces of teleport
+
+139
+00:09:30,238 --> 00:09:33,442
+you'll see here are the proxy pods running in each of in this case,
+
+140
+00:09:33,496 --> 00:09:36,834
+we'll just talk about three regions where the client is connecting
+
+141
+00:09:36,882 --> 00:09:40,280
+through proxies in us east one to
+
+142
+00:09:41,370 --> 00:09:44,840
+proxies in AP southeast one where the Kubernetes cluster is running.
+
+143
+00:09:45,690 --> 00:09:49,018
+All the proxy pods have a kind
+
+144
+00:09:49,024 --> 00:09:52,150
+of streaming connections to the auth server,
+
+145
+00:09:52,230 --> 00:09:56,118
+so they get up to date information on roles
+
+146
+00:09:56,294 --> 00:10:00,140
+and information needed to make
+
+147
+00:10:00,830 --> 00:10:04,718
+authorization decisions. All the
+
+148
+00:10:04,724 --> 00:10:08,302
+proxies cache this information so that they can really quickly
+
+149
+00:10:08,356 --> 00:10:11,390
+make these decisions without having to reach out to auth for all of it.
+
+150
+00:10:11,460 --> 00:10:14,782
+So we have the reverse tunnel that's coming from the Kubernetes
+
+151
+00:10:14,846 --> 00:10:18,446
+cluster, and we have the agent connections,
+
+152
+00:10:18,558 --> 00:10:22,126
+these Goop control, that get routed to the closest proxy
+
+153
+00:10:22,238 --> 00:10:25,410
+through a peered connection between the proxies and then finally back up to
+
+154
+00:10:25,480 --> 00:10:28,878
+the Kubernetes cluster. So if we take auth out of this for a second and
+
+155
+00:10:28,904 --> 00:10:32,934
+just look at the connectivity piece, what this looks like is we
+
+156
+00:10:32,972 --> 00:10:36,786
+have the external DNS controller running in each cluster,
+
+157
+00:10:36,978 --> 00:10:40,282
+and we have nlbs sitting in front of
+
+158
+00:10:40,336 --> 00:10:43,946
+the nodes that run the
+
+159
+00:10:43,968 --> 00:10:47,466
+proxy pods in each of the clusters. And external DNS is
+
+160
+00:10:47,488 --> 00:10:50,846
+reading the ips of those nlbs and reporting them back
+
+161
+00:10:50,868 --> 00:10:55,070
+to route 53 so that it can report the ip of the closest
+
+162
+00:10:55,730 --> 00:10:59,178
+proxy when your end user,
+
+163
+00:10:59,354 --> 00:11:03,018
+client or agent needs to connect to a proxy so that
+
+164
+00:11:03,044 --> 00:11:05,970
+it gets the closest regions.
+
+165
+00:11:07,430 --> 00:11:10,834
+And so how do we do a zero downtime deploy on top of this
+
+166
+00:11:10,872 --> 00:11:14,642
+architecture? And this gets a little coordinated because we have
+
+167
+00:11:14,776 --> 00:11:18,434
+these reverse tunnels that are open all the time connected to proxies,
+
+168
+00:11:18,482 --> 00:11:21,462
+but we need to update those proxies, right?
+
+169
+00:11:21,596 --> 00:11:25,014
+So if you look at the architecture we had before, what this looks
+
+170
+00:11:25,052 --> 00:11:28,326
+like is that we have envoy running in each cluster,
+
+171
+00:11:28,438 --> 00:11:31,994
+configured by Envoy gateway routing to different
+
+172
+00:11:32,032 --> 00:11:35,020
+proxy pods for different customers.
+
+173
+00:11:35,390 --> 00:11:39,274
+And when we want to do a deploy, we use
+
+174
+00:11:39,312 --> 00:11:42,800
+the ALPN routing feature in envoy in order to
+
+175
+00:11:45,570 --> 00:11:49,674
+control whether connections
+
+176
+00:11:49,722 --> 00:11:52,894
+land on the old pods or the new pods. So an interesting thing we did
+
+177
+00:11:52,932 --> 00:11:56,942
+here is that we used a feature of Kubernetes deployments
+
+178
+00:11:57,006 --> 00:12:00,062
+that you might not know about called min ready seconds.
+
+179
+00:12:00,126 --> 00:12:03,374
+And so this is kind of similar to a termination grace
+
+180
+00:12:03,422 --> 00:12:07,894
+period where you keep multiple sets of
+
+181
+00:12:07,932 --> 00:12:11,394
+pods running at a time, old generation and new generation
+
+182
+00:12:11,442 --> 00:12:15,810
+running at the same time. But with min ready seconds, you can keep both generations
+
+183
+00:12:15,890 --> 00:12:19,058
+responding to new network requests at the same time for
+
+184
+00:12:19,084 --> 00:12:22,906
+a certain period of time until the new set of
+
+185
+00:12:22,928 --> 00:12:26,554
+proxy pods is not just considered ready,
+
+186
+00:12:26,672 --> 00:12:30,334
+but after the min ready seconds is considered fully available, and then the old
+
+187
+00:12:30,372 --> 00:12:34,126
+pods will terminate. So we use this period of availability of
+
+188
+00:12:34,148 --> 00:12:37,834
+readiness at the same time for both generations
+
+189
+00:12:37,882 --> 00:12:41,920
+of pods to allow new
+
+190
+00:12:42,290 --> 00:12:46,146
+tunnels to come from the existing agents and
+
+191
+00:12:46,168 --> 00:12:49,602
+hit the newly spun up pods until
+
+192
+00:12:49,656 --> 00:12:53,202
+all the new tunnels are fully established before we make
+
+193
+00:12:53,256 --> 00:12:56,890
+the ingress changes that start routing connections through the new set of pods.
+
+194
+00:12:56,990 --> 00:13:00,882
+And then after that happens, and after old connections
+
+195
+00:13:00,946 --> 00:13:04,338
+drain off through the old network pathway,
+
+196
+00:13:04,514 --> 00:13:07,606
+then we shut down the old set of proxy pods. And the way we do
+
+197
+00:13:07,628 --> 00:13:11,066
+this flip from one set of pods to another is that
+
+198
+00:13:11,088 --> 00:13:14,374
+we have a custom controller that changes the labels
+
+199
+00:13:14,422 --> 00:13:17,654
+on a service to point from the old generation to the new generation
+
+200
+00:13:17,702 --> 00:13:21,478
+of pods using our own custom controller logic underneath.
+
+201
+00:13:21,654 --> 00:13:24,926
+And so that's basically an overview of
+
+202
+00:13:24,948 --> 00:13:28,382
+our ingress stack for how we route really
+
+203
+00:13:28,436 --> 00:13:31,966
+ultra long lived tunnels. We route client connections through those
+
+204
+00:13:31,988 --> 00:13:35,522
+long lived tunnels for Kubernetes clusters in six
+
+205
+00:13:35,576 --> 00:13:38,866
+regions. The next thing
+
+206
+00:13:38,888 --> 00:13:42,706
+I'll talk about is deployment. So when we need
+
+207
+00:13:42,728 --> 00:13:46,990
+to upgrade teleport, I talked about how we do it like a zero downtime upgrade
+
+208
+00:13:47,070 --> 00:13:50,566
+for an individual cluster for proxies, but how do we
+
+209
+00:13:50,588 --> 00:13:53,906
+upgrade teleport, auth and proxy across six regions
+
+210
+00:13:53,938 --> 00:13:57,158
+in a coordinated way? And so we tried a couple of
+
+211
+00:13:57,164 --> 00:14:00,690
+different options here. The first thing we tried was Gitops.
+
+212
+00:14:00,770 --> 00:14:04,506
+So what's the most you're doing? Deployment to Kubernetes clusters. What's the first thing
+
+213
+00:14:04,528 --> 00:14:07,978
+you think of? Right, use flux CD or a similar tool to deploy it
+
+214
+00:14:07,984 --> 00:14:11,680
+from a git repo. And so we had our
+
+215
+00:14:12,530 --> 00:14:16,622
+own custom controller, a CRD that's reconciled by
+
+216
+00:14:16,676 --> 00:14:20,510
+a controller we have called tenant controller, and the CRD is of course called tenant.
+
+217
+00:14:20,850 --> 00:14:24,046
+And we thought about storing that configuration in git for
+
+218
+00:14:24,068 --> 00:14:28,366
+each customer and then applying that to all of the clusters.
+
+219
+00:14:28,558 --> 00:14:32,594
+And a disadvantage of this approach we found, number one was
+
+220
+00:14:32,632 --> 00:14:36,722
+we really wanted all the data to stay in postgres. We didn't want to
+
+221
+00:14:36,776 --> 00:14:39,942
+start writing a bunch of customer data into a git repo and having to manage
+
+222
+00:14:39,996 --> 00:14:43,206
+that git repo over time. Another need we
+
+223
+00:14:43,228 --> 00:14:47,250
+had there, another thing didn't work. Sorry about the Gitops approach with Flux,
+
+224
+00:14:47,330 --> 00:14:51,238
+was that flux is very unidirectional. So we didn't just want information synced from
+
+225
+00:14:51,244 --> 00:14:54,266
+a git repo into clusters, we wanted to pull information out
+
+226
+00:14:54,288 --> 00:14:57,626
+of those clusters in order to be able to progress the deploy to more
+
+227
+00:14:57,648 --> 00:15:02,010
+steps. So auth servers finished deploying. Now we want to update proxies,
+
+228
+00:15:02,090 --> 00:15:04,846
+maybe we want to update proxies. We don't want to update every region at the
+
+229
+00:15:04,868 --> 00:15:05,680
+same time.
+
+230
+00:15:07,970 --> 00:15:12,122
+So that approach didn't work. We didn't go with Gitops.
+
+231
+00:15:12,266 --> 00:15:15,554
+We tried cross cluster reconcilers after that,
+
+232
+00:15:15,752 --> 00:15:19,550
+where we had a controller running in each regions,
+
+233
+00:15:19,710 --> 00:15:22,994
+but we didn't have a CRD in each of those regions. They all
+
+234
+00:15:23,032 --> 00:15:26,422
+reconciled against a custom resource, that tenant custom
+
+235
+00:15:26,476 --> 00:15:30,002
+resource in a namespace in the management cluster.
+
+236
+00:15:30,066 --> 00:15:33,906
+So we have a namespace for each customer in every cluster,
+
+237
+00:15:34,018 --> 00:15:37,106
+but the custom resource
+
+238
+00:15:37,218 --> 00:15:41,610
+only lives in the management cluster. In this proposal,
+
+239
+00:15:42,510 --> 00:15:46,298
+this didn't work very well either. So if
+
+240
+00:15:46,304 --> 00:15:49,514
+we'd gone with this, we would have created a big single point of failure for
+
+241
+00:15:49,552 --> 00:15:52,718
+the whole platform in that one cluster. We didn't like that. We wanted everything to
+
+242
+00:15:52,724 --> 00:15:54,670
+be able to operate without management.
+
+243
+00:15:55,410 --> 00:15:59,326
+And there were some difficulties in,
+
+244
+00:15:59,348 --> 00:16:03,282
+like we'd have to have all of the regional clusters write
+
+245
+00:16:03,336 --> 00:16:08,930
+to the same status field of that
+
+246
+00:16:09,000 --> 00:16:12,786
+shared tenancy are, and it leads to conflicts and other problems.
+
+247
+00:16:12,888 --> 00:16:16,150
+And so what we arrived at was
+
+248
+00:16:16,220 --> 00:16:20,166
+neither of those things. We really liked kubefed. We thought Kubefed kind
+
+249
+00:16:20,188 --> 00:16:24,070
+of maybe was on the right track with exposing
+
+250
+00:16:24,730 --> 00:16:28,606
+APIs from one cluster into another cluster, so you could have a controller
+
+251
+00:16:28,658 --> 00:16:32,378
+that understands how to operate custom resources that
+
+252
+00:16:32,384 --> 00:16:35,180
+it's not reconciling, which are reconciled somewhere else.
+
+253
+00:16:35,550 --> 00:16:38,454
+We really like that model, but the project isn't active anymore,
+
+254
+00:16:38,582 --> 00:16:42,586
+and it seems like it'd be a big risk to pick up Kubefed
+
+255
+00:16:42,618 --> 00:16:46,094
+if there really wasn't a lot of activity there. And so we built something that
+
+256
+00:16:46,132 --> 00:16:50,000
+just solves this problem in a really narrow way.
+
+257
+00:16:51,730 --> 00:16:54,834
+It's called sync controller. We just open sourced it a couple of days
+
+258
+00:16:54,872 --> 00:16:58,594
+ago, so you can check it out if you want to. The way
+
+259
+00:16:58,632 --> 00:17:02,382
+sync controller works is it let us build this architecture
+
+260
+00:17:02,446 --> 00:17:06,182
+where we could have a management cluster that
+
+261
+00:17:06,316 --> 00:17:10,150
+is driven by that tenant custom resource inside of a customer
+
+262
+00:17:10,220 --> 00:17:13,746
+namespace. But the controller for the tenant
+
+263
+00:17:13,778 --> 00:17:17,646
+resource is just responsible for creating additional teleport
+
+264
+00:17:17,698 --> 00:17:22,090
+deployment resources, one for each regions that the
+
+265
+00:17:22,240 --> 00:17:25,834
+teleport needs to operate in for that customer. And then
+
+266
+00:17:25,872 --> 00:17:29,370
+that custom resource is synced
+
+267
+00:17:29,970 --> 00:17:34,350
+just to an individual instance of the
+
+268
+00:17:34,420 --> 00:17:37,902
+same resource that lives in each of the different
+
+269
+00:17:37,956 --> 00:17:41,790
+regions. And so tenant CR might create, if there's customers
+
+270
+00:17:41,860 --> 00:17:46,446
+in three regions, US west two, US east one, and AP Southeast
+
+271
+00:17:46,478 --> 00:17:49,966
+one, and each of those are then picked
+
+272
+00:17:49,998 --> 00:17:53,534
+up by sync controller running in those regions, which then creates a namespace,
+
+273
+00:17:53,582 --> 00:17:58,802
+creates the resources, and then reconciles that resource
+
+274
+00:17:58,866 --> 00:18:03,094
+there. And so to kind of dig into what that looks like really in
+
+275
+00:18:03,132 --> 00:18:05,910
+more detail in the management cluster,
+
+276
+00:18:06,570 --> 00:18:09,822
+this diagram here isn't specific to teleport,
+
+277
+00:18:09,906 --> 00:18:13,498
+just generally how you use sync controller. I'll show you a teleport specific version in
+
+278
+00:18:13,504 --> 00:18:17,222
+a second but in this instance
+
+279
+00:18:17,366 --> 00:18:21,066
+you have synccontroller running regionally. It watches the
+
+280
+00:18:21,088 --> 00:18:24,634
+spec of the resource in the management cluster. It copies
+
+281
+00:18:24,682 --> 00:18:28,302
+any changes that it sees to the spec
+
+282
+00:18:28,356 --> 00:18:31,786
+of that resource into the instance of the resource in the regional
+
+283
+00:18:31,818 --> 00:18:35,406
+cluster, where it's then reconciled. The reconciler
+
+284
+00:18:35,438 --> 00:18:39,346
+then writes the latest status of that resource in the
+
+285
+00:18:39,368 --> 00:18:42,882
+regional cluster, and then sync controller is also watching
+
+286
+00:18:43,016 --> 00:18:46,294
+that regional status and copying that back
+
+287
+00:18:46,332 --> 00:18:49,606
+to the management cluster. So that from both the
+
+288
+00:18:49,628 --> 00:18:53,446
+regional cluster's perspective and the management cluster's perspective, you have
+
+289
+00:18:53,468 --> 00:18:55,110
+the same resource,
+
+290
+00:18:56,010 --> 00:18:59,480
+but the management cluster can create and
+
+291
+00:18:59,870 --> 00:19:03,818
+kind of operate a selection of these resources from the outside,
+
+292
+00:19:03,984 --> 00:19:07,334
+whereas the regional cluster can do the actual reconciliation of the resource
+
+293
+00:19:07,382 --> 00:19:11,010
+and create the necessary pods. And so for teleport.
+
+294
+00:19:11,110 --> 00:19:14,526
+So here's the kind of teleport specific version of what
+
+295
+00:19:14,548 --> 00:19:18,186
+this architecture looks like. We have sync controller
+
+296
+00:19:18,218 --> 00:19:21,434
+running in the regional cluster. It's copying the teleport deployment
+
+297
+00:19:21,482 --> 00:19:25,274
+spec into the regional cluster for management, and where it's being reconciled
+
+298
+00:19:25,322 --> 00:19:29,054
+by the teleport controller that creates the auth server and proxy
+
+299
+00:19:29,102 --> 00:19:32,706
+pods, and then any changes to the status are sent back
+
+300
+00:19:32,728 --> 00:19:36,514
+to the management cluster. And then in the management cluster we have a tenant controller
+
+301
+00:19:36,642 --> 00:19:40,214
+that's for one, it's creating, doing any
+
+302
+00:19:40,252 --> 00:19:43,798
+centralized work. So it creates the dynamodB tables or
+
+303
+00:19:43,884 --> 00:19:47,558
+Athena resources for audit logging, all of
+
+304
+00:19:47,564 --> 00:19:51,162
+those things that are shared. And then it creates a selection of
+
+305
+00:19:51,216 --> 00:19:54,858
+teleport deployment resources that configure each region. And the nice thing
+
+306
+00:19:54,864 --> 00:19:58,860
+is that it can react to changes in those, so it can listen to the,
+
+307
+00:20:00,430 --> 00:20:04,110
+it can watch for status changes in us west two know when
+
+308
+00:20:04,180 --> 00:20:07,886
+auth is finished deploying and tell regions that
+
+309
+00:20:07,908 --> 00:20:11,966
+they can update their proxies, for example. So it can make decisions based on the
+
+310
+00:20:11,988 --> 00:20:16,014
+challenging state in the different clusters. And this architecture
+
+311
+00:20:16,062 --> 00:20:19,442
+worked really, really well for us. It's really nice because we can lose the entire
+
+312
+00:20:19,496 --> 00:20:23,342
+management cluster, and all of our regional clusters
+
+313
+00:20:23,406 --> 00:20:25,330
+are still operatable.
+
+314
+00:20:26,150 --> 00:20:29,558
+We have to change the teleport deployments manually in
+
+315
+00:20:29,564 --> 00:20:32,680
+the different regions, but they can keep reconciling forever in that state.
+
+316
+00:20:34,410 --> 00:20:36,840
+So on top of this,
+
+317
+00:20:37,390 --> 00:20:40,742
+I mentioned earlier that we wanted to store customer data in postgres,
+
+318
+00:20:40,806 --> 00:20:44,746
+right? So we
+
+319
+00:20:44,768 --> 00:20:49,158
+kind of built the configuration storage into our customer portal.
+
+320
+00:20:49,254 --> 00:20:53,054
+And so when customers sign up or when employees want
+
+321
+00:20:53,092 --> 00:20:57,150
+to manage customer information, obviously through teleport,
+
+322
+00:21:00,610 --> 00:21:04,218
+all the data is stored in postgres, but the data that
+
+323
+00:21:04,244 --> 00:21:08,210
+needs to live on the cluster as well is stored as
+
+324
+00:21:08,280 --> 00:21:12,034
+a custom resource, as a tenant custom resource in
+
+325
+00:21:12,072 --> 00:21:15,318
+JSON B and postgres. And then whenever there's a change to
+
+326
+00:21:15,324 --> 00:21:18,902
+that data. In postgres we have a sync service that
+
+327
+00:21:18,956 --> 00:21:23,986
+reads that change and sends
+
+328
+00:21:24,018 --> 00:21:27,526
+the change version of that to the management cluster. A really cool thing
+
+329
+00:21:27,548 --> 00:21:31,222
+we did here is we took the open API schema validations
+
+330
+00:21:31,286 --> 00:21:34,922
+that the cluster uses for that CRD, and we also apply
+
+331
+00:21:34,976 --> 00:21:40,874
+them to validate the request to
+
+332
+00:21:40,912 --> 00:21:44,526
+change customer data at the portal level so we don't end up with a
+
+333
+00:21:44,548 --> 00:21:48,574
+CRD that wouldn't apply to the cluster getting stored in the database. That was
+
+334
+00:21:48,612 --> 00:21:51,818
+surprisingly easy to do, using kind of the open source tooling
+
+335
+00:21:51,834 --> 00:21:56,146
+for open API available on GitHub. And so that
+
+336
+00:21:56,168 --> 00:21:59,842
+covers the way we do our coordinated rollouts across
+
+337
+00:21:59,896 --> 00:22:03,186
+clusters. The next kind
+
+338
+00:22:03,208 --> 00:22:06,606
+of big important piece of all this is how did we do container networking?
+
+339
+00:22:06,638 --> 00:22:09,746
+How do we let proxies talk to auth servers?
+
+340
+00:22:09,778 --> 00:22:13,206
+How do we let proxies peer with each other across regions for
+
+341
+00:22:13,228 --> 00:22:16,598
+this massive multi cluster deployment? And what
+
+342
+00:22:16,604 --> 00:22:20,634
+we found was that Psyllium Global services worked really,
+
+343
+00:22:20,672 --> 00:22:24,490
+really well. We tried some different deployment architectures
+
+344
+00:22:24,830 --> 00:22:29,062
+with psyllium. We found that having a dedicated
+
+345
+00:22:29,126 --> 00:22:34,858
+ETCD can perform the best. It let
+
+346
+00:22:34,864 --> 00:22:38,394
+us deal with a lot of pod churn. So whenever we do a big update
+
+347
+00:22:38,442 --> 00:22:42,106
+for many tenants at the same time, and we have a lot of new pods
+
+348
+00:22:42,138 --> 00:22:44,240
+spinning up and shutting down,
+
+349
+00:22:46,210 --> 00:22:49,298
+or also when we update selenium itself, and there's a
+
+350
+00:22:49,304 --> 00:22:53,502
+lot of things that get reconfigured, a dedicated ETCD
+
+351
+00:22:53,566 --> 00:22:57,154
+ended up performing the best. There are some other ways of deploying
+
+352
+00:22:57,202 --> 00:22:59,480
+psyllium global services that you can look into,
+
+353
+00:23:01,050 --> 00:23:04,758
+but that's what worked for us. And so to kind of break down what
+
+354
+00:23:04,764 --> 00:23:08,486
+that looks like, I'll trade this diagram that you
+
+355
+00:23:08,508 --> 00:23:12,002
+saw earlier where you have the teleport deployments in each region, if we focus
+
+356
+00:23:12,076 --> 00:23:15,850
+on the services that get created by the teleport controller there for a second.
+
+357
+00:23:16,000 --> 00:23:19,322
+So we have an auth service and we have a proxy service,
+
+358
+00:23:19,376 --> 00:23:23,770
+but we don't have auth running in every region. So whenever proxies
+
+359
+00:23:23,850 --> 00:23:27,614
+need to speak to auth in us east one, those connections get
+
+360
+00:23:27,652 --> 00:23:31,086
+redirected to Auth, to a
+
+361
+00:23:31,108 --> 00:23:35,620
+service that has the same name that cilium automatically provides forwarding connectivity to
+
+362
+00:23:36,230 --> 00:23:39,806
+in us east
+
+363
+00:23:39,838 --> 00:23:44,340
+one, to us west two. So that lets us run
+
+364
+00:23:45,290 --> 00:23:48,870
+our Auth servers in multiple availability zones in one region,
+
+365
+00:23:49,370 --> 00:23:53,094
+but not have to run them in every region. And proxies in all
+
+366
+00:23:53,132 --> 00:23:57,238
+regions have cached access to those
+
+367
+00:23:57,404 --> 00:24:00,166
+auth server pods. In some cases,
+
+368
+00:24:00,358 --> 00:24:02,730
+we don't have proxies available at a region,
+
+369
+00:24:03,790 --> 00:24:07,206
+and in those cases, our custom controllers also can create a global
+
+370
+00:24:07,238 --> 00:24:10,540
+service that redirects proxy connectivity to
+
+371
+00:24:12,030 --> 00:24:15,582
+the closest region which can calculate. And so
+
+372
+00:24:15,716 --> 00:24:19,146
+that is our user journey through teleport cloud architecture
+
+373
+00:24:19,338 --> 00:24:22,510
+covering ingress deployment and container networking.
+
+374
+00:24:24,290 --> 00:24:27,586
+Just as a reminder, a lot of the stuff you saw today
+
+375
+00:24:27,608 --> 00:24:30,290
+is open source sync controller.
+
+376
+00:24:30,870 --> 00:24:33,774
+You know, as Apache two licensed,
+
+377
+00:24:33,822 --> 00:24:37,080
+we actually just open sourced this a couple of days ago. Please check it out.
+
+378
+00:24:38,810 --> 00:24:42,166
+It's not something you deploy to a Kubernetes cluster. It's a tool you
+
+379
+00:24:42,188 --> 00:24:45,398
+can use to build. It's a reconciler you
+
+380
+00:24:45,404 --> 00:24:48,886
+can import into your own controller manager that will let you create
+
+381
+00:24:48,908 --> 00:24:52,090
+a management plane using your own custom resources.
+
+382
+00:24:52,750 --> 00:24:56,134
+We also maintain a fork of envoy gateway that supports ALPN
+
+383
+00:24:56,182 --> 00:24:59,738
+routing and has a couple of other changes we made and a
+
+384
+00:24:59,744 --> 00:25:03,280
+lot of them we got upstream actually to kind of
+
+385
+00:25:03,730 --> 00:25:07,230
+stabilize some parts of envoy gateway work.
+
+386
+00:25:07,380 --> 00:25:10,426
+And finally, of course, teleport is Apache two licensed.
+
+387
+00:25:10,538 --> 00:25:14,334
+You can check that out as well, deploy the open source version and see
+
+388
+00:25:14,372 --> 00:25:17,934
+what you think. And last but not least,
+
+389
+00:25:17,972 --> 00:25:21,418
+I want to give a huge thanks to everybody on the teleport
+
+390
+00:25:21,434 --> 00:25:25,570
+cloud backend team. Carson, David Tobias and Bert Bernard.
+
+391
+00:25:25,650 --> 00:25:28,422
+You can kind of see the parts they worked on here. This was a huge
+
+392
+00:25:28,476 --> 00:25:31,480
+team effort, wasn't just this team, right,
+
+393
+00:25:32,970 --> 00:25:35,960
+to kind of get this platform together.
+
+394
+00:25:36,490 --> 00:25:38,420
+And that's all I got. Thanks everybody.
+
