@@ -1,0 +1,956 @@
+1
+00:00:44,130 --> 00:00:47,586
+Hi everybody, my name is Azad Rudyk and I'm the director of engineering
+
+2
+00:00:47,618 --> 00:00:51,482
+at Stackpools and I'm here with Oralimelev, our SRE
+
+3
+00:00:51,546 --> 00:00:55,082
+lead. And today we areas going to discuss Puerta, which is a gating
+
+4
+00:00:55,146 --> 00:00:58,650
+service that we created for our Kubernetes native
+
+5
+00:00:58,730 --> 00:01:02,014
+continuous delivery. What we are going to discuss today first we'll start
+
+6
+00:01:02,052 --> 00:01:05,762
+with a quick introduction to Stackpools. After that we will discuss
+
+7
+00:01:05,896 --> 00:01:10,034
+a little bit more about our delivery pipeline and we will
+
+8
+00:01:10,072 --> 00:01:13,442
+dig into later about our custom gates. We will
+
+9
+00:01:13,496 --> 00:01:17,006
+explain how they created and how they support our culture.
+
+10
+00:01:17,118 --> 00:01:21,158
+And after that we will describe Puerta, which is the service that
+
+11
+00:01:21,244 --> 00:01:25,222
+handles those gates and support our pipeline. Okay, so about
+
+12
+00:01:25,276 --> 00:01:28,490
+Stackpools. So Stackpulse is a fairly new
+
+13
+00:01:28,560 --> 00:01:32,314
+startup that creates we create a SaaS platform
+
+14
+00:01:32,512 --> 00:01:36,122
+for sres and for reliability in general. We call that
+
+15
+00:01:36,176 --> 00:01:39,466
+reliability as code. We digest many
+
+16
+00:01:39,568 --> 00:01:43,738
+events coming from monitoring systems and we enable sres
+
+17
+00:01:43,834 --> 00:01:47,950
+to automatically respond to those events by
+
+18
+00:01:48,020 --> 00:01:50,890
+executing an automation that we call playbooks.
+
+19
+00:01:50,970 --> 00:01:54,606
+Playbooks help investigate and remediate events
+
+20
+00:01:54,638 --> 00:01:58,958
+and resolve incidents automatically without any manual intervention
+
+21
+00:01:59,054 --> 00:02:02,686
+and therefore reaching a faster resolution, a safer resolution
+
+22
+00:02:02,798 --> 00:02:06,770
+and quicker response. A bit about our tech stack
+
+23
+00:02:06,850 --> 00:02:10,694
+at Stackpulse we leverage Google Cloud platform as our cloud
+
+24
+00:02:10,732 --> 00:02:14,326
+provider, and we heavily relied on Kubernetes to
+
+25
+00:02:14,348 --> 00:02:17,966
+deploy our services. Particularly we use GKE,
+
+26
+00:02:18,098 --> 00:02:21,766
+which is the managed solution in GCP. We strongly
+
+27
+00:02:21,798 --> 00:02:25,674
+believe in immutable infrastructure. So we have terraform code
+
+28
+00:02:25,792 --> 00:02:28,940
+that describes all our infrastructure as code.
+
+29
+00:02:29,310 --> 00:02:33,226
+And probably, as you guessed, we are cloud native architecture.
+
+30
+00:02:33,258 --> 00:02:37,166
+We have microservices and we have modern RPC in
+
+31
+00:02:37,188 --> 00:02:39,978
+the communication between those microservices.
+
+32
+00:02:40,154 --> 00:02:43,694
+And as the context of this talk, we have
+
+33
+00:02:43,732 --> 00:02:47,486
+a full CI CD from a merge to the main branch
+
+34
+00:02:47,598 --> 00:02:51,598
+up to production automatically without any human intervention
+
+35
+00:02:51,694 --> 00:02:54,914
+in between. And that's the context of this talk,
+
+36
+00:02:54,952 --> 00:02:58,834
+and we'll dig a little bit about that in the next slides.
+
+37
+00:02:58,962 --> 00:03:03,106
+Okay, so with that I let Orr explain and discuss our pipeline.
+
+38
+00:03:03,218 --> 00:03:07,090
+Thank you Rudik. I'm Orr, the SRE lead at Stackpulse,
+
+39
+00:03:07,170 --> 00:03:10,842
+and I'll take it from here. Let's talk about the
+
+40
+00:03:10,896 --> 00:03:15,098
+CD pipeline. At Stackpulse we use fairly common
+
+41
+00:03:15,184 --> 00:03:19,082
+infrastructure. We use GitHub as our hosting for code
+
+42
+00:03:19,136 --> 00:03:22,542
+repositories and circle CI for the
+
+43
+00:03:22,596 --> 00:03:26,186
+CI pipelines. We are using with lego
+
+44
+00:03:26,298 --> 00:03:29,674
+bricks, with Fluxcd and flugger and circle,
+
+45
+00:03:29,722 --> 00:03:32,842
+and connecting all of it together with Puerta,
+
+46
+00:03:32,906 --> 00:03:36,306
+which I'll discuss in a bit. For the CI part we have
+
+47
+00:03:36,408 --> 00:03:40,126
+GitHub, which kicks a circle CI job for each commit,
+
+48
+00:03:40,238 --> 00:03:43,886
+then the circleci. A successful job ends
+
+49
+00:03:43,918 --> 00:03:47,750
+up with Docker and OCI image pushed to a
+
+50
+00:03:47,820 --> 00:03:51,362
+registry. In the CD part we have flux,
+
+51
+00:03:51,426 --> 00:03:54,882
+which is for those who don't know, Flux is a GitHub
+
+52
+00:03:54,946 --> 00:03:59,254
+toolkit which listens to two resources.
+
+53
+00:03:59,382 --> 00:04:03,354
+One of them is git for configuration, the other is
+
+54
+00:04:03,472 --> 00:04:06,982
+container registry, in our case, Google container
+
+55
+00:04:07,126 --> 00:04:10,730
+registry for new artifacts and images.
+
+56
+00:04:10,890 --> 00:04:14,058
+We push the image to the registry,
+
+57
+00:04:14,154 --> 00:04:17,694
+flux then refreshes its cache, discovers the
+
+58
+00:04:17,732 --> 00:04:21,642
+image, applies it to the new canary flagger,
+
+59
+00:04:21,706 --> 00:04:25,358
+then recognize that and triggers a new canary
+
+60
+00:04:25,454 --> 00:04:30,110
+pipeline. The way we extend flagger is through webhook
+
+61
+00:04:30,190 --> 00:04:34,162
+as you see listed here, all the webhook stages that
+
+62
+00:04:34,216 --> 00:04:37,602
+flagger supports and we leverage and implement
+
+63
+00:04:37,666 --> 00:04:41,186
+those in Puerta. The custom gates are implemented
+
+64
+00:04:41,218 --> 00:04:45,202
+in Puerta like I said, and this is how we extend
+
+65
+00:04:45,346 --> 00:04:48,950
+flagger and support internal tooling
+
+66
+00:04:49,030 --> 00:04:52,426
+and the organizational culture and structure we use.
+
+67
+00:04:52,528 --> 00:04:55,786
+Let's discuss deeper so what happens to
+
+68
+00:04:55,808 --> 00:04:59,274
+a commit HPR get merged to the main
+
+69
+00:04:59,312 --> 00:05:02,814
+branch, then CI system triggers a
+
+70
+00:05:02,852 --> 00:05:05,786
+build on staging on the main branch.
+
+71
+00:05:05,898 --> 00:05:10,154
+Flux then updates the workload for the canary flagger
+
+72
+00:05:10,202 --> 00:05:13,266
+triggers a new canary pipeline, then we
+
+73
+00:05:13,288 --> 00:05:16,882
+have pre rollout triggers our e two e and
+
+74
+00:05:16,936 --> 00:05:19,730
+waits for the e two e job to finish.
+
+75
+00:05:19,880 --> 00:05:23,730
+During rollout, we use the built in
+
+76
+00:05:23,880 --> 00:05:27,690
+metrics for flagger. It queries
+
+77
+00:05:27,870 --> 00:05:31,142
+our Prometheus monitoring system for success rate
+
+78
+00:05:31,196 --> 00:05:35,218
+and latency. We fine tune each canary
+
+79
+00:05:35,314 --> 00:05:39,030
+metrics depending on its slos
+
+80
+00:05:39,190 --> 00:05:42,394
+and if we stray away from the
+
+81
+00:05:42,432 --> 00:05:45,994
+success rate and latency we set to
+
+82
+00:05:46,032 --> 00:05:49,974
+reach in our service, we fail the rollout
+
+83
+00:05:50,102 --> 00:05:53,806
+and roll back the canary deployments and shift all
+
+84
+00:05:53,828 --> 00:05:58,010
+the traffic back to the priming. We then have a post rollout.
+
+85
+00:05:58,090 --> 00:06:01,726
+On a successful rollout on Flagger, we implements the
+
+86
+00:06:01,748 --> 00:06:05,134
+post rollout webhook which creates a new release
+
+87
+00:06:05,182 --> 00:06:09,826
+on GitHub and then all the things happens
+
+88
+00:06:10,008 --> 00:06:13,410
+again the same way on prod. So a new
+
+89
+00:06:13,480 --> 00:06:16,498
+CI built triggers on the new release.
+
+90
+00:06:16,594 --> 00:06:20,114
+Fluxity then updates the workload on production
+
+91
+00:06:20,242 --> 00:06:24,022
+flagger, triggering a new canary pipeline on production and
+
+92
+00:06:24,156 --> 00:06:27,586
+again and again. So why do we need custom gates?
+
+93
+00:06:27,698 --> 00:06:31,082
+Let's discuss. We want to deliver a value
+
+94
+00:06:31,136 --> 00:06:34,858
+for our customers since we are a new startup and we want
+
+95
+00:06:34,944 --> 00:06:39,254
+to impact customers as fast and as reliably
+
+96
+00:06:39,302 --> 00:06:43,082
+as we can. The way we do this is with gating.
+
+97
+00:06:43,226 --> 00:06:46,814
+We make developers feel comfortable with
+
+98
+00:06:46,852 --> 00:06:50,746
+pushing all day every day and relying
+
+99
+00:06:50,778 --> 00:06:54,542
+on a gating service to gate and fence
+
+100
+00:06:54,606 --> 00:06:58,178
+their failures and mitigate bad
+
+101
+00:06:58,264 --> 00:07:02,274
+releases from reaching production. We want to support our
+
+102
+00:07:02,312 --> 00:07:06,102
+organizational culture. We strongly believe in
+
+103
+00:07:06,236 --> 00:07:09,922
+great engineering culture throughout our organization.
+
+104
+00:07:10,066 --> 00:07:13,894
+The CD is not an exception for this.
+
+105
+00:07:14,012 --> 00:07:17,078
+We want to have everything support
+
+106
+00:07:17,244 --> 00:07:20,634
+our organizational culture and we do
+
+107
+00:07:20,672 --> 00:07:25,046
+this with gating only e two e tested flows
+
+108
+00:07:25,238 --> 00:07:29,610
+which the e two e are tested by the
+
+109
+00:07:29,680 --> 00:07:33,678
+point of view of the user. Which means we can catch bugs that
+
+110
+00:07:33,764 --> 00:07:37,566
+developers may missed during unit test and
+
+111
+00:07:37,588 --> 00:07:41,166
+integration test and we might catch those in the
+
+112
+00:07:41,188 --> 00:07:44,642
+gating and then prevent from those
+
+113
+00:07:44,696 --> 00:07:48,942
+who reach production. Visibility is a crucial part of pipeline.
+
+114
+00:07:49,006 --> 00:07:53,102
+Developers want to know what's the state and phase
+
+115
+00:07:53,166 --> 00:07:57,154
+of their deployment and where it stands. Is it
+
+116
+00:07:57,192 --> 00:08:01,014
+in prod yet or not? Can I check, can I reach the code on
+
+117
+00:08:01,052 --> 00:08:04,518
+prod? Can I test it? Can I check that everything that I
+
+118
+00:08:04,604 --> 00:08:08,558
+tested in dev is actually working as expected
+
+119
+00:08:08,674 --> 00:08:11,910
+or not. We strongly believe in full ownership
+
+120
+00:08:11,990 --> 00:08:15,754
+of developers from dev to production. You build
+
+121
+00:08:15,792 --> 00:08:18,838
+it, you run it, you are the owner of the commit,
+
+122
+00:08:18,934 --> 00:08:22,210
+you make sure it reaches staging,
+
+123
+00:08:22,310 --> 00:08:25,982
+it behaves correctly, you test it, you write
+
+124
+00:08:26,036 --> 00:08:29,454
+the e two e test, you write the integration and unit test and
+
+125
+00:08:29,492 --> 00:08:33,806
+make sure everything reaches in a safe manner to production.
+
+126
+00:08:33,998 --> 00:08:37,586
+Another benefit of having a gate is we
+
+127
+00:08:37,608 --> 00:08:41,634
+can gather all the events happening in flagger and keep
+
+128
+00:08:41,672 --> 00:08:45,070
+an audit trail in logs and store them for a
+
+129
+00:08:45,080 --> 00:08:48,962
+longer time. Plus having them in a central
+
+130
+00:08:49,106 --> 00:08:52,534
+channel. We can follow when and
+
+131
+00:08:52,572 --> 00:08:56,134
+where was a release and we can use
+
+132
+00:08:56,172 --> 00:08:59,734
+it for compliance reasons. So let's
+
+133
+00:08:59,782 --> 00:09:03,990
+talk about the gates a bit. We have confirmed
+
+134
+00:09:04,070 --> 00:09:08,214
+rollout webhook implemented in Puerta. We strongly
+
+135
+00:09:08,262 --> 00:09:12,174
+believe in reliability since we areas a reliability platform.
+
+136
+00:09:12,372 --> 00:09:16,126
+And what we want from developers is actually
+
+137
+00:09:16,308 --> 00:09:19,902
+work when they feel comfortable remotely or
+
+138
+00:09:19,956 --> 00:09:24,014
+in the office or at night where they reach peak
+
+139
+00:09:24,062 --> 00:09:28,162
+performance. We don't want to block them from merging their code
+
+140
+00:09:28,216 --> 00:09:31,986
+when it's ready. We believe in small code changes and
+
+141
+00:09:32,088 --> 00:09:35,098
+prs and merging constantly.
+
+142
+00:09:35,214 --> 00:09:38,614
+The PRS is crucial part. The thing is everything is
+
+143
+00:09:38,652 --> 00:09:41,846
+automated. So we don't want someone
+
+144
+00:09:42,028 --> 00:09:45,622
+merging at midnight their commit to reach
+
+145
+00:09:45,676 --> 00:09:49,622
+prod. So we actually gate them from
+
+146
+00:09:49,676 --> 00:09:53,074
+reaching production in hours. People cannot
+
+147
+00:09:53,122 --> 00:09:56,934
+attend their code reaching production without waking
+
+148
+00:09:56,982 --> 00:10:00,646
+up the on caller and stuff. We are making sure
+
+149
+00:10:00,768 --> 00:10:04,542
+the rollout happens during work hours. We have
+
+150
+00:10:04,596 --> 00:10:08,734
+12 hours during the day that everyone can attend and
+
+151
+00:10:08,852 --> 00:10:12,822
+actually answer on call regarding bad deployments.
+
+152
+00:10:12,986 --> 00:10:16,590
+So it's actually guarding developers
+
+153
+00:10:16,670 --> 00:10:19,874
+from having mistakes without
+
+154
+00:10:19,992 --> 00:10:23,538
+intention at night. And we keep the code
+
+155
+00:10:23,624 --> 00:10:26,882
+chunks smaller and much more reliable
+
+156
+00:10:26,946 --> 00:10:30,646
+and easier to read instead of having a
+
+157
+00:10:30,668 --> 00:10:33,894
+big chunk of code reaching production in
+
+158
+00:10:34,012 --> 00:10:37,902
+every time of the day. So we use the confirmable
+
+159
+00:10:37,986 --> 00:10:42,166
+rollout webhook to simulate release trains
+
+160
+00:10:42,278 --> 00:10:46,294
+and we areas queuing the releases from reaching
+
+161
+00:10:46,342 --> 00:10:49,514
+production to certain hours.
+
+162
+00:10:49,632 --> 00:10:53,162
+Here is can example. So the canary is waiting.
+
+163
+00:10:53,226 --> 00:10:56,874
+This is Friday. It's weekend here in Israel.
+
+164
+00:10:57,002 --> 00:11:00,286
+People don't want to wake up from a
+
+165
+00:11:00,308 --> 00:11:04,234
+release happening during the weekend, and this release
+
+166
+00:11:04,282 --> 00:11:07,938
+will queue up until Sunday morning and
+
+167
+00:11:08,024 --> 00:11:11,154
+will let hard devs have their
+
+168
+00:11:11,192 --> 00:11:14,046
+weekend with their families, et cetera.
+
+169
+00:11:14,238 --> 00:11:17,714
+So the next gate is the e two e execution.
+
+170
+00:11:17,842 --> 00:11:21,170
+We use the pre rollout webhook
+
+171
+00:11:21,250 --> 00:11:25,106
+to trigger a CI job on each newly deployed
+
+172
+00:11:25,138 --> 00:11:29,266
+Canary. If the job fails, we fail
+
+173
+00:11:29,378 --> 00:11:32,818
+the entire canary without actually impacting prod.
+
+174
+00:11:32,914 --> 00:11:36,186
+The pre rollout prevents traffic from getting to the
+
+175
+00:11:36,208 --> 00:11:40,502
+new canary and it stops before even propagating
+
+176
+00:11:40,646 --> 00:11:44,358
+a single percent of traffic. We use playwright,
+
+177
+00:11:44,454 --> 00:11:48,014
+which is an etc infrastructure for UI tests and
+
+178
+00:11:48,132 --> 00:11:51,950
+our entire APIs are GRPC based. So we
+
+179
+00:11:52,100 --> 00:11:55,566
+enjoy the fact that we get generated
+
+180
+00:11:55,678 --> 00:11:59,566
+clients for each API and we leverage
+
+181
+00:11:59,678 --> 00:12:03,278
+these generated clients in the e two e to trigger
+
+182
+00:12:03,374 --> 00:12:06,774
+both UI and API tests along
+
+183
+00:12:06,812 --> 00:12:10,754
+the same job. This one helps us simulate
+
+184
+00:12:10,882 --> 00:12:14,294
+a user accessing our systems from the
+
+185
+00:12:14,332 --> 00:12:18,246
+CLI, the API or the UI,
+
+186
+00:12:18,358 --> 00:12:22,378
+and helps us catch bugs which we couldn't find or
+
+187
+00:12:22,464 --> 00:12:26,362
+catch beforehand. This adds another layer of
+
+188
+00:12:26,416 --> 00:12:29,746
+protection and makes developers
+
+189
+00:12:29,878 --> 00:12:33,466
+feel much comfortable when pushing code. Next gate
+
+190
+00:12:33,578 --> 00:12:37,214
+is crucial it seems trivial to have
+
+191
+00:12:37,252 --> 00:12:40,366
+stack notifications for each phase, but what
+
+192
+00:12:40,388 --> 00:12:44,002
+we had at first is we use
+
+193
+00:12:44,136 --> 00:12:47,742
+the built in notifications from Flagger,
+
+194
+00:12:47,806 --> 00:12:51,650
+which are lacking. They're not that verbose. So we
+
+195
+00:12:51,720 --> 00:12:54,530
+added an event webhook in Puerta,
+
+196
+00:12:55,210 --> 00:12:58,966
+which took every event verbosely and pushed it
+
+197
+00:12:58,988 --> 00:13:02,886
+to a central channel. What we then realized is
+
+198
+00:13:02,988 --> 00:13:06,162
+developers were complaining about the noise in the central
+
+199
+00:13:06,226 --> 00:13:10,102
+channel. They have very verbose messages
+
+200
+00:13:10,166 --> 00:13:13,514
+about all the microservices we deploy at
+
+201
+00:13:13,552 --> 00:13:17,174
+Stackpulse for dev and staging, and everything was concentrated
+
+202
+00:13:17,222 --> 00:13:20,854
+into the same channel. We then decided to actually keep
+
+203
+00:13:20,912 --> 00:13:24,206
+the channel and copy the messages in order to
+
+204
+00:13:24,308 --> 00:13:28,318
+be able to audit and transparency in the organization and
+
+205
+00:13:28,404 --> 00:13:32,074
+let everyone know what happened when, so we can correlate
+
+206
+00:13:32,122 --> 00:13:35,554
+between incidents and deployments. But we wanted
+
+207
+00:13:35,672 --> 00:13:39,794
+the developers to know where they stand, in which
+
+208
+00:13:39,832 --> 00:13:44,002
+phase their code and commit is at, and know
+
+209
+00:13:44,136 --> 00:13:47,798
+where exactly they stand and whether their code
+
+210
+00:13:47,884 --> 00:13:51,730
+reached production or staging, and whether it failed.
+
+211
+00:13:51,810 --> 00:13:54,934
+And then if it failed, they can
+
+212
+00:13:54,972 --> 00:13:58,182
+go back and probably fix it and know why
+
+213
+00:13:58,236 --> 00:14:01,786
+it failed. Maybe 500, maybe something in
+
+214
+00:14:01,808 --> 00:14:05,146
+the server, maybe something in the e two e broke it
+
+215
+00:14:05,248 --> 00:14:08,442
+and they broke the contract and they go and fix it.
+
+216
+00:14:08,496 --> 00:14:11,806
+The feedback loop is much shorter and the
+
+217
+00:14:11,828 --> 00:14:14,874
+DM is more curated at the developer
+
+218
+00:14:14,922 --> 00:14:18,106
+and helps the developer identify bugs
+
+219
+00:14:18,138 --> 00:14:21,806
+and stuff earlier in the pipeline. So I'll give it
+
+220
+00:14:21,828 --> 00:14:24,946
+back to Rudik. I think we're done.
+
+221
+00:14:25,048 --> 00:14:28,658
+If everyone want to know another they have questions
+
+222
+00:14:28,744 --> 00:14:32,818
+regarding Flager and Puerta. They can reach me.
+
+223
+00:14:32,984 --> 00:14:36,774
+So let's sum up. At Stackpulse we create a SaaS platform for
+
+224
+00:14:36,812 --> 00:14:40,194
+sres and for reliability in general. We relied
+
+225
+00:14:40,242 --> 00:14:44,006
+heavily on our continuous deployment pipeline to do that safely and to
+
+226
+00:14:44,028 --> 00:14:47,366
+deliver fast value for our customers. To do
+
+227
+00:14:47,388 --> 00:14:50,806
+that, we use Flager, which is a very common solution in
+
+228
+00:14:50,828 --> 00:14:54,774
+that field. But we had to extend the built in functionality
+
+229
+00:14:54,822 --> 00:14:58,474
+of flagger using a custom tool that we created, which is which
+
+230
+00:14:58,512 --> 00:15:02,298
+we call Puerta. And Puerta has custom gates that support
+
+231
+00:15:02,384 --> 00:15:05,706
+our own needs and our own organizational culture. As Tor
+
+232
+00:15:05,738 --> 00:15:09,754
+mentioned, we have e to e there and we have notifications
+
+233
+00:15:09,802 --> 00:15:13,358
+there and many other things, and that's what helps us to achieve that
+
+234
+00:15:13,444 --> 00:15:16,970
+fast value and fast and safe feedback loop.
+
+235
+00:15:17,130 --> 00:15:20,462
+So it help us a lot to extend that functionality and
+
+236
+00:15:20,516 --> 00:15:24,206
+get state of the art continuous deployment pipeline thank you
+
+237
+00:15:24,228 --> 00:15:27,394
+so much for watching our session on Puerta, a gating service for Kubernetes
+
+238
+00:15:27,442 --> 00:15:31,042
+native CD. Please feel free to reach out on Twitter and ask us additional
+
+239
+00:15:31,106 --> 00:15:33,014
+questions. We'd love to hear from you.
+
