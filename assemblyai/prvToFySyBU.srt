@@ -1,0 +1,1116 @@
+1
+00:00:38,850 --> 00:00:42,674
+Hello and welcome to this talk on automated grenade testing for platform components.
+
+2
+00:00:42,802 --> 00:00:46,086
+My name is Jonathan Mounty and I'm a cloud engineer and engineering leader here at
+
+3
+00:00:46,108 --> 00:00:49,430
+Cisco, where we maintain a Kubernetes based multi cloud platform
+
+4
+00:00:49,500 --> 00:00:53,226
+at scale it today I wanted to present to you a technique we've
+
+5
+00:00:53,258 --> 00:00:56,766
+developed for efficiently testing platform components together and share that
+
+6
+00:00:56,788 --> 00:01:00,282
+with the DevOps community. So to give a bit of background,
+
+7
+00:01:00,346 --> 00:01:04,034
+we maintain hundreds of clusters in different environments, owning everything between
+
+8
+00:01:04,072 --> 00:01:08,254
+the data center and the application layer. That includes environment definitions, the physical
+
+9
+00:01:08,302 --> 00:01:11,710
+virtual machines themselves, the control plane metrics and observability
+
+10
+00:01:11,790 --> 00:01:15,182
+stacks, as well as deployment pipelines. And at this scale,
+
+11
+00:01:15,246 --> 00:01:18,286
+your configuration becomes a critical point of failure of your platform,
+
+12
+00:01:18,408 --> 00:01:22,306
+especially when it comes to version combinations. And the velocity
+
+13
+00:01:22,338 --> 00:01:25,666
+of the changes that you make in these environments necessitates a different approach
+
+14
+00:01:25,698 --> 00:01:29,110
+to integration testing than we have found in other fields of software engineering.
+
+15
+00:01:29,550 --> 00:01:32,890
+So grenade testing itself actually involves no actual
+
+16
+00:01:32,960 --> 00:01:36,438
+grenades, but it does provide an output of compatible versions that don't
+
+17
+00:01:36,454 --> 00:01:38,060
+blow up when they're used together.
+
+18
+00:01:40,270 --> 00:01:43,426
+So to understand or introduce grenade testing as a concept,
+
+19
+00:01:43,478 --> 00:01:46,814
+I'll first introduce you to our stack. Yours might be different to this,
+
+20
+00:01:46,852 --> 00:01:50,942
+but it likely has the same or similar layers involved. So we
+
+21
+00:01:50,996 --> 00:01:54,922
+start with provisioning the actual machines that we run on using terraform.
+
+22
+00:01:55,066 --> 00:01:58,466
+We then make those machines easy to manage by clustering them.
+
+23
+00:01:58,568 --> 00:02:02,194
+We then make the applications on top easy to manage by bundling them together using
+
+24
+00:02:02,232 --> 00:02:05,826
+a release management tool. We link that in with the other peer clusters so
+
+25
+00:02:05,848 --> 00:02:08,846
+we can see what's going on in one place, and then we add an awareness
+
+26
+00:02:08,878 --> 00:02:12,486
+of what's going on in different environments, for example, your integration environment and
+
+27
+00:02:12,508 --> 00:02:15,878
+your production environment and things like that. Grenade testing will help with
+
+28
+00:02:15,884 --> 00:02:17,670
+the first three of these considerations.
+
+29
+00:02:20,990 --> 00:02:24,630
+So we've mostly built our platform with CNCF projects.
+
+30
+00:02:24,710 --> 00:02:28,262
+So to start with, we define a manifest which includes
+
+31
+00:02:28,326 --> 00:02:31,966
+size, instance types and core versions of the actual infrastructure which we
+
+32
+00:02:31,988 --> 00:02:35,658
+aim to provision, which is transformed into terraform by two tightly coupled
+
+33
+00:02:35,674 --> 00:02:38,746
+tools which we call infrastl and federated infra.
+
+34
+00:02:38,938 --> 00:02:42,666
+We then provision a cluster control plane using lots
+
+35
+00:02:42,698 --> 00:02:45,738
+of relatively horrible ansible and kubespray,
+
+36
+00:02:45,914 --> 00:02:48,930
+and we do application deploys using helm.
+
+37
+00:02:49,350 --> 00:02:52,946
+We then use the concept of a command and control cluster, which we use
+
+38
+00:02:52,968 --> 00:02:55,966
+to run a lot of our automation and make things easy to manage. And we've
+
+39
+00:02:55,998 --> 00:02:59,350
+also defined a high level way of orchestrating applications across environments.
+
+40
+00:02:59,850 --> 00:03:03,398
+This is a relatively extensible tool, so we can always change the
+
+41
+00:03:03,404 --> 00:03:06,674
+way we run. Add cluster, API, eks, GKE clusters,
+
+42
+00:03:06,722 --> 00:03:10,034
+whatever platform is really a fusion of these components,
+
+43
+00:03:10,082 --> 00:03:13,002
+and it's constantly evolving, which is all the more reason that we need to test
+
+44
+00:03:13,056 --> 00:03:16,506
+these things pretty comprehensively. It's great to see
+
+45
+00:03:16,528 --> 00:03:19,946
+this stuff on a presentation slide. It looks like it makes sense, but actually
+
+46
+00:03:20,048 --> 00:03:23,710
+under the hood, what you're looking at, it's a pipeline.
+
+47
+00:03:24,050 --> 00:03:28,014
+So hopefully most of you are familiar with this absolute dream of everything going
+
+48
+00:03:28,052 --> 00:03:32,078
+well in Argo or your workflow engine of choice. Other workflow engines are available,
+
+49
+00:03:32,244 --> 00:03:35,646
+but the reality is, whenever we put these things
+
+50
+00:03:35,668 --> 00:03:39,566
+on a slide, you're missing a lot of links, like a misconfigured cluster that breaks
+
+51
+00:03:39,598 --> 00:03:43,182
+your terraform rendering, or when you think your fix was backward compatible,
+
+52
+00:03:43,246 --> 00:03:46,946
+but actually it wasn't. Or the engineer that pushed that
+
+53
+00:03:46,968 --> 00:03:50,646
+fix at 447 on a Friday night before heading on PTO for a week that
+
+54
+00:03:50,668 --> 00:03:53,878
+you hit at 924 on Monday morning. Because you would,
+
+55
+00:03:53,964 --> 00:03:57,638
+wouldn't you? And the pipelines that link these all up, how do you
+
+56
+00:03:57,644 --> 00:04:01,466
+ensure that an update to your pipelines that adds a feature or allows you
+
+57
+00:04:01,488 --> 00:04:05,222
+to enable new functionality doesn't break things somewhere else in your tooling?
+
+58
+00:04:05,286 --> 00:04:08,860
+And often these things aren't tested as comprehensively as we might like.
+
+59
+00:04:09,470 --> 00:04:12,954
+In these cases, combinatorial testing is intractable once you have a few
+
+60
+00:04:12,992 --> 00:04:16,746
+versions, and unit testing will go some way to ensure individual components
+
+61
+00:04:16,778 --> 00:04:19,998
+aren't faulty. But what about when you put them together? And maybe you upgrade a
+
+62
+00:04:20,004 --> 00:04:23,226
+version of one tool that expects a different API version?
+
+63
+00:04:23,418 --> 00:04:27,314
+And traditional integration testing very quickly becomes very
+
+64
+00:04:27,352 --> 00:04:30,850
+expensive for every change we make, especially when it comes to
+
+65
+00:04:30,920 --> 00:04:34,514
+various different environments where we're running multiple tools on top of the same platform,
+
+66
+00:04:34,632 --> 00:04:38,566
+and every tool wants its, or every use case of the platform wants its
+
+67
+00:04:38,588 --> 00:04:42,440
+own integration environment becomes very, very difficult very, very quickly.
+
+68
+00:04:43,210 --> 00:04:46,642
+So we've come up with a relatively simple solution
+
+69
+00:04:46,786 --> 00:04:49,290
+in what we like to call grenade testing.
+
+70
+00:04:50,990 --> 00:04:54,858
+So this is a brief introduction to grenade testing at
+
+71
+00:04:54,864 --> 00:04:58,794
+a very high level. We really identified two different failure modes in
+
+72
+00:04:58,832 --> 00:05:02,278
+our platform tooling. One before we have a control plane, which might be due
+
+73
+00:05:02,294 --> 00:05:05,594
+to broken configuration, broken terraform or broken ansible,
+
+74
+00:05:05,722 --> 00:05:09,530
+and then the other use case is afterwards. So use these as an application incompatibility.
+
+75
+00:05:09,610 --> 00:05:13,466
+Or maybe we didn't set up the networks correctly or incorrectly
+
+76
+00:05:13,498 --> 00:05:16,594
+configured base images. So the first
+
+77
+00:05:16,632 --> 00:05:19,998
+thing we did was to identify the core base tooling. So these are likely
+
+78
+00:05:20,014 --> 00:05:23,262
+to cause control plane failure. In our case that's infrastl,
+
+79
+00:05:23,326 --> 00:05:26,898
+federation, infra, and the Kubernetes provisioning step, or alternatively the
+
+80
+00:05:26,904 --> 00:05:29,958
+base image itself. And then we automatically run,
+
+81
+00:05:30,044 --> 00:05:33,078
+you guessed it a pipeline which then brings up a
+
+82
+00:05:33,084 --> 00:05:36,566
+minimal integration environment in a variety of different cases that might
+
+83
+00:05:36,588 --> 00:05:39,798
+be in our private data center, maybe one in AWS, maybe one that
+
+84
+00:05:39,804 --> 00:05:43,526
+runs cluster API, and we then verify that the control plane
+
+85
+00:05:43,558 --> 00:05:47,366
+is healthy and conduct minimal testing afterwards, installing some base applications
+
+86
+00:05:47,398 --> 00:05:51,386
+and ensure that we have the basic functionality available. If that's
+
+87
+00:05:51,418 --> 00:05:54,874
+successful, then we can commit and use that version with more confidence
+
+88
+00:05:54,922 --> 00:05:58,586
+than we would do any other without actually testing
+
+89
+00:05:58,618 --> 00:06:02,830
+with every single version of the base applications.
+
+90
+00:06:03,170 --> 00:06:06,450
+If that fails, we can automatically go back to the engineering question.
+
+91
+00:06:06,520 --> 00:06:10,450
+Because all of these pipelines are automated, we tighten that feedback loop from
+
+92
+00:06:10,520 --> 00:06:14,340
+potentially weeks before we discover the issue to a matter of hours.
+
+93
+00:06:16,650 --> 00:06:20,386
+So what we've discussed is an automated workflow
+
+94
+00:06:20,418 --> 00:06:24,066
+which has a relatively quick turnaround time. It improves developers productivity,
+
+95
+00:06:24,178 --> 00:06:27,702
+it verifies the tooling that will be deployed in the real
+
+96
+00:06:27,756 --> 00:06:31,314
+world. It handles failure. In the case of failure, we identify
+
+97
+00:06:31,362 --> 00:06:35,354
+the faulting component. We do have the option of including regression testing to check
+
+98
+00:06:35,392 --> 00:06:38,634
+whether it would work with the previous version. We consistently test
+
+99
+00:06:38,672 --> 00:06:41,542
+versions that people want to use and encourage the use of latest,
+
+100
+00:06:41,606 --> 00:06:44,846
+because every time we run this pipeline, it actually pulls the latest version of
+
+101
+00:06:44,868 --> 00:06:49,022
+all those base tools. It also
+
+102
+00:06:49,076 --> 00:06:52,398
+mimics the production environment. We currently don't grenade test in our
+
+103
+00:06:52,404 --> 00:06:56,286
+production environment live, but we have a mimic of it. We don't have any paging
+
+104
+00:06:56,318 --> 00:07:00,386
+involved in that, and it's not a chaos monkey, but it does provide insight into
+
+105
+00:07:00,568 --> 00:07:03,410
+how this would behave if it were running in production.
+
+106
+00:07:05,190 --> 00:07:08,822
+So the question then is, where does this fit in with other testing? It sounds
+
+107
+00:07:08,876 --> 00:07:12,534
+relatively similar to integration testing. So we
+
+108
+00:07:12,572 --> 00:07:16,274
+built grenade testing as a relatively efficient
+
+109
+00:07:16,322 --> 00:07:20,314
+tool to kind of fit around the other forms of testing and be something which
+
+110
+00:07:20,352 --> 00:07:23,866
+is a relatively broad brush, but which
+
+111
+00:07:23,888 --> 00:07:26,650
+is significantly easier to maintain than other environments.
+
+112
+00:07:28,190 --> 00:07:31,766
+So we built this probably moderately vaguely
+
+113
+00:07:31,798 --> 00:07:35,246
+accurate graph based on what feels right in the context of a platform where
+
+114
+00:07:35,268 --> 00:07:37,854
+we discuss all of the different kinds of testing that we do.
+
+115
+00:07:38,052 --> 00:07:40,974
+So as I mentioned, unit testing is relatively small,
+
+116
+00:07:41,092 --> 00:07:44,254
+relatively tied to one version of an API. You're really testing it
+
+117
+00:07:44,292 --> 00:07:48,322
+situationally against maybe issues that you've seen in the past. We then have
+
+118
+00:07:48,376 --> 00:07:51,198
+integration testing, which is good, but pretty expensive,
+
+119
+00:07:51,294 --> 00:07:55,026
+and everybody wants their own integration environment in our use case,
+
+120
+00:07:55,128 --> 00:07:58,774
+so that comes with a significant maintenance cost. And they also
+
+121
+00:07:58,812 --> 00:08:02,214
+don't like their integration environments being changed frequently, which is
+
+122
+00:08:02,252 --> 00:08:05,606
+something that we maybe want to do when we're constantly releasing new versions of
+
+123
+00:08:05,628 --> 00:08:09,426
+our platform. So we then have stubbed integration testing,
+
+124
+00:08:09,458 --> 00:08:12,442
+which is a bit of a middle ground. It's a lot easier, but it does
+
+125
+00:08:12,496 --> 00:08:16,278
+considerably reduce the chance of catching
+
+126
+00:08:16,294 --> 00:08:19,974
+things if you're stubbing everything out and you've still got the issue of versions incompatibilities
+
+127
+00:08:20,022 --> 00:08:23,514
+if something changes an API when you don't expect it. As much as I'd love
+
+128
+00:08:23,552 --> 00:08:27,066
+semantic versioning to work in all cases, often it's not respected
+
+129
+00:08:27,098 --> 00:08:30,394
+as much as we might like. We then have system testing.
+
+130
+00:08:30,442 --> 00:08:33,778
+This is when we're starting getting into the really good stuff. We're getting there on
+
+131
+00:08:33,784 --> 00:08:38,382
+how comprehensive we are, but it's still a lot of work to maintain
+
+132
+00:08:38,446 --> 00:08:42,914
+system testing or a system testing process. And then
+
+133
+00:08:43,112 --> 00:08:46,642
+the probably most comprehensive thing, and the most difficult
+
+134
+00:08:46,696 --> 00:08:50,294
+to maintain thing is manual acceptance testing, which may well
+
+135
+00:08:50,332 --> 00:08:53,506
+be the worst job maybe ever, but it does deliver
+
+136
+00:08:53,538 --> 00:08:56,790
+you good confidence that your system is going to work. And when we get towards
+
+137
+00:08:56,860 --> 00:09:00,454
+the final points of a release, then maybe that's something we want to do.
+
+138
+00:09:00,652 --> 00:09:03,782
+So grenade testing here comes as a compromise. It's not wonderful,
+
+139
+00:09:03,846 --> 00:09:06,986
+it doesn't fix everything that you're going to run into, but it does make your
+
+140
+00:09:07,008 --> 00:09:10,490
+job a lot easier. It's relatively low cost and mostly automated.
+
+141
+00:09:10,830 --> 00:09:14,078
+And again, it just allows you to tighten that feedback loop at
+
+142
+00:09:14,084 --> 00:09:17,678
+a relatively low cost. So grenade testing is not an
+
+143
+00:09:17,684 --> 00:09:20,858
+open source project. It's a concept that we found useful, that we thought we'd
+
+144
+00:09:20,874 --> 00:09:24,170
+like to share. It's tied to your own pipelines,
+
+145
+00:09:24,250 --> 00:09:28,066
+and in our case it was built in a bespoke manner, but it
+
+146
+00:09:28,088 --> 00:09:32,046
+is something which is probably extensible, and we would support open source
+
+147
+00:09:32,158 --> 00:09:34,420
+implementations if someone would like to do so.
+
+148
+00:09:35,430 --> 00:09:39,158
+So I wanted to talk a little bit or share a little bit about what
+
+149
+00:09:39,324 --> 00:09:42,930
+grenade testing looks for us. We're very dependent on Githubs,
+
+150
+00:09:43,010 --> 00:09:46,406
+so you can see that this is mainly driven using a
+
+151
+00:09:46,508 --> 00:09:50,218
+pull request based model. So we have pipelines that
+
+152
+00:09:50,224 --> 00:09:53,494
+monitor the release of core platform tooling. In this case, we've upgraded federated
+
+153
+00:09:53,542 --> 00:09:56,938
+infra to a new version, ten one
+
+154
+00:09:57,024 --> 00:10:00,774
+six. And we've then pulled the latest version of infrastl
+
+155
+00:10:00,822 --> 00:10:04,650
+Kubernetes provisioning and the base image
+
+156
+00:10:04,810 --> 00:10:08,314
+to test against that. And the monitoring pull request
+
+157
+00:10:08,362 --> 00:10:11,386
+commits reports of status and failure to a master branch,
+
+158
+00:10:11,418 --> 00:10:14,430
+so that we have a log of when things failed and when things passed.
+
+159
+00:10:15,510 --> 00:10:18,658
+So these then are then run in another environment, which again,
+
+160
+00:10:18,744 --> 00:10:22,306
+all of our infrastructure pipelines are driven using git ops, so all
+
+161
+00:10:22,328 --> 00:10:26,082
+of our infra repositories use real pipelines. So we will then provision
+
+162
+00:10:26,146 --> 00:10:29,606
+this using generic accounts, and we then
+
+163
+00:10:29,708 --> 00:10:33,538
+perform all of our testing against that cluster as we would a normal
+
+164
+00:10:33,634 --> 00:10:37,286
+cluster. So we've kind of
+
+165
+00:10:37,308 --> 00:10:40,598
+tested this base infrastructure and workload control plane somewhat,
+
+166
+00:10:40,694 --> 00:10:44,250
+but then we have to consider the workload deployment and configuration.
+
+167
+00:10:44,590 --> 00:10:48,838
+Now, we actually leave a grenade
+
+168
+00:10:48,854 --> 00:10:52,874
+testing cluster up at any one time, the latest successful grenade testing cluster.
+
+169
+00:10:53,002 --> 00:10:57,018
+And that ensures that we always have one active target that allows for pluginstyle
+
+170
+00:10:57,034 --> 00:11:00,682
+checks against the active cluster to allow for extensible testing.
+
+171
+00:11:00,826 --> 00:11:04,574
+We can automatically test a new chart version once it's released against a real
+
+172
+00:11:04,612 --> 00:11:08,094
+cluster, and optionally automatically merge the bump into our integration
+
+173
+00:11:08,142 --> 00:11:12,082
+environment if it works. And that allows us to reduce the drift between
+
+174
+00:11:12,136 --> 00:11:15,990
+what we have in development and what we have in production by automatically
+
+175
+00:11:16,410 --> 00:11:20,274
+merging things that we are confident, at least semi confident
+
+176
+00:11:20,322 --> 00:11:24,054
+with, to our integration environment. So how
+
+177
+00:11:24,092 --> 00:11:27,106
+does this affect our kind of diagram? We came beforehand,
+
+178
+00:11:27,138 --> 00:11:30,842
+this is a relatively trivial initial pass
+
+179
+00:11:30,896 --> 00:11:34,522
+through, and we just add two different sections, so we have the
+
+180
+00:11:34,576 --> 00:11:37,930
+continuously maintaining a version of the
+
+181
+00:11:38,080 --> 00:11:41,114
+cluster. So if we have a successful
+
+182
+00:11:41,162 --> 00:11:44,366
+grenade test run, then we'll destroy the old testing target, and then we
+
+183
+00:11:44,388 --> 00:11:47,774
+also do continuous chart verification against
+
+184
+00:11:47,892 --> 00:11:51,054
+that running cluster. And we also have
+
+185
+00:11:51,092 --> 00:11:54,434
+automated testing, plug and play automated testing, so you can write
+
+186
+00:11:54,472 --> 00:11:58,020
+your own unit test that will run against a cluster and verify that
+
+187
+00:11:58,630 --> 00:12:02,574
+whenever a new grenade test is run now, that also allows
+
+188
+00:12:02,622 --> 00:12:06,382
+you to test, for example, particular networking
+
+189
+00:12:06,446 --> 00:12:09,686
+expectations that you have, or the way that you
+
+190
+00:12:09,708 --> 00:12:13,462
+expect the cluster to behave under particular conditions. It's not designed for really,
+
+191
+00:12:13,516 --> 00:12:17,522
+really comprehensive integration testing, but just kind of initial indications
+
+192
+00:12:17,586 --> 00:12:20,586
+that you might get as to whether your cluster is working as you expect it
+
+193
+00:12:20,608 --> 00:12:21,660
+to or not.
+
+194
+00:12:24,110 --> 00:12:28,070
+So the challenges that we came through when we were implementing this initially,
+
+195
+00:12:28,150 --> 00:12:31,114
+figuring out who to blame. So we have number of cases where we have maybe
+
+196
+00:12:31,152 --> 00:12:34,714
+flaky APIs or running out of capacity, or maybe we're
+
+197
+00:12:34,762 --> 00:12:38,218
+struggling to identify the source pull request of errors.
+
+198
+00:12:38,314 --> 00:12:41,562
+We can identify that a new version bump was released,
+
+199
+00:12:41,626 --> 00:12:44,986
+but maybe a version bump will include multiple pull
+
+200
+00:12:45,028 --> 00:12:48,466
+requests worth of changes. And then we also have the issue with
+
+201
+00:12:48,488 --> 00:12:51,780
+pipelines. So pipelines can be bumped independently of all
+
+202
+00:12:52,230 --> 00:12:55,678
+these base images and could also break the way that grenade
+
+203
+00:12:55,694 --> 00:12:59,318
+testing works. But it's nonetheless useful to know that your pipelines are
+
+204
+00:12:59,324 --> 00:13:02,534
+not working. Grenade testing, as we mentioned,
+
+205
+00:13:02,572 --> 00:13:06,130
+doesn't catch everything. It's not a silver bullet when it comes to testing,
+
+206
+00:13:06,290 --> 00:13:10,034
+especially when it comes to application configuration and specialized cluster configurations.
+
+207
+00:13:10,082 --> 00:13:13,542
+You still want to do comprehensive testing for that, and it's more of a complement
+
+208
+00:13:13,606 --> 00:13:17,206
+to other forms of testing that you might do. And it doesn't even replace
+
+209
+00:13:17,238 --> 00:13:20,474
+your integration environment. It's just a lower cost way of maybe
+
+210
+00:13:20,512 --> 00:13:22,910
+detecting issues before you hit integration.
+
+211
+00:13:24,290 --> 00:13:28,394
+It is also entirely dependent on your stability of your pipelines
+
+212
+00:13:28,442 --> 00:13:31,614
+and data centers. So system maintenance does become a bit of a question. It does
+
+213
+00:13:31,652 --> 00:13:35,442
+need oversight. Most version releases that we release are rather large,
+
+214
+00:13:35,496 --> 00:13:38,754
+so identifying the issue within that delta can be challenging. So it does
+
+215
+00:13:38,792 --> 00:13:41,250
+require intervention of engineers.
+
+216
+00:13:42,230 --> 00:13:46,326
+We also have the end user application compatibility, so application
+
+217
+00:13:46,428 --> 00:13:50,342
+configuration can break deploys. In many cases, platform applications are also
+
+218
+00:13:50,396 --> 00:13:54,274
+applications. So when we're trying to maybe roll out a CNI,
+
+219
+00:13:54,322 --> 00:13:58,182
+for example, that could also break the cluster in
+
+220
+00:13:58,236 --> 00:14:02,294
+various creative ways that you might discover during grenade testing,
+
+221
+00:14:02,422 --> 00:14:05,574
+but may not be related to the base images that you've been releasing.
+
+222
+00:14:05,702 --> 00:14:09,322
+We also talk about environment configuration and how that can also change things,
+
+223
+00:14:09,376 --> 00:14:12,510
+mentioning again config being a major
+
+224
+00:14:12,580 --> 00:14:15,962
+issue there, and then also validating
+
+225
+00:14:16,026 --> 00:14:19,498
+application behavior. We don't really do that at all within grenade testing,
+
+226
+00:14:19,514 --> 00:14:23,050
+and that's why we need to have normal integration testing, system testing,
+
+227
+00:14:23,130 --> 00:14:27,186
+and even acceptance testing as well. But we
+
+228
+00:14:27,208 --> 00:14:30,786
+never really do that validation of application behavior, merely that it deploys and
+
+229
+00:14:30,808 --> 00:14:34,446
+things like that. We also have issues with noise, with failed
+
+230
+00:14:34,478 --> 00:14:37,894
+builds. Often grenade testing can fail and can go down,
+
+231
+00:14:37,932 --> 00:14:41,718
+and obviously we then need to commit engineering time to maintaining it.
+
+232
+00:14:41,884 --> 00:14:45,894
+We should also I test in every cloud provider, so sometimes things will
+
+233
+00:14:45,932 --> 00:14:49,180
+fail within AWS, but won't fail in our private data center,
+
+234
+00:14:49,550 --> 00:14:52,140
+especially when your terraform is different between the two.
+
+235
+00:14:52,830 --> 00:14:56,540
+So there are some challenges when you're implementing grenade testing as well.
+
+236
+00:14:58,430 --> 00:15:01,770
+In general, though, we have definitely
+
+237
+00:15:01,840 --> 00:15:05,162
+improved our level of confidence in releases that pass grenade testing.
+
+238
+00:15:05,226 --> 00:15:09,722
+Previously, the first challenge when you joined the platform team was building your first cluster.
+
+239
+00:15:09,866 --> 00:15:13,118
+Now, your first challenge is still building your first cluster, but at least you have
+
+240
+00:15:13,124 --> 00:15:16,194
+the right versions, or at least you have confidence that your versions worked at least
+
+241
+00:15:16,232 --> 00:15:20,702
+once before you do that. We also have some automatically
+
+242
+00:15:20,846 --> 00:15:23,986
+generated compatibility information that enables you
+
+243
+00:15:24,008 --> 00:15:27,478
+to make those kind of decisions when you're initially bringing up clusters, which was
+
+244
+00:15:27,564 --> 00:15:30,870
+again a big issue before we introduced grenade testing.
+
+245
+00:15:31,770 --> 00:15:35,074
+It's reduced our time to detect issues. Admittedly, we didn't
+
+246
+00:15:35,122 --> 00:15:38,658
+have great integration testing beforehand, but grenade testing provides
+
+247
+00:15:38,674 --> 00:15:42,042
+a reasonable job of kind of bridging the gap between
+
+248
+00:15:42,096 --> 00:15:45,194
+those two things. It acts as a data
+
+249
+00:15:45,232 --> 00:15:49,446
+source so we can gain information on build success rates, build frequency, et cetera,
+
+250
+00:15:49,558 --> 00:15:52,830
+which can be used to inform us on maybe the quality of our platform.
+
+251
+00:15:52,980 --> 00:15:56,846
+And we can also tag versions accordingly to whether they
+
+252
+00:15:56,868 --> 00:15:59,790
+pass grenade testing and how confident we are with releases.
+
+253
+00:16:01,330 --> 00:16:05,326
+We don't have a test environment for each application or each component,
+
+254
+00:16:05,438 --> 00:16:09,074
+so it's reasonably cost effective. When we're doing
+
+255
+00:16:09,192 --> 00:16:12,514
+grenade testing and there's no overhead of keeping these test
+
+256
+00:16:12,552 --> 00:16:16,146
+environments up to date, we don't end up with one application team demanding that we
+
+257
+00:16:16,168 --> 00:16:19,814
+run a particular version because they haven't tested against the new one. It's already
+
+258
+00:16:19,932 --> 00:16:23,474
+consistently being torn down and replaced more frequently,
+
+259
+00:16:23,522 --> 00:16:27,426
+far more frequently than our integration environment. And we have some confidence
+
+260
+00:16:27,458 --> 00:16:30,906
+in whatever's running in master at any one time, that it
+
+261
+00:16:30,928 --> 00:16:34,010
+works with the rest of the platform rather than just in isolation.
+
+262
+00:16:35,070 --> 00:16:38,010
+So is grenade testing finished? Absolutely not.
+
+263
+00:16:38,160 --> 00:16:42,266
+We thought it was a cool concept that's relatively simple and kind of is
+
+264
+00:16:42,448 --> 00:16:46,474
+sufficiently different from traditional integration testing that you might do introducing
+
+265
+00:16:46,522 --> 00:16:50,382
+more automation. And we think that it could be valuable to other people,
+
+266
+00:16:50,436 --> 00:16:54,160
+whether you're a big or a small operator of cloud platform technology.
+
+267
+00:16:55,090 --> 00:16:58,546
+That said, we would love to start a conversation on how other people do their
+
+268
+00:16:58,568 --> 00:17:02,146
+testing within their platforms, share enhancements. On top of
+
+269
+00:17:02,168 --> 00:17:05,698
+what we've done here with the community and generally working together,
+
+270
+00:17:05,784 --> 00:17:09,766
+we can improve the reliability of all of these cloud platforms, which benefits
+
+271
+00:17:09,868 --> 00:17:11,320
+everybody in the long run.
+
+272
+00:17:13,530 --> 00:17:16,694
+So I hope this talk has been insightful for you or maybe raised some
+
+273
+00:17:16,732 --> 00:17:20,086
+questions. Thank you very much for taking the time to watch
+
+274
+00:17:20,188 --> 00:17:23,606
+this talk, and thank you very much for the Conf 42 organizers for inviting us
+
+275
+00:17:23,628 --> 00:17:26,486
+to talk about this. I'd just like to take a little bit of time to
+
+276
+00:17:26,508 --> 00:17:29,918
+acknowledge JP and lorn for their work,
+
+277
+00:17:29,964 --> 00:17:33,386
+work within grenade testing that made it the reality
+
+278
+00:17:33,418 --> 00:17:36,618
+that it is today, and I hope you enjoy the rest of the conference.
+
+279
+00:17:36,714 --> 00:17:37,740
+Thank you very much for your time.
+
