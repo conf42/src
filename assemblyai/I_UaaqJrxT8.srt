@@ -1,0 +1,2148 @@
+1
+00:00:39,010 --> 00:00:42,920
+Hello everyone, I'm Alexey Ozeritskiy and today
+
+2
+00:00:43,370 --> 00:00:46,854
+I'm going to talk about performance optimization of
+
+3
+00:00:46,892 --> 00:00:50,960
+distributed SQL engine which is used by we project.
+
+4
+00:00:51,490 --> 00:00:54,574
+First few words about me.
+
+5
+00:00:54,772 --> 00:00:58,606
+I'm a software engineer and I have been working with
+
+6
+00:00:58,708 --> 00:01:02,734
+distributed systems for many years and
+
+7
+00:01:02,852 --> 00:01:06,750
+since the beginning of last year I was
+
+8
+00:01:06,820 --> 00:01:10,706
+deeply involved in VDB project and
+
+9
+00:01:10,888 --> 00:01:14,734
+I've been working on optimizing of distributed
+
+10
+00:01:14,782 --> 00:01:18,866
+square engine. Here is my agenda
+
+11
+00:01:18,898 --> 00:01:22,774
+for today. Firstly, I'll be talking
+
+12
+00:01:22,972 --> 00:01:27,030
+about background information about YDB engine
+
+13
+00:01:27,100 --> 00:01:30,762
+itself and where it is used.
+
+14
+00:01:30,896 --> 00:01:35,130
+Then I'll discuss my testing methodology
+
+15
+00:01:35,710 --> 00:01:39,878
+and then I'll discuss my
+
+16
+00:01:39,984 --> 00:01:43,230
+investigations. And the final
+
+17
+00:01:43,300 --> 00:01:47,466
+part of my talk will be about containerization
+
+18
+00:01:47,578 --> 00:01:51,280
+and performance. Let's get started.
+
+19
+00:01:52,610 --> 00:01:56,766
+Firstly, a few words about distributed
+
+20
+00:01:56,798 --> 00:02:00,514
+SQL engine. The distributed SQL engine which is
+
+21
+00:02:00,552 --> 00:02:04,050
+used by YDB is called SQL or
+
+22
+00:02:04,200 --> 00:02:08,470
+VDB query language. SQL is a library
+
+23
+00:02:08,970 --> 00:02:12,342
+which was designed to pass
+
+24
+00:02:12,396 --> 00:02:15,030
+and execute SQL queries.
+
+25
+00:02:15,690 --> 00:02:19,306
+Currently it is used by four
+
+26
+00:02:19,408 --> 00:02:22,758
+projects. It is VDB
+
+27
+00:02:22,854 --> 00:02:26,246
+itself. VDB is distributed to open source SQL
+
+28
+00:02:26,278 --> 00:02:30,758
+database. Then SQL is used by Vitisaurus.
+
+29
+00:02:30,854 --> 00:02:34,510
+Vitisaurus is an open source big data
+
+30
+00:02:34,580 --> 00:02:38,186
+platform which is similar to Apache
+
+31
+00:02:38,298 --> 00:02:42,240
+Hadoop and with
+
+32
+00:02:42,690 --> 00:02:49,122
+Waco Engine Waitizaurus can
+
+33
+00:02:49,176 --> 00:02:53,906
+provide feature like Apache Hive and.
+
+34
+00:02:54,008 --> 00:02:57,960
+Well, there are also
+
+35
+00:02:58,650 --> 00:03:02,450
+two projects similar to Google's Bigquery.
+
+36
+00:03:02,610 --> 00:03:06,690
+The first one is project which is called SQL.
+
+37
+00:03:06,770 --> 00:03:10,154
+It is internal Yandex service and the
+
+38
+00:03:10,192 --> 00:03:13,610
+second project is Yandex Query.
+
+39
+00:03:14,590 --> 00:03:17,770
+This project is also
+
+40
+00:03:17,840 --> 00:03:21,582
+similar to Google Bigquery and it used
+
+41
+00:03:21,716 --> 00:03:25,550
+by Yandex Cloud for
+
+42
+00:03:25,700 --> 00:03:29,082
+our external customers. Yandex query
+
+43
+00:03:29,146 --> 00:03:33,218
+is also open source project and it is part of
+
+44
+00:03:33,384 --> 00:03:34,660
+YDB project.
+
+45
+00:03:36,470 --> 00:03:38,980
+Now let's have a look at these numbers.
+
+46
+00:03:40,390 --> 00:03:43,570
+I got these statistics
+
+47
+00:03:45,450 --> 00:03:49,510
+from Yandex internal service
+
+48
+00:03:49,580 --> 00:03:54,278
+SQL and these statistics shows
+
+49
+00:03:54,364 --> 00:03:59,500
+that we process
+
+50
+00:04:00,350 --> 00:04:03,820
+a lot of queries. This is
+
+51
+00:04:04,350 --> 00:04:08,460
+600,000 queries per day and eight
+
+52
+00:04:08,830 --> 00:04:12,462
+petabytes data per day. These numbers are very
+
+53
+00:04:12,516 --> 00:04:16,190
+huge I think and even small
+
+54
+00:04:16,260 --> 00:04:20,462
+improvement of our
+
+55
+00:04:20,516 --> 00:04:24,580
+distributed square engine even on 1%
+
+56
+00:04:25,430 --> 00:04:27,460
+could give big value.
+
+57
+00:04:29,670 --> 00:04:33,342
+Now I'll talk about Wakel
+
+58
+00:04:33,486 --> 00:04:38,210
+architecture. This is a brief introduction to Wakel architecture.
+
+59
+00:04:38,630 --> 00:04:43,430
+Wakel consists of four main components.
+
+60
+00:04:43,850 --> 00:04:47,502
+This is parser execution plan builder,
+
+61
+00:04:47,666 --> 00:04:50,410
+execution layer and compute layer.
+
+62
+00:04:50,830 --> 00:04:55,158
+Parser parses query and constructs
+
+63
+00:04:55,334 --> 00:04:58,410
+abstract syntax tree or IST.
+
+64
+00:04:59,070 --> 00:05:03,454
+Then plan builder gets
+
+65
+00:05:03,572 --> 00:05:07,322
+ST and constructs execution
+
+66
+00:05:07,386 --> 00:05:11,422
+plan and also plan builder can
+
+67
+00:05:11,476 --> 00:05:15,522
+optimize this plan. Then this
+
+68
+00:05:15,576 --> 00:05:19,410
+plan is executed by execution layer
+
+69
+00:05:19,910 --> 00:05:23,540
+and execution itself
+
+70
+00:05:26,490 --> 00:05:30,402
+is made with the help of compute layer. Compute layer
+
+71
+00:05:30,466 --> 00:05:33,926
+handles execution of individual plan nodes and
+
+72
+00:05:34,028 --> 00:05:38,374
+compute layer is responsible for computations
+
+73
+00:05:38,502 --> 00:05:42,214
+like SQL filters, SQL projections,
+
+74
+00:05:42,342 --> 00:05:44,870
+expressions, SQL functions,
+
+75
+00:05:44,950 --> 00:05:50,266
+joins and so on. And now let's
+
+76
+00:05:50,298 --> 00:05:54,160
+have a look at this very basic example.
+
+77
+00:05:54,930 --> 00:05:58,910
+In this example we want to join two tables.
+
+78
+00:06:00,130 --> 00:06:04,354
+We want to filter the result and to
+
+79
+00:06:04,392 --> 00:06:07,570
+get top first rows.
+
+80
+00:06:08,310 --> 00:06:12,420
+Now let's have a look at WaqL's execution plan.
+
+81
+00:06:12,950 --> 00:06:17,350
+Execution plan is graph.
+
+82
+00:06:19,690 --> 00:06:23,170
+Graph consists of nodes or stages.
+
+83
+00:06:23,330 --> 00:06:26,710
+Each stage is divided into tasks.
+
+84
+00:06:27,470 --> 00:06:31,814
+And as you can see leaves
+
+85
+00:06:31,862 --> 00:06:35,910
+of this graph can read tables,
+
+86
+00:06:36,070 --> 00:06:39,562
+customers and orders. And also some
+
+87
+00:06:39,616 --> 00:06:43,770
+read stages can contain filter
+
+88
+00:06:43,850 --> 00:06:46,750
+like this read order stage.
+
+89
+00:06:47,330 --> 00:06:51,600
+Then after read stages we have
+
+90
+00:06:52,710 --> 00:06:56,366
+join stage, then aggregate and sort stage
+
+91
+00:06:56,398 --> 00:06:59,694
+and the final stage. Now let's
+
+92
+00:06:59,742 --> 00:07:02,290
+have a look at my testing methodology.
+
+93
+00:07:05,130 --> 00:07:08,834
+For my testing methodology I use benchmark
+
+94
+00:07:08,882 --> 00:07:13,014
+driven approach. This approach has
+
+95
+00:07:13,052 --> 00:07:16,550
+some advantages. First of all it provide
+
+96
+00:07:16,620 --> 00:07:19,994
+us metrics. For example
+
+97
+00:07:20,192 --> 00:07:23,354
+it is execution times
+
+98
+00:07:23,552 --> 00:07:27,530
+of our benchmarks. Then the help of benchmark
+
+99
+00:07:30,130 --> 00:07:32,990
+we can find bottlenecks.
+
+100
+00:07:33,490 --> 00:07:37,306
+Then benchmark is a good scalability
+
+101
+00:07:37,418 --> 00:07:42,074
+test. For example we can tune scale
+
+102
+00:07:42,122 --> 00:07:46,180
+parameter of benchmark and we can see
+
+103
+00:07:46,870 --> 00:07:50,994
+how our system is scalable for some
+
+104
+00:07:51,032 --> 00:07:56,322
+amount of data. Then benchmarkdriven
+
+105
+00:07:56,386 --> 00:08:00,294
+also provide some real world simulation. And so if
+
+106
+00:08:00,332 --> 00:08:05,080
+we improve benchmark we
+
+107
+00:08:06,650 --> 00:08:10,518
+will improve real users tasks.
+
+108
+00:08:10,614 --> 00:08:15,610
+And also benchmarkdriven
+
+109
+00:08:16,030 --> 00:08:20,042
+are vendor natural. So we can run this
+
+110
+00:08:20,096 --> 00:08:23,730
+benchmark on different systems and we can compile
+
+111
+00:08:23,910 --> 00:08:26,910
+our system with its competitors.
+
+112
+00:08:28,850 --> 00:08:33,634
+And this is the benchmarkdriven that
+
+113
+00:08:33,672 --> 00:08:37,410
+I used. This is TPCH benchmark.
+
+114
+00:08:38,070 --> 00:08:41,662
+This is very famous benchmark
+
+115
+00:08:41,726 --> 00:08:45,242
+for OLAP systems or analytical database.
+
+116
+00:08:45,406 --> 00:08:48,950
+This benchmark consists of 22 SQL queries,
+
+117
+00:08:49,290 --> 00:08:52,930
+nine tables and it contains
+
+118
+00:08:53,010 --> 00:08:57,706
+data generator. On the right side you
+
+119
+00:08:57,728 --> 00:09:01,190
+can see TPCH database
+
+120
+00:09:01,270 --> 00:09:02,170
+schema.
+
+121
+00:09:03,710 --> 00:09:07,100
+Well now let's consider
+
+122
+00:09:08,670 --> 00:09:13,146
+TPCh benchmark data generator. It is DBGen
+
+123
+00:09:13,178 --> 00:09:16,640
+tool. With the help of DBGEn tool
+
+124
+00:09:17,970 --> 00:09:22,222
+you can generate data of any
+
+125
+00:09:22,276 --> 00:09:25,700
+size. For example GBGen tool
+
+126
+00:09:26,390 --> 00:09:29,774
+has minus s or scale parameter
+
+127
+00:09:29,902 --> 00:09:34,494
+and for instance scale
+
+128
+00:09:34,542 --> 00:09:39,346
+100 means to generate 100gb
+
+129
+00:09:39,378 --> 00:09:43,074
+of data. Then there are very useful
+
+130
+00:09:43,122 --> 00:09:47,442
+keys minus c and minus s. And with
+
+131
+00:09:47,516 --> 00:09:51,210
+help of these keys you can generate
+
+132
+00:09:53,230 --> 00:09:57,098
+a really big amount of data
+
+133
+00:09:57,264 --> 00:10:01,774
+on Mapreduce system. And of
+
+134
+00:10:01,812 --> 00:10:05,050
+course I generated everything on Mapreduce.
+
+135
+00:10:05,130 --> 00:10:09,130
+Then I converted this generated
+
+136
+00:10:09,210 --> 00:10:13,026
+data to paquette format and uploaded it
+
+137
+00:10:13,048 --> 00:10:16,386
+to s three storage. And here you
+
+138
+00:10:16,408 --> 00:10:20,702
+can see my packet files,
+
+139
+00:10:20,766 --> 00:10:24,814
+properties like compression, row group and
+
+140
+00:10:24,952 --> 00:10:26,470
+table split parts.
+
+141
+00:10:28,890 --> 00:10:32,310
+Now let's talk about continuous integration.
+
+142
+00:10:32,810 --> 00:10:36,162
+To see improvements
+
+143
+00:10:36,226 --> 00:10:42,202
+in performance of our engine we
+
+144
+00:10:42,256 --> 00:10:47,130
+should set up continuous integration or CI.
+
+145
+00:10:48,350 --> 00:10:51,914
+For CI I used virtual
+
+146
+00:10:51,962 --> 00:10:55,754
+machines and TPCh benchmark
+
+147
+00:10:55,802 --> 00:10:58,080
+of small scale of ten.
+
+148
+00:10:58,690 --> 00:11:03,710
+I run this continuous integration daily
+
+149
+00:11:04,210 --> 00:11:06,850
+and I run it on packet files.
+
+150
+00:11:07,590 --> 00:11:11,010
+Also I set up
+
+151
+00:11:11,160 --> 00:11:15,410
+per commit run and commit to comment comparison.
+
+152
+00:11:15,850 --> 00:11:21,174
+And as you can see on this graph when
+
+153
+00:11:21,212 --> 00:11:21,960
+I started,
+
+154
+00:11:24,250 --> 00:11:28,650
+we cannot pass some TPCH tests.
+
+155
+00:11:29,150 --> 00:11:32,586
+For example, we had a lot
+
+156
+00:11:32,608 --> 00:11:37,180
+of problems with test 29
+
+157
+00:11:37,710 --> 00:11:42,206
+21 and we had a
+
+158
+00:11:42,228 --> 00:11:45,790
+lot of issues with scale
+
+159
+00:11:46,690 --> 00:11:50,394
+100. This graph was constructed
+
+160
+00:11:50,442 --> 00:11:51,920
+on scale ten.
+
+161
+00:11:54,310 --> 00:11:58,574
+And for running this continuous integration
+
+162
+00:11:58,622 --> 00:12:02,626
+pipeline I used the
+
+163
+00:12:02,648 --> 00:12:08,150
+utility which could execute
+
+164
+00:12:08,810 --> 00:12:11,400
+whole engine and one process.
+
+165
+00:12:12,250 --> 00:12:16,534
+It is possible in our architecture because
+
+166
+00:12:16,732 --> 00:12:20,934
+we use so colon actor
+
+167
+00:12:20,982 --> 00:12:24,966
+approach and actually our tasks
+
+168
+00:12:25,078 --> 00:12:29,130
+in execution plan are actors. And the sectors
+
+169
+00:12:29,890 --> 00:12:33,680
+can work in a single process or they can work
+
+170
+00:12:34,050 --> 00:12:38,174
+on some ledge distributed system and so
+
+171
+00:12:38,212 --> 00:12:41,594
+on. And now let's
+
+172
+00:12:41,642 --> 00:12:45,522
+consider this utility that
+
+173
+00:12:45,656 --> 00:12:49,502
+was used for testing for continuous integration
+
+174
+00:12:49,566 --> 00:12:51,780
+and actually for everything.
+
+175
+00:12:52,630 --> 00:12:56,594
+This utility is called decoran or distributed
+
+176
+00:12:56,642 --> 00:13:00,582
+query run. And this utility can run
+
+177
+00:13:00,636 --> 00:13:03,960
+all components of distributed engine in a single process.
+
+178
+00:13:04,650 --> 00:13:08,502
+And this utility designed for
+
+179
+00:13:08,556 --> 00:13:13,526
+execute SQL queries on
+
+180
+00:13:13,708 --> 00:13:16,950
+pique files. And this utility
+
+181
+00:13:17,110 --> 00:13:21,086
+doesn't contain a
+
+182
+00:13:21,108 --> 00:13:24,574
+lot of layers of big YDB project for
+
+183
+00:13:24,612 --> 00:13:28,474
+example doesn't contain transactional
+
+184
+00:13:28,522 --> 00:13:33,122
+layer, then replication layer, storage layer and
+
+185
+00:13:33,176 --> 00:13:37,860
+so on. And for running
+
+186
+00:13:38,470 --> 00:13:43,042
+benchmarks with network interaction I
+
+187
+00:13:43,096 --> 00:13:46,410
+implemented these totalities, service node
+
+188
+00:13:46,590 --> 00:13:48,630
+and worker node.
+
+189
+00:13:50,410 --> 00:13:54,680
+To run the test with network interaction you should start
+
+190
+00:13:55,290 --> 00:13:58,934
+one or more worker node instances
+
+191
+00:13:58,982 --> 00:14:03,450
+and only one service node instance. Worker nodes
+
+192
+00:14:04,110 --> 00:14:08,198
+are responsible for compute part of our layer.
+
+193
+00:14:08,374 --> 00:14:11,990
+The service node is execution
+
+194
+00:14:12,070 --> 00:14:15,486
+part. Servicenode actually
+
+195
+00:14:15,588 --> 00:14:19,738
+controls compute
+
+196
+00:14:19,754 --> 00:14:23,570
+layer which is executed in Walker nodes.
+
+197
+00:14:24,070 --> 00:14:28,574
+And also to run this test in distributed
+
+198
+00:14:28,622 --> 00:14:32,850
+configuration you should construct plan
+
+199
+00:14:33,000 --> 00:14:37,254
+and the plan can
+
+200
+00:14:37,292 --> 00:14:40,230
+be constructed with the help of decora utility.
+
+201
+00:14:41,130 --> 00:14:44,402
+So first you run Decoran utility.
+
+202
+00:14:44,466 --> 00:14:47,682
+Decora utility constructs execution plan,
+
+203
+00:14:47,756 --> 00:14:51,402
+then it sends the execution plan
+
+204
+00:14:51,456 --> 00:14:54,874
+to service node and so on.
+
+205
+00:14:55,072 --> 00:14:56,940
+To achieve this,
+
+206
+00:14:58,750 --> 00:15:02,246
+you should provide two additional parameters
+
+207
+00:15:02,358 --> 00:15:06,318
+to gcoran utility. Here they are.
+
+208
+00:15:06,404 --> 00:15:10,350
+This is minus minus Gq host and minus minus
+
+209
+00:15:10,850 --> 00:15:12,030
+gqpot.
+
+210
+00:15:14,150 --> 00:15:17,570
+Now let's consider what we actually
+
+211
+00:15:17,640 --> 00:15:21,694
+measure. For measurements. I use Unix
+
+212
+00:15:21,742 --> 00:15:25,446
+bench styles measures and
+
+213
+00:15:25,548 --> 00:15:29,974
+here it is, I execute each
+
+214
+00:15:30,012 --> 00:15:33,778
+test n times, then I discard
+
+215
+00:15:33,874 --> 00:15:37,506
+lower third of the results and I
+
+216
+00:15:37,548 --> 00:15:41,370
+calculate the final value using geometric mean or the
+
+217
+00:15:41,440 --> 00:15:45,100
+remaining results. And actually
+
+218
+00:15:45,790 --> 00:15:48,854
+this is very effective
+
+219
+00:15:48,902 --> 00:15:53,470
+method for getting a reliable measure of performance.
+
+220
+00:15:56,450 --> 00:15:59,854
+Let's move on. This is our
+
+221
+00:15:59,972 --> 00:16:01,470
+target values.
+
+222
+00:16:03,830 --> 00:16:08,340
+When you are improving something,
+
+223
+00:16:08,870 --> 00:16:12,260
+you need to compare your values with
+
+224
+00:16:13,110 --> 00:16:17,206
+something. And I
+
+225
+00:16:17,228 --> 00:16:20,758
+think that the best approach is to compare your values with
+
+226
+00:16:20,844 --> 00:16:23,510
+values of your competitors.
+
+227
+00:16:24,010 --> 00:16:27,754
+And I came across with an
+
+228
+00:16:27,792 --> 00:16:32,774
+article about benchmarkdriven
+
+229
+00:16:32,822 --> 00:16:37,142
+of these three database IDB,
+
+230
+00:16:37,206 --> 00:16:41,600
+Green, plum and Apache Spark on TPCH 100.
+
+231
+00:16:42,130 --> 00:16:46,282
+And this article provides
+
+232
+00:16:46,346 --> 00:16:50,238
+the following numbers. So I used
+
+233
+00:16:50,404 --> 00:16:54,370
+these numbers as my target values
+
+234
+00:16:54,870 --> 00:16:59,394
+and as this benchmarkdriven was
+
+235
+00:16:59,432 --> 00:17:03,330
+running on 120
+
+236
+00:17:03,400 --> 00:17:07,400
+cores. I also decided to use
+
+237
+00:17:07,930 --> 00:17:11,846
+the similar hardware and this
+
+238
+00:17:11,868 --> 00:17:15,218
+is my hardware. I use this hardware
+
+239
+00:17:15,314 --> 00:17:19,178
+for the final result
+
+240
+00:17:19,264 --> 00:17:24,138
+and for debugging. It is a
+
+241
+00:17:24,224 --> 00:17:28,314
+big machine which contains of two
+
+242
+00:17:28,432 --> 00:17:31,930
+zone processors and it contains
+
+243
+00:17:32,010 --> 00:17:35,882
+total of 64 cores
+
+244
+00:17:36,026 --> 00:17:42,698
+or 128 threads. Also it has 512gb
+
+245
+00:17:42,714 --> 00:17:46,066
+of ram. Okay, let's move on
+
+246
+00:17:46,088 --> 00:17:49,138
+to my investigations. I'll focus
+
+247
+00:17:49,224 --> 00:17:53,406
+only on most meaningful
+
+248
+00:17:53,598 --> 00:17:58,310
+low level improvements because I found
+
+249
+00:17:58,380 --> 00:18:00,280
+this especially interesting.
+
+250
+00:18:01,130 --> 00:18:05,334
+Of course I worked on low
+
+251
+00:18:05,372 --> 00:18:09,420
+level improvements as well as high level
+
+252
+00:18:10,110 --> 00:18:13,580
+plan improvements. Let's move on.
+
+253
+00:18:14,030 --> 00:18:18,250
+First of all, let's consider these tools
+
+254
+00:18:19,550 --> 00:18:22,910
+which I used. There are three tools.
+
+255
+00:18:23,330 --> 00:18:26,350
+The first one is perfutility.
+
+256
+00:18:27,330 --> 00:18:32,282
+This is a well known Linux
+
+257
+00:18:32,346 --> 00:18:35,810
+profiler. With the help of these tools
+
+258
+00:18:37,190 --> 00:18:40,494
+you can collect performance
+
+259
+00:18:40,542 --> 00:18:44,466
+metrics from running processes. Also I
+
+260
+00:18:44,488 --> 00:18:47,458
+used these two utilities,
+
+261
+00:18:47,634 --> 00:18:50,230
+stack count and mem leak.
+
+262
+00:18:50,890 --> 00:18:54,520
+Stack count is a very useful utility and
+
+263
+00:18:55,770 --> 00:18:59,306
+it is especially useful when you use it in
+
+264
+00:18:59,328 --> 00:19:02,970
+pair with perf top comment.
+
+265
+00:19:03,870 --> 00:19:07,034
+In perf top you
+
+266
+00:19:07,072 --> 00:19:10,434
+can see hottest functions
+
+267
+00:19:10,502 --> 00:19:14,334
+and with the stack count you
+
+268
+00:19:14,372 --> 00:19:18,394
+can find who calls these hottest
+
+269
+00:19:18,442 --> 00:19:22,494
+functions. And there is also mem
+
+270
+00:19:22,532 --> 00:19:25,082
+leak utility which is also very useful.
+
+271
+00:19:25,146 --> 00:19:28,500
+With this memory utility you can find
+
+272
+00:19:30,470 --> 00:19:33,890
+memory consumption of
+
+273
+00:19:33,960 --> 00:19:37,542
+parts of your code. And with
+
+274
+00:19:37,676 --> 00:19:42,886
+this utility it's very easy to resolve problems
+
+275
+00:19:43,068 --> 00:19:47,282
+such as incorrect functionality
+
+276
+00:19:47,346 --> 00:19:51,190
+of bug pressure companion,
+
+277
+00:19:51,690 --> 00:19:56,058
+the back pressure often used during
+
+278
+00:19:56,144 --> 00:19:59,770
+communication of tasks.
+
+279
+00:20:01,570 --> 00:20:05,146
+There are also more Linux performance
+
+280
+00:20:05,178 --> 00:20:08,654
+tools. First of all it
+
+281
+00:20:08,692 --> 00:20:13,262
+is Bcc utility. Actually this picture
+
+282
+00:20:13,326 --> 00:20:17,300
+that you can see was taken from BcC project.
+
+283
+00:20:17,750 --> 00:20:21,486
+I think that this is well known
+
+284
+00:20:21,518 --> 00:20:26,710
+picture. And BCC project uses
+
+285
+00:20:27,450 --> 00:20:30,870
+EBPF functionality of new Linux kernel.
+
+286
+00:20:31,290 --> 00:20:35,346
+It provides C library and Python
+
+287
+00:20:35,378 --> 00:20:38,898
+bingens. And with the help of this library
+
+288
+00:20:38,994 --> 00:20:43,340
+and Python binge you can
+
+289
+00:20:44,270 --> 00:20:48,022
+collect any performance
+
+290
+00:20:48,086 --> 00:20:52,080
+metrics of your program. Of course
+
+291
+00:20:53,410 --> 00:20:57,262
+this project is very low
+
+292
+00:20:57,316 --> 00:21:02,094
+level. So on top of BCc it
+
+293
+00:21:02,132 --> 00:21:05,790
+was created a lot of useful utilities.
+
+294
+00:21:05,870 --> 00:21:09,090
+For example in BCC repository
+
+295
+00:21:10,470 --> 00:21:14,698
+you can find special utilities for performance benchmarkdriven
+
+296
+00:21:14,894 --> 00:21:18,054
+of such databases like
+
+297
+00:21:18,172 --> 00:21:20,790
+SQL and PostgreSQL.
+
+298
+00:21:21,290 --> 00:21:25,670
+There are also the similar utility Bpftrace.
+
+299
+00:21:26,010 --> 00:21:29,322
+Bpftrace is more high
+
+300
+00:21:29,376 --> 00:21:33,462
+level because it is implemented
+
+301
+00:21:33,526 --> 00:21:37,206
+as language. As programming language.
+
+302
+00:21:37,318 --> 00:21:40,570
+It looks like avocado language.
+
+303
+00:21:41,090 --> 00:21:44,750
+And also there is very useful script
+
+304
+00:21:45,410 --> 00:21:48,938
+by Brandon Gregg which is called flame graph.
+
+305
+00:21:49,034 --> 00:21:52,982
+And with the help of this script you can visualize
+
+306
+00:21:53,146 --> 00:21:56,770
+the output of Bcc utilities and
+
+307
+00:21:56,920 --> 00:22:00,402
+BPF trace. Let's move on
+
+308
+00:22:00,536 --> 00:22:05,314
+to my first investigation. I run some
+
+309
+00:22:05,352 --> 00:22:09,282
+tpch query which contains
+
+310
+00:22:09,346 --> 00:22:13,746
+join and I collected
+
+311
+00:22:13,858 --> 00:22:18,070
+perf counters and I constructed this flame graph
+
+312
+00:22:18,670 --> 00:22:22,954
+and I
+
+313
+00:22:22,992 --> 00:22:26,330
+saw that our great
+
+314
+00:22:26,400 --> 00:22:30,286
+join algorithm consumed a lot
+
+315
+00:22:30,308 --> 00:22:34,014
+of cpu time. And if
+
+316
+00:22:34,052 --> 00:22:38,080
+you zoom in you
+
+317
+00:22:38,770 --> 00:22:41,950
+will see that there is nothing
+
+318
+00:22:42,020 --> 00:22:44,660
+interesting, just add tuple function.
+
+319
+00:22:45,350 --> 00:22:49,780
+It's very difficult to
+
+320
+00:22:50,550 --> 00:22:54,098
+see something on this
+
+321
+00:22:54,184 --> 00:22:59,302
+flame graph. So after
+
+322
+00:22:59,356 --> 00:23:03,094
+that of course you
+
+323
+00:23:03,132 --> 00:23:07,160
+could look at your code and read it
+
+324
+00:23:07,710 --> 00:23:10,986
+line by line. But the best solution is to
+
+325
+00:23:11,008 --> 00:23:16,106
+use perf report to
+
+326
+00:23:16,288 --> 00:23:19,900
+look at raw perf data.
+
+327
+00:23:20,530 --> 00:23:24,730
+And let's do it. This is perfreport,
+
+328
+00:23:24,890 --> 00:23:28,654
+and with perfreport you
+
+329
+00:23:28,692 --> 00:23:31,866
+can zoom in into your code. Let's zoom
+
+330
+00:23:31,898 --> 00:23:34,340
+in into a tuple function.
+
+331
+00:23:34,950 --> 00:23:40,958
+Here it is. And you can see that atomic
+
+332
+00:23:41,054 --> 00:23:45,010
+fetch ad consumes a lot of cpu.
+
+333
+00:23:45,370 --> 00:23:47,430
+Actually this is very strange.
+
+334
+00:23:49,450 --> 00:23:53,782
+First when I looked at it that there
+
+335
+00:23:53,836 --> 00:23:58,700
+was something wrong because
+
+336
+00:24:00,510 --> 00:24:03,340
+it looks like a mistake actually,
+
+337
+00:24:04,190 --> 00:24:08,940
+and actually this was a mistake because
+
+338
+00:24:10,930 --> 00:24:14,030
+when this code was written,
+
+339
+00:24:14,930 --> 00:24:18,826
+someone added to this code these atomic
+
+340
+00:24:18,858 --> 00:24:23,138
+counters for debugging purpose and
+
+341
+00:24:23,304 --> 00:24:25,220
+he forgot to remove it.
+
+342
+00:24:26,230 --> 00:24:30,130
+And here is the patch,
+
+343
+00:24:30,710 --> 00:24:34,850
+these atomic counters were just removed
+
+344
+00:24:35,370 --> 00:24:39,154
+and I got this impressive
+
+345
+00:24:39,202 --> 00:24:42,294
+performance improvement. And as
+
+346
+00:24:42,332 --> 00:24:46,182
+you can see query 29 was
+
+347
+00:24:46,236 --> 00:24:49,766
+improved from 15 seconds to 7 seconds.
+
+348
+00:24:49,958 --> 00:24:53,770
+And actually all other queries
+
+349
+00:24:54,110 --> 00:24:58,214
+with joints was improved
+
+350
+00:24:58,262 --> 00:25:02,382
+by half. And I think this is very big
+
+351
+00:25:02,436 --> 00:25:05,934
+improvement. Let's move on to
+
+352
+00:25:05,972 --> 00:25:10,318
+my second investigation. When I running
+
+353
+00:25:10,404 --> 00:25:14,062
+benchmarks I like to run pufftop
+
+354
+00:25:14,126 --> 00:25:18,094
+comment in parallel to see hottest functions
+
+355
+00:25:18,142 --> 00:25:22,034
+in real time. And once when
+
+356
+00:25:22,072 --> 00:25:27,762
+I run pf top I saw that some
+
+357
+00:25:27,816 --> 00:25:31,302
+kernel symbol rescue lock is
+
+358
+00:25:31,356 --> 00:25:34,438
+shown in pufftop and it was
+
+359
+00:25:34,524 --> 00:25:38,790
+very strange. And to investigate
+
+360
+00:25:39,290 --> 00:25:42,860
+who called this Oscar lock, I used
+
+361
+00:25:43,390 --> 00:25:47,126
+stack count utility. And stack count utility showed
+
+362
+00:25:47,158 --> 00:25:50,906
+me that this OSQ
+
+363
+00:25:50,938 --> 00:25:54,240
+lock is part of a mapsis call.
+
+364
+00:25:54,770 --> 00:25:58,698
+But why do we use this mps
+
+365
+00:25:58,794 --> 00:26:02,094
+call? And the answer was
+
+366
+00:26:02,132 --> 00:26:06,258
+very simple, we use it because we use our own
+
+367
+00:26:06,344 --> 00:26:10,478
+memory allocator in our compute
+
+368
+00:26:10,494 --> 00:26:14,306
+layer. And why do we
+
+369
+00:26:14,328 --> 00:26:17,254
+do this? First of all,
+
+370
+00:26:17,292 --> 00:26:21,314
+we do this because our memory allocator
+
+371
+00:26:21,442 --> 00:26:25,010
+is optimized for concurrency and it's optimized
+
+372
+00:26:25,090 --> 00:26:28,406
+for running in multithreaded environment.
+
+373
+00:26:28,518 --> 00:26:32,170
+And in theory it
+
+374
+00:26:32,240 --> 00:26:36,154
+should work very fast, but actually
+
+375
+00:26:36,272 --> 00:26:37,740
+it wasn't very fast.
+
+376
+00:26:40,770 --> 00:26:45,086
+The second we
+
+377
+00:26:45,188 --> 00:26:49,230
+create an allocator instance per query.
+
+378
+00:26:49,890 --> 00:26:55,700
+And this approach has
+
+379
+00:26:57,670 --> 00:27:00,722
+some advantages. First of all,
+
+380
+00:27:00,856 --> 00:27:04,594
+we isolate queries from
+
+381
+00:27:04,632 --> 00:27:07,954
+each other. Then it's very easier
+
+382
+00:27:08,002 --> 00:27:11,894
+to allocate memory and release memory. With this
+
+383
+00:27:11,932 --> 00:27:15,880
+approach you can write
+
+384
+00:27:17,630 --> 00:27:21,820
+exception unsafe code on compute layer because
+
+385
+00:27:22,670 --> 00:27:26,794
+on the end of your query all
+
+386
+00:27:26,912 --> 00:27:29,930
+memory will be allocated automatically.
+
+387
+00:27:30,350 --> 00:27:33,580
+And let's have a look at our problem.
+
+388
+00:27:34,350 --> 00:27:38,830
+Problem with high frequency of mps calls.
+
+389
+00:27:39,250 --> 00:27:43,042
+I solved this problem in a very easy
+
+390
+00:27:43,096 --> 00:27:48,290
+way. I think I just started to
+
+391
+00:27:48,440 --> 00:27:52,450
+allocate 32 pages memory pages
+
+392
+00:27:52,950 --> 00:27:56,358
+on one allocated call.
+
+393
+00:27:56,524 --> 00:28:01,414
+Before this we allocated one
+
+394
+00:28:01,612 --> 00:28:05,222
+memory page on each call and
+
+395
+00:28:05,276 --> 00:28:09,114
+I started to allocate 32 pages and
+
+396
+00:28:09,232 --> 00:28:13,002
+I return one page to
+
+397
+00:28:13,056 --> 00:28:17,082
+caller and the rest pages I
+
+398
+00:28:17,136 --> 00:28:21,702
+store into cache. And next time when
+
+399
+00:28:21,776 --> 00:28:25,834
+caller calls allocator I'll
+
+400
+00:28:25,882 --> 00:28:29,614
+get him some page from cache. This is
+
+401
+00:28:29,652 --> 00:28:32,778
+very simple patch and
+
+402
+00:28:32,964 --> 00:28:35,890
+here you can see performance improvements.
+
+403
+00:28:36,550 --> 00:28:39,970
+Actually I think this is very big improvement.
+
+404
+00:28:41,590 --> 00:28:47,140
+And here is the final execution time for
+
+405
+00:28:49,350 --> 00:28:54,822
+Wakel. I got 154
+
+406
+00:28:54,876 --> 00:29:00,874
+seconds. This run was on
+
+407
+00:29:00,992 --> 00:29:05,034
+packet files and with VGb I got 209
+
+408
+00:29:05,072 --> 00:29:08,394
+seconds. VGB means I
+
+409
+00:29:08,432 --> 00:29:12,830
+run this benchmark on VGB cluster.
+
+410
+00:29:13,250 --> 00:29:17,114
+And as you can see we outperformed
+
+411
+00:29:17,162 --> 00:29:21,520
+our competitors. And now
+
+412
+00:29:22,210 --> 00:29:25,522
+let's move on on my final part of this
+
+413
+00:29:25,576 --> 00:29:26,180
+talk.
+
+414
+00:29:29,030 --> 00:29:32,674
+First of all let's have a look at this very interesting feature of our
+
+415
+00:29:32,712 --> 00:29:36,738
+engine. This is an SQL query
+
+416
+00:29:36,914 --> 00:29:40,950
+with embedded Python script.
+
+417
+00:29:43,050 --> 00:29:46,338
+You can switch on this feature
+
+418
+00:29:46,434 --> 00:29:49,754
+on engines configuration. As you can
+
+419
+00:29:49,792 --> 00:29:52,810
+see a user can execute
+
+420
+00:29:53,790 --> 00:29:57,206
+any Python code. We don't
+
+421
+00:29:57,238 --> 00:30:00,494
+have any limitations on
+
+422
+00:30:00,532 --> 00:30:04,426
+this. And for example our user
+
+423
+00:30:04,618 --> 00:30:09,342
+can use ctypes library for
+
+424
+00:30:09,396 --> 00:30:13,460
+calling any C code. In this example
+
+425
+00:30:15,670 --> 00:30:19,906
+the user calls ctypes to
+
+426
+00:30:19,928 --> 00:30:23,698
+the reference invalid pointer and
+
+427
+00:30:23,784 --> 00:30:27,494
+as a result he
+
+428
+00:30:27,532 --> 00:30:29,750
+got segmentation fault.
+
+429
+00:30:31,210 --> 00:30:35,782
+And actually one
+
+430
+00:30:35,836 --> 00:30:39,962
+binary of our engine can
+
+431
+00:30:40,016 --> 00:30:44,540
+execute a lot of queries of different users and
+
+432
+00:30:44,990 --> 00:30:49,338
+if one query crashes the
+
+433
+00:30:49,424 --> 00:30:52,542
+other queries will case too.
+
+434
+00:30:52,596 --> 00:30:56,574
+And this is very bad and we
+
+435
+00:30:56,612 --> 00:30:58,320
+wanted to resolve it.
+
+436
+00:31:00,690 --> 00:31:04,698
+To resolve it, we use the following
+
+437
+00:31:04,874 --> 00:31:08,942
+execution scammer. Let's recall
+
+438
+00:31:09,086 --> 00:31:12,530
+our execution plan which consists of strategies and each
+
+439
+00:31:12,600 --> 00:31:16,438
+stage is divided to tasks and
+
+440
+00:31:16,524 --> 00:31:19,942
+so on. Now let's divide our
+
+441
+00:31:19,996 --> 00:31:23,942
+task into two components. The first
+
+442
+00:31:23,996 --> 00:31:27,720
+component will be responsible to
+
+443
+00:31:28,350 --> 00:31:32,314
+network interactions and the second
+
+444
+00:31:32,512 --> 00:31:36,410
+component will be responsible for
+
+445
+00:31:36,480 --> 00:31:41,294
+computation itself. And for
+
+446
+00:31:41,492 --> 00:31:44,894
+the second component we will start
+
+447
+00:31:45,092 --> 00:31:48,446
+a container. And here it
+
+448
+00:31:48,468 --> 00:31:53,234
+is. So we have lot
+
+449
+00:31:53,272 --> 00:31:56,690
+of containers container per task.
+
+450
+00:31:57,430 --> 00:32:01,726
+These containers contain compute,
+
+451
+00:32:01,758 --> 00:32:05,474
+path and tasks are
+
+452
+00:32:05,512 --> 00:32:09,670
+communicating with containers with the help of Unix pipe.
+
+453
+00:32:10,730 --> 00:32:15,254
+And we
+
+454
+00:32:15,292 --> 00:32:20,714
+use bi directional communications for
+
+455
+00:32:20,752 --> 00:32:25,002
+communicating tasks with containers. So each
+
+456
+00:32:25,056 --> 00:32:29,642
+task uses two
+
+457
+00:32:29,696 --> 00:32:32,590
+pipes per container,
+
+458
+00:32:33,330 --> 00:32:37,134
+one pipe for input and other pipe for
+
+459
+00:32:37,172 --> 00:32:41,150
+output. I think this is very simple scammer.
+
+460
+00:32:41,490 --> 00:32:45,150
+And of course I run TPCH
+
+461
+00:32:45,230 --> 00:32:49,298
+benchmark with this feature switched on and
+
+462
+00:32:49,384 --> 00:32:52,900
+I got the following numbers. I got
+
+463
+00:32:53,270 --> 00:32:57,734
+561 seconds and I thought that this
+
+464
+00:32:57,772 --> 00:33:01,542
+is very slow and my
+
+465
+00:33:01,596 --> 00:33:05,446
+first thought that it's problem with
+
+466
+00:33:05,468 --> 00:33:07,000
+the pipe itself,
+
+467
+00:33:09,950 --> 00:33:13,354
+why I decided that. Let's have a look
+
+468
+00:33:13,392 --> 00:33:16,598
+at this well known picture. This picture
+
+469
+00:33:16,694 --> 00:33:20,714
+was taken from IPC
+
+470
+00:33:20,762 --> 00:33:24,042
+bench project by Peter Goldsborough.
+
+471
+00:33:24,106 --> 00:33:27,774
+And as you can see pipes are very
+
+472
+00:33:27,812 --> 00:33:31,630
+slow in Linux. And the most fast
+
+473
+00:33:31,780 --> 00:33:34,610
+IPC in Linux is memory mapped files.
+
+474
+00:33:35,510 --> 00:33:42,030
+And there is also very interesting article
+
+475
+00:33:42,110 --> 00:33:45,860
+about how to write two pipes fast.
+
+476
+00:33:46,390 --> 00:33:49,750
+An article by Francesco Mazole.
+
+477
+00:33:50,330 --> 00:33:55,094
+And he said that with
+
+478
+00:33:55,132 --> 00:33:58,440
+the help of new VEm splice call,
+
+479
+00:34:00,430 --> 00:34:05,546
+you can read and write two
+
+480
+00:34:05,568 --> 00:34:09,942
+pipes very fast. And I
+
+481
+00:34:10,016 --> 00:34:13,294
+decided to try these two
+
+482
+00:34:13,332 --> 00:34:17,566
+techniques. First, I tried to
+
+483
+00:34:17,668 --> 00:34:21,226
+replace pipes with memory mapped
+
+484
+00:34:21,258 --> 00:34:26,274
+files with in memory query on
+
+485
+00:34:26,312 --> 00:34:30,180
+memory mapped files. And then I tried to use
+
+486
+00:34:32,070 --> 00:34:34,290
+VM splice syscol.
+
+487
+00:34:36,250 --> 00:34:44,102
+I spent a day on it and I
+
+488
+00:34:44,156 --> 00:34:45,880
+achieved nothing.
+
+489
+00:34:47,210 --> 00:34:48,570
+Nothing improvements.
+
+490
+00:34:51,550 --> 00:34:53,900
+And after that, only after that,
+
+491
+00:34:54,750 --> 00:34:58,966
+I decided to try PF. And PF showed
+
+492
+00:34:58,998 --> 00:35:00,170
+me the following.
+
+493
+00:35:02,690 --> 00:35:06,000
+Let's have a look at the second square.
+
+494
+00:35:08,290 --> 00:35:14,530
+The second square shows that we
+
+495
+00:35:14,680 --> 00:35:17,954
+call some
+
+496
+00:35:17,992 --> 00:35:20,020
+kind of statistics very often.
+
+497
+00:35:21,910 --> 00:35:26,070
+And as you can see, the statistics uses
+
+498
+00:35:27,130 --> 00:35:28,390
+hash maps.
+
+499
+00:35:30,010 --> 00:35:33,480
+Actually, it appeared that
+
+500
+00:35:34,490 --> 00:35:38,070
+these statistics were designed
+
+501
+00:35:39,070 --> 00:35:42,294
+to be called once on query,
+
+502
+00:35:42,422 --> 00:35:45,850
+on the end of query. But these statistics
+
+503
+00:35:46,590 --> 00:35:50,474
+were touched on every pipe
+
+504
+00:35:50,522 --> 00:35:54,474
+message and it was very slow. It was very slow
+
+505
+00:35:54,522 --> 00:36:00,110
+because these statistics were
+
+506
+00:36:00,180 --> 00:36:01,710
+very ineffective.
+
+507
+00:36:03,430 --> 00:36:07,982
+They uses string
+
+508
+00:36:08,046 --> 00:36:12,210
+based hash maps, which are very slow.
+
+509
+00:36:12,710 --> 00:36:16,514
+And I just removed
+
+510
+00:36:16,562 --> 00:36:20,294
+these statistics and I
+
+511
+00:36:20,332 --> 00:36:22,840
+got these numbers.
+
+512
+00:36:23,530 --> 00:36:28,922
+After optimizations, I got 223
+
+513
+00:36:28,976 --> 00:36:33,340
+seconds and it was achieved with running
+
+514
+00:36:34,030 --> 00:36:37,174
+all benchmarkdriven in containers.
+
+515
+00:36:37,222 --> 00:36:42,554
+So I started a container query
+
+516
+00:36:42,602 --> 00:36:46,734
+plan task and I think this is an
+
+517
+00:36:46,772 --> 00:36:50,240
+excellent number. What's next?
+
+518
+00:36:50,610 --> 00:36:54,562
+First of all, we are going to work on
+
+519
+00:36:54,616 --> 00:36:56,930
+TPCh of terabyte scales.
+
+520
+00:36:57,510 --> 00:37:00,674
+I think we will
+
+521
+00:37:00,712 --> 00:37:03,890
+get a lot of issues with it, but who knows?
+
+522
+00:37:04,310 --> 00:37:08,950
+And the second, we are going to work on
+
+523
+00:37:09,100 --> 00:37:14,310
+tpcds benchmark tpcds
+
+524
+00:37:14,730 --> 00:37:18,182
+is also Olap
+
+525
+00:37:18,246 --> 00:37:21,418
+benchmark or benchmark for
+
+526
+00:37:21,584 --> 00:37:24,662
+analytical databases, but it's more modern.
+
+527
+00:37:24,806 --> 00:37:28,250
+It contains 99 queries
+
+528
+00:37:29,150 --> 00:37:33,002
+and most queries contain joins
+
+529
+00:37:33,146 --> 00:37:36,590
+and typical join
+
+530
+00:37:37,730 --> 00:37:40,110
+consists of ten tables.
+
+531
+00:37:41,730 --> 00:37:45,310
+So for this benchmark
+
+532
+00:37:46,050 --> 00:37:48,800
+plan level optimizations will be important.
+
+533
+00:37:49,730 --> 00:37:53,722
+That's it. Thank you for watching and listening.
+
+534
+00:37:53,866 --> 00:37:57,560
+And if you like my talk,
+
+535
+00:37:58,330 --> 00:38:01,880
+please hit the like button
+
+536
+00:38:02,650 --> 00:38:05,798
+as well as feel free to join me on this
+
+537
+00:38:05,964 --> 00:38:08,100
+social media. Thank you very much.
+
