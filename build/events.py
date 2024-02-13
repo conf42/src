@@ -155,6 +155,8 @@ def get_enriched_metadata(base_folder):
         event["talks_start"] = start
         event["talks_end"] = end
         event["talks_end_offset"] = (end - start).total_seconds()/60
+        event["hallway_start"] = start - timedelta(hours=1)
+        event["hallway_end"] = start
         #print("Loaded %d confirmed talks in %d tracks: %s" % (len(event["talks"]), len(tracks), tracks.keys()))
 
         # enrich the talks
