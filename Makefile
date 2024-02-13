@@ -7,6 +7,9 @@ deps:
 generate:
 	python -m build.generate
 
+previews:
+	python -m build.previews
+
 transcribe:
 	python -m build.transcribe
 
@@ -25,4 +28,5 @@ clean:
 env:
 	python3 -m venv env
 
-all: deps jpeg generate transcribe summarize verify
+all: deps jpeg generate transcribe summarize verify previews
+.PHONY: deps jpeg generate transcribe summarize verify previews
