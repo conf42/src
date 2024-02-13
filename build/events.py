@@ -160,7 +160,7 @@ def get_enriched_metadata(base_folder):
         # enrich the talks
         for talk in talks:
             talk["short_url"] = generate_short_url(event, talk)
-            talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
+            talk["YouTubeId"] = talk.get("YouTube", "").split("/")[-1]
 
             # check if transcript exists
             transcript = read_transcript(talk["YouTubeId"])
