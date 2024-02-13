@@ -153,11 +153,11 @@ for event in context.get("events"):
             talk["Slides"] = slide_path
 
         # check the headshot exists
-        picture_path = make_remote_address("headshots", talk["Picture"])
+        picture_path = make_remote_address("headshots", talk.get("Picture", ""))
         warn_on_missing_file(picture_path, remote=True)
         talk["Picture"] = picture_path
         talk["short_url"] = generate_short_url(event, talk)
-        talk["YouTubeId"] = talk.get("YouTube").split("/")[-1]
+        talk["YouTubeId"] = talk.get("YouTube", "").split("/")[-1]
 
 
 print(DIVIDER)
@@ -215,7 +215,7 @@ for event in context.get("events"):
     )
     event["totals"] = totals
     for talk in event.get("talks_raw", []):
-        video_id = talk.get("YouTube").split("/")[-1]
+        video_id = talk.get("YouTube", "").split("/")[-1]
         stats = video_to_stats.get(video_id)
         talk["stats"] = stats
         position = video_to_position.get(video_id)
