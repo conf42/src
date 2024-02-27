@@ -1,0 +1,3464 @@
+1
+00:00:20,650 --> 00:00:24,494
+Hello everyone. My name is Adam Fremanig and thank you for coming to this
+
+2
+00:00:24,532 --> 00:00:28,166
+talk in which we are going to talk a little bit about
+
+3
+00:00:28,268 --> 00:00:31,510
+maintaining SDK over many
+
+4
+00:00:31,580 --> 00:00:35,254
+years. We are going to see some lessons learned, we are going to see
+
+5
+00:00:35,292 --> 00:00:38,694
+some experience that we gained when working with sdks,
+
+6
+00:00:38,822 --> 00:00:42,458
+and we are going to basically analyze a big case study
+
+7
+00:00:42,544 --> 00:00:46,378
+of what happened in Matis over many, many years
+
+8
+00:00:46,464 --> 00:00:50,234
+across many languages. I am Adam Furmanek. I work at
+
+9
+00:00:50,272 --> 00:00:53,774
+Matis as a devreau. Feel free to take a look at our webpage and see
+
+10
+00:00:53,812 --> 00:00:56,810
+what we do over there. And without further ado,
+
+11
+00:00:56,890 --> 00:01:01,434
+let us jump straight to the point. So, I've been working as a software engineer
+
+12
+00:01:01,482 --> 00:01:05,086
+for many years, and Matis is developing a software
+
+13
+00:01:05,198 --> 00:01:08,386
+that extensively uses sdks. So what we need to
+
+14
+00:01:08,408 --> 00:01:11,698
+do is we need to first understand what we tried to build
+
+15
+00:01:11,784 --> 00:01:15,182
+over those years, how we structured our sdks,
+
+16
+00:01:15,246 --> 00:01:18,798
+how we built them, how we evolved them over time. And then we
+
+17
+00:01:18,824 --> 00:01:22,354
+are going to see what particularly interesting we learned
+
+18
+00:01:22,402 --> 00:01:25,942
+and what we would like to share. So let's go. So the very first thing
+
+19
+00:01:25,996 --> 00:01:29,546
+is, what do we do at Matis? So Matis is basically a
+
+20
+00:01:29,568 --> 00:01:33,082
+software that provides you the ability to
+
+21
+00:01:33,136 --> 00:01:37,402
+build observability for your databases. The idea is
+
+22
+00:01:37,536 --> 00:01:40,934
+that you have your SQL database or NoSQL database
+
+23
+00:01:40,982 --> 00:01:44,282
+or database of any kind, and you have your applications
+
+24
+00:01:44,346 --> 00:01:47,326
+that talk to the database. Now,
+
+25
+00:01:47,428 --> 00:01:51,006
+in order to build the observability the right way, we need
+
+26
+00:01:51,028 --> 00:01:54,770
+to understand what happened in the database and in your application.
+
+27
+00:01:54,920 --> 00:01:58,818
+So we would like to understand, for instance, what rest
+
+28
+00:01:58,904 --> 00:02:03,134
+API was called on your application and then what SQL
+
+29
+00:02:03,182 --> 00:02:06,530
+query was executed as a part of
+
+30
+00:02:06,600 --> 00:02:10,006
+handling this particular rest call. And ultimately we
+
+31
+00:02:10,028 --> 00:02:13,350
+would like to get the execution plan. Why do we want to do that?
+
+32
+00:02:13,420 --> 00:02:16,626
+Well, the idea here is that developers,
+
+33
+00:02:16,738 --> 00:02:20,470
+whenever they deal with databases, whenever they work with databases,
+
+34
+00:02:20,630 --> 00:02:23,930
+they very often don't notice problems that
+
+35
+00:02:24,000 --> 00:02:27,386
+later can cause troubles on the production end.
+
+36
+00:02:27,488 --> 00:02:31,962
+And this applies to, no matter whether you're a small startup or big enterprise
+
+37
+00:02:32,026 --> 00:02:35,598
+company, all those places, well, they have them to face
+
+38
+00:02:35,684 --> 00:02:39,278
+the same issues. Why? Because many times
+
+39
+00:02:39,364 --> 00:02:43,322
+whenever we test our applications, we only focus
+
+40
+00:02:43,476 --> 00:02:46,642
+on the correctness of the data, not on the
+
+41
+00:02:46,696 --> 00:02:50,338
+performance, how things work. So we miss problems
+
+42
+00:02:50,424 --> 00:02:53,714
+like n plus one queries from our orm, or we
+
+43
+00:02:53,752 --> 00:02:57,826
+miss cases when our queries do not use indexes.
+
+44
+00:02:57,938 --> 00:03:01,126
+And when we test these things locally, or when we
+
+45
+00:03:01,148 --> 00:03:04,374
+play with those things locally, well, we typically have a
+
+46
+00:03:04,412 --> 00:03:07,554
+small database with what, five rows, ten rows,
+
+47
+00:03:07,602 --> 00:03:11,046
+maybe 100 of rows. But we do not have production
+
+48
+00:03:11,158 --> 00:03:13,846
+like database available locally.
+
+49
+00:03:13,958 --> 00:03:17,498
+So we do not know what the actual size of the data
+
+50
+00:03:17,584 --> 00:03:20,906
+is. So even if we have a slow query that
+
+51
+00:03:20,928 --> 00:03:24,302
+for instance, scans the whole table, then we don't know
+
+52
+00:03:24,436 --> 00:03:27,886
+that it is going to cause performance issues. And there
+
+53
+00:03:27,908 --> 00:03:31,118
+are no tools to prevent you from deploying such a
+
+54
+00:03:31,124 --> 00:03:34,642
+code to production. Yes, you can run load tests. The problem
+
+55
+00:03:34,696 --> 00:03:38,942
+with load tests though is they happen very late in the pipeline.
+
+56
+00:03:39,086 --> 00:03:42,722
+And then those load tests, when they show you issues,
+
+57
+00:03:42,856 --> 00:03:46,498
+you basically need to go back to your coding and
+
+58
+00:03:46,584 --> 00:03:50,070
+rewrite the solution, restructure it, and sometimes even
+
+59
+00:03:50,140 --> 00:03:53,622
+start from scratch. So this is way too late and very
+
+60
+00:03:53,676 --> 00:03:57,286
+expensive to be efficient. So what we want to do is we
+
+61
+00:03:57,308 --> 00:04:01,110
+would like to capture issues with your databases
+
+62
+00:04:01,270 --> 00:04:04,666
+as early as possible, ideally right when you
+
+63
+00:04:04,688 --> 00:04:08,042
+are typing your code. And to do that, Matis wants
+
+64
+00:04:08,096 --> 00:04:11,482
+to understand what the rest API was called,
+
+65
+00:04:11,616 --> 00:04:15,370
+what are the SQL queries that are executed and what the execution
+
+66
+00:04:15,450 --> 00:04:19,294
+plans are in order to tell you, hey, this query was
+
+67
+00:04:19,332 --> 00:04:23,146
+fast locally because you have only 100 rows in your database.
+
+68
+00:04:23,258 --> 00:04:26,586
+But hey, you scanned the table and if you deploy
+
+69
+00:04:26,618 --> 00:04:29,954
+this to production and you don't use index, it's going to kill your
+
+70
+00:04:29,992 --> 00:04:33,474
+performance. So this is a critical issue and you need to change that. And we
+
+71
+00:04:33,512 --> 00:04:37,374
+want to alert the users right before they even
+
+72
+00:04:37,432 --> 00:04:41,106
+commit the code or at latest during their CI
+
+73
+00:04:41,138 --> 00:04:44,854
+CD pipeline. So this is what we do. So we have a couple of
+
+74
+00:04:44,892 --> 00:04:48,386
+assumptions where we deal with and how we want to tackle
+
+75
+00:04:48,418 --> 00:04:51,866
+that. So generally we need to extract those three things
+
+76
+00:04:51,968 --> 00:04:56,422
+and we are breaking with web APIs. So generally applications that expose
+
+77
+00:04:56,486 --> 00:05:00,338
+like rest APIs or whatever else, and they are basically dealing
+
+78
+00:05:00,374 --> 00:05:04,682
+with the network traffic. Those applications can be running like locally
+
+79
+00:05:04,746 --> 00:05:08,602
+or in the cloud or on prem or whatever else. We generally
+
+80
+00:05:08,746 --> 00:05:12,286
+don't necessarily constrain ourselves what types of
+
+81
+00:05:12,308 --> 00:05:15,798
+applications we support. They are generally modern,
+
+82
+00:05:15,914 --> 00:05:19,394
+meaning that we do not focus on technologies from, I don't know,
+
+83
+00:05:19,432 --> 00:05:22,834
+ten years ago or 15 years ago. We generally focus on
+
+84
+00:05:22,872 --> 00:05:26,550
+things that are modern in the sense that we want to
+
+85
+00:05:26,620 --> 00:05:29,842
+embrace the problems with microservices
+
+86
+00:05:29,986 --> 00:05:33,942
+or the problems with unclear interdependencies between
+
+87
+00:05:33,996 --> 00:05:37,862
+applications, or many applications talking to many
+
+88
+00:05:37,916 --> 00:05:42,186
+databases at once, or a single application talking to many databases at once.
+
+89
+00:05:42,288 --> 00:05:45,914
+Generally this is the world where we try to deal with. We are not
+
+90
+00:05:45,952 --> 00:05:49,722
+focusing on like monolithical applications talking
+
+91
+00:05:49,776 --> 00:05:53,242
+to a single database. No. Instead we want to support
+
+92
+00:05:53,296 --> 00:05:57,066
+a case when we have hundreds of microservices with hundreds
+
+93
+00:05:57,098 --> 00:06:00,586
+of databases of various kind and generally
+
+94
+00:06:00,618 --> 00:06:04,146
+support all of that. And ultimately we want to support the
+
+95
+00:06:04,168 --> 00:06:07,714
+users in their CI CD pipelines as
+
+96
+00:06:07,752 --> 00:06:11,250
+much as possible. So not only work with them in their local
+
+97
+00:06:11,320 --> 00:06:15,054
+environments, but also work in their CI CD environments,
+
+98
+00:06:15,182 --> 00:06:18,822
+showing them hey, this is your CI CD and
+
+99
+00:06:18,876 --> 00:06:22,646
+you can feel safe and you can rely on it so that
+
+100
+00:06:22,668 --> 00:06:26,422
+when CI CD tells you everything is good, it's not going to
+
+101
+00:06:26,476 --> 00:06:30,342
+break in production. So this is the idea and we have a couple of tenets
+
+102
+00:06:30,406 --> 00:06:33,930
+how we wanted to build the sdks. First, they must
+
+103
+00:06:34,000 --> 00:06:38,042
+be easy to use. Breaking that, we do not want to build
+
+104
+00:06:38,096 --> 00:06:42,014
+a solution that is hard to understand how to set up and
+
+105
+00:06:42,052 --> 00:06:45,502
+hard to use. Our users ideally should
+
+106
+00:06:45,556 --> 00:06:49,246
+do next to nothing to use MAtis. Ideally it
+
+107
+00:06:49,268 --> 00:06:52,382
+should be like one command and all is up and running,
+
+108
+00:06:52,516 --> 00:06:56,482
+right. Another thingy that we want to focus on is just one
+
+109
+00:06:56,536 --> 00:06:59,790
+time integration of the Matis solution.
+
+110
+00:06:59,950 --> 00:07:03,138
+Meaning that it's not that when you have a team of five
+
+111
+00:07:03,224 --> 00:07:06,594
+developers, then every single developer needs to
+
+112
+00:07:06,632 --> 00:07:10,134
+do something to integrate MatIs. No, nothing like that. We would like
+
+113
+00:07:10,172 --> 00:07:13,922
+this to be a single time action. So you integrate MatIs,
+
+114
+00:07:13,986 --> 00:07:17,874
+you commit anything you needed to do to the repository
+
+115
+00:07:18,002 --> 00:07:21,430
+and bank. All the team can benefit
+
+116
+00:07:21,510 --> 00:07:24,714
+from the integration you just did. All the team, all the
+
+117
+00:07:24,752 --> 00:07:28,234
+company, basically everyone working with the product. No matter
+
+118
+00:07:28,272 --> 00:07:31,566
+whether this is like in house product or open source product or
+
+119
+00:07:31,588 --> 00:07:35,930
+whatever else, you do it just once and everyone can use Matis.
+
+120
+00:07:36,090 --> 00:07:39,710
+Next thingy is ideally no code changes.
+
+121
+00:07:39,860 --> 00:07:43,662
+Ideally we want the integration to not
+
+122
+00:07:43,716 --> 00:07:47,874
+touch your application at all. Not change your application at all,
+
+123
+00:07:47,992 --> 00:07:51,662
+if that's possible, obviously. So you don't need to modify
+
+124
+00:07:51,726 --> 00:07:55,346
+the application. But this also goes the second thingy, which is
+
+125
+00:07:55,448 --> 00:07:58,882
+we do not want you to change the way how you implement
+
+126
+00:07:58,946 --> 00:08:02,582
+your application. Yes, maybe you will need to add
+
+127
+00:08:02,636 --> 00:08:06,674
+like one line of code triggering Mattis or enabling Matis.
+
+128
+00:08:06,802 --> 00:08:09,942
+But generally we don't want you to change
+
+129
+00:08:09,996 --> 00:08:14,246
+the way you run your test, change the way you deal with your orm,
+
+130
+00:08:14,358 --> 00:08:17,962
+change the way you write your business logic. No, we don't want to touch
+
+131
+00:08:18,016 --> 00:08:21,182
+that. Ideally your business code stays the same,
+
+132
+00:08:21,236 --> 00:08:25,230
+your infrastructure code stands the same, the only thing you need to do is,
+
+133
+00:08:25,300 --> 00:08:29,230
+well, enable Mattis. And finally, we want to bring as
+
+134
+00:08:29,300 --> 00:08:33,230
+few dependencies as possible, ideally zero.
+
+135
+00:08:33,380 --> 00:08:37,090
+We don't want to bring dependencies on you so that you need to install
+
+136
+00:08:37,160 --> 00:08:40,530
+this library, that library or whatever else. No, we only
+
+137
+00:08:40,600 --> 00:08:44,834
+want to bring Mattis and that's it. The fewer dependencies the
+
+138
+00:08:44,872 --> 00:08:48,566
+better. So this is where we are. So we want to
+
+139
+00:08:48,748 --> 00:08:52,854
+implement sdks. We wanted to implement sdks for
+
+140
+00:08:52,892 --> 00:08:56,422
+the web applications that are quite
+
+141
+00:08:56,476 --> 00:08:59,050
+modern, dealing with microservices,
+
+142
+00:08:59,550 --> 00:09:03,418
+many databases. At the same time, we want to get
+
+143
+00:09:03,504 --> 00:09:07,514
+things that can show you this is what happened in your application
+
+144
+00:09:07,632 --> 00:09:11,034
+like API X has been called in
+
+145
+00:09:11,072 --> 00:09:14,746
+turn. This is the SQL query that has been executed
+
+146
+00:09:14,858 --> 00:09:18,366
+and this is the performance and how it was executed. So then
+
+147
+00:09:18,388 --> 00:09:22,458
+we can later tell you this thingy is not going to work well in production.
+
+148
+00:09:22,554 --> 00:09:26,114
+And all of that needs to happen automatically. Should be as
+
+149
+00:09:26,152 --> 00:09:29,954
+straightforward for user as possible and ideally not change
+
+150
+00:09:29,992 --> 00:09:33,650
+the user's code at all. So let's see what happened
+
+151
+00:09:33,720 --> 00:09:37,810
+and let's see what we build over the years. So generally
+
+152
+00:09:37,970 --> 00:09:41,894
+what we want to achieve is we
+
+153
+00:09:41,932 --> 00:09:45,462
+wanted to use open telemetry to achieve all of that.
+
+154
+00:09:45,516 --> 00:09:48,214
+When we were brainstorming and trying to figure out,
+
+155
+00:09:48,252 --> 00:09:51,626
+okay, how do we want to tackle this problem? So how do
+
+156
+00:09:51,648 --> 00:09:55,574
+we want to tackle this problem? What exactly happened, what query
+
+157
+00:09:55,622 --> 00:09:59,318
+has been executed and what was the execution plan? We decided
+
+158
+00:09:59,414 --> 00:10:03,514
+yes, we want to use open telemetry to capture the interactions.
+
+159
+00:10:03,562 --> 00:10:06,778
+Why open telemetry and what is open telemetry?
+
+160
+00:10:06,874 --> 00:10:10,542
+Opentelemetry is basically a set of sdks and
+
+161
+00:10:10,596 --> 00:10:14,242
+open standards showing how to shape the data
+
+162
+00:10:14,296 --> 00:10:18,062
+and how to send the data and process the data that captures
+
+163
+00:10:18,206 --> 00:10:21,794
+signals, signals from your application, signals like
+
+164
+00:10:21,912 --> 00:10:25,970
+metrics, logs or activity
+
+165
+00:10:26,130 --> 00:10:29,878
+or explanation about particular activity that happened.
+
+166
+00:10:30,044 --> 00:10:33,794
+So traces and spans. This is what is called in open telemetry
+
+167
+00:10:33,842 --> 00:10:37,302
+world. So open telemetry can capture that,
+
+168
+00:10:37,356 --> 00:10:40,986
+hey, this is the SQL query that was executed or
+
+169
+00:10:41,088 --> 00:10:44,518
+that was the interaction you had with some other microservice.
+
+170
+00:10:44,614 --> 00:10:48,966
+So opentelemetry is basically an open standard on explaining
+
+171
+00:10:48,998 --> 00:10:52,990
+and defining on how to explain capture that
+
+172
+00:10:53,060 --> 00:10:57,290
+those interactions happened. And Opentelemetry also provides
+
+173
+00:10:57,370 --> 00:11:01,278
+libraries and sdks for capturing those signals. Just like in
+
+174
+00:11:01,284 --> 00:11:05,226
+your application, you have some logger, right? You have console log
+
+175
+00:11:05,348 --> 00:11:09,186
+or you have just logger or you have system out print line in Java or
+
+176
+00:11:09,208 --> 00:11:12,786
+whatever else, you just print mistakes. And there are
+
+177
+00:11:12,808 --> 00:11:17,026
+many libraries that can take those mistakes and save them to file,
+
+178
+00:11:17,218 --> 00:11:20,194
+send them over, network, save them to the database,
+
+179
+00:11:20,322 --> 00:11:23,750
+add things like, I don't know, a date and time,
+
+180
+00:11:23,820 --> 00:11:27,302
+timestamp, Fred ID, other stuff, right? Those things,
+
+181
+00:11:27,356 --> 00:11:30,998
+those are libraries that you just use the same way. Open telemetry
+
+182
+00:11:31,094 --> 00:11:34,614
+is basically a concept and a library how to capture
+
+183
+00:11:34,662 --> 00:11:38,886
+metrics from your application. So you don't need to reinvent
+
+184
+00:11:38,918 --> 00:11:42,206
+the wheel, you don't need to figure that out from scratch. No, you just take
+
+185
+00:11:42,228 --> 00:11:45,818
+the open telemetry and you use it and bang, all your metrics
+
+186
+00:11:45,834 --> 00:11:49,386
+are captured. Open telemetry also provides additional
+
+187
+00:11:49,498 --> 00:11:53,474
+things to later process the data, process these signals and
+
+188
+00:11:53,512 --> 00:11:57,634
+visualize them. For instance. So we have the tools to
+
+189
+00:11:57,752 --> 00:12:01,234
+capture the signals so that those tools know how to
+
+190
+00:12:01,272 --> 00:12:05,346
+emit them, how to structure JSON data or whatever else,
+
+191
+00:12:05,448 --> 00:12:08,754
+how to send them over, how to process them and finally how to visualize
+
+192
+00:12:08,802 --> 00:12:12,406
+them. So this is what we wanted to do next. We want to get the
+
+193
+00:12:12,428 --> 00:12:15,986
+details from the rest endpoint and the SQL,
+
+194
+00:12:16,098 --> 00:12:20,054
+meaning that we basically want to capture something like your rest path.
+
+195
+00:12:20,102 --> 00:12:25,078
+So this is the API that was called under the API
+
+196
+00:12:25,254 --> 00:12:28,586
+X with parameters, blah, blah, okay, and the
+
+197
+00:12:28,608 --> 00:12:32,490
+SQL. So we want to capture the SQL
+
+198
+00:12:32,570 --> 00:12:36,382
+statement that your application executed. And once
+
+199
+00:12:36,436 --> 00:12:40,430
+we capture those two things, we can correlate them together
+
+200
+00:12:40,580 --> 00:12:44,014
+showing that hey, this is what happened.
+
+201
+00:12:44,212 --> 00:12:47,934
+So this API has been called and this is the SQL query
+
+202
+00:12:47,982 --> 00:12:51,394
+that was executed as part of handling the workflow in this
+
+203
+00:12:51,432 --> 00:12:55,278
+API. Once we have that we can get the query
+
+204
+00:12:55,374 --> 00:12:59,494
+and we can go to the database and ask the
+
+205
+00:12:59,532 --> 00:13:02,806
+database for the execution plan. So you don't need
+
+206
+00:13:02,828 --> 00:13:06,614
+to give us the execution plan, we can capture the query and we can get
+
+207
+00:13:06,652 --> 00:13:10,426
+the execution plan by using the explain keyword. So we basically go to
+
+208
+00:13:10,448 --> 00:13:14,266
+postgres or MySQL or wherever else and we send
+
+209
+00:13:14,368 --> 00:13:18,694
+explain your query. And this gives us execution plan explaining
+
+210
+00:13:18,742 --> 00:13:22,606
+how the query has been executed, whether it was using indexes, whether it
+
+211
+00:13:22,628 --> 00:13:25,918
+was scanning tables or whatever else. And finally,
+
+212
+00:13:26,084 --> 00:13:29,898
+once we get all of that, we want to send that to Matis.
+
+213
+00:13:29,994 --> 00:13:33,866
+Matis is a software as a service. So we send those details
+
+214
+00:13:33,898 --> 00:13:37,262
+to Matis and we can show you, hey, this is the API,
+
+215
+00:13:37,326 --> 00:13:40,994
+this is what happened. This is the SQL query. This is how slow it is,
+
+216
+00:13:41,032 --> 00:13:44,466
+this is why it's slow. And most importantly, this is how you
+
+217
+00:13:44,488 --> 00:13:47,574
+fix it. That's the idea. This is how we wanted
+
+218
+00:13:47,612 --> 00:13:51,510
+to tackle this problem. And when solving this problem, we actually
+
+219
+00:13:51,580 --> 00:13:55,410
+went through three stages of three different sdks.
+
+220
+00:13:55,570 --> 00:13:59,190
+So we maintained our sdks and we changed our approach
+
+221
+00:13:59,270 --> 00:14:03,258
+and we learned a lot over this time. So the first approach was
+
+222
+00:14:03,344 --> 00:14:06,474
+having SDK. So if your
+
+223
+00:14:06,512 --> 00:14:09,574
+tech stack was I am using Python,
+
+224
+00:14:09,702 --> 00:14:13,130
+with fast API, with SQL alchemy,
+
+225
+00:14:13,210 --> 00:14:16,846
+that's like one instance of a tech stack. If you are using
+
+226
+00:14:16,948 --> 00:14:20,122
+JavaScript with PG driver, with sqlize,
+
+227
+00:14:20,186 --> 00:14:23,834
+that's another instance of the stack. If you are using Java,
+
+228
+00:14:23,882 --> 00:14:26,958
+with JDBC, with spring, with hibernate,
+
+229
+00:14:27,054 --> 00:14:30,334
+that's yet another instance of the stack. So generally
+
+230
+00:14:30,382 --> 00:14:33,746
+we wanted to build an SDK per tech stack and we wanted to
+
+231
+00:14:33,768 --> 00:14:36,626
+support many languages, JavaScript, Python,
+
+232
+00:14:36,738 --> 00:14:40,150
+Go Java, Kotlin, C sharp,
+
+233
+00:14:40,810 --> 00:14:44,898
+Ruby, et cetera, et cetera. Many languages, many libraries,
+
+234
+00:14:44,994 --> 00:14:48,042
+many orms, many tech stacks to support.
+
+235
+00:14:48,176 --> 00:14:52,086
+The second approach was we wanted to reconfigure
+
+236
+00:14:52,198 --> 00:14:56,358
+the database a bit, to read things from the database logs
+
+237
+00:14:56,454 --> 00:15:00,346
+instead of necessarily instrumenting everything. And finally,
+
+238
+00:15:00,448 --> 00:15:04,266
+in the third approach, we wanted to utilize open telemetry
+
+239
+00:15:04,298 --> 00:15:07,694
+much more. So let's see what we did, how we did it, and what we
+
+240
+00:15:07,732 --> 00:15:11,934
+learned. So the first approach, SDK per
+
+241
+00:15:11,972 --> 00:15:15,346
+tech stack. So the way we wanted it to work was we
+
+242
+00:15:15,368 --> 00:15:18,514
+take your application or you take your application,
+
+243
+00:15:18,712 --> 00:15:21,858
+and this application has some basically entry point,
+
+244
+00:15:21,944 --> 00:15:25,474
+some web framework, so ORM library, et cetera, et cetera,
+
+245
+00:15:25,522 --> 00:15:29,522
+many things, and we ask you to install Matis
+
+246
+00:15:29,586 --> 00:15:33,240
+SDK as a dependency of your application.
+
+247
+00:15:33,770 --> 00:15:38,078
+And then this SDK does the following magic.
+
+248
+00:15:38,194 --> 00:15:41,526
+So whenever there is a request from the user,
+
+249
+00:15:41,558 --> 00:15:45,386
+from the browser, from external service coming to your
+
+250
+00:15:45,488 --> 00:15:49,542
+web framework, and as a part of this web framework, like handling
+
+251
+00:15:49,606 --> 00:15:53,390
+the request, you basically call your ORM library.
+
+252
+00:15:53,810 --> 00:15:58,074
+Then this OrM library is going to the database to extract
+
+253
+00:15:58,122 --> 00:16:01,342
+the data and thus select star from table. It then
+
+254
+00:16:01,396 --> 00:16:05,118
+returns the data and the data is ultimately returned to the user,
+
+255
+00:16:05,214 --> 00:16:08,994
+but at the same time as some kind of
+
+256
+00:16:09,032 --> 00:16:12,450
+a hook is sent or event
+
+257
+00:16:12,520 --> 00:16:16,130
+is sent to our SDK. So Matis configures
+
+258
+00:16:16,210 --> 00:16:20,002
+hookings on the ORM library and on the web framework
+
+259
+00:16:20,066 --> 00:16:23,334
+and whatever else to capture the
+
+260
+00:16:23,372 --> 00:16:27,854
+event that hey, such and such query has been executed
+
+261
+00:16:27,922 --> 00:16:31,450
+on the database as part of this particular single
+
+262
+00:16:31,520 --> 00:16:34,586
+flow. So Matis captures this thanks to
+
+263
+00:16:34,608 --> 00:16:38,458
+hooking, and then goes to the database to
+
+264
+00:16:38,544 --> 00:16:42,350
+explain this query, gets the data,
+
+265
+00:16:42,500 --> 00:16:45,194
+gets all the traces, ids,
+
+266
+00:16:45,242 --> 00:16:49,098
+identifiers, whatever else, and finally sends them to Mattis.
+
+267
+00:16:49,194 --> 00:16:52,814
+So this is the idea. So now how does it work?
+
+268
+00:16:53,012 --> 00:16:56,922
+In the essence, you take your application, you do pip
+
+269
+00:16:56,986 --> 00:17:00,674
+install of Matty's dependency at
+
+270
+00:17:00,712 --> 00:17:04,370
+the entry point of your application. You trigger one line of code,
+
+271
+00:17:04,440 --> 00:17:07,874
+something like Mattis enable, and then the magic
+
+272
+00:17:07,922 --> 00:17:11,714
+we see here on the screen happens. So let's
+
+273
+00:17:11,762 --> 00:17:15,190
+see how it actually worked and what wasn't working.
+
+274
+00:17:15,340 --> 00:17:18,890
+So generally this approach was quite good.
+
+275
+00:17:18,960 --> 00:17:23,510
+First, it was very easy to install. You just do Pip, install NPM,
+
+276
+00:17:23,590 --> 00:17:27,226
+install maven, install whatever else,
+
+277
+00:17:27,408 --> 00:17:30,966
+and bang, you have all the magic, you have the libraries and that's
+
+278
+00:17:30,998 --> 00:17:35,130
+it. Second, it integrates with the language of your choice,
+
+279
+00:17:35,210 --> 00:17:38,922
+breaking that. If you're writing in Python, well, you get Python API.
+
+280
+00:17:38,986 --> 00:17:42,906
+If you are writing in JavaScript, you get JavaScript API, right? We don't
+
+281
+00:17:42,938 --> 00:17:46,322
+need to change anything but that. We don't need to change
+
+282
+00:17:46,376 --> 00:17:50,658
+your database, we don't need to change your application because,
+
+283
+00:17:50,744 --> 00:17:54,114
+well, we just need you to enable Matis. And then
+
+284
+00:17:54,152 --> 00:17:57,654
+everything else happens thanks to hooks and whatever else. So we just
+
+285
+00:17:57,692 --> 00:18:00,802
+figure out how to plug into your web framework,
+
+286
+00:18:00,866 --> 00:18:03,682
+plug into your orm library and whatnot.
+
+287
+00:18:03,826 --> 00:18:07,202
+And it generally works everywhere with automated tests,
+
+288
+00:18:07,266 --> 00:18:10,460
+with the actual APIs. When you run the application,
+
+289
+00:18:10,830 --> 00:18:14,234
+it captures the queries, it can be easily disabled for
+
+290
+00:18:14,272 --> 00:18:17,926
+production because you can control it and just not enable Mattis.
+
+291
+00:18:18,038 --> 00:18:21,822
+So generally very nice, very easy and should work well.
+
+292
+00:18:21,956 --> 00:18:23,920
+The problems were okay.
+
+293
+00:18:25,330 --> 00:18:29,178
+The biggest problem is we need to implement
+
+294
+00:18:29,274 --> 00:18:33,366
+a new solution for every single new tech stack.
+
+295
+00:18:33,498 --> 00:18:37,198
+Meaning that if you are using a different web framework
+
+296
+00:18:37,294 --> 00:18:39,934
+like flask instead of fast API,
+
+297
+00:18:40,062 --> 00:18:44,526
+bank new tech stock. If you are using different SQL Alchemy
+
+298
+00:18:44,558 --> 00:18:48,178
+version, bank new tech stock. If you are using different
+
+299
+00:18:48,264 --> 00:18:51,634
+driver behind SQL Alchemy, bank new
+
+300
+00:18:51,672 --> 00:18:54,722
+tech stock. If you switch languages, you go with JavaScript,
+
+301
+00:18:54,786 --> 00:18:58,210
+typeScript, Java Kotlin, whatever else, new tech stack,
+
+302
+00:18:58,290 --> 00:19:01,594
+new tech stack over and over and over again.
+
+303
+00:19:01,712 --> 00:19:05,750
+So we would need to maintaining many many SDK
+
+304
+00:19:05,830 --> 00:19:09,478
+and we can't reuse the code at all. We can't reuse
+
+305
+00:19:09,494 --> 00:19:13,310
+the implementation. Yes, we can reuse bits of it,
+
+306
+00:19:13,380 --> 00:19:17,326
+for instance the part that sends the data to Matis. This can be
+
+307
+00:19:17,348 --> 00:19:20,686
+reused across all the Python sdks, right?
+
+308
+00:19:20,788 --> 00:19:24,642
+But if you try to reuse the integration with
+
+309
+00:19:24,696 --> 00:19:27,854
+ORM, or for instance your JavaScript library,
+
+310
+00:19:27,982 --> 00:19:31,406
+or for instance your web framework, no way, you can't
+
+311
+00:19:31,438 --> 00:19:35,102
+reuse that. So with every single tech stack we had to reimplement
+
+312
+00:19:35,166 --> 00:19:38,614
+more and more things. And generally maintenance of that was
+
+313
+00:19:38,652 --> 00:19:41,906
+super hard. Not to mention that even new version
+
+314
+00:19:42,018 --> 00:19:45,714
+of web framework or new version of the OrM
+
+315
+00:19:45,762 --> 00:19:48,874
+library could also introduce breaking changes. So we would
+
+316
+00:19:48,912 --> 00:19:52,522
+need to support older versions for the very long
+
+317
+00:19:52,576 --> 00:19:56,074
+time. Another thingy that doesn't work
+
+318
+00:19:56,112 --> 00:19:59,590
+well in this approach is, well, we have differences
+
+319
+00:19:59,670 --> 00:20:02,842
+between dependencies that we use. For instance,
+
+320
+00:20:02,906 --> 00:20:06,734
+if we want to send, I don't know, JSON data, there are
+
+321
+00:20:06,772 --> 00:20:10,062
+many different libraries that we need to use. We use different
+
+322
+00:20:10,116 --> 00:20:13,938
+library in Python, different library in Python two and Python three,
+
+323
+00:20:14,024 --> 00:20:17,982
+and different library in JavaScript, right? So those libraries,
+
+324
+00:20:18,046 --> 00:20:21,298
+first, integration with them is different, and second,
+
+325
+00:20:21,384 --> 00:20:24,530
+they have their own quirks, how they deal. Yes,
+
+326
+00:20:24,600 --> 00:20:27,974
+even sending JSOn and encoding stuff can be
+
+327
+00:20:28,012 --> 00:20:31,622
+very tricky. But there were also other problems
+
+328
+00:20:31,756 --> 00:20:35,094
+that, well, apart from the burden of
+
+329
+00:20:35,132 --> 00:20:38,490
+maintenance and implementation on our end were also like
+
+330
+00:20:38,560 --> 00:20:41,174
+hard in terms of how it worked. For instance,
+
+331
+00:20:41,302 --> 00:20:45,002
+integrating with open telemetry is not that
+
+332
+00:20:45,056 --> 00:20:48,566
+straightforward. Sometimes depending on your Orm library,
+
+333
+00:20:48,678 --> 00:20:51,594
+we may not be able to get the parameter values,
+
+334
+00:20:51,722 --> 00:20:55,342
+or extracting the parameter values may be harder because
+
+335
+00:20:55,396 --> 00:20:59,454
+we will need to scrape the locks or we can't correlate the
+
+336
+00:20:59,492 --> 00:21:02,994
+rest API with the SQL query because
+
+337
+00:21:03,032 --> 00:21:06,402
+they are executed on completely different threads and they don't share
+
+338
+00:21:06,456 --> 00:21:10,146
+any unique identifier. So generally there
+
+339
+00:21:10,168 --> 00:21:14,510
+are many quirks, many issues, how to correlate the rest API
+
+340
+00:21:14,590 --> 00:21:18,738
+with SQL and whatnot. Not to mention testing frameworks.
+
+341
+00:21:18,834 --> 00:21:22,134
+Some testing frameworks when you want to spin up your application
+
+342
+00:21:22,252 --> 00:21:25,846
+in like testing environment and then test it. Some of
+
+343
+00:21:25,868 --> 00:21:29,382
+those testing frameworks, well, they won't capture and they won't
+
+344
+00:21:29,446 --> 00:21:32,310
+initialize the rest structures properly.
+
+345
+00:21:32,390 --> 00:21:36,314
+So you don't know what API is being called. So generally this
+
+346
+00:21:36,352 --> 00:21:39,834
+approach worked well in the essence, but was
+
+347
+00:21:39,872 --> 00:21:43,280
+very hard to maintain, very slow to develop,
+
+348
+00:21:43,730 --> 00:21:47,982
+and also had some quirks that we had to overcome over
+
+349
+00:21:48,036 --> 00:21:51,454
+and over again. So we decided, okay, this is
+
+350
+00:21:51,492 --> 00:21:55,362
+something we just can't do. We won't be able to support every
+
+351
+00:21:55,416 --> 00:21:59,026
+combination of the rest of the web framework and
+
+352
+00:21:59,048 --> 00:22:01,950
+every combination of the ORM and the language.
+
+353
+00:22:02,030 --> 00:22:05,558
+That's going to be too hard and too much of a
+
+354
+00:22:05,564 --> 00:22:09,734
+burden for us. Let's figure something else. So the second approach we
+
+355
+00:22:09,772 --> 00:22:13,234
+wanted to take was breaking from the database.
+
+356
+00:22:13,362 --> 00:22:16,520
+So now the idea is we have the application
+
+357
+00:22:17,710 --> 00:22:21,500
+and then what we do is we would like
+
+358
+00:22:22,350 --> 00:22:26,358
+get the rest API again which calls the RM library.
+
+359
+00:22:26,454 --> 00:22:29,810
+Now this Orm library conceptually
+
+360
+00:22:29,990 --> 00:22:33,454
+doesn't go to the database per se, but goes
+
+361
+00:22:33,492 --> 00:22:37,258
+to the SDK which stamps the query.
+
+362
+00:22:37,434 --> 00:22:41,514
+So Matty's now takes for instance the identifier
+
+363
+00:22:41,642 --> 00:22:45,614
+of the rest call and puts it on the SQL
+
+364
+00:22:45,662 --> 00:22:49,538
+query inside a comment. And then this query is being
+
+365
+00:22:49,624 --> 00:22:53,726
+sent to the database and then the data is returned
+
+366
+00:22:53,838 --> 00:22:58,178
+and then Matis SDK at the same time sends
+
+367
+00:22:58,274 --> 00:23:02,294
+this information to Matis platform. So what
+
+368
+00:23:02,332 --> 00:23:06,002
+happens at this point? Imagine that you call API orders,
+
+369
+00:23:06,066 --> 00:23:08,534
+get order by id, right?
+
+370
+00:23:08,732 --> 00:23:12,460
+Open telemetry, initializes. This is
+
+371
+00:23:13,230 --> 00:23:16,970
+a new request with identifier. I don't know, one to three.
+
+372
+00:23:17,120 --> 00:23:20,838
+Some guid comes here, right? So we take this guid,
+
+373
+00:23:20,934 --> 00:23:24,286
+we put it on the SQL query and at the
+
+374
+00:23:24,308 --> 00:23:27,802
+same time we lets Mattis know, hey, there was a GUI,
+
+375
+00:23:27,866 --> 00:23:31,150
+one to three. And that was the interaction over
+
+376
+00:23:31,220 --> 00:23:35,534
+API orders get order by ip, by identifier
+
+377
+00:23:35,582 --> 00:23:38,706
+or whatever else. Okay, so this is what we do.
+
+378
+00:23:38,808 --> 00:23:42,914
+And later asynchronously we have another piece
+
+379
+00:23:43,032 --> 00:23:46,546
+that is Matis collector. That is a docker container that runs
+
+380
+00:23:46,578 --> 00:23:50,822
+on the side. Asynchronously it goes to your database and
+
+381
+00:23:50,876 --> 00:23:54,646
+reads logs from the database and
+
+382
+00:23:54,668 --> 00:23:58,746
+then looks for the execution plans for all the
+
+383
+00:23:58,848 --> 00:24:02,566
+SQL queries. And it finds the SQL query reads
+
+384
+00:24:02,598 --> 00:24:06,554
+the comment on the query which says this is the query for the
+
+385
+00:24:06,592 --> 00:24:10,734
+identifier one to three extracts the execution plan and
+
+386
+00:24:10,772 --> 00:24:14,110
+finally developers it to Mattis. So this is what we do.
+
+387
+00:24:14,180 --> 00:24:18,174
+So basically we install an SDK to your application
+
+388
+00:24:18,372 --> 00:24:21,822
+that stamps the SQL query with the
+
+389
+00:24:21,876 --> 00:24:25,406
+trace id, with the identifier of the interaction.
+
+390
+00:24:25,518 --> 00:24:29,294
+And then we have another piece that reads the logs from the database
+
+391
+00:24:29,422 --> 00:24:32,914
+and checks for the execution plans based
+
+392
+00:24:32,952 --> 00:24:36,938
+on particular trace ids and sends all of that to Mattis.
+
+393
+00:24:37,054 --> 00:24:40,790
+Okay, so that was approach number two. So what we
+
+394
+00:24:40,940 --> 00:24:45,126
+now have is again, this is quite easy to install,
+
+395
+00:24:45,308 --> 00:24:48,666
+just one command and deploying docker, one command and
+
+396
+00:24:48,688 --> 00:24:51,994
+that's it. And it works, it still integrates with your
+
+397
+00:24:52,032 --> 00:24:55,754
+language. So you still have like API that is your
+
+398
+00:24:55,792 --> 00:24:59,594
+language specific is idiomatic, is whatever else.
+
+399
+00:24:59,712 --> 00:25:03,294
+And we again make nearly no changes to
+
+400
+00:25:03,332 --> 00:25:06,522
+your application code, right? Because you just need to enable
+
+401
+00:25:06,586 --> 00:25:10,046
+Mattis and that's it. We can capture everything.
+
+402
+00:25:10,148 --> 00:25:14,222
+We can disable that for the application, for the production and whatnot.
+
+403
+00:25:14,366 --> 00:25:17,874
+The problems now the database must be
+
+404
+00:25:17,912 --> 00:25:22,270
+reconfigured, must be reconfigured because you need to enable
+
+405
+00:25:22,430 --> 00:25:25,922
+the database to log execution plans for every
+
+406
+00:25:25,976 --> 00:25:29,126
+single query. So that's quite a lot of work.
+
+407
+00:25:29,228 --> 00:25:32,374
+So you need to go to the database, change how
+
+408
+00:25:32,412 --> 00:25:35,506
+it logs the data, change what it logs,
+
+409
+00:25:35,618 --> 00:25:39,082
+and so you get all those logs and they must
+
+410
+00:25:39,136 --> 00:25:42,618
+be sufficient enough for us to understand
+
+411
+00:25:42,704 --> 00:25:46,358
+what happened. And this is especially hard when we are dealing
+
+412
+00:25:46,374 --> 00:25:50,490
+with ephemeral databases. So databases that you just create
+
+413
+00:25:50,560 --> 00:25:54,206
+for the duration of, I don't know, unit test and then you
+
+414
+00:25:54,228 --> 00:25:57,998
+take them down. So with test containers or whatever
+
+415
+00:25:58,084 --> 00:26:01,486
+else, right. Why? Because those databases, when you
+
+416
+00:26:01,508 --> 00:26:04,806
+just create them, they won't be configured
+
+417
+00:26:04,858 --> 00:26:08,034
+appropriately for our need, right. So what we need
+
+418
+00:26:08,072 --> 00:26:11,458
+to do is we need to step in and changes the configuration of
+
+419
+00:26:11,464 --> 00:26:14,674
+the database. But then many times we
+
+420
+00:26:14,712 --> 00:26:18,374
+need to restart the database, and it's very
+
+421
+00:26:18,412 --> 00:26:22,002
+hard to restart the database in an ephemeral context
+
+422
+00:26:22,066 --> 00:26:25,894
+when you are just spinning it with test containers or whatever else.
+
+423
+00:26:25,932 --> 00:26:29,946
+So this is hard. So sometimes we had to consider like building a
+
+424
+00:26:29,968 --> 00:26:33,130
+specific image of the database, for instance, a specific
+
+425
+00:26:33,200 --> 00:26:36,950
+image of postgres instance that would have this configuration
+
+426
+00:26:37,030 --> 00:26:40,634
+enabled. Again, those are problems that
+
+427
+00:26:40,672 --> 00:26:44,174
+are not easy to solve and they are highly dependent on
+
+428
+00:26:44,212 --> 00:26:48,298
+how you execute stuff. If you execute stuff in CI CD,
+
+429
+00:26:48,394 --> 00:26:52,186
+that gets trickier. If you execute that in GitHub actions, that gets trickier.
+
+430
+00:26:52,218 --> 00:26:56,302
+If you execute that locally gets even more trickier. So generally
+
+431
+00:26:56,366 --> 00:26:59,906
+those things are hard to be done. Again,
+
+432
+00:27:00,088 --> 00:27:04,306
+another issue around this reconfiguration of the database is the cost
+
+433
+00:27:04,408 --> 00:27:08,530
+money, because if you log and you explode
+
+434
+00:27:08,610 --> 00:27:11,954
+your logs, then you need to pay for storing these logs,
+
+435
+00:27:12,002 --> 00:27:15,238
+processing them and handling them. And this is even
+
+436
+00:27:15,324 --> 00:27:18,406
+harder because well those logs,
+
+437
+00:27:18,438 --> 00:27:21,946
+they take memory, then take space and
+
+438
+00:27:21,968 --> 00:27:25,814
+they cost, processing them costs a lot. So generally
+
+439
+00:27:25,862 --> 00:27:28,234
+it's not easy to do that.
+
+440
+00:27:28,432 --> 00:27:32,234
+And yet another issue we have is difficult query
+
+441
+00:27:32,282 --> 00:27:35,386
+stamping because some orm libraries,
+
+442
+00:27:35,498 --> 00:27:39,114
+they are tricky in the sense that first, you can't
+
+443
+00:27:39,162 --> 00:27:43,066
+put any comment on the query. Second, putting a comment
+
+444
+00:27:43,098 --> 00:27:46,466
+on the query may breaking some other integrations, for instance with
+
+445
+00:27:46,488 --> 00:27:50,302
+your monitoring solutions. And third, some libraries
+
+446
+00:27:50,366 --> 00:27:53,474
+when you send just one single query, hey, get me data from
+
+447
+00:27:53,512 --> 00:27:57,042
+these two tables. This library will generate multiple
+
+448
+00:27:57,106 --> 00:28:00,166
+SQL statements, but you can stamp only one of them,
+
+449
+00:28:00,268 --> 00:28:03,750
+so you effectively miss some queries.
+
+450
+00:28:04,650 --> 00:28:08,550
+Not to mention the same issues we had with previous approach,
+
+451
+00:28:08,630 --> 00:28:13,066
+meaning that hard to reuse the code between
+
+452
+00:28:13,168 --> 00:28:17,034
+languages and libraries. Why? Because even though we
+
+453
+00:28:17,072 --> 00:28:20,794
+do not need to integrate with
+
+454
+00:28:20,832 --> 00:28:23,360
+DRM to that extent as before,
+
+455
+00:28:23,810 --> 00:28:27,134
+we still need to integrate with your web framework for
+
+456
+00:28:27,172 --> 00:28:30,766
+instance, and we still need to support many versions and we
+
+457
+00:28:30,788 --> 00:28:35,074
+still can't reuse the code between Java, JavaScript, Python and
+
+458
+00:28:35,112 --> 00:28:38,834
+other places. So generally, still many issues with this
+
+459
+00:28:38,872 --> 00:28:42,962
+approach and generally this approach worked pretty
+
+460
+00:28:43,016 --> 00:28:47,074
+well. It was very promising but still wasn't
+
+461
+00:28:47,122 --> 00:28:51,570
+quite that easy and was very hard to maintaining and post many challenges
+
+462
+00:28:51,650 --> 00:28:55,030
+between many languages and technologies we wanted to use.
+
+463
+00:28:55,180 --> 00:28:59,770
+So we wanted to use something else, yet another approach.
+
+464
+00:29:00,110 --> 00:29:03,706
+So this year that yet another approach was moving the
+
+465
+00:29:03,728 --> 00:29:08,102
+ownership. So you can see that in previous approaches
+
+466
+00:29:08,246 --> 00:29:11,870
+we were building a solution that we wanted to build,
+
+467
+00:29:11,940 --> 00:29:14,654
+we wanted to maintain and we owned it.
+
+468
+00:29:14,852 --> 00:29:18,574
+Now we want to shift this ownership to some
+
+469
+00:29:18,612 --> 00:29:22,554
+other place. We wanted to build something or
+
+470
+00:29:22,612 --> 00:29:26,366
+users, something that we wouldn't need to maintain
+
+471
+00:29:26,478 --> 00:29:30,674
+and implement and fix every single time a new
+
+472
+00:29:30,792 --> 00:29:34,878
+library comes or a new version of a web server comes.
+
+473
+00:29:35,064 --> 00:29:38,342
+So what we build now is we
+
+474
+00:29:38,396 --> 00:29:41,590
+dropped this idea of SDK altogether.
+
+475
+00:29:42,010 --> 00:29:45,894
+What we now do is hey, you have your application
+
+476
+00:29:46,092 --> 00:29:49,734
+and we don't really care what is in
+
+477
+00:29:49,772 --> 00:29:53,222
+this application. You can see this application goes to the database,
+
+478
+00:29:53,286 --> 00:29:56,954
+returns data, no magic in here. But now what we want
+
+479
+00:29:56,992 --> 00:30:01,102
+you to do is we want you to reconfigure this application
+
+480
+00:30:01,236 --> 00:30:04,366
+slightly and use open telemetry to
+
+481
+00:30:04,388 --> 00:30:07,854
+just send us the logs and traces from
+
+482
+00:30:07,892 --> 00:30:11,310
+your application so we can capture them inside
+
+483
+00:30:11,380 --> 00:30:14,510
+the thing we call Matis collector. And Matis collector
+
+484
+00:30:14,590 --> 00:30:17,714
+goes to the database, extracts the execution plan and
+
+485
+00:30:17,752 --> 00:30:21,346
+stands that to Matis. How does this work now?
+
+486
+00:30:21,448 --> 00:30:25,362
+How is it? What happened here? So we
+
+487
+00:30:25,416 --> 00:30:29,330
+want to changes this approach now thanks to open
+
+488
+00:30:29,400 --> 00:30:32,598
+telemetry. Open telemetry is,
+
+489
+00:30:32,684 --> 00:30:36,614
+as I mentioned, a set of sdks and libraries that
+
+490
+00:30:36,652 --> 00:30:40,554
+can be used to emit logs, traces, metrics and
+
+491
+00:30:40,592 --> 00:30:44,602
+other pieces of information. And Opentelemetry has this
+
+492
+00:30:44,656 --> 00:30:49,050
+fantastic mechanism called auto instrumentation.
+
+493
+00:30:49,630 --> 00:30:52,974
+Auto instrumentation is the mechanism that
+
+494
+00:30:53,012 --> 00:30:58,138
+can enable instrumenting, the libraries automatically
+
+495
+00:30:58,314 --> 00:31:01,582
+instrumenting, so enabling them to
+
+496
+00:31:01,636 --> 00:31:06,158
+send metrics, traces, logs and automatically
+
+497
+00:31:06,254 --> 00:31:09,794
+breaking that. The only thing you need to do is you need to
+
+498
+00:31:09,832 --> 00:31:13,810
+kick open telemetry and say, hey, instrument everything
+
+499
+00:31:13,880 --> 00:31:17,010
+I have and then it will do the magic.
+
+500
+00:31:17,170 --> 00:31:20,770
+Okay, so now we want you to instrument your libraries.
+
+501
+00:31:20,850 --> 00:31:23,810
+So they send data to Matis collector,
+
+502
+00:31:23,890 --> 00:31:27,522
+which is a docker that runs locally on the same host.
+
+503
+00:31:27,666 --> 00:31:32,246
+But now the question is, okay, how do you trigger this open telemetry?
+
+504
+00:31:32,358 --> 00:31:36,698
+And the best is yet to come. Open telemetry is
+
+505
+00:31:36,784 --> 00:31:40,278
+or can be enabled from outside of the process.
+
+506
+00:31:40,464 --> 00:31:44,606
+You don't need to change the application code at all. All you
+
+507
+00:31:44,628 --> 00:31:48,490
+need to do is put some environment variables
+
+508
+00:31:48,650 --> 00:31:51,966
+and then run your application. And if
+
+509
+00:31:51,988 --> 00:31:55,310
+you have open telemetry in your dependencies,
+
+510
+00:31:55,470 --> 00:32:00,210
+then it's going to work, it's going to trigger itself automatically.
+
+511
+00:32:00,710 --> 00:32:04,194
+So how do you do that? Well, previously we were
+
+512
+00:32:04,232 --> 00:32:08,354
+asking you install Matis SDK, trigger matis
+
+513
+00:32:08,402 --> 00:32:12,034
+SDK during your entry point and then Matis SDK
+
+514
+00:32:12,082 --> 00:32:15,650
+will take care of hooking into your libraries,
+
+515
+00:32:15,730 --> 00:32:18,914
+extracting queries, using open telemetry to send the data,
+
+516
+00:32:18,972 --> 00:32:22,874
+et cetera, et cetera. Now we do it completely differently. Hey,
+
+517
+00:32:22,992 --> 00:32:26,838
+the only thing you need to do is install open telemetry,
+
+518
+00:32:26,934 --> 00:32:30,794
+which most likely you already have in your applications
+
+519
+00:32:30,842 --> 00:32:34,538
+because our assumption is your applications are modern.
+
+520
+00:32:34,634 --> 00:32:38,750
+And if they are modern then well, most likely you already have the telemetry
+
+521
+00:32:39,090 --> 00:32:43,002
+and you then need to trigger this open telemetry
+
+522
+00:32:43,066 --> 00:32:47,058
+and that's it. And triggering the open telemetry is as simple
+
+523
+00:32:47,144 --> 00:32:51,266
+as you just put some environment variables and then it goes.
+
+524
+00:32:51,448 --> 00:32:55,578
+So that's it. So now you just install dependencies
+
+525
+00:32:55,694 --> 00:32:58,886
+once. So you do pip install or add things to
+
+526
+00:32:58,908 --> 00:33:03,362
+your pomfire or whatever else, and you put a couple of environment
+
+527
+00:33:03,426 --> 00:33:07,282
+variables in your start script,
+
+528
+00:33:07,346 --> 00:33:10,794
+bootstrap script, and then all the
+
+529
+00:33:10,832 --> 00:33:14,422
+traces are automatically sent to the docker
+
+530
+00:33:14,486 --> 00:33:18,566
+that we provide to Matis collector. And you basically need to run this Matis
+
+531
+00:33:18,598 --> 00:33:22,314
+collector somewhere locally. So you can spin it up with test containers
+
+532
+00:33:22,362 --> 00:33:25,786
+or spin it up wherever you wish and that's it. And then Matis
+
+533
+00:33:25,818 --> 00:33:29,530
+collector gets those traces. It can extract
+
+534
+00:33:29,610 --> 00:33:33,486
+the SQL queries from those traces, go to
+
+535
+00:33:33,508 --> 00:33:37,166
+the database, explain, get the execution plan, send it
+
+536
+00:33:37,188 --> 00:33:41,326
+over to Matis. So this is what we can do. Now pros
+
+537
+00:33:41,358 --> 00:33:45,074
+of this approach, no changes to application code,
+
+538
+00:33:45,192 --> 00:33:48,934
+literally no changes. And there is an asterisk over here because
+
+539
+00:33:48,972 --> 00:33:52,614
+that depends on the language you use. You get no
+
+540
+00:33:52,652 --> 00:33:55,714
+changes in python, no changes in JavaScript,
+
+541
+00:33:55,842 --> 00:33:59,866
+no changes in Java, no changes in. Net, no changes in
+
+542
+00:33:59,888 --> 00:34:03,242
+many languages. But for some languages you need
+
+543
+00:34:03,296 --> 00:34:06,902
+to do some changes. You need to trigger open telemetry manually,
+
+544
+00:34:06,966 --> 00:34:10,134
+for instance in C Plus plus, right? So generally
+
+545
+00:34:10,182 --> 00:34:13,566
+there is an asterisk, but most of the times you
+
+546
+00:34:13,588 --> 00:34:16,862
+don't need to change your application code at all. You don't need
+
+547
+00:34:16,916 --> 00:34:20,458
+to change your database at all, meaning that we don't
+
+548
+00:34:20,474 --> 00:34:24,254
+need to reconfigure your database anymore, we can just
+
+549
+00:34:24,452 --> 00:34:27,918
+send the xplane and that's it. You don't
+
+550
+00:34:27,934 --> 00:34:31,630
+need to change the database, meaning that we can support ephemeral databases,
+
+551
+00:34:31,790 --> 00:34:35,554
+read only databases, whatever you have, we don't need to touch that.
+
+552
+00:34:35,752 --> 00:34:39,622
+It integrates with the language in this sense that
+
+553
+00:34:39,756 --> 00:34:43,746
+the way you enable open telemetry depends on your language
+
+554
+00:34:43,858 --> 00:34:47,590
+and it is well integrated with your language. So it can use
+
+555
+00:34:47,660 --> 00:34:51,114
+things specific to your language, it can
+
+556
+00:34:51,152 --> 00:34:54,822
+use dynamic code execution, it can use additional parameters,
+
+557
+00:34:54,886 --> 00:34:58,586
+I don't know, to node runtime, it can use additional parameters to
+
+558
+00:34:58,608 --> 00:35:02,118
+python, whatever else. So it basically works in
+
+559
+00:35:02,144 --> 00:35:05,866
+the idiomatic way. It can be easily disabled for production
+
+560
+00:35:05,898 --> 00:35:09,102
+because, well, you just don't let open telemetry send
+
+561
+00:35:09,156 --> 00:35:12,654
+things to us. Not to mention you don't deploy lets collector and it
+
+562
+00:35:12,692 --> 00:35:16,354
+works. And the best of all the worlds is we
+
+563
+00:35:16,392 --> 00:35:19,666
+don't own it, meaning that if there
+
+564
+00:35:19,688 --> 00:35:23,554
+is a new version of the Orm library or new
+
+565
+00:35:23,592 --> 00:35:27,234
+version of the web framework, then it's
+
+566
+00:35:27,282 --> 00:35:30,502
+on them to integrate with open telemetry because
+
+567
+00:35:30,556 --> 00:35:34,134
+they want to integrate with open telemetry. So if they
+
+568
+00:35:34,172 --> 00:35:37,320
+break something or introduce breaking changes,
+
+569
+00:35:37,690 --> 00:35:41,386
+they need to integrate with open telemetry. So they are
+
+570
+00:35:41,408 --> 00:35:45,018
+going to fix that. And from our perspective nothing
+
+571
+00:35:45,104 --> 00:35:48,394
+changes because if it doesn't work it's going to be
+
+572
+00:35:48,432 --> 00:35:51,626
+them who fixes that. The only thing we
+
+573
+00:35:51,648 --> 00:35:55,054
+need to do is we need to maintain this collector that
+
+574
+00:35:55,092 --> 00:35:58,510
+does the magic. However, there are some problems.
+
+575
+00:35:58,660 --> 00:36:01,946
+Sometimes we need to change the code depending on the programming
+
+576
+00:36:01,978 --> 00:36:06,206
+language, for instance c plus plus or go. Not all libraries
+
+577
+00:36:06,318 --> 00:36:09,858
+support auto instrumentation. It's more and more of them
+
+578
+00:36:09,944 --> 00:36:13,838
+and it's obviously for their benefit. So mature
+
+579
+00:36:13,934 --> 00:36:17,202
+and popular libraries, they are integrated
+
+580
+00:36:17,266 --> 00:36:20,854
+with open telemetry and they support auto instrumentation because
+
+581
+00:36:20,892 --> 00:36:24,774
+it's for their greater good, right? But some of them, they are not
+
+582
+00:36:24,812 --> 00:36:28,854
+integrated and in that case we basically need to do some
+
+583
+00:36:28,892 --> 00:36:32,346
+magic. For instance, other three lines of code to extract the things
+
+584
+00:36:32,448 --> 00:36:36,502
+with hooks just like we did before. Sometimes those libraries
+
+585
+00:36:36,566 --> 00:36:40,134
+are integrated with open telemetry in a way that we can't
+
+586
+00:36:40,182 --> 00:36:44,474
+use them easily because for instance, they do not emit parameter
+
+587
+00:36:44,522 --> 00:36:48,062
+values for SQL queries. They just, whenever you do select
+
+588
+00:36:48,116 --> 00:36:52,142
+star from table where column greater than ten, you don't get
+
+589
+00:36:52,196 --> 00:36:56,066
+this value. Ten you only get placeholder like dollar one that there
+
+590
+00:36:56,088 --> 00:36:59,986
+was a parameter in that place, but you don't get this parameter value.
+
+591
+00:37:00,088 --> 00:37:03,342
+So we need to extract the logs for instance and parse
+
+592
+00:37:03,406 --> 00:37:06,978
+those logs to reconstruct the actual query.
+
+593
+00:37:07,154 --> 00:37:11,122
+Sometimes it's hard to correlate like rest with SQL
+
+594
+00:37:11,266 --> 00:37:14,934
+because well, open telemetry can't correlate that so
+
+595
+00:37:14,972 --> 00:37:18,854
+we can't show you. This was the SQL that was part of this rest API.
+
+596
+00:37:18,982 --> 00:37:23,062
+Sometimes it doesn't work well with testing frameworks, but generally
+
+597
+00:37:23,206 --> 00:37:26,890
+this is a pretty good approach. And the most important part
+
+598
+00:37:26,960 --> 00:37:30,578
+is we don't own it. Meaning if something breaks
+
+599
+00:37:30,694 --> 00:37:35,370
+the authors of the libraries, they need to fix that. So generally,
+
+600
+00:37:35,450 --> 00:37:39,150
+based on those three approaches and based on the
+
+601
+00:37:39,220 --> 00:37:43,046
+history of how we evolved those dks in many languages,
+
+602
+00:37:43,178 --> 00:37:46,942
+this is what we learned. We learned that uniform functionality
+
+603
+00:37:47,086 --> 00:37:50,274
+is crucial. We learned that version management is
+
+604
+00:37:50,312 --> 00:37:54,402
+crucial, and we learned that diverse languages and
+
+605
+00:37:54,456 --> 00:37:58,134
+idiomatic approaches and other stuff, this is hard to keep
+
+606
+00:37:58,172 --> 00:38:01,494
+in track. So let's see what actually we
+
+607
+00:38:01,532 --> 00:38:04,150
+learned first. Uniform functionality.
+
+608
+00:38:04,970 --> 00:38:08,614
+Whenever you deal with those sdks,
+
+609
+00:38:08,742 --> 00:38:12,154
+sdks for different text tags, sdks for
+
+610
+00:38:12,192 --> 00:38:15,466
+different languages, sdks depending on
+
+611
+00:38:15,488 --> 00:38:19,510
+the particular version of a particular library.
+
+612
+00:38:19,670 --> 00:38:22,462
+We learned that hey, those languages are different.
+
+613
+00:38:22,596 --> 00:38:26,480
+Some languages they have static typing like compile time
+
+614
+00:38:26,850 --> 00:38:30,442
+type checks. Sometimes they have dynamic typing
+
+615
+00:38:30,506 --> 00:38:34,014
+or they can change types of variables or whatever else.
+
+616
+00:38:34,132 --> 00:38:37,558
+Sometimes you have generics, sometimes you don't. Sometimes you have macros,
+
+617
+00:38:37,594 --> 00:38:40,478
+sometimes you don't. Sometimes you have dependency injection,
+
+618
+00:38:40,574 --> 00:38:43,486
+sometimes you have aspects, but sometimes you don't.
+
+619
+00:38:43,598 --> 00:38:48,002
+Sometimes you can generate the code on the fly or even execute
+
+620
+00:38:48,066 --> 00:38:51,522
+the code from a string, for instance, evil in JavaScript.
+
+621
+00:38:51,666 --> 00:38:55,362
+Sometimes you can't do that. So whenever
+
+622
+00:38:55,426 --> 00:38:59,290
+you deal with many languages and you want to keep your
+
+623
+00:38:59,360 --> 00:39:03,398
+SDK uniform across many languages,
+
+624
+00:39:03,574 --> 00:39:07,210
+you need to understand, okay, do I want to
+
+625
+00:39:07,360 --> 00:39:11,230
+embrace additional features of programming languages?
+
+626
+00:39:11,890 --> 00:39:15,230
+Or maybe I don't want to do that.
+
+627
+00:39:15,380 --> 00:39:19,562
+And what I want instead is I want to keep my SDK
+
+628
+00:39:19,626 --> 00:39:23,620
+implementation as primitive as possible so that
+
+629
+00:39:24,230 --> 00:39:27,938
+all the features are users can be basically
+
+630
+00:39:28,024 --> 00:39:31,646
+implemented in every single language. So you don't use generics,
+
+631
+00:39:31,758 --> 00:39:35,154
+so you don't use macros, so you don't use dynamic code
+
+632
+00:39:35,192 --> 00:39:38,374
+execution or whatever else, right? Those are the things that
+
+633
+00:39:38,412 --> 00:39:42,310
+you need to take into account. But sometimes you can't do that.
+
+634
+00:39:42,460 --> 00:39:45,974
+Sometimes you really need to rely on
+
+635
+00:39:46,012 --> 00:39:49,194
+the particular language because you need to integrate with the
+
+636
+00:39:49,232 --> 00:39:52,822
+ecosystem of this language. If you need to integrate
+
+637
+00:39:52,886 --> 00:39:57,386
+with ORM hacks, then, well, generally it's not easy
+
+638
+00:39:57,568 --> 00:40:01,034
+because you need to rely on the particular OrM
+
+639
+00:40:01,082 --> 00:40:04,606
+implementation, right? So there are many things that you need
+
+640
+00:40:04,628 --> 00:40:08,334
+to consider when doing this. Sdks for many
+
+641
+00:40:08,372 --> 00:40:11,710
+languages. For instance, can you even represent your data
+
+642
+00:40:11,780 --> 00:40:15,394
+structures the same way between languages? If you don't have
+
+643
+00:40:15,432 --> 00:40:19,166
+generics somewhere, then well, you won't be able to represent
+
+644
+00:40:19,198 --> 00:40:23,650
+those data structures, right? If you have class based inheritance
+
+645
+00:40:24,230 --> 00:40:28,134
+like Python or Java versus prototype based
+
+646
+00:40:28,172 --> 00:40:31,622
+inheritance in JavaScript, then how do you implement your data
+
+647
+00:40:31,676 --> 00:40:35,478
+structures the same way? Super hard. Another thing
+
+648
+00:40:35,564 --> 00:40:39,110
+is, can you use the same protocols for communication?
+
+649
+00:40:39,270 --> 00:40:43,254
+Right? So can your SDK communicate
+
+650
+00:40:43,302 --> 00:40:47,622
+of a network using the same protocol? Do you have JSON
+
+651
+00:40:47,686 --> 00:40:51,514
+support in your language? In all the languages? Most likely
+
+652
+00:40:51,562 --> 00:40:54,670
+yes. Do you have GRPC support in all the languages?
+
+653
+00:40:55,090 --> 00:40:58,494
+It may get trickier. Do you have, I don't know,
+
+654
+00:40:58,532 --> 00:41:02,602
+so specific proprietary protocol support
+
+655
+00:41:02,756 --> 00:41:05,666
+in all the languages? Definitely no.
+
+656
+00:41:05,848 --> 00:41:09,438
+You need to think, are there any implementation differences
+
+657
+00:41:09,534 --> 00:41:13,262
+between the languages that would affect how your SDK
+
+658
+00:41:13,326 --> 00:41:17,538
+gets initialized, for instance, or how your SDK gets installed,
+
+659
+00:41:17,634 --> 00:41:21,142
+or what things you can use? Can you use private data? Can you use public
+
+660
+00:41:21,196 --> 00:41:24,630
+data, et cetera, et cetera. How do you even deal
+
+661
+00:41:24,780 --> 00:41:28,234
+with evolving the schema that
+
+662
+00:41:28,272 --> 00:41:31,754
+you use to communicate between your SDK and
+
+663
+00:41:31,792 --> 00:41:35,402
+your software as a service platform? Right? How do you
+
+664
+00:41:35,456 --> 00:41:38,806
+introduce optional fields? Can you add optional
+
+665
+00:41:38,838 --> 00:41:42,462
+fields as a dictionary, or can you put them as a pass
+
+666
+00:41:42,516 --> 00:41:47,070
+through? How is this going to work when you have various libraries
+
+667
+00:41:47,730 --> 00:41:51,454
+that deal with that and answering all those questions?
+
+668
+00:41:51,652 --> 00:41:55,742
+Those things breaking using idiomatic
+
+669
+00:41:55,806 --> 00:41:59,202
+approach is generally much harder and much more time
+
+670
+00:41:59,256 --> 00:42:03,006
+consuming. And using specific things like generics, et cetera,
+
+671
+00:42:03,038 --> 00:42:06,882
+et cetera is not reusable between languages.
+
+672
+00:42:07,026 --> 00:42:10,866
+So years you can implement every SDK differently,
+
+673
+00:42:10,978 --> 00:42:14,322
+but those things are not easy to translate
+
+674
+00:42:14,386 --> 00:42:18,374
+between languages, so it increases the burden of the maintenance.
+
+675
+00:42:18,502 --> 00:42:21,914
+And finally the documentation. How do you
+
+676
+00:42:21,952 --> 00:42:25,482
+write a documentation for different sdks in different
+
+677
+00:42:25,536 --> 00:42:29,142
+languages? You would like to get the same documentation,
+
+678
+00:42:29,286 --> 00:42:32,750
+right? You would like to get the same parameters, the same
+
+679
+00:42:32,820 --> 00:42:36,606
+APIs in your documentation. And to
+
+680
+00:42:36,628 --> 00:42:40,074
+do that, you need to have exactly the same functions
+
+681
+00:42:40,202 --> 00:42:42,998
+across sdks. So generally,
+
+682
+00:42:43,194 --> 00:42:46,702
+in order to make this functionality uniform,
+
+683
+00:42:46,766 --> 00:42:50,478
+functionality easier to implement and maintaining between text tags,
+
+684
+00:42:50,574 --> 00:42:54,322
+you need to drop support for many
+
+685
+00:42:54,456 --> 00:42:57,762
+language specific things, language specific extensions
+
+686
+00:42:57,826 --> 00:43:02,722
+or constructs or whatever else. So to keep it maintainable
+
+687
+00:43:02,786 --> 00:43:06,722
+over time, you need to keep it as simple, as basic,
+
+688
+00:43:06,786 --> 00:43:09,020
+as primitive as possible.
+
+689
+00:43:09,630 --> 00:43:13,046
+Another thingy is what protocols
+
+690
+00:43:13,078 --> 00:43:16,650
+to use. JSon may sound like a great
+
+691
+00:43:16,720 --> 00:43:20,534
+solution for everything, right? You just put JSon, any language
+
+692
+00:43:20,582 --> 00:43:23,310
+can speak JSon, any language can use it.
+
+693
+00:43:23,380 --> 00:43:26,926
+What could go wrong? Well, yes, implementations of
+
+694
+00:43:26,948 --> 00:43:30,922
+JSON libraries, they are different. If you need to deserialize
+
+695
+00:43:30,986 --> 00:43:34,706
+data, sometimes you need to have metadata on your JSon, sometimes you
+
+696
+00:43:34,728 --> 00:43:37,954
+need to write this deserialization manually over and over
+
+697
+00:43:37,992 --> 00:43:41,518
+again between languages. Sometimes JSon is ill handled
+
+698
+00:43:41,614 --> 00:43:44,734
+in different languages, depending on the escaping,
+
+699
+00:43:44,862 --> 00:43:48,466
+depending on special characters, on character encoding, et cetera,
+
+700
+00:43:48,498 --> 00:43:52,674
+et cetera. Not to mention there are even differences in HTTP handling
+
+701
+00:43:52,802 --> 00:43:55,730
+between languages. So generally JSOn,
+
+702
+00:43:55,810 --> 00:43:59,334
+while it sounds easy, is actually hard to maintain
+
+703
+00:43:59,382 --> 00:44:02,810
+over time. GrPC, on the other hand,
+
+704
+00:44:02,960 --> 00:44:07,066
+is way easier if you can use it in
+
+705
+00:44:07,088 --> 00:44:11,020
+your language. So if you take the languages that you want to support
+
+706
+00:44:11,330 --> 00:44:14,846
+and you have GrPC in all of them, it's going to
+
+707
+00:44:14,868 --> 00:44:18,666
+be easier. Why? Because in GrPC you define your schema
+
+708
+00:44:18,698 --> 00:44:22,806
+just once and then you don't care. And then GrPC
+
+709
+00:44:22,858 --> 00:44:25,870
+library takes care of generating classes,
+
+710
+00:44:25,950 --> 00:44:30,782
+generating structures, serializing the data, and even minimalizing
+
+711
+00:44:30,926 --> 00:44:34,930
+or cutting the network usage. So this is generally
+
+712
+00:44:35,270 --> 00:44:40,034
+when you choose, when you need to pick between like JSON
+
+713
+00:44:40,082 --> 00:44:44,230
+standards or GrPC generally consider things that
+
+714
+00:44:44,300 --> 00:44:47,702
+have bindings to all the languages, and there is one single
+
+715
+00:44:47,756 --> 00:44:51,434
+entity that maintains those bindings. So it's way easier to deal
+
+716
+00:44:51,472 --> 00:44:55,286
+with that. You don't need to go and look for different JSON library
+
+717
+00:44:55,318 --> 00:44:58,842
+in each language, just go with GRPC or
+
+718
+00:44:58,896 --> 00:45:02,314
+go with something that supports the languages. And similarly
+
+719
+00:45:02,362 --> 00:45:06,014
+the same goes for protocols. Should you
+
+720
+00:45:06,052 --> 00:45:09,182
+use an open protocol, an open standard,
+
+721
+00:45:09,316 --> 00:45:13,582
+or a proprietary one? Do you want to implement your protocol
+
+722
+00:45:13,726 --> 00:45:16,866
+or your data structures or whatever else,
+
+723
+00:45:16,968 --> 00:45:20,654
+or do you want to take some open standard, like open telemetry
+
+724
+00:45:20,702 --> 00:45:24,014
+for instance. So with proprietary protocol, the biggest
+
+725
+00:45:24,062 --> 00:45:28,150
+advantage is you can send anything you need and
+
+726
+00:45:28,220 --> 00:45:31,842
+only the things you need. You don't get noise,
+
+727
+00:45:31,906 --> 00:45:35,062
+you don't get the noise, and you get the things you need
+
+728
+00:45:35,116 --> 00:45:38,578
+in exactly the way you need them, right? But the
+
+729
+00:45:38,604 --> 00:45:41,722
+problem with proprietary protocols is, well,
+
+730
+00:45:41,776 --> 00:45:45,146
+you don't have libraries to deal with that. You need to maintain your
+
+731
+00:45:45,168 --> 00:45:48,486
+data structures, you need to maintain your communication,
+
+732
+00:45:48,598 --> 00:45:51,774
+you need to implement that. And if you want
+
+733
+00:45:51,812 --> 00:45:55,406
+people to help you, like from the open source world, they won't be
+
+734
+00:45:55,428 --> 00:45:58,762
+able. So generally go with open standards,
+
+735
+00:45:58,826 --> 00:46:01,600
+because users will have libraries for that,
+
+736
+00:46:02,210 --> 00:46:05,538
+users will know how to use it and you don't need to
+
+737
+00:46:05,544 --> 00:46:09,378
+own it. But the problem with open standards is that sometimes
+
+738
+00:46:09,464 --> 00:46:13,074
+you need to squeeze your structures into those
+
+739
+00:46:13,112 --> 00:46:16,802
+open definitions so that can be delivered
+
+740
+00:46:16,866 --> 00:46:19,570
+and handled between languages.
+
+741
+00:46:19,730 --> 00:46:23,922
+So generally, whatever you do, just don't
+
+742
+00:46:23,986 --> 00:46:27,518
+try reinventing the wheel, don't reinvent
+
+743
+00:46:27,554 --> 00:46:31,562
+the stuff, do not build your stuff, keep it basic, use open
+
+744
+00:46:31,616 --> 00:46:35,034
+standards and that's it. This way you basically
+
+745
+00:46:35,152 --> 00:46:38,506
+minimize the amount of the stuff
+
+746
+00:46:38,688 --> 00:46:42,846
+you need to maintain over time. Next thingy is
+
+747
+00:46:42,948 --> 00:46:46,398
+version management. So we do have
+
+748
+00:46:46,484 --> 00:46:50,170
+Sam versioning, right? So we have those like major version,
+
+749
+00:46:50,250 --> 00:46:54,194
+minor version and patch version, and we can use them
+
+750
+00:46:54,232 --> 00:46:57,810
+to indicate what has been changed, right? But now comes the problem.
+
+751
+00:46:57,880 --> 00:47:01,970
+Okay, what if I have sdks in different languages?
+
+752
+00:47:02,390 --> 00:47:06,214
+Do I bump their versions consistently or
+
+753
+00:47:06,252 --> 00:47:09,750
+do I just bump the version independently?
+
+754
+00:47:10,090 --> 00:47:13,990
+And how do I know whether SDK in Python
+
+755
+00:47:14,410 --> 00:47:18,194
+in this version supports the same set of features
+
+756
+00:47:18,242 --> 00:47:22,086
+as SDK in JavaScript in that version? How do I correlate
+
+757
+00:47:22,118 --> 00:47:25,306
+all of that? How do I adopt new features from the
+
+758
+00:47:25,328 --> 00:47:28,954
+language if I want to use them? Do I actually need to
+
+759
+00:47:28,992 --> 00:47:32,426
+bump the version across all the sdks or just
+
+760
+00:47:32,448 --> 00:47:35,726
+one SDK? And how do I actually keep track of my
+
+761
+00:47:35,748 --> 00:47:39,726
+versions? How do I actually test the versions? How do I do all
+
+762
+00:47:39,748 --> 00:47:43,086
+of that? So there are many things that you need to
+
+763
+00:47:43,108 --> 00:47:46,514
+consider here. How do you add a new feature to all
+
+764
+00:47:46,552 --> 00:47:50,286
+sdks at once? Do you keep those features consistent
+
+765
+00:47:50,398 --> 00:47:53,522
+across sdks? Or maybe you just let them live
+
+766
+00:47:53,576 --> 00:47:56,986
+independently? What's your release cadence?
+
+767
+00:47:57,038 --> 00:48:00,950
+Do you release a new version of all languages at once,
+
+768
+00:48:01,100 --> 00:48:04,262
+or can they go out independently? How do you deal
+
+769
+00:48:04,316 --> 00:48:07,654
+with things like, I don't know, logging between technologies or
+
+770
+00:48:07,692 --> 00:48:10,586
+how do you deal with language specific options? Yeah,
+
+771
+00:48:10,688 --> 00:48:14,122
+so all those things, they are very hard to deal.
+
+772
+00:48:14,256 --> 00:48:17,660
+But generally whatever we learned is that first,
+
+773
+00:48:19,630 --> 00:48:22,910
+whatever you do, you need to keep your
+
+774
+00:48:22,980 --> 00:48:26,078
+environments tested as much as possible.
+
+775
+00:48:26,244 --> 00:48:29,946
+You need to test the stuff in a reproducible manner,
+
+776
+00:48:30,058 --> 00:48:33,646
+so you can take the things and reproduce them locally
+
+777
+00:48:33,758 --> 00:48:37,358
+or in the cloud or in CI CD. So generally docker
+
+778
+00:48:37,454 --> 00:48:41,134
+test containers nix other tricks that maintain
+
+779
+00:48:41,182 --> 00:48:44,354
+those versioning for you. You want to run the
+
+780
+00:48:44,392 --> 00:48:47,830
+tests across all languages for every single change.
+
+781
+00:48:47,900 --> 00:48:51,634
+And if you find a bug in one implementation,
+
+782
+00:48:51,762 --> 00:48:55,554
+like in Python implementation for instance, then most likely
+
+783
+00:48:55,602 --> 00:48:58,950
+the same bug is there in implementations for JavaScript,
+
+784
+00:48:59,030 --> 00:49:02,950
+Java, whatever else. So always look for those implementations
+
+785
+00:49:03,030 --> 00:49:07,366
+everywhere. You need to try reproducing these things everywhere.
+
+786
+00:49:07,478 --> 00:49:11,078
+And you would like to ideally have a common
+
+787
+00:49:11,264 --> 00:49:14,606
+test set for all the sdks. So you
+
+788
+00:49:14,628 --> 00:49:18,574
+don't have like language specific tests, or you don't have different
+
+789
+00:49:18,692 --> 00:49:21,966
+data like sample data for testing. No, you want
+
+790
+00:49:21,988 --> 00:49:25,346
+to have those tests running uniformly in all
+
+791
+00:49:25,368 --> 00:49:29,182
+the technologies, so it's super easy to maintain. So whenever
+
+792
+00:49:29,246 --> 00:49:32,530
+you need to introduce changes in one place, you know how to apply
+
+793
+00:49:32,600 --> 00:49:36,326
+them in other places as well. Other thing is
+
+794
+00:49:36,428 --> 00:49:39,622
+consider using like Monorepo for
+
+795
+00:49:39,676 --> 00:49:43,158
+having all the packages and libraries that you want
+
+796
+00:49:43,164 --> 00:49:46,966
+to use and users tools for that. For instance, use learner in
+
+797
+00:49:46,988 --> 00:49:50,778
+JavaScript to keep those things in place and under control.
+
+798
+00:49:50,944 --> 00:49:54,950
+And be explicit about your dependencies. Never use transitive
+
+799
+00:49:55,030 --> 00:49:58,470
+dependencies that you do not control or versions
+
+800
+00:49:58,550 --> 00:50:02,334
+that can go be bumped without you
+
+801
+00:50:02,372 --> 00:50:06,810
+knowing about that because then those things may breaking accidentally
+
+802
+00:50:06,890 --> 00:50:10,142
+and you have no idea about that. Be explicit about
+
+803
+00:50:10,196 --> 00:50:13,554
+dependencies. Have as few dependencies as
+
+804
+00:50:13,592 --> 00:50:16,914
+possible and control the versions of your
+
+805
+00:50:16,952 --> 00:50:20,286
+databases and of your dependencies.
+
+806
+00:50:20,478 --> 00:50:23,746
+And generally use as few dependencies to
+
+807
+00:50:23,768 --> 00:50:27,222
+not cause conflicts, conflicts on different
+
+808
+00:50:27,276 --> 00:50:31,042
+lessons between your sdks or your SDK
+
+809
+00:50:31,106 --> 00:50:34,598
+and the user code. So generally be very
+
+810
+00:50:34,684 --> 00:50:38,634
+explicit about that. Run your lets constantly and have
+
+811
+00:50:38,672 --> 00:50:42,666
+them uniform and as easy as possible. Basically consider sdks for
+
+812
+00:50:42,688 --> 00:50:46,822
+all the languages as one single SDK.
+
+813
+00:50:46,966 --> 00:50:50,558
+That's the easiest way to keep that in shape and maintain that
+
+814
+00:50:50,644 --> 00:50:53,246
+over time. And finally,
+
+815
+00:50:53,428 --> 00:50:57,162
+diversity of the languages. So generally languages
+
+816
+00:50:57,226 --> 00:51:01,134
+are different. And it's not about languages per se,
+
+817
+00:51:01,252 --> 00:51:04,510
+but it's much more about the ecosystem of the languages,
+
+818
+00:51:04,590 --> 00:51:07,982
+like dependency management, like the quirks
+
+819
+00:51:08,046 --> 00:51:11,586
+of the platform, like the way how you deploy stuff on
+
+820
+00:51:11,608 --> 00:51:15,574
+the platform, like the way how things evolve, how net
+
+821
+00:51:15,612 --> 00:51:18,822
+framework changes to net core, how things get
+
+822
+00:51:18,876 --> 00:51:22,502
+dropped and support gets lost. So generally those
+
+823
+00:51:22,556 --> 00:51:26,210
+things are hard to understand, how to grasp
+
+824
+00:51:26,290 --> 00:51:29,706
+for one person. One person won't be able to do that.
+
+825
+00:51:29,808 --> 00:51:33,770
+One person can't understand all the ecosystems. That just
+
+826
+00:51:33,840 --> 00:51:37,898
+doesn't work. So what you'd like to do is
+
+827
+00:51:37,984 --> 00:51:41,770
+you would like to have, what worked
+
+828
+00:51:41,840 --> 00:51:45,626
+for us is we have a language champion.
+
+829
+00:51:45,738 --> 00:51:48,686
+So for every single language that we wanted support,
+
+830
+00:51:48,788 --> 00:51:52,554
+we had a designated person, a language champion,
+
+831
+00:51:52,682 --> 00:51:56,386
+so the person that knew and had to stay up to
+
+832
+00:51:56,408 --> 00:51:59,746
+date. And on top of all the changes in the language and in
+
+833
+00:51:59,768 --> 00:52:02,766
+the platform that could be affecting our sdks,
+
+834
+00:52:02,878 --> 00:52:06,680
+there was a change in, let's say,
+
+835
+00:52:07,850 --> 00:52:11,442
+orm versions, or a change in SQL drivers,
+
+836
+00:52:11,506 --> 00:52:15,522
+or a change in dependency management in given language,
+
+837
+00:52:15,586 --> 00:52:19,638
+or a change in other things, build systems or whatever,
+
+838
+00:52:19,804 --> 00:52:23,370
+all change in features that a language supported, right?
+
+839
+00:52:23,520 --> 00:52:27,194
+The language champion was supposed to stay on top of that
+
+840
+00:52:27,312 --> 00:52:31,262
+and they had to push this knowledge and
+
+841
+00:52:31,316 --> 00:52:35,454
+those updates onto the rest of the team. So we
+
+842
+00:52:35,492 --> 00:52:39,274
+had like regular updates, weekly meetings where we discussed,
+
+843
+00:52:39,322 --> 00:52:42,454
+okay, what new happened that could affect
+
+844
+00:52:42,522 --> 00:52:45,646
+our sdks and what also broke
+
+845
+00:52:45,758 --> 00:52:49,422
+in those sdks. Okay, what happened in Python SDK
+
+846
+00:52:49,486 --> 00:52:52,994
+recently that broke the Python SDK and that
+
+847
+00:52:53,032 --> 00:52:57,014
+we think could break other sdks or may affect how
+
+848
+00:52:57,052 --> 00:53:00,694
+we want to evolve our sdks over time. So having
+
+849
+00:53:00,732 --> 00:53:04,134
+this language champion was the solution for us to
+
+850
+00:53:04,172 --> 00:53:08,134
+actually deal with that stuff. So that was
+
+851
+00:53:08,172 --> 00:53:11,594
+basically it when it comes to what we did. So in
+
+852
+00:53:11,632 --> 00:53:14,682
+summary, generally what we do is we had
+
+853
+00:53:14,736 --> 00:53:18,698
+those evolution of sdks and the lesson learned always
+
+854
+00:53:18,784 --> 00:53:22,366
+is the best thingy is the thingy that you don't own.
+
+855
+00:53:22,548 --> 00:53:26,014
+So minimize the set of things that you
+
+856
+00:53:26,052 --> 00:53:29,802
+need to own and maintain. Minimize the number of features,
+
+857
+00:53:29,866 --> 00:53:33,790
+minimize the diversity between languages and the sample data
+
+858
+00:53:33,860 --> 00:53:37,294
+you use, generally keep that as small as possible
+
+859
+00:53:37,492 --> 00:53:41,470
+and just have this under your control and
+
+860
+00:53:41,540 --> 00:53:44,882
+test things constantly in a reproducible manner
+
+861
+00:53:44,986 --> 00:53:48,694
+as much as possible. And have a language champion that can
+
+862
+00:53:48,732 --> 00:53:51,846
+help you maintaining those sdks across the
+
+863
+00:53:51,868 --> 00:53:55,746
+planet. So this is what we did, and thank you for listening.
+
+864
+00:53:55,858 --> 00:53:59,714
+Drop me a line if you have any questions. Join our discord.
+
+865
+00:53:59,762 --> 00:54:03,126
+Take a look at the webpage. My name is Adam Furmanek and thank
+
+866
+00:54:03,148 --> 00:54:06,500
+you for watching this session. I hope you enjoyed it. Thank you.
+
