@@ -1,0 +1,832 @@
+1
+00:00:20,720 --> 00:00:24,766
+Hello everyone. My name is Kirill and today we will talk about simple
+
+2
+00:00:24,830 --> 00:00:28,360
+but common mistakes in system design. Let's get
+
+3
+00:00:28,392 --> 00:00:31,768
+started. So the first issue we will cover
+
+4
+00:00:31,856 --> 00:00:35,504
+is connected with idempotency. It can happen when
+
+5
+00:00:35,544 --> 00:00:38,936
+there is communication between two services with data creation.
+
+6
+00:00:39,000 --> 00:00:43,084
+In the second service it can lead to duplicated data.
+
+7
+00:00:43,784 --> 00:00:47,192
+Let's consider this example. We have advertisement service
+
+8
+00:00:47,328 --> 00:00:51,048
+in our scheme. Also we have user who sends to us
+
+9
+00:00:51,136 --> 00:00:54,904
+data about an impression of the ad.
+
+10
+00:00:55,064 --> 00:00:58,488
+The payload has ad id. Ad ID
+
+11
+00:00:58,576 --> 00:01:02,644
+is the id of the advertisement. We check the impression form.
+
+12
+00:01:03,024 --> 00:01:06,240
+Also service has a downstream dependency, external ad
+
+13
+00:01:06,272 --> 00:01:10,084
+service. And external ad service has its own database.
+
+14
+00:01:10,704 --> 00:01:14,088
+The final goal of the whole scheme is to
+
+15
+00:01:14,136 --> 00:01:17,664
+increase this counter. Now let's imagine this.
+
+16
+00:01:17,784 --> 00:01:21,540
+What if there is sometimes there is high latency
+
+17
+00:01:21,572 --> 00:01:24,984
+between external ad service and the database.
+
+18
+00:01:25,764 --> 00:01:30,024
+Let's also imagine this. Right after we have successfully
+
+19
+00:01:30,604 --> 00:01:34,172
+increased the counter the user decides
+
+20
+00:01:34,348 --> 00:01:38,116
+to break the connection because of the total
+
+21
+00:01:38,180 --> 00:01:42,108
+high latency. In that case we have successfully
+
+22
+00:01:42,156 --> 00:01:45,588
+increased the counter. But from the user's perspective,
+
+23
+00:01:45,636 --> 00:01:49,004
+the request failed. So the user
+
+24
+00:01:49,044 --> 00:01:53,388
+decides to retrieve the request. So it sends
+
+25
+00:01:53,476 --> 00:01:55,784
+the same request twice.
+
+26
+00:01:56,324 --> 00:02:00,524
+And now there is no high latency between external service and
+
+27
+00:02:00,604 --> 00:02:04,584
+the database. We have successfully increased the counter again.
+
+28
+00:02:04,964 --> 00:02:08,584
+And from the user's perspective everything is fine too.
+
+29
+00:02:09,724 --> 00:02:13,360
+So we have increased the counter twice.
+
+30
+00:02:13,532 --> 00:02:17,124
+We had the only expression, but the counter is two.
+
+31
+00:02:17,504 --> 00:02:20,484
+The counter should be one, but it's what it is two.
+
+32
+00:02:21,104 --> 00:02:24,416
+That's the adepotency issue. We will try to
+
+33
+00:02:24,440 --> 00:02:28,184
+fix how we conf. How we can fix it.
+
+34
+00:02:28,304 --> 00:02:31,648
+We could add event id, one more
+
+35
+00:02:31,696 --> 00:02:35,496
+id to our payload. But unlike an id which
+
+36
+00:02:35,520 --> 00:02:38,688
+is the id of the ad, this id,
+
+37
+00:02:38,776 --> 00:02:42,866
+event id is the id of the particular
+
+38
+00:02:43,010 --> 00:02:46,778
+event. Unique id for every
+
+39
+00:02:46,866 --> 00:02:51,050
+impression, every event. And now
+
+40
+00:02:51,202 --> 00:02:54,626
+having that id, we also should add
+
+41
+00:02:54,770 --> 00:02:58,394
+that id to the payload between service and external ad
+
+42
+00:02:58,434 --> 00:03:02,290
+service. And now having that id lets
+
+43
+00:03:02,322 --> 00:03:05,722
+us to duplicate data on
+
+44
+00:03:05,738 --> 00:03:09,810
+the database level. So even if we have
+
+45
+00:03:10,002 --> 00:03:13,618
+two different payloads for the same impression, we can
+
+46
+00:03:13,706 --> 00:03:17,682
+deduplicate. We can duplicate it by event
+
+47
+00:03:17,738 --> 00:03:21,490
+id on the database level, which is fine.
+
+48
+00:03:21,562 --> 00:03:24,294
+And now our data is consistent.
+
+49
+00:03:24,794 --> 00:03:28,090
+Okay, let's move on. Next issue
+
+50
+00:03:28,162 --> 00:03:32,314
+is external request inside transaction. It can happen when
+
+51
+00:03:32,434 --> 00:03:35,782
+this transaction to the database
+
+52
+00:03:35,938 --> 00:03:40,474
+and inside that transaction we request an external service.
+
+53
+00:03:41,094 --> 00:03:44,234
+It can lead to exhausted database connection pool.
+
+54
+00:03:44,974 --> 00:03:48,914
+And let's consider why. So we
+
+55
+00:03:49,294 --> 00:03:52,942
+have an advertisement service as the example
+
+56
+00:03:52,998 --> 00:03:56,558
+again. Also we have a user
+
+57
+00:03:56,686 --> 00:04:00,326
+who creates an ad campaign under the
+
+58
+00:04:00,350 --> 00:04:03,914
+hood. The service starts transaction,
+
+59
+00:04:04,254 --> 00:04:08,086
+it inserts data to the to the database and
+
+60
+00:04:08,190 --> 00:04:11,862
+it sends a post request to external
+
+61
+00:04:11,918 --> 00:04:15,222
+ad service. At the first glance it
+
+62
+00:04:15,238 --> 00:04:19,222
+can work. Plus transaction provides us data
+
+63
+00:04:19,278 --> 00:04:22,318
+consistency. But let's imagine this.
+
+64
+00:04:22,486 --> 00:04:26,354
+What if this high latency between service and external ad service
+
+65
+00:04:26,734 --> 00:04:30,592
+plus these, so service
+
+66
+00:04:30,768 --> 00:04:35,016
+has a lot of users. Eventually it
+
+67
+00:04:35,040 --> 00:04:38,704
+will lead to exhaust database connection pool.
+
+68
+00:04:38,784 --> 00:04:42,304
+And this is why we won't release our
+
+69
+00:04:42,344 --> 00:04:46,416
+database connection here until the request
+
+70
+00:04:46,480 --> 00:04:49,640
+is finished. So in this case,
+
+71
+00:04:49,832 --> 00:04:53,352
+if we have highlighter here and high level here,
+
+72
+00:04:53,488 --> 00:04:57,200
+we will end up with having exhausted
+
+73
+00:04:57,232 --> 00:05:00,608
+database connection pool. So how can we
+
+74
+00:05:00,616 --> 00:05:03,904
+fix it? We can use a queue.
+
+75
+00:05:04,024 --> 00:05:08,328
+Basically it doesn't matter what type of queue, but the
+
+76
+00:05:08,416 --> 00:05:12,124
+eventual scheme will depend on the type of the queue.
+
+77
+00:05:12,664 --> 00:05:15,604
+In this scheme I use database queue,
+
+78
+00:05:16,144 --> 00:05:19,960
+database queue, in fact just a table inside the
+
+79
+00:05:19,992 --> 00:05:23,680
+same database. So now it's pretty safe for us to
+
+80
+00:05:23,712 --> 00:05:28,244
+use transaction and to do these two operations
+
+81
+00:05:29,544 --> 00:05:33,232
+inside the same transaction. Because in fact
+
+82
+00:05:33,368 --> 00:05:36,568
+these two operations, insert and create job,
+
+83
+00:05:36,736 --> 00:05:40,360
+are just two
+
+84
+00:05:40,392 --> 00:05:44,764
+SQL queries to the same database. We fixed
+
+85
+00:05:46,024 --> 00:05:49,256
+that database connection pull issue, but we
+
+86
+00:05:49,320 --> 00:05:53,236
+also need to create data in
+
+87
+00:05:53,300 --> 00:05:57,904
+external edge service. To do that, we could add worker
+
+88
+00:05:58,284 --> 00:06:02,020
+which sends data which gets
+
+89
+00:06:02,052 --> 00:06:05,348
+a job from the queue and sends data to
+
+90
+00:06:05,396 --> 00:06:09,756
+the external ed service. So in this scheme we
+
+91
+00:06:09,780 --> 00:06:13,428
+got rid of the connection pool issue,
+
+92
+00:06:13,596 --> 00:06:17,660
+plus we have eventual consistency so
+
+93
+00:06:17,772 --> 00:06:21,304
+our data is consistent. Okay,
+
+94
+00:06:21,424 --> 00:06:23,804
+that's fine. Let's move on.
+
+95
+00:06:24,544 --> 00:06:27,604
+Next issue is request and service at the same time.
+
+96
+00:06:28,304 --> 00:06:32,056
+It can happen when multiple clients request a service at the
+
+97
+00:06:32,080 --> 00:06:35,728
+same time and it can lead to overloaded
+
+98
+00:06:35,776 --> 00:06:38,840
+service. Let's consider an example.
+
+99
+00:06:38,992 --> 00:06:43,044
+This example is about service and client
+
+100
+00:06:43,664 --> 00:06:46,900
+client app request service
+
+101
+00:06:47,052 --> 00:06:51,012
+to get new plugin versions. And everything's fine
+
+102
+00:06:51,068 --> 00:06:55,132
+if we have just a few clients. But what
+
+103
+00:06:55,228 --> 00:06:59,092
+if we have multiple clients? And what if we have,
+
+104
+00:06:59,188 --> 00:07:02,492
+for instance, 2 million clients and usually
+
+105
+00:07:02,548 --> 00:07:05,580
+these 2 million clients? The load from these
+
+106
+00:07:05,612 --> 00:07:09,588
+2 million clients is distributed among the day
+
+107
+00:07:09,716 --> 00:07:13,592
+because some users use the app in
+
+108
+00:07:13,608 --> 00:07:16,912
+the morning, some of them use it in the evening, and so on and
+
+109
+00:07:16,928 --> 00:07:20,424
+so forth. This sound something
+
+110
+00:07:20,504 --> 00:07:23,976
+like a cron job with specified time.
+
+111
+00:07:24,080 --> 00:07:27,296
+And the time is specified so
+
+112
+00:07:27,360 --> 00:07:31,192
+that all the apps will request our service at
+
+113
+00:07:31,248 --> 00:07:34,800
+the exactly same time. It can lead
+
+114
+00:07:34,832 --> 00:07:38,124
+to an overloaded service and temporary outage.
+
+115
+00:07:38,964 --> 00:07:42,324
+To fix that issue, we could, we could
+
+116
+00:07:42,364 --> 00:07:46,908
+add some, some random
+
+117
+00:07:46,956 --> 00:07:50,452
+time. I mean client client apps could,
+
+118
+00:07:50,588 --> 00:07:53,996
+instead of requesting our service at the
+
+119
+00:07:54,020 --> 00:07:57,724
+same time, they could request our service at a random
+
+120
+00:07:57,764 --> 00:08:01,464
+time. So the load will be distributed among the day
+
+121
+00:08:01,924 --> 00:08:04,584
+and it, it won't,
+
+122
+00:08:05,354 --> 00:08:09,410
+in this case, we will not end up with overloaded
+
+123
+00:08:09,442 --> 00:08:12,650
+service. Okay, let's move
+
+124
+00:08:12,682 --> 00:08:17,014
+on. Next issue is lack of rate limiter.
+
+125
+00:08:17,554 --> 00:08:21,338
+Okay, so let's let's consider the same
+
+126
+00:08:21,386 --> 00:08:24,802
+example, the previous example by
+
+127
+00:08:24,858 --> 00:08:28,694
+design on the client side. But let's also
+
+128
+00:08:29,794 --> 00:08:33,122
+imagine that we added rate limiter
+
+129
+00:08:33,178 --> 00:08:36,454
+before our service. So in this case,
+
+130
+00:08:37,434 --> 00:08:41,538
+if we, even if there is bad design on
+
+131
+00:08:41,546 --> 00:08:45,498
+the client side, our rate limiter won't
+
+132
+00:08:45,626 --> 00:08:49,690
+let client apps to overload our service because
+
+133
+00:08:49,762 --> 00:08:53,334
+we can specify on the rate limiter side a rule,
+
+134
+00:08:53,834 --> 00:08:58,092
+for instance, something like no more than 2000 thousand
+
+135
+00:08:58,188 --> 00:09:02,180
+rp's. Plus we can restrict a
+
+136
+00:09:02,212 --> 00:09:05,396
+particular user from sending us to money
+
+137
+00:09:05,460 --> 00:09:08,984
+request. So in that case we,
+
+138
+00:09:09,444 --> 00:09:12,744
+we won't, we won't end up with these issues.
+
+139
+00:09:13,644 --> 00:09:17,428
+Okay, so rate limiter is
+
+140
+00:09:17,556 --> 00:09:21,292
+a very good thing, but let's now talk about
+
+141
+00:09:21,388 --> 00:09:24,774
+memory limiter for instance. Well, let's imagine
+
+142
+00:09:24,814 --> 00:09:27,634
+we have restricted the number of requests,
+
+143
+00:09:27,934 --> 00:09:31,942
+but what if payload of
+
+144
+00:09:32,118 --> 00:09:35,234
+a particular request is too big?
+
+145
+00:09:35,694 --> 00:09:39,798
+For instance, let's consider this to
+
+146
+00:09:39,846 --> 00:09:43,806
+example in Golang, this is a
+
+147
+00:09:43,830 --> 00:09:47,230
+post handler, and in this handler
+
+148
+00:09:47,302 --> 00:09:50,374
+we read all the data from the body.
+
+149
+00:09:50,994 --> 00:09:54,786
+And what if the size of the body is
+
+150
+00:09:54,850 --> 00:09:59,370
+too big? For instance 5gb. Most likely we'll
+
+151
+00:09:59,442 --> 00:10:02,974
+have out of memory error in that case.
+
+152
+00:10:03,794 --> 00:10:07,546
+So how can we fix it? How? We can restrict the
+
+153
+00:10:07,570 --> 00:10:11,466
+client from sending us to too
+
+154
+00:10:11,490 --> 00:10:15,058
+many bytes in Golang, we could do that with
+
+155
+00:10:15,106 --> 00:10:17,574
+just one line of code.
+
+156
+00:10:18,164 --> 00:10:21,780
+So with this line we specify that
+
+157
+00:10:21,892 --> 00:10:26,020
+the body shouldn't be more than 500 kb.
+
+158
+00:10:26,212 --> 00:10:29,628
+So now with this line of code,
+
+159
+00:10:29,756 --> 00:10:33,524
+instead of crushing our application, the client will
+
+160
+00:10:33,564 --> 00:10:37,476
+get an error. So we have fixed it.
+
+161
+00:10:37,620 --> 00:10:41,236
+Okay, let's now let's talk
+
+162
+00:10:41,300 --> 00:10:44,684
+about retries and let's consider a very simple
+
+163
+00:10:44,764 --> 00:10:48,600
+example, just client service and
+
+164
+00:10:48,712 --> 00:10:52,928
+external dependency request failed,
+
+165
+00:10:53,096 --> 00:10:57,856
+which can obviously can happen because
+
+166
+00:10:57,920 --> 00:11:01,560
+of network issues, because of temporary outage
+
+167
+00:11:01,632 --> 00:11:05,176
+or something like that. So we should
+
+168
+00:11:05,360 --> 00:11:08,444
+handle these cases when request failed.
+
+169
+00:11:09,184 --> 00:11:13,400
+How can we do that? We could retry send
+
+170
+00:11:13,472 --> 00:11:17,896
+the same request. And if
+
+171
+00:11:17,920 --> 00:11:22,096
+we don't do that, if we don't use retry
+
+172
+00:11:22,160 --> 00:11:26,240
+policy, we could end up with high
+
+173
+00:11:26,272 --> 00:11:29,244
+error rate and poor user experience.
+
+174
+00:11:30,144 --> 00:11:34,064
+Okay, so let's move
+
+175
+00:11:34,104 --> 00:11:38,392
+on. Next issue is connected
+
+176
+00:11:38,448 --> 00:11:42,094
+with retries, but a bit cheaper.
+
+177
+00:11:42,714 --> 00:11:47,170
+What if we have added retries, but we
+
+178
+00:11:47,202 --> 00:11:50,450
+haven't added back off and for instance we send a
+
+179
+00:11:50,482 --> 00:11:54,774
+request to external service and request files.
+
+180
+00:11:55,074 --> 00:11:58,434
+Then we retry, and next request fails
+
+181
+00:11:58,474 --> 00:12:02,266
+two, and the third one fails too. We have
+
+182
+00:12:02,290 --> 00:12:06,698
+the choice, which is fine. What if this
+
+183
+00:12:06,746 --> 00:12:10,566
+service is overloaded? In that case
+
+184
+00:12:10,630 --> 00:12:14,774
+we are making things worse, not better, because we don't let
+
+185
+00:12:14,854 --> 00:12:18,990
+the service recover. So instead of
+
+186
+00:12:19,142 --> 00:12:23,034
+just sending request one by one,
+
+187
+00:12:23,774 --> 00:12:26,794
+we can use buck off strategy.
+
+188
+00:12:27,374 --> 00:12:30,742
+And here buco strategies. So the first
+
+189
+00:12:30,798 --> 00:12:34,922
+one is linear a linear strategy is about waiting
+
+190
+00:12:35,018 --> 00:12:39,218
+for some constant time. For instance, we could wait for
+
+191
+00:12:39,266 --> 00:12:42,974
+1 second between first and second requests.
+
+192
+00:12:43,634 --> 00:12:47,194
+Next one is linear. With Egypt, it's pretty the
+
+193
+00:12:47,234 --> 00:12:50,938
+same as linear, but instead of waiting for
+
+194
+00:12:50,986 --> 00:12:54,122
+1 second, we would wait for 1 second
+
+195
+00:12:54,178 --> 00:12:58,338
+plus random time, like 1 second plus random
+
+196
+00:12:58,386 --> 00:13:02,124
+time between 20 between ten and 20 milliseconds,
+
+197
+00:13:02,164 --> 00:13:06,464
+for instance. Okay, next strategy is exponential.
+
+198
+00:13:07,124 --> 00:13:10,224
+Exponential is about waiting,
+
+199
+00:13:11,164 --> 00:13:15,404
+not just static time, but we
+
+200
+00:13:15,444 --> 00:13:19,180
+wait between first and second request
+
+201
+00:13:19,252 --> 00:13:22,860
+for 1 second between second and third request for
+
+202
+00:13:22,892 --> 00:13:26,894
+2 seconds, then for 4 seconds, and for eight, and so on and so forth.
+
+203
+00:13:27,084 --> 00:13:30,682
+So we double our waiting time after
+
+204
+00:13:30,738 --> 00:13:34,962
+every try. And the last exponential, with jittery,
+
+205
+00:13:35,138 --> 00:13:38,986
+it's something like it's the same as
+
+206
+00:13:39,050 --> 00:13:43,454
+exponential, but with random time,
+
+207
+00:13:44,034 --> 00:13:46,094
+like in the second approach.
+
+208
+00:13:46,874 --> 00:13:49,794
+So that's pretty much it. Thank you for your attention.
+
