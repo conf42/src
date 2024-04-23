@@ -1,0 +1,1808 @@
+1
+00:00:20,600 --> 00:00:24,014
+Today I am going to talk about go concurrency powering a
+
+2
+00:00:24,054 --> 00:00:27,780
+gigabyte scale real world data pipeline. So let's get into
+
+3
+00:00:27,812 --> 00:00:31,876
+it. So before we get started, a quick thing about myself.
+
+4
+00:00:31,980 --> 00:00:35,612
+I'm chinmay naik. I go by chinmai 185 on Twitter,
+
+5
+00:00:35,748 --> 00:00:39,660
+GitHub, LinkedIn, etcetera. You can catch me up right there. I'm a founder
+
+6
+00:00:39,692 --> 00:00:43,044
+at one two n where we help companies with backend and
+
+7
+00:00:43,084 --> 00:00:46,420
+reliability engineering. I also write stories on pragmatic
+
+8
+00:00:46,452 --> 00:00:49,780
+software engineering based on our work that we do on
+
+9
+00:00:49,812 --> 00:00:53,912
+Twitter and LinkedIn. So follow me up there. And in
+
+10
+00:00:53,928 --> 00:00:57,456
+general, I like engineering. I love psychology, I play
+
+11
+00:00:57,480 --> 00:01:01,176
+percussion, and I'm a huge fan of rather old computer game
+
+12
+00:01:01,320 --> 00:01:04,404
+called Age of empires two. So hit me up there.
+
+13
+00:01:05,024 --> 00:01:08,544
+So today I'm going to talk about MongoDB to RDBMs,
+
+14
+00:01:08,624 --> 00:01:12,160
+data migration, and how we achieved that using ghost concurrency
+
+15
+00:01:12,192 --> 00:01:16,144
+features. Right? So fundamentally, we wanted to move data from
+
+16
+00:01:16,184 --> 00:01:19,784
+Mongo to postgres. I'm not advocating for either
+
+17
+00:01:19,824 --> 00:01:22,760
+one of these two technologies as such, but we just had a use case where
+
+18
+00:01:22,792 --> 00:01:25,924
+we had to move data from MongoDB to postgres.
+
+19
+00:01:26,424 --> 00:01:30,192
+Now this was two type of transfer. Like one is the ETL
+
+20
+00:01:30,288 --> 00:01:33,704
+extract transform load kind of transfer where we were doing one
+
+21
+00:01:33,744 --> 00:01:37,920
+time bulk transfer. Kind of think of it like snapshot transfer of data. And we
+
+22
+00:01:37,952 --> 00:01:41,312
+also had to worry about streaming data transfer. Like if
+
+23
+00:01:41,328 --> 00:01:44,744
+there is any ongoing updates to MongoDB, how do those reflect
+
+24
+00:01:44,784 --> 00:01:48,096
+in postgres? Before we go
+
+25
+00:01:48,120 --> 00:01:51,844
+ahead, let's think about how do we map MongoDB documents,
+
+26
+00:01:52,464 --> 00:01:56,200
+tables and rows? Because these two are different technologies,
+
+27
+00:01:56,312 --> 00:01:59,244
+they're not one to one direct data transfer.
+
+28
+00:01:59,784 --> 00:02:03,624
+So let's look at student collection.
+
+29
+00:02:03,784 --> 00:02:07,408
+It's just sample collection. In MongodB, where we have,
+
+30
+00:02:07,576 --> 00:02:11,504
+this is a sample student document where you see id,
+
+31
+00:02:11,584 --> 00:02:15,214
+which is primary key. There is name, which is a string field.
+
+32
+00:02:15,374 --> 00:02:19,674
+You've got role number, which is a numeric field. There is Boolean field for
+
+33
+00:02:19,974 --> 00:02:23,270
+is graduated. And this is also another string
+
+34
+00:02:23,302 --> 00:02:26,726
+field. And in Mongo, what you can do is you have bunch
+
+35
+00:02:26,750 --> 00:02:30,554
+of nested documents. So you have address as a nested set of
+
+36
+00:02:30,854 --> 00:02:34,254
+nested array of objects, and you have nested
+
+37
+00:02:34,294 --> 00:02:37,896
+object, which is phone number. How does that data
+
+38
+00:02:38,030 --> 00:02:41,452
+get translated into postgres? So the student
+
+39
+00:02:41,508 --> 00:02:45,460
+record itself is pretty simple, right? You could just migrate the
+
+40
+00:02:45,492 --> 00:02:49,564
+keys one on one, and keys in MongodB document become columns
+
+41
+00:02:49,604 --> 00:02:53,252
+in postgres. So for example, id becomes primary key.
+
+42
+00:02:53,388 --> 00:02:56,556
+You have name as a string field, roll number is graduated,
+
+43
+00:02:56,620 --> 00:03:00,500
+date of birth. Pretty simple. What about nested
+
+44
+00:03:00,532 --> 00:03:03,260
+fields? We had addressed and we had phone.
+
+45
+00:03:03,412 --> 00:03:07,300
+How do those get translated? What we could do
+
+46
+00:03:07,372 --> 00:03:11,260
+is we could create a relationship between student address
+
+47
+00:03:11,332 --> 00:03:14,612
+and student phone, right? So we could create a student address
+
+48
+00:03:14,668 --> 00:03:18,796
+table where we have the primary key and
+
+49
+00:03:18,820 --> 00:03:22,580
+we have a foreign key of sorts, which is logical foreign key from the
+
+50
+00:03:22,652 --> 00:03:26,104
+parent student table. Then we have
+
+51
+00:03:26,524 --> 00:03:29,612
+line items and other fields, line address and
+
+52
+00:03:29,628 --> 00:03:33,380
+zip and other fields. Similarly, for phone number, we can create a primary key
+
+53
+00:03:33,492 --> 00:03:36,604
+and we have a foreign key, which is a logical foreign key
+
+54
+00:03:36,644 --> 00:03:39,876
+based on the student id, right? So and other fields
+
+55
+00:03:39,900 --> 00:03:43,980
+like personal and work from the previous Mongo document. So essentially
+
+56
+00:03:44,132 --> 00:03:47,304
+we are migrating data in this fashion. We have got,
+
+57
+00:03:47,924 --> 00:03:51,532
+for a single Mongo document, we have got a student table,
+
+58
+00:03:51,668 --> 00:03:54,852
+one record in postgres for the address,
+
+59
+00:03:54,948 --> 00:03:58,928
+which is a nested sub document. We are going to create two records in
+
+60
+00:03:59,076 --> 00:04:02,456
+postgres for student address table. And of
+
+61
+00:04:02,480 --> 00:04:06,084
+course there will be a relationship between student table and the student address table.
+
+62
+00:04:06,504 --> 00:04:10,768
+And there is going to be a third table which is student phone table,
+
+63
+00:04:10,896 --> 00:04:14,216
+which will have one record right from the Mongo document. So that's
+
+64
+00:04:14,240 --> 00:04:17,724
+how we are going to migrate data from Mongo to postgres.
+
+65
+00:04:18,304 --> 00:04:21,752
+If you think about how does it translate into from JSON
+
+66
+00:04:21,808 --> 00:04:26,142
+to SQL, this is how it looks like. So for the id column
+
+67
+00:04:26,278 --> 00:04:30,246
+in our id field in Mongo, we are going to create an
+
+68
+00:04:30,270 --> 00:04:34,022
+insert table record in student table. The same id
+
+69
+00:04:34,118 --> 00:04:37,574
+will then get replicated as foreign key of sorts
+
+70
+00:04:37,654 --> 00:04:40,554
+as part of the student id table,
+
+71
+00:04:40,854 --> 00:04:44,302
+a column in the in postgres and same for the
+
+72
+00:04:44,318 --> 00:04:47,854
+phone record. So how does MongoDB
+
+73
+00:04:47,974 --> 00:04:51,542
+JSOn data maps to Sql? We just saw
+
+74
+00:04:51,678 --> 00:04:55,558
+one Mongo document can map to N SQL statements,
+
+75
+00:04:55,686 --> 00:04:59,754
+right? So a nested array of JSON
+
+76
+00:05:00,134 --> 00:05:03,990
+objects or further array of objects in Mongo,
+
+77
+00:05:04,142 --> 00:05:07,262
+they get translated into relevant tables in
+
+78
+00:05:07,278 --> 00:05:10,798
+postgres and are recorded with primary key and
+
+79
+00:05:10,806 --> 00:05:14,554
+foreign key relationships with some logical key constraint.
+
+80
+00:05:15,054 --> 00:05:18,642
+Well, inserts are cool, but I. How do we do updates
+
+81
+00:05:18,738 --> 00:05:21,946
+and deletes in Mongo? Right? We also have updates to
+
+82
+00:05:21,970 --> 00:05:25,306
+records and deletes. Well, for updates there can
+
+83
+00:05:25,330 --> 00:05:29,074
+be two types of update. One is we have an update SQL statement
+
+84
+00:05:29,154 --> 00:05:32,626
+wherein a particular documents, some records get updated
+
+85
+00:05:32,690 --> 00:05:35,814
+or some column get updated in postgres,
+
+86
+00:05:36,434 --> 00:05:40,162
+which is update table, set column value
+
+87
+00:05:40,258 --> 00:05:43,906
+kind of command in SQL. Because Mongo doesn't have
+
+88
+00:05:43,930 --> 00:05:47,688
+schema, a fixed schema and postgres or any relational database has a
+
+89
+00:05:47,696 --> 00:05:50,872
+schema, a new key added to JSON
+
+90
+00:05:50,928 --> 00:05:54,200
+document that will translate into alter table statement
+
+91
+00:05:54,272 --> 00:05:58,084
+in Mongo, in postgres, right? Which will have a schema change essentially.
+
+92
+00:05:58,744 --> 00:06:02,424
+So for delete, it's going to be a simple delete SQL statement
+
+93
+00:06:02,544 --> 00:06:06,928
+from a table. Then we have two choices of migrating
+
+94
+00:06:06,976 --> 00:06:10,612
+data. One is a bulk one time migrate where we
+
+95
+00:06:10,628 --> 00:06:14,612
+just move all the data from Mongo to postgres in this fashion, where we copy
+
+96
+00:06:14,748 --> 00:06:19,028
+data from Mongo, create proper SQL schema,
+
+97
+00:06:19,156 --> 00:06:22,504
+create insert statements, and just copy data.
+
+98
+00:06:23,204 --> 00:06:26,740
+But we can't stop our production mongo and
+
+99
+00:06:26,772 --> 00:06:30,340
+migrate everything and then just migrate to postgres. For example,
+
+100
+00:06:30,492 --> 00:06:34,548
+we would have to have some streaming data fashion as well where
+
+101
+00:06:34,636 --> 00:06:38,512
+we would migrate one time the initial data, and after that
+
+102
+00:06:38,528 --> 00:06:41,968
+we are going to need to rely on updates
+
+103
+00:06:42,016 --> 00:06:45,704
+to mongo or new inserts to mongo or deletes to Mongo to be
+
+104
+00:06:45,744 --> 00:06:49,184
+also translated to postgres. So that has to be done in a streaming
+
+105
+00:06:49,224 --> 00:06:53,004
+fashion. What if we want both options,
+
+106
+00:06:53,584 --> 00:06:56,952
+which is where we need a reliable way to track all the
+
+107
+00:06:56,968 --> 00:07:00,144
+updates to Mongo database so that we can
+
+108
+00:07:00,224 --> 00:07:03,936
+use that to migrate to postgres. Any thoughts that
+
+109
+00:07:03,960 --> 00:07:07,936
+come to mind? What kind of Mongo feature we can use? You guessed
+
+110
+00:07:07,960 --> 00:07:12,032
+it, it's called Mongo Uplog. In the Mongo operation,
+
+111
+00:07:12,088 --> 00:07:15,968
+log is a logical collection. It's a capped collection in MongoDB.
+
+112
+00:07:16,136 --> 00:07:19,616
+It's in the local database. What it does is it kind of
+
+113
+00:07:19,640 --> 00:07:22,360
+think of it like a write ahead log for MongoDB.
+
+114
+00:07:22,552 --> 00:07:25,984
+It tracks all the edits to the database,
+
+115
+00:07:26,104 --> 00:07:29,802
+whether it's insert updates or deletes. And you're going to be
+
+116
+00:07:29,818 --> 00:07:33,298
+able to look at whatever is happening to the database in
+
+117
+00:07:33,306 --> 00:07:36,786
+terms of updates or inserts or deletes. So what
+
+118
+00:07:36,810 --> 00:07:41,226
+we could do is we could use Oplog to
+
+119
+00:07:41,250 --> 00:07:45,282
+translate data or transfer data from Mongo to postgres. So let's look
+
+120
+00:07:45,298 --> 00:07:48,866
+at how it looks like in practice. What does the Oplog record look
+
+121
+00:07:48,890 --> 00:07:52,730
+like? Here is the sample insert oplog. You've got the
+
+122
+00:07:52,762 --> 00:07:56,134
+op as the operation, which is insert. Here I stands for insert.
+
+123
+00:07:56,474 --> 00:07:59,698
+The namespace stands for a database and a collection
+
+124
+00:07:59,746 --> 00:08:03,050
+combination. So you got test as a database name and student as
+
+125
+00:08:03,082 --> 00:08:06,586
+the collection name. Then you've got the proper
+
+126
+00:08:06,650 --> 00:08:10,266
+insert object, which contains the actual object that is
+
+127
+00:08:10,290 --> 00:08:13,346
+being inserted in MongoDB. Similarly for
+
+128
+00:08:13,370 --> 00:08:17,338
+update, you've got operation as update, you've got the namespace
+
+129
+00:08:17,466 --> 00:08:20,722
+and you get a set of field value pairs,
+
+130
+00:08:20,818 --> 00:08:24,198
+right? What is being updated, for example, and you get the actual
+
+131
+00:08:24,246 --> 00:08:27,790
+updated object. So imagine this to be you want to update based
+
+132
+00:08:27,822 --> 00:08:31,310
+on some key and you want to set some new set of values.
+
+133
+00:08:31,382 --> 00:08:34,846
+So that's what you get in the update oplog. And similarly, you'll have delete
+
+134
+00:08:34,870 --> 00:08:38,294
+as well. You might be wondering when are we really getting
+
+135
+00:08:38,334 --> 00:08:41,994
+to the concurrency and the go part of it? So, well, the wait is over.
+
+136
+00:08:42,614 --> 00:08:46,646
+Here is the sequential pipeline. What looks like. So fundamentally our
+
+137
+00:08:46,670 --> 00:08:50,318
+idea is to migrate data from MongoDB on one side to postgres on
+
+138
+00:08:50,326 --> 00:08:54,174
+the other. The way we do this is we think of writing
+
+139
+00:08:54,254 --> 00:08:58,274
+a utility or a program called, let's call it Oplog to SQL.
+
+140
+00:08:59,334 --> 00:09:02,502
+What that program is going to do is it's going to read the oplogs from
+
+141
+00:09:02,518 --> 00:09:05,702
+MongoDB sequentially as it comes is going
+
+142
+00:09:05,718 --> 00:09:08,926
+to, there is going to be a go routine which can read these oplogs.
+
+143
+00:09:09,030 --> 00:09:12,726
+It's going to then put these records, put these oplogs into a channel.
+
+144
+00:09:12,910 --> 00:09:16,326
+There will be another go routine which will read from this channel which will
+
+145
+00:09:16,350 --> 00:09:19,656
+convert process oplogs in some sort of
+
+146
+00:09:19,680 --> 00:09:23,440
+SQL format. That's what we saw just now, right, how we can convert a single
+
+147
+00:09:23,472 --> 00:09:27,184
+oplog into N SQL statements. So we are going to cover,
+
+148
+00:09:27,304 --> 00:09:30,784
+convert and process and convert an oplog to
+
+149
+00:09:30,904 --> 00:09:34,856
+a bunch of SQL statements. Once that's done, we put them
+
+150
+00:09:34,920 --> 00:09:38,896
+into another channel from this channel, another go
+
+151
+00:09:38,920 --> 00:09:42,224
+routine picks up these values, these SQL statements, and then it
+
+152
+00:09:42,264 --> 00:09:45,468
+just basically does raw inserts in postgres, right?
+
+153
+00:09:45,596 --> 00:09:48,860
+So imagine we wrote this program with this
+
+154
+00:09:48,892 --> 00:09:52,380
+kind of sequential data pipeline. We will be able to migrate
+
+155
+00:09:52,532 --> 00:09:56,052
+data from Mongo to postgres both in streaming and in the
+
+156
+00:09:56,068 --> 00:09:59,676
+bulk fashion, assuming we have access to those set of oplogs from
+
+157
+00:09:59,700 --> 00:10:02,860
+that time. So here you can consider
+
+158
+00:10:02,932 --> 00:10:07,064
+these as go routines and these channels,
+
+159
+00:10:07,564 --> 00:10:10,144
+these sort of pipes as channels essentially.
+
+160
+00:10:10,594 --> 00:10:13,986
+So this is how our Mongo oplog looks like. Here is
+
+161
+00:10:14,010 --> 00:10:16,778
+how corresponding postgres database table would look like.
+
+162
+00:10:16,906 --> 00:10:20,826
+Similarly, you've got this namespace and you've got
+
+163
+00:10:20,890 --> 00:10:24,386
+table that translates into database schema
+
+164
+00:10:24,450 --> 00:10:27,746
+and table name. In postgres, the data
+
+165
+00:10:27,810 --> 00:10:30,534
+gets translated into particular table.
+
+166
+00:10:31,234 --> 00:10:34,370
+So to be able to translate or move this data
+
+167
+00:10:34,402 --> 00:10:37,492
+from Mongo to postgres, we are going to have to create schema,
+
+168
+00:10:37,628 --> 00:10:40,316
+we are going to have to create a table and then we are going to
+
+169
+00:10:40,380 --> 00:10:43,796
+insert data into that table. Once we insert this
+
+170
+00:10:43,820 --> 00:10:47,692
+data, this is what it looks like. We have the schema, the table
+
+171
+00:10:47,788 --> 00:10:50,836
+and the insert statements. Well,
+
+172
+00:10:50,900 --> 00:10:53,996
+imagine we have two oplogs, two insert oplogs
+
+173
+00:10:54,020 --> 00:10:57,476
+on the same mongo collection. Well, we can't go and
+
+174
+00:10:57,660 --> 00:11:01,156
+create new schema and new table all the time.
+
+175
+00:11:01,260 --> 00:11:04,354
+We shouldn't actually. So we're going to create schema
+
+176
+00:11:04,394 --> 00:11:07,706
+and table only once and perform n number of
+
+177
+00:11:07,730 --> 00:11:10,890
+inserts, right? So that's what we look at
+
+178
+00:11:10,922 --> 00:11:14,506
+here. So one insert goes here and then the second insert goes here.
+
+179
+00:11:14,610 --> 00:11:19,178
+So we have to also maintain some sort of state to be able to not
+
+180
+00:11:19,226 --> 00:11:21,734
+create schema and table multiple times.
+
+181
+00:11:22,594 --> 00:11:26,330
+For now, given this is a talk related to
+
+182
+00:11:26,362 --> 00:11:30,074
+concurrency, we'll skip all the details and edge cases related to updates
+
+183
+00:11:30,114 --> 00:11:33,094
+and deletes. You can trust me that I've got it handled.
+
+184
+00:11:33,674 --> 00:11:36,254
+So here is what our pipeline looks like.
+
+185
+00:11:36,834 --> 00:11:40,114
+Let's say we run this pipeline, right? What we get
+
+186
+00:11:40,234 --> 00:11:43,834
+for about 3.6 million records. I ran this pipeline
+
+187
+00:11:43,874 --> 00:11:46,774
+on my sort of MacBook with basic specs.
+
+188
+00:11:47,314 --> 00:11:50,454
+It ran for about nine hour 20 minutes.
+
+189
+00:11:51,834 --> 00:11:55,454
+So let's think about how we can improve the performance of the system.
+
+190
+00:11:55,994 --> 00:11:59,742
+Typically if you think about it, we can probably
+
+191
+00:11:59,798 --> 00:12:02,754
+add some worker pool to be able to speed up things.
+
+192
+00:12:03,094 --> 00:12:06,686
+But where? Which parts of the program
+
+193
+00:12:06,750 --> 00:12:09,354
+can be parallelized? Where can we add concurrency?
+
+194
+00:12:10,214 --> 00:12:13,870
+Typically the process and the convert Oplog to SQL. That's the go
+
+195
+00:12:13,902 --> 00:12:17,222
+routine. That seems like it's doing too much work and
+
+196
+00:12:17,238 --> 00:12:20,734
+it could use some help. So let's
+
+197
+00:12:20,854 --> 00:12:24,012
+modify the program to add worker pools.
+
+198
+00:12:24,198 --> 00:12:27,288
+What we have done in this case is we are reading the oplogs in a
+
+199
+00:12:27,296 --> 00:12:30,656
+single go routine. We are pushing the oplogs in the oplogs
+
+200
+00:12:30,720 --> 00:12:34,364
+channel. From there we have an orchestration where
+
+201
+00:12:34,664 --> 00:12:38,216
+we are creating n number of worker pools or worker go
+
+202
+00:12:38,240 --> 00:12:41,672
+routines to be able to process these oplogs concurrently.
+
+203
+00:12:41,728 --> 00:12:45,200
+And hopefully if you have multiple cpu cores we can
+
+204
+00:12:45,232 --> 00:12:48,720
+also run them in parallel. Once all of these worker go
+
+205
+00:12:48,752 --> 00:12:51,954
+routines run there Oplog processing
+
+206
+00:12:52,034 --> 00:12:55,258
+and conversion operations, they will convert these into
+
+207
+00:12:55,306 --> 00:12:59,194
+SQL statements. Those SQL statements will go into this SQL
+
+208
+00:12:59,234 --> 00:13:02,506
+statements channel. The execute
+
+209
+00:13:02,530 --> 00:13:06,314
+SQL go routine is going to then pick up and run
+
+210
+00:13:06,354 --> 00:13:09,866
+these SQL statements in postgres. We've got
+
+211
+00:13:09,890 --> 00:13:13,202
+one design, but can we do better? Can we add more worker pools?
+
+212
+00:13:13,338 --> 00:13:16,940
+Well, I think the SQL Go routine execution can
+
+213
+00:13:16,972 --> 00:13:20,164
+also be parallelized and can also use some concurrency, right?
+
+214
+00:13:20,284 --> 00:13:23,348
+So it could also use some help. So let's modify
+
+215
+00:13:23,396 --> 00:13:27,252
+the program to be able to have more go routines. Now in
+
+216
+00:13:27,268 --> 00:13:31,164
+this case we have same, but what we've done is for each go
+
+217
+00:13:31,204 --> 00:13:35,004
+routine which handles the incoming oplog,
+
+218
+00:13:35,164 --> 00:13:39,020
+it creates a set of SQL statements and it pushes
+
+219
+00:13:39,052 --> 00:13:42,524
+the SQL statements in its own channel which another
+
+220
+00:13:42,564 --> 00:13:45,596
+guru team can read from. This way we have
+
+221
+00:13:45,620 --> 00:13:49,548
+maximum concurrency. And by the way, I can tell you like no go routines,
+
+222
+00:13:49,676 --> 00:13:53,304
+gophers are harmed in this exercise. So we are good.
+
+223
+00:13:54,484 --> 00:13:57,556
+So we ran this program. What happens
+
+224
+00:13:57,580 --> 00:14:02,284
+is it runs in about for the same number of same
+
+225
+00:14:02,324 --> 00:14:06,116
+number of oplogs. 3.6 million. It runs
+
+226
+00:14:06,260 --> 00:14:09,524
+concurrently in about 2 hours 18 minutes.
+
+227
+00:14:09,684 --> 00:14:13,378
+And that's actually four X performance
+
+228
+00:14:13,466 --> 00:14:17,010
+improvement over the sequential one. So we've already gotten like four
+
+229
+00:14:17,042 --> 00:14:19,174
+X performance improvements. That's amazing.
+
+230
+00:14:19,754 --> 00:14:23,282
+Before we do something more, we just realize something
+
+231
+00:14:23,338 --> 00:14:26,978
+is wrong. So what could be wrong? So again,
+
+232
+00:14:27,026 --> 00:14:30,722
+remember we have this oplog channel where you are getting all the oplogs
+
+233
+00:14:30,738 --> 00:14:34,226
+one by one. And there is multiple go routines which are
+
+234
+00:14:34,290 --> 00:14:37,620
+processing these oplogs concurrently. If you use go
+
+235
+00:14:37,652 --> 00:14:40,940
+routines multiple times, you will probably know that
+
+236
+00:14:41,092 --> 00:14:44,788
+you can't guarantee ordering of independent go routines.
+
+237
+00:14:44,876 --> 00:14:48,100
+You can't really have synchronizations across go
+
+238
+00:14:48,132 --> 00:14:51,276
+routines. So what does that mean?
+
+239
+00:14:51,380 --> 00:14:55,364
+That means this insert and update in the output
+
+240
+00:14:55,444 --> 00:14:59,572
+can actually also become update and insert. Well it can also become delete
+
+241
+00:14:59,588 --> 00:15:03,420
+and insert. This is a problem. How does
+
+242
+00:15:03,612 --> 00:15:06,984
+this cause a problem? So think about our pipeline.
+
+243
+00:15:07,284 --> 00:15:10,940
+We read the oplogs, we put them in a channel. There is bunch of go
+
+244
+00:15:10,972 --> 00:15:14,344
+routine workers which process these oplogs.
+
+245
+00:15:14,884 --> 00:15:18,556
+So imagine we have a single document which is being inserted
+
+246
+00:15:18,620 --> 00:15:22,508
+and immediately after is being updated sequential
+
+247
+00:15:22,556 --> 00:15:26,124
+oplog entries, one for insert and one for update of the same
+
+248
+00:15:26,164 --> 00:15:29,728
+document. What could happen with this setup is that
+
+249
+00:15:29,916 --> 00:15:33,080
+the SQL statement for insert would be generated and similar
+
+250
+00:15:33,152 --> 00:15:37,120
+SQL statement for update would be generated. But we can't guarantee
+
+251
+00:15:37,232 --> 00:15:40,576
+the ordering of these results. That means it
+
+252
+00:15:40,600 --> 00:15:44,256
+could end up happening that the update SQL runs first and then
+
+253
+00:15:44,280 --> 00:15:47,544
+it tries to run the insert SQL. Well that would result in SQL
+
+254
+00:15:47,584 --> 00:15:50,632
+error. So we can't really
+
+255
+00:15:50,688 --> 00:15:54,408
+throw worker pulls at a problem, right? Like the data integrity
+
+256
+00:15:54,456 --> 00:15:58,628
+gets compromised and we have a correctness
+
+257
+00:15:58,676 --> 00:16:02,292
+issue. So we need to always write correct program first. Then we
+
+258
+00:16:02,308 --> 00:16:05,908
+can make it performant. So this is a program that
+
+259
+00:16:05,916 --> 00:16:09,372
+is performant but it's not really correct. So then
+
+260
+00:16:09,468 --> 00:16:12,748
+do we go back to drawing board or what do we do? And again,
+
+261
+00:16:12,796 --> 00:16:16,988
+imagine we have n number of databases in Mongo and each database
+
+262
+00:16:17,036 --> 00:16:20,396
+has m collections. What we could do is we
+
+263
+00:16:20,420 --> 00:16:24,380
+could fan out for each database and fan
+
+264
+00:16:24,412 --> 00:16:28,140
+in for SQL. That's an option. So for example,
+
+265
+00:16:28,292 --> 00:16:32,252
+what we would do is again we would read the same in
+
+266
+00:16:32,268 --> 00:16:36,380
+a single go routine. Remember from MongoDB we push this into the
+
+267
+00:16:36,412 --> 00:16:40,180
+same channel, same oplox channel. But on the other side
+
+268
+00:16:40,372 --> 00:16:44,204
+we have a go routine, a single go routine which will fan
+
+269
+00:16:44,244 --> 00:16:47,524
+out these oplogs based on per database.
+
+270
+00:16:47,644 --> 00:16:51,746
+So essentially what we are doing is we are segregating per database.
+
+271
+00:16:51,810 --> 00:16:55,454
+So if you have n databases, we are going to create n number of channels
+
+272
+00:16:55,994 --> 00:16:59,850
+on the other side, right side of the oplogs for each database
+
+273
+00:16:59,962 --> 00:17:03,974
+we will have a go routine that will consume these oplogs.
+
+274
+00:17:04,554 --> 00:17:07,850
+Remember, each go routine consumes oplogs from only one database.
+
+275
+00:17:07,882 --> 00:17:12,170
+So for example, that go routine only processes DB one Oplog.
+
+276
+00:17:12,322 --> 00:17:16,440
+This go routine only processes DB two Oplog and vice versa.
+
+277
+00:17:16,562 --> 00:17:19,780
+So we have n number of go routines based
+
+278
+00:17:19,812 --> 00:17:23,180
+on the number of databases. And ultimately all these go
+
+279
+00:17:23,212 --> 00:17:26,868
+routines would then fan in and send all the SQL
+
+280
+00:17:26,916 --> 00:17:30,676
+updates or statements to a single channel, from which we
+
+281
+00:17:30,700 --> 00:17:33,464
+could then execute the SQL to postgres.
+
+282
+00:17:34,044 --> 00:17:37,864
+Well, you could theoretically say that that
+
+283
+00:17:38,244 --> 00:17:42,322
+single go routine on the who is executing the SQL
+
+284
+00:17:42,428 --> 00:17:46,314
+on database, that could become the bottleneck and it could use some help.
+
+285
+00:17:46,814 --> 00:17:50,438
+So we could modify this design and we could
+
+286
+00:17:50,486 --> 00:17:54,206
+fan out for each database without fanning in all the coroutines
+
+287
+00:17:54,270 --> 00:17:57,806
+into a single without fanning
+
+288
+00:17:57,830 --> 00:18:00,734
+in all the SQL statements into a single channel.
+
+289
+00:18:00,854 --> 00:18:02,834
+So this would, this is how it looks like.
+
+290
+00:18:03,294 --> 00:18:06,934
+Similarly we have those n databases, right? We have n go routines,
+
+291
+00:18:07,054 --> 00:18:11,150
+but instead of fanning them all in into a single channel,
+
+292
+00:18:11,302 --> 00:18:14,954
+we are creating a channel for each go routine.
+
+293
+00:18:15,454 --> 00:18:19,166
+And similarly to be able to insert records
+
+294
+00:18:19,190 --> 00:18:23,022
+in postgres, we are going to create n number of Go routines on
+
+295
+00:18:23,038 --> 00:18:26,670
+the database also, right? So we will have one go routine
+
+296
+00:18:26,702 --> 00:18:30,158
+per database and we'll have one go routine
+
+297
+00:18:30,246 --> 00:18:33,542
+per SQL insert, update or whatever. The total
+
+298
+00:18:33,598 --> 00:18:36,886
+number of go routines that we'll end up having is two nice. Plus obviously
+
+299
+00:18:36,910 --> 00:18:40,006
+there are two go routines that we have, one for reading the Oplog and one
+
+300
+00:18:40,030 --> 00:18:43,886
+for orchestrating the fan out. But basically
+
+301
+00:18:44,030 --> 00:18:47,742
+if we have n databases, we are typically going to have twice the number of
+
+302
+00:18:47,758 --> 00:18:51,314
+Go routines. If we take this idea even further
+
+303
+00:18:51,934 --> 00:18:55,726
+and we say well, why don't we create go routines
+
+304
+00:18:55,830 --> 00:18:59,262
+for each database and collection combination?
+
+305
+00:18:59,358 --> 00:19:02,470
+Also, right now we were only creating
+
+306
+00:19:02,542 --> 00:19:06,176
+go routines per database, but each database has
+
+307
+00:19:06,240 --> 00:19:09,456
+m or some collections, right? So what if we
+
+308
+00:19:09,480 --> 00:19:13,032
+create go routines per database collection combination?
+
+309
+00:19:13,208 --> 00:19:17,444
+That will be a truly concurrent and massively parallelized
+
+310
+00:19:17,784 --> 00:19:20,640
+solution, right? So this is what,
+
+311
+00:19:20,712 --> 00:19:24,120
+what we end up with. We have a concurrent data pipeline. We've got
+
+312
+00:19:24,152 --> 00:19:27,592
+Mongodb. The diagram was so huge to fit horizontally that
+
+313
+00:19:27,608 --> 00:19:30,704
+I had to fit it vertically, right? So we have Mongodb on top.
+
+314
+00:19:30,864 --> 00:19:34,244
+Then we have this oplog to SQL program where we have,
+
+315
+00:19:34,704 --> 00:19:38,696
+we read the oplogs in a single go routine. We push them into a channel.
+
+316
+00:19:38,840 --> 00:19:42,544
+On the receiving end we have a orchestrator go routine which is going to fan
+
+317
+00:19:42,584 --> 00:19:46,576
+out per database. So it's going to create n channels
+
+318
+00:19:46,720 --> 00:19:50,592
+every time it encounters a new database. It's going to create a new channel and
+
+319
+00:19:50,608 --> 00:19:53,824
+it's going to push all the values, all the oplogs for that
+
+320
+00:19:53,864 --> 00:19:57,790
+database in that channel. Then we have the
+
+321
+00:19:57,822 --> 00:20:01,134
+fan out oplogs per collection. So we have those
+
+322
+00:20:01,174 --> 00:20:04,566
+n go routines, one for each database as and when
+
+323
+00:20:04,590 --> 00:20:08,022
+they encounter an oplog for a different collection in the
+
+324
+00:20:08,038 --> 00:20:12,110
+database, they are going to create M such collections
+
+325
+00:20:12,182 --> 00:20:14,474
+oplogs or m such channels.
+
+326
+00:20:15,174 --> 00:20:19,294
+Goroutine will then process oplogs
+
+327
+00:20:19,414 --> 00:20:22,578
+for that only which channel
+
+328
+00:20:22,626 --> 00:20:25,854
+specifies for a database and a collection combination.
+
+329
+00:20:26,514 --> 00:20:30,346
+So this go routine is going to work on only,
+
+330
+00:20:30,410 --> 00:20:34,210
+let's say DB one collection one combination. The next coroutine
+
+331
+00:20:34,242 --> 00:20:37,410
+will work on DB one, collection two, db one
+
+332
+00:20:37,442 --> 00:20:40,850
+collection three likewise. And then a new set of go
+
+333
+00:20:40,882 --> 00:20:44,234
+routines will work on DB two, collection one, db two collection two,
+
+334
+00:20:44,274 --> 00:20:47,538
+etcetera. So we've essentially got m into
+
+335
+00:20:47,586 --> 00:20:51,300
+n kind of go routines. Each of them
+
+336
+00:20:51,412 --> 00:20:55,116
+write create SQL statements. Each of them push these
+
+337
+00:20:55,140 --> 00:20:58,084
+SQL statements into another channel,
+
+338
+00:20:58,244 --> 00:21:02,076
+which we will have again a SQL execution go routine which
+
+339
+00:21:02,100 --> 00:21:04,964
+will execute all these SQL statements onto postgres.
+
+340
+00:21:05,124 --> 00:21:08,340
+So essentially when we run this program,
+
+341
+00:21:08,492 --> 00:21:12,784
+we see that it runs in about like 1 hour 36 minutes
+
+342
+00:21:14,364 --> 00:21:18,646
+and 30 seconds for the same number of oplogs.
+
+343
+00:21:18,750 --> 00:21:22,414
+So we had about 3.6 million oplogs. The sequential
+
+344
+00:21:22,454 --> 00:21:26,126
+operation ran in nine hour 20 minutes and the concurrent one
+
+345
+00:21:26,150 --> 00:21:27,914
+ran in 1 hour 36 minutes.
+
+346
+00:21:29,334 --> 00:21:32,798
+Have in terms of resource utilization though, for this is that,
+
+347
+00:21:32,926 --> 00:21:36,526
+imagine we have 16 databases and we have
+
+348
+00:21:36,550 --> 00:21:39,634
+128 collections per database,
+
+349
+00:21:39,974 --> 00:21:43,222
+right? That's on the higher side, but let's imagine that. So the total
+
+350
+00:21:43,278 --> 00:21:46,950
+number of go routines that we'll have is we going to have n
+
+351
+00:21:47,062 --> 00:21:50,390
+number of fan out oplogs per database,
+
+352
+00:21:50,462 --> 00:21:53,958
+right? So we have got n goroutines like this. Then we
+
+353
+00:21:53,966 --> 00:21:57,638
+have got, for each database we are going to create m go routines.
+
+354
+00:21:57,726 --> 00:22:01,574
+So there will be n multiplied by m of those
+
+355
+00:22:01,614 --> 00:22:05,174
+yellow go routines. And lastly, for execution
+
+356
+00:22:05,214 --> 00:22:09,366
+of SQL, we are going to have one go routine per database collection combination.
+
+357
+00:22:09,510 --> 00:22:12,692
+That means n multiplied by m. Again, if we
+
+358
+00:22:12,708 --> 00:22:16,668
+just consider 16 databases and 128 collections, we are
+
+359
+00:22:16,676 --> 00:22:20,784
+going to end up with 2048 database connections
+
+360
+00:22:21,124 --> 00:22:25,064
+because each coroutine will actually form a connection to postgres.
+
+361
+00:22:25,604 --> 00:22:29,572
+That's going to be quite some number of connections and it's going to hog the
+
+362
+00:22:29,588 --> 00:22:33,100
+cpu and probably even cause
+
+363
+00:22:33,132 --> 00:22:36,864
+problems with postgres if we have so many open connections.
+
+364
+00:22:37,534 --> 00:22:41,478
+So while this program is performant, it is not utilizing the resources
+
+365
+00:22:41,526 --> 00:22:44,990
+or it is over utilizing or overburdening postgres.
+
+366
+00:22:45,102 --> 00:22:48,354
+What can we do? Can we do better? Right?
+
+367
+00:22:48,694 --> 00:22:52,022
+So what we do in this case is we keep the most of
+
+368
+00:22:52,038 --> 00:22:55,558
+the pipeline, the same, but instead of fanning
+
+369
+00:22:55,606 --> 00:22:58,814
+out for postgres writes we fan
+
+370
+00:22:58,854 --> 00:23:03,418
+them in. Remember, we don't need to create n
+
+371
+00:23:03,506 --> 00:23:06,930
+multiplied by m connections to database if we can
+
+372
+00:23:06,962 --> 00:23:10,146
+limit it to just n connections, one connection per database,
+
+373
+00:23:10,290 --> 00:23:14,554
+that's good enough, and that's what we'll do here. So from
+
+374
+00:23:14,594 --> 00:23:18,282
+all the go routines which process a single databases,
+
+375
+00:23:18,418 --> 00:23:22,114
+records, all of them will funnel the data back
+
+376
+00:23:22,154 --> 00:23:25,586
+into a single channel, and that channel will
+
+377
+00:23:25,610 --> 00:23:28,730
+have another go routine which will execute all those SQL
+
+378
+00:23:28,762 --> 00:23:32,934
+updates, inserts, etcetera on the postgres. So essentially we are going to create
+
+379
+00:23:33,434 --> 00:23:36,738
+n number of go routines for handling database
+
+380
+00:23:36,786 --> 00:23:40,242
+connections to postgres and that's where we limit the number of
+
+381
+00:23:40,298 --> 00:23:44,506
+go routines prol that happens. So if you consider
+
+382
+00:23:44,610 --> 00:23:48,826
+16 databases and 128 collections per database before
+
+383
+00:23:48,890 --> 00:23:52,370
+we had a massive fan out where we would
+
+384
+00:23:52,402 --> 00:23:57,402
+end up with 2048 database connections on
+
+385
+00:23:57,418 --> 00:24:00,574
+the right side after the modification, what we have is
+
+386
+00:24:00,714 --> 00:24:04,234
+we are fanning them in again to per database.
+
+387
+00:24:04,734 --> 00:24:08,594
+That means we have only 16 number of
+
+388
+00:24:09,334 --> 00:24:12,598
+connections to database. So we don't create
+
+389
+00:24:12,686 --> 00:24:16,318
+massive database connections and cause database to hang and perform slow,
+
+390
+00:24:16,446 --> 00:24:20,394
+but we instead create only 16 connections to database.
+
+391
+00:24:20,934 --> 00:24:24,238
+So if you were to then compare this improved performance,
+
+392
+00:24:24,366 --> 00:24:27,962
+you will see that in my case it ran a
+
+393
+00:24:27,978 --> 00:24:32,042
+bit faster because it's probably utilizing the database and overall
+
+394
+00:24:32,138 --> 00:24:36,194
+machine properly. So it was definitely better than
+
+395
+00:24:36,234 --> 00:24:39,854
+concurrent implementation earlier, but it wasn't
+
+396
+00:24:40,354 --> 00:24:43,698
+so much better. But in terms of resource utilization it was
+
+397
+00:24:43,746 --> 00:24:47,450
+massively so. This is what our final concurrent
+
+398
+00:24:47,482 --> 00:24:51,410
+data pipeline looks like we've got. We're reading
+
+399
+00:24:51,442 --> 00:24:54,470
+those from Mongolia. We are fanning out into
+
+400
+00:24:54,582 --> 00:24:58,594
+n number of Go routines, one for each database
+
+401
+00:24:58,934 --> 00:25:02,526
+for each of them. We are fanning them out again into m number of collections
+
+402
+00:25:02,590 --> 00:25:06,394
+and m number of Go routines, one for each database collection combination.
+
+403
+00:25:06,894 --> 00:25:10,510
+Ultimately then we fan in again. We don't have a go routine
+
+404
+00:25:10,542 --> 00:25:14,062
+sprawl. We fan them in into collecting all
+
+405
+00:25:14,238 --> 00:25:18,054
+SQL updates, inserts, deletes all sqls basically
+
+406
+00:25:18,174 --> 00:25:21,872
+for one database into a single go routine and a single channel.
+
+407
+00:25:22,038 --> 00:25:25,412
+And then that go routine will perform updates, insert and
+
+408
+00:25:25,428 --> 00:25:29,228
+delete to Mongo to postgres database. That's what our final
+
+409
+00:25:29,276 --> 00:25:32,676
+concurrent pipeline looks like. Think about what we
+
+410
+00:25:32,700 --> 00:25:35,900
+just did overall as a solution, right? We understood
+
+411
+00:25:35,932 --> 00:25:39,024
+the problem domain. We didn't.
+
+412
+00:25:39,564 --> 00:25:42,972
+We said that the solution is in context of
+
+413
+00:25:43,028 --> 00:25:46,244
+what the problem that we are solving. So our problem was
+
+414
+00:25:46,324 --> 00:25:49,224
+MongoDB to database postgres data migration.
+
+415
+00:25:49,804 --> 00:25:53,084
+We built the working solution first, which is a sequential
+
+416
+00:25:53,124 --> 00:25:56,388
+data pipeline. Agreed that it ran very much slow,
+
+417
+00:25:56,476 --> 00:25:59,932
+but we first always have a working solution before we try to optimize
+
+418
+00:25:59,988 --> 00:26:03,852
+something, we identify possible
+
+419
+00:26:03,948 --> 00:26:07,524
+parallel portions of the program. Not every program can
+
+420
+00:26:07,564 --> 00:26:11,188
+be parallelized, right? So you have to identify what
+
+421
+00:26:11,236 --> 00:26:14,932
+parts of the program can actually be improved. We have
+
+422
+00:26:14,948 --> 00:26:18,396
+to avoid blindly applying concurrency patterns.
+
+423
+00:26:18,540 --> 00:26:22,020
+For example, we tried to apply worker pools without really thinking too
+
+424
+00:26:22,052 --> 00:26:24,620
+much, and then it didn't work out,
+
+425
+00:26:24,692 --> 00:26:28,900
+right? The program was concurrent, but it wasn't performing.
+
+426
+00:26:29,012 --> 00:26:32,700
+I mean, it was performing well, but we did not have correctness.
+
+427
+00:26:32,812 --> 00:26:36,424
+And without correctness, no optimization helps.
+
+428
+00:26:36,964 --> 00:26:40,356
+We have to also consider Amdahl's law, where what parts of the
+
+429
+00:26:40,380 --> 00:26:43,960
+program can be parallelized and what's the sequential only portion
+
+430
+00:26:43,992 --> 00:26:47,696
+of the program, right, which cannot be parallelized. So no matter
+
+431
+00:26:47,760 --> 00:26:51,032
+how much hardware you throw at the parallelizable portion of the program.
+
+432
+00:26:51,168 --> 00:26:54,776
+But if it's not more than some percentage of the
+
+433
+00:26:54,800 --> 00:26:58,472
+remaining program, which is the sequential program, it's not going to help out much.
+
+434
+00:26:58,528 --> 00:27:02,616
+So always like consider Amdahl's law, and also consider its
+
+435
+00:27:02,720 --> 00:27:06,280
+sort of variant and even more broader law, which is universal
+
+436
+00:27:06,312 --> 00:27:10,236
+scalability law. Fundamentally, like simplicity may
+
+437
+00:27:10,260 --> 00:27:14,516
+be more valuable, and keeping things simple may be more valuable for
+
+438
+00:27:14,540 --> 00:27:18,972
+the maintenance and runtime of the program. And then premature optimization,
+
+439
+00:27:19,068 --> 00:27:22,484
+right? And premature performance gains that
+
+440
+00:27:22,564 --> 00:27:25,144
+you may gain beyond certain point.
+
+441
+00:27:25,724 --> 00:27:29,620
+So finally we ended up with a performant concurrent
+
+442
+00:27:29,652 --> 00:27:33,424
+implementation with fan in for database, to be able to limit the
+
+443
+00:27:33,854 --> 00:27:37,230
+the go routine sprawl and to be able to limit the number of database
+
+444
+00:27:37,262 --> 00:27:40,870
+connections. So that's it. I hope you learned
+
+445
+00:27:40,902 --> 00:27:44,514
+something. Connect with me on Chen Mai 185
+
+446
+00:27:45,414 --> 00:27:48,766
+and check out our website at 120. Here is
+
+447
+00:27:48,790 --> 00:27:52,758
+a link to our playbook and specifically link to this particular
+
+448
+00:27:52,846 --> 00:27:56,686
+problem where I've dumbed down this problem into set of stories
+
+449
+00:27:56,790 --> 00:28:00,590
+that you can implement yourself and try out various concurrency
+
+450
+00:28:00,622 --> 00:28:04,500
+features of Google. I've broken this problem down into multiple
+
+451
+00:28:04,532 --> 00:28:08,584
+small stories so that you can incrementally work on those.
+
+452
+00:28:09,724 --> 00:28:12,204
+Thanks. Hope you have a nice conference.
+
