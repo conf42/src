@@ -100,6 +100,26 @@ def write_summary(yt_id, summary):
     with open(get_transcript_path(yt_id, extension="-summary.txt"), "w") as f:
         f.write(summary)
 
+def get_chapters(talk, transcript):
+    print(f"Getting chapters for {talk['Title']}")
+    transcript = aai.Transcript.get_by_id(transcript["metadata"]["id"])
+    if transcript.status == aai.TranscriptStatus.error:
+        print(f"Transcription failed: {transcript.error}")
+        return False
+    
+    prompt = "Provide a YouTube description of the transcript. Include chapters with timestamps. Do not provide a preambule."
+    req = transcript.lemur.task(
+        prompt=prompt,
+        #context="this is a talk at a technology conference called Conf42",
+        temperature=0.1,
+        max_output_size=2000,
+    )
+    return req.response
+
+def write_chapters(yt_id, summary):
+    with open(get_transcript_path(yt_id, extension="-chapters.txt"), "w") as f:
+        f.write(summary)
+
 def get_article(talk, transcript):
     print(f"Generating an article for {talk['Title']}")
     transcript = aai.Transcript.get_by_id(transcript["metadata"]["id"])
