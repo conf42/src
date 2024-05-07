@@ -16,6 +16,9 @@ transcribe:
 summarize:
 	python -m build.summarize
 
+chapters:
+	python -m build.chapters
+
 verify:
 	CHECK_REMOTE=true python -m build.generate
 
