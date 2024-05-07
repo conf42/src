@@ -1,0 +1,1472 @@
+1
+00:00:27,120 --> 00:00:30,538
+Hi, call for it viewers and welcome to this episode SRE 2024
+
+2
+00:00:30,586 --> 00:00:33,946
+session about creating terraform providers and my journey when
+
+3
+00:00:33,970 --> 00:00:37,978
+I wanted to create one, starting from learning the documentation up until
+
+4
+00:00:38,106 --> 00:00:40,374
+publishing it into the terraform registry.
+
+5
+00:00:41,274 --> 00:00:44,810
+We'll cover a bit of a refresher about what is infrastructure as code and
+
+6
+00:00:44,842 --> 00:00:48,170
+then discuss where should we start and how to create a provider in coding
+
+7
+00:00:48,202 --> 00:00:52,178
+and live demo. I'm Harel Safra. I'm a data platform engineering
+
+8
+00:00:52,226 --> 00:00:56,294
+team lead at riskify. Riskified is a fraud detection company
+
+9
+00:00:56,794 --> 00:01:00,154
+centered around e commerce solutions and
+
+10
+00:01:00,314 --> 00:01:03,394
+my team managed all online databases that are part of our
+
+11
+00:01:03,434 --> 00:01:06,534
+systems. We use SQL, NoSQL,
+
+12
+00:01:06,954 --> 00:01:10,210
+search engines, graph databases to provide our services.
+
+13
+00:01:10,402 --> 00:01:14,154
+Before that, I've been in the infrastructure domain for 20
+
+14
+00:01:14,194 --> 00:01:17,974
+plus years, managing servers, network switches,
+
+15
+00:01:18,634 --> 00:01:22,094
+stored databases, and anything to that effect.
+
+16
+00:01:22,834 --> 00:01:26,162
+What is infrastructure is code infrastructure code is
+
+17
+00:01:26,178 --> 00:01:29,880
+a programmatic definition of infrastructure elements. That means that
+
+18
+00:01:29,912 --> 00:01:33,352
+we want to define infrastructure, which could be various things
+
+19
+00:01:33,408 --> 00:01:37,424
+like servers and network switches, but it could also be database
+
+20
+00:01:37,464 --> 00:01:41,768
+users or elasticsearch indexes in a programmatic way
+
+21
+00:01:41,896 --> 00:01:45,472
+that allows for repeatable and documented processes
+
+22
+00:01:45,648 --> 00:01:49,536
+where the knowledge is baked into the process itself and doesn't depend
+
+23
+00:01:49,600 --> 00:01:52,484
+on humans remembering what they need to do.
+
+24
+00:01:53,224 --> 00:01:56,990
+There are two general approaches for infrastructure as code. The first
+
+25
+00:01:57,062 --> 00:02:01,034
+one is declarative. We ask the user to define what they want to achieve
+
+26
+00:02:01,854 --> 00:02:05,086
+and the framework compiles that into
+
+27
+00:02:05,190 --> 00:02:09,354
+infrastructure elements. You can think of terraform in that domain.
+
+28
+00:02:09,854 --> 00:02:13,310
+The other approach is imperative. The user defines how they
+
+29
+00:02:13,342 --> 00:02:16,430
+want to achieve something. It's more of a code based approach,
+
+30
+00:02:16,542 --> 00:02:20,780
+and the framework again creates an infrastructure
+
+31
+00:02:20,902 --> 00:02:24,524
+for the user. You can think of Pulumi in that domain.
+
+32
+00:02:25,824 --> 00:02:29,704
+Terraform providers are the plugins that interface
+
+33
+00:02:29,784 --> 00:02:34,088
+with the infrastructure API on one side, and they also interface
+
+34
+00:02:34,136 --> 00:02:37,744
+with a terraform core over RPC on the other side,
+
+35
+00:02:37,904 --> 00:02:41,456
+and they bridge the gap between what terraform core is and what the
+
+36
+00:02:41,480 --> 00:02:45,376
+infrastructure needs on the API to create the
+
+37
+00:02:45,400 --> 00:02:49,028
+infrastructure elements. There are 4100
+
+38
+00:02:49,116 --> 00:02:52,904
+plus published providers as of this recording,
+
+39
+00:02:53,644 --> 00:02:57,140
+and the main point is that anyone can create more providers. You don't have to
+
+40
+00:02:57,212 --> 00:03:01,224
+associate with the infrastructure vendor itself. Anyone can create
+
+41
+00:03:01,724 --> 00:03:04,732
+and provider as long as there's a valid API that
+
+42
+00:03:04,748 --> 00:03:08,356
+you can work with. You need to understand a bit about
+
+43
+00:03:08,380 --> 00:03:12,188
+the architecture first. The first element is terraform core,
+
+44
+00:03:12,236 --> 00:03:16,172
+which is actually the terraform executable that runs when you run a
+
+45
+00:03:16,188 --> 00:03:19,598
+terraform command. If you run terraform plan, it actually
+
+46
+00:03:19,646 --> 00:03:24,234
+runs terraform core in the documentation language.
+
+47
+00:03:25,254 --> 00:03:29,594
+Terraform Core will communicate over RPC with a terraform provider,
+
+48
+00:03:30,094 --> 00:03:33,646
+and the terraform provider uses native calls inside the process
+
+49
+00:03:33,790 --> 00:03:37,238
+to communicate with a client library that
+
+50
+00:03:37,326 --> 00:03:41,446
+then communicates over the native infrastructure APIs and
+
+51
+00:03:41,470 --> 00:03:45,462
+protocol with the infrastructure itself to provision resources and
+
+52
+00:03:45,478 --> 00:03:49,030
+this native library. This native communication can happen
+
+53
+00:03:49,142 --> 00:03:52,286
+on HTTP. You'll find it in various documentation,
+
+54
+00:03:52,470 --> 00:03:56,006
+but it could also be GRPC or SQL or system calls
+
+55
+00:03:56,030 --> 00:03:59,714
+or anything that infrastructure knows how to interpret.
+
+56
+00:04:00,734 --> 00:04:04,782
+So obviously the first thing you need to understand is the API that's
+
+57
+00:04:04,798 --> 00:04:08,294
+supported by your infrastructure. Find the correct API
+
+58
+00:04:08,334 --> 00:04:11,806
+to interface with that and find an easy way to do
+
+59
+00:04:11,830 --> 00:04:15,552
+that. If you, if there's an existing goal and client for your
+
+60
+00:04:15,568 --> 00:04:18,712
+infrastructure, try and use that. It will probably be easiest.
+
+61
+00:04:18,808 --> 00:04:22,764
+Otherwise you have to reverse engineer the protocol and that can be a bit annoying.
+
+62
+00:04:23,584 --> 00:04:26,844
+After you understood the API, you should learn go.
+
+63
+00:04:27,144 --> 00:04:30,856
+Go is the language that the terraform providers are
+
+64
+00:04:30,880 --> 00:04:34,364
+written in. It's a compiled, high level programming language.
+
+65
+00:04:34,904 --> 00:04:38,408
+I need to understand Go didn't understand go
+
+66
+00:04:38,576 --> 00:04:42,296
+too deeply, but you need to understand control structures and a
+
+67
+00:04:42,320 --> 00:04:45,888
+bit about interfaces and how you go about creating
+
+68
+00:04:45,936 --> 00:04:49,080
+code. I use a step by step
+
+69
+00:04:49,112 --> 00:04:54,664
+tutorial that's found in the Go site tour
+
+70
+00:04:54,744 --> 00:04:58,640
+and it's a good tutorial. It will take you from not knowing Go
+
+71
+00:04:58,712 --> 00:05:02,044
+to have a working knowledge about how to use it.
+
+72
+00:05:02,384 --> 00:05:05,712
+I like Go for its simplicity. It's easy to
+
+73
+00:05:05,728 --> 00:05:10,136
+understand and to learn. I like very much that it's compiled compile
+
+74
+00:05:10,280 --> 00:05:14,710
+find problems before you do in production, there's one
+
+75
+00:05:14,862 --> 00:05:18,790
+thing that need to remember. There's no exception. If you, if you are
+
+76
+00:05:18,942 --> 00:05:23,134
+used to exception handling for other operate languages that
+
+77
+00:05:23,174 --> 00:05:27,486
+you have to check method return values for errors
+
+78
+00:05:27,630 --> 00:05:31,830
+and otherwise you'll find that your code will error
+
+79
+00:05:31,862 --> 00:05:35,994
+out for various reasons because it didn't check the error, the return error
+
+80
+00:05:36,614 --> 00:05:41,030
+so you understand the API you have a working knowledge
+
+81
+00:05:41,062 --> 00:05:44,314
+of go now you need to understand how to create the providers.
+
+82
+00:05:44,874 --> 00:05:48,762
+I used Hashicorp's documentation to
+
+83
+00:05:48,818 --> 00:05:53,174
+learn how to do that. It's located in the developer portal
+
+84
+00:05:53,594 --> 00:05:56,706
+under terraform plugins. You don't
+
+85
+00:05:56,730 --> 00:06:00,298
+need to learn everything in advance,
+
+86
+00:06:00,466 --> 00:06:03,946
+just read the overview and then continue from there in the
+
+87
+00:06:03,970 --> 00:06:07,402
+sections you need. After you
+
+88
+00:06:07,418 --> 00:06:10,854
+have the basics, let's see how you create the provider itself.
+
+89
+00:06:12,254 --> 00:06:16,110
+We'll use a demo of a provider that manages lines
+
+90
+00:06:16,142 --> 00:06:19,998
+inside the text file. It's a simple made up example,
+
+91
+00:06:20,046 --> 00:06:22,754
+but it will allow you to understand what we do.
+
+92
+00:06:23,214 --> 00:06:27,114
+All the files are managed in a single path that's defined in the provider
+
+93
+00:06:27,574 --> 00:06:30,846
+configuration. There's a single type of
+
+94
+00:06:30,870 --> 00:06:34,966
+resource, a file that has a file name and
+
+95
+00:06:35,030 --> 00:06:38,190
+a lines array, and it's actually just an array of
+
+96
+00:06:38,222 --> 00:06:42,022
+strings nothing too fancy. The file API that provided
+
+97
+00:06:42,118 --> 00:06:45,822
+is limited and limited by design, because when
+
+98
+00:06:45,838 --> 00:06:49,582
+you're working with other types of APIs, there will be limitations that you
+
+99
+00:06:49,598 --> 00:06:53,142
+need to understand and work around. And you didn't just want to provide an
+
+100
+00:06:53,158 --> 00:06:55,554
+API that allows you to do everything on files.
+
+101
+00:06:57,174 --> 00:07:00,878
+An example for this sort of our recent configuration, you can see on the left
+
+102
+00:07:01,006 --> 00:07:04,448
+there's file file
+
+103
+00:07:04,496 --> 00:07:07,832
+one resource that has file name equals file one and lines
+
+104
+00:07:07,888 --> 00:07:11,264
+line 192, and the provider will translate that
+
+105
+00:07:11,304 --> 00:07:14,464
+into a text file containing line one and line two,
+
+106
+00:07:14,544 --> 00:07:18,232
+named file one. Clone the code
+
+107
+00:07:18,328 --> 00:07:22,080
+under my GitHub repository, eight safer terraform provider
+
+108
+00:07:22,112 --> 00:07:25,504
+filedata and it's also published in the terraform registry
+
+109
+00:07:25,544 --> 00:07:28,884
+for you to see after.
+
+110
+00:07:29,904 --> 00:07:34,242
+After you understood the API that you work on and
+
+111
+00:07:34,258 --> 00:07:37,818
+you're into will point
+
+112
+00:07:37,866 --> 00:07:41,426
+you to creating providers with a plugin framework.
+
+113
+00:07:41,570 --> 00:07:45,050
+And this is actually the correct way and the recommended way to create new
+
+114
+00:07:45,082 --> 00:07:49,174
+providers. It abstracts a lot of interactions that
+
+115
+00:07:49,514 --> 00:07:53,414
+either happen with terraform core and allows you to focus on your logic.
+
+116
+00:07:54,834 --> 00:07:58,858
+You start by cloning the terraform provider, scaffolding framework,
+
+117
+00:07:58,906 --> 00:08:03,080
+repo to your GitHub
+
+118
+00:08:03,112 --> 00:08:06,576
+profile, and then you can tweak it and customize it
+
+119
+00:08:06,600 --> 00:08:11,552
+from there. Therefore, providers have
+
+120
+00:08:11,608 --> 00:08:15,200
+four basic operations that they need to support for
+
+121
+00:08:15,232 --> 00:08:19,624
+each managed resource. And these operations both
+
+122
+00:08:19,784 --> 00:08:23,160
+provision the infrastructure itself, or change infrastructure,
+
+123
+00:08:23,192 --> 00:08:26,558
+or delete the infrastructure, but they also amend the terraform state.
+
+124
+00:08:26,696 --> 00:08:30,530
+Or actually they provide the instructions for terraform
+
+125
+00:08:30,562 --> 00:08:34,018
+core to amend the terraform state after they've
+
+126
+00:08:34,026 --> 00:08:37,666
+done the operation. So after a create operation, you need to
+
+127
+00:08:37,730 --> 00:08:41,434
+amend the state so that the state will include the new resource
+
+128
+00:08:41,474 --> 00:08:45,266
+that was created. A create operation obviously provisions
+
+129
+00:08:45,290 --> 00:08:48,690
+a new resource. A read operation gets
+
+130
+00:08:48,722 --> 00:08:51,970
+the infrastructure's current state. That means that it will go
+
+131
+00:08:52,002 --> 00:08:55,522
+and, and read the infrastructure state over the API and
+
+132
+00:08:55,618 --> 00:08:59,074
+return that into terraform core. An update
+
+133
+00:08:59,114 --> 00:09:02,186
+operation changes attributes that can be changed,
+
+134
+00:09:02,370 --> 00:09:06,414
+and obviously not, not every attribute in the threshold can be changed
+
+135
+00:09:06,914 --> 00:09:10,986
+and a delete operation removes the resource. Terraform core sometimes
+
+136
+00:09:11,010 --> 00:09:13,054
+uses delete operation to change,
+
+137
+00:09:14,354 --> 00:09:18,498
+to change resources that cannot be changed if there's an immutable
+
+138
+00:09:18,546 --> 00:09:21,940
+opinion with an attribute, therefore core will destroy
+
+139
+00:09:21,972 --> 00:09:25,484
+and recreate the resource to change that
+
+140
+00:09:25,604 --> 00:09:28,464
+attribute. If you look at the code,
+
+141
+00:09:29,884 --> 00:09:33,556
+this is how the repository works. When you close the repository, we have
+
+142
+00:09:33,580 --> 00:09:36,904
+a documentation directory and
+
+143
+00:09:37,204 --> 00:09:40,812
+all the other code sits in the internal provider
+
+144
+00:09:40,908 --> 00:09:44,636
+and the resources. So if we look at the
+
+145
+00:09:44,660 --> 00:09:48,334
+file resource, it has a few
+
+146
+00:09:48,414 --> 00:09:51,998
+different methods that cover the operations. It has
+
+147
+00:09:52,046 --> 00:09:55,574
+the delete operation. The delete method covers the delete operation,
+
+148
+00:09:55,734 --> 00:09:59,350
+update, read and create. And if you look
+
+149
+00:09:59,382 --> 00:10:03,006
+inside one of the methods you can see they all start with
+
+150
+00:10:03,030 --> 00:10:05,714
+the same kind of way.
+
+151
+00:10:06,094 --> 00:10:10,238
+You start by getting
+
+152
+00:10:10,286 --> 00:10:13,886
+the parameters the terraform course has sent to the
+
+153
+00:10:13,910 --> 00:10:17,542
+provider, and then you do a
+
+154
+00:10:17,558 --> 00:10:21,454
+bit of logic and then you return a response
+
+155
+00:10:21,534 --> 00:10:25,214
+to terraform port to allow it to amend the state correctly. So if you take
+
+156
+00:10:25,294 --> 00:10:28,990
+for example the create operation, you can see this provider starts with
+
+157
+00:10:29,022 --> 00:10:33,526
+creating a full name from the base path inside
+
+158
+00:10:33,550 --> 00:10:36,822
+the provider, and then from the
+
+159
+00:10:36,958 --> 00:10:40,500
+file name provided inside the create operation. Then it
+
+160
+00:10:40,532 --> 00:10:44,468
+iterates over all the lines inside
+
+161
+00:10:44,516 --> 00:10:48,300
+the lines array and writes them to the file
+
+162
+00:10:48,452 --> 00:10:52,664
+with API writeline operation.
+
+163
+00:10:53,364 --> 00:10:57,356
+Schemas and attributes are used to map between terraform configuration
+
+164
+00:10:57,420 --> 00:11:01,892
+files and the code itself. So every
+
+165
+00:11:02,028 --> 00:11:05,772
+configuration block of the provider, the resource,
+
+166
+00:11:05,908 --> 00:11:09,516
+or the provider itself has a schema that
+
+167
+00:11:09,540 --> 00:11:13,636
+define the needed parameters, and schemas contain attributes that
+
+168
+00:11:13,660 --> 00:11:17,228
+define the data elements itself. Each attribute
+
+169
+00:11:17,276 --> 00:11:20,868
+has a type. It could be a primitive, like an x 64
+
+170
+00:11:20,916 --> 00:11:24,164
+or a string, and could also be a complex type like a map,
+
+171
+00:11:24,204 --> 00:11:28,244
+an object, a list. Each attribute also
+
+172
+00:11:28,284 --> 00:11:30,864
+has properties like a description,
+
+173
+00:11:31,384 --> 00:11:34,936
+if it's optional, if it's sensitive, or other attributes,
+
+174
+00:11:35,040 --> 00:11:38,560
+other properties, and it can
+
+175
+00:11:38,592 --> 00:11:42,048
+have optional validators that check the user
+
+176
+00:11:42,136 --> 00:11:45,848
+supplied values against what the provider expects
+
+177
+00:11:46,016 --> 00:11:49,564
+and allows you to not check them later on because they will fail
+
+178
+00:11:49,864 --> 00:11:53,256
+validation checks. If you
+
+179
+00:11:53,280 --> 00:11:56,720
+look at the code, you can see that the
+
+180
+00:11:56,792 --> 00:12:00,476
+file reasons has a schema method that
+
+181
+00:12:00,500 --> 00:12:04,492
+defines the schema that the file resource expects to receive. It starts
+
+182
+00:12:04,508 --> 00:12:08,556
+with a description of the file resource itself and
+
+183
+00:12:08,580 --> 00:12:12,316
+then has an attribute named filename which
+
+184
+00:12:12,340 --> 00:12:16,476
+is of type string. It has a description file name,
+
+185
+00:12:16,540 --> 00:12:20,304
+it's required obviously, and it has a validator
+
+186
+00:12:20,604 --> 00:12:24,744
+that checks the correctness of the file name provided
+
+187
+00:12:25,574 --> 00:12:29,286
+in this example with the regix. It also has a lines
+
+188
+00:12:29,310 --> 00:12:33,014
+attribute which is a list attribute. A list
+
+189
+00:12:33,094 --> 00:12:37,154
+interfrom has is a collection of elements of the same type.
+
+190
+00:12:38,054 --> 00:12:41,846
+This is also required, and the
+
+191
+00:12:41,870 --> 00:12:45,742
+element type is string, as I mentioned earlier. And it has a
+
+192
+00:12:45,758 --> 00:12:49,638
+validator that's a list validator that requires the list to have
+
+193
+00:12:49,686 --> 00:12:53,826
+at least two elements inside it, just as
+
+194
+00:12:53,850 --> 00:12:56,294
+an example. Nothing too fancy about it.
+
+195
+00:12:57,074 --> 00:12:59,938
+Try new descriptions wherever you can,
+
+196
+00:12:59,986 --> 00:13:03,626
+because these descriptions are later on grabbed
+
+197
+00:13:03,690 --> 00:13:08,186
+by the plugin by the documentation framework to create these
+
+198
+00:13:08,290 --> 00:13:12,122
+lovely documentation files. And you can see the description
+
+199
+00:13:12,298 --> 00:13:15,226
+is copied from here and every other attribute.
+
+200
+00:13:15,290 --> 00:13:18,846
+So if you have the descriptions inside, inside your
+
+201
+00:13:18,870 --> 00:13:22,166
+resource file, it will be copied to the documentation and you can
+
+202
+00:13:22,190 --> 00:13:24,434
+use that to publish your provider later on.
+
+203
+00:13:26,214 --> 00:13:30,214
+Types of the terraform plugin framework are not
+
+204
+00:13:30,294 --> 00:13:34,054
+native Golang types, so an n 64 in the plugin framework is
+
+205
+00:13:34,094 --> 00:13:37,806
+not a native n 64 because they have additional methods
+
+206
+00:13:37,870 --> 00:13:41,474
+to handle null values and unknown values.
+
+207
+00:13:41,854 --> 00:13:45,314
+For example, in x 64 and any other
+
+208
+00:13:46,284 --> 00:13:50,428
+type has an is null method that returns a true force
+
+209
+00:13:50,556 --> 00:13:53,144
+in case this is a null value or not.
+
+210
+00:13:54,324 --> 00:13:58,292
+When you want to access the values, use the in
+
+211
+00:13:58,308 --> 00:14:01,804
+case of it's a primitive type, you use the value
+
+212
+00:14:01,964 --> 00:14:05,740
+type method like value in 64 that
+
+213
+00:14:05,772 --> 00:14:09,180
+returns a native in 64. If it's a collection,
+
+214
+00:14:09,212 --> 00:14:12,744
+you can convert the values into go learn types with the add methods.
+
+215
+00:14:12,844 --> 00:14:17,216
+For example, list has an elements as an
+
+216
+00:14:17,240 --> 00:14:20,804
+elements as a method that returns the
+
+217
+00:14:22,424 --> 00:14:25,684
+type as a native go type.
+
+218
+00:14:26,304 --> 00:14:30,216
+If we look at the code again inside the file resources,
+
+219
+00:14:30,360 --> 00:14:34,416
+you can see that over the
+
+220
+00:14:34,440 --> 00:14:38,316
+breakpoint, you can see that the same create method is accessed.
+
+221
+00:14:38,440 --> 00:14:42,092
+The filename attribute, which is a string attribute
+
+222
+00:14:42,148 --> 00:14:45,544
+with a value with value dot string.
+
+223
+00:14:46,084 --> 00:14:49,732
+This is used in various other places, so this value string
+
+224
+00:14:49,828 --> 00:14:53,716
+will copy the native the framework type
+
+225
+00:14:53,820 --> 00:14:57,676
+into a native type and convert into a string that you can work
+
+226
+00:14:57,700 --> 00:15:01,304
+with after you created your code. The code
+
+227
+00:15:02,564 --> 00:15:06,220
+run at least hopefully. You probably want to run it locally and
+
+228
+00:15:06,252 --> 00:15:10,180
+debug it in case there are errors. The first thing that
+
+229
+00:15:10,332 --> 00:15:13,924
+you can use to run telephone providers locally is
+
+230
+00:15:13,964 --> 00:15:17,948
+to use a TFC like config file with a provider.
+
+231
+00:15:17,996 --> 00:15:22,824
+Installation dev overrides substance,
+
+232
+00:15:23,604 --> 00:15:27,364
+which translates a registry address into
+
+233
+00:15:27,404 --> 00:15:30,744
+a local address that has your code.
+
+234
+00:15:31,204 --> 00:15:35,064
+This will allow you to run the code without publishing it into terraform registry.
+
+235
+00:15:35,604 --> 00:15:38,704
+You can use log based debugging for simple cases,
+
+236
+00:15:39,524 --> 00:15:43,100
+but for more complex cases use debugger based debugging.
+
+237
+00:15:43,252 --> 00:15:46,740
+It will allow you to set breakpoints and run your code
+
+238
+00:15:46,812 --> 00:15:51,036
+as any other code. You do that by passing
+
+239
+00:15:51,060 --> 00:15:54,844
+a flag debug. True, you set an environment
+
+240
+00:15:54,924 --> 00:15:58,716
+variable that it outputs and then you run your action
+
+241
+00:15:58,900 --> 00:16:03,012
+that you want to run, and then it will break inside
+
+242
+00:16:03,108 --> 00:16:06,976
+the provider code. Let's see an example for that
+
+243
+00:16:07,000 --> 00:16:10,804
+in action. We started with a configuration directory.
+
+244
+00:16:11,424 --> 00:16:15,216
+We have a configuration directory that has a
+
+245
+00:16:15,240 --> 00:16:17,964
+provider file that defines a base path,
+
+246
+00:16:18,664 --> 00:16:22,604
+and this base path is the same as the one we're currently in.
+
+247
+00:16:23,344 --> 00:16:26,672
+It also has a resources file that defines
+
+248
+00:16:26,728 --> 00:16:30,244
+two files and file two with these names
+
+249
+00:16:30,724 --> 00:16:35,804
+and the line inside them. And we can see that if we add
+
+250
+00:16:35,844 --> 00:16:38,932
+file two, you will see the lines AA,
+
+251
+00:16:38,988 --> 00:16:42,984
+BBB and CCC the same as the provider has defined them.
+
+252
+00:16:43,644 --> 00:16:46,464
+If you want if we run terraform plan now,
+
+253
+00:16:47,284 --> 00:16:51,388
+there's no changes because the resources have the same values
+
+254
+00:16:51,436 --> 00:16:53,944
+as this as the infrastructure.
+
+255
+00:16:54,724 --> 00:16:58,506
+Say you want to debug the the plan
+
+256
+00:16:58,690 --> 00:17:02,706
+state and specifically want to debug the create the read operation inside
+
+257
+00:17:02,810 --> 00:17:06,250
+the terraform plan. We'll start by setting a breakpoint
+
+258
+00:17:06,322 --> 00:17:10,094
+inside the read method of the provider.
+
+259
+00:17:10,754 --> 00:17:14,698
+Then we'll make sure the run configuration has a debug
+
+260
+00:17:14,746 --> 00:17:19,354
+equals true as a program argument and
+
+261
+00:17:19,514 --> 00:17:23,461
+we click the debug button and
+
+262
+00:17:23,477 --> 00:17:26,789
+it will instruct us to copy these values and set
+
+263
+00:17:26,821 --> 00:17:30,309
+them as an environment variable. And this will allow the
+
+264
+00:17:30,381 --> 00:17:34,133
+core executable to reconnect to that running session,
+
+265
+00:17:34,173 --> 00:17:36,953
+not just use what it has in this directory.
+
+266
+00:17:37,333 --> 00:17:40,461
+So we export this value and if you
+
+267
+00:17:40,477 --> 00:17:44,013
+run terraform plan again now you will see
+
+268
+00:17:44,133 --> 00:17:47,845
+that the
+
+269
+00:17:47,989 --> 00:17:52,234
+debugger has jumped and started to run and it breaks inside
+
+270
+00:17:52,274 --> 00:17:55,482
+the read method. And from here you can just
+
+271
+00:17:55,578 --> 00:17:58,866
+use the regular debugging operation to
+
+272
+00:17:58,890 --> 00:18:02,546
+debug your code and see what happens. In this case you can see that
+
+273
+00:18:02,610 --> 00:18:06,294
+this is the read operation for file two.
+
+274
+00:18:06,994 --> 00:18:10,514
+And if we resume running the code there will be
+
+275
+00:18:10,554 --> 00:18:14,658
+another break for the read operation of file
+
+276
+00:18:14,706 --> 00:18:17,584
+one. And while it's running,
+
+277
+00:18:17,704 --> 00:18:22,084
+the terraform process is hanging. It's actually waiting
+
+278
+00:18:22,664 --> 00:18:25,724
+for instruction that are returned from the provider.
+
+279
+00:18:26,024 --> 00:18:29,616
+And if we resume the operation it will continue
+
+280
+00:18:29,760 --> 00:18:33,352
+and in this case again show that there are no changes.
+
+281
+00:18:33,448 --> 00:18:36,688
+So that's how you debug operations. Use it.
+
+282
+00:18:36,736 --> 00:18:39,684
+It's very powerful. It's very easy to debug like that.
+
+283
+00:18:41,104 --> 00:18:45,016
+After we created the code, they debugged it. It seemed to be working. Add acceptance
+
+284
+00:18:45,080 --> 00:18:49,240
+tests it will be used both for automatic tests
+
+285
+00:18:49,352 --> 00:18:52,952
+during deploys inside inside GitHub actions,
+
+286
+00:18:53,008 --> 00:18:56,328
+but you can also use it locally to make sure that your changes are valid
+
+287
+00:18:56,376 --> 00:18:59,912
+and not you didn't break anything. You can
+
+288
+00:18:59,928 --> 00:19:02,724
+have automatic testing for resources, data sources,
+
+289
+00:19:03,024 --> 00:19:05,964
+providers, and anything that you created.
+
+290
+00:19:06,464 --> 00:19:09,880
+The state inside the acceptance test is checking.
+
+291
+00:19:09,912 --> 00:19:13,484
+Basically you don't have to check that the state changes are done correctly,
+
+292
+00:19:13,824 --> 00:19:17,232
+but if you do have any change that you want to validate on
+
+293
+00:19:17,248 --> 00:19:21,024
+the infrastructure side, you need to do that inside the acceptance
+
+294
+00:19:21,064 --> 00:19:23,684
+test. You can run it manually.
+
+295
+00:19:24,304 --> 00:19:28,880
+All tests with manually will make test act and
+
+296
+00:19:28,912 --> 00:19:32,288
+the way you structure that is you have file
+
+297
+00:19:32,336 --> 00:19:35,544
+resource. The resource name underscore test inside
+
+298
+00:19:35,584 --> 00:19:38,648
+the same directory. So if we take a
+
+299
+00:19:38,656 --> 00:19:41,944
+look at the code, you can see that
+
+300
+00:19:42,284 --> 00:19:46,384
+the file resource has a file resource test
+
+301
+00:19:46,924 --> 00:19:51,060
+file and it has a
+
+302
+00:19:51,092 --> 00:19:54,948
+function called, and each function is actually a test.
+
+303
+00:19:55,076 --> 00:19:58,824
+So you have multiple functions for test and
+
+304
+00:19:59,764 --> 00:20:03,260
+there's a helper function here that defines the files
+
+305
+00:20:03,412 --> 00:20:06,860
+that need to be run. So you can see there's a configuration block
+
+306
+00:20:06,892 --> 00:20:10,550
+for provider and another configuration bug for
+
+307
+00:20:10,582 --> 00:20:14,550
+a resource of type file data with this name that
+
+308
+00:20:14,582 --> 00:20:18,638
+gets passed inside as a parameter. Here and
+
+309
+00:20:18,686 --> 00:20:21,902
+has the lines formatted as lines here.
+
+310
+00:20:21,998 --> 00:20:25,278
+And this allows you to see as the same kind of configuration block for different
+
+311
+00:20:25,326 --> 00:20:29,234
+tests. You can see for example that in this test
+
+312
+00:20:29,614 --> 00:20:32,982
+I passed file one with one and two in
+
+313
+00:20:32,998 --> 00:20:37,116
+the lines, and in this case the test and update I
+
+314
+00:20:37,140 --> 00:20:41,572
+passed the same file name but with two and three. And this
+
+315
+00:20:41,668 --> 00:20:45,244
+allows the same configuration method to create different
+
+316
+00:20:45,284 --> 00:20:50,188
+configuration files. To allow you to test the
+
+317
+00:20:50,236 --> 00:20:53,820
+check. You have to define each check to
+
+318
+00:20:53,852 --> 00:20:57,904
+pass. And this is just a check that tests the resource attribute.
+
+319
+00:20:59,004 --> 00:21:02,704
+The filename is indeed equal to file one.
+
+320
+00:21:03,594 --> 00:21:07,494
+This check is a bit more interesting because it tests
+
+321
+00:21:07,834 --> 00:21:11,266
+that lines the first line.
+
+322
+00:21:11,450 --> 00:21:14,810
+The first value inlines is equal to
+
+323
+00:21:14,842 --> 00:21:18,010
+two as we defined here. As I said,
+
+324
+00:21:18,042 --> 00:21:21,850
+you can run the configuration acceptance tests both
+
+325
+00:21:21,922 --> 00:21:26,178
+inside the operation and you can also run it by running
+
+326
+00:21:26,306 --> 00:21:28,734
+bake test act. That will,
+
+327
+00:21:29,454 --> 00:21:33,942
+that will just run the acceptance test and
+
+328
+00:21:33,958 --> 00:21:37,182
+we can just run it again and again to make sure that everything that we
+
+329
+00:21:37,318 --> 00:21:41,314
+created and changes indeed validated break any other functionality.
+
+330
+00:21:42,414 --> 00:21:45,958
+After you finish creating your provider, you debugged it. It looked all working.
+
+331
+00:21:46,006 --> 00:21:49,678
+You created test acceptance tests and auth
+
+332
+00:21:49,726 --> 00:21:52,750
+passing you could publish into the terraform
+
+333
+00:21:52,782 --> 00:21:57,018
+register and allow other people to use your work. You first define a
+
+334
+00:21:57,066 --> 00:22:02,346
+GPG key and then set the
+
+335
+00:22:02,370 --> 00:22:06,334
+repo sacred GPG private key and passphrase to your value.
+
+336
+00:22:07,434 --> 00:22:11,042
+An important thing that it took me some time to understand is that
+
+337
+00:22:11,058 --> 00:22:14,294
+you need to create a tag named v version.
+
+338
+00:22:14,714 --> 00:22:17,974
+For example v zero dot one dot zero
+
+339
+00:22:18,834 --> 00:22:22,426
+to allow the automation to grab the changes. And after
+
+340
+00:22:22,450 --> 00:22:26,050
+you created a tag and pushed it into GitHub, you can log into Terraform
+
+341
+00:22:26,082 --> 00:22:29,802
+registry and add the repo for
+
+342
+00:22:29,818 --> 00:22:33,458
+the initial node. Terraform will read what the current context of
+
+343
+00:22:33,466 --> 00:22:37,778
+the repo, but it will also set webhooks that
+
+344
+00:22:37,866 --> 00:22:41,650
+push any new changes to Terraform registry.
+
+345
+00:22:41,722 --> 00:22:45,954
+And new changes are new tags. So if you have a tag named v
+
+346
+00:22:46,114 --> 00:22:49,386
+one and then you push a new tag named
+
+347
+00:22:49,410 --> 00:22:52,642
+v two, there's a default GitHub
+
+348
+00:22:52,698 --> 00:22:55,898
+action that will compile that into resources
+
+349
+00:22:56,026 --> 00:23:00,334
+and then Terraform registry will go and grab these resources and publish it.
+
+350
+00:23:00,994 --> 00:23:04,442
+You can see this in this example, the version is zero
+
+351
+00:23:04,498 --> 00:23:07,946
+dot one dot zero and it's backed by a tag name v
+
+352
+00:23:08,090 --> 00:23:11,290
+zero dot one dot zero. So to wrap
+
+353
+00:23:11,322 --> 00:23:14,764
+it up by journey with the provider started with
+
+354
+00:23:14,884 --> 00:23:18,900
+no provider, just manual management scripts,
+
+355
+00:23:19,052 --> 00:23:22,636
+manual procedures, a lot of documentation.
+
+356
+00:23:22,700 --> 00:23:26,044
+Confluence. I started
+
+357
+00:23:26,084 --> 00:23:29,304
+by learning go and terraform framework.
+
+358
+00:23:29,924 --> 00:23:33,604
+I then created code for the provider
+
+359
+00:23:33,644 --> 00:23:38,144
+and released more features. In my example I created a provider
+
+360
+00:23:38,524 --> 00:23:42,158
+that defines users and sets
+
+361
+00:23:42,246 --> 00:23:45,674
+inside the aerospace database. That's something that wasn't available
+
+362
+00:23:46,894 --> 00:23:50,238
+after the code was created. I published it into
+
+363
+00:23:50,286 --> 00:23:54,034
+the terraform registry and people appear to be using it.
+
+364
+00:23:54,374 --> 00:23:57,814
+Thank you for your time today. If you have any questions,
+
+365
+00:23:57,854 --> 00:24:00,714
+feel free to reach out to me either by my email,
+
+366
+00:24:01,214 --> 00:24:05,174
+by my LinkedIn profile, or opening
+
+367
+00:24:05,334 --> 00:24:10,234
+issue on the provider that's published under GitHub hsafra.
+
+368
+00:24:10,534 --> 00:24:13,662
+Thank you and I hope it's been instructing for.
+
