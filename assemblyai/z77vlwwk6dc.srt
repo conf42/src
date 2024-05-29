@@ -1,0 +1,1904 @@
+1
+00:00:27,160 --> 00:00:30,450
+Hi guys. Today we are going to discuss optimizing
+
+2
+00:00:30,482 --> 00:00:34,594
+of Apache Spark. Today we are going to discuss performance tuning
+
+3
+00:00:34,674 --> 00:00:38,306
+of Apache Spark. And you might ask, why would I
+
+4
+00:00:38,330 --> 00:00:41,298
+care? Spark three is quite good, is good enough.
+
+5
+00:00:41,386 --> 00:00:43,654
+I don't really need to pay attention to that.
+
+6
+00:00:43,994 --> 00:00:47,770
+But the reality is that problems are
+
+7
+00:00:47,802 --> 00:00:51,706
+still happening every now and then. So if you know how to debug them,
+
+8
+00:00:51,770 --> 00:00:55,126
+if you know how to tune the performance, then you
+
+9
+00:00:55,150 --> 00:00:58,886
+save time of yourself, you save time of
+
+10
+00:00:59,030 --> 00:01:02,398
+your team, but that also means saving money
+
+11
+00:01:02,526 --> 00:01:05,822
+you spend on the infrastructure, saving money
+
+12
+00:01:05,878 --> 00:01:09,982
+you spend on your cloud. Bill my name is Martin,
+
+13
+00:01:10,118 --> 00:01:13,862
+I'm CEO of Tantus Data. At Tantusdata
+
+14
+00:01:13,918 --> 00:01:17,142
+we help our customers with everything data related,
+
+15
+00:01:17,318 --> 00:01:20,594
+from infrastructure through data engineering
+
+16
+00:01:20,674 --> 00:01:25,050
+up to machine learning in production. And we also help
+
+17
+00:01:25,122 --> 00:01:28,874
+with trainings. And today I'll share
+
+18
+00:01:28,954 --> 00:01:32,738
+our lessons learned from multiple projects we
+
+19
+00:01:32,866 --> 00:01:36,882
+have been helping with. And let me get started with
+
+20
+00:01:37,058 --> 00:01:41,146
+short history of Spark. Because depending of
+
+21
+00:01:41,210 --> 00:01:44,530
+which spark version you are working with,
+
+22
+00:01:44,642 --> 00:01:48,666
+which spark version you had experience with, it very much depends
+
+23
+00:01:48,690 --> 00:01:52,094
+on what impressions you've had, what experience you've had.
+
+24
+00:01:52,434 --> 00:01:56,346
+So Spark version one was very unstable construct and
+
+25
+00:01:56,370 --> 00:02:00,234
+you very often had to run to your admins, to your ops for some
+
+26
+00:02:00,274 --> 00:02:02,614
+help for restarting of some services.
+
+27
+00:02:03,554 --> 00:02:06,858
+Then Spark version two was much
+
+28
+00:02:06,906 --> 00:02:10,610
+more stable. But still there was quite a big chance that
+
+29
+00:02:10,682 --> 00:02:14,296
+you run a sequel, a sequel, which is
+
+30
+00:02:14,450 --> 00:02:18,212
+perfectly correct, but it doesn't work. It doesn't work
+
+31
+00:02:18,388 --> 00:02:21,788
+because of the data distribution, it doesn't work
+
+32
+00:02:21,916 --> 00:02:24,104
+because of size of the data.
+
+33
+00:02:24,844 --> 00:02:28,036
+If it doesn't work, if you don't know how to solve this
+
+34
+00:02:28,060 --> 00:02:31,324
+kind of problem, all you could do, you could go and
+
+35
+00:02:31,364 --> 00:02:35,092
+run asking for help or randomly selecting
+
+36
+00:02:35,148 --> 00:02:38,764
+some random parameters with some hope that it will help,
+
+37
+00:02:38,844 --> 00:02:42,918
+but usually it need not help. And then with Spark
+
+38
+00:02:42,966 --> 00:02:46,614
+version three, the situation improved significantly because
+
+39
+00:02:46,694 --> 00:02:49,750
+many of the common problems have been resolved.
+
+40
+00:02:49,902 --> 00:02:54,390
+You have adaptive query execution, which basically does
+
+41
+00:02:54,582 --> 00:02:57,274
+lots of optimizations for you,
+
+42
+00:02:57,574 --> 00:03:01,206
+but still there is a chance it
+
+43
+00:03:01,230 --> 00:03:04,638
+will fail, it will be too slow and you have to do the
+
+44
+00:03:04,686 --> 00:03:08,278
+manual tuning. And today I'll show you
+
+45
+00:03:08,366 --> 00:03:12,438
+some of these examples, some of examples which are not fixed
+
+46
+00:03:12,566 --> 00:03:15,554
+even if, even in spark three,
+
+47
+00:03:16,134 --> 00:03:19,822
+if SQL is good enough these
+
+48
+00:03:19,878 --> 00:03:23,646
+days, in many cases, yes, in many cases you are good
+
+49
+00:03:23,670 --> 00:03:26,806
+with SQL or with understanding of spark API,
+
+50
+00:03:26,990 --> 00:03:30,126
+but I'll be sharing the cases where SQL is
+
+51
+00:03:30,150 --> 00:03:34,034
+just let's get started with case number one
+
+52
+00:03:34,174 --> 00:03:37,650
+and a short disclaimer is about what
+
+53
+00:03:37,682 --> 00:03:41,994
+kind of cases. I'm showing cases which are
+
+54
+00:03:42,074 --> 00:03:45,458
+based on production use cases, but they are very much simplified
+
+55
+00:03:45,546 --> 00:03:48,066
+so they are simplified. We are dealing with very,
+
+56
+00:03:48,250 --> 00:03:52,410
+very simplistic schema. We are working with very simplistic SQL,
+
+57
+00:03:52,562 --> 00:03:56,434
+but the techniques we will be applying are very much
+
+58
+00:03:56,594 --> 00:03:59,730
+matching what you would do in production. So how
+
+59
+00:03:59,762 --> 00:04:03,168
+you debug, how you find out what the problem is,
+
+60
+00:04:03,256 --> 00:04:07,272
+how you fix that, it's pretty much production
+
+61
+00:04:07,328 --> 00:04:11,208
+like. And so it's very practical. So let's get started with case number
+
+62
+00:04:11,256 --> 00:04:15,264
+one. In case number one, we will be processing
+
+63
+00:04:15,344 --> 00:04:19,144
+events. We'll be processing a table with events. And that
+
+64
+00:04:19,184 --> 00:04:23,640
+table will have just three columns, user id, event id,
+
+65
+00:04:23,752 --> 00:04:27,280
+and a timestamp. And the whole point is that we are
+
+66
+00:04:27,312 --> 00:04:31,104
+collecting some events, and let's say we are collecting them because
+
+67
+00:04:31,184 --> 00:04:34,552
+we would like to understand how our users
+
+68
+00:04:34,648 --> 00:04:37,856
+are interacting with a mobile app. So we
+
+69
+00:04:37,880 --> 00:04:41,152
+understand where the glitch is, what is confusing to the users,
+
+70
+00:04:41,288 --> 00:04:44,960
+and so on. And we would like to understand how much
+
+71
+00:04:44,992 --> 00:04:49,284
+time they spend on a specific event. So we would like to calculate
+
+72
+00:04:49,944 --> 00:04:53,656
+current event timestamp and the next event timestamp.
+
+73
+00:04:53,800 --> 00:04:57,560
+So we understand which action
+
+74
+00:04:57,672 --> 00:05:01,064
+is taking lots of time, which is potentially a
+
+75
+00:05:01,104 --> 00:05:05,184
+confusing one. So we are searching for a potential of two
+
+76
+00:05:05,304 --> 00:05:08,960
+to improve. So we are searching for the
+
+77
+00:05:08,992 --> 00:05:12,512
+next event. We have some users and timestamp here we are
+
+78
+00:05:12,528 --> 00:05:16,232
+looking at just single user. I pre sorted the event
+
+79
+00:05:16,288 --> 00:05:20,204
+timestamp. We want to fill in
+
+80
+00:05:20,244 --> 00:05:23,332
+an extra column which is next timestamp. And that
+
+81
+00:05:23,348 --> 00:05:27,100
+is super simple on a data which is already pre sorted because the next
+
+82
+00:05:27,172 --> 00:05:30,452
+timestamp would be exactly this one.
+
+83
+00:05:30,588 --> 00:05:33,764
+And then for the second row, the next
+
+84
+00:05:33,844 --> 00:05:37,108
+timestamp would be and
+
+85
+00:05:37,236 --> 00:05:40,828
+so on. So it is quite simple. And if you
+
+86
+00:05:40,956 --> 00:05:44,940
+would like to implement the code, then this is what it would
+
+87
+00:05:44,972 --> 00:05:48,686
+look like in it doesn't look like a rocket science. We are just
+
+88
+00:05:48,830 --> 00:05:51,634
+using a lead function.
+
+89
+00:05:52,014 --> 00:05:56,014
+We do it over partition, data partition by
+
+90
+00:05:56,174 --> 00:06:00,246
+user id and ordered by event timestamp.
+
+91
+00:06:00,390 --> 00:06:04,110
+Super simple code. I don't really want to dig into that more,
+
+92
+00:06:04,182 --> 00:06:07,630
+but the point is the code is perfectly fine,
+
+93
+00:06:07,782 --> 00:06:10,910
+the code is correct. And let's see
+
+94
+00:06:10,942 --> 00:06:14,374
+what will happen when you go to the Sparkui.
+
+95
+00:06:14,834 --> 00:06:18,210
+If you go to the Sparkui, you will realize that
+
+96
+00:06:18,282 --> 00:06:21,738
+the job is running. It has been running for 23
+
+97
+00:06:21,786 --> 00:06:25,410
+minutes. Nothing to be worried about yet. We don't know the size
+
+98
+00:06:25,442 --> 00:06:28,570
+of the data yet. So might be perfectly fine,
+
+99
+00:06:28,682 --> 00:06:32,394
+might be not. What's a bit worrisome
+
+100
+00:06:32,474 --> 00:06:36,090
+is number of tasks which are failing. We have already
+
+101
+00:06:36,242 --> 00:06:39,782
+three tasks which are failing, but that doesn't necessarily
+
+102
+00:06:39,838 --> 00:06:43,646
+mean something is wrong. We are talking about distributed system.
+
+103
+00:06:43,750 --> 00:06:47,150
+It could be a network glitch and spark is supposed
+
+104
+00:06:47,222 --> 00:06:50,526
+to recover from some random failures. So that's
+
+105
+00:06:50,550 --> 00:06:54,510
+the whole point of having system like spark. It will hide
+
+106
+00:06:54,622 --> 00:06:58,166
+some of the complexities, some of the failures from you if it was just
+
+107
+00:06:58,230 --> 00:07:01,654
+random. But let's go a bit deeper. Let's go into
+
+108
+00:07:01,694 --> 00:07:05,406
+the job details. In the job details, we have a
+
+109
+00:07:05,510 --> 00:07:08,554
+single active stage which has been running for
+
+110
+00:07:08,674 --> 00:07:13,458
+23 minutes, and we have 126
+
+111
+00:07:13,506 --> 00:07:17,210
+tasks completed. One task is still waiting, is still
+
+112
+00:07:17,322 --> 00:07:20,970
+running. If we go to that stage details,
+
+113
+00:07:21,082 --> 00:07:24,334
+we can see extra information.
+
+114
+00:07:24,754 --> 00:07:28,738
+So, first of all, the output size so far is quite
+
+115
+00:07:28,786 --> 00:07:33,094
+small. It's just five gigs. But the PO is
+
+116
+00:07:33,174 --> 00:07:35,830
+150 gigs of memory spill,
+
+117
+00:07:35,982 --> 00:07:40,286
+80 gigs of disk spill. So it's, it is quite a lot. And that already
+
+118
+00:07:40,470 --> 00:07:43,474
+shows us that there is some inefficiency.
+
+119
+00:07:44,134 --> 00:07:47,630
+Whether we should be optimizing that or not, it very much depends. It very much
+
+120
+00:07:47,662 --> 00:07:51,798
+depends on what exactly we are optimizing
+
+121
+00:07:51,926 --> 00:07:55,206
+for. And it doesn't necessarily mean that if you
+
+122
+00:07:55,270 --> 00:07:58,670
+see some spill that you have to jump into the optimization, because it could
+
+123
+00:07:58,702 --> 00:08:02,288
+be quite hard. Let's see if
+
+124
+00:08:02,416 --> 00:08:06,444
+we actually can see anything else which is boring.
+
+125
+00:08:06,904 --> 00:08:10,680
+So if we can have a look at the diagram, we can see lots of
+
+126
+00:08:10,712 --> 00:08:14,536
+those green, very tiny tasks. So most of the
+
+127
+00:08:14,560 --> 00:08:16,924
+tasks are completing in no time.
+
+128
+00:08:17,504 --> 00:08:21,432
+There is this one task has been running for quite a
+
+129
+00:08:21,448 --> 00:08:24,824
+lot of time. There is another one which
+
+130
+00:08:24,864 --> 00:08:28,686
+has been running for some time, and it failed again.
+
+131
+00:08:28,790 --> 00:08:32,022
+And it's attempt number one. The previous one was attempt
+
+132
+00:08:32,078 --> 00:08:35,158
+number zero. Now it's attempt number one. So we
+
+133
+00:08:35,206 --> 00:08:39,254
+keep restarting the same task failing,
+
+134
+00:08:39,294 --> 00:08:42,974
+and it takes most of the job time. That's already
+
+135
+00:08:43,134 --> 00:08:46,950
+something we should look closer into. So what
+
+136
+00:08:46,982 --> 00:08:50,046
+we have now, we have another attempt of the same task,
+
+137
+00:08:50,190 --> 00:08:53,396
+and it's running for the fourth time. In the
+
+138
+00:08:53,420 --> 00:08:57,220
+task overview, we can see all the tasks which has failed. We can
+
+139
+00:08:57,252 --> 00:09:01,092
+see the single one which is running. This memory
+
+140
+00:09:01,148 --> 00:09:04,716
+spill is actually produced only, but by those tasks,
+
+141
+00:09:04,860 --> 00:09:08,316
+there is no more memory spill. We can see
+
+142
+00:09:08,380 --> 00:09:11,764
+that they are taking some time, as we could see on the graph.
+
+143
+00:09:11,924 --> 00:09:15,772
+And we also can see some, we can see some errors, and they
+
+144
+00:09:15,788 --> 00:09:19,024
+are not very descriptive, maybe, except the disk space one.
+
+145
+00:09:19,744 --> 00:09:22,688
+But overall, we can see errors,
+
+146
+00:09:22,736 --> 00:09:26,096
+which doesn't really give us a good clue
+
+147
+00:09:26,200 --> 00:09:30,056
+why it's happening. And other than that,
+
+148
+00:09:30,200 --> 00:09:33,776
+we can see other tasks which are completing within 10
+
+149
+00:09:33,840 --> 00:09:37,152
+seconds, which are producing like 40 megabytes
+
+150
+00:09:37,168 --> 00:09:40,416
+of data. Nothing really suspicious about that.
+
+151
+00:09:40,480 --> 00:09:44,564
+So let's try to dig into the problematic tasks, the task which
+
+152
+00:09:45,194 --> 00:09:48,378
+keep restarting. If we look here,
+
+153
+00:09:48,466 --> 00:09:51,946
+we can see the view from the SQL tab in
+
+154
+00:09:51,970 --> 00:09:55,314
+spark and that gives us pretty much an execution
+
+155
+00:09:55,354 --> 00:09:57,454
+plan with lots of details.
+
+156
+00:09:58,114 --> 00:10:02,690
+First information we can see is that we are reading 100gb
+
+157
+00:10:02,722 --> 00:10:06,178
+of data, nothing very special. It's 1 billion
+
+158
+00:10:06,226 --> 00:10:10,042
+records. It is a lot, but it not
+
+159
+00:10:10,098 --> 00:10:13,918
+something we shouldn't be able to process, right? Right. We are dealing with a distributed
+
+160
+00:10:13,966 --> 00:10:17,630
+system, we are dealing with very small records. It shouldn't be
+
+161
+00:10:17,662 --> 00:10:21,510
+too bad. And if we scroll down, we can
+
+162
+00:10:21,622 --> 00:10:25,086
+see this first box we always should
+
+163
+00:10:25,110 --> 00:10:29,194
+be paying attention to is called exchange. And that's pretty much
+
+164
+00:10:29,534 --> 00:10:32,286
+means we are shuffling the data over the network.
+
+165
+00:10:32,430 --> 00:10:36,094
+We are exchanging the data over the network. And this is something
+
+166
+00:10:36,174 --> 00:10:39,450
+you need to pay attention to simply because first
+
+167
+00:10:39,482 --> 00:10:42,698
+of all, it's expensive in general. Shuffle is something
+
+168
+00:10:42,786 --> 00:10:46,474
+expensive in general, because it involves disk,
+
+169
+00:10:46,554 --> 00:10:49,850
+network and so on. But other than that,
+
+170
+00:10:50,002 --> 00:10:53,454
+it's good to pay attention to these kind of boxes.
+
+171
+00:10:54,114 --> 00:10:57,618
+There are many things which are going wrong with exchanging
+
+172
+00:10:57,666 --> 00:11:00,946
+of the data with. And in this code we are
+
+173
+00:11:00,970 --> 00:11:04,746
+doing just a single shuffle. It's good to
+
+174
+00:11:04,810 --> 00:11:08,616
+hover over the exchange box and understand what it's
+
+175
+00:11:08,720 --> 00:11:12,024
+caused by. And it's here we are hash partitioning
+
+176
+00:11:12,064 --> 00:11:16,584
+based on user id simply because we are explicitly
+
+177
+00:11:16,624 --> 00:11:19,936
+in the, in the SQL code, we tell that we want to
+
+178
+00:11:19,960 --> 00:11:23,016
+partition the data based on user id. But if your code
+
+179
+00:11:23,040 --> 00:11:26,840
+is much bigger, it's good to understand what is
+
+180
+00:11:26,872 --> 00:11:30,320
+the correlation between what in the spark UI and part of the code.
+
+181
+00:11:30,352 --> 00:11:33,782
+And that helps you understand that, because usually you join by,
+
+182
+00:11:33,968 --> 00:11:37,378
+you have multiple joins, you join by multiple different columns.
+
+183
+00:11:37,426 --> 00:11:41,330
+And this is a good hint to narrow it down. Which part of the code
+
+184
+00:11:41,442 --> 00:11:46,014
+is responsible for a specific box
+
+185
+00:11:46,354 --> 00:11:48,934
+in the execution plan in the SQL tab?
+
+186
+00:11:49,394 --> 00:11:53,898
+Okay, but if we check how many bytes
+
+187
+00:11:54,026 --> 00:11:58,306
+were written by the shuffle, we are talking about 40 gigs.
+
+188
+00:11:58,450 --> 00:12:02,358
+And the top partition is 45 megabytes. It is
+
+189
+00:12:02,406 --> 00:12:06,594
+small, nothing to be worried about. But on the other hand,
+
+190
+00:12:07,134 --> 00:12:10,526
+how many bytes have been after the
+
+191
+00:12:10,550 --> 00:12:14,134
+shuffle, then it's completely different story.
+
+192
+00:12:14,294 --> 00:12:18,510
+The top partition is 6gb, and that's
+
+193
+00:12:18,702 --> 00:12:22,454
+huge. That means top partition is 67gb
+
+194
+00:12:22,574 --> 00:12:26,446
+and that partition will be processed by just a single,
+
+195
+00:12:26,630 --> 00:12:30,330
+by a single task. And that partition will
+
+196
+00:12:30,362 --> 00:12:33,506
+be causing the problems because the,
+
+197
+00:12:33,650 --> 00:12:37,450
+the whole rule is that single partition is processed
+
+198
+00:12:37,482 --> 00:12:41,274
+by a single task. So the way it looks like
+
+199
+00:12:41,394 --> 00:12:45,442
+is that whenever you read the data here we have virtual
+
+200
+00:12:45,498 --> 00:12:49,170
+slide with hdfs. But that applies to s three,
+
+201
+00:12:49,242 --> 00:12:52,986
+that applies to delta. Whatever data source
+
+202
+00:12:53,010 --> 00:12:56,180
+you have, parc always have the
+
+203
+00:12:56,212 --> 00:12:59,492
+concept of partition in mind, and it reads the data in chunks.
+
+204
+00:12:59,548 --> 00:13:03,324
+So you read a chunk of the data within a task, you do some
+
+205
+00:13:03,364 --> 00:13:06,940
+processing on the fly and eventually you prepare the
+
+206
+00:13:06,972 --> 00:13:10,436
+data for shuffle. Here we are organizing the data based on the
+
+207
+00:13:10,460 --> 00:13:13,772
+user id, simply because we are partitioning by
+
+208
+00:13:13,948 --> 00:13:17,532
+user id. But it's the same with joins. If you join by a specific
+
+209
+00:13:17,588 --> 00:13:21,950
+column, the data will be organized by that column,
+
+210
+00:13:22,142 --> 00:13:25,782
+and then you have many tasks like that. And what will
+
+211
+00:13:25,838 --> 00:13:29,398
+happen during the shuffle? All the chunks
+
+212
+00:13:29,526 --> 00:13:33,614
+with specific user will go to the
+
+213
+00:13:33,654 --> 00:13:36,846
+same, and that's perfectly fine.
+
+214
+00:13:37,030 --> 00:13:40,470
+And the second user will probably go to another task,
+
+215
+00:13:40,582 --> 00:13:43,630
+and that's all perfectly fine as long as
+
+216
+00:13:43,662 --> 00:13:47,286
+the data can fit into the executor, as the data can be processed
+
+217
+00:13:47,310 --> 00:13:51,348
+by the executor. If your user's user
+
+218
+00:13:51,396 --> 00:13:54,948
+base, the event base is not balanced, if single
+
+219
+00:13:54,996 --> 00:13:58,540
+user is producing too many events, you have
+
+220
+00:13:58,572 --> 00:14:02,044
+a problem. Then you have a problem with maybe just
+
+221
+00:14:02,084 --> 00:14:05,556
+a single task which cannot really process that data.
+
+222
+00:14:05,740 --> 00:14:09,340
+And these kind of problems were very common in spark version
+
+223
+00:14:09,372 --> 00:14:13,468
+two. Then with adaptive query
+
+224
+00:14:13,516 --> 00:14:17,194
+execution it's been improved because for instance, like if you
+
+225
+00:14:17,234 --> 00:14:20,890
+have this problem with left join, it's automatically
+
+226
+00:14:20,922 --> 00:14:24,818
+balanced. But we are looking at the window function example
+
+227
+00:14:24,866 --> 00:14:28,082
+where it is not balanced and we are struggling with that.
+
+228
+00:14:28,218 --> 00:14:31,706
+That's exactly the situation we are struggling with. So how do
+
+229
+00:14:31,730 --> 00:14:34,938
+we solve that? How do you fix a
+
+230
+00:14:34,986 --> 00:14:38,282
+data which is imbalanced? How do you fix
+
+231
+00:14:38,418 --> 00:14:42,396
+a skew in your data? First of all, you really need to
+
+232
+00:14:42,460 --> 00:14:45,868
+understand where the problem is coming from and that
+
+233
+00:14:45,996 --> 00:14:49,852
+your spark job is failing because of the skew. And once
+
+234
+00:14:49,868 --> 00:14:53,492
+you understand that, then you can think, okay, maybe it
+
+235
+00:14:53,508 --> 00:14:57,300
+is a bug, maybe it is a bug in my data, and then you simply
+
+236
+00:14:57,332 --> 00:15:00,964
+have to fix that. Maybe you can think of filtering
+
+237
+00:15:01,004 --> 00:15:04,916
+out the problematic users because in that given processing,
+
+238
+00:15:05,060 --> 00:15:09,398
+you don't really need them. If that doesn't help,
+
+239
+00:15:09,566 --> 00:15:13,270
+then you need to find out a way, figure out
+
+240
+00:15:13,302 --> 00:15:16,630
+a way of completing the processing.
+
+241
+00:15:16,782 --> 00:15:20,246
+And before I show you how to do that in this specific
+
+242
+00:15:20,310 --> 00:15:23,714
+use case, I just want to make one more note,
+
+243
+00:15:24,054 --> 00:15:28,046
+one more note, which is upgrade Spark if
+
+244
+00:15:28,070 --> 00:15:31,974
+you are not on spark version three yet, because the
+
+245
+00:15:32,014 --> 00:15:36,136
+problem I'm showing you is still something you
+
+246
+00:15:36,160 --> 00:15:40,604
+have to fix manually. But in many cases,
+
+247
+00:15:40,984 --> 00:15:44,544
+Spark three allows you to avoid this kind of manual fixes.
+
+248
+00:15:44,584 --> 00:15:48,064
+So for instance, if you are doing a left join,
+
+249
+00:15:48,144 --> 00:15:51,896
+Spark would automatically fix it for you if you are with
+
+250
+00:15:51,920 --> 00:15:54,888
+the newest version. So keep that in mind,
+
+251
+00:15:55,016 --> 00:15:58,764
+but let's see how we can potentially solve this problem.
+
+252
+00:15:59,364 --> 00:16:03,104
+So the scenario I showed you is that we are calculating
+
+253
+00:16:03,604 --> 00:16:07,184
+the next timestamp, so we are pulling it from the next record
+
+254
+00:16:07,964 --> 00:16:11,620
+and so on. And the scenario I'm showing you
+
+255
+00:16:11,652 --> 00:16:15,420
+is that we are calculating user one
+
+256
+00:16:15,572 --> 00:16:19,644
+data in the same partition. But if this user is producing
+
+257
+00:16:19,684 --> 00:16:23,212
+so many records, why don't we process that
+
+258
+00:16:23,268 --> 00:16:26,752
+user or all the users, so we don't have to
+
+259
+00:16:26,808 --> 00:16:29,880
+process all the, all the records at once. We have,
+
+260
+00:16:29,952 --> 00:16:33,336
+we can process them day by day,
+
+261
+00:16:33,480 --> 00:16:36,840
+and that's quite easy to implement. The only problem with that will
+
+262
+00:16:36,872 --> 00:16:40,488
+be that the last record of each
+
+263
+00:16:40,536 --> 00:16:44,176
+day will be now, unless we fix that. And coming up with
+
+264
+00:16:44,200 --> 00:16:46,564
+a fix is really not a rocket science.
+
+265
+00:16:47,264 --> 00:16:50,608
+So if we look into that here, we are calculating an extra
+
+266
+00:16:50,656 --> 00:16:54,584
+column, which is a bit of math to tell which day
+
+267
+00:16:55,004 --> 00:16:58,660
+is that. So we are not dealing with timestamp anymore. We are also dealing
+
+268
+00:16:58,692 --> 00:17:01,884
+with number of a day. We are defining
+
+269
+00:17:02,004 --> 00:17:05,540
+a bunch of windows for the processing,
+
+270
+00:17:05,572 --> 00:17:09,340
+because we will be processing the user not only based
+
+271
+00:17:09,372 --> 00:17:12,836
+on user id, but also on a window which is user id and
+
+272
+00:17:12,860 --> 00:17:16,644
+a day. And then we calculate a bunch of
+
+273
+00:17:16,804 --> 00:17:20,373
+kind of helper data frames, which is the
+
+274
+00:17:20,413 --> 00:17:23,805
+events with nodes. Then after that we
+
+275
+00:17:23,829 --> 00:17:27,749
+fix the nodes and then we do the union and
+
+276
+00:17:27,821 --> 00:17:31,789
+merge them together. But the whole point is not really how exactly this code works.
+
+277
+00:17:31,901 --> 00:17:35,309
+It's not a rocket science. The whole point is that if we
+
+278
+00:17:35,341 --> 00:17:38,933
+do that, if we do this kind of processing, we explicitly tell
+
+279
+00:17:38,973 --> 00:17:42,433
+Spark that we want to do day by day processing.
+
+280
+00:17:43,053 --> 00:17:46,508
+And this is what we will see in the spark UI.
+
+281
+00:17:46,556 --> 00:17:50,700
+So we don't have this single event with or single task,
+
+282
+00:17:50,732 --> 00:17:54,460
+which is taking most of the time and eventually failing. We see
+
+283
+00:17:54,492 --> 00:17:58,100
+the distribution being very even and the
+
+284
+00:17:58,132 --> 00:18:01,884
+top task is taking 210 seconds. You might argue that
+
+285
+00:18:01,964 --> 00:18:04,796
+it probably not optimal either.
+
+286
+00:18:04,980 --> 00:18:08,324
+But the point is the job was running for 20 minutes
+
+287
+00:18:08,364 --> 00:18:12,172
+and it would never really complete. I just killed that.
+
+288
+00:18:12,348 --> 00:18:16,044
+And now it's running less for less than
+
+289
+00:18:16,124 --> 00:18:18,944
+1 minute and it completes and everything is fine.
+
+290
+00:18:19,524 --> 00:18:22,744
+So if you do this kind of optimizations,
+
+291
+00:18:23,524 --> 00:18:27,380
+really need to understand why you are optimizing
+
+292
+00:18:27,492 --> 00:18:30,916
+this. In our case, the job was just failing,
+
+293
+00:18:30,940 --> 00:18:34,580
+so you had to fix that. But if you do further optimizations, you need to
+
+294
+00:18:34,612 --> 00:18:38,056
+think what is worth your time. Maybe you want to
+
+295
+00:18:38,180 --> 00:18:41,840
+just move on and move to another problem. Maybe you want to
+
+296
+00:18:41,872 --> 00:18:45,400
+optimize for the wall clock time because your customers are waiting
+
+297
+00:18:45,472 --> 00:18:49,136
+for the data. Maybe you want to optimize for the resource utilizer
+
+298
+00:18:49,160 --> 00:18:52,824
+because you want to optimize the cloud bill. And maybe
+
+299
+00:18:52,984 --> 00:18:57,080
+you want to avoid optimization because you don't want to complicate
+
+300
+00:18:57,112 --> 00:19:00,800
+your code. You don't want to make your code
+
+301
+00:19:00,872 --> 00:19:04,764
+more complex simply because you want the maintenance.
+
+302
+00:19:05,524 --> 00:19:09,148
+All right, so let's have a look at case number two. Case number
+
+303
+00:19:09,196 --> 00:19:12,260
+two, which on the surface could look very similar
+
+304
+00:19:12,332 --> 00:19:15,460
+to the previous one, but it would be slightly different.
+
+305
+00:19:15,532 --> 00:19:19,500
+So let's have a look. We are not looking into the code.
+
+306
+00:19:19,532 --> 00:19:23,308
+We just try to very quickly figure out what's going
+
+307
+00:19:23,356 --> 00:19:26,932
+on based on just Sparkui. So we have a spark drop, which is
+
+308
+00:19:26,948 --> 00:19:30,444
+again running for 20 minutes. After an hour or so, I killed it because
+
+309
+00:19:30,484 --> 00:19:33,906
+it could never really complete. And what we can see is
+
+310
+00:19:33,930 --> 00:19:37,738
+a very similar situation to the previous
+
+311
+00:19:37,866 --> 00:19:41,818
+job, which had tasks almost
+
+312
+00:19:41,866 --> 00:19:45,826
+immediately completing. And this single task, which is problematic,
+
+313
+00:19:45,890 --> 00:19:50,174
+which is running for probably it would be very hard to complete.
+
+314
+00:19:50,474 --> 00:19:54,174
+And you might say, okay, but it looks like exactly the same situation.
+
+315
+00:19:54,594 --> 00:19:57,960
+The difference would be when we look into
+
+316
+00:19:58,122 --> 00:20:01,996
+active stages and if you look at the output
+
+317
+00:20:02,140 --> 00:20:05,788
+and the shuffle read, it looks like we are processing
+
+318
+00:20:05,836 --> 00:20:09,156
+almost no data. In the shuffle read phase we have
+
+319
+00:20:09,180 --> 00:20:12,484
+just 20 megabytes. So it looks like we are processing
+
+320
+00:20:12,524 --> 00:20:16,984
+almost no data. Yet the job cannot complete.
+
+321
+00:20:17,444 --> 00:20:20,944
+In the SQL tab we can confirm that
+
+322
+00:20:21,364 --> 00:20:24,686
+the input is small. After doing
+
+323
+00:20:24,860 --> 00:20:28,122
+a bit of kind of self joining, we can see that
+
+324
+00:20:28,178 --> 00:20:31,602
+the sortmer join phase is
+
+325
+00:20:31,738 --> 00:20:35,294
+processing the record number, 4 billion something.
+
+326
+00:20:35,794 --> 00:20:39,722
+And it, the number is growing. So even though we are reading
+
+327
+00:20:39,778 --> 00:20:43,586
+not that many records, we are producing lots of
+
+328
+00:20:43,650 --> 00:20:47,130
+record. I'll do a bit of a shortcut because
+
+329
+00:20:47,162 --> 00:20:50,498
+of the time limitation, but bottom line
+
+330
+00:20:50,586 --> 00:20:54,032
+is that products table with order id
+
+331
+00:20:54,168 --> 00:20:57,920
+and we are joining the product table with itself based
+
+332
+00:20:57,952 --> 00:21:01,440
+on the order id, because we would like to do an
+
+333
+00:21:01,552 --> 00:21:05,272
+analysis of products r
+
+334
+00:21:05,368 --> 00:21:08,880
+board. And the problem with Cartesian join, that if
+
+335
+00:21:08,912 --> 00:21:12,288
+you have three records as an input size is
+
+336
+00:21:12,336 --> 00:21:16,448
+nine, then for ten you get hundred in an output,
+
+337
+00:21:16,576 --> 00:21:20,172
+but it grows really quickly. So for 10,000 records,
+
+338
+00:21:20,308 --> 00:21:24,468
+you end up with hundreds, millions of records. It's nothing
+
+339
+00:21:24,516 --> 00:21:27,932
+new. It's a problem which is known for a long time. You just need to
+
+340
+00:21:27,948 --> 00:21:31,452
+be aware that if you are doing self joined, then the number of records will
+
+341
+00:21:31,468 --> 00:21:34,804
+be huge. But the problem here is that all the records are
+
+342
+00:21:34,844 --> 00:21:38,024
+processed within just a single executors.
+
+343
+00:21:38,644 --> 00:21:43,096
+Single executor. Simply because Spark
+
+344
+00:21:43,260 --> 00:21:46,680
+is doing that based on the order id is our joint key
+
+345
+00:21:46,832 --> 00:21:49,912
+and the same order id is being processed in the
+
+346
+00:21:49,928 --> 00:21:53,704
+same task. Unless we explicitly. The very
+
+347
+00:21:53,744 --> 00:21:57,204
+simple technique to avoid this kind of behavior is salting
+
+348
+00:21:57,984 --> 00:22:01,496
+in the product table. If we join it
+
+349
+00:22:01,560 --> 00:22:05,184
+with itself, we on one hand we
+
+350
+00:22:05,224 --> 00:22:08,244
+add a random value.
+
+351
+00:22:08,964 --> 00:22:12,460
+Here I'm using the random value from range one up to two
+
+352
+00:22:12,492 --> 00:22:15,988
+so it can fit into the slides right hand side
+
+353
+00:22:16,036 --> 00:22:20,476
+table. We are generating every single
+
+354
+00:22:20,620 --> 00:22:24,700
+possible combination of SAl. So we duplicate
+
+355
+00:22:24,812 --> 00:22:27,996
+the records. But the benefit of doing that is
+
+356
+00:22:28,020 --> 00:22:31,700
+that instead of all the nine records being
+
+357
+00:22:31,772 --> 00:22:35,496
+processed in one task, with these
+
+358
+00:22:35,560 --> 00:22:39,608
+three producing six records with the remaining
+
+359
+00:22:39,696 --> 00:22:42,968
+three. So instead of processing all the nine
+
+360
+00:22:43,016 --> 00:22:46,312
+records in the same task, it will be processed by two
+
+361
+00:22:46,368 --> 00:22:49,864
+separate tasks. And this way we distribute the load.
+
+362
+00:22:49,904 --> 00:22:53,192
+So just so we are on the same page doing
+
+363
+00:22:53,248 --> 00:22:56,424
+something in cartesian join, we are not limiting the number of
+
+364
+00:22:56,464 --> 00:23:00,016
+records. The number of records will still be the
+
+365
+00:23:00,040 --> 00:23:03,630
+same. You just produce lots of records. But what you're doing is you're
+
+366
+00:23:03,662 --> 00:23:07,542
+parallelizing the execution, you make it better
+
+367
+00:23:07,718 --> 00:23:10,742
+distributed. So end of the day,
+
+368
+00:23:10,878 --> 00:23:14,734
+we can see many tasks which are
+
+369
+00:23:14,774 --> 00:23:18,950
+all doing something which are all running for quite some time,
+
+370
+00:23:19,142 --> 00:23:23,502
+and the top task is running for eleven minutes. You could argue we
+
+371
+00:23:23,518 --> 00:23:27,310
+could split it even further. The tasks are still processing quite
+
+372
+00:23:27,342 --> 00:23:31,318
+a lot of data. Probably we can split that. But the point is
+
+373
+00:23:31,446 --> 00:23:35,238
+we won't be waiting forever. This might be good enough.
+
+374
+00:23:35,326 --> 00:23:38,870
+You might want to tune the saud value we used in this case,
+
+375
+00:23:38,902 --> 00:23:41,894
+I believe we used 180 or something like that.
+
+376
+00:23:42,054 --> 00:23:45,462
+So a bit more than on the. Alright, so let's have
+
+377
+00:23:45,478 --> 00:23:48,834
+a look at case number three and case number four.
+
+378
+00:23:49,134 --> 00:23:53,754
+And they are grouped together because they are both related to lazy evaluation.
+
+379
+00:23:54,134 --> 00:23:57,434
+So lazy evaluation is something which is thought
+
+380
+00:23:57,574 --> 00:24:00,370
+at the very beginning of every single spark curse.
+
+381
+00:24:00,522 --> 00:24:04,690
+Yet it is something which is very easy to forget about.
+
+382
+00:24:04,882 --> 00:24:08,778
+And the whole concept is that if you read some data
+
+383
+00:24:08,826 --> 00:24:11,762
+frame and then you do some complex transformation,
+
+384
+00:24:11,938 --> 00:24:15,650
+then that complex transformation does not happen immediately.
+
+385
+00:24:15,762 --> 00:24:18,658
+The park just remembers what it has to do,
+
+386
+00:24:18,826 --> 00:24:22,730
+and it does it when it's absolutely necessary.
+
+387
+00:24:22,802 --> 00:24:26,362
+So it's a, it's an optimization concept, so it doesn't
+
+388
+00:24:26,418 --> 00:24:29,534
+have to do every single action immediately.
+
+389
+00:24:30,194 --> 00:24:33,786
+If you for some reason decide to do a while and
+
+390
+00:24:33,810 --> 00:24:37,290
+then do this kind of complex transformation in a loop,
+
+391
+00:24:37,482 --> 00:24:41,682
+you need to be aware that this will not
+
+392
+00:24:41,818 --> 00:24:45,186
+be memorized anywhere. Spark doesn't have any cache for
+
+393
+00:24:45,210 --> 00:24:48,734
+that which is happening immediately.
+
+394
+00:24:49,294 --> 00:24:52,958
+Parc will be just remembering more and more operations to be
+
+395
+00:24:53,006 --> 00:24:57,310
+done, and the complexity of every single iteration
+
+396
+00:24:57,382 --> 00:25:01,494
+will grow. So the first iteration it takes 23 seconds
+
+397
+00:25:01,614 --> 00:25:05,422
+and a few jobs to be completed. Then after some more iterations,
+
+398
+00:25:05,518 --> 00:25:09,634
+it takes 1 minute and several jobs to be completed.
+
+399
+00:25:09,974 --> 00:25:13,326
+And then it takes nine minutes and growing really
+
+400
+00:25:13,470 --> 00:25:16,922
+fast. And the same with the complexity.
+
+401
+00:25:17,018 --> 00:25:21,114
+Initial one is initial job is quite simple,
+
+402
+00:25:21,274 --> 00:25:25,066
+then it's a bit more complex. And then we go
+
+403
+00:25:25,130 --> 00:25:28,546
+here, we scroll down even more and we are keep repeating the
+
+404
+00:25:28,570 --> 00:25:32,146
+same operations, but we do them from scratch
+
+405
+00:25:32,210 --> 00:25:35,706
+in every iteration unless we do something
+
+406
+00:25:35,770 --> 00:25:39,842
+about that. So what is the conclusion here. First of all,
+
+407
+00:25:39,938 --> 00:25:43,646
+loops are suspicious because it's somewhat like
+
+408
+00:25:43,710 --> 00:25:47,190
+doing a batch within a batch system so far
+
+409
+00:25:47,262 --> 00:25:50,558
+has its own operators,
+
+410
+00:25:50,646 --> 00:25:54,566
+which are batch operators. But we are using loops simply
+
+411
+00:25:54,590 --> 00:25:57,814
+because we can. And sometimes it's okay, but in some cases
+
+412
+00:25:57,894 --> 00:26:01,430
+it's really suspicious. In some cases it really leads to
+
+413
+00:26:01,582 --> 00:26:04,862
+growing complexity of the execution plan. But you
+
+414
+00:26:04,878 --> 00:26:08,470
+can grow the execution plan even without the loop. So if your
+
+415
+00:26:08,502 --> 00:26:12,554
+execution plan is growing out of hand, if you can see that spark
+
+416
+00:26:13,244 --> 00:26:16,332
+slowing down because of how complex,
+
+417
+00:26:16,508 --> 00:26:20,292
+how many operations you have to do, then it's worth
+
+418
+00:26:20,428 --> 00:26:24,028
+considering checkpointing or materializing the results
+
+419
+00:26:24,116 --> 00:26:27,236
+on the way. And it's, on one hand, it's a
+
+420
+00:26:27,260 --> 00:26:30,780
+good kind of hack, or it's a
+
+421
+00:26:30,812 --> 00:26:34,172
+good, let's say, workaround for very
+
+422
+00:26:34,228 --> 00:26:37,996
+big. But on the other hand, it could be good idea to
+
+423
+00:26:38,060 --> 00:26:42,008
+split very complex code, very complex, dug into modules,
+
+424
+00:26:42,136 --> 00:26:46,224
+and that could help, you could help even with the code maintenance.
+
+425
+00:26:46,344 --> 00:26:48,684
+So it could serve two purposes.
+
+426
+00:26:49,344 --> 00:26:52,976
+But other than that, something which is very much related to
+
+427
+00:26:53,120 --> 00:26:56,752
+the lazy execution is whether our code is
+
+428
+00:26:56,768 --> 00:27:00,312
+deterministic or not, because if it's not deterministic.
+
+429
+00:27:00,488 --> 00:27:03,808
+So for instance, we want to randomly generate
+
+430
+00:27:03,856 --> 00:27:06,484
+values because we want a unique.
+
+431
+00:27:07,064 --> 00:27:10,368
+It becomes very tricky. It becomes
+
+432
+00:27:10,456 --> 00:27:13,664
+very tricky because let's say we want to split our
+
+433
+00:27:13,784 --> 00:27:17,344
+data frame into two data frames because of the machine
+
+434
+00:27:17,384 --> 00:27:21,376
+learning, split the split for machine learning. Then if we write
+
+435
+00:27:21,400 --> 00:27:25,324
+a code like that, we generate a column with random value
+
+436
+00:27:26,024 --> 00:27:29,920
+and we generate two different data frames, and we hope that the
+
+437
+00:27:29,952 --> 00:27:32,884
+split based on that random value is,
+
+438
+00:27:33,224 --> 00:27:37,048
+is happening. So you have two data frames
+
+439
+00:27:37,096 --> 00:27:40,344
+which are not overlapping. Then you might get surprised,
+
+440
+00:27:40,504 --> 00:27:43,928
+because when you write data frame one, then you write data
+
+441
+00:27:43,976 --> 00:27:47,744
+frame two. The random generation will happen
+
+442
+00:27:47,824 --> 00:27:50,624
+from the very beginning, it will happen from scratch.
+
+443
+00:27:50,744 --> 00:27:53,604
+And that's a real problem I actually have seen.
+
+444
+00:27:54,264 --> 00:27:57,800
+It will fail. It will create overlaps, it will create
+
+445
+00:27:57,912 --> 00:28:01,656
+lost records. And this is a LinkedIn message
+
+446
+00:28:01,760 --> 00:28:05,264
+I received from a friend. He was fuming because
+
+447
+00:28:05,304 --> 00:28:08,524
+of that. He spent lots of time.
+
+448
+00:28:09,184 --> 00:28:13,444
+It was really significant bug because it was introducing
+
+449
+00:28:14,784 --> 00:28:18,964
+an overfitting effect
+
+450
+00:28:19,344 --> 00:28:22,720
+in their machine learning pipeline. So whenever
+
+451
+00:28:22,752 --> 00:28:26,220
+you deal with random values, first of all, check if you
+
+452
+00:28:26,252 --> 00:28:29,844
+don't have this kind of mechanism like splitting data frames
+
+453
+00:28:29,924 --> 00:28:33,652
+in the standard library, because that you do have. But if you
+
+454
+00:28:33,668 --> 00:28:37,372
+do something a bit more custom, then make sure you materialize
+
+455
+00:28:37,428 --> 00:28:41,324
+result, because that's the safest. That is the safest one. It might be not
+
+456
+00:28:41,444 --> 00:28:45,132
+the most kind of time efficient, but it's
+
+457
+00:28:45,148 --> 00:28:48,844
+the safest. You don't risk that someone else will come do
+
+458
+00:28:48,924 --> 00:28:52,184
+some modification in your code without knowing what is happening.
+
+459
+00:28:52,734 --> 00:28:57,686
+So what will be the conclusion from all
+
+460
+00:28:57,710 --> 00:29:01,422
+the examples I showed you? First of all, you really need to know
+
+461
+00:29:01,478 --> 00:29:04,582
+what you are optimizing for, whether it's your time,
+
+462
+00:29:04,678 --> 00:29:08,714
+the compute time, the wall clock time. It really
+
+463
+00:29:09,454 --> 00:29:12,634
+helps if you understand where the bottleneck is.
+
+464
+00:29:13,334 --> 00:29:16,518
+If these kind of cases are new to you,
+
+465
+00:29:16,566 --> 00:29:20,070
+I would suggest that you invest a bit of time for experimenting and
+
+466
+00:29:20,142 --> 00:29:24,056
+learning a bit more about how spark works under the hood. But if
+
+467
+00:29:24,080 --> 00:29:27,472
+you feel that you don't have these kind of problems
+
+468
+00:29:27,528 --> 00:29:31,040
+on daily basis, you should at least know
+
+469
+00:29:31,152 --> 00:29:35,088
+when to ask for help and who to ask for help. Because maybe you
+
+470
+00:29:35,096 --> 00:29:38,800
+are a data scientist. You want to focus on the data science, not spark debugging.
+
+471
+00:29:38,832 --> 00:29:41,936
+You don't want to be a PhD in
+
+472
+00:29:41,960 --> 00:29:45,568
+spark, but then at least know when you are blocked
+
+473
+00:29:45,616 --> 00:29:48,916
+and make sure you know where to ask for help. So for
+
+474
+00:29:48,940 --> 00:29:52,184
+instance, maybe there is a data engineer which is good at these kind of things.
+
+475
+00:29:52,804 --> 00:29:56,948
+Feel free to reach out to me on LinkedIn and
+
+476
+00:29:56,996 --> 00:29:58,356
+I will be very happy to talk to.
+
