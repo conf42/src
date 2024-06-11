@@ -1,0 +1,1772 @@
+1
+00:00:27,160 --> 00:00:30,724
+Hello everyone and welcome to my talk about measuring
+
+2
+00:00:31,064 --> 00:00:35,084
+expression complexity for PromptQL and MetricsQL.
+
+3
+00:00:35,624 --> 00:00:39,256
+A few words about me. My name is Roman. I'm software
+
+4
+00:00:39,320 --> 00:00:43,080
+engineer with experience in distributed systems
+
+5
+00:00:43,112 --> 00:00:46,760
+and lasts five years. I'm working on an open source project
+
+6
+00:00:46,872 --> 00:00:50,640
+called Victoria Metrics. Victoria Metrics is an open source time
+
+7
+00:00:50,672 --> 00:00:54,040
+series database. It's available on GitHub under Apache
+
+8
+00:00:54,072 --> 00:00:57,704
+two license. So I encourage everyone to check on it.
+
+9
+00:00:58,644 --> 00:01:02,724
+Okay, what this talk is about, so maybe many of you know
+
+10
+00:01:02,804 --> 00:01:06,164
+what Prometheus is or what euctorium metrics is, but just
+
+11
+00:01:06,204 --> 00:01:09,604
+in case, both of them are used for monitoring
+
+12
+00:01:09,684 --> 00:01:13,644
+and for alerting, for collecting metrics, storing them and processing.
+
+13
+00:01:13,764 --> 00:01:17,020
+Both of them are open source and Prometheus is
+
+14
+00:01:17,052 --> 00:01:20,236
+using PromQL as a query language and
+
+15
+00:01:20,260 --> 00:01:23,494
+Xtora Matrix uses Matrixql as a query language.
+
+16
+00:01:23,614 --> 00:01:26,446
+These two languages are very similar with the same syntax.
+
+17
+00:01:26,550 --> 00:01:30,350
+So this talk will be beneficial for if you,
+
+18
+00:01:30,382 --> 00:01:34,278
+if you familiar with any of these systems. And both of them
+
+19
+00:01:34,326 --> 00:01:37,834
+are well integrated with Grafana. So you can plot dashboards
+
+20
+00:01:38,334 --> 00:01:41,234
+with vectoriometrics or Prometheus as data sources.
+
+21
+00:01:42,374 --> 00:01:45,594
+And this exactly the case when
+
+22
+00:01:46,214 --> 00:01:49,366
+things can go bad. So imagine yourself in the middle of
+
+23
+00:01:49,390 --> 00:01:53,078
+the incident trying to understand why your system
+
+24
+00:01:53,126 --> 00:01:56,630
+is on fire. You go to Grafana, you open your tarpaulin, and then
+
+25
+00:01:56,662 --> 00:02:00,514
+it takes 60 seconds or something like that to load.
+
+26
+00:02:00,974 --> 00:02:04,766
+Everything is so slow and this just adds
+
+27
+00:02:04,830 --> 00:02:08,034
+more stress to your working day.
+
+28
+00:02:08,574 --> 00:02:12,238
+So I hope with this talk we will try to address this
+
+29
+00:02:12,286 --> 00:02:16,230
+stress level to reduce it, because hopefully you will
+
+30
+00:02:16,262 --> 00:02:20,378
+learn how to make your queries faster or at least to understand
+
+31
+00:02:20,546 --> 00:02:22,774
+why they are slow.
+
+32
+00:02:23,834 --> 00:02:27,762
+Okay, on the screen we have two examples,
+
+33
+00:02:27,818 --> 00:02:31,354
+two similar examples of a slow query and a fast query.
+
+34
+00:02:31,514 --> 00:02:34,714
+So the first query on the screen is the slow one.
+
+35
+00:02:34,754 --> 00:02:38,330
+It takes 3.5 seconds to execute. And the
+
+36
+00:02:38,362 --> 00:02:41,522
+second query is very similar, it's almost the
+
+37
+00:02:41,538 --> 00:02:45,704
+same, but it has a different metric name inside and it takes 50 milliseconds.
+
+38
+00:02:45,794 --> 00:02:49,140
+So why it is so
+
+39
+00:02:49,212 --> 00:02:52,772
+fast? Or the first query, why it is so slow? Normally I
+
+40
+00:02:52,788 --> 00:02:57,132
+will ask on a flying conference, I will ask people to answer in
+
+41
+00:02:57,148 --> 00:03:00,612
+the room, but we are online, so I will answer myself.
+
+42
+00:03:00,668 --> 00:03:04,332
+Well, because those queries are not identical, they scan
+
+43
+00:03:04,388 --> 00:03:07,788
+different amounts of data, those metric names,
+
+44
+00:03:07,836 --> 00:03:11,184
+they have different amounts of time series behind them.
+
+45
+00:03:12,464 --> 00:03:16,844
+So in order to understand this difference,
+
+46
+00:03:18,264 --> 00:03:21,600
+why we scan that much data, or why queries so slow
+
+47
+00:03:21,632 --> 00:03:25,240
+because of scanning much data, let's try
+
+48
+00:03:25,312 --> 00:03:29,044
+to build a mental model of what is going on with timesir database.
+
+49
+00:03:29,504 --> 00:03:32,928
+And maybe not all of you have this mental model
+
+50
+00:03:32,976 --> 00:03:36,984
+already of how Prometheus vector metrics works, but it is very likely
+
+51
+00:03:37,064 --> 00:03:40,080
+you understand how traditional relational databases work,
+
+52
+00:03:40,112 --> 00:03:43,550
+like MySQL for example. So let's try to refer to
+
+53
+00:03:43,582 --> 00:03:47,478
+that experience of optimizing MySQL queries and
+
+54
+00:03:47,526 --> 00:03:50,914
+try to apply them to prompt your metric SQL expression.
+
+55
+00:03:51,574 --> 00:03:54,354
+So to do this, I asked ChatGpt,
+
+56
+00:03:54,894 --> 00:03:59,486
+how can I optimize this SQL query? And chat
+
+57
+00:03:59,510 --> 00:04:04,150
+GPT provided really good advices, so that
+
+58
+00:04:04,182 --> 00:04:08,018
+was pretty helpful. So for example, I have this not
+
+59
+00:04:08,106 --> 00:04:10,882
+optimized query which selects everything from table,
+
+60
+00:04:10,938 --> 00:04:14,442
+bar and chat. GPT gave me these advice.
+
+61
+00:04:14,498 --> 00:04:18,694
+So use indexes, but avoid using too much indexes.
+
+62
+00:04:19,154 --> 00:04:22,826
+Select only what you need, try to filter data as early as
+
+63
+00:04:22,850 --> 00:04:25,978
+possible, think of your database design and maybe apply
+
+64
+00:04:26,026 --> 00:04:29,514
+partitioning if you need it. Okay,
+
+65
+00:04:29,634 --> 00:04:32,774
+so I follow those advices. I reworked my table.
+
+66
+00:04:33,494 --> 00:04:37,286
+I'm selecting only the columns that I need. I partition
+
+67
+00:04:37,350 --> 00:04:41,198
+my table by time. So I am adding the filter by date and
+
+68
+00:04:41,246 --> 00:04:44,670
+I index my table by user id. So I'm
+
+69
+00:04:44,702 --> 00:04:47,870
+selecting only the user I want to and this
+
+70
+00:04:47,902 --> 00:04:51,974
+query will become faster after I modified the table, after I modified
+
+71
+00:04:52,054 --> 00:04:55,310
+my database design, after I changed
+
+72
+00:04:55,422 --> 00:04:57,794
+my query to be efficient.
+
+73
+00:04:58,474 --> 00:05:02,170
+Okay, but can I apply the same tips, the same strategy
+
+74
+00:05:02,202 --> 00:05:05,162
+to prompt QL and metrics QL expression? Well,
+
+75
+00:05:05,258 --> 00:05:08,330
+not really, because neither the Prometheus
+
+76
+00:05:08,402 --> 00:05:11,734
+nor Victoria metrics provide you that flexibility,
+
+77
+00:05:12,034 --> 00:05:15,378
+actually. In fact, you can use only filtering
+
+78
+00:05:15,426 --> 00:05:19,454
+data as your main leverage on improving the performance of the queries.
+
+79
+00:05:20,714 --> 00:05:24,652
+Okay, let's now try to build a mental
+
+80
+00:05:24,818 --> 00:05:29,096
+model of how Prometheus vector metrics works.
+
+81
+00:05:29,240 --> 00:05:32,528
+Very simplified, sophisticated mental model.
+
+82
+00:05:32,656 --> 00:05:36,008
+So on the screen you have four time series
+
+83
+00:05:36,136 --> 00:05:39,776
+with the same name metric name foo all time series
+
+84
+00:05:39,840 --> 00:05:43,884
+has a value and the timestamp when that value was observed.
+
+85
+00:05:44,384 --> 00:05:48,192
+So we talk here about four attributes, the metric
+
+86
+00:05:48,248 --> 00:05:51,804
+name and metadata which identifies
+
+87
+00:05:51,844 --> 00:05:55,316
+the time series. And then we have a value and a timestamp.
+
+88
+00:05:55,420 --> 00:05:58,884
+Basically our observation when it was made and what
+
+89
+00:05:58,924 --> 00:06:02,788
+is the observation? If you want to learn more about internals
+
+90
+00:06:02,916 --> 00:06:06,692
+of the data model in, please visit docsecterometrics.com
+
+91
+00:06:06,788 --> 00:06:10,668
+keyconcepts and I hope you will find many useful information
+
+92
+00:06:10,756 --> 00:06:14,252
+there. Okay, when we ingest
+
+93
+00:06:14,388 --> 00:06:16,664
+this time series in the database,
+
+94
+00:06:17,544 --> 00:06:21,672
+both Prometheus and vector metrics will use metric name and metadata
+
+95
+00:06:21,728 --> 00:06:25,232
+combination as an id and that id will be added to
+
+96
+00:06:25,248 --> 00:06:28,928
+the index. So next time we can identify if we already
+
+97
+00:06:29,016 --> 00:06:32,584
+seen this time series and during read
+
+98
+00:06:32,624 --> 00:06:36,336
+time we will also know where to find our data
+
+99
+00:06:36,440 --> 00:06:40,296
+that user asked for value in timestamps
+
+100
+00:06:40,400 --> 00:06:43,880
+will be stored as a separate columns. Those separate columns
+
+101
+00:06:43,912 --> 00:06:47,566
+will be sorted differently. Different compression
+
+102
+00:06:47,630 --> 00:06:51,514
+algorithms will be applied to those columns. So this will be
+
+103
+00:06:52,494 --> 00:06:55,874
+stored like this automatically by Prometheus or vector metrics.
+
+104
+00:06:56,694 --> 00:07:01,038
+And knowing this, now we can say that data model
+
+105
+00:07:01,166 --> 00:07:05,110
+in Prometheus vector metrics can be changed. User doesn't
+
+106
+00:07:05,142 --> 00:07:07,710
+have control over this indexes.
+
+107
+00:07:07,902 --> 00:07:11,742
+Also no indexes are created automatically. You can't
+
+108
+00:07:11,798 --> 00:07:15,088
+change that. Data blocks already partitioned by time because
+
+109
+00:07:15,136 --> 00:07:19,440
+we are talking about time series database and the stored data types.
+
+110
+00:07:19,632 --> 00:07:23,664
+Stored data columns are already predefined. Values and
+
+111
+00:07:23,704 --> 00:07:27,792
+timestamps, names, metadata, you don't have control over this.
+
+112
+00:07:27,888 --> 00:07:31,904
+This is already predefined. So not
+
+113
+00:07:31,944 --> 00:07:35,616
+much we can do. Let's now understand better what time series
+
+114
+00:07:35,680 --> 00:07:39,650
+is. So we have a metric called
+
+115
+00:07:39,792 --> 00:07:43,754
+foo and it has four time series. Under these names.
+
+116
+00:07:44,214 --> 00:07:48,022
+The different only labels and the dots on
+
+117
+00:07:48,038 --> 00:07:52,274
+the screen are basically our data samples.
+
+118
+00:07:52,614 --> 00:07:56,366
+So data sample is a pair of value and
+
+119
+00:07:56,390 --> 00:07:59,590
+the timestamp when this data sample was
+
+120
+00:07:59,622 --> 00:08:03,078
+observed. And this is exactly why timeseries called time
+
+121
+00:08:03,126 --> 00:08:06,726
+series because we have a series of these observations. We have a
+
+122
+00:08:06,750 --> 00:08:10,494
+series of data samples ordered by time and
+
+123
+00:08:10,534 --> 00:08:14,054
+each time series can have arbitrary number of these observations at different
+
+124
+00:08:14,134 --> 00:08:17,126
+resolution. Okay,
+
+125
+00:08:17,270 --> 00:08:20,914
+and what makes our prom quell and
+
+126
+00:08:21,814 --> 00:08:24,674
+metrics QL queries slow?
+
+127
+00:08:25,734 --> 00:08:29,166
+There are two main reasons why they can be slow.
+
+128
+00:08:29,350 --> 00:08:32,474
+When we select big number of time series
+
+129
+00:08:32,974 --> 00:08:36,952
+and when we select big number of data samples within
+
+130
+00:08:37,008 --> 00:08:40,400
+those time series. Let's see it on example.
+
+131
+00:08:40,592 --> 00:08:44,848
+So here we have a query which doesn't
+
+132
+00:08:44,896 --> 00:08:48,488
+have any filters in it. No time filter,
+
+133
+00:08:48,576 --> 00:08:52,088
+no label filter. So we select everything. So we select all the time series,
+
+134
+00:08:52,136 --> 00:08:55,576
+we have all the time samples that we have. This query
+
+135
+00:08:55,680 --> 00:08:59,404
+will be slow, likely to be slow.
+
+136
+00:08:59,904 --> 00:09:02,524
+Now we add a filter to this query.
+
+137
+00:09:03,344 --> 00:09:07,074
+So we want only label one and label two
+
+138
+00:09:07,144 --> 00:09:10,838
+to be present in response. So we scan twice less data.
+
+139
+00:09:10,966 --> 00:09:14,534
+This query will be faster than the previous. And in this example
+
+140
+00:09:14,574 --> 00:09:18,350
+we also had time filter. So we want not all the
+
+141
+00:09:18,462 --> 00:09:22,110
+data samples that we want that there are in the database, but only last
+
+142
+00:09:22,142 --> 00:09:25,750
+five minutes. So we reduce the number of
+
+143
+00:09:25,782 --> 00:09:29,430
+samples we need to select. This query will be faster than the previous
+
+144
+00:09:29,502 --> 00:09:33,286
+query. And yeah, the most valuable
+
+145
+00:09:33,350 --> 00:09:37,516
+advice I can give you on this talk is selecting less data is
+
+146
+00:09:37,540 --> 00:09:40,784
+the most effective way to optimize the query performance.
+
+147
+00:09:41,164 --> 00:09:44,908
+If you remember only this from this talk, that already
+
+148
+00:09:44,996 --> 00:09:46,344
+will be very good.
+
+149
+00:09:47,964 --> 00:09:52,324
+Okay, so the question now is how I, as a developer
+
+150
+00:09:52,404 --> 00:09:55,964
+or DevOps can understand the volume,
+
+151
+00:09:56,004 --> 00:09:59,644
+the volume of data my query selects. How can,
+
+152
+00:09:59,724 --> 00:10:03,308
+how can I estimate complexity of my query?
+
+153
+00:10:03,436 --> 00:10:07,116
+Well, for this we need to answer this two questions, how many
+
+154
+00:10:07,220 --> 00:10:10,876
+series we select and how many samples we select. So on the screen right now,
+
+155
+00:10:10,900 --> 00:10:14,644
+you have advice how you can estimate the number
+
+156
+00:10:14,684 --> 00:10:18,116
+of series your query select. For this, you basically need to apply
+
+157
+00:10:18,140 --> 00:10:22,196
+a function called count. So you have your series selector and
+
+158
+00:10:22,220 --> 00:10:26,444
+you wrap it in the function count. This will calculate the number of time series
+
+159
+00:10:26,604 --> 00:10:29,796
+your query will select. Here's an
+
+160
+00:10:29,820 --> 00:10:33,502
+example of our first two queries. In the beginning of
+
+161
+00:10:33,518 --> 00:10:36,726
+the presentation, the first query is slow, the second is fast.
+
+162
+00:10:36,870 --> 00:10:40,034
+So the slow query selects about
+
+163
+00:10:40,934 --> 00:10:44,446
+1000 of time series and
+
+164
+00:10:44,470 --> 00:10:47,950
+the second query selects only one. So no
+
+165
+00:10:47,982 --> 00:10:51,126
+surprise why the slope query is slow. It selects 1000 more
+
+166
+00:10:51,190 --> 00:10:54,182
+time series than the second one. Okay,
+
+167
+00:10:54,238 --> 00:10:58,282
+these are serious. What about samples? For samples,
+
+168
+00:10:58,418 --> 00:11:01,754
+you need to apply a different function called
+
+169
+00:11:01,834 --> 00:11:05,818
+count overtime which calculates the amount of samples
+
+170
+00:11:05,866 --> 00:11:09,650
+on specified interval. Now let's try
+
+171
+00:11:09,682 --> 00:11:13,202
+it on example. So our slow and fast query.
+
+172
+00:11:13,338 --> 00:11:16,466
+Well, slow query selects 16
+
+173
+00:11:16,610 --> 00:11:20,034
+million of samples and the fast query
+
+174
+00:11:20,074 --> 00:11:23,786
+selects 17,000. So pretty huge difference.
+
+175
+00:11:23,930 --> 00:11:27,218
+Again, no wonder why the first query was
+
+176
+00:11:27,346 --> 00:11:29,814
+so slow and the second query was so fast.
+
+177
+00:11:30,754 --> 00:11:34,330
+Cool. So conclusion, no matter what your query
+
+178
+00:11:34,402 --> 00:11:37,826
+is, the more series you select and the
+
+179
+00:11:37,850 --> 00:11:40,974
+more data samples you select and process,
+
+180
+00:11:41,634 --> 00:11:45,174
+the slower this query will be. That's the rule of thumb.
+
+181
+00:11:45,754 --> 00:11:48,714
+And one more trick to this.
+
+182
+00:11:48,834 --> 00:11:52,124
+So selected samples aren't always equal
+
+183
+00:11:52,164 --> 00:11:55,060
+to processed samples. So, you know,
+
+184
+00:11:55,092 --> 00:11:59,044
+in Grafana you use these panels called time series which are plotting
+
+185
+00:11:59,164 --> 00:12:03,060
+many data points ordered by time on the time
+
+186
+00:12:03,092 --> 00:12:07,116
+series graph and those queries. To plot this
+
+187
+00:12:07,140 --> 00:12:11,556
+query, you need to issue range query range
+
+188
+00:12:11,580 --> 00:12:15,324
+query executes the given query with the specified
+
+189
+00:12:15,444 --> 00:12:19,312
+step paramount. Basically it executes it many
+
+190
+00:12:19,368 --> 00:12:21,524
+times on the selecting interval.
+
+191
+00:12:23,024 --> 00:12:26,804
+This is how it looks. So here we have an example of
+
+192
+00:12:27,144 --> 00:12:30,376
+query max over time over 1 hour interval for
+
+193
+00:12:30,400 --> 00:12:34,724
+metric name and we execute it on 1 hour
+
+194
+00:12:35,184 --> 00:12:39,096
+time range with 1 second resolution. So what
+
+195
+00:12:39,120 --> 00:12:42,644
+it actually means that max over time will be executed
+
+196
+00:12:42,964 --> 00:12:46,436
+3600 times and each time it
+
+197
+00:12:46,460 --> 00:12:50,148
+will be selecting 1 hour of data what is specified in
+
+198
+00:12:50,276 --> 00:12:53,544
+square brackets. So here we will select
+
+199
+00:12:54,324 --> 00:12:57,732
+2 hours of data samples but we will
+
+200
+00:12:57,868 --> 00:13:02,036
+process them 3000 times. So this is the difference between
+
+201
+00:13:02,100 --> 00:13:05,900
+selected samples and processed samples. This query will
+
+202
+00:13:05,932 --> 00:13:09,684
+be very slow because of the step param. If we'll increase
+
+203
+00:13:09,804 --> 00:13:13,354
+step paramount, the query will be more lightweight. If we set
+
+204
+00:13:13,434 --> 00:13:17,134
+step paramount to 30 minutes it will be pretty lightweight.
+
+205
+00:13:17,994 --> 00:13:21,282
+Okay, what about functions?
+
+206
+00:13:21,458 --> 00:13:25,250
+How slow are the functions that we use in our expressions?
+
+207
+00:13:25,322 --> 00:13:28,954
+Well, on the screen you have ordered list
+
+208
+00:13:29,114 --> 00:13:32,402
+from least expensive to the most expensive functions.
+
+209
+00:13:32,578 --> 00:13:35,618
+And I also used font size to emphasize
+
+210
+00:13:35,666 --> 00:13:39,604
+complexity. So the small font size are lightweight. Function lightweight
+
+211
+00:13:39,644 --> 00:13:43,504
+functions, big font size is expensive functions.
+
+212
+00:13:44,284 --> 00:13:47,868
+So label manipulation functions are the least
+
+213
+00:13:47,916 --> 00:13:51,452
+expensive. They don't do calculations, they just attach
+
+214
+00:13:51,588 --> 00:13:55,140
+meta information to the response. That's all. Pretty lightweight
+
+215
+00:13:55,332 --> 00:13:59,668
+transform functions as well. They're not doing anything
+
+216
+00:13:59,716 --> 00:14:03,516
+complex aggregate functions, more complex. They have some logic logic
+
+217
+00:14:03,540 --> 00:14:07,834
+in processing, so they need to calculate mean mux sample for example.
+
+218
+00:14:08,574 --> 00:14:12,342
+And the most expensive functions are allowed. Functions such as rate
+
+219
+00:14:12,438 --> 00:14:16,054
+increase min over time. Well, the functions that need look
+
+220
+00:14:16,094 --> 00:14:19,074
+behind min dup to specify it next to the metric name.
+
+221
+00:14:19,494 --> 00:14:23,174
+And by coincidence, rate and increase
+
+222
+00:14:23,334 --> 00:14:26,806
+are the most popular functions in the prom queue
+
+223
+00:14:26,830 --> 00:14:30,406
+or metrics. Kl it is very likely most of your dashboards
+
+224
+00:14:30,590 --> 00:14:33,154
+in grafana they use this function.
+
+225
+00:14:33,764 --> 00:14:37,036
+So yeah, rate and increase are the
+
+226
+00:14:37,060 --> 00:14:40,584
+most expensive. Oh wait, I forgot.
+
+227
+00:14:41,244 --> 00:14:44,876
+Subqueries are so big that they didn't fit the
+
+228
+00:14:44,900 --> 00:14:47,940
+previous slide. So I'm changing my mind.
+
+229
+00:14:48,092 --> 00:14:51,948
+Subqueries are the most expensive. What subquery is,
+
+230
+00:14:52,076 --> 00:14:54,824
+you can see example how subquery look like.
+
+231
+00:14:55,364 --> 00:14:59,324
+So they allow you to use
+
+232
+00:14:59,444 --> 00:15:02,714
+to combine functions to calculate the inner query many
+
+233
+00:15:02,754 --> 00:15:06,402
+times and then fed results of those calculations to the author
+
+234
+00:15:06,578 --> 00:15:10,170
+query. And this is why they are so expensive,
+
+235
+00:15:10,282 --> 00:15:13,898
+because the inner query can be calculated many, many times and this inner query
+
+236
+00:15:13,946 --> 00:15:16,338
+can be not very lightweight.
+
+237
+00:15:16,466 --> 00:15:19,986
+So you will end up with a
+
+238
+00:15:20,010 --> 00:15:23,210
+pretty expensive query in the end. And another bad
+
+239
+00:15:23,242 --> 00:15:26,490
+thing about subqueries, they are very complicated,
+
+240
+00:15:26,602 --> 00:15:30,054
+they are complex to write, they are hard
+
+241
+00:15:30,094 --> 00:15:33,590
+to understand, they are hard to read. So if
+
+242
+00:15:33,622 --> 00:15:36,910
+you have an option to not use
+
+243
+00:15:36,942 --> 00:15:40,286
+subqueries, I would stick to that. If you want
+
+244
+00:15:40,390 --> 00:15:42,994
+queries to be fast, don't use subqueries.
+
+245
+00:15:44,774 --> 00:15:48,594
+Okay, what other performance improvement tips can I give you?
+
+246
+00:15:48,894 --> 00:15:52,834
+Query caching of course, caching makes everything faster.
+
+247
+00:15:53,134 --> 00:15:56,376
+So Prometheus doesn't support caching out of
+
+248
+00:15:56,400 --> 00:15:59,744
+the box. Really? So it is community
+
+249
+00:15:59,864 --> 00:16:03,672
+implemented. The fix for that there are reverse proxies to
+
+250
+00:16:03,688 --> 00:16:07,536
+the rescue. Reverse proxies such as Promsky or
+
+251
+00:16:07,640 --> 00:16:10,936
+tanosquery frontend. What are reverse proxies?
+
+252
+00:16:11,000 --> 00:16:14,600
+It's a middleware between a
+
+253
+00:16:14,632 --> 00:16:17,880
+user and Prometheus server. So you
+
+254
+00:16:17,912 --> 00:16:21,396
+install it, user communicates with a proxy and proxy sends
+
+255
+00:16:21,460 --> 00:16:24,844
+query to the Prometheus and this proxy can
+
+256
+00:16:24,924 --> 00:16:28,716
+cache the responses from Prometheus. So the repeatant query will be served
+
+257
+00:16:28,900 --> 00:16:32,104
+without touching the Prometheus data source.
+
+258
+00:16:32,924 --> 00:16:38,036
+How this looks like in
+
+259
+00:16:38,060 --> 00:16:41,140
+reality. So here we have the range query which
+
+260
+00:16:41,172 --> 00:16:44,364
+calculates rate over the metric. And in response to this
+
+261
+00:16:44,404 --> 00:16:48,216
+query we get single data points
+
+262
+00:16:48,400 --> 00:16:51,804
+ordered like with 30 minutes or something like that here.
+
+263
+00:16:52,384 --> 00:16:55,912
+So we execute this query and we get this ordered
+
+264
+00:16:55,968 --> 00:17:00,600
+list of values with 30 minutes step okay,
+
+265
+00:17:00,792 --> 00:17:03,484
+if we execute this query one more time,
+
+266
+00:17:04,024 --> 00:17:07,936
+30 minutes later, it is likely that
+
+267
+00:17:07,960 --> 00:17:11,224
+we can reuse our previous result, right? Because those queries
+
+268
+00:17:11,264 --> 00:17:14,960
+in the past, they didn't change, the time series didn't change in the
+
+269
+00:17:14,992 --> 00:17:18,912
+past. So what this reverse
+
+270
+00:17:18,928 --> 00:17:22,888
+proxy do they cache those previous
+
+271
+00:17:22,976 --> 00:17:26,376
+data points and when you repeat your query again,
+
+272
+00:17:26,560 --> 00:17:30,000
+they serve the most of these data points from the
+
+273
+00:17:30,032 --> 00:17:33,520
+cache, and then they ask from the data source
+
+274
+00:17:33,672 --> 00:17:37,584
+only for the data points they don't have yet, because time
+
+275
+00:17:37,664 --> 00:17:41,160
+already shifted a bit like 30 minutes later, we issued the same
+
+276
+00:17:41,192 --> 00:17:44,124
+query, so we don't have the most recent data point.
+
+277
+00:17:44,714 --> 00:17:48,106
+And those reverse proxies can understand that and they can
+
+278
+00:17:48,170 --> 00:17:51,570
+ask, they can query only this for this missing
+
+279
+00:17:51,602 --> 00:17:55,370
+data point from the database. So that's cool. For repeating
+
+280
+00:17:55,442 --> 00:17:59,450
+queries, it reduces pressure on your Prometheus server.
+
+281
+00:17:59,562 --> 00:18:02,814
+Very very much so. I recommend using them.
+
+282
+00:18:03,314 --> 00:18:06,854
+They are pretty handy and will improve the query performance.
+
+283
+00:18:08,194 --> 00:18:12,094
+What else? Builders push down so we
+
+284
+00:18:12,134 --> 00:18:15,558
+have two queries on the screen. The first query
+
+285
+00:18:15,606 --> 00:18:19,790
+takes 3 seconds to load, the second query takes 70 milliseconds
+
+286
+00:18:19,822 --> 00:18:23,382
+to load, but they will provide you, they will return you
+
+287
+00:18:23,478 --> 00:18:25,834
+the same equal the same result.
+
+288
+00:18:26,614 --> 00:18:29,790
+And the reason why the first query is expensive and takes
+
+289
+00:18:29,822 --> 00:18:33,286
+too much time is because Prometheus executes the
+
+290
+00:18:33,310 --> 00:18:36,820
+first and the second query one by one.
+
+291
+00:18:36,852 --> 00:18:40,204
+So we execute the first query with the filter and the second query
+
+292
+00:18:40,244 --> 00:18:43,624
+without filter. And then when we do the division,
+
+293
+00:18:44,404 --> 00:18:48,124
+Prometheus will keep only those time series that match by
+
+294
+00:18:48,164 --> 00:18:51,644
+labels perfectly from the first expression and the second expression.
+
+295
+00:18:51,804 --> 00:18:56,076
+So basically it will drop a
+
+296
+00:18:56,100 --> 00:18:59,624
+lot of time series that do not satisfy the filter in denominator.
+
+297
+00:19:00,204 --> 00:19:04,456
+This is why if we specify the filter in both
+
+298
+00:19:04,560 --> 00:19:08,644
+numerator and denominator, the query will be faster because
+
+299
+00:19:09,544 --> 00:19:13,592
+Prometheus will not select the data it doesn't need for
+
+300
+00:19:13,608 --> 00:19:17,488
+this calculation. This called filters pushdown. So if you have
+
+301
+00:19:17,536 --> 00:19:20,984
+this somewhere in your queries, make sure that you propagate that
+
+302
+00:19:21,024 --> 00:19:24,640
+filter to each part of the
+
+303
+00:19:24,672 --> 00:19:27,684
+query. This will improve the performance.
+
+304
+00:19:28,694 --> 00:19:32,854
+What else? Recording rules this is also a common
+
+305
+00:19:32,894 --> 00:19:36,750
+advice by the Prometheus community that you can for
+
+306
+00:19:36,782 --> 00:19:40,982
+expensive queries. For mission criticals queries, you can precompute
+
+307
+00:19:41,118 --> 00:19:43,674
+some time series via recording rules.
+
+308
+00:19:44,374 --> 00:19:48,926
+So recording rule is usually generating
+
+309
+00:19:49,030 --> 00:19:52,174
+less data in the output than it receives
+
+310
+00:19:52,214 --> 00:19:55,494
+on the input. And this data is also time series.
+
+311
+00:19:55,654 --> 00:19:59,006
+So if you have this less data to
+
+312
+00:19:59,030 --> 00:20:02,206
+query back, then this query over recording rule results will be
+
+313
+00:20:02,230 --> 00:20:05,886
+much faster. It is likely if you didn't mess up, of course, with recording rule
+
+314
+00:20:05,910 --> 00:20:09,574
+expression. So this is a really cool
+
+315
+00:20:09,614 --> 00:20:13,582
+thing for a dashboard, because dashboards always have the same queries.
+
+316
+00:20:13,638 --> 00:20:16,474
+And if you pre compute those queries,
+
+317
+00:20:16,774 --> 00:20:20,406
+your dashboards will be lowered and faster. But there are also disadvantages
+
+318
+00:20:20,470 --> 00:20:23,900
+of using recording rules. So the
+
+319
+00:20:23,932 --> 00:20:27,476
+first disadvantage is that recording rules, they have a
+
+320
+00:20:27,500 --> 00:20:30,852
+constant pressure on your database because they constantly
+
+321
+00:20:30,908 --> 00:20:33,964
+reevaluate the same expression over and over,
+
+322
+00:20:34,044 --> 00:20:37,624
+and your data source need to calculate it over and over.
+
+323
+00:20:38,164 --> 00:20:41,724
+Also, recording rules produce extra time series in
+
+324
+00:20:41,764 --> 00:20:45,636
+response, and those time series need to be stored in the database.
+
+325
+00:20:45,740 --> 00:20:48,988
+So every time when you apply, when you set up a
+
+326
+00:20:48,996 --> 00:20:52,658
+new recording rule in your prometheus, you will have
+
+327
+00:20:52,706 --> 00:20:55,614
+more time series in the database stored after that.
+
+328
+00:20:56,154 --> 00:21:00,506
+So, and this requires resources, of course. And also
+
+329
+00:21:00,690 --> 00:21:04,578
+recording rules is something that needs to be maintained. You need to define
+
+330
+00:21:04,626 --> 00:21:07,706
+them and you need to remember
+
+331
+00:21:07,770 --> 00:21:11,330
+about them, because if you want to change the query in your
+
+332
+00:21:11,362 --> 00:21:15,194
+dashboard or you want to change metrics in your application which
+
+333
+00:21:15,234 --> 00:21:19,330
+exposes this metrics, you. You need to remember that somewhere you
+
+334
+00:21:19,362 --> 00:21:22,722
+have this recording rule configured, and it is very likely you
+
+335
+00:21:22,738 --> 00:21:26,374
+need to go and change the expression there as well,
+
+336
+00:21:26,834 --> 00:21:30,578
+otherwise it will be not correct. So yeah,
+
+337
+00:21:30,626 --> 00:21:34,402
+recording rules. So let's sum up
+
+338
+00:21:34,458 --> 00:21:37,898
+quickly what we can do. So, to optimize
+
+339
+00:21:37,946 --> 00:21:40,614
+promql and metrics Ql queries,
+
+340
+00:21:41,674 --> 00:21:45,346
+very good. The strategy will be to measure their complexity to
+
+341
+00:21:45,370 --> 00:21:49,066
+understand how much time series and how many samples we select.
+
+342
+00:21:49,250 --> 00:21:52,694
+Can we select less? Can we optimize this query somehow?
+
+343
+00:21:53,954 --> 00:21:57,682
+We can also use caching frontend to reduce the pressure on the database
+
+344
+00:21:57,738 --> 00:22:01,338
+for queries that are repeating themselves over the time interval.
+
+345
+00:22:01,506 --> 00:22:04,854
+We also need to carefully craft queries
+
+346
+00:22:07,434 --> 00:22:11,576
+to always use the right filters or to not have too
+
+347
+00:22:11,600 --> 00:22:15,136
+small step or too big look behind windows to get
+
+348
+00:22:15,160 --> 00:22:19,336
+the optimal performance for these queries. And of course use recording rules for
+
+349
+00:22:19,440 --> 00:22:21,084
+performance critical queries.
+
+350
+00:22:21,944 --> 00:22:25,256
+Okay, and now the second part. Can Victoria
+
+351
+00:22:25,280 --> 00:22:28,832
+Matrix make it easier for developers?
+
+352
+00:22:28,888 --> 00:22:32,728
+For DevOps for users? Yes, it can.
+
+353
+00:22:32,856 --> 00:22:36,424
+Well, Victoria metrics provide a set of optimizations and
+
+354
+00:22:36,464 --> 00:22:40,112
+instruments which will help you to understand and to
+
+355
+00:22:40,128 --> 00:22:43,764
+understand complexity of the query and improve its performance.
+
+356
+00:22:44,744 --> 00:22:49,288
+And the first thing that Victoriometrics provides is a cardinality explorer.
+
+357
+00:22:49,416 --> 00:22:52,736
+It's basically built in page in the Vector metrics
+
+358
+00:22:52,760 --> 00:22:56,364
+UI, which shows you the most expensive
+
+359
+00:22:57,144 --> 00:23:00,576
+metric names, the most expensive time series,
+
+360
+00:23:00,760 --> 00:23:04,104
+etcetera. So cardinal Explorer
+
+361
+00:23:04,144 --> 00:23:08,004
+helps you to understand what actually stored in your database,
+
+362
+00:23:08,464 --> 00:23:11,324
+how many time series are behind the metric name.
+
+363
+00:23:11,904 --> 00:23:15,800
+It also can help you to decide whether it's
+
+364
+00:23:15,872 --> 00:23:19,808
+worth to store those super expensive metrics. Do you actually use
+
+365
+00:23:19,856 --> 00:23:23,704
+them? Because if you get rid of them, your database will just become faster,
+
+366
+00:23:23,784 --> 00:23:25,524
+you will need less resources.
+
+367
+00:23:26,784 --> 00:23:30,352
+Yeah, so this is available in Victoria metrics
+
+368
+00:23:30,488 --> 00:23:33,944
+UI components. And the cool thing about
+
+369
+00:23:34,024 --> 00:23:37,566
+this cardinality Explorer is that you can use it with
+
+370
+00:23:37,590 --> 00:23:41,446
+Prometheus as well. So you can specify Prometheus URL in
+
+371
+00:23:41,470 --> 00:23:45,390
+Cardinality Explorer and it will give you some functionality of this
+
+372
+00:23:45,422 --> 00:23:47,434
+explorer for Prometheus.
+
+373
+00:23:48,174 --> 00:23:51,982
+Okay, query tracing. So there is also a built in
+
+374
+00:23:51,998 --> 00:23:55,454
+feature which helps you to understand what
+
+375
+00:23:55,494 --> 00:23:58,862
+happens on every stage of query execution. This is very
+
+376
+00:23:58,918 --> 00:24:02,518
+similar to what postgres has with explain
+
+377
+00:24:02,606 --> 00:24:05,798
+analyze statement. So here's how it looks like.
+
+378
+00:24:05,846 --> 00:24:09,686
+You execute the query and you enable trace query button and
+
+379
+00:24:09,710 --> 00:24:13,726
+it will provide you like tree lag structure with
+
+380
+00:24:13,790 --> 00:24:17,118
+every stage of query execution as it was executed
+
+381
+00:24:17,166 --> 00:24:20,422
+inside Victoria metrics. And it will show how much time was
+
+382
+00:24:20,478 --> 00:24:24,158
+spent on each stage, plus additional information about
+
+383
+00:24:24,206 --> 00:24:27,794
+what's happening on each stage of the execution.
+
+384
+00:24:28,294 --> 00:24:31,414
+So for example, in the query trace
+
+385
+00:24:31,994 --> 00:24:36,050
+you can see how many series
+
+386
+00:24:36,122 --> 00:24:40,074
+and samples it selected for this query. The trace
+
+387
+00:24:40,114 --> 00:24:44,014
+will say well, we selected 500 series,
+
+388
+00:24:44,594 --> 00:24:51,106
+66,000 of samples and 273
+
+389
+00:24:51,130 --> 00:24:54,442
+data in overall. The trace also can contain information
+
+390
+00:24:54,538 --> 00:24:58,364
+like we used that much ram
+
+391
+00:24:58,904 --> 00:25:02,576
+on during processing this query. So that's the estimation for
+
+392
+00:25:02,600 --> 00:25:05,728
+you. And with query trace you can understand
+
+393
+00:25:05,816 --> 00:25:08,564
+exactly what's happening when you execute the query.
+
+394
+00:25:09,264 --> 00:25:12,400
+Or for example query caching. Yeah. By the way,
+
+395
+00:25:12,512 --> 00:25:16,128
+the cache thing that I explained a few slides ago,
+
+396
+00:25:16,256 --> 00:25:19,832
+it is built in in vector metrics components.
+
+397
+00:25:19,968 --> 00:25:23,812
+So you don't need to think of reverse proxies. It is already there.
+
+398
+00:25:23,928 --> 00:25:27,844
+It is already used for range and instant queries. You don't need to
+
+399
+00:25:27,884 --> 00:25:31,300
+even think about this. And in
+
+400
+00:25:31,332 --> 00:25:35,196
+query trace you can see if your query hit the cache
+
+401
+00:25:35,340 --> 00:25:39,340
+and maybe it hit cache partially. So you will see how
+
+402
+00:25:39,372 --> 00:25:43,180
+many entries exactly was fetched from cache, how many
+
+403
+00:25:43,372 --> 00:25:46,812
+what? The query was sent to the data source to
+
+404
+00:25:46,828 --> 00:25:50,618
+fetch the missing data. So all this information is there in
+
+405
+00:25:50,626 --> 00:25:54,290
+the trace filters pushdown. You don't
+
+406
+00:25:54,322 --> 00:25:57,370
+need to think about this in victoriometrics as well, because it does,
+
+407
+00:25:57,402 --> 00:26:01,138
+it automatically. It optimizes the query when it can,
+
+408
+00:26:01,306 --> 00:26:05,254
+and trace will show you this as well. So you see the first,
+
+409
+00:26:05,914 --> 00:26:09,666
+in the first row of the trace
+
+410
+00:26:09,810 --> 00:26:13,494
+we see the exact query, how we send it, and on the
+
+411
+00:26:14,714 --> 00:26:18,850
+second step, Vector matrix applied optimization and pushed down
+
+412
+00:26:19,002 --> 00:26:22,252
+the filter to the second part of the expression to make it
+
+413
+00:26:22,298 --> 00:26:24,524
+in the most efficient way.
+
+414
+00:26:26,344 --> 00:26:30,016
+Okay, recording rules so remember this recording rules concept where
+
+415
+00:26:30,080 --> 00:26:35,344
+you need to evaluate expressions and persist results back
+
+416
+00:26:35,384 --> 00:26:39,144
+to the time series database. Vector matrix can do that,
+
+417
+00:26:39,224 --> 00:26:42,560
+but it also can do a better thing. It supports
+
+418
+00:26:42,592 --> 00:26:46,752
+the streaming aggregation concept. So you
+
+419
+00:26:46,768 --> 00:26:50,396
+can do this aggregations these pre calculations of
+
+420
+00:26:50,420 --> 00:26:54,196
+the data before data gets into the
+
+421
+00:26:54,340 --> 00:26:57,812
+time series database. And this is super cool because you
+
+422
+00:26:57,828 --> 00:27:01,140
+don't need to store raw data if you don't want to. You can
+
+423
+00:27:01,172 --> 00:27:05,144
+store only aggregates and this will tremendously
+
+424
+00:27:05,444 --> 00:27:08,556
+reduce the amount of resources your time series database need
+
+425
+00:27:08,580 --> 00:27:12,260
+to have. And by the way, this streaming aggregation concept,
+
+426
+00:27:12,292 --> 00:27:15,772
+it is available in the VM agent which one of the
+
+427
+00:27:15,788 --> 00:27:19,170
+Victor metrics tools. And you can use VM agent with your Prometheus.
+
+428
+00:27:19,282 --> 00:27:22,514
+You can use VM agent with other database which supports
+
+429
+00:27:22,554 --> 00:27:26,410
+remote write protocol. So yes,
+
+430
+00:27:26,562 --> 00:27:29,746
+I really like this feature because it helps to reduce pressure on
+
+431
+00:27:29,770 --> 00:27:33,014
+database many many times. It's super cool.
+
+432
+00:27:34,114 --> 00:27:36,734
+Yeah, so that was mostly it.
+
+433
+00:27:37,354 --> 00:27:40,826
+My talk. You can find more information in
+
+434
+00:27:40,850 --> 00:27:44,664
+this additional materials if you scan the QR code. You will go to the
+
+435
+00:27:45,004 --> 00:27:48,396
+slides of this presentation and all links there will be
+
+436
+00:27:48,420 --> 00:27:52,764
+available for you. So I recommend reading the blog
+
+437
+00:27:52,804 --> 00:27:55,852
+post about optimizing PropQL and metricsQl expressions
+
+438
+00:27:55,948 --> 00:27:59,908
+and also a very detailed blog post about how subqueries works
+
+439
+00:27:59,956 --> 00:28:03,092
+in vector metrics and in Prometheus you can find information about
+
+440
+00:28:03,148 --> 00:28:05,944
+query, trace and stream aggregation, etcetera.
+
+441
+00:28:06,764 --> 00:28:10,972
+Yep, so that's me. Thank you very much for your attention and
+
+442
+00:28:11,028 --> 00:28:14,300
+I will be happy to answer any questions if you will have them.
+
+443
+00:28:14,452 --> 00:28:14,844
+Thank you.
+
