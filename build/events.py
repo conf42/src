@@ -13,6 +13,9 @@ from .shared import (
 from .assemblyai import (
     read_transcript,
 )
+from .srt import (
+    read_srt_transcript,
+)
 english_dict = get_dict()
 
 
@@ -165,10 +168,14 @@ def get_enriched_metadata(base_folder):
             talk["YouTubeId"] = talk.get("YouTube", "").split("/")[-1]
 
             # check if transcript exists
+            transcript = read_srt_transcript(talk["Name1"], event["short_url"])
+            if transcript:
+                talk["transcript"] = transcript
+                continue
             transcript = read_transcript(talk["YouTubeId"])
             if transcript:
                 talk["transcript"] = transcript
-
+            
     return context
 
 def extract_keywords(talk):
