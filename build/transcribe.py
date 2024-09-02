@@ -41,7 +41,7 @@ for talk, video in video_queue:
 print(f"Found {len(missing_transcriptions)} talks without transcripts")
 
 for i, (talk, video) in enumerate(missing_transcriptions):
-    print(f"({i}/{len(missing_transcriptions)}) Processing video {video}")
+    print(f"[{i+1}/{len(missing_transcriptions)}] Processing video {video}")
 
     # get the audio to transcribe
     audio_path = None
@@ -52,7 +52,7 @@ for i, (talk, video) in enumerate(missing_transcriptions):
             print(f"Got audio: {audio_path}")
             break
         except Exception as ex:
-            print(f"({i}/{retries}) Error getting audio: {ex}")
+            print(f" (retry {i}/{retries}) Error getting audio: {ex}")
             pass
     if not audio_path:
         print("Couldn't get the video after")
