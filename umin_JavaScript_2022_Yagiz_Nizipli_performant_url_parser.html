@@ -404,7 +404,7 @@
 
             <script>
               
-              var transcript = [{"text": "Jamaica real", "timestamp": "00:00:00,410", "timestamp_s": 0.0}, {"text": "time feedback into the behavior of your distributed systems", "timestamp": "00:00:06,212", "timestamp_s": 6.0}, {"text": "and observing changes exceptions errors in", "timestamp": "00:00:09,674", "timestamp_s": 9.0}, {"text": "real time allows you to not only experiment with confidence,", "timestamp": "00:00:13,412", "timestamp_s": 13.0}, {"text": "but respond instantly to get things working again.", "timestamp": "00:00:16,858", "timestamp_s": 16.0}, {"text": "Close today", "timestamp": "00:00:24,610", "timestamp_s": 24.0}, {"text": "I\u0027m going to be talking about implementing a performance URL parser", "timestamp": "00:00:49,136", "timestamp_s": 49.0}, {"text": "from scratch. So before we start, I want to", "timestamp": "00:00:52,698", "timestamp_s": 52.0}, {"text": "give some a little bit of information about me I\u0027m", "timestamp": "00:00:56,164", "timestamp_s": 56.0}, {"text": "yold Nizipli. I\u0027m a software engineer. I\u0027m a master\u0027s", "timestamp": "00:01:00,042", "timestamp_s": 60.0}, {"text": "student at Fordham University.", "timestamp": "00:01:03,882", "timestamp_s": 63.0}, {"text": "I\u0027m a node core collaborator and performance team member.", "timestamp": "00:01:07,110", "timestamp_s": 67.0}, {"text": "Ive been mainly focusing on text encoders and decoders and the", "timestamp": "00:01:10,846", "timestamp_s": 70.0}, {"text": "performant in nodeshifts. I\u0027m the creator of", "timestamp": "00:01:14,248", "timestamp_s": 74.0}, {"text": "URL state machine and fast query string.", "timestamp": "00:01:18,268", "timestamp_s": 78.0}, {"text": "So let\u0027s give a little bit of a background before", "timestamp": "00:01:21,770", "timestamp_s": 81.0}, {"text": "we start into what URL parses are and", "timestamp": "00:01:25,356", "timestamp_s": 85.0}, {"text": "how that goes. So a little bit of brief introduction to", "timestamp": "00:01:28,924", "timestamp_s": 88.0}, {"text": "JavaScript runtimes. So nodejs is a runtime on top", "timestamp": "00:01:32,288", "timestamp_s": 92.0}, {"text": "of v eight engine, the JavaScript engine behind chromium.", "timestamp": "00:01:36,288", "timestamp_s": 96.0}, {"text": "Just like Nodejs, Dino is also using v eight and", "timestamp": "00:01:40,750", "timestamp_s": 100.0}, {"text": "a little bit of new runtime bound GS using webkit", "timestamp": "00:01:44,436", "timestamp_s": 104.0}, {"text": "as a runtime.", "timestamp": "00:01:48,282", "timestamp_s": 108.0}, {"text": "Basically in JavaScript runtimes is that whenever", "timestamp": "00:01:53,030", "timestamp_s": 113.0}, {"text": "you call a function, the javascript under lines user", "timestamp": "00:01:57,358", "timestamp_s": 117.0}, {"text": "land runs a c plus plus code using a bridge through node js.", "timestamp": "00:02:00,718", "timestamp_s": 120.0}, {"text": "And the value that you retrieve", "timestamp": "00:02:04,702", "timestamp_s": 124.0}, {"text": "from the C Plus plus is deserialized on the JavaScript side and then present", "timestamp": "00:02:08,718", "timestamp_s": 128.0}, {"text": "to the user, which is the developer so computationally has a", "timestamp": "00:02:12,396", "timestamp_s": 132.0}, {"text": "function living in C plays plus. This means that you don\u0027t need to focus", "timestamp": "00:02:15,868", "timestamp_s": 135.0}, {"text": "any of your code in JavaScript, but you can write it in", "timestamp": "00:02:21,712", "timestamp_s": 141.0}, {"text": "c if you want to produce performant", "timestamp": "00:02:24,848", "timestamp_s": 144.0}, {"text": "code. So let\u0027s start with URL parsers.", "timestamp": "00:02:28,774", "timestamp_s": 148.0}, {"text": "Why URL parser matters? So URL parsers are", "timestamp": "00:02:33,170", "timestamp_s": 153.0}, {"text": "the most important functionality for a web server. Every single network request", "timestamp": "00:02:36,324", "timestamp_s": 156.0}, {"text": "uses URL parser, and it basically creates", "timestamp": "00:02:40,602", "timestamp_s": 160.0}, {"text": "the baseline of benchmarks with any", "timestamp": "00:02:43,934", "timestamp_s": 163.0}, {"text": "network request. So this is", "timestamp": "00:02:47,560", "timestamp_s": 167.0}, {"text": "an example of a diagram of a request coming to a server. So it\u0027s basically", "timestamp": "00:02:51,208", "timestamp_s": 171.0}, {"text": "on the left side there\u0027s this person, let\u0027s say Alice or Bob.", "timestamp": "00:02:55,208", "timestamp_s": 175.0}, {"text": "Bob submits a credential through user", "timestamp": "00:03:00,730", "timestamp_s": 180.0}, {"text": "agent which sends to the client. The client sends a", "timestamp": "00:03:04,098", "timestamp_s": 184.0}, {"text": "request, submits the credentials client id, redirect URL", "timestamp": "00:03:07,996", "timestamp_s": 187.0}, {"text": "to authorization server authorization, returns authorization code,", "timestamp": "00:03:11,318", "timestamp_s": 191.0}, {"text": "and then user agents like redirects authorization code and client request", "timestamp": "00:03:14,768", "timestamp_s": 194.0}, {"text": "token and so on and so forth. So basically every arrow from left", "timestamp": "00:03:18,838", "timestamp_s": 198.0}, {"text": "to right includes a URL,", "timestamp": "00:03:22,228", "timestamp_s": 202.0}, {"text": "and for every left to right request it", "timestamp": "00:03:25,258", "timestamp_s": 205.0}, {"text": "needs to parse and understand", "timestamp": "00:03:29,012", "timestamp_s": 209.0}, {"text": "what that URL is and what the path is. So that\u0027s where URL", "timestamp": "00:03:32,964", "timestamp_s": 212.0}, {"text": "parses come in. So URL parser is a very significant", "timestamp": "00:03:36,878", "timestamp_s": 216.0}, {"text": "component, but it\u0027s too complex and leads to bugs and that\u0027s why", "timestamp": "00:03:40,286", "timestamp_s": 220.0}, {"text": "nobody focuses and nobody wants to focus on", "timestamp": "00:03:44,008", "timestamp_s": 224.0}, {"text": "it. So this is one of the examples while I was", "timestamp": "00:03:47,368", "timestamp_s": 227.0}, {"text": "working on this project is that I thought", "timestamp": "00:03:50,780", "timestamp_s": 230.0}, {"text": "that I found a bug and it seems that like 256-25-6256", "timestamp": "00:03:54,268", "timestamp_s": 234.0}, {"text": "URL is invalid. And one of the libraries what", "timestamp": "00:03:58,620", "timestamp_s": 238.0}, {"text": "we URL recommended that actually it worked in Chrome and", "timestamp": "00:04:02,428", "timestamp_s": 242.0}, {"text": "safari, but not in Node Js. So this means that the initial", "timestamp": "00:04:05,632", "timestamp_s": 245.0}, {"text": "implementing of a URL parser was somehow wrong or not", "timestamp": "00:04:09,462", "timestamp_s": 249.0}, {"text": "up to date. So after", "timestamp": "00:04:12,868", "timestamp_s": 252.0}, {"text": "this feedback that I get, I opened an", "timestamp": "00:04:16,196", "timestamp_s": 256.0}, {"text": "issue like URL parsers does not relate to IP before with more than four parts.", "timestamp": "00:04:19,508", "timestamp_s": 259.0}, {"text": "This is one of the issues, URL is not compliant with specification.", "timestamp": "00:04:23,226", "timestamp_s": 263.0}, {"text": "This is another issue created by me and later they\u0027re all", "timestamp": "00:04:26,686", "timestamp_s": 266.0}, {"text": "fixed. But let\u0027s", "timestamp": "00:04:30,472", "timestamp_s": 270.0}, {"text": "talk about the goal of a URL parser. What is the goal?", "timestamp": "00:04:33,678", "timestamp_s": 273.0}, {"text": "Basically, if you look into this diagram, you will see on the", "timestamp": "00:04:38,090", "timestamp_s": 278.0}, {"text": "orange side that HTTPs userpassample.com", "timestamp": "00:04:42,108", "timestamp_s": 282.0}, {"text": "80 80. So basically HTTPs is the protocol.", "timestamp": "00:04:46,524", "timestamp_s": 286.0}, {"text": "Username password is an optional value with add characters", "timestamp": "00:04:50,166", "timestamp_s": 290.0}, {"text": "and then hostname is always there.", "timestamp": "00:04:54,518", "timestamp_s": 294.0}, {"text": "The port, if it\u0027s another special", "timestamp": "00:04:57,470", "timestamp_s": 297.0}, {"text": "port which is like 80 or four, four three. It\u0027s not required because URL parsers", "timestamp": "00:05:01,136", "timestamp_s": 301.0}, {"text": "understand that. And then we might need some path name", "timestamp": "00:05:05,494", "timestamp_s": 305.0}, {"text": "and search and hash. So if you look at from this diagram, you can", "timestamp": "00:05:09,012", "timestamp_s": 309.0}, {"text": "easily say that oh, okay, it\u0027s really easy to understand and implement URL parse,", "timestamp": "00:05:12,228", "timestamp_s": 312.0}, {"text": "right? You just need to get, if it starts with HTTPs,", "timestamp": "00:05:15,978", "timestamp_s": 315.0}, {"text": "if there\u0027s a user and path, what about hostnames? What about ports?", "timestamp": "00:05:19,510", "timestamp_s": 319.0}, {"text": "What about path name? We want to make sure that the search", "timestamp": "00:05:23,358", "timestamp_s": 323.0}, {"text": "is a valid one and so on and so forth. But it\u0027s not", "timestamp": "00:05:26,712", "timestamp_s": 326.0}, {"text": "as easy as writing a regex and it\u0027s much more complicated.", "timestamp": "00:05:30,172", "timestamp_s": 330.0}, {"text": "So what is the state machine behind it? There is actually a specification", "timestamp": "00:05:34,570", "timestamp_s": 334.0}, {"text": "for writing URL parsers and this is an", "timestamp": "00:05:38,406", "timestamp_s": 338.0}, {"text": "example of it. This represents all of the state machines", "timestamp": "00:05:42,400", "timestamp_s": 342.0}, {"text": "that needs to traverse", "timestamp": "00:05:46,750", "timestamp_s": 346.0}, {"text": "in order to complete the URL parser. So if you look at from", "timestamp": "00:05:50,830", "timestamp_s": 350.0}, {"text": "a much more closer perspective, there is a schema start", "timestamp": "00:05:54,212", "timestamp_s": 354.0}, {"text": "state scheme. Start state can go to no schema state. Let\u0027s say we don\u0027t have", "timestamp": "00:05:57,636", "timestamp_s": 357.0}, {"text": "HTTP HTTPs. If it starts,", "timestamp": "00:06:01,412", "timestamp_s": 361.0}, {"text": "then it\u0027s schema state. Then we need to parse that schema.", "timestamp": "00:06:04,842", "timestamp_s": 364.0}, {"text": "What is that valid one? What are the valid ones. If it\u0027s HTTPs", "timestamp": "00:06:08,062", "timestamp_s": 368.0}, {"text": "then we might omit the port part because", "timestamp": "00:06:11,854", "timestamp_s": 371.0}, {"text": "HTTPs is always four four, three. If it\u0027s HTTP then", "timestamp": "00:06:15,640", "timestamp_s": 375.0}, {"text": "it\u0027s 80 if it\u0027s SSH. So there are some special cases", "timestamp": "00:06:19,308", "timestamp_s": 379.0}, {"text": "and according to schema state it can go to special authority estate,", "timestamp": "00:06:22,626", "timestamp_s": 382.0}, {"text": "special relative authority state or relative state.", "timestamp": "00:06:27,218", "timestamp_s": 387.0}, {"text": "So special authority estate, which means that either I", "timestamp": "00:06:30,476", "timestamp_s": 390.0}, {"text": "have a username password kind of combination,", "timestamp": "00:06:34,128", "timestamp_s": 394.0}, {"text": "so I need to parse that state. If it\u0027s a special relative or authority", "timestamp": "00:06:37,062", "timestamp_s": 397.0}, {"text": "state, it can be a file path. In windows it\u0027s", "timestamp": "00:06:40,902", "timestamp_s": 400.0}, {"text": "something else, in Mac OS Unix systems it\u0027s something", "timestamp": "00:06:44,118", "timestamp_s": 404.0}, {"text": "else. And according to that, it can be a relative state. It can be a", "timestamp": "00:06:47,236", "timestamp_s": 407.0}, {"text": "relative state. So it\u0027s not as easy as writing regex or", "timestamp": "00:06:50,644", "timestamp_s": 410.0}, {"text": "userland. So this is one of the states that are available in the URL", "timestamp": "00:06:54,328", "timestamp_s": 414.0}, {"text": "parsing specification. So let\u0027s", "timestamp": "00:06:57,998", "timestamp_s": 417.0}, {"text": "dive into scheme start state. So if c", "timestamp": "00:07:01,694", "timestamp_s": 421.0}, {"text": "sees a character is an ASG alpha append c lowercase", "timestamp": "00:07:05,224", "timestamp_s": 425.0}, {"text": "to buffer and set the state to schema state. So this is pretty straightforward.", "timestamp": "00:07:09,202", "timestamp_s": 429.0}, {"text": "Otherwise, if state override is not given, set state", "timestamp": "00:07:12,866", "timestamp_s": 432.0}, {"text": "to no scheme state and decrease pointer by one, otherwise validationary", "timestamp": "00:07:16,012", "timestamp_s": 436.0}, {"text": "return further. So if you look at from this perspective, it\u0027s pretty straightforward,", "timestamp": "00:07:19,698", "timestamp_s": 439.0}, {"text": "right? But this is one of the, I think 20 states", "timestamp": "00:07:23,686", "timestamp_s": 443.0}, {"text": "that are available in this specification. So let\u0027s", "timestamp": "00:07:28,592", "timestamp_s": 448.0}, {"text": "look into a little bit more complex efforts. No scheme state.", "timestamp": "00:07:31,718", "timestamp_s": 451.0}, {"text": "What happens if I don\u0027t have a HTTP, HTTPs and so on and so", "timestamp": "00:07:35,220", "timestamp_s": 455.0}, {"text": "forth? If base is null or base has an OPAC path and c is not", "timestamp": "00:07:38,948", "timestamp_s": 458.0}, {"text": "u, which is like hashtag validation error return failure.", "timestamp": "00:07:42,756", "timestamp_s": 462.0}, {"text": "So first of all we need to know what is an OPAC path? It\u0027s all", "timestamp": "00:07:45,758", "timestamp_s": 465.0}, {"text": "explained in the documentation.", "timestamp": "00:07:49,496", "timestamp_s": 469.0}, {"text": "Otherwise, if base has an OpAC path and sees an hashtag set", "timestamp": "00:07:52,550", "timestamp_s": 472.0}, {"text": "URL scheme to the base scheme, URL path to path URL query", "timestamp": "00:07:56,152", "timestamp_s": 476.0}, {"text": "base and URL fragment to the empty stream. So if my path starts with", "timestamp": "00:07:59,806", "timestamp_s": 479.0}, {"text": "a hashtag, which means that this is a fragment state, so the URL needs to", "timestamp": "00:08:03,548", "timestamp_s": 483.0}, {"text": "go to the fragment state and that\u0027s one of the end states, otherwise blah.", "timestamp": "00:08:07,004", "timestamp_s": 487.0}, {"text": "So this is what URL specification", "timestamp": "00:08:10,966", "timestamp_s": 490.0}, {"text": "URL part of specification is all about.", "timestamp": "00:08:14,726", "timestamp_s": 494.0}, {"text": "I kind of hear, why are we even", "timestamp": "00:08:19,790", "timestamp_s": 499.0}, {"text": "talking about it? So the main issue that", "timestamp": "00:08:22,932", "timestamp_s": 502.0}, {"text": "actually led me to this implementation is that there\u0027s a significant", "timestamp": "00:08:26,532", "timestamp_s": 506.0}, {"text": "performance issue with what Wegrl in node js,", "timestamp": "00:08:30,850", "timestamp_s": 510.0}, {"text": "and in order to update it there was", "timestamp": "00:08:33,902", "timestamp_s": 513.0}, {"text": "an issue opened and I", "timestamp": "00:08:37,992", "timestamp_s": 517.0}, {"text": "wanted to make it faster. So can it be faster? So this is", "timestamp": "00:08:41,992", "timestamp_s": 521.0}, {"text": "one of the issues re implement was VGrL parser and Wassem.", "timestamp": "00:08:45,544", "timestamp_s": 525.0}, {"text": "The URL is there for you if you want to look.", "timestamp": "00:08:49,850", "timestamp_s": 529.0}, {"text": "And it was actually opened by one of the technical", "timestamp": "00:08:53,290", "timestamp_s": 533.0}, {"text": "steering committee members, which is James Nell.", "timestamp": "00:08:56,706", "timestamp_s": 536.0}, {"text": "He basically said that it should be possible to realize a", "timestamp": "00:09:00,274", "timestamp_s": 540.0}, {"text": "significant performant improvement by porting the implementation to WASM.", "timestamp": "00:09:03,344", "timestamp_s": 543.0}, {"text": "So wasm is webassembly. So if we implementing the URL", "timestamp": "00:09:07,334", "timestamp_s": 547.0}, {"text": "parser through WASM, then we might get a URL", "timestamp": "00:09:11,878", "timestamp_s": 551.0}, {"text": "parser. So this was pretty interesting to me, because right now I know what", "timestamp": "00:09:15,338", "timestamp_s": 555.0}, {"text": "I needed to do. I need to port the implementation in a language that\u0027s", "timestamp": "00:09:18,948", "timestamp_s": 558.0}, {"text": "performant like C or rust,", "timestamp": "00:09:22,958", "timestamp_s": 562.0}, {"text": "and then I need to expose the API through", "timestamp": "00:09:26,238", "timestamp_s": 566.0}, {"text": "webassembly so that node js applications can consume it.", "timestamp": "00:09:29,576", "timestamp_s": 569.0}, {"text": "But before we start, let\u0027s take a step back and understand what our", "timestamp": "00:09:33,910", "timestamp_s": 573.0}, {"text": "options are. Webassembly is really webassembly", "timestamp": "00:09:37,532", "timestamp_s": 577.0}, {"text": "our only option. The potential solutions,", "timestamp": "00:09:41,378", "timestamp_s": 581.0}, {"text": "not for writing URL parses, but also for most of the application,", "timestamp": "00:09:44,786", "timestamp_s": 584.0}, {"text": "is that you can either compile C, rust or any other language", "timestamp": "00:09:48,380", "timestamp_s": 588.0}, {"text": "through webassembly and expose the API. Or you can", "timestamp": "00:09:52,550", "timestamp_s": 592.0}, {"text": "write an API which is node API in C rust,", "timestamp": "00:09:55,872", "timestamp_s": 595.0}, {"text": "and you can actually run the C code and expose it", "timestamp": "00:09:59,206", "timestamp_s": 599.0}, {"text": "through the c binding. Or you can write a pure Javascript.", "timestamp": "00:10:02,548", "timestamp_s": 602.0}, {"text": "So we don\u0027t want to write and expose our", "timestamp": "00:10:05,626", "timestamp_s": 605.0}, {"text": "implementation through C", "timestamp": "00:10:09,092", "timestamp_s": 609.0}, {"text": "and rust through any API, because that\u0027s the actual implementing what\u0027s", "timestamp": "00:10:12,532", "timestamp_s": 612.0}, {"text": "happening right now. So let\u0027s start with webassembly then.", "timestamp": "00:10:15,998", "timestamp_s": 615.0}, {"text": "So I chose rust because it\u0027s", "timestamp": "00:10:20,088", "timestamp_s": 620.0}, {"text": "proven that rust is super performance. Actually,", "timestamp": "00:10:24,078", "timestamp_s": 624.0}, {"text": "I wanted to learn rust. So this is one of the emotional", "timestamp": "00:10:27,276", "timestamp_s": 627.0}, {"text": "decisions that led to this decision making process.", "timestamp": "00:10:30,914", "timestamp_s": 630.0}, {"text": "So webassembly and rust is a really good job thanks to Firefox. There are lots", "timestamp": "00:10:35,690", "timestamp_s": 635.0}, {"text": "of contributions on that side. There are really great libraries, and the ecosystem is ready", "timestamp": "00:10:39,298", "timestamp_s": 639.0}, {"text": "for mass adoption. And one of the", "timestamp": "00:10:43,136", "timestamp_s": 643.0}, {"text": "most crucial parts in nodejs, and on top", "timestamp": "00:10:46,688", "timestamp_s": 646.0}, {"text": "of that there was umdichi. Umdichi is a really good example.", "timestamp": "00:10:50,192", "timestamp_s": 650.0}, {"text": "It\u0027s backed by node and actually", "timestamp": "00:10:53,810", "timestamp_s": 653.0}, {"text": "by using webassembly and compiling LLA HTTP", "timestamp": "00:10:57,876", "timestamp_s": 657.0}, {"text": "to webassembly, they had a 1329%", "timestamp": "00:11:02,090", "timestamp_s": 662.0}, {"text": "performance boost and it was really good, and it was the basis of webassembly.", "timestamp": "00:11:07,160", "timestamp_s": 667.0}, {"text": "But these are the expectations. But the reality is decoding", "timestamp": "00:11:11,262", "timestamp_s": 671.0}, {"text": "UTF 16 to UDF eight.", "timestamp": "00:11:15,102", "timestamp_s": 675.0}, {"text": "Webassembly communication relies on shared memory. Okay, there\u0027s some", "timestamp": "00:11:18,470", "timestamp_s": 678.0}, {"text": "problems with deserialization, and deserialization of that data.", "timestamp": "00:11:21,948", "timestamp_s": 681.0}, {"text": "Shared memory requires decoding and encoding. So text", "timestamp": "00:11:25,290", "timestamp_s": 685.0}, {"text": "encoding and decoding in nodejs relies on c plays plus, which means that we\u0027re", "timestamp": "00:11:30,236", "timestamp_s": 690.0}, {"text": "going to use text encoder and text decoder. So why", "timestamp": "00:11:33,878", "timestamp_s": 693.0}, {"text": "did we end up with text nodejs?", "timestamp": "00:11:38,592", "timestamp_s": 698.0}, {"text": "So a quick recap. So the goal of this presentation", "timestamp": "00:11:41,490", "timestamp_s": 701.0}, {"text": "was that we are trying to improve the existing implementing improving", "timestamp": "00:11:45,002", "timestamp_s": 705.0}, {"text": "by removing the c bridge,", "timestamp": "00:11:49,546", "timestamp_s": 709.0}, {"text": "but text encoding and decoding in node", "timestamp": "00:11:52,930", "timestamp_s": 712.0}, {"text": "js relied on c. So let\u0027s do a benchmark about", "timestamp": "00:11:56,602", "timestamp_s": 716.0}, {"text": "all of those things. If you use a webassembly and", "timestamp": "00:12:00,232", "timestamp_s": 720.0}, {"text": "if you use rust and expose it through webassembly,", "timestamp": "00:12:03,640", "timestamp_s": 723.0}, {"text": "this is again roughly estimation. This is not a full", "timestamp": "00:12:08,490", "timestamp_s": 728.0}, {"text": "feature set URL parses that\u0027s written in rust, but the rust", "timestamp": "00:12:11,724", "timestamp_s": 731.0}, {"text": "implementing is 28 24% slower.", "timestamp": "00:12:15,682", "timestamp_s": 735.0}, {"text": "For URL constructor, this is just by passing the", "timestamp": "00:12:18,742", "timestamp_s": 738.0}, {"text": "URL and returning an object. That\u0027s it.", "timestamp": "00:12:22,448", "timestamp_s": 742.0}, {"text": "On the other side, URL search param set is 86%", "timestamp": "00:12:26,910", "timestamp_s": 746.0}, {"text": "slower because whenever you are calling set, get those kind", "timestamp": "00:12:31,376", "timestamp_s": 751.0}, {"text": "of variables. There\u0027s a c plus plus to JavaScript communication,", "timestamp": "00:12:34,948", "timestamp_s": 754.0}, {"text": "which is we are using webassembly but there\u0027s always a bridge between it and for", "timestamp": "00:12:38,490", "timestamp_s": 758.0}, {"text": "fm it\u0027s 96% slower. The main", "timestamp": "00:12:42,228", "timestamp_s": 762.0}, {"text": "reason for URL search params is slobber is that because it\u0027s", "timestamp": "00:12:45,748", "timestamp_s": 765.0}, {"text": "actually implemented in JavaScript and nodejs. But I wanted to make", "timestamp": "00:12:49,198", "timestamp_s": 769.0}, {"text": "sure that if it\u0027s possible to also improve the URL search parameters implementation", "timestamp": "00:12:52,968", "timestamp_s": 772.0}, {"text": "too. So it means that it\u0027s 86% slower.", "timestamp": "00:12:57,202", "timestamp_s": 777.0}, {"text": "That\u0027s a fact, not a random number.", "timestamp": "00:13:00,418", "timestamp_s": 780.0}, {"text": "And here we are again, we are starting this", "timestamp": "00:13:03,130", "timestamp_s": 783.0}, {"text": "presentation from scratch. Can we write a fast URL parser using", "timestamp": "00:13:06,956", "timestamp_s": 786.0}, {"text": "Javascript? So today I\u0027m going to talk about the road fast URL parser", "timestamp": "00:13:10,732", "timestamp_s": 790.0}, {"text": "for node js. My name is Dipli and let\u0027s start from scratch", "timestamp": "00:13:14,134", "timestamp_s": 794.0}, {"text": "again. So why Javascript?", "timestamp": "00:13:18,038", "timestamp_s": 798.0}, {"text": "So if you know, there was three", "timestamp": "00:13:21,090", "timestamp_s": 801.0}, {"text": "main reasons that we thought what are the three", "timestamp": "00:13:24,532", "timestamp_s": 804.0}, {"text": "alternatives? We could either use c plays plus and", "timestamp": "00:13:27,812", "timestamp_s": 807.0}, {"text": "rot through webassembly. We could either use Nodejs API with", "timestamp": "00:13:32,404", "timestamp_s": 812.0}, {"text": "c, or we could just write", "timestamp": "00:13:36,568", "timestamp_s": 816.0}, {"text": "any javascript. So existing implementation in C we", "timestamp": "00:13:39,992", "timestamp_s": 819.0}, {"text": "tried webassembly and did some benchmarking, but it", "timestamp": "00:13:43,192", "timestamp_s": 823.0}, {"text": "was slow. So there are no other solutions that does not use", "timestamp": "00:13:46,504", "timestamp_s": 826.0}, {"text": "a c bridge. So I\u0027m kind of limited by the technology", "timestamp": "00:13:49,788", "timestamp_s": 829.0}, {"text": "of my time as Howard Starkin.", "timestamp": "00:13:53,164", "timestamp_s": 833.0}, {"text": "So as a result, URL state machine mpm", "timestamp": "00:13:57,630", "timestamp_s": 837.0}, {"text": "package rise. It\u0027s available through GitHub", "timestamp": "00:14:01,718", "timestamp_s": 841.0}, {"text": "on anonyric URL, which I will include at", "timestamp": "00:14:05,622", "timestamp_s": 845.0}, {"text": "the end of this presentation. But it basically is a super fast compliant", "timestamp": "00:14:08,864", "timestamp_s": 848.0}, {"text": "URL state machine for nodejs that\u0027s written in JavaScript,", "timestamp": "00:14:12,678", "timestamp_s": 852.0}, {"text": "but not as fast as I would expect it to be. So this", "timestamp": "00:14:16,186", "timestamp_s": 856.0}, {"text": "is one of the packages, the usage example. So if you just pass the", "timestamp": "00:14:20,228", "timestamp_s": 860.0}, {"text": "string of the URL, then it actually returns an object which", "timestamp": "00:14:24,024", "timestamp_s": 864.0}, {"text": "is scheme username password, and you can retrieve those information.", "timestamp": "00:14:28,088", "timestamp_s": 868.0}, {"text": "So let\u0027s do some benchmarks about the JavaScript implementation", "timestamp": "00:14:33,190", "timestamp_s": 873.0}, {"text": "of it. There\u0027s another library called what we G", "timestamp": "00:14:36,622", "timestamp_s": 876.0}, {"text": "URL, which provides the same feature set, and it\u0027s around 576%", "timestamp": "00:14:40,168", "timestamp_s": 880.0}, {"text": "slower. URL state machines is yes,", "timestamp": "00:14:45,036", "timestamp_s": 885.0}, {"text": "five, six times faster, I guess. And the actual URL", "timestamp": "00:14:48,876", "timestamp_s": 888.0}, {"text": "implementation provided by node js is that it\u0027s 85% faster than", "timestamp": "00:14:52,982", "timestamp_s": 892.0}, {"text": "my solution. So this means that the decoding and", "timestamp": "00:14:56,928", "timestamp_s": 896.0}, {"text": "encoding side of it, and it\u0027s slow, and JavaScript", "timestamp": "00:15:00,928", "timestamp_s": 900.0}, {"text": "is kind of slow for these particular operations.", "timestamp": "00:15:04,362", "timestamp_s": 904.0}, {"text": "So there are some of optimizations", "timestamp": "00:15:07,354", "timestamp_s": 907.0}, {"text": "that I did, and I\u0027m going to talk about those things. So using function versus", "timestamp": "00:15:11,354", "timestamp_s": 911.0}, {"text": "class, actually up until nodejs 18,", "timestamp": "00:15:14,702", "timestamp_s": 914.0}, {"text": "up until v eight 9.59.7 version,", "timestamp": "00:15:18,550", "timestamp_s": 918.0}, {"text": "if you create a class and have private variables on", "timestamp": "00:15:22,558", "timestamp_s": 922.0}, {"text": "top of it, it was actually 55% slower.", "timestamp": "00:15:26,348", "timestamp_s": 926.0}, {"text": "And just by converting a class to function, a bit", "timestamp": "00:15:29,586", "timestamp_s": 929.0}, {"text": "like function prototype kind of keywords,", "timestamp": "00:15:33,356", "timestamp_s": 933.0}, {"text": "it makes your code 55% faster. So this is one of the first", "timestamp": "00:15:37,906", "timestamp_s": 937.0}, {"text": "optimizations that I did. The second thing was if", "timestamp": "00:15:42,670", "timestamp_s": 942.0}, {"text": "you change your conditional function to", "timestamp": "00:15:47,312", "timestamp_s": 947.0}, {"text": "switch, or if it actually improves", "timestamp": "00:15:51,890", "timestamp_s": 951.0}, {"text": "your quota. So if you have more than ten keys,", "timestamp": "00:15:56,218", "timestamp_s": 956.0}, {"text": "if you\u0027re doing an if else statement, actually converting it to switch", "timestamp": "00:16:00,130", "timestamp_s": 960.0}, {"text": "is faster. If you have less than ten,", "timestamp": "00:16:03,258", "timestamp_s": 963.0}, {"text": "then if is faster. So again,", "timestamp": "00:16:06,152", "timestamp_s": 966.0}, {"text": "it depends on how your implementation is going, and you need to choose correctly", "timestamp": "00:16:09,000", "timestamp_s": 969.0}, {"text": "and do some micro benchmarks in order to understand. But again,", "timestamp": "00:16:12,878", "timestamp_s": 972.0}, {"text": "if you\u0027re using a new node version, these dynamics can change because", "timestamp": "00:16:18,410", "timestamp_s": 978.0}, {"text": "there are micro benchmarking that are based on v eight.", "timestamp": "00:16:21,852", "timestamp_s": 981.0}, {"text": "So there\u0027s another one that like string to number comparison.", "timestamp": "00:16:25,530", "timestamp_s": 985.0}, {"text": "This is really important because if you want to compare, let\u0027s say string, how would", "timestamp": "00:16:29,170", "timestamp_s": 989.0}, {"text": "you compare two different strings? First you would check for if their lengths", "timestamp": "00:16:32,448", "timestamp_s": 992.0}, {"text": "are equal. If their lengths are equal, then you would traverse every", "timestamp": "00:16:35,782", "timestamp_s": 995.0}, {"text": "character one by one and make sure that each character is equal to each", "timestamp": "00:16:39,552", "timestamp_s": 999.0}, {"text": "other. This means that I need to access all of", "timestamp": "00:16:43,428", "timestamp_s": 1003.0}, {"text": "these compared strings, each character one time, and then", "timestamp": "00:16:46,948", "timestamp_s": 1006.0}, {"text": "make an equal operation and then check it. So this is one of the idiomatic", "timestamp": "00:16:50,980", "timestamp_s": 1010.0}, {"text": "implementations that you need to do. So just", "timestamp": "00:16:55,646", "timestamp_s": 1015.0}, {"text": "by changing my alternative, like my states from strings to", "timestamp": "00:16:59,512", "timestamp_s": 1019.0}, {"text": "numbers, which means that this is one of the changes that I did.", "timestamp": "00:17:03,320", "timestamp_s": 1023.0}, {"text": "The authority 100 schemes start 101,", "timestamp": "00:17:06,376", "timestamp_s": 1026.0}, {"text": "I had a really huge performance.", "timestamp": "00:17:10,730", "timestamp_s": 1030.0}, {"text": "So this is one of the changes that I did,", "timestamp": "00:17:14,338", "timestamp_s": 1034.0}, {"text": "again, really important. One of the other thing is that", "timestamp": "00:17:17,850", "timestamp_s": 1037.0}, {"text": "with slice versus substring. Slice creates a new", "timestamp": "00:17:21,548", "timestamp_s": 1041.0}, {"text": "string, substring does not, but actually", "timestamp": "00:17:25,216", "timestamp_s": 1045.0}, {"text": "slice is faster. This is one of the examples. Instead of having", "timestamp": "00:17:29,616", "timestamp_s": 1049.0}, {"text": "substring this point to plus one and this input length, I just change it", "timestamp": "00:17:34,370", "timestamp_s": 1054.0}, {"text": "with a slice and calculation of fragment is", "timestamp": "00:17:37,988", "timestamp_s": 1057.0}, {"text": "a lot faster. On top of that is none.", "timestamp": "00:17:41,364", "timestamp_s": 1061.0}, {"text": "So defining if it\u0027s not a number versus if it\u0027s checking for", "timestamp": "00:17:45,598", "timestamp_s": 1065.0}, {"text": "undefined is actually really", "timestamp": "00:17:49,608", "timestamp_s": 1069.0}, {"text": "costly operation. This is one of the mistakes that I did. Not a", "timestamp": "00:17:53,750", "timestamp_s": 1073.0}, {"text": "mistake, but it was mentioned directly in the URL", "timestamp": "00:17:57,244", "timestamp_s": 1077.0}, {"text": "parser specification and I wanted to be 100% compliant", "timestamp": "00:18:01,026", "timestamp_s": 1081.0}, {"text": "to it. So in order to make it faster. Right now I\u0027m starting", "timestamp": "00:18:05,058", "timestamp_s": 1085.0}, {"text": "to divert from the specification", "timestamp": "00:18:08,940", "timestamp_s": 1088.0}, {"text": "and I\u0027m trying to introduce optimizations of it. So this is what happens with", "timestamp": "00:18:12,390", "timestamp_s": 1092.0}, {"text": "all of those runtimes. If you want to make things faster, you need to find", "timestamp": "00:18:16,288", "timestamp_s": 1096.0}, {"text": "shortcuts. And those shortcuts are not always", "timestamp": "00:18:20,000", "timestamp_s": 1100.0}, {"text": "means that you are going to follow specification. And then there", "timestamp": "00:18:25,090", "timestamp_s": 1105.0}, {"text": "might be some uncode issues that might occur.", "timestamp": "00:18:28,452", "timestamp_s": 1108.0}, {"text": "And because you are not following the specification, it will be also super hard for", "timestamp": "00:18:31,818", "timestamp_s": 1111.0}, {"text": "you to track. So yeah, instead of saying core point", "timestamp": "00:18:35,928", "timestamp_s": 1115.0}, {"text": "and accessing grid, I just checked it for if", "timestamp": "00:18:39,816", "timestamp_s": 1119.0}, {"text": "it\u0027s undefined, undefined. If it\u0027s not, just get the core point at", "timestamp": "00:18:43,192", "timestamp_s": 1123.0}, {"text": "character zero. And this is also a really huge", "timestamp": "00:18:46,616", "timestamp_s": 1126.0}, {"text": "boost. Instead of saying is none, then I\u0027m just", "timestamp": "00:18:50,220", "timestamp_s": 1130.0}, {"text": "checking for if it\u0027s undefined again.", "timestamp": "00:18:53,404", "timestamp_s": 1133.0}, {"text": "So one of the again, most important parts", "timestamp": "00:18:57,630", "timestamp_s": 1137.0}, {"text": "of optimization is memorization. If you\u0027re recalculating", "timestamp": "00:19:01,478", "timestamp_s": 1141.0}, {"text": "a variable every time, if you\u0027re doing comparison many times,", "timestamp": "00:19:05,926", "timestamp_s": 1145.0}, {"text": "then if you store that variable in the memory and then access", "timestamp": "00:19:09,296", "timestamp_s": 1149.0}, {"text": "to that variable in the function callback,", "timestamp": "00:19:13,908", "timestamp_s": 1153.0}, {"text": "then again super fast. So this is", "timestamp": "00:19:17,530", "timestamp_s": 1157.0}, {"text": "one of the optimizations that I did. So the URL", "timestamp": "00:19:21,108", "timestamp_s": 1161.0}, {"text": "specification actually states that you need to check", "timestamp": "00:19:25,510", "timestamp_s": 1165.0}, {"text": "for if the current URL scheme is a special schemes", "timestamp": "00:19:29,096", "timestamp_s": 1169.0}, {"text": "state. So previously I was just checking", "timestamp": "00:19:33,006", "timestamp_s": 1173.0}, {"text": "if it\u0027s in an object of special schemes, then I", "timestamp": "00:19:37,590", "timestamp_s": 1177.0}, {"text": "would assume that it was a special URL. But the thing is, you just need", "timestamp": "00:19:41,468", "timestamp_s": 1181.0}, {"text": "to set these if it\u0027s a special URL or not, when you", "timestamp": "00:19:44,588", "timestamp_s": 1184.0}, {"text": "are changing the URL scheme, then it\u0027s actually a lot faster.", "timestamp": "00:19:48,608", "timestamp_s": 1188.0}, {"text": "So let\u0027s do some statistics. So because", "timestamp": "00:19:52,990", "timestamp_s": 1192.0}, {"text": "of the work that I did, there\u0027s almost 2000", "timestamp": "00:19:57,072", "timestamp_s": 1197.0}, {"text": "lines of code was written, more than 800 benchmarks", "timestamp": "00:20:00,352", "timestamp_s": 1200.0}, {"text": "was run, and the current implementation is 99.9", "timestamp": "00:20:05,114", "timestamp_s": 1205.0}, {"text": "perfect spec compliant, that\u0027s 0.1%.", "timestamp": "00:20:08,692", "timestamp_s": 1208.0}, {"text": "That one test is related to text encoders and", "timestamp": "00:20:12,484", "timestamp_s": 1212.0}, {"text": "like encoding UTF eight and UTF 16.", "timestamp": "00:20:16,072", "timestamp_s": 1216.0}, {"text": "But it again can be completed 100% really", "timestamp": "00:20:19,518", "timestamp_s": 1219.0}, {"text": "easily. There were 733 successful", "timestamp": "00:20:22,952", "timestamp_s": 1222.0}, {"text": "web platform tests that was run in under to make sure that our implementing", "timestamp": "00:20:26,942", "timestamp_s": 1226.0}, {"text": "is correct. And even though I use all", "timestamp": "00:20:30,946", "timestamp_s": 1230.0}, {"text": "of the I tested all of those WPT tests,", "timestamp": "00:20:34,268", "timestamp_s": 1234.0}, {"text": "it was actually 96% covered", "timestamp": "00:20:39,630", "timestamp_s": 1239.0}, {"text": "in the tests. So this means that the URL specification", "timestamp": "00:20:43,782", "timestamp_s": 1243.0}, {"text": "does not have the necessary tests to cover 100%", "timestamp": "00:20:47,558", "timestamp_s": 1247.0}, {"text": "of the code that was written. And I", "timestamp": "00:20:51,636", "timestamp_s": 1251.0}, {"text": "think this should be handled on the web platform test.", "timestamp": "00:20:54,788", "timestamp_s": 1254.0}, {"text": "So performance in terms of", "timestamp": "00:20:58,932", "timestamp_s": 1258.0}, {"text": "performance, the JavaScript based parser was 566 66%", "timestamp": "00:21:02,468", "timestamp_s": 1262.0}, {"text": "faster compared to the other", "timestamp": "00:21:08,120", "timestamp_s": 1268.0}, {"text": "JavaScript implementation, but again it was 95", "timestamp": "00:21:11,576", "timestamp_s": 1271.0}, {"text": "and 96% slower than the native C plus plays implementation.", "timestamp": "00:21:15,112", "timestamp_s": 1275.0}, {"text": "So what basically is that there\u0027s a really", "timestamp": "00:21:18,930", "timestamp_s": 1278.0}, {"text": "great guy from Brooklyn that said that great power comes with", "timestamp": "00:21:22,652", "timestamp_s": 1282.0}, {"text": "great responsibility after v eight fixes this performance problem. So we are", "timestamp": "00:21:26,012", "timestamp_s": 1286.0}, {"text": "really dependent on v eight on performance, and I hope we", "timestamp": "00:21:29,468", "timestamp_s": 1289.0}, {"text": "will have some breakthroughs in the future. So a small", "timestamp": "00:21:33,708", "timestamp_s": 1293.0}, {"text": "footnote, this is a product, this, this whole presentation,", "timestamp": "00:21:37,276", "timestamp_s": 1297.0}, {"text": "this whole project was a product of my graduation thesis,", "timestamp": "00:21:41,226", "timestamp_s": 1301.0}, {"text": "Fordham University. And so I would like to thank William Lord from", "timestamp": "00:21:44,842", "timestamp_s": 1304.0}, {"text": "Fordham University, as well as James Nell and Mario", "timestamp": "00:21:48,308", "timestamp_s": 1308.0}, {"text": "Colina from Nodejs and", "timestamp": "00:21:51,578", "timestamp_s": 1311.0}, {"text": "thank you for that. And thank you for listening.", "timestamp": "00:21:55,604", "timestamp_s": 1315.0}];
+              var transcript = [{"text": ["Jamaica real"], "timestamp": "00:00:00,410", "timestamp_s": 0.0}, {"text": ["time feedback into the behavior of your distributed systems"], "timestamp": "00:00:06,212", "timestamp_s": 6.0}, {"text": ["and observing changes exceptions errors in"], "timestamp": "00:00:09,674", "timestamp_s": 9.0}, {"text": ["real time allows you to not only experiment with confidence,"], "timestamp": "00:00:13,412", "timestamp_s": 13.0}, {"text": ["but respond instantly to get things working again."], "timestamp": "00:00:16,858", "timestamp_s": 16.0}, {"text": ["Close today"], "timestamp": "00:00:24,610", "timestamp_s": 24.0}, {"text": ["I\u0027m going to be talking about implementing a performance URL parser"], "timestamp": "00:00:49,136", "timestamp_s": 49.0}, {"text": ["from scratch. So before we start, I want to"], "timestamp": "00:00:52,698", "timestamp_s": 52.0}, {"text": ["give some a little bit of information about me I\u0027m"], "timestamp": "00:00:56,164", "timestamp_s": 56.0}, {"text": ["yold Nizipli. I\u0027m a software engineer. I\u0027m a master\u0027s"], "timestamp": "00:01:00,042", "timestamp_s": 60.0}, {"text": ["student at Fordham University."], "timestamp": "00:01:03,882", "timestamp_s": 63.0}, {"text": ["I\u0027m a node core collaborator and performance team member."], "timestamp": "00:01:07,110", "timestamp_s": 67.0}, {"text": ["Ive been mainly focusing on text encoders and decoders and the"], "timestamp": "00:01:10,846", "timestamp_s": 70.0}, {"text": ["performant in nodeshifts. I\u0027m the creator of"], "timestamp": "00:01:14,248", "timestamp_s": 74.0}, {"text": ["URL state machine and fast query string."], "timestamp": "00:01:18,268", "timestamp_s": 78.0}, {"text": ["So let\u0027s give a little bit of a background before"], "timestamp": "00:01:21,770", "timestamp_s": 81.0}, {"text": ["we start into what URL parses are and"], "timestamp": "00:01:25,356", "timestamp_s": 85.0}, {"text": ["how that goes. So a little bit of brief introduction to"], "timestamp": "00:01:28,924", "timestamp_s": 88.0}, {"text": ["JavaScript runtimes. So nodejs is a runtime on top"], "timestamp": "00:01:32,288", "timestamp_s": 92.0}, {"text": ["of v eight engine, the JavaScript engine behind chromium."], "timestamp": "00:01:36,288", "timestamp_s": 96.0}, {"text": ["Just like Nodejs, Dino is also using v eight and"], "timestamp": "00:01:40,750", "timestamp_s": 100.0}, {"text": ["a little bit of new runtime bound GS using webkit"], "timestamp": "00:01:44,436", "timestamp_s": 104.0}, {"text": ["as a runtime."], "timestamp": "00:01:48,282", "timestamp_s": 108.0}, {"text": ["Basically in JavaScript runtimes is that whenever"], "timestamp": "00:01:53,030", "timestamp_s": 113.0}, {"text": ["you call a function, the javascript under lines user"], "timestamp": "00:01:57,358", "timestamp_s": 117.0}, {"text": ["land runs a c plus plus code using a bridge through node js."], "timestamp": "00:02:00,718", "timestamp_s": 120.0}, {"text": ["And the value that you retrieve"], "timestamp": "00:02:04,702", "timestamp_s": 124.0}, {"text": ["from the C Plus plus is deserialized on the JavaScript side and then present"], "timestamp": "00:02:08,718", "timestamp_s": 128.0}, {"text": ["to the user, which is the developer so computationally has a"], "timestamp": "00:02:12,396", "timestamp_s": 132.0}, {"text": ["function living in C plays plus. This means that you don\u0027t need to focus"], "timestamp": "00:02:15,868", "timestamp_s": 135.0}, {"text": ["any of your code in JavaScript, but you can write it in"], "timestamp": "00:02:21,712", "timestamp_s": 141.0}, {"text": ["c if you want to produce performant"], "timestamp": "00:02:24,848", "timestamp_s": 144.0}, {"text": ["code. So let\u0027s start with URL parsers."], "timestamp": "00:02:28,774", "timestamp_s": 148.0}, {"text": ["Why URL parser matters? So URL parsers are"], "timestamp": "00:02:33,170", "timestamp_s": 153.0}, {"text": ["the most important functionality for a web server. Every single network request"], "timestamp": "00:02:36,324", "timestamp_s": 156.0}, {"text": ["uses URL parser, and it basically creates"], "timestamp": "00:02:40,602", "timestamp_s": 160.0}, {"text": ["the baseline of benchmarks with any"], "timestamp": "00:02:43,934", "timestamp_s": 163.0}, {"text": ["network request. So this is"], "timestamp": "00:02:47,560", "timestamp_s": 167.0}, {"text": ["an example of a diagram of a request coming to a server. So it\u0027s basically"], "timestamp": "00:02:51,208", "timestamp_s": 171.0}, {"text": ["on the left side there\u0027s this person, let\u0027s say Alice or Bob."], "timestamp": "00:02:55,208", "timestamp_s": 175.0}, {"text": ["Bob submits a credential through user"], "timestamp": "00:03:00,730", "timestamp_s": 180.0}, {"text": ["agent which sends to the client. The client sends a"], "timestamp": "00:03:04,098", "timestamp_s": 184.0}, {"text": ["request, submits the credentials client id, redirect URL"], "timestamp": "00:03:07,996", "timestamp_s": 187.0}, {"text": ["to authorization server authorization, returns authorization code,"], "timestamp": "00:03:11,318", "timestamp_s": 191.0}, {"text": ["and then user agents like redirects authorization code and client request"], "timestamp": "00:03:14,768", "timestamp_s": 194.0}, {"text": ["token and so on and so forth. So basically every arrow from left"], "timestamp": "00:03:18,838", "timestamp_s": 198.0}, {"text": ["to right includes a URL,"], "timestamp": "00:03:22,228", "timestamp_s": 202.0}, {"text": ["and for every left to right request it"], "timestamp": "00:03:25,258", "timestamp_s": 205.0}, {"text": ["needs to parse and understand"], "timestamp": "00:03:29,012", "timestamp_s": 209.0}, {"text": ["what that URL is and what the path is. So that\u0027s where URL"], "timestamp": "00:03:32,964", "timestamp_s": 212.0}, {"text": ["parses come in. So URL parser is a very significant"], "timestamp": "00:03:36,878", "timestamp_s": 216.0}, {"text": ["component, but it\u0027s too complex and leads to bugs and that\u0027s why"], "timestamp": "00:03:40,286", "timestamp_s": 220.0}, {"text": ["nobody focuses and nobody wants to focus on"], "timestamp": "00:03:44,008", "timestamp_s": 224.0}, {"text": ["it. So this is one of the examples while I was"], "timestamp": "00:03:47,368", "timestamp_s": 227.0}, {"text": ["working on this project is that I thought"], "timestamp": "00:03:50,780", "timestamp_s": 230.0}, {"text": ["that I found a bug and it seems that like 256-25-6256"], "timestamp": "00:03:54,268", "timestamp_s": 234.0}, {"text": ["URL is invalid. And one of the libraries what"], "timestamp": "00:03:58,620", "timestamp_s": 238.0}, {"text": ["we URL recommended that actually it worked in Chrome and"], "timestamp": "00:04:02,428", "timestamp_s": 242.0}, {"text": ["safari, but not in Node Js. So this means that the initial"], "timestamp": "00:04:05,632", "timestamp_s": 245.0}, {"text": ["implementing of a URL parser was somehow wrong or not"], "timestamp": "00:04:09,462", "timestamp_s": 249.0}, {"text": ["up to date. So after"], "timestamp": "00:04:12,868", "timestamp_s": 252.0}, {"text": ["this feedback that I get, I opened an"], "timestamp": "00:04:16,196", "timestamp_s": 256.0}, {"text": ["issue like URL parsers does not relate to IP before with more than four parts."], "timestamp": "00:04:19,508", "timestamp_s": 259.0}, {"text": ["This is one of the issues, URL is not compliant with specification."], "timestamp": "00:04:23,226", "timestamp_s": 263.0}, {"text": ["This is another issue created by me and later they\u0027re all"], "timestamp": "00:04:26,686", "timestamp_s": 266.0}, {"text": ["fixed. But let\u0027s"], "timestamp": "00:04:30,472", "timestamp_s": 270.0}, {"text": ["talk about the goal of a URL parser. What is the goal?"], "timestamp": "00:04:33,678", "timestamp_s": 273.0}, {"text": ["Basically, if you look into this diagram, you will see on the"], "timestamp": "00:04:38,090", "timestamp_s": 278.0}, {"text": ["orange side that HTTPs userpassample.com"], "timestamp": "00:04:42,108", "timestamp_s": 282.0}, {"text": ["80 80. So basically HTTPs is the protocol."], "timestamp": "00:04:46,524", "timestamp_s": 286.0}, {"text": ["Username password is an optional value with add characters"], "timestamp": "00:04:50,166", "timestamp_s": 290.0}, {"text": ["and then hostname is always there."], "timestamp": "00:04:54,518", "timestamp_s": 294.0}, {"text": ["The port, if it\u0027s another special"], "timestamp": "00:04:57,470", "timestamp_s": 297.0}, {"text": ["port which is like 80 or four, four three. It\u0027s not required because URL parsers"], "timestamp": "00:05:01,136", "timestamp_s": 301.0}, {"text": ["understand that. And then we might need some path name"], "timestamp": "00:05:05,494", "timestamp_s": 305.0}, {"text": ["and search and hash. So if you look at from this diagram, you can"], "timestamp": "00:05:09,012", "timestamp_s": 309.0}, {"text": ["easily say that oh, okay, it\u0027s really easy to understand and implement URL parse,"], "timestamp": "00:05:12,228", "timestamp_s": 312.0}, {"text": ["right? You just need to get, if it starts with HTTPs,"], "timestamp": "00:05:15,978", "timestamp_s": 315.0}, {"text": ["if there\u0027s a user and path, what about hostnames? What about ports?"], "timestamp": "00:05:19,510", "timestamp_s": 319.0}, {"text": ["What about path name? We want to make sure that the search"], "timestamp": "00:05:23,358", "timestamp_s": 323.0}, {"text": ["is a valid one and so on and so forth. But it\u0027s not"], "timestamp": "00:05:26,712", "timestamp_s": 326.0}, {"text": ["as easy as writing a regex and it\u0027s much more complicated."], "timestamp": "00:05:30,172", "timestamp_s": 330.0}, {"text": ["So what is the state machine behind it? There is actually a specification"], "timestamp": "00:05:34,570", "timestamp_s": 334.0}, {"text": ["for writing URL parsers and this is an"], "timestamp": "00:05:38,406", "timestamp_s": 338.0}, {"text": ["example of it. This represents all of the state machines"], "timestamp": "00:05:42,400", "timestamp_s": 342.0}, {"text": ["that needs to traverse"], "timestamp": "00:05:46,750", "timestamp_s": 346.0}, {"text": ["in order to complete the URL parser. So if you look at from"], "timestamp": "00:05:50,830", "timestamp_s": 350.0}, {"text": ["a much more closer perspective, there is a schema start"], "timestamp": "00:05:54,212", "timestamp_s": 354.0}, {"text": ["state scheme. Start state can go to no schema state. Let\u0027s say we don\u0027t have"], "timestamp": "00:05:57,636", "timestamp_s": 357.0}, {"text": ["HTTP HTTPs. If it starts,"], "timestamp": "00:06:01,412", "timestamp_s": 361.0}, {"text": ["then it\u0027s schema state. Then we need to parse that schema."], "timestamp": "00:06:04,842", "timestamp_s": 364.0}, {"text": ["What is that valid one? What are the valid ones. If it\u0027s HTTPs"], "timestamp": "00:06:08,062", "timestamp_s": 368.0}, {"text": ["then we might omit the port part because"], "timestamp": "00:06:11,854", "timestamp_s": 371.0}, {"text": ["HTTPs is always four four, three. If it\u0027s HTTP then"], "timestamp": "00:06:15,640", "timestamp_s": 375.0}, {"text": ["it\u0027s 80 if it\u0027s SSH. So there are some special cases"], "timestamp": "00:06:19,308", "timestamp_s": 379.0}, {"text": ["and according to schema state it can go to special authority estate,"], "timestamp": "00:06:22,626", "timestamp_s": 382.0}, {"text": ["special relative authority state or relative state."], "timestamp": "00:06:27,218", "timestamp_s": 387.0}, {"text": ["So special authority estate, which means that either I"], "timestamp": "00:06:30,476", "timestamp_s": 390.0}, {"text": ["have a username password kind of combination,"], "timestamp": "00:06:34,128", "timestamp_s": 394.0}, {"text": ["so I need to parse that state. If it\u0027s a special relative or authority"], "timestamp": "00:06:37,062", "timestamp_s": 397.0}, {"text": ["state, it can be a file path. In windows it\u0027s"], "timestamp": "00:06:40,902", "timestamp_s": 400.0}, {"text": ["something else, in Mac OS Unix systems it\u0027s something"], "timestamp": "00:06:44,118", "timestamp_s": 404.0}, {"text": ["else. And according to that, it can be a relative state. It can be a"], "timestamp": "00:06:47,236", "timestamp_s": 407.0}, {"text": ["relative state. So it\u0027s not as easy as writing regex or"], "timestamp": "00:06:50,644", "timestamp_s": 410.0}, {"text": ["userland. So this is one of the states that are available in the URL"], "timestamp": "00:06:54,328", "timestamp_s": 414.0}, {"text": ["parsing specification. So let\u0027s"], "timestamp": "00:06:57,998", "timestamp_s": 417.0}, {"text": ["dive into scheme start state. So if c"], "timestamp": "00:07:01,694", "timestamp_s": 421.0}, {"text": ["sees a character is an ASG alpha append c lowercase"], "timestamp": "00:07:05,224", "timestamp_s": 425.0}, {"text": ["to buffer and set the state to schema state. So this is pretty straightforward."], "timestamp": "00:07:09,202", "timestamp_s": 429.0}, {"text": ["Otherwise, if state override is not given, set state"], "timestamp": "00:07:12,866", "timestamp_s": 432.0}, {"text": ["to no scheme state and decrease pointer by one, otherwise validationary"], "timestamp": "00:07:16,012", "timestamp_s": 436.0}, {"text": ["return further. So if you look at from this perspective, it\u0027s pretty straightforward,"], "timestamp": "00:07:19,698", "timestamp_s": 439.0}, {"text": ["right? But this is one of the, I think 20 states"], "timestamp": "00:07:23,686", "timestamp_s": 443.0}, {"text": ["that are available in this specification. So let\u0027s"], "timestamp": "00:07:28,592", "timestamp_s": 448.0}, {"text": ["look into a little bit more complex efforts. No scheme state."], "timestamp": "00:07:31,718", "timestamp_s": 451.0}, {"text": ["What happens if I don\u0027t have a HTTP, HTTPs and so on and so"], "timestamp": "00:07:35,220", "timestamp_s": 455.0}, {"text": ["forth? If base is null or base has an OPAC path and c is not"], "timestamp": "00:07:38,948", "timestamp_s": 458.0}, {"text": ["u, which is like hashtag validation error return failure."], "timestamp": "00:07:42,756", "timestamp_s": 462.0}, {"text": ["So first of all we need to know what is an OPAC path? It\u0027s all"], "timestamp": "00:07:45,758", "timestamp_s": 465.0}, {"text": ["explained in the documentation."], "timestamp": "00:07:49,496", "timestamp_s": 469.0}, {"text": ["Otherwise, if base has an OpAC path and sees an hashtag set"], "timestamp": "00:07:52,550", "timestamp_s": 472.0}, {"text": ["URL scheme to the base scheme, URL path to path URL query"], "timestamp": "00:07:56,152", "timestamp_s": 476.0}, {"text": ["base and URL fragment to the empty stream. So if my path starts with"], "timestamp": "00:07:59,806", "timestamp_s": 479.0}, {"text": ["a hashtag, which means that this is a fragment state, so the URL needs to"], "timestamp": "00:08:03,548", "timestamp_s": 483.0}, {"text": ["go to the fragment state and that\u0027s one of the end states, otherwise blah."], "timestamp": "00:08:07,004", "timestamp_s": 487.0}, {"text": ["So this is what URL specification"], "timestamp": "00:08:10,966", "timestamp_s": 490.0}, {"text": ["URL part of specification is all about."], "timestamp": "00:08:14,726", "timestamp_s": 494.0}, {"text": ["I kind of hear, why are we even"], "timestamp": "00:08:19,790", "timestamp_s": 499.0}, {"text": ["talking about it? So the main issue that"], "timestamp": "00:08:22,932", "timestamp_s": 502.0}, {"text": ["actually led me to this implementation is that there\u0027s a significant"], "timestamp": "00:08:26,532", "timestamp_s": 506.0}, {"text": ["performance issue with what Wegrl in node js,"], "timestamp": "00:08:30,850", "timestamp_s": 510.0}, {"text": ["and in order to update it there was"], "timestamp": "00:08:33,902", "timestamp_s": 513.0}, {"text": ["an issue opened and I"], "timestamp": "00:08:37,992", "timestamp_s": 517.0}, {"text": ["wanted to make it faster. So can it be faster? So this is"], "timestamp": "00:08:41,992", "timestamp_s": 521.0}, {"text": ["one of the issues re implement was VGrL parser and Wassem."], "timestamp": "00:08:45,544", "timestamp_s": 525.0}, {"text": ["The URL is there for you if you want to look."], "timestamp": "00:08:49,850", "timestamp_s": 529.0}, {"text": ["And it was actually opened by one of the technical"], "timestamp": "00:08:53,290", "timestamp_s": 533.0}, {"text": ["steering committee members, which is James Nell."], "timestamp": "00:08:56,706", "timestamp_s": 536.0}, {"text": ["He basically said that it should be possible to realize a"], "timestamp": "00:09:00,274", "timestamp_s": 540.0}, {"text": ["significant performant improvement by porting the implementation to WASM."], "timestamp": "00:09:03,344", "timestamp_s": 543.0}, {"text": ["So wasm is webassembly. So if we implementing the URL"], "timestamp": "00:09:07,334", "timestamp_s": 547.0}, {"text": ["parser through WASM, then we might get a URL"], "timestamp": "00:09:11,878", "timestamp_s": 551.0}, {"text": ["parser. So this was pretty interesting to me, because right now I know what"], "timestamp": "00:09:15,338", "timestamp_s": 555.0}, {"text": ["I needed to do. I need to port the implementation in a language that\u0027s"], "timestamp": "00:09:18,948", "timestamp_s": 558.0}, {"text": ["performant like C or rust,"], "timestamp": "00:09:22,958", "timestamp_s": 562.0}, {"text": ["and then I need to expose the API through"], "timestamp": "00:09:26,238", "timestamp_s": 566.0}, {"text": ["webassembly so that node js applications can consume it."], "timestamp": "00:09:29,576", "timestamp_s": 569.0}, {"text": ["But before we start, let\u0027s take a step back and understand what our"], "timestamp": "00:09:33,910", "timestamp_s": 573.0}, {"text": ["options are. Webassembly is really webassembly"], "timestamp": "00:09:37,532", "timestamp_s": 577.0}, {"text": ["our only option. The potential solutions,"], "timestamp": "00:09:41,378", "timestamp_s": 581.0}, {"text": ["not for writing URL parses, but also for most of the application,"], "timestamp": "00:09:44,786", "timestamp_s": 584.0}, {"text": ["is that you can either compile C, rust or any other language"], "timestamp": "00:09:48,380", "timestamp_s": 588.0}, {"text": ["through webassembly and expose the API. Or you can"], "timestamp": "00:09:52,550", "timestamp_s": 592.0}, {"text": ["write an API which is node API in C rust,"], "timestamp": "00:09:55,872", "timestamp_s": 595.0}, {"text": ["and you can actually run the C code and expose it"], "timestamp": "00:09:59,206", "timestamp_s": 599.0}, {"text": ["through the c binding. Or you can write a pure Javascript."], "timestamp": "00:10:02,548", "timestamp_s": 602.0}, {"text": ["So we don\u0027t want to write and expose our"], "timestamp": "00:10:05,626", "timestamp_s": 605.0}, {"text": ["implementation through C"], "timestamp": "00:10:09,092", "timestamp_s": 609.0}, {"text": ["and rust through any API, because that\u0027s the actual implementing what\u0027s"], "timestamp": "00:10:12,532", "timestamp_s": 612.0}, {"text": ["happening right now. So let\u0027s start with webassembly then."], "timestamp": "00:10:15,998", "timestamp_s": 615.0}, {"text": ["So I chose rust because it\u0027s"], "timestamp": "00:10:20,088", "timestamp_s": 620.0}, {"text": ["proven that rust is super performance. Actually,"], "timestamp": "00:10:24,078", "timestamp_s": 624.0}, {"text": ["I wanted to learn rust. So this is one of the emotional"], "timestamp": "00:10:27,276", "timestamp_s": 627.0}, {"text": ["decisions that led to this decision making process."], "timestamp": "00:10:30,914", "timestamp_s": 630.0}, {"text": ["So webassembly and rust is a really good job thanks to Firefox. There are lots"], "timestamp": "00:10:35,690", "timestamp_s": 635.0}, {"text": ["of contributions on that side. There are really great libraries, and the ecosystem is ready"], "timestamp": "00:10:39,298", "timestamp_s": 639.0}, {"text": ["for mass adoption. And one of the"], "timestamp": "00:10:43,136", "timestamp_s": 643.0}, {"text": ["most crucial parts in nodejs, and on top"], "timestamp": "00:10:46,688", "timestamp_s": 646.0}, {"text": ["of that there was umdichi. Umdichi is a really good example."], "timestamp": "00:10:50,192", "timestamp_s": 650.0}, {"text": ["It\u0027s backed by node and actually"], "timestamp": "00:10:53,810", "timestamp_s": 653.0}, {"text": ["by using webassembly and compiling LLA HTTP"], "timestamp": "00:10:57,876", "timestamp_s": 657.0}, {"text": ["to webassembly, they had a 1329%"], "timestamp": "00:11:02,090", "timestamp_s": 662.0}, {"text": ["performance boost and it was really good, and it was the basis of webassembly."], "timestamp": "00:11:07,160", "timestamp_s": 667.0}, {"text": ["But these are the expectations. But the reality is decoding"], "timestamp": "00:11:11,262", "timestamp_s": 671.0}, {"text": ["UTF 16 to UDF eight."], "timestamp": "00:11:15,102", "timestamp_s": 675.0}, {"text": ["Webassembly communication relies on shared memory. Okay, there\u0027s some"], "timestamp": "00:11:18,470", "timestamp_s": 678.0}, {"text": ["problems with deserialization, and deserialization of that data."], "timestamp": "00:11:21,948", "timestamp_s": 681.0}, {"text": ["Shared memory requires decoding and encoding. So text"], "timestamp": "00:11:25,290", "timestamp_s": 685.0}, {"text": ["encoding and decoding in nodejs relies on c plays plus, which means that we\u0027re"], "timestamp": "00:11:30,236", "timestamp_s": 690.0}, {"text": ["going to use text encoder and text decoder. So why"], "timestamp": "00:11:33,878", "timestamp_s": 693.0}, {"text": ["did we end up with text nodejs?"], "timestamp": "00:11:38,592", "timestamp_s": 698.0}, {"text": ["So a quick recap. So the goal of this presentation"], "timestamp": "00:11:41,490", "timestamp_s": 701.0}, {"text": ["was that we are trying to improve the existing implementing improving"], "timestamp": "00:11:45,002", "timestamp_s": 705.0}, {"text": ["by removing the c bridge,"], "timestamp": "00:11:49,546", "timestamp_s": 709.0}, {"text": ["but text encoding and decoding in node"], "timestamp": "00:11:52,930", "timestamp_s": 712.0}, {"text": ["js relied on c. So let\u0027s do a benchmark about"], "timestamp": "00:11:56,602", "timestamp_s": 716.0}, {"text": ["all of those things. If you use a webassembly and"], "timestamp": "00:12:00,232", "timestamp_s": 720.0}, {"text": ["if you use rust and expose it through webassembly,"], "timestamp": "00:12:03,640", "timestamp_s": 723.0}, {"text": ["this is again roughly estimation. This is not a full"], "timestamp": "00:12:08,490", "timestamp_s": 728.0}, {"text": ["feature set URL parses that\u0027s written in rust, but the rust"], "timestamp": "00:12:11,724", "timestamp_s": 731.0}, {"text": ["implementing is 28 24% slower."], "timestamp": "00:12:15,682", "timestamp_s": 735.0}, {"text": ["For URL constructor, this is just by passing the"], "timestamp": "00:12:18,742", "timestamp_s": 738.0}, {"text": ["URL and returning an object. That\u0027s it."], "timestamp": "00:12:22,448", "timestamp_s": 742.0}, {"text": ["On the other side, URL search param set is 86%"], "timestamp": "00:12:26,910", "timestamp_s": 746.0}, {"text": ["slower because whenever you are calling set, get those kind"], "timestamp": "00:12:31,376", "timestamp_s": 751.0}, {"text": ["of variables. There\u0027s a c plus plus to JavaScript communication,"], "timestamp": "00:12:34,948", "timestamp_s": 754.0}, {"text": ["which is we are using webassembly but there\u0027s always a bridge between it and for"], "timestamp": "00:12:38,490", "timestamp_s": 758.0}, {"text": ["fm it\u0027s 96% slower. The main"], "timestamp": "00:12:42,228", "timestamp_s": 762.0}, {"text": ["reason for URL search params is slobber is that because it\u0027s"], "timestamp": "00:12:45,748", "timestamp_s": 765.0}, {"text": ["actually implemented in JavaScript and nodejs. But I wanted to make"], "timestamp": "00:12:49,198", "timestamp_s": 769.0}, {"text": ["sure that if it\u0027s possible to also improve the URL search parameters implementation"], "timestamp": "00:12:52,968", "timestamp_s": 772.0}, {"text": ["too. So it means that it\u0027s 86% slower."], "timestamp": "00:12:57,202", "timestamp_s": 777.0}, {"text": ["That\u0027s a fact, not a random number."], "timestamp": "00:13:00,418", "timestamp_s": 780.0}, {"text": ["And here we are again, we are starting this"], "timestamp": "00:13:03,130", "timestamp_s": 783.0}, {"text": ["presentation from scratch. Can we write a fast URL parser using"], "timestamp": "00:13:06,956", "timestamp_s": 786.0}, {"text": ["Javascript? So today I\u0027m going to talk about the road fast URL parser"], "timestamp": "00:13:10,732", "timestamp_s": 790.0}, {"text": ["for node js. My name is Dipli and let\u0027s start from scratch"], "timestamp": "00:13:14,134", "timestamp_s": 794.0}, {"text": ["again. So why Javascript?"], "timestamp": "00:13:18,038", "timestamp_s": 798.0}, {"text": ["So if you know, there was three"], "timestamp": "00:13:21,090", "timestamp_s": 801.0}, {"text": ["main reasons that we thought what are the three"], "timestamp": "00:13:24,532", "timestamp_s": 804.0}, {"text": ["alternatives? We could either use c plays plus and"], "timestamp": "00:13:27,812", "timestamp_s": 807.0}, {"text": ["rot through webassembly. We could either use Nodejs API with"], "timestamp": "00:13:32,404", "timestamp_s": 812.0}, {"text": ["c, or we could just write"], "timestamp": "00:13:36,568", "timestamp_s": 816.0}, {"text": ["any javascript. So existing implementation in C we"], "timestamp": "00:13:39,992", "timestamp_s": 819.0}, {"text": ["tried webassembly and did some benchmarking, but it"], "timestamp": "00:13:43,192", "timestamp_s": 823.0}, {"text": ["was slow. So there are no other solutions that does not use"], "timestamp": "00:13:46,504", "timestamp_s": 826.0}, {"text": ["a c bridge. So I\u0027m kind of limited by the technology"], "timestamp": "00:13:49,788", "timestamp_s": 829.0}, {"text": ["of my time as Howard Starkin."], "timestamp": "00:13:53,164", "timestamp_s": 833.0}, {"text": ["So as a result, URL state machine mpm"], "timestamp": "00:13:57,630", "timestamp_s": 837.0}, {"text": ["package rise. It\u0027s available through GitHub"], "timestamp": "00:14:01,718", "timestamp_s": 841.0}, {"text": ["on anonyric URL, which I will include at"], "timestamp": "00:14:05,622", "timestamp_s": 845.0}, {"text": ["the end of this presentation. But it basically is a super fast compliant"], "timestamp": "00:14:08,864", "timestamp_s": 848.0}, {"text": ["URL state machine for nodejs that\u0027s written in JavaScript,"], "timestamp": "00:14:12,678", "timestamp_s": 852.0}, {"text": ["but not as fast as I would expect it to be. So this"], "timestamp": "00:14:16,186", "timestamp_s": 856.0}, {"text": ["is one of the packages, the usage example. So if you just pass the"], "timestamp": "00:14:20,228", "timestamp_s": 860.0}, {"text": ["string of the URL, then it actually returns an object which"], "timestamp": "00:14:24,024", "timestamp_s": 864.0}, {"text": ["is scheme username password, and you can retrieve those information."], "timestamp": "00:14:28,088", "timestamp_s": 868.0}, {"text": ["So let\u0027s do some benchmarks about the JavaScript implementation"], "timestamp": "00:14:33,190", "timestamp_s": 873.0}, {"text": ["of it. There\u0027s another library called what we G"], "timestamp": "00:14:36,622", "timestamp_s": 876.0}, {"text": ["URL, which provides the same feature set, and it\u0027s around 576%"], "timestamp": "00:14:40,168", "timestamp_s": 880.0}, {"text": ["slower. URL state machines is yes,"], "timestamp": "00:14:45,036", "timestamp_s": 885.0}, {"text": ["five, six times faster, I guess. And the actual URL"], "timestamp": "00:14:48,876", "timestamp_s": 888.0}, {"text": ["implementation provided by node js is that it\u0027s 85% faster than"], "timestamp": "00:14:52,982", "timestamp_s": 892.0}, {"text": ["my solution. So this means that the decoding and"], "timestamp": "00:14:56,928", "timestamp_s": 896.0}, {"text": ["encoding side of it, and it\u0027s slow, and JavaScript"], "timestamp": "00:15:00,928", "timestamp_s": 900.0}, {"text": ["is kind of slow for these particular operations."], "timestamp": "00:15:04,362", "timestamp_s": 904.0}, {"text": ["So there are some of optimizations"], "timestamp": "00:15:07,354", "timestamp_s": 907.0}, {"text": ["that I did, and I\u0027m going to talk about those things. So using function versus"], "timestamp": "00:15:11,354", "timestamp_s": 911.0}, {"text": ["class, actually up until nodejs 18,"], "timestamp": "00:15:14,702", "timestamp_s": 914.0}, {"text": ["up until v eight 9.59.7 version,"], "timestamp": "00:15:18,550", "timestamp_s": 918.0}, {"text": ["if you create a class and have private variables on"], "timestamp": "00:15:22,558", "timestamp_s": 922.0}, {"text": ["top of it, it was actually 55% slower."], "timestamp": "00:15:26,348", "timestamp_s": 926.0}, {"text": ["And just by converting a class to function, a bit"], "timestamp": "00:15:29,586", "timestamp_s": 929.0}, {"text": ["like function prototype kind of keywords,"], "timestamp": "00:15:33,356", "timestamp_s": 933.0}, {"text": ["it makes your code 55% faster. So this is one of the first"], "timestamp": "00:15:37,906", "timestamp_s": 937.0}, {"text": ["optimizations that I did. The second thing was if"], "timestamp": "00:15:42,670", "timestamp_s": 942.0}, {"text": ["you change your conditional function to"], "timestamp": "00:15:47,312", "timestamp_s": 947.0}, {"text": ["switch, or if it actually improves"], "timestamp": "00:15:51,890", "timestamp_s": 951.0}, {"text": ["your quota. So if you have more than ten keys,"], "timestamp": "00:15:56,218", "timestamp_s": 956.0}, {"text": ["if you\u0027re doing an if else statement, actually converting it to switch"], "timestamp": "00:16:00,130", "timestamp_s": 960.0}, {"text": ["is faster. If you have less than ten,"], "timestamp": "00:16:03,258", "timestamp_s": 963.0}, {"text": ["then if is faster. So again,"], "timestamp": "00:16:06,152", "timestamp_s": 966.0}, {"text": ["it depends on how your implementation is going, and you need to choose correctly"], "timestamp": "00:16:09,000", "timestamp_s": 969.0}, {"text": ["and do some micro benchmarks in order to understand. But again,"], "timestamp": "00:16:12,878", "timestamp_s": 972.0}, {"text": ["if you\u0027re using a new node version, these dynamics can change because"], "timestamp": "00:16:18,410", "timestamp_s": 978.0}, {"text": ["there are micro benchmarking that are based on v eight."], "timestamp": "00:16:21,852", "timestamp_s": 981.0}, {"text": ["So there\u0027s another one that like string to number comparison."], "timestamp": "00:16:25,530", "timestamp_s": 985.0}, {"text": ["This is really important because if you want to compare, let\u0027s say string, how would"], "timestamp": "00:16:29,170", "timestamp_s": 989.0}, {"text": ["you compare two different strings? First you would check for if their lengths"], "timestamp": "00:16:32,448", "timestamp_s": 992.0}, {"text": ["are equal. If their lengths are equal, then you would traverse every"], "timestamp": "00:16:35,782", "timestamp_s": 995.0}, {"text": ["character one by one and make sure that each character is equal to each"], "timestamp": "00:16:39,552", "timestamp_s": 999.0}, {"text": ["other. This means that I need to access all of"], "timestamp": "00:16:43,428", "timestamp_s": 1003.0}, {"text": ["these compared strings, each character one time, and then"], "timestamp": "00:16:46,948", "timestamp_s": 1006.0}, {"text": ["make an equal operation and then check it. So this is one of the idiomatic"], "timestamp": "00:16:50,980", "timestamp_s": 1010.0}, {"text": ["implementations that you need to do. So just"], "timestamp": "00:16:55,646", "timestamp_s": 1015.0}, {"text": ["by changing my alternative, like my states from strings to"], "timestamp": "00:16:59,512", "timestamp_s": 1019.0}, {"text": ["numbers, which means that this is one of the changes that I did."], "timestamp": "00:17:03,320", "timestamp_s": 1023.0}, {"text": ["The authority 100 schemes start 101,"], "timestamp": "00:17:06,376", "timestamp_s": 1026.0}, {"text": ["I had a really huge performance."], "timestamp": "00:17:10,730", "timestamp_s": 1030.0}, {"text": ["So this is one of the changes that I did,"], "timestamp": "00:17:14,338", "timestamp_s": 1034.0}, {"text": ["again, really important. One of the other thing is that"], "timestamp": "00:17:17,850", "timestamp_s": 1037.0}, {"text": ["with slice versus substring. Slice creates a new"], "timestamp": "00:17:21,548", "timestamp_s": 1041.0}, {"text": ["string, substring does not, but actually"], "timestamp": "00:17:25,216", "timestamp_s": 1045.0}, {"text": ["slice is faster. This is one of the examples. Instead of having"], "timestamp": "00:17:29,616", "timestamp_s": 1049.0}, {"text": ["substring this point to plus one and this input length, I just change it"], "timestamp": "00:17:34,370", "timestamp_s": 1054.0}, {"text": ["with a slice and calculation of fragment is"], "timestamp": "00:17:37,988", "timestamp_s": 1057.0}, {"text": ["a lot faster. On top of that is none."], "timestamp": "00:17:41,364", "timestamp_s": 1061.0}, {"text": ["So defining if it\u0027s not a number versus if it\u0027s checking for"], "timestamp": "00:17:45,598", "timestamp_s": 1065.0}, {"text": ["undefined is actually really"], "timestamp": "00:17:49,608", "timestamp_s": 1069.0}, {"text": ["costly operation. This is one of the mistakes that I did. Not a"], "timestamp": "00:17:53,750", "timestamp_s": 1073.0}, {"text": ["mistake, but it was mentioned directly in the URL"], "timestamp": "00:17:57,244", "timestamp_s": 1077.0}, {"text": ["parser specification and I wanted to be 100% compliant"], "timestamp": "00:18:01,026", "timestamp_s": 1081.0}, {"text": ["to it. So in order to make it faster. Right now I\u0027m starting"], "timestamp": "00:18:05,058", "timestamp_s": 1085.0}, {"text": ["to divert from the specification"], "timestamp": "00:18:08,940", "timestamp_s": 1088.0}, {"text": ["and I\u0027m trying to introduce optimizations of it. So this is what happens with"], "timestamp": "00:18:12,390", "timestamp_s": 1092.0}, {"text": ["all of those runtimes. If you want to make things faster, you need to find"], "timestamp": "00:18:16,288", "timestamp_s": 1096.0}, {"text": ["shortcuts. And those shortcuts are not always"], "timestamp": "00:18:20,000", "timestamp_s": 1100.0}, {"text": ["means that you are going to follow specification. And then there"], "timestamp": "00:18:25,090", "timestamp_s": 1105.0}, {"text": ["might be some uncode issues that might occur."], "timestamp": "00:18:28,452", "timestamp_s": 1108.0}, {"text": ["And because you are not following the specification, it will be also super hard for"], "timestamp": "00:18:31,818", "timestamp_s": 1111.0}, {"text": ["you to track. So yeah, instead of saying core point"], "timestamp": "00:18:35,928", "timestamp_s": 1115.0}, {"text": ["and accessing grid, I just checked it for if"], "timestamp": "00:18:39,816", "timestamp_s": 1119.0}, {"text": ["it\u0027s undefined, undefined. If it\u0027s not, just get the core point at"], "timestamp": "00:18:43,192", "timestamp_s": 1123.0}, {"text": ["character zero. And this is also a really huge"], "timestamp": "00:18:46,616", "timestamp_s": 1126.0}, {"text": ["boost. Instead of saying is none, then I\u0027m just"], "timestamp": "00:18:50,220", "timestamp_s": 1130.0}, {"text": ["checking for if it\u0027s undefined again."], "timestamp": "00:18:53,404", "timestamp_s": 1133.0}, {"text": ["So one of the again, most important parts"], "timestamp": "00:18:57,630", "timestamp_s": 1137.0}, {"text": ["of optimization is memorization. If you\u0027re recalculating"], "timestamp": "00:19:01,478", "timestamp_s": 1141.0}, {"text": ["a variable every time, if you\u0027re doing comparison many times,"], "timestamp": "00:19:05,926", "timestamp_s": 1145.0}, {"text": ["then if you store that variable in the memory and then access"], "timestamp": "00:19:09,296", "timestamp_s": 1149.0}, {"text": ["to that variable in the function callback,"], "timestamp": "00:19:13,908", "timestamp_s": 1153.0}, {"text": ["then again super fast. So this is"], "timestamp": "00:19:17,530", "timestamp_s": 1157.0}, {"text": ["one of the optimizations that I did. So the URL"], "timestamp": "00:19:21,108", "timestamp_s": 1161.0}, {"text": ["specification actually states that you need to check"], "timestamp": "00:19:25,510", "timestamp_s": 1165.0}, {"text": ["for if the current URL scheme is a special schemes"], "timestamp": "00:19:29,096", "timestamp_s": 1169.0}, {"text": ["state. So previously I was just checking"], "timestamp": "00:19:33,006", "timestamp_s": 1173.0}, {"text": ["if it\u0027s in an object of special schemes, then I"], "timestamp": "00:19:37,590", "timestamp_s": 1177.0}, {"text": ["would assume that it was a special URL. But the thing is, you just need"], "timestamp": "00:19:41,468", "timestamp_s": 1181.0}, {"text": ["to set these if it\u0027s a special URL or not, when you"], "timestamp": "00:19:44,588", "timestamp_s": 1184.0}, {"text": ["are changing the URL scheme, then it\u0027s actually a lot faster."], "timestamp": "00:19:48,608", "timestamp_s": 1188.0}, {"text": ["So let\u0027s do some statistics. So because"], "timestamp": "00:19:52,990", "timestamp_s": 1192.0}, {"text": ["of the work that I did, there\u0027s almost 2000"], "timestamp": "00:19:57,072", "timestamp_s": 1197.0}, {"text": ["lines of code was written, more than 800 benchmarks"], "timestamp": "00:20:00,352", "timestamp_s": 1200.0}, {"text": ["was run, and the current implementation is 99.9"], "timestamp": "00:20:05,114", "timestamp_s": 1205.0}, {"text": ["perfect spec compliant, that\u0027s 0.1%."], "timestamp": "00:20:08,692", "timestamp_s": 1208.0}, {"text": ["That one test is related to text encoders and"], "timestamp": "00:20:12,484", "timestamp_s": 1212.0}, {"text": ["like encoding UTF eight and UTF 16."], "timestamp": "00:20:16,072", "timestamp_s": 1216.0}, {"text": ["But it again can be completed 100% really"], "timestamp": "00:20:19,518", "timestamp_s": 1219.0}, {"text": ["easily. There were 733 successful"], "timestamp": "00:20:22,952", "timestamp_s": 1222.0}, {"text": ["web platform tests that was run in under to make sure that our implementing"], "timestamp": "00:20:26,942", "timestamp_s": 1226.0}, {"text": ["is correct. And even though I use all"], "timestamp": "00:20:30,946", "timestamp_s": 1230.0}, {"text": ["of the I tested all of those WPT tests,"], "timestamp": "00:20:34,268", "timestamp_s": 1234.0}, {"text": ["it was actually 96% covered"], "timestamp": "00:20:39,630", "timestamp_s": 1239.0}, {"text": ["in the tests. So this means that the URL specification"], "timestamp": "00:20:43,782", "timestamp_s": 1243.0}, {"text": ["does not have the necessary tests to cover 100%"], "timestamp": "00:20:47,558", "timestamp_s": 1247.0}, {"text": ["of the code that was written. And I"], "timestamp": "00:20:51,636", "timestamp_s": 1251.0}, {"text": ["think this should be handled on the web platform test."], "timestamp": "00:20:54,788", "timestamp_s": 1254.0}, {"text": ["So performance in terms of"], "timestamp": "00:20:58,932", "timestamp_s": 1258.0}, {"text": ["performance, the JavaScript based parser was 566 66%"], "timestamp": "00:21:02,468", "timestamp_s": 1262.0}, {"text": ["faster compared to the other"], "timestamp": "00:21:08,120", "timestamp_s": 1268.0}, {"text": ["JavaScript implementation, but again it was 95"], "timestamp": "00:21:11,576", "timestamp_s": 1271.0}, {"text": ["and 96% slower than the native C plus plays implementation."], "timestamp": "00:21:15,112", "timestamp_s": 1275.0}, {"text": ["So what basically is that there\u0027s a really"], "timestamp": "00:21:18,930", "timestamp_s": 1278.0}, {"text": ["great guy from Brooklyn that said that great power comes with"], "timestamp": "00:21:22,652", "timestamp_s": 1282.0}, {"text": ["great responsibility after v eight fixes this performance problem. So we are"], "timestamp": "00:21:26,012", "timestamp_s": 1286.0}, {"text": ["really dependent on v eight on performance, and I hope we"], "timestamp": "00:21:29,468", "timestamp_s": 1289.0}, {"text": ["will have some breakthroughs in the future. So a small"], "timestamp": "00:21:33,708", "timestamp_s": 1293.0}, {"text": ["footnote, this is a product, this, this whole presentation,"], "timestamp": "00:21:37,276", "timestamp_s": 1297.0}, {"text": ["this whole project was a product of my graduation thesis,"], "timestamp": "00:21:41,226", "timestamp_s": 1301.0}, {"text": ["Fordham University. And so I would like to thank William Lord from"], "timestamp": "00:21:44,842", "timestamp_s": 1304.0}, {"text": ["Fordham University, as well as James Nell and Mario"], "timestamp": "00:21:48,308", "timestamp_s": 1308.0}, {"text": ["Colina from Nodejs and"], "timestamp": "00:21:51,578", "timestamp_s": 1311.0}, {"text": ["thank you for that. And thank you for listening."], "timestamp": "00:21:55,604", "timestamp_s": 1315.0}];
               
 
               var tag = document.createElement('script');
@@ -554,1375 +554,1375 @@
             <div>
             
             <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:00,410'); seek(0.0)">
-              Jamaica real
+              ['Jamaica real']
             </span>
             
             <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:06,212'); seek(6.0)">
-              time feedback into the behavior of your distributed systems
+              ['time feedback into the behavior of your distributed systems']
             </span>
             
             <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:09,674'); seek(9.0)">
-              and observing changes exceptions errors in
+              ['and observing changes exceptions errors in']
             </span>
             
             <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:13,412'); seek(13.0)">
-              real time allows you to not only experiment with confidence,
+              ['real time allows you to not only experiment with confidence,']
             </span>
             
             <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:16,858'); seek(16.0)">
-              but respond instantly to get things working again.
+              ['but respond instantly to get things working again.']
             </span>
             
             <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:24,610'); seek(24.0)">
-              Close today
+              ['Close today']
             </span>
             
             <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:49,136'); seek(49.0)">
-              I'm going to be talking about implementing a performance URL parser
+              ["I'm going to be talking about implementing a performance URL parser"]
             </span>
             
             <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:52,698'); seek(52.0)">
-              from scratch. So before we start, I want to
+              ['from scratch. So before we start, I want to']
             </span>
             
             <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:56,164'); seek(56.0)">
-              give some a little bit of information about me I'm
+              ["give some a little bit of information about me I'm"]
             </span>
             
             <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:01:00,042'); seek(60.0)">
-              yold Nizipli. I'm a software engineer. I'm a master's
+              ["yold Nizipli. I'm a software engineer. I'm a master's"]
             </span>
             
             <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:01:03,882'); seek(63.0)">
-              student at Fordham University.
+              ['student at Fordham University.']
             </span>
             
             <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:01:07,110'); seek(67.0)">
-              I'm a node core collaborator and performance team member.
+              ["I'm a node core collaborator and performance team member."]
             </span>
             
             <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:01:10,846'); seek(70.0)">
-              Ive been mainly focusing on text encoders and decoders and the
+              ['Ive been mainly focusing on text encoders and decoders and the']
             </span>
             
             <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:01:14,248'); seek(74.0)">
-              performant in nodeshifts. I'm the creator of
+              ["performant in nodeshifts. I'm the creator of"]
             </span>
             
             <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:01:18,268'); seek(78.0)">
-              URL state machine and fast query string.
+              ['URL state machine and fast query string.']
             </span>
             
             <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:01:21,770'); seek(81.0)">
-              So let's give a little bit of a background before
+              ["So let's give a little bit of a background before"]
             </span>
             
             <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:01:25,356'); seek(85.0)">
-              we start into what URL parses are and
+              ['we start into what URL parses are and']
             </span>
             
             <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:01:28,924'); seek(88.0)">
-              how that goes. So a little bit of brief introduction to
+              ['how that goes. So a little bit of brief introduction to']
             </span>
             
             <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:01:32,288'); seek(92.0)">
-              JavaScript runtimes. So nodejs is a runtime on top
+              ['JavaScript runtimes. So nodejs is a runtime on top']
             </span>
             
             <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:01:36,288'); seek(96.0)">
-              of v eight engine, the JavaScript engine behind chromium.
+              ['of v eight engine, the JavaScript engine behind chromium.']
             </span>
             
             <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:40,750'); seek(100.0)">
-              Just like Nodejs, Dino is also using v eight and
+              ['Just like Nodejs, Dino is also using v eight and']
             </span>
             
             <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:44,436'); seek(104.0)">
-              a little bit of new runtime bound GS using webkit
+              ['a little bit of new runtime bound GS using webkit']
             </span>
             
             <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:48,282'); seek(108.0)">
-              as a runtime.
+              ['as a runtime.']
             </span>
             
             <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:53,030'); seek(113.0)">
-              Basically in JavaScript runtimes is that whenever
+              ['Basically in JavaScript runtimes is that whenever']
             </span>
             
             <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:57,358'); seek(117.0)">
-              you call a function, the javascript under lines user
+              ['you call a function, the javascript under lines user']
             </span>
             
             <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:02:00,718'); seek(120.0)">
-              land runs a c plus plus code using a bridge through node js.
+              ['land runs a c plus plus code using a bridge through node js.']
             </span>
             
             <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:02:04,702'); seek(124.0)">
-              And the value that you retrieve
+              ['And the value that you retrieve']
             </span>
             
             <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:02:08,718'); seek(128.0)">
-              from the C Plus plus is deserialized on the JavaScript side and then present
+              ['from the C Plus plus is deserialized on the JavaScript side and then present']
             </span>
             
             <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:02:12,396'); seek(132.0)">
-              to the user, which is the developer so computationally has a
+              ['to the user, which is the developer so computationally has a']
             </span>
             
             <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:02:15,868'); seek(135.0)">
-              function living in C plays plus. This means that you don't need to focus
+              ["function living in C plays plus. This means that you don't need to focus"]
             </span>
             
             <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:02:21,712'); seek(141.0)">
-              any of your code in JavaScript, but you can write it in
+              ['any of your code in JavaScript, but you can write it in']
             </span>
             
             <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:02:24,848'); seek(144.0)">
-              c if you want to produce performant
+              ['c if you want to produce performant']
             </span>
             
             <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:02:28,774'); seek(148.0)">
-              code. So let's start with URL parsers.
+              ["code. So let's start with URL parsers."]
             </span>
             
             <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:02:33,170'); seek(153.0)">
-              Why URL parser matters? So URL parsers are
+              ['Why URL parser matters? So URL parsers are']
             </span>
             
             <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:02:36,324'); seek(156.0)">
-              the most important functionality for a web server. Every single network request
+              ['the most important functionality for a web server. Every single network request']
             </span>
             
             <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:02:40,602'); seek(160.0)">
-              uses URL parser, and it basically creates
+              ['uses URL parser, and it basically creates']
             </span>
             
             <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:43,934'); seek(163.0)">
-              the baseline of benchmarks with any
+              ['the baseline of benchmarks with any']
             </span>
             
             <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:47,560'); seek(167.0)">
-              network request. So this is
+              ['network request. So this is']
             </span>
             
             <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:51,208'); seek(171.0)">
-              an example of a diagram of a request coming to a server. So it's basically
+              ["an example of a diagram of a request coming to a server. So it's basically"]
             </span>
             
             <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:55,208'); seek(175.0)">
-              on the left side there's this person, let's say Alice or Bob.
+              ["on the left side there's this person, let's say Alice or Bob."]
             </span>
             
             <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:03:00,730'); seek(180.0)">
-              Bob submits a credential through user
+              ['Bob submits a credential through user']
             </span>
             
             <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:03:04,098'); seek(184.0)">
-              agent which sends to the client. The client sends a
+              ['agent which sends to the client. The client sends a']
             </span>
             
             <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:03:07,996'); seek(187.0)">
-              request, submits the credentials client id, redirect URL
+              ['request, submits the credentials client id, redirect URL']
             </span>
             
             <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:03:11,318'); seek(191.0)">
-              to authorization server authorization, returns authorization code,
+              ['to authorization server authorization, returns authorization code,']
             </span>
             
             <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:03:14,768'); seek(194.0)">
-              and then user agents like redirects authorization code and client request
+              ['and then user agents like redirects authorization code and client request']
             </span>
             
             <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:03:18,838'); seek(198.0)">
-              token and so on and so forth. So basically every arrow from left
+              ['token and so on and so forth. So basically every arrow from left']
             </span>
             
             <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:03:22,228'); seek(202.0)">
-              to right includes a URL,
+              ['to right includes a URL,']
             </span>
             
             <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:03:25,258'); seek(205.0)">
-              and for every left to right request it
+              ['and for every left to right request it']
             </span>
             
             <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:03:29,012'); seek(209.0)">
-              needs to parse and understand
+              ['needs to parse and understand']
             </span>
             
             <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:03:32,964'); seek(212.0)">
-              what that URL is and what the path is. So that's where URL
+              ["what that URL is and what the path is. So that's where URL"]
             </span>
             
             <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:03:36,878'); seek(216.0)">
-              parses come in. So URL parser is a very significant
+              ['parses come in. So URL parser is a very significant']
             </span>
             
             <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:03:40,286'); seek(220.0)">
-              component, but it's too complex and leads to bugs and that's why
+              ["component, but it's too complex and leads to bugs and that's why"]
             </span>
             
             <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:03:44,008'); seek(224.0)">
-              nobody focuses and nobody wants to focus on
+              ['nobody focuses and nobody wants to focus on']
             </span>
             
             <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:47,368'); seek(227.0)">
-              it. So this is one of the examples while I was
+              ['it. So this is one of the examples while I was']
             </span>
             
             <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:50,780'); seek(230.0)">
-              working on this project is that I thought
+              ['working on this project is that I thought']
             </span>
             
             <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:03:54,268'); seek(234.0)">
-              that I found a bug and it seems that like 256-25-6256
+              ['that I found a bug and it seems that like 256-25-6256']
             </span>
             
             <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:03:58,620'); seek(238.0)">
-              URL is invalid. And one of the libraries what
+              ['URL is invalid. And one of the libraries what']
             </span>
             
             <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:04:02,428'); seek(242.0)">
-              we URL recommended that actually it worked in Chrome and
+              ['we URL recommended that actually it worked in Chrome and']
             </span>
             
             <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:04:05,632'); seek(245.0)">
-              safari, but not in Node Js. So this means that the initial
+              ['safari, but not in Node Js. So this means that the initial']
             </span>
             
             <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:04:09,462'); seek(249.0)">
-              implementing of a URL parser was somehow wrong or not
+              ['implementing of a URL parser was somehow wrong or not']
             </span>
             
             <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:04:12,868'); seek(252.0)">
-              up to date. So after
+              ['up to date. So after']
             </span>
             
             <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:04:16,196'); seek(256.0)">
-              this feedback that I get, I opened an
+              ['this feedback that I get, I opened an']
             </span>
             
             <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:04:19,508'); seek(259.0)">
-              issue like URL parsers does not relate to IP before with more than four parts.
+              ['issue like URL parsers does not relate to IP before with more than four parts.']
             </span>
             
             <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:04:23,226'); seek(263.0)">
-              This is one of the issues, URL is not compliant with specification.
+              ['This is one of the issues, URL is not compliant with specification.']
             </span>
             
             <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:04:26,686'); seek(266.0)">
-              This is another issue created by me and later they're all
+              ["This is another issue created by me and later they're all"]
             </span>
             
             <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:04:30,472'); seek(270.0)">
-              fixed. But let's
+              ["fixed. But let's"]
             </span>
             
             <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:04:33,678'); seek(273.0)">
-              talk about the goal of a URL parser. What is the goal?
+              ['talk about the goal of a URL parser. What is the goal?']
             </span>
             
             <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:04:38,090'); seek(278.0)">
-              Basically, if you look into this diagram, you will see on the
+              ['Basically, if you look into this diagram, you will see on the']
             </span>
             
             <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:04:42,108'); seek(282.0)">
-              orange side that HTTPs userpassample.com
+              ['orange side that HTTPs userpassample.com']
             </span>
             
             <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:04:46,524'); seek(286.0)">
-              80 80. So basically HTTPs is the protocol.
+              ['80 80. So basically HTTPs is the protocol.']
             </span>
             
             <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:04:50,166'); seek(290.0)">
-              Username password is an optional value with add characters
+              ['Username password is an optional value with add characters']
             </span>
             
             <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:04:54,518'); seek(294.0)">
-              and then hostname is always there.
+              ['and then hostname is always there.']
             </span>
             
             <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:04:57,470'); seek(297.0)">
-              The port, if it's another special
+              ["The port, if it's another special"]
             </span>
             
             <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:05:01,136'); seek(301.0)">
-              port which is like 80 or four, four three. It's not required because URL parsers
+              ["port which is like 80 or four, four three. It's not required because URL parsers"]
             </span>
             
             <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:05:05,494'); seek(305.0)">
-              understand that. And then we might need some path name
+              ['understand that. And then we might need some path name']
             </span>
             
             <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:05:09,012'); seek(309.0)">
-              and search and hash. So if you look at from this diagram, you can
+              ['and search and hash. So if you look at from this diagram, you can']
             </span>
             
             <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:05:12,228'); seek(312.0)">
-              easily say that oh, okay, it's really easy to understand and implement URL parse,
+              ["easily say that oh, okay, it's really easy to understand and implement URL parse,"]
             </span>
             
             <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:05:15,978'); seek(315.0)">
-              right? You just need to get, if it starts with HTTPs,
+              ['right? You just need to get, if it starts with HTTPs,']
             </span>
             
             <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:05:19,510'); seek(319.0)">
-              if there's a user and path, what about hostnames? What about ports?
+              ["if there's a user and path, what about hostnames? What about ports?"]
             </span>
             
             <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:05:23,358'); seek(323.0)">
-              What about path name? We want to make sure that the search
+              ['What about path name? We want to make sure that the search']
             </span>
             
             <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:05:26,712'); seek(326.0)">
-              is a valid one and so on and so forth. But it's not
+              ["is a valid one and so on and so forth. But it's not"]
             </span>
             
             <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:05:30,172'); seek(330.0)">
-              as easy as writing a regex and it's much more complicated.
+              ["as easy as writing a regex and it's much more complicated."]
             </span>
             
             <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:05:34,570'); seek(334.0)">
-              So what is the state machine behind it? There is actually a specification
+              ['So what is the state machine behind it? There is actually a specification']
             </span>
             
             <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:05:38,406'); seek(338.0)">
-              for writing URL parsers and this is an
+              ['for writing URL parsers and this is an']
             </span>
             
             <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:05:42,400'); seek(342.0)">
-              example of it. This represents all of the state machines
+              ['example of it. This represents all of the state machines']
             </span>
             
             <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:05:46,750'); seek(346.0)">
-              that needs to traverse
+              ['that needs to traverse']
             </span>
             
             <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:05:50,830'); seek(350.0)">
-              in order to complete the URL parser. So if you look at from
+              ['in order to complete the URL parser. So if you look at from']
             </span>
             
             <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:05:54,212'); seek(354.0)">
-              a much more closer perspective, there is a schema start
+              ['a much more closer perspective, there is a schema start']
             </span>
             
             <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:05:57,636'); seek(357.0)">
-              state scheme. Start state can go to no schema state. Let's say we don't have
+              ["state scheme. Start state can go to no schema state. Let's say we don't have"]
             </span>
             
             <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:06:01,412'); seek(361.0)">
-              HTTP HTTPs. If it starts,
+              ['HTTP HTTPs. If it starts,']
             </span>
             
             <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:06:04,842'); seek(364.0)">
-              then it's schema state. Then we need to parse that schema.
+              ["then it's schema state. Then we need to parse that schema."]
             </span>
             
             <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:06:08,062'); seek(368.0)">
-              What is that valid one? What are the valid ones. If it's HTTPs
+              ["What is that valid one? What are the valid ones. If it's HTTPs"]
             </span>
             
             <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:06:11,854'); seek(371.0)">
-              then we might omit the port part because
+              ['then we might omit the port part because']
             </span>
             
             <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:06:15,640'); seek(375.0)">
-              HTTPs is always four four, three. If it's HTTP then
+              ["HTTPs is always four four, three. If it's HTTP then"]
             </span>
             
             <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:06:19,308'); seek(379.0)">
-              it's 80 if it's SSH. So there are some special cases
+              ["it's 80 if it's SSH. So there are some special cases"]
             </span>
             
             <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:06:22,626'); seek(382.0)">
-              and according to schema state it can go to special authority estate,
+              ['and according to schema state it can go to special authority estate,']
             </span>
             
             <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:06:27,218'); seek(387.0)">
-              special relative authority state or relative state.
+              ['special relative authority state or relative state.']
             </span>
             
             <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:06:30,476'); seek(390.0)">
-              So special authority estate, which means that either I
+              ['So special authority estate, which means that either I']
             </span>
             
             <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:06:34,128'); seek(394.0)">
-              have a username password kind of combination,
+              ['have a username password kind of combination,']
             </span>
             
             <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:06:37,062'); seek(397.0)">
-              so I need to parse that state. If it's a special relative or authority
+              ["so I need to parse that state. If it's a special relative or authority"]
             </span>
             
             <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:06:40,902'); seek(400.0)">
-              state, it can be a file path. In windows it's
+              ["state, it can be a file path. In windows it's"]
             </span>
             
             <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:06:44,118'); seek(404.0)">
-              something else, in Mac OS Unix systems it's something
+              ["something else, in Mac OS Unix systems it's something"]
             </span>
             
             <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:06:47,236'); seek(407.0)">
-              else. And according to that, it can be a relative state. It can be a
+              ['else. And according to that, it can be a relative state. It can be a']
             </span>
             
             <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:06:50,644'); seek(410.0)">
-              relative state. So it's not as easy as writing regex or
+              ["relative state. So it's not as easy as writing regex or"]
             </span>
             
             <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:06:54,328'); seek(414.0)">
-              userland. So this is one of the states that are available in the URL
+              ['userland. So this is one of the states that are available in the URL']
             </span>
             
             <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:06:57,998'); seek(417.0)">
-              parsing specification. So let's
+              ["parsing specification. So let's"]
             </span>
             
             <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:07:01,694'); seek(421.0)">
-              dive into scheme start state. So if c
+              ['dive into scheme start state. So if c']
             </span>
             
             <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:07:05,224'); seek(425.0)">
-              sees a character is an ASG alpha append c lowercase
+              ['sees a character is an ASG alpha append c lowercase']
             </span>
             
             <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:07:09,202'); seek(429.0)">
-              to buffer and set the state to schema state. So this is pretty straightforward.
+              ['to buffer and set the state to schema state. So this is pretty straightforward.']
             </span>
             
             <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:07:12,866'); seek(432.0)">
-              Otherwise, if state override is not given, set state
+              ['Otherwise, if state override is not given, set state']
             </span>
             
             <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:07:16,012'); seek(436.0)">
-              to no scheme state and decrease pointer by one, otherwise validationary
+              ['to no scheme state and decrease pointer by one, otherwise validationary']
             </span>
             
             <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:07:19,698'); seek(439.0)">
-              return further. So if you look at from this perspective, it's pretty straightforward,
+              ["return further. So if you look at from this perspective, it's pretty straightforward,"]
             </span>
             
             <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:07:23,686'); seek(443.0)">
-              right? But this is one of the, I think 20 states
+              ['right? But this is one of the, I think 20 states']
             </span>
             
             <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:07:28,592'); seek(448.0)">
-              that are available in this specification. So let's
+              ["that are available in this specification. So let's"]
             </span>
             
             <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:07:31,718'); seek(451.0)">
-              look into a little bit more complex efforts. No scheme state.
+              ['look into a little bit more complex efforts. No scheme state.']
             </span>
             
             <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:07:35,220'); seek(455.0)">
-              What happens if I don't have a HTTP, HTTPs and so on and so
+              ["What happens if I don't have a HTTP, HTTPs and so on and so"]
             </span>
             
             <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:07:38,948'); seek(458.0)">
-              forth? If base is null or base has an OPAC path and c is not
+              ['forth? If base is null or base has an OPAC path and c is not']
             </span>
             
             <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:07:42,756'); seek(462.0)">
-              u, which is like hashtag validation error return failure.
+              ['u, which is like hashtag validation error return failure.']
             </span>
             
             <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:07:45,758'); seek(465.0)">
-              So first of all we need to know what is an OPAC path? It's all
+              ["So first of all we need to know what is an OPAC path? It's all"]
             </span>
             
             <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:07:49,496'); seek(469.0)">
-              explained in the documentation.
+              ['explained in the documentation.']
             </span>
             
             <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:07:52,550'); seek(472.0)">
-              Otherwise, if base has an OpAC path and sees an hashtag set
+              ['Otherwise, if base has an OpAC path and sees an hashtag set']
             </span>
             
             <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:07:56,152'); seek(476.0)">
-              URL scheme to the base scheme, URL path to path URL query
+              ['URL scheme to the base scheme, URL path to path URL query']
             </span>
             
             <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:07:59,806'); seek(479.0)">
-              base and URL fragment to the empty stream. So if my path starts with
+              ['base and URL fragment to the empty stream. So if my path starts with']
             </span>
             
             <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:08:03,548'); seek(483.0)">
-              a hashtag, which means that this is a fragment state, so the URL needs to
+              ['a hashtag, which means that this is a fragment state, so the URL needs to']
             </span>
             
             <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:08:07,004'); seek(487.0)">
-              go to the fragment state and that's one of the end states, otherwise blah.
+              ["go to the fragment state and that's one of the end states, otherwise blah."]
             </span>
             
             <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:08:10,966'); seek(490.0)">
-              So this is what URL specification
+              ['So this is what URL specification']
             </span>
             
             <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:08:14,726'); seek(494.0)">
-              URL part of specification is all about.
+              ['URL part of specification is all about.']
             </span>
             
             <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:08:19,790'); seek(499.0)">
-              I kind of hear, why are we even
+              ['I kind of hear, why are we even']
             </span>
             
             <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:08:22,932'); seek(502.0)">
-              talking about it? So the main issue that
+              ['talking about it? So the main issue that']
             </span>
             
             <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:08:26,532'); seek(506.0)">
-              actually led me to this implementation is that there's a significant
+              ["actually led me to this implementation is that there's a significant"]
             </span>
             
             <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:08:30,850'); seek(510.0)">
-              performance issue with what Wegrl in node js,
+              ['performance issue with what Wegrl in node js,']
             </span>
             
             <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:08:33,902'); seek(513.0)">
-              and in order to update it there was
+              ['and in order to update it there was']
             </span>
             
             <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:08:37,992'); seek(517.0)">
-              an issue opened and I
+              ['an issue opened and I']
             </span>
             
             <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:08:41,992'); seek(521.0)">
-              wanted to make it faster. So can it be faster? So this is
+              ['wanted to make it faster. So can it be faster? So this is']
             </span>
             
             <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:08:45,544'); seek(525.0)">
-              one of the issues re implement was VGrL parser and Wassem.
+              ['one of the issues re implement was VGrL parser and Wassem.']
             </span>
             
             <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:08:49,850'); seek(529.0)">
-              The URL is there for you if you want to look.
+              ['The URL is there for you if you want to look.']
             </span>
             
             <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:08:53,290'); seek(533.0)">
-              And it was actually opened by one of the technical
+              ['And it was actually opened by one of the technical']
             </span>
             
             <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:08:56,706'); seek(536.0)">
-              steering committee members, which is James Nell.
+              ['steering committee members, which is James Nell.']
             </span>
             
             <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:09:00,274'); seek(540.0)">
-              He basically said that it should be possible to realize a
+              ['He basically said that it should be possible to realize a']
             </span>
             
             <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:09:03,344'); seek(543.0)">
-              significant performant improvement by porting the implementation to WASM.
+              ['significant performant improvement by porting the implementation to WASM.']
             </span>
             
             <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:09:07,334'); seek(547.0)">
-              So wasm is webassembly. So if we implementing the URL
+              ['So wasm is webassembly. So if we implementing the URL']
             </span>
             
             <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:09:11,878'); seek(551.0)">
-              parser through WASM, then we might get a URL
+              ['parser through WASM, then we might get a URL']
             </span>
             
             <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:09:15,338'); seek(555.0)">
-              parser. So this was pretty interesting to me, because right now I know what
+              ['parser. So this was pretty interesting to me, because right now I know what']
             </span>
             
             <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:09:18,948'); seek(558.0)">
-              I needed to do. I need to port the implementation in a language that's
+              ["I needed to do. I need to port the implementation in a language that's"]
             </span>
             
             <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:09:22,958'); seek(562.0)">
-              performant like C or rust,
+              ['performant like C or rust,']
             </span>
             
             <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:09:26,238'); seek(566.0)">
-              and then I need to expose the API through
+              ['and then I need to expose the API through']
             </span>
             
             <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:09:29,576'); seek(569.0)">
-              webassembly so that node js applications can consume it.
+              ['webassembly so that node js applications can consume it.']
             </span>
             
             <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:09:33,910'); seek(573.0)">
-              But before we start, let's take a step back and understand what our
+              ["But before we start, let's take a step back and understand what our"]
             </span>
             
             <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:09:37,532'); seek(577.0)">
-              options are. Webassembly is really webassembly
+              ['options are. Webassembly is really webassembly']
             </span>
             
             <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:09:41,378'); seek(581.0)">
-              our only option. The potential solutions,
+              ['our only option. The potential solutions,']
             </span>
             
             <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:09:44,786'); seek(584.0)">
-              not for writing URL parses, but also for most of the application,
+              ['not for writing URL parses, but also for most of the application,']
             </span>
             
             <span id="chunk-151" class="transcript-chunks" onclick="console.log('00:09:48,380'); seek(588.0)">
-              is that you can either compile C, rust or any other language
+              ['is that you can either compile C, rust or any other language']
             </span>
             
             <span id="chunk-152" class="transcript-chunks" onclick="console.log('00:09:52,550'); seek(592.0)">
-              through webassembly and expose the API. Or you can
+              ['through webassembly and expose the API. Or you can']
             </span>
             
             <span id="chunk-153" class="transcript-chunks" onclick="console.log('00:09:55,872'); seek(595.0)">
-              write an API which is node API in C rust,
+              ['write an API which is node API in C rust,']
             </span>
             
             <span id="chunk-154" class="transcript-chunks" onclick="console.log('00:09:59,206'); seek(599.0)">
-              and you can actually run the C code and expose it
+              ['and you can actually run the C code and expose it']
             </span>
             
             <span id="chunk-155" class="transcript-chunks" onclick="console.log('00:10:02,548'); seek(602.0)">
-              through the c binding. Or you can write a pure Javascript.
+              ['through the c binding. Or you can write a pure Javascript.']
             </span>
             
             <span id="chunk-156" class="transcript-chunks" onclick="console.log('00:10:05,626'); seek(605.0)">
-              So we don't want to write and expose our
+              ["So we don't want to write and expose our"]
             </span>
             
             <span id="chunk-157" class="transcript-chunks" onclick="console.log('00:10:09,092'); seek(609.0)">
-              implementation through C
+              ['implementation through C']
             </span>
             
             <span id="chunk-158" class="transcript-chunks" onclick="console.log('00:10:12,532'); seek(612.0)">
-              and rust through any API, because that's the actual implementing what's
+              ["and rust through any API, because that's the actual implementing what's"]
             </span>
             
             <span id="chunk-159" class="transcript-chunks" onclick="console.log('00:10:15,998'); seek(615.0)">
-              happening right now. So let's start with webassembly then.
+              ["happening right now. So let's start with webassembly then."]
             </span>
             
             <span id="chunk-160" class="transcript-chunks" onclick="console.log('00:10:20,088'); seek(620.0)">
-              So I chose rust because it's
+              ["So I chose rust because it's"]
             </span>
             
             <span id="chunk-161" class="transcript-chunks" onclick="console.log('00:10:24,078'); seek(624.0)">
-              proven that rust is super performance. Actually,
+              ['proven that rust is super performance. Actually,']
             </span>
             
             <span id="chunk-162" class="transcript-chunks" onclick="console.log('00:10:27,276'); seek(627.0)">
-              I wanted to learn rust. So this is one of the emotional
+              ['I wanted to learn rust. So this is one of the emotional']
             </span>
             
             <span id="chunk-163" class="transcript-chunks" onclick="console.log('00:10:30,914'); seek(630.0)">
-              decisions that led to this decision making process.
+              ['decisions that led to this decision making process.']
             </span>
             
             <span id="chunk-164" class="transcript-chunks" onclick="console.log('00:10:35,690'); seek(635.0)">
-              So webassembly and rust is a really good job thanks to Firefox. There are lots
+              ['So webassembly and rust is a really good job thanks to Firefox. There are lots']
             </span>
             
             <span id="chunk-165" class="transcript-chunks" onclick="console.log('00:10:39,298'); seek(639.0)">
-              of contributions on that side. There are really great libraries, and the ecosystem is ready
+              ['of contributions on that side. There are really great libraries, and the ecosystem is ready']
             </span>
             
             <span id="chunk-166" class="transcript-chunks" onclick="console.log('00:10:43,136'); seek(643.0)">
-              for mass adoption. And one of the
+              ['for mass adoption. And one of the']
             </span>
             
             <span id="chunk-167" class="transcript-chunks" onclick="console.log('00:10:46,688'); seek(646.0)">
-              most crucial parts in nodejs, and on top
+              ['most crucial parts in nodejs, and on top']
             </span>
             
             <span id="chunk-168" class="transcript-chunks" onclick="console.log('00:10:50,192'); seek(650.0)">
-              of that there was umdichi. Umdichi is a really good example.
+              ['of that there was umdichi. Umdichi is a really good example.']
             </span>
             
             <span id="chunk-169" class="transcript-chunks" onclick="console.log('00:10:53,810'); seek(653.0)">
-              It's backed by node and actually
+              ["It's backed by node and actually"]
             </span>
             
             <span id="chunk-170" class="transcript-chunks" onclick="console.log('00:10:57,876'); seek(657.0)">
-              by using webassembly and compiling LLA HTTP
+              ['by using webassembly and compiling LLA HTTP']
             </span>
             
             <span id="chunk-171" class="transcript-chunks" onclick="console.log('00:11:02,090'); seek(662.0)">
-              to webassembly, they had a 1329%
+              ['to webassembly, they had a 1329%']
             </span>
             
             <span id="chunk-172" class="transcript-chunks" onclick="console.log('00:11:07,160'); seek(667.0)">
-              performance boost and it was really good, and it was the basis of webassembly.
+              ['performance boost and it was really good, and it was the basis of webassembly.']
             </span>
             
             <span id="chunk-173" class="transcript-chunks" onclick="console.log('00:11:11,262'); seek(671.0)">
-              But these are the expectations. But the reality is decoding
+              ['But these are the expectations. But the reality is decoding']
             </span>
             
             <span id="chunk-174" class="transcript-chunks" onclick="console.log('00:11:15,102'); seek(675.0)">
-              UTF 16 to UDF eight.
+              ['UTF 16 to UDF eight.']
             </span>
             
             <span id="chunk-175" class="transcript-chunks" onclick="console.log('00:11:18,470'); seek(678.0)">
-              Webassembly communication relies on shared memory. Okay, there's some
+              ["Webassembly communication relies on shared memory. Okay, there's some"]
             </span>
             
             <span id="chunk-176" class="transcript-chunks" onclick="console.log('00:11:21,948'); seek(681.0)">
-              problems with deserialization, and deserialization of that data.
+              ['problems with deserialization, and deserialization of that data.']
             </span>
             
             <span id="chunk-177" class="transcript-chunks" onclick="console.log('00:11:25,290'); seek(685.0)">
-              Shared memory requires decoding and encoding. So text
+              ['Shared memory requires decoding and encoding. So text']
             </span>
             
             <span id="chunk-178" class="transcript-chunks" onclick="console.log('00:11:30,236'); seek(690.0)">
-              encoding and decoding in nodejs relies on c plays plus, which means that we're
+              ["encoding and decoding in nodejs relies on c plays plus, which means that we're"]
             </span>
             
             <span id="chunk-179" class="transcript-chunks" onclick="console.log('00:11:33,878'); seek(693.0)">
-              going to use text encoder and text decoder. So why
+              ['going to use text encoder and text decoder. So why']
             </span>
             
             <span id="chunk-180" class="transcript-chunks" onclick="console.log('00:11:38,592'); seek(698.0)">
-              did we end up with text nodejs?
+              ['did we end up with text nodejs?']
             </span>
             
             <span id="chunk-181" class="transcript-chunks" onclick="console.log('00:11:41,490'); seek(701.0)">
-              So a quick recap. So the goal of this presentation
+              ['So a quick recap. So the goal of this presentation']
             </span>
             
             <span id="chunk-182" class="transcript-chunks" onclick="console.log('00:11:45,002'); seek(705.0)">
-              was that we are trying to improve the existing implementing improving
+              ['was that we are trying to improve the existing implementing improving']
             </span>
             
             <span id="chunk-183" class="transcript-chunks" onclick="console.log('00:11:49,546'); seek(709.0)">
-              by removing the c bridge,
+              ['by removing the c bridge,']
             </span>
             
             <span id="chunk-184" class="transcript-chunks" onclick="console.log('00:11:52,930'); seek(712.0)">
-              but text encoding and decoding in node
+              ['but text encoding and decoding in node']
             </span>
             
             <span id="chunk-185" class="transcript-chunks" onclick="console.log('00:11:56,602'); seek(716.0)">
-              js relied on c. So let's do a benchmark about
+              ["js relied on c. So let's do a benchmark about"]
             </span>
             
             <span id="chunk-186" class="transcript-chunks" onclick="console.log('00:12:00,232'); seek(720.0)">
-              all of those things. If you use a webassembly and
+              ['all of those things. If you use a webassembly and']
             </span>
             
             <span id="chunk-187" class="transcript-chunks" onclick="console.log('00:12:03,640'); seek(723.0)">
-              if you use rust and expose it through webassembly,
+              ['if you use rust and expose it through webassembly,']
             </span>
             
             <span id="chunk-188" class="transcript-chunks" onclick="console.log('00:12:08,490'); seek(728.0)">
-              this is again roughly estimation. This is not a full
+              ['this is again roughly estimation. This is not a full']
             </span>
             
             <span id="chunk-189" class="transcript-chunks" onclick="console.log('00:12:11,724'); seek(731.0)">
-              feature set URL parses that's written in rust, but the rust
+              ["feature set URL parses that's written in rust, but the rust"]
             </span>
             
             <span id="chunk-190" class="transcript-chunks" onclick="console.log('00:12:15,682'); seek(735.0)">
-              implementing is 28 24% slower.
+              ['implementing is 28 24% slower.']
             </span>
             
             <span id="chunk-191" class="transcript-chunks" onclick="console.log('00:12:18,742'); seek(738.0)">
-              For URL constructor, this is just by passing the
+              ['For URL constructor, this is just by passing the']
             </span>
             
             <span id="chunk-192" class="transcript-chunks" onclick="console.log('00:12:22,448'); seek(742.0)">
-              URL and returning an object. That's it.
+              ["URL and returning an object. That's it."]
             </span>
             
             <span id="chunk-193" class="transcript-chunks" onclick="console.log('00:12:26,910'); seek(746.0)">
-              On the other side, URL search param set is 86%
+              ['On the other side, URL search param set is 86%']
             </span>
             
             <span id="chunk-194" class="transcript-chunks" onclick="console.log('00:12:31,376'); seek(751.0)">
-              slower because whenever you are calling set, get those kind
+              ['slower because whenever you are calling set, get those kind']
             </span>
             
             <span id="chunk-195" class="transcript-chunks" onclick="console.log('00:12:34,948'); seek(754.0)">
-              of variables. There's a c plus plus to JavaScript communication,
+              ["of variables. There's a c plus plus to JavaScript communication,"]
             </span>
             
             <span id="chunk-196" class="transcript-chunks" onclick="console.log('00:12:38,490'); seek(758.0)">
-              which is we are using webassembly but there's always a bridge between it and for
+              ["which is we are using webassembly but there's always a bridge between it and for"]
             </span>
             
             <span id="chunk-197" class="transcript-chunks" onclick="console.log('00:12:42,228'); seek(762.0)">
-              fm it's 96% slower. The main
+              ["fm it's 96% slower. The main"]
             </span>
             
             <span id="chunk-198" class="transcript-chunks" onclick="console.log('00:12:45,748'); seek(765.0)">
-              reason for URL search params is slobber is that because it's
+              ["reason for URL search params is slobber is that because it's"]
             </span>
             
             <span id="chunk-199" class="transcript-chunks" onclick="console.log('00:12:49,198'); seek(769.0)">
-              actually implemented in JavaScript and nodejs. But I wanted to make
+              ['actually implemented in JavaScript and nodejs. But I wanted to make']
             </span>
             
             <span id="chunk-200" class="transcript-chunks" onclick="console.log('00:12:52,968'); seek(772.0)">
-              sure that if it's possible to also improve the URL search parameters implementation
+              ["sure that if it's possible to also improve the URL search parameters implementation"]
             </span>
             
             <span id="chunk-201" class="transcript-chunks" onclick="console.log('00:12:57,202'); seek(777.0)">
-              too. So it means that it's 86% slower.
+              ["too. So it means that it's 86% slower."]
             </span>
             
             <span id="chunk-202" class="transcript-chunks" onclick="console.log('00:13:00,418'); seek(780.0)">
-              That's a fact, not a random number.
+              ["That's a fact, not a random number."]
             </span>
             
             <span id="chunk-203" class="transcript-chunks" onclick="console.log('00:13:03,130'); seek(783.0)">
-              And here we are again, we are starting this
+              ['And here we are again, we are starting this']
             </span>
             
             <span id="chunk-204" class="transcript-chunks" onclick="console.log('00:13:06,956'); seek(786.0)">
-              presentation from scratch. Can we write a fast URL parser using
+              ['presentation from scratch. Can we write a fast URL parser using']
             </span>
             
             <span id="chunk-205" class="transcript-chunks" onclick="console.log('00:13:10,732'); seek(790.0)">
-              Javascript? So today I'm going to talk about the road fast URL parser
+              ["Javascript? So today I'm going to talk about the road fast URL parser"]
             </span>
             
             <span id="chunk-206" class="transcript-chunks" onclick="console.log('00:13:14,134'); seek(794.0)">
-              for node js. My name is Dipli and let's start from scratch
+              ["for node js. My name is Dipli and let's start from scratch"]
             </span>
             
             <span id="chunk-207" class="transcript-chunks" onclick="console.log('00:13:18,038'); seek(798.0)">
-              again. So why Javascript?
+              ['again. So why Javascript?']
             </span>
             
             <span id="chunk-208" class="transcript-chunks" onclick="console.log('00:13:21,090'); seek(801.0)">
-              So if you know, there was three
+              ['So if you know, there was three']
             </span>
             
             <span id="chunk-209" class="transcript-chunks" onclick="console.log('00:13:24,532'); seek(804.0)">
-              main reasons that we thought what are the three
+              ['main reasons that we thought what are the three']
             </span>
             
             <span id="chunk-210" class="transcript-chunks" onclick="console.log('00:13:27,812'); seek(807.0)">
-              alternatives? We could either use c plays plus and
+              ['alternatives? We could either use c plays plus and']
             </span>
             
             <span id="chunk-211" class="transcript-chunks" onclick="console.log('00:13:32,404'); seek(812.0)">
-              rot through webassembly. We could either use Nodejs API with
+              ['rot through webassembly. We could either use Nodejs API with']
             </span>
             
             <span id="chunk-212" class="transcript-chunks" onclick="console.log('00:13:36,568'); seek(816.0)">
-              c, or we could just write
+              ['c, or we could just write']
             </span>
             
             <span id="chunk-213" class="transcript-chunks" onclick="console.log('00:13:39,992'); seek(819.0)">
-              any javascript. So existing implementation in C we
+              ['any javascript. So existing implementation in C we']
             </span>
             
             <span id="chunk-214" class="transcript-chunks" onclick="console.log('00:13:43,192'); seek(823.0)">
-              tried webassembly and did some benchmarking, but it
+              ['tried webassembly and did some benchmarking, but it']
             </span>
             
             <span id="chunk-215" class="transcript-chunks" onclick="console.log('00:13:46,504'); seek(826.0)">
-              was slow. So there are no other solutions that does not use
+              ['was slow. So there are no other solutions that does not use']
             </span>
             
             <span id="chunk-216" class="transcript-chunks" onclick="console.log('00:13:49,788'); seek(829.0)">
-              a c bridge. So I'm kind of limited by the technology
+              ["a c bridge. So I'm kind of limited by the technology"]
             </span>
             
             <span id="chunk-217" class="transcript-chunks" onclick="console.log('00:13:53,164'); seek(833.0)">
-              of my time as Howard Starkin.
+              ['of my time as Howard Starkin.']
             </span>
             
             <span id="chunk-218" class="transcript-chunks" onclick="console.log('00:13:57,630'); seek(837.0)">
-              So as a result, URL state machine mpm
+              ['So as a result, URL state machine mpm']
             </span>
             
             <span id="chunk-219" class="transcript-chunks" onclick="console.log('00:14:01,718'); seek(841.0)">
-              package rise. It's available through GitHub
+              ["package rise. It's available through GitHub"]
             </span>
             
             <span id="chunk-220" class="transcript-chunks" onclick="console.log('00:14:05,622'); seek(845.0)">
-              on anonyric URL, which I will include at
+              ['on anonyric URL, which I will include at']
             </span>
             
             <span id="chunk-221" class="transcript-chunks" onclick="console.log('00:14:08,864'); seek(848.0)">
-              the end of this presentation. But it basically is a super fast compliant
+              ['the end of this presentation. But it basically is a super fast compliant']
             </span>
             
             <span id="chunk-222" class="transcript-chunks" onclick="console.log('00:14:12,678'); seek(852.0)">
-              URL state machine for nodejs that's written in JavaScript,
+              ["URL state machine for nodejs that's written in JavaScript,"]
             </span>
             
             <span id="chunk-223" class="transcript-chunks" onclick="console.log('00:14:16,186'); seek(856.0)">
-              but not as fast as I would expect it to be. So this
+              ['but not as fast as I would expect it to be. So this']
             </span>
             
             <span id="chunk-224" class="transcript-chunks" onclick="console.log('00:14:20,228'); seek(860.0)">
-              is one of the packages, the usage example. So if you just pass the
+              ['is one of the packages, the usage example. So if you just pass the']
             </span>
             
             <span id="chunk-225" class="transcript-chunks" onclick="console.log('00:14:24,024'); seek(864.0)">
-              string of the URL, then it actually returns an object which
+              ['string of the URL, then it actually returns an object which']
             </span>
             
             <span id="chunk-226" class="transcript-chunks" onclick="console.log('00:14:28,088'); seek(868.0)">
-              is scheme username password, and you can retrieve those information.
+              ['is scheme username password, and you can retrieve those information.']
             </span>
             
             <span id="chunk-227" class="transcript-chunks" onclick="console.log('00:14:33,190'); seek(873.0)">
-              So let's do some benchmarks about the JavaScript implementation
+              ["So let's do some benchmarks about the JavaScript implementation"]
             </span>
             
             <span id="chunk-228" class="transcript-chunks" onclick="console.log('00:14:36,622'); seek(876.0)">
-              of it. There's another library called what we G
+              ["of it. There's another library called what we G"]
             </span>
             
             <span id="chunk-229" class="transcript-chunks" onclick="console.log('00:14:40,168'); seek(880.0)">
-              URL, which provides the same feature set, and it's around 576%
+              ["URL, which provides the same feature set, and it's around 576%"]
             </span>
             
             <span id="chunk-230" class="transcript-chunks" onclick="console.log('00:14:45,036'); seek(885.0)">
-              slower. URL state machines is yes,
+              ['slower. URL state machines is yes,']
             </span>
             
             <span id="chunk-231" class="transcript-chunks" onclick="console.log('00:14:48,876'); seek(888.0)">
-              five, six times faster, I guess. And the actual URL
+              ['five, six times faster, I guess. And the actual URL']
             </span>
             
             <span id="chunk-232" class="transcript-chunks" onclick="console.log('00:14:52,982'); seek(892.0)">
-              implementation provided by node js is that it's 85% faster than
+              ["implementation provided by node js is that it's 85% faster than"]
             </span>
             
             <span id="chunk-233" class="transcript-chunks" onclick="console.log('00:14:56,928'); seek(896.0)">
-              my solution. So this means that the decoding and
+              ['my solution. So this means that the decoding and']
             </span>
             
             <span id="chunk-234" class="transcript-chunks" onclick="console.log('00:15:00,928'); seek(900.0)">
-              encoding side of it, and it's slow, and JavaScript
+              ["encoding side of it, and it's slow, and JavaScript"]
             </span>
             
             <span id="chunk-235" class="transcript-chunks" onclick="console.log('00:15:04,362'); seek(904.0)">
-              is kind of slow for these particular operations.
+              ['is kind of slow for these particular operations.']
             </span>
             
             <span id="chunk-236" class="transcript-chunks" onclick="console.log('00:15:07,354'); seek(907.0)">
-              So there are some of optimizations
+              ['So there are some of optimizations']
             </span>
             
             <span id="chunk-237" class="transcript-chunks" onclick="console.log('00:15:11,354'); seek(911.0)">
-              that I did, and I'm going to talk about those things. So using function versus
+              ["that I did, and I'm going to talk about those things. So using function versus"]
             </span>
             
             <span id="chunk-238" class="transcript-chunks" onclick="console.log('00:15:14,702'); seek(914.0)">
-              class, actually up until nodejs 18,
+              ['class, actually up until nodejs 18,']
             </span>
             
             <span id="chunk-239" class="transcript-chunks" onclick="console.log('00:15:18,550'); seek(918.0)">
-              up until v eight 9.59.7 version,
+              ['up until v eight 9.59.7 version,']
             </span>
             
             <span id="chunk-240" class="transcript-chunks" onclick="console.log('00:15:22,558'); seek(922.0)">
-              if you create a class and have private variables on
+              ['if you create a class and have private variables on']
             </span>
             
             <span id="chunk-241" class="transcript-chunks" onclick="console.log('00:15:26,348'); seek(926.0)">
-              top of it, it was actually 55% slower.
+              ['top of it, it was actually 55% slower.']
             </span>
             
             <span id="chunk-242" class="transcript-chunks" onclick="console.log('00:15:29,586'); seek(929.0)">
-              And just by converting a class to function, a bit
+              ['And just by converting a class to function, a bit']
             </span>
             
             <span id="chunk-243" class="transcript-chunks" onclick="console.log('00:15:33,356'); seek(933.0)">
-              like function prototype kind of keywords,
+              ['like function prototype kind of keywords,']
             </span>
             
             <span id="chunk-244" class="transcript-chunks" onclick="console.log('00:15:37,906'); seek(937.0)">
-              it makes your code 55% faster. So this is one of the first
+              ['it makes your code 55% faster. So this is one of the first']
             </span>
             
             <span id="chunk-245" class="transcript-chunks" onclick="console.log('00:15:42,670'); seek(942.0)">
-              optimizations that I did. The second thing was if
+              ['optimizations that I did. The second thing was if']
             </span>
             
             <span id="chunk-246" class="transcript-chunks" onclick="console.log('00:15:47,312'); seek(947.0)">
-              you change your conditional function to
+              ['you change your conditional function to']
             </span>
             
             <span id="chunk-247" class="transcript-chunks" onclick="console.log('00:15:51,890'); seek(951.0)">
-              switch, or if it actually improves
+              ['switch, or if it actually improves']
             </span>
             
             <span id="chunk-248" class="transcript-chunks" onclick="console.log('00:15:56,218'); seek(956.0)">
-              your quota. So if you have more than ten keys,
+              ['your quota. So if you have more than ten keys,']
             </span>
             
             <span id="chunk-249" class="transcript-chunks" onclick="console.log('00:16:00,130'); seek(960.0)">
-              if you're doing an if else statement, actually converting it to switch
+              ["if you're doing an if else statement, actually converting it to switch"]
             </span>
             
             <span id="chunk-250" class="transcript-chunks" onclick="console.log('00:16:03,258'); seek(963.0)">
-              is faster. If you have less than ten,
+              ['is faster. If you have less than ten,']
             </span>
             
             <span id="chunk-251" class="transcript-chunks" onclick="console.log('00:16:06,152'); seek(966.0)">
-              then if is faster. So again,
+              ['then if is faster. So again,']
             </span>
             
             <span id="chunk-252" class="transcript-chunks" onclick="console.log('00:16:09,000'); seek(969.0)">
-              it depends on how your implementation is going, and you need to choose correctly
+              ['it depends on how your implementation is going, and you need to choose correctly']
             </span>
             
             <span id="chunk-253" class="transcript-chunks" onclick="console.log('00:16:12,878'); seek(972.0)">
-              and do some micro benchmarks in order to understand. But again,
+              ['and do some micro benchmarks in order to understand. But again,']
             </span>
             
             <span id="chunk-254" class="transcript-chunks" onclick="console.log('00:16:18,410'); seek(978.0)">
-              if you're using a new node version, these dynamics can change because
+              ["if you're using a new node version, these dynamics can change because"]
             </span>
             
             <span id="chunk-255" class="transcript-chunks" onclick="console.log('00:16:21,852'); seek(981.0)">
-              there are micro benchmarking that are based on v eight.
+              ['there are micro benchmarking that are based on v eight.']
             </span>
             
             <span id="chunk-256" class="transcript-chunks" onclick="console.log('00:16:25,530'); seek(985.0)">
-              So there's another one that like string to number comparison.
+              ["So there's another one that like string to number comparison."]
             </span>
             
             <span id="chunk-257" class="transcript-chunks" onclick="console.log('00:16:29,170'); seek(989.0)">
-              This is really important because if you want to compare, let's say string, how would
+              ["This is really important because if you want to compare, let's say string, how would"]
             </span>
             
             <span id="chunk-258" class="transcript-chunks" onclick="console.log('00:16:32,448'); seek(992.0)">
-              you compare two different strings? First you would check for if their lengths
+              ['you compare two different strings? First you would check for if their lengths']
             </span>
             
             <span id="chunk-259" class="transcript-chunks" onclick="console.log('00:16:35,782'); seek(995.0)">
-              are equal. If their lengths are equal, then you would traverse every
+              ['are equal. If their lengths are equal, then you would traverse every']
             </span>
             
             <span id="chunk-260" class="transcript-chunks" onclick="console.log('00:16:39,552'); seek(999.0)">
-              character one by one and make sure that each character is equal to each
+              ['character one by one and make sure that each character is equal to each']
             </span>
             
             <span id="chunk-261" class="transcript-chunks" onclick="console.log('00:16:43,428'); seek(1003.0)">
-              other. This means that I need to access all of
+              ['other. This means that I need to access all of']
             </span>
             
             <span id="chunk-262" class="transcript-chunks" onclick="console.log('00:16:46,948'); seek(1006.0)">
-              these compared strings, each character one time, and then
+              ['these compared strings, each character one time, and then']
             </span>
             
             <span id="chunk-263" class="transcript-chunks" onclick="console.log('00:16:50,980'); seek(1010.0)">
-              make an equal operation and then check it. So this is one of the idiomatic
+              ['make an equal operation and then check it. So this is one of the idiomatic']
             </span>
             
             <span id="chunk-264" class="transcript-chunks" onclick="console.log('00:16:55,646'); seek(1015.0)">
-              implementations that you need to do. So just
+              ['implementations that you need to do. So just']
             </span>
             
             <span id="chunk-265" class="transcript-chunks" onclick="console.log('00:16:59,512'); seek(1019.0)">
-              by changing my alternative, like my states from strings to
+              ['by changing my alternative, like my states from strings to']
             </span>
             
             <span id="chunk-266" class="transcript-chunks" onclick="console.log('00:17:03,320'); seek(1023.0)">
-              numbers, which means that this is one of the changes that I did.
+              ['numbers, which means that this is one of the changes that I did.']
             </span>
             
             <span id="chunk-267" class="transcript-chunks" onclick="console.log('00:17:06,376'); seek(1026.0)">
-              The authority 100 schemes start 101,
+              ['The authority 100 schemes start 101,']
             </span>
             
             <span id="chunk-268" class="transcript-chunks" onclick="console.log('00:17:10,730'); seek(1030.0)">
-              I had a really huge performance.
+              ['I had a really huge performance.']
             </span>
             
             <span id="chunk-269" class="transcript-chunks" onclick="console.log('00:17:14,338'); seek(1034.0)">
-              So this is one of the changes that I did,
+              ['So this is one of the changes that I did,']
             </span>
             
             <span id="chunk-270" class="transcript-chunks" onclick="console.log('00:17:17,850'); seek(1037.0)">
-              again, really important. One of the other thing is that
+              ['again, really important. One of the other thing is that']
             </span>
             
             <span id="chunk-271" class="transcript-chunks" onclick="console.log('00:17:21,548'); seek(1041.0)">
-              with slice versus substring. Slice creates a new
+              ['with slice versus substring. Slice creates a new']
             </span>
             
             <span id="chunk-272" class="transcript-chunks" onclick="console.log('00:17:25,216'); seek(1045.0)">
-              string, substring does not, but actually
+              ['string, substring does not, but actually']
             </span>
             
             <span id="chunk-273" class="transcript-chunks" onclick="console.log('00:17:29,616'); seek(1049.0)">
-              slice is faster. This is one of the examples. Instead of having
+              ['slice is faster. This is one of the examples. Instead of having']
             </span>
             
             <span id="chunk-274" class="transcript-chunks" onclick="console.log('00:17:34,370'); seek(1054.0)">
-              substring this point to plus one and this input length, I just change it
+              ['substring this point to plus one and this input length, I just change it']
             </span>
             
             <span id="chunk-275" class="transcript-chunks" onclick="console.log('00:17:37,988'); seek(1057.0)">
-              with a slice and calculation of fragment is
+              ['with a slice and calculation of fragment is']
             </span>
             
             <span id="chunk-276" class="transcript-chunks" onclick="console.log('00:17:41,364'); seek(1061.0)">
-              a lot faster. On top of that is none.
+              ['a lot faster. On top of that is none.']
             </span>
             
             <span id="chunk-277" class="transcript-chunks" onclick="console.log('00:17:45,598'); seek(1065.0)">
-              So defining if it's not a number versus if it's checking for
+              ["So defining if it's not a number versus if it's checking for"]
             </span>
             
             <span id="chunk-278" class="transcript-chunks" onclick="console.log('00:17:49,608'); seek(1069.0)">
-              undefined is actually really
+              ['undefined is actually really']
             </span>
             
             <span id="chunk-279" class="transcript-chunks" onclick="console.log('00:17:53,750'); seek(1073.0)">
-              costly operation. This is one of the mistakes that I did. Not a
+              ['costly operation. This is one of the mistakes that I did. Not a']
             </span>
             
             <span id="chunk-280" class="transcript-chunks" onclick="console.log('00:17:57,244'); seek(1077.0)">
-              mistake, but it was mentioned directly in the URL
+              ['mistake, but it was mentioned directly in the URL']
             </span>
             
             <span id="chunk-281" class="transcript-chunks" onclick="console.log('00:18:01,026'); seek(1081.0)">
-              parser specification and I wanted to be 100% compliant
+              ['parser specification and I wanted to be 100% compliant']
             </span>
             
             <span id="chunk-282" class="transcript-chunks" onclick="console.log('00:18:05,058'); seek(1085.0)">
-              to it. So in order to make it faster. Right now I'm starting
+              ["to it. So in order to make it faster. Right now I'm starting"]
             </span>
             
             <span id="chunk-283" class="transcript-chunks" onclick="console.log('00:18:08,940'); seek(1088.0)">
-              to divert from the specification
+              ['to divert from the specification']
             </span>
             
             <span id="chunk-284" class="transcript-chunks" onclick="console.log('00:18:12,390'); seek(1092.0)">
-              and I'm trying to introduce optimizations of it. So this is what happens with
+              ["and I'm trying to introduce optimizations of it. So this is what happens with"]
             </span>
             
             <span id="chunk-285" class="transcript-chunks" onclick="console.log('00:18:16,288'); seek(1096.0)">
-              all of those runtimes. If you want to make things faster, you need to find
+              ['all of those runtimes. If you want to make things faster, you need to find']
             </span>
             
             <span id="chunk-286" class="transcript-chunks" onclick="console.log('00:18:20,000'); seek(1100.0)">
-              shortcuts. And those shortcuts are not always
+              ['shortcuts. And those shortcuts are not always']
             </span>
             
             <span id="chunk-287" class="transcript-chunks" onclick="console.log('00:18:25,090'); seek(1105.0)">
-              means that you are going to follow specification. And then there
+              ['means that you are going to follow specification. And then there']
             </span>
             
             <span id="chunk-288" class="transcript-chunks" onclick="console.log('00:18:28,452'); seek(1108.0)">
-              might be some uncode issues that might occur.
+              ['might be some uncode issues that might occur.']
             </span>
             
             <span id="chunk-289" class="transcript-chunks" onclick="console.log('00:18:31,818'); seek(1111.0)">
-              And because you are not following the specification, it will be also super hard for
+              ['And because you are not following the specification, it will be also super hard for']
             </span>
             
             <span id="chunk-290" class="transcript-chunks" onclick="console.log('00:18:35,928'); seek(1115.0)">
-              you to track. So yeah, instead of saying core point
+              ['you to track. So yeah, instead of saying core point']
             </span>
             
             <span id="chunk-291" class="transcript-chunks" onclick="console.log('00:18:39,816'); seek(1119.0)">
-              and accessing grid, I just checked it for if
+              ['and accessing grid, I just checked it for if']
             </span>
             
             <span id="chunk-292" class="transcript-chunks" onclick="console.log('00:18:43,192'); seek(1123.0)">
-              it's undefined, undefined. If it's not, just get the core point at
+              ["it's undefined, undefined. If it's not, just get the core point at"]
             </span>
             
             <span id="chunk-293" class="transcript-chunks" onclick="console.log('00:18:46,616'); seek(1126.0)">
-              character zero. And this is also a really huge
+              ['character zero. And this is also a really huge']
             </span>
             
             <span id="chunk-294" class="transcript-chunks" onclick="console.log('00:18:50,220'); seek(1130.0)">
-              boost. Instead of saying is none, then I'm just
+              ["boost. Instead of saying is none, then I'm just"]
             </span>
             
             <span id="chunk-295" class="transcript-chunks" onclick="console.log('00:18:53,404'); seek(1133.0)">
-              checking for if it's undefined again.
+              ["checking for if it's undefined again."]
             </span>
             
             <span id="chunk-296" class="transcript-chunks" onclick="console.log('00:18:57,630'); seek(1137.0)">
-              So one of the again, most important parts
+              ['So one of the again, most important parts']
             </span>
             
             <span id="chunk-297" class="transcript-chunks" onclick="console.log('00:19:01,478'); seek(1141.0)">
-              of optimization is memorization. If you're recalculating
+              ["of optimization is memorization. If you're recalculating"]
             </span>
             
             <span id="chunk-298" class="transcript-chunks" onclick="console.log('00:19:05,926'); seek(1145.0)">
-              a variable every time, if you're doing comparison many times,
+              ["a variable every time, if you're doing comparison many times,"]
             </span>
             
             <span id="chunk-299" class="transcript-chunks" onclick="console.log('00:19:09,296'); seek(1149.0)">
-              then if you store that variable in the memory and then access
+              ['then if you store that variable in the memory and then access']
             </span>
             
             <span id="chunk-300" class="transcript-chunks" onclick="console.log('00:19:13,908'); seek(1153.0)">
-              to that variable in the function callback,
+              ['to that variable in the function callback,']
             </span>
             
             <span id="chunk-301" class="transcript-chunks" onclick="console.log('00:19:17,530'); seek(1157.0)">
-              then again super fast. So this is
+              ['then again super fast. So this is']
             </span>
             
             <span id="chunk-302" class="transcript-chunks" onclick="console.log('00:19:21,108'); seek(1161.0)">
-              one of the optimizations that I did. So the URL
+              ['one of the optimizations that I did. So the URL']
             </span>
             
             <span id="chunk-303" class="transcript-chunks" onclick="console.log('00:19:25,510'); seek(1165.0)">
-              specification actually states that you need to check
+              ['specification actually states that you need to check']
             </span>
             
             <span id="chunk-304" class="transcript-chunks" onclick="console.log('00:19:29,096'); seek(1169.0)">
-              for if the current URL scheme is a special schemes
+              ['for if the current URL scheme is a special schemes']
             </span>
             
             <span id="chunk-305" class="transcript-chunks" onclick="console.log('00:19:33,006'); seek(1173.0)">
-              state. So previously I was just checking
+              ['state. So previously I was just checking']
             </span>
             
             <span id="chunk-306" class="transcript-chunks" onclick="console.log('00:19:37,590'); seek(1177.0)">
-              if it's in an object of special schemes, then I
+              ["if it's in an object of special schemes, then I"]
             </span>
             
             <span id="chunk-307" class="transcript-chunks" onclick="console.log('00:19:41,468'); seek(1181.0)">
-              would assume that it was a special URL. But the thing is, you just need
+              ['would assume that it was a special URL. But the thing is, you just need']
             </span>
             
             <span id="chunk-308" class="transcript-chunks" onclick="console.log('00:19:44,588'); seek(1184.0)">
-              to set these if it's a special URL or not, when you
+              ["to set these if it's a special URL or not, when you"]
             </span>
             
             <span id="chunk-309" class="transcript-chunks" onclick="console.log('00:19:48,608'); seek(1188.0)">
-              are changing the URL scheme, then it's actually a lot faster.
+              ["are changing the URL scheme, then it's actually a lot faster."]
             </span>
             
             <span id="chunk-310" class="transcript-chunks" onclick="console.log('00:19:52,990'); seek(1192.0)">
-              So let's do some statistics. So because
+              ["So let's do some statistics. So because"]
             </span>
             
             <span id="chunk-311" class="transcript-chunks" onclick="console.log('00:19:57,072'); seek(1197.0)">
-              of the work that I did, there's almost 2000
+              ["of the work that I did, there's almost 2000"]
             </span>
             
             <span id="chunk-312" class="transcript-chunks" onclick="console.log('00:20:00,352'); seek(1200.0)">
-              lines of code was written, more than 800 benchmarks
+              ['lines of code was written, more than 800 benchmarks']
             </span>
             
             <span id="chunk-313" class="transcript-chunks" onclick="console.log('00:20:05,114'); seek(1205.0)">
-              was run, and the current implementation is 99.9
+              ['was run, and the current implementation is 99.9']
             </span>
             
             <span id="chunk-314" class="transcript-chunks" onclick="console.log('00:20:08,692'); seek(1208.0)">
-              perfect spec compliant, that's 0.1%.
+              ["perfect spec compliant, that's 0.1%."]
             </span>
             
             <span id="chunk-315" class="transcript-chunks" onclick="console.log('00:20:12,484'); seek(1212.0)">
-              That one test is related to text encoders and
+              ['That one test is related to text encoders and']
             </span>
             
             <span id="chunk-316" class="transcript-chunks" onclick="console.log('00:20:16,072'); seek(1216.0)">
-              like encoding UTF eight and UTF 16.
+              ['like encoding UTF eight and UTF 16.']
             </span>
             
             <span id="chunk-317" class="transcript-chunks" onclick="console.log('00:20:19,518'); seek(1219.0)">
-              But it again can be completed 100% really
+              ['But it again can be completed 100% really']
             </span>
             
             <span id="chunk-318" class="transcript-chunks" onclick="console.log('00:20:22,952'); seek(1222.0)">
-              easily. There were 733 successful
+              ['easily. There were 733 successful']
             </span>
             
             <span id="chunk-319" class="transcript-chunks" onclick="console.log('00:20:26,942'); seek(1226.0)">
-              web platform tests that was run in under to make sure that our implementing
+              ['web platform tests that was run in under to make sure that our implementing']
             </span>
             
             <span id="chunk-320" class="transcript-chunks" onclick="console.log('00:20:30,946'); seek(1230.0)">
-              is correct. And even though I use all
+              ['is correct. And even though I use all']
             </span>
             
             <span id="chunk-321" class="transcript-chunks" onclick="console.log('00:20:34,268'); seek(1234.0)">
-              of the I tested all of those WPT tests,
+              ['of the I tested all of those WPT tests,']
             </span>
             
             <span id="chunk-322" class="transcript-chunks" onclick="console.log('00:20:39,630'); seek(1239.0)">
-              it was actually 96% covered
+              ['it was actually 96% covered']
             </span>
             
             <span id="chunk-323" class="transcript-chunks" onclick="console.log('00:20:43,782'); seek(1243.0)">
-              in the tests. So this means that the URL specification
+              ['in the tests. So this means that the URL specification']
             </span>
             
             <span id="chunk-324" class="transcript-chunks" onclick="console.log('00:20:47,558'); seek(1247.0)">
-              does not have the necessary tests to cover 100%
+              ['does not have the necessary tests to cover 100%']
             </span>
             
             <span id="chunk-325" class="transcript-chunks" onclick="console.log('00:20:51,636'); seek(1251.0)">
-              of the code that was written. And I
+              ['of the code that was written. And I']
             </span>
             
             <span id="chunk-326" class="transcript-chunks" onclick="console.log('00:20:54,788'); seek(1254.0)">
-              think this should be handled on the web platform test.
+              ['think this should be handled on the web platform test.']
             </span>
             
             <span id="chunk-327" class="transcript-chunks" onclick="console.log('00:20:58,932'); seek(1258.0)">
-              So performance in terms of
+              ['So performance in terms of']
             </span>
             
             <span id="chunk-328" class="transcript-chunks" onclick="console.log('00:21:02,468'); seek(1262.0)">
-              performance, the JavaScript based parser was 566 66%
+              ['performance, the JavaScript based parser was 566 66%']
             </span>
             
             <span id="chunk-329" class="transcript-chunks" onclick="console.log('00:21:08,120'); seek(1268.0)">
-              faster compared to the other
+              ['faster compared to the other']
             </span>
             
             <span id="chunk-330" class="transcript-chunks" onclick="console.log('00:21:11,576'); seek(1271.0)">
-              JavaScript implementation, but again it was 95
+              ['JavaScript implementation, but again it was 95']
             </span>
             
             <span id="chunk-331" class="transcript-chunks" onclick="console.log('00:21:15,112'); seek(1275.0)">
-              and 96% slower than the native C plus plays implementation.
+              ['and 96% slower than the native C plus plays implementation.']
             </span>
             
             <span id="chunk-332" class="transcript-chunks" onclick="console.log('00:21:18,930'); seek(1278.0)">
-              So what basically is that there's a really
+              ["So what basically is that there's a really"]
             </span>
             
             <span id="chunk-333" class="transcript-chunks" onclick="console.log('00:21:22,652'); seek(1282.0)">
-              great guy from Brooklyn that said that great power comes with
+              ['great guy from Brooklyn that said that great power comes with']
             </span>
             
             <span id="chunk-334" class="transcript-chunks" onclick="console.log('00:21:26,012'); seek(1286.0)">
-              great responsibility after v eight fixes this performance problem. So we are
+              ['great responsibility after v eight fixes this performance problem. So we are']
             </span>
             
             <span id="chunk-335" class="transcript-chunks" onclick="console.log('00:21:29,468'); seek(1289.0)">
-              really dependent on v eight on performance, and I hope we
+              ['really dependent on v eight on performance, and I hope we']
             </span>
             
             <span id="chunk-336" class="transcript-chunks" onclick="console.log('00:21:33,708'); seek(1293.0)">
-              will have some breakthroughs in the future. So a small
+              ['will have some breakthroughs in the future. So a small']
             </span>
             
             <span id="chunk-337" class="transcript-chunks" onclick="console.log('00:21:37,276'); seek(1297.0)">
-              footnote, this is a product, this, this whole presentation,
+              ['footnote, this is a product, this, this whole presentation,']
             </span>
             
             <span id="chunk-338" class="transcript-chunks" onclick="console.log('00:21:41,226'); seek(1301.0)">
-              this whole project was a product of my graduation thesis,
+              ['this whole project was a product of my graduation thesis,']
             </span>
             
             <span id="chunk-339" class="transcript-chunks" onclick="console.log('00:21:44,842'); seek(1304.0)">
-              Fordham University. And so I would like to thank William Lord from
+              ['Fordham University. And so I would like to thank William Lord from']
             </span>
             
             <span id="chunk-340" class="transcript-chunks" onclick="console.log('00:21:48,308'); seek(1308.0)">
-              Fordham University, as well as James Nell and Mario
+              ['Fordham University, as well as James Nell and Mario']
             </span>
             
             <span id="chunk-341" class="transcript-chunks" onclick="console.log('00:21:51,578'); seek(1311.0)">
-              Colina from Nodejs and
+              ['Colina from Nodejs and']
             </span>
             
             <span id="chunk-342" class="transcript-chunks" onclick="console.log('00:21:55,604'); seek(1315.0)">
-              thank you for that. And thank you for listening.
+              ['thank you for that. And thank you for listening.']
             </span>
             
             </div>
