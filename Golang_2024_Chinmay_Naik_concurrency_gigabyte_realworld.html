@@ -410,7 +410,7 @@
 
             <script>
               
-              var transcript = [];
+              var transcript = [{"text": "Today I am going to talk about go concurrency powering a", "timestamp": "00:00:20,600", "timestamp_s": 20.0}, {"text": "gigabyte scale real world data pipeline. So let\u0027s get into", "timestamp": "00:00:24,054", "timestamp_s": 24.0}, {"text": "it. So before we get started, a quick thing about myself.", "timestamp": "00:00:27,812", "timestamp_s": 27.0}, {"text": "I\u0027m chinmay naik. I go by chinmai 185 on Twitter,", "timestamp": "00:00:31,980", "timestamp_s": 31.0}, {"text": "GitHub, LinkedIn, etcetera. You can catch me up right there. I\u0027m a founder", "timestamp": "00:00:35,748", "timestamp_s": 35.0}, {"text": "at one two n where we help companies with backend and", "timestamp": "00:00:39,692", "timestamp_s": 39.0}, {"text": "reliability engineering. I also write stories on pragmatic", "timestamp": "00:00:43,084", "timestamp_s": 43.0}, {"text": "software engineering based on our work that we do on", "timestamp": "00:00:46,452", "timestamp_s": 46.0}, {"text": "Twitter and LinkedIn. So follow me up there. And in", "timestamp": "00:00:49,812", "timestamp_s": 49.0}, {"text": "general, I like engineering. I love psychology, I play", "timestamp": "00:00:53,928", "timestamp_s": 53.0}, {"text": "percussion, and I\u0027m a huge fan of rather old computer game", "timestamp": "00:00:57,480", "timestamp_s": 57.0}, {"text": "called Age of empires two. So hit me up there.", "timestamp": "00:01:01,320", "timestamp_s": 61.0}, {"text": "So today I\u0027m going to talk about MongoDB to RDBMs,", "timestamp": "00:01:05,024", "timestamp_s": 65.0}, {"text": "data migration, and how we achieved that using ghost concurrency", "timestamp": "00:01:08,624", "timestamp_s": 68.0}, {"text": "features. Right? So fundamentally, we wanted to move data from", "timestamp": "00:01:12,192", "timestamp_s": 72.0}, {"text": "Mongo to postgres. I\u0027m not advocating for either", "timestamp": "00:01:16,184", "timestamp_s": 76.0}, {"text": "one of these two technologies as such, but we just had a use case where", "timestamp": "00:01:19,824", "timestamp_s": 79.0}, {"text": "we had to move data from MongoDB to postgres.", "timestamp": "00:01:22,792", "timestamp_s": 82.0}, {"text": "Now this was two type of transfer. Like one is the ETL", "timestamp": "00:01:26,424", "timestamp_s": 86.0}, {"text": "extract transform load kind of transfer where we were doing one", "timestamp": "00:01:30,288", "timestamp_s": 90.0}, {"text": "time bulk transfer. Kind of think of it like snapshot transfer of data. And we", "timestamp": "00:01:33,744", "timestamp_s": 93.0}, {"text": "also had to worry about streaming data transfer. Like if", "timestamp": "00:01:37,952", "timestamp_s": 97.0}, {"text": "there is any ongoing updates to MongoDB, how do those reflect", "timestamp": "00:01:41,328", "timestamp_s": 101.0}, {"text": "in postgres? Before we go", "timestamp": "00:01:44,784", "timestamp_s": 104.0}, {"text": "ahead, let\u0027s think about how do we map MongoDB documents,", "timestamp": "00:01:48,120", "timestamp_s": 108.0}, {"text": "tables and rows? Because these two are different technologies,", "timestamp": "00:01:52,464", "timestamp_s": 112.0}, {"text": "they\u0027re not one to one direct data transfer.", "timestamp": "00:01:56,312", "timestamp_s": 116.0}, {"text": "So let\u0027s look at student collection.", "timestamp": "00:01:59,784", "timestamp_s": 119.0}, {"text": "It\u0027s just sample collection. In MongodB, where we have,", "timestamp": "00:02:03,784", "timestamp_s": 123.0}, {"text": "this is a sample student document where you see id,", "timestamp": "00:02:07,576", "timestamp_s": 127.0}, {"text": "which is primary key. There is name, which is a string field.", "timestamp": "00:02:11,584", "timestamp_s": 131.0}, {"text": "You\u0027ve got role number, which is a numeric field. There is Boolean field for", "timestamp": "00:02:15,374", "timestamp_s": 135.0}, {"text": "is graduated. And this is also another string", "timestamp": "00:02:19,974", "timestamp_s": 139.0}, {"text": "field. And in Mongo, what you can do is you have bunch", "timestamp": "00:02:23,302", "timestamp_s": 143.0}, {"text": "of nested documents. So you have address as a nested set of", "timestamp": "00:02:26,750", "timestamp_s": 146.0}, {"text": "nested array of objects, and you have nested", "timestamp": "00:02:30,854", "timestamp_s": 150.0}, {"text": "object, which is phone number. How does that data", "timestamp": "00:02:34,294", "timestamp_s": 154.0}, {"text": "get translated into postgres? So the student", "timestamp": "00:02:38,030", "timestamp_s": 158.0}, {"text": "record itself is pretty simple, right? You could just migrate the", "timestamp": "00:02:41,508", "timestamp_s": 161.0}, {"text": "keys one on one, and keys in MongodB document become columns", "timestamp": "00:02:45,492", "timestamp_s": 165.0}, {"text": "in postgres. So for example, id becomes primary key.", "timestamp": "00:02:49,604", "timestamp_s": 169.0}, {"text": "You have name as a string field, roll number is graduated,", "timestamp": "00:02:53,388", "timestamp_s": 173.0}, {"text": "date of birth. Pretty simple. What about nested", "timestamp": "00:02:56,620", "timestamp_s": 176.0}, {"text": "fields? We had addressed and we had phone.", "timestamp": "00:03:00,532", "timestamp_s": 180.0}, {"text": "How do those get translated? What we could do", "timestamp": "00:03:03,412", "timestamp_s": 183.0}, {"text": "is we could create a relationship between student address", "timestamp": "00:03:07,372", "timestamp_s": 187.0}, {"text": "and student phone, right? So we could create a student address", "timestamp": "00:03:11,332", "timestamp_s": 191.0}, {"text": "table where we have the primary key and", "timestamp": "00:03:14,668", "timestamp_s": 194.0}, {"text": "we have a foreign key of sorts, which is logical foreign key from the", "timestamp": "00:03:18,820", "timestamp_s": 198.0}, {"text": "parent student table. Then we have", "timestamp": "00:03:22,652", "timestamp_s": 202.0}, {"text": "line items and other fields, line address and", "timestamp": "00:03:26,524", "timestamp_s": 206.0}, {"text": "zip and other fields. Similarly, for phone number, we can create a primary key", "timestamp": "00:03:29,628", "timestamp_s": 209.0}, {"text": "and we have a foreign key, which is a logical foreign key", "timestamp": "00:03:33,492", "timestamp_s": 213.0}, {"text": "based on the student id, right? So and other fields", "timestamp": "00:03:36,644", "timestamp_s": 216.0}, {"text": "like personal and work from the previous Mongo document. So essentially", "timestamp": "00:03:39,900", "timestamp_s": 219.0}, {"text": "we are migrating data in this fashion. We have got,", "timestamp": "00:03:44,132", "timestamp_s": 224.0}, {"text": "for a single Mongo document, we have got a student table,", "timestamp": "00:03:47,924", "timestamp_s": 227.0}, {"text": "one record in postgres for the address,", "timestamp": "00:03:51,668", "timestamp_s": 231.0}, {"text": "which is a nested sub document. We are going to create two records in", "timestamp": "00:03:54,948", "timestamp_s": 234.0}, {"text": "postgres for student address table. And of", "timestamp": "00:03:59,076", "timestamp_s": 239.0}, {"text": "course there will be a relationship between student table and the student address table.", "timestamp": "00:04:02,480", "timestamp_s": 242.0}, {"text": "And there is going to be a third table which is student phone table,", "timestamp": "00:04:06,504", "timestamp_s": 246.0}, {"text": "which will have one record right from the Mongo document. So that\u0027s", "timestamp": "00:04:10,896", "timestamp_s": 250.0}, {"text": "how we are going to migrate data from Mongo to postgres.", "timestamp": "00:04:14,240", "timestamp_s": 254.0}, {"text": "If you think about how does it translate into from JSON", "timestamp": "00:04:18,304", "timestamp_s": 258.0}, {"text": "to SQL, this is how it looks like. So for the id column", "timestamp": "00:04:21,808", "timestamp_s": 261.0}, {"text": "in our id field in Mongo, we are going to create an", "timestamp": "00:04:26,278", "timestamp_s": 266.0}, {"text": "insert table record in student table. The same id", "timestamp": "00:04:30,270", "timestamp_s": 270.0}, {"text": "will then get replicated as foreign key of sorts", "timestamp": "00:04:34,118", "timestamp_s": 274.0}, {"text": "as part of the student id table,", "timestamp": "00:04:37,654", "timestamp_s": 277.0}, {"text": "a column in the in postgres and same for the", "timestamp": "00:04:40,854", "timestamp_s": 280.0}, {"text": "phone record. So how does MongoDB", "timestamp": "00:04:44,318", "timestamp_s": 284.0}, {"text": "JSOn data maps to Sql? We just saw", "timestamp": "00:04:47,974", "timestamp_s": 287.0}, {"text": "one Mongo document can map to N SQL statements,", "timestamp": "00:04:51,678", "timestamp_s": 291.0}, {"text": "right? So a nested array of JSON", "timestamp": "00:04:55,686", "timestamp_s": 295.0}, {"text": "objects or further array of objects in Mongo,", "timestamp": "00:05:00,134", "timestamp_s": 300.0}, {"text": "they get translated into relevant tables in", "timestamp": "00:05:04,142", "timestamp_s": 304.0}, {"text": "postgres and are recorded with primary key and", "timestamp": "00:05:07,278", "timestamp_s": 307.0}, {"text": "foreign key relationships with some logical key constraint.", "timestamp": "00:05:10,806", "timestamp_s": 310.0}, {"text": "Well, inserts are cool, but I. How do we do updates", "timestamp": "00:05:15,054", "timestamp_s": 315.0}, {"text": "and deletes in Mongo? Right? We also have updates to", "timestamp": "00:05:18,738", "timestamp_s": 318.0}, {"text": "records and deletes. Well, for updates there can", "timestamp": "00:05:21,970", "timestamp_s": 321.0}, {"text": "be two types of update. One is we have an update SQL statement", "timestamp": "00:05:25,330", "timestamp_s": 325.0}, {"text": "wherein a particular documents, some records get updated", "timestamp": "00:05:29,154", "timestamp_s": 329.0}, {"text": "or some column get updated in postgres,", "timestamp": "00:05:32,690", "timestamp_s": 332.0}, {"text": "which is update table, set column value", "timestamp": "00:05:36,434", "timestamp_s": 336.0}, {"text": "kind of command in SQL. Because Mongo doesn\u0027t have", "timestamp": "00:05:40,258", "timestamp_s": 340.0}, {"text": "schema, a fixed schema and postgres or any relational database has a", "timestamp": "00:05:43,930", "timestamp_s": 343.0}, {"text": "schema, a new key added to JSON", "timestamp": "00:05:47,696", "timestamp_s": 347.0}, {"text": "document that will translate into alter table statement", "timestamp": "00:05:50,928", "timestamp_s": 350.0}, {"text": "in Mongo, in postgres, right? Which will have a schema change essentially.", "timestamp": "00:05:54,272", "timestamp_s": 354.0}, {"text": "So for delete, it\u0027s going to be a simple delete SQL statement", "timestamp": "00:05:58,744", "timestamp_s": 358.0}, {"text": "from a table. Then we have two choices of migrating", "timestamp": "00:06:02,544", "timestamp_s": 362.0}, {"text": "data. One is a bulk one time migrate where we", "timestamp": "00:06:06,976", "timestamp_s": 366.0}, {"text": "just move all the data from Mongo to postgres in this fashion, where we copy", "timestamp": "00:06:10,628", "timestamp_s": 370.0}, {"text": "data from Mongo, create proper SQL schema,", "timestamp": "00:06:14,748", "timestamp_s": 374.0}, {"text": "create insert statements, and just copy data.", "timestamp": "00:06:19,156", "timestamp_s": 379.0}, {"text": "But we can\u0027t stop our production mongo and", "timestamp": "00:06:23,204", "timestamp_s": 383.0}, {"text": "migrate everything and then just migrate to postgres. For example,", "timestamp": "00:06:26,772", "timestamp_s": 386.0}, {"text": "we would have to have some streaming data fashion as well where", "timestamp": "00:06:30,492", "timestamp_s": 390.0}, {"text": "we would migrate one time the initial data, and after that", "timestamp": "00:06:34,636", "timestamp_s": 394.0}, {"text": "we are going to need to rely on updates", "timestamp": "00:06:38,528", "timestamp_s": 398.0}, {"text": "to mongo or new inserts to mongo or deletes to Mongo to be", "timestamp": "00:06:42,016", "timestamp_s": 402.0}, {"text": "also translated to postgres. So that has to be done in a streaming", "timestamp": "00:06:45,744", "timestamp_s": 405.0}, {"text": "fashion. What if we want both options,", "timestamp": "00:06:49,224", "timestamp_s": 409.0}, {"text": "which is where we need a reliable way to track all the", "timestamp": "00:06:53,584", "timestamp_s": 413.0}, {"text": "updates to Mongo database so that we can", "timestamp": "00:06:56,968", "timestamp_s": 416.0}, {"text": "use that to migrate to postgres. Any thoughts that", "timestamp": "00:07:00,224", "timestamp_s": 420.0}, {"text": "come to mind? What kind of Mongo feature we can use? You guessed", "timestamp": "00:07:03,960", "timestamp_s": 423.0}, {"text": "it, it\u0027s called Mongo Uplog. In the Mongo operation,", "timestamp": "00:07:07,960", "timestamp_s": 427.0}, {"text": "log is a logical collection. It\u0027s a capped collection in MongoDB.", "timestamp": "00:07:12,088", "timestamp_s": 432.0}, {"text": "It\u0027s in the local database. What it does is it kind of", "timestamp": "00:07:16,136", "timestamp_s": 436.0}, {"text": "think of it like a write ahead log for MongoDB.", "timestamp": "00:07:19,640", "timestamp_s": 439.0}, {"text": "It tracks all the edits to the database,", "timestamp": "00:07:22,552", "timestamp_s": 442.0}, {"text": "whether it\u0027s insert updates or deletes. And you\u0027re going to be", "timestamp": "00:07:26,104", "timestamp_s": 446.0}, {"text": "able to look at whatever is happening to the database in", "timestamp": "00:07:29,818", "timestamp_s": 449.0}, {"text": "terms of updates or inserts or deletes. So what", "timestamp": "00:07:33,306", "timestamp_s": 453.0}, {"text": "we could do is we could use Oplog to", "timestamp": "00:07:36,810", "timestamp_s": 456.0}, {"text": "translate data or transfer data from Mongo to postgres. So let\u0027s look", "timestamp": "00:07:41,250", "timestamp_s": 461.0}, {"text": "at how it looks like in practice. What does the Oplog record look", "timestamp": "00:07:45,298", "timestamp_s": 465.0}, {"text": "like? Here is the sample insert oplog. You\u0027ve got the", "timestamp": "00:07:48,890", "timestamp_s": 468.0}, {"text": "op as the operation, which is insert. Here I stands for insert.", "timestamp": "00:07:52,762", "timestamp_s": 472.0}, {"text": "The namespace stands for a database and a collection", "timestamp": "00:07:56,474", "timestamp_s": 476.0}, {"text": "combination. So you got test as a database name and student as", "timestamp": "00:07:59,746", "timestamp_s": 479.0}, {"text": "the collection name. Then you\u0027ve got the proper", "timestamp": "00:08:03,082", "timestamp_s": 483.0}, {"text": "insert object, which contains the actual object that is", "timestamp": "00:08:06,650", "timestamp_s": 486.0}, {"text": "being inserted in MongoDB. Similarly for", "timestamp": "00:08:10,290", "timestamp_s": 490.0}, {"text": "update, you\u0027ve got operation as update, you\u0027ve got the namespace", "timestamp": "00:08:13,370", "timestamp_s": 493.0}, {"text": "and you get a set of field value pairs,", "timestamp": "00:08:17,466", "timestamp_s": 497.0}, {"text": "right? What is being updated, for example, and you get the actual", "timestamp": "00:08:20,818", "timestamp_s": 500.0}, {"text": "updated object. So imagine this to be you want to update based", "timestamp": "00:08:24,246", "timestamp_s": 504.0}, {"text": "on some key and you want to set some new set of values.", "timestamp": "00:08:27,822", "timestamp_s": 507.0}, {"text": "So that\u0027s what you get in the update oplog. And similarly, you\u0027ll have delete", "timestamp": "00:08:31,382", "timestamp_s": 511.0}, {"text": "as well. You might be wondering when are we really getting", "timestamp": "00:08:34,870", "timestamp_s": 514.0}, {"text": "to the concurrency and the go part of it? So, well, the wait is over.", "timestamp": "00:08:38,334", "timestamp_s": 518.0}, {"text": "Here is the sequential pipeline. What looks like. So fundamentally our", "timestamp": "00:08:42,614", "timestamp_s": 522.0}, {"text": "idea is to migrate data from MongoDB on one side to postgres on", "timestamp": "00:08:46,670", "timestamp_s": 526.0}, {"text": "the other. The way we do this is we think of writing", "timestamp": "00:08:50,326", "timestamp_s": 530.0}, {"text": "a utility or a program called, let\u0027s call it Oplog to SQL.", "timestamp": "00:08:54,254", "timestamp_s": 534.0}, {"text": "What that program is going to do is it\u0027s going to read the oplogs from", "timestamp": "00:08:59,334", "timestamp_s": 539.0}, {"text": "MongoDB sequentially as it comes is going", "timestamp": "00:09:02,518", "timestamp_s": 542.0}, {"text": "to, there is going to be a go routine which can read these oplogs.", "timestamp": "00:09:05,718", "timestamp_s": 545.0}, {"text": "It\u0027s going to then put these records, put these oplogs into a channel.", "timestamp": "00:09:09,030", "timestamp_s": 549.0}, {"text": "There will be another go routine which will read from this channel which will", "timestamp": "00:09:12,910", "timestamp_s": 552.0}, {"text": "convert process oplogs in some sort of", "timestamp": "00:09:16,350", "timestamp_s": 556.0}, {"text": "SQL format. That\u0027s what we saw just now, right, how we can convert a single", "timestamp": "00:09:19,680", "timestamp_s": 559.0}, {"text": "oplog into N SQL statements. So we are going to cover,", "timestamp": "00:09:23,472", "timestamp_s": 563.0}, {"text": "convert and process and convert an oplog to", "timestamp": "00:09:27,304", "timestamp_s": 567.0}, {"text": "a bunch of SQL statements. Once that\u0027s done, we put them", "timestamp": "00:09:30,904", "timestamp_s": 570.0}, {"text": "into another channel from this channel, another go", "timestamp": "00:09:34,920", "timestamp_s": 574.0}, {"text": "routine picks up these values, these SQL statements, and then it", "timestamp": "00:09:38,920", "timestamp_s": 578.0}, {"text": "just basically does raw inserts in postgres, right?", "timestamp": "00:09:42,264", "timestamp_s": 582.0}, {"text": "So imagine we wrote this program with this", "timestamp": "00:09:45,596", "timestamp_s": 585.0}, {"text": "kind of sequential data pipeline. We will be able to migrate", "timestamp": "00:09:48,892", "timestamp_s": 588.0}, {"text": "data from Mongo to postgres both in streaming and in the", "timestamp": "00:09:52,532", "timestamp_s": 592.0}, {"text": "bulk fashion, assuming we have access to those set of oplogs from", "timestamp": "00:09:56,068", "timestamp_s": 596.0}, {"text": "that time. So here you can consider", "timestamp": "00:09:59,700", "timestamp_s": 599.0}, {"text": "these as go routines and these channels,", "timestamp": "00:10:02,932", "timestamp_s": 602.0}, {"text": "these sort of pipes as channels essentially.", "timestamp": "00:10:07,564", "timestamp_s": 607.0}, {"text": "So this is how our Mongo oplog looks like. Here is", "timestamp": "00:10:10,594", "timestamp_s": 610.0}, {"text": "how corresponding postgres database table would look like.", "timestamp": "00:10:14,010", "timestamp_s": 614.0}, {"text": "Similarly, you\u0027ve got this namespace and you\u0027ve got", "timestamp": "00:10:16,906", "timestamp_s": 616.0}, {"text": "table that translates into database schema", "timestamp": "00:10:20,890", "timestamp_s": 620.0}, {"text": "and table name. In postgres, the data", "timestamp": "00:10:24,450", "timestamp_s": 624.0}, {"text": "gets translated into particular table.", "timestamp": "00:10:27,810", "timestamp_s": 627.0}, {"text": "So to be able to translate or move this data", "timestamp": "00:10:31,234", "timestamp_s": 631.0}, {"text": "from Mongo to postgres, we are going to have to create schema,", "timestamp": "00:10:34,402", "timestamp_s": 634.0}, {"text": "we are going to have to create a table and then we are going to", "timestamp": "00:10:37,628", "timestamp_s": 637.0}, {"text": "insert data into that table. Once we insert this", "timestamp": "00:10:40,380", "timestamp_s": 640.0}, {"text": "data, this is what it looks like. We have the schema, the table", "timestamp": "00:10:43,820", "timestamp_s": 643.0}, {"text": "and the insert statements. Well,", "timestamp": "00:10:47,788", "timestamp_s": 647.0}, {"text": "imagine we have two oplogs, two insert oplogs", "timestamp": "00:10:50,900", "timestamp_s": 650.0}, {"text": "on the same mongo collection. Well, we can\u0027t go and", "timestamp": "00:10:54,020", "timestamp_s": 654.0}, {"text": "create new schema and new table all the time.", "timestamp": "00:10:57,660", "timestamp_s": 657.0}, {"text": "We shouldn\u0027t actually. So we\u0027re going to create schema", "timestamp": "00:11:01,260", "timestamp_s": 661.0}, {"text": "and table only once and perform n number of", "timestamp": "00:11:04,394", "timestamp_s": 664.0}, {"text": "inserts, right? So that\u0027s what we look at", "timestamp": "00:11:07,730", "timestamp_s": 667.0}, {"text": "here. So one insert goes here and then the second insert goes here.", "timestamp": "00:11:10,922", "timestamp_s": 670.0}, {"text": "So we have to also maintain some sort of state to be able to not", "timestamp": "00:11:14,610", "timestamp_s": 674.0}, {"text": "create schema and table multiple times.", "timestamp": "00:11:19,226", "timestamp_s": 679.0}, {"text": "For now, given this is a talk related to", "timestamp": "00:11:22,594", "timestamp_s": 682.0}, {"text": "concurrency, we\u0027ll skip all the details and edge cases related to updates", "timestamp": "00:11:26,362", "timestamp_s": 686.0}, {"text": "and deletes. You can trust me that I\u0027ve got it handled.", "timestamp": "00:11:30,114", "timestamp_s": 690.0}, {"text": "So here is what our pipeline looks like.", "timestamp": "00:11:33,674", "timestamp_s": 693.0}, {"text": "Let\u0027s say we run this pipeline, right? What we get", "timestamp": "00:11:36,834", "timestamp_s": 696.0}, {"text": "for about 3.6 million records. I ran this pipeline", "timestamp": "00:11:40,234", "timestamp_s": 700.0}, {"text": "on my sort of MacBook with basic specs.", "timestamp": "00:11:43,874", "timestamp_s": 703.0}, {"text": "It ran for about nine hour 20 minutes.", "timestamp": "00:11:47,314", "timestamp_s": 707.0}, {"text": "So let\u0027s think about how we can improve the performance of the system.", "timestamp": "00:11:51,834", "timestamp_s": 711.0}, {"text": "Typically if you think about it, we can probably", "timestamp": "00:11:55,994", "timestamp_s": 715.0}, {"text": "add some worker pool to be able to speed up things.", "timestamp": "00:11:59,798", "timestamp_s": 719.0}, {"text": "But where? Which parts of the program", "timestamp": "00:12:03,094", "timestamp_s": 723.0}, {"text": "can be parallelized? Where can we add concurrency?", "timestamp": "00:12:06,750", "timestamp_s": 726.0}, {"text": "Typically the process and the convert Oplog to SQL. That\u0027s the go", "timestamp": "00:12:10,214", "timestamp_s": 730.0}, {"text": "routine. That seems like it\u0027s doing too much work and", "timestamp": "00:12:13,902", "timestamp_s": 733.0}, {"text": "it could use some help. So let\u0027s", "timestamp": "00:12:17,238", "timestamp_s": 737.0}, {"text": "modify the program to add worker pools.", "timestamp": "00:12:20,854", "timestamp_s": 740.0}, {"text": "What we have done in this case is we are reading the oplogs in a", "timestamp": "00:12:24,198", "timestamp_s": 744.0}, {"text": "single go routine. We are pushing the oplogs in the oplogs", "timestamp": "00:12:27,296", "timestamp_s": 747.0}, {"text": "channel. From there we have an orchestration where", "timestamp": "00:12:30,720", "timestamp_s": 750.0}, {"text": "we are creating n number of worker pools or worker go", "timestamp": "00:12:34,664", "timestamp_s": 754.0}, {"text": "routines to be able to process these oplogs concurrently.", "timestamp": "00:12:38,240", "timestamp_s": 758.0}, {"text": "And hopefully if you have multiple cpu cores we can", "timestamp": "00:12:41,728", "timestamp_s": 761.0}, {"text": "also run them in parallel. Once all of these worker go", "timestamp": "00:12:45,232", "timestamp_s": 765.0}, {"text": "routines run there Oplog processing", "timestamp": "00:12:48,752", "timestamp_s": 768.0}, {"text": "and conversion operations, they will convert these into", "timestamp": "00:12:52,034", "timestamp_s": 772.0}, {"text": "SQL statements. Those SQL statements will go into this SQL", "timestamp": "00:12:55,306", "timestamp_s": 775.0}, {"text": "statements channel. The execute", "timestamp": "00:12:59,234", "timestamp_s": 779.0}, {"text": "SQL go routine is going to then pick up and run", "timestamp": "00:13:02,530", "timestamp_s": 782.0}, {"text": "these SQL statements in postgres. We\u0027ve got", "timestamp": "00:13:06,354", "timestamp_s": 786.0}, {"text": "one design, but can we do better? Can we add more worker pools?", "timestamp": "00:13:09,890", "timestamp_s": 789.0}, {"text": "Well, I think the SQL Go routine execution can", "timestamp": "00:13:13,338", "timestamp_s": 793.0}, {"text": "also be parallelized and can also use some concurrency, right?", "timestamp": "00:13:16,972", "timestamp_s": 796.0}, {"text": "So it could also use some help. So let\u0027s modify", "timestamp": "00:13:20,284", "timestamp_s": 800.0}, {"text": "the program to be able to have more go routines. Now in", "timestamp": "00:13:23,396", "timestamp_s": 803.0}, {"text": "this case we have same, but what we\u0027ve done is for each go", "timestamp": "00:13:27,268", "timestamp_s": 807.0}, {"text": "routine which handles the incoming oplog,", "timestamp": "00:13:31,204", "timestamp_s": 811.0}, {"text": "it creates a set of SQL statements and it pushes", "timestamp": "00:13:35,164", "timestamp_s": 815.0}, {"text": "the SQL statements in its own channel which another", "timestamp": "00:13:39,052", "timestamp_s": 819.0}, {"text": "guru team can read from. This way we have", "timestamp": "00:13:42,564", "timestamp_s": 822.0}, {"text": "maximum concurrency. And by the way, I can tell you like no go routines,", "timestamp": "00:13:45,620", "timestamp_s": 825.0}, {"text": "gophers are harmed in this exercise. So we are good.", "timestamp": "00:13:49,676", "timestamp_s": 829.0}, {"text": "So we ran this program. What happens", "timestamp": "00:13:54,484", "timestamp_s": 834.0}, {"text": "is it runs in about for the same number of same", "timestamp": "00:13:57,580", "timestamp_s": 837.0}, {"text": "number of oplogs. 3.6 million. It runs", "timestamp": "00:14:02,324", "timestamp_s": 842.0}, {"text": "concurrently in about 2 hours 18 minutes.", "timestamp": "00:14:06,260", "timestamp_s": 846.0}, {"text": "And that\u0027s actually four X performance", "timestamp": "00:14:09,684", "timestamp_s": 849.0}, {"text": "improvement over the sequential one. So we\u0027ve already gotten like four", "timestamp": "00:14:13,466", "timestamp_s": 853.0}, {"text": "X performance improvements. That\u0027s amazing.", "timestamp": "00:14:17,042", "timestamp_s": 857.0}, {"text": "Before we do something more, we just realize something", "timestamp": "00:14:19,754", "timestamp_s": 859.0}, {"text": "is wrong. So what could be wrong? So again,", "timestamp": "00:14:23,338", "timestamp_s": 863.0}, {"text": "remember we have this oplog channel where you are getting all the oplogs", "timestamp": "00:14:27,026", "timestamp_s": 867.0}, {"text": "one by one. And there is multiple go routines which are", "timestamp": "00:14:30,738", "timestamp_s": 870.0}, {"text": "processing these oplogs concurrently. If you use go", "timestamp": "00:14:34,290", "timestamp_s": 874.0}, {"text": "routines multiple times, you will probably know that", "timestamp": "00:14:37,652", "timestamp_s": 877.0}, {"text": "you can\u0027t guarantee ordering of independent go routines.", "timestamp": "00:14:41,092", "timestamp_s": 881.0}, {"text": "You can\u0027t really have synchronizations across go", "timestamp": "00:14:44,876", "timestamp_s": 884.0}, {"text": "routines. So what does that mean?", "timestamp": "00:14:48,132", "timestamp_s": 888.0}, {"text": "That means this insert and update in the output", "timestamp": "00:14:51,380", "timestamp_s": 891.0}, {"text": "can actually also become update and insert. Well it can also become delete", "timestamp": "00:14:55,444", "timestamp_s": 895.0}, {"text": "and insert. This is a problem. How does", "timestamp": "00:14:59,588", "timestamp_s": 899.0}, {"text": "this cause a problem? So think about our pipeline.", "timestamp": "00:15:03,612", "timestamp_s": 903.0}, {"text": "We read the oplogs, we put them in a channel. There is bunch of go", "timestamp": "00:15:07,284", "timestamp_s": 907.0}, {"text": "routine workers which process these oplogs.", "timestamp": "00:15:10,972", "timestamp_s": 910.0}, {"text": "So imagine we have a single document which is being inserted", "timestamp": "00:15:14,884", "timestamp_s": 914.0}, {"text": "and immediately after is being updated sequential", "timestamp": "00:15:18,620", "timestamp_s": 918.0}, {"text": "oplog entries, one for insert and one for update of the same", "timestamp": "00:15:22,556", "timestamp_s": 922.0}, {"text": "document. What could happen with this setup is that", "timestamp": "00:15:26,164", "timestamp_s": 926.0}, {"text": "the SQL statement for insert would be generated and similar", "timestamp": "00:15:29,916", "timestamp_s": 929.0}, {"text": "SQL statement for update would be generated. But we can\u0027t guarantee", "timestamp": "00:15:33,152", "timestamp_s": 933.0}, {"text": "the ordering of these results. That means it", "timestamp": "00:15:37,232", "timestamp_s": 937.0}, {"text": "could end up happening that the update SQL runs first and then", "timestamp": "00:15:40,600", "timestamp_s": 940.0}, {"text": "it tries to run the insert SQL. Well that would result in SQL", "timestamp": "00:15:44,280", "timestamp_s": 944.0}, {"text": "error. So we can\u0027t really", "timestamp": "00:15:47,584", "timestamp_s": 947.0}, {"text": "throw worker pulls at a problem, right? Like the data integrity", "timestamp": "00:15:50,688", "timestamp_s": 950.0}, {"text": "gets compromised and we have a correctness", "timestamp": "00:15:54,456", "timestamp_s": 954.0}, {"text": "issue. So we need to always write correct program first. Then we", "timestamp": "00:15:58,676", "timestamp_s": 958.0}, {"text": "can make it performant. So this is a program that", "timestamp": "00:16:02,308", "timestamp_s": 962.0}, {"text": "is performant but it\u0027s not really correct. So then", "timestamp": "00:16:05,916", "timestamp_s": 965.0}, {"text": "do we go back to drawing board or what do we do? And again,", "timestamp": "00:16:09,468", "timestamp_s": 969.0}, {"text": "imagine we have n number of databases in Mongo and each database", "timestamp": "00:16:12,796", "timestamp_s": 972.0}, {"text": "has m collections. What we could do is we", "timestamp": "00:16:17,036", "timestamp_s": 977.0}, {"text": "could fan out for each database and fan", "timestamp": "00:16:20,420", "timestamp_s": 980.0}, {"text": "in for SQL. That\u0027s an option. So for example,", "timestamp": "00:16:24,412", "timestamp_s": 984.0}, {"text": "what we would do is again we would read the same in", "timestamp": "00:16:28,292", "timestamp_s": 988.0}, {"text": "a single go routine. Remember from MongoDB we push this into the", "timestamp": "00:16:32,268", "timestamp_s": 992.0}, {"text": "same channel, same oplox channel. But on the other side", "timestamp": "00:16:36,412", "timestamp_s": 996.0}, {"text": "we have a go routine, a single go routine which will fan", "timestamp": "00:16:40,372", "timestamp_s": 1000.0}, {"text": "out these oplogs based on per database.", "timestamp": "00:16:44,244", "timestamp_s": 1004.0}, {"text": "So essentially what we are doing is we are segregating per database.", "timestamp": "00:16:47,644", "timestamp_s": 1007.0}, {"text": "So if you have n databases, we are going to create n number of channels", "timestamp": "00:16:51,810", "timestamp_s": 1011.0}, {"text": "on the other side, right side of the oplogs for each database", "timestamp": "00:16:55,994", "timestamp_s": 1015.0}, {"text": "we will have a go routine that will consume these oplogs.", "timestamp": "00:16:59,962", "timestamp_s": 1019.0}, {"text": "Remember, each go routine consumes oplogs from only one database.", "timestamp": "00:17:04,554", "timestamp_s": 1024.0}, {"text": "So for example, that go routine only processes DB one Oplog.", "timestamp": "00:17:07,882", "timestamp_s": 1027.0}, {"text": "This go routine only processes DB two Oplog and vice versa.", "timestamp": "00:17:12,322", "timestamp_s": 1032.0}, {"text": "So we have n number of go routines based", "timestamp": "00:17:16,562", "timestamp_s": 1036.0}, {"text": "on the number of databases. And ultimately all these go", "timestamp": "00:17:19,812", "timestamp_s": 1039.0}, {"text": "routines would then fan in and send all the SQL", "timestamp": "00:17:23,212", "timestamp_s": 1043.0}, {"text": "updates or statements to a single channel, from which we", "timestamp": "00:17:26,916", "timestamp_s": 1046.0}, {"text": "could then execute the SQL to postgres.", "timestamp": "00:17:30,700", "timestamp_s": 1050.0}, {"text": "Well, you could theoretically say that that", "timestamp": "00:17:34,044", "timestamp_s": 1054.0}, {"text": "single go routine on the who is executing the SQL", "timestamp": "00:17:38,244", "timestamp_s": 1058.0}, {"text": "on database, that could become the bottleneck and it could use some help.", "timestamp": "00:17:42,428", "timestamp_s": 1062.0}, {"text": "So we could modify this design and we could", "timestamp": "00:17:46,814", "timestamp_s": 1066.0}, {"text": "fan out for each database without fanning in all the coroutines", "timestamp": "00:17:50,486", "timestamp_s": 1070.0}, {"text": "into a single without fanning", "timestamp": "00:17:54,270", "timestamp_s": 1074.0}, {"text": "in all the SQL statements into a single channel.", "timestamp": "00:17:57,830", "timestamp_s": 1077.0}, {"text": "So this would, this is how it looks like.", "timestamp": "00:18:00,854", "timestamp_s": 1080.0}, {"text": "Similarly we have those n databases, right? We have n go routines,", "timestamp": "00:18:03,294", "timestamp_s": 1083.0}, {"text": "but instead of fanning them all in into a single channel,", "timestamp": "00:18:07,054", "timestamp_s": 1087.0}, {"text": "we are creating a channel for each go routine.", "timestamp": "00:18:11,302", "timestamp_s": 1091.0}, {"text": "And similarly to be able to insert records", "timestamp": "00:18:15,454", "timestamp_s": 1095.0}, {"text": "in postgres, we are going to create n number of Go routines on", "timestamp": "00:18:19,190", "timestamp_s": 1099.0}, {"text": "the database also, right? So we will have one go routine", "timestamp": "00:18:23,038", "timestamp_s": 1103.0}, {"text": "per database and we\u0027ll have one go routine", "timestamp": "00:18:26,702", "timestamp_s": 1106.0}, {"text": "per SQL insert, update or whatever. The total", "timestamp": "00:18:30,246", "timestamp_s": 1110.0}, {"text": "number of go routines that we\u0027ll end up having is two nice. Plus obviously", "timestamp": "00:18:33,598", "timestamp_s": 1113.0}, {"text": "there are two go routines that we have, one for reading the Oplog and one", "timestamp": "00:18:36,910", "timestamp_s": 1116.0}, {"text": "for orchestrating the fan out. But basically", "timestamp": "00:18:40,030", "timestamp_s": 1120.0}, {"text": "if we have n databases, we are typically going to have twice the number of", "timestamp": "00:18:44,030", "timestamp_s": 1124.0}, {"text": "Go routines. If we take this idea even further", "timestamp": "00:18:47,758", "timestamp_s": 1127.0}, {"text": "and we say well, why don\u0027t we create go routines", "timestamp": "00:18:51,934", "timestamp_s": 1131.0}, {"text": "for each database and collection combination?", "timestamp": "00:18:55,830", "timestamp_s": 1135.0}, {"text": "Also, right now we were only creating", "timestamp": "00:18:59,358", "timestamp_s": 1139.0}, {"text": "go routines per database, but each database has", "timestamp": "00:19:02,542", "timestamp_s": 1142.0}, {"text": "m or some collections, right? So what if we", "timestamp": "00:19:06,240", "timestamp_s": 1146.0}, {"text": "create go routines per database collection combination?", "timestamp": "00:19:09,480", "timestamp_s": 1149.0}, {"text": "That will be a truly concurrent and massively parallelized", "timestamp": "00:19:13,208", "timestamp_s": 1153.0}, {"text": "solution, right? So this is what,", "timestamp": "00:19:17,784", "timestamp_s": 1157.0}, {"text": "what we end up with. We have a concurrent data pipeline. We\u0027ve got", "timestamp": "00:19:20,712", "timestamp_s": 1160.0}, {"text": "Mongodb. The diagram was so huge to fit horizontally that", "timestamp": "00:19:24,152", "timestamp_s": 1164.0}, {"text": "I had to fit it vertically, right? So we have Mongodb on top.", "timestamp": "00:19:27,608", "timestamp_s": 1167.0}, {"text": "Then we have this oplog to SQL program where we have,", "timestamp": "00:19:30,864", "timestamp_s": 1170.0}, {"text": "we read the oplogs in a single go routine. We push them into a channel.", "timestamp": "00:19:34,704", "timestamp_s": 1174.0}, {"text": "On the receiving end we have a orchestrator go routine which is going to fan", "timestamp": "00:19:38,840", "timestamp_s": 1178.0}, {"text": "out per database. So it\u0027s going to create n channels", "timestamp": "00:19:42,584", "timestamp_s": 1182.0}, {"text": "every time it encounters a new database. It\u0027s going to create a new channel and", "timestamp": "00:19:46,720", "timestamp_s": 1186.0}, {"text": "it\u0027s going to push all the values, all the oplogs for that", "timestamp": "00:19:50,608", "timestamp_s": 1190.0}, {"text": "database in that channel. Then we have the", "timestamp": "00:19:53,864", "timestamp_s": 1193.0}, {"text": "fan out oplogs per collection. So we have those", "timestamp": "00:19:57,822", "timestamp_s": 1197.0}, {"text": "n go routines, one for each database as and when", "timestamp": "00:20:01,174", "timestamp_s": 1201.0}, {"text": "they encounter an oplog for a different collection in the", "timestamp": "00:20:04,590", "timestamp_s": 1204.0}, {"text": "database, they are going to create M such collections", "timestamp": "00:20:08,038", "timestamp_s": 1208.0}, {"text": "oplogs or m such channels.", "timestamp": "00:20:12,182", "timestamp_s": 1212.0}, {"text": "Goroutine will then process oplogs", "timestamp": "00:20:15,174", "timestamp_s": 1215.0}, {"text": "for that only which channel", "timestamp": "00:20:19,414", "timestamp_s": 1219.0}, {"text": "specifies for a database and a collection combination.", "timestamp": "00:20:22,626", "timestamp_s": 1222.0}, {"text": "So this go routine is going to work on only,", "timestamp": "00:20:26,514", "timestamp_s": 1226.0}, {"text": "let\u0027s say DB one collection one combination. The next coroutine", "timestamp": "00:20:30,410", "timestamp_s": 1230.0}, {"text": "will work on DB one, collection two, db one", "timestamp": "00:20:34,242", "timestamp_s": 1234.0}, {"text": "collection three likewise. And then a new set of go", "timestamp": "00:20:37,442", "timestamp_s": 1237.0}, {"text": "routines will work on DB two, collection one, db two collection two,", "timestamp": "00:20:40,882", "timestamp_s": 1240.0}, {"text": "etcetera. So we\u0027ve essentially got m into", "timestamp": "00:20:44,274", "timestamp_s": 1244.0}, {"text": "n kind of go routines. Each of them", "timestamp": "00:20:47,586", "timestamp_s": 1247.0}, {"text": "write create SQL statements. Each of them push these", "timestamp": "00:20:51,412", "timestamp_s": 1251.0}, {"text": "SQL statements into another channel,", "timestamp": "00:20:55,140", "timestamp_s": 1255.0}, {"text": "which we will have again a SQL execution go routine which", "timestamp": "00:20:58,244", "timestamp_s": 1258.0}, {"text": "will execute all these SQL statements onto postgres.", "timestamp": "00:21:02,100", "timestamp_s": 1262.0}, {"text": "So essentially when we run this program,", "timestamp": "00:21:05,124", "timestamp_s": 1265.0}, {"text": "we see that it runs in about like 1 hour 36 minutes", "timestamp": "00:21:08,492", "timestamp_s": 1268.0}, {"text": "and 30 seconds for the same number of oplogs.", "timestamp": "00:21:14,364", "timestamp_s": 1274.0}, {"text": "So we had about 3.6 million oplogs. The sequential", "timestamp": "00:21:18,750", "timestamp_s": 1278.0}, {"text": "operation ran in nine hour 20 minutes and the concurrent one", "timestamp": "00:21:22,454", "timestamp_s": 1282.0}, {"text": "ran in 1 hour 36 minutes.", "timestamp": "00:21:26,150", "timestamp_s": 1286.0}, {"text": "Have in terms of resource utilization though, for this is that,", "timestamp": "00:21:29,334", "timestamp_s": 1289.0}, {"text": "imagine we have 16 databases and we have", "timestamp": "00:21:32,926", "timestamp_s": 1292.0}, {"text": "128 collections per database,", "timestamp": "00:21:36,550", "timestamp_s": 1296.0}, {"text": "right? That\u0027s on the higher side, but let\u0027s imagine that. So the total", "timestamp": "00:21:39,974", "timestamp_s": 1299.0}, {"text": "number of go routines that we\u0027ll have is we going to have n", "timestamp": "00:21:43,278", "timestamp_s": 1303.0}, {"text": "number of fan out oplogs per database,", "timestamp": "00:21:47,062", "timestamp_s": 1307.0}, {"text": "right? So we have got n goroutines like this. Then we", "timestamp": "00:21:50,462", "timestamp_s": 1310.0}, {"text": "have got, for each database we are going to create m go routines.", "timestamp": "00:21:53,966", "timestamp_s": 1313.0}, {"text": "So there will be n multiplied by m of those", "timestamp": "00:21:57,726", "timestamp_s": 1317.0}, {"text": "yellow go routines. And lastly, for execution", "timestamp": "00:22:01,614", "timestamp_s": 1321.0}, {"text": "of SQL, we are going to have one go routine per database collection combination.", "timestamp": "00:22:05,214", "timestamp_s": 1325.0}, {"text": "That means n multiplied by m. Again, if we", "timestamp": "00:22:09,510", "timestamp_s": 1329.0}, {"text": "just consider 16 databases and 128 collections, we are", "timestamp": "00:22:12,708", "timestamp_s": 1332.0}, {"text": "going to end up with 2048 database connections", "timestamp": "00:22:16,676", "timestamp_s": 1336.0}, {"text": "because each coroutine will actually form a connection to postgres.", "timestamp": "00:22:21,124", "timestamp_s": 1341.0}, {"text": "That\u0027s going to be quite some number of connections and it\u0027s going to hog the", "timestamp": "00:22:25,604", "timestamp_s": 1345.0}, {"text": "cpu and probably even cause", "timestamp": "00:22:29,588", "timestamp_s": 1349.0}, {"text": "problems with postgres if we have so many open connections.", "timestamp": "00:22:33,132", "timestamp_s": 1353.0}, {"text": "So while this program is performant, it is not utilizing the resources", "timestamp": "00:22:37,534", "timestamp_s": 1357.0}, {"text": "or it is over utilizing or overburdening postgres.", "timestamp": "00:22:41,526", "timestamp_s": 1361.0}, {"text": "What can we do? Can we do better? Right?", "timestamp": "00:22:45,102", "timestamp_s": 1365.0}, {"text": "So what we do in this case is we keep the most of", "timestamp": "00:22:48,694", "timestamp_s": 1368.0}, {"text": "the pipeline, the same, but instead of fanning", "timestamp": "00:22:52,038", "timestamp_s": 1372.0}, {"text": "out for postgres writes we fan", "timestamp": "00:22:55,606", "timestamp_s": 1375.0}, {"text": "them in. Remember, we don\u0027t need to create n", "timestamp": "00:22:58,854", "timestamp_s": 1378.0}, {"text": "multiplied by m connections to database if we can", "timestamp": "00:23:03,506", "timestamp_s": 1383.0}, {"text": "limit it to just n connections, one connection per database,", "timestamp": "00:23:06,962", "timestamp_s": 1386.0}, {"text": "that\u0027s good enough, and that\u0027s what we\u0027ll do here. So from", "timestamp": "00:23:10,290", "timestamp_s": 1390.0}, {"text": "all the go routines which process a single databases,", "timestamp": "00:23:14,594", "timestamp_s": 1394.0}, {"text": "records, all of them will funnel the data back", "timestamp": "00:23:18,418", "timestamp_s": 1398.0}, {"text": "into a single channel, and that channel will", "timestamp": "00:23:22,154", "timestamp_s": 1402.0}, {"text": "have another go routine which will execute all those SQL", "timestamp": "00:23:25,610", "timestamp_s": 1405.0}, {"text": "updates, inserts, etcetera on the postgres. So essentially we are going to create", "timestamp": "00:23:28,762", "timestamp_s": 1408.0}, {"text": "n number of go routines for handling database", "timestamp": "00:23:33,434", "timestamp_s": 1413.0}, {"text": "connections to postgres and that\u0027s where we limit the number of", "timestamp": "00:23:36,786", "timestamp_s": 1416.0}, {"text": "go routines prol that happens. So if you consider", "timestamp": "00:23:40,298", "timestamp_s": 1420.0}, {"text": "16 databases and 128 collections per database before", "timestamp": "00:23:44,610", "timestamp_s": 1424.0}, {"text": "we had a massive fan out where we would", "timestamp": "00:23:48,890", "timestamp_s": 1428.0}, {"text": "end up with 2048 database connections on", "timestamp": "00:23:52,402", "timestamp_s": 1432.0}, {"text": "the right side after the modification, what we have is", "timestamp": "00:23:57,418", "timestamp_s": 1437.0}, {"text": "we are fanning them in again to per database.", "timestamp": "00:24:00,714", "timestamp_s": 1440.0}, {"text": "That means we have only 16 number of", "timestamp": "00:24:04,734", "timestamp_s": 1444.0}, {"text": "connections to database. So we don\u0027t create", "timestamp": "00:24:09,334", "timestamp_s": 1449.0}, {"text": "massive database connections and cause database to hang and perform slow,", "timestamp": "00:24:12,686", "timestamp_s": 1452.0}, {"text": "but we instead create only 16 connections to database.", "timestamp": "00:24:16,446", "timestamp_s": 1456.0}, {"text": "So if you were to then compare this improved performance,", "timestamp": "00:24:20,934", "timestamp_s": 1460.0}, {"text": "you will see that in my case it ran a", "timestamp": "00:24:24,366", "timestamp_s": 1464.0}, {"text": "bit faster because it\u0027s probably utilizing the database and overall", "timestamp": "00:24:27,978", "timestamp_s": 1467.0}, {"text": "machine properly. So it was definitely better than", "timestamp": "00:24:32,138", "timestamp_s": 1472.0}, {"text": "concurrent implementation earlier, but it wasn\u0027t", "timestamp": "00:24:36,234", "timestamp_s": 1476.0}, {"text": "so much better. But in terms of resource utilization it was", "timestamp": "00:24:40,354", "timestamp_s": 1480.0}, {"text": "massively so. This is what our final concurrent", "timestamp": "00:24:43,746", "timestamp_s": 1483.0}, {"text": "data pipeline looks like we\u0027ve got. We\u0027re reading", "timestamp": "00:24:47,482", "timestamp_s": 1487.0}, {"text": "those from Mongolia. We are fanning out into", "timestamp": "00:24:51,442", "timestamp_s": 1491.0}, {"text": "n number of Go routines, one for each database", "timestamp": "00:24:54,582", "timestamp_s": 1494.0}, {"text": "for each of them. We are fanning them out again into m number of collections", "timestamp": "00:24:58,934", "timestamp_s": 1498.0}, {"text": "and m number of Go routines, one for each database collection combination.", "timestamp": "00:25:02,590", "timestamp_s": 1502.0}, {"text": "Ultimately then we fan in again. We don\u0027t have a go routine", "timestamp": "00:25:06,894", "timestamp_s": 1506.0}, {"text": "sprawl. We fan them in into collecting all", "timestamp": "00:25:10,542", "timestamp_s": 1510.0}, {"text": "SQL updates, inserts, deletes all sqls basically", "timestamp": "00:25:14,238", "timestamp_s": 1514.0}, {"text": "for one database into a single go routine and a single channel.", "timestamp": "00:25:18,174", "timestamp_s": 1518.0}, {"text": "And then that go routine will perform updates, insert and", "timestamp": "00:25:22,038", "timestamp_s": 1522.0}, {"text": "delete to Mongo to postgres database. That\u0027s what our final", "timestamp": "00:25:25,428", "timestamp_s": 1525.0}, {"text": "concurrent pipeline looks like. Think about what we", "timestamp": "00:25:29,276", "timestamp_s": 1529.0}, {"text": "just did overall as a solution, right? We understood", "timestamp": "00:25:32,700", "timestamp_s": 1532.0}, {"text": "the problem domain. We didn\u0027t.", "timestamp": "00:25:35,932", "timestamp_s": 1535.0}, {"text": "We said that the solution is in context of", "timestamp": "00:25:39,564", "timestamp_s": 1539.0}, {"text": "what the problem that we are solving. So our problem was", "timestamp": "00:25:43,028", "timestamp_s": 1543.0}, {"text": "MongoDB to database postgres data migration.", "timestamp": "00:25:46,324", "timestamp_s": 1546.0}, {"text": "We built the working solution first, which is a sequential", "timestamp": "00:25:49,804", "timestamp_s": 1549.0}, {"text": "data pipeline. Agreed that it ran very much slow,", "timestamp": "00:25:53,124", "timestamp_s": 1553.0}, {"text": "but we first always have a working solution before we try to optimize", "timestamp": "00:25:56,476", "timestamp_s": 1556.0}, {"text": "something, we identify possible", "timestamp": "00:25:59,988", "timestamp_s": 1559.0}, {"text": "parallel portions of the program. Not every program can", "timestamp": "00:26:03,948", "timestamp_s": 1563.0}, {"text": "be parallelized, right? So you have to identify what", "timestamp": "00:26:07,564", "timestamp_s": 1567.0}, {"text": "parts of the program can actually be improved. We have", "timestamp": "00:26:11,236", "timestamp_s": 1571.0}, {"text": "to avoid blindly applying concurrency patterns.", "timestamp": "00:26:14,948", "timestamp_s": 1574.0}, {"text": "For example, we tried to apply worker pools without really thinking too", "timestamp": "00:26:18,540", "timestamp_s": 1578.0}, {"text": "much, and then it didn\u0027t work out,", "timestamp": "00:26:22,052", "timestamp_s": 1582.0}, {"text": "right? The program was concurrent, but it wasn\u0027t performing.", "timestamp": "00:26:24,692", "timestamp_s": 1584.0}, {"text": "I mean, it was performing well, but we did not have correctness.", "timestamp": "00:26:29,012", "timestamp_s": 1589.0}, {"text": "And without correctness, no optimization helps.", "timestamp": "00:26:32,812", "timestamp_s": 1592.0}, {"text": "We have to also consider Amdahl\u0027s law, where what parts of the", "timestamp": "00:26:36,964", "timestamp_s": 1596.0}, {"text": "program can be parallelized and what\u0027s the sequential only portion", "timestamp": "00:26:40,380", "timestamp_s": 1600.0}, {"text": "of the program, right, which cannot be parallelized. So no matter", "timestamp": "00:26:43,992", "timestamp_s": 1603.0}, {"text": "how much hardware you throw at the parallelizable portion of the program.", "timestamp": "00:26:47,760", "timestamp_s": 1607.0}, {"text": "But if it\u0027s not more than some percentage of the", "timestamp": "00:26:51,168", "timestamp_s": 1611.0}, {"text": "remaining program, which is the sequential program, it\u0027s not going to help out much.", "timestamp": "00:26:54,800", "timestamp_s": 1614.0}, {"text": "So always like consider Amdahl\u0027s law, and also consider its", "timestamp": "00:26:58,528", "timestamp_s": 1618.0}, {"text": "sort of variant and even more broader law, which is universal", "timestamp": "00:27:02,720", "timestamp_s": 1622.0}, {"text": "scalability law. Fundamentally, like simplicity may", "timestamp": "00:27:06,312", "timestamp_s": 1626.0}, {"text": "be more valuable, and keeping things simple may be more valuable for", "timestamp": "00:27:10,260", "timestamp_s": 1630.0}, {"text": "the maintenance and runtime of the program. And then premature optimization,", "timestamp": "00:27:14,540", "timestamp_s": 1634.0}, {"text": "right? And premature performance gains that", "timestamp": "00:27:19,068", "timestamp_s": 1639.0}, {"text": "you may gain beyond certain point.", "timestamp": "00:27:22,564", "timestamp_s": 1642.0}, {"text": "So finally we ended up with a performant concurrent", "timestamp": "00:27:25,724", "timestamp_s": 1645.0}, {"text": "implementation with fan in for database, to be able to limit the", "timestamp": "00:27:29,652", "timestamp_s": 1649.0}, {"text": "the go routine sprawl and to be able to limit the number of database", "timestamp": "00:27:33,854", "timestamp_s": 1653.0}, {"text": "connections. So that\u0027s it. I hope you learned", "timestamp": "00:27:37,262", "timestamp_s": 1657.0}, {"text": "something. Connect with me on Chen Mai 185", "timestamp": "00:27:40,902", "timestamp_s": 1660.0}, {"text": "and check out our website at 120. Here is", "timestamp": "00:27:45,414", "timestamp_s": 1665.0}, {"text": "a link to our playbook and specifically link to this particular", "timestamp": "00:27:48,790", "timestamp_s": 1668.0}, {"text": "problem where I\u0027ve dumbed down this problem into set of stories", "timestamp": "00:27:52,846", "timestamp_s": 1672.0}, {"text": "that you can implement yourself and try out various concurrency", "timestamp": "00:27:56,790", "timestamp_s": 1676.0}, {"text": "features of Google. I\u0027ve broken this problem down into multiple", "timestamp": "00:28:00,622", "timestamp_s": 1680.0}, {"text": "small stories so that you can incrementally work on those.", "timestamp": "00:28:04,532", "timestamp_s": 1684.0}, {"text": "Thanks. Hope you have a nice conference.", "timestamp": "00:28:09,724", "timestamp_s": 1689.0}];
               
 
               var tag = document.createElement('script');
@@ -562,6 +562,1814 @@
               This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/assemblyai/mV8LIhCz9D4.srt" target="_blank">submit a PR</a>.
             </span>
             <div>
+            
+            <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:20,600'); seek(20.0)">
+              Today I am going to talk about go concurrency powering a
+            </span>
+            
+            <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:24,054'); seek(24.0)">
+              gigabyte scale real world data pipeline. So let's get into
+            </span>
+            
+            <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:27,812'); seek(27.0)">
+              it. So before we get started, a quick thing about myself.
+            </span>
+            
+            <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:31,980'); seek(31.0)">
+              I'm chinmay naik. I go by chinmai 185 on Twitter,
+            </span>
+            
+            <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:35,748'); seek(35.0)">
+              GitHub, LinkedIn, etcetera. You can catch me up right there. I'm a founder
+            </span>
+            
+            <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:39,692'); seek(39.0)">
+              at one two n where we help companies with backend and
+            </span>
+            
+            <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:43,084'); seek(43.0)">
+              reliability engineering. I also write stories on pragmatic
+            </span>
+            
+            <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:46,452'); seek(46.0)">
+              software engineering based on our work that we do on
+            </span>
+            
+            <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:49,812'); seek(49.0)">
+              Twitter and LinkedIn. So follow me up there. And in
+            </span>
+            
+            <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:00:53,928'); seek(53.0)">
+              general, I like engineering. I love psychology, I play
+            </span>
+            
+            <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:00:57,480'); seek(57.0)">
+              percussion, and I'm a huge fan of rather old computer game
+            </span>
+            
+            <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:01:01,320'); seek(61.0)">
+              called Age of empires two. So hit me up there.
+            </span>
+            
+            <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:01:05,024'); seek(65.0)">
+              So today I'm going to talk about MongoDB to RDBMs,
+            </span>
+            
+            <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:01:08,624'); seek(68.0)">
+              data migration, and how we achieved that using ghost concurrency
+            </span>
+            
+            <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:01:12,192'); seek(72.0)">
+              features. Right? So fundamentally, we wanted to move data from
+            </span>
+            
+            <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:01:16,184'); seek(76.0)">
+              Mongo to postgres. I'm not advocating for either
+            </span>
+            
+            <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:01:19,824'); seek(79.0)">
+              one of these two technologies as such, but we just had a use case where
+            </span>
+            
+            <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:01:22,792'); seek(82.0)">
+              we had to move data from MongoDB to postgres.
+            </span>
+            
+            <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:01:26,424'); seek(86.0)">
+              Now this was two type of transfer. Like one is the ETL
+            </span>
+            
+            <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:01:30,288'); seek(90.0)">
+              extract transform load kind of transfer where we were doing one
+            </span>
+            
+            <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:33,744'); seek(93.0)">
+              time bulk transfer. Kind of think of it like snapshot transfer of data. And we
+            </span>
+            
+            <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:37,952'); seek(97.0)">
+              also had to worry about streaming data transfer. Like if
+            </span>
+            
+            <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:41,328'); seek(101.0)">
+              there is any ongoing updates to MongoDB, how do those reflect
+            </span>
+            
+            <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:44,784'); seek(104.0)">
+              in postgres? Before we go
+            </span>
+            
+            <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:48,120'); seek(108.0)">
+              ahead, let's think about how do we map MongoDB documents,
+            </span>
+            
+            <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:01:52,464'); seek(112.0)">
+              tables and rows? Because these two are different technologies,
+            </span>
+            
+            <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:01:56,312'); seek(116.0)">
+              they're not one to one direct data transfer.
+            </span>
+            
+            <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:01:59,784'); seek(119.0)">
+              So let's look at student collection.
+            </span>
+            
+            <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:02:03,784'); seek(123.0)">
+              It's just sample collection. In MongodB, where we have,
+            </span>
+            
+            <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:02:07,576'); seek(127.0)">
+              this is a sample student document where you see id,
+            </span>
+            
+            <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:02:11,584'); seek(131.0)">
+              which is primary key. There is name, which is a string field.
+            </span>
+            
+            <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:02:15,374'); seek(135.0)">
+              You've got role number, which is a numeric field. There is Boolean field for
+            </span>
+            
+            <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:02:19,974'); seek(139.0)">
+              is graduated. And this is also another string
+            </span>
+            
+            <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:02:23,302'); seek(143.0)">
+              field. And in Mongo, what you can do is you have bunch
+            </span>
+            
+            <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:02:26,750'); seek(146.0)">
+              of nested documents. So you have address as a nested set of
+            </span>
+            
+            <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:02:30,854'); seek(150.0)">
+              nested array of objects, and you have nested
+            </span>
+            
+            <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:34,294'); seek(154.0)">
+              object, which is phone number. How does that data
+            </span>
+            
+            <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:38,030'); seek(158.0)">
+              get translated into postgres? So the student
+            </span>
+            
+            <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:41,508'); seek(161.0)">
+              record itself is pretty simple, right? You could just migrate the
+            </span>
+            
+            <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:45,492'); seek(165.0)">
+              keys one on one, and keys in MongodB document become columns
+            </span>
+            
+            <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:02:49,604'); seek(169.0)">
+              in postgres. So for example, id becomes primary key.
+            </span>
+            
+            <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:02:53,388'); seek(173.0)">
+              You have name as a string field, roll number is graduated,
+            </span>
+            
+            <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:02:56,620'); seek(176.0)">
+              date of birth. Pretty simple. What about nested
+            </span>
+            
+            <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:03:00,532'); seek(180.0)">
+              fields? We had addressed and we had phone.
+            </span>
+            
+            <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:03:03,412'); seek(183.0)">
+              How do those get translated? What we could do
+            </span>
+            
+            <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:03:07,372'); seek(187.0)">
+              is we could create a relationship between student address
+            </span>
+            
+            <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:03:11,332'); seek(191.0)">
+              and student phone, right? So we could create a student address
+            </span>
+            
+            <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:03:14,668'); seek(194.0)">
+              table where we have the primary key and
+            </span>
+            
+            <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:03:18,820'); seek(198.0)">
+              we have a foreign key of sorts, which is logical foreign key from the
+            </span>
+            
+            <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:03:22,652'); seek(202.0)">
+              parent student table. Then we have
+            </span>
+            
+            <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:03:26,524'); seek(206.0)">
+              line items and other fields, line address and
+            </span>
+            
+            <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:03:29,628'); seek(209.0)">
+              zip and other fields. Similarly, for phone number, we can create a primary key
+            </span>
+            
+            <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:03:33,492'); seek(213.0)">
+              and we have a foreign key, which is a logical foreign key
+            </span>
+            
+            <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:36,644'); seek(216.0)">
+              based on the student id, right? So and other fields
+            </span>
+            
+            <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:39,900'); seek(219.0)">
+              like personal and work from the previous Mongo document. So essentially
+            </span>
+            
+            <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:03:44,132'); seek(224.0)">
+              we are migrating data in this fashion. We have got,
+            </span>
+            
+            <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:03:47,924'); seek(227.0)">
+              for a single Mongo document, we have got a student table,
+            </span>
+            
+            <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:03:51,668'); seek(231.0)">
+              one record in postgres for the address,
+            </span>
+            
+            <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:03:54,948'); seek(234.0)">
+              which is a nested sub document. We are going to create two records in
+            </span>
+            
+            <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:03:59,076'); seek(239.0)">
+              postgres for student address table. And of
+            </span>
+            
+            <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:04:02,480'); seek(242.0)">
+              course there will be a relationship between student table and the student address table.
+            </span>
+            
+            <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:04:06,504'); seek(246.0)">
+              And there is going to be a third table which is student phone table,
+            </span>
+            
+            <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:04:10,896'); seek(250.0)">
+              which will have one record right from the Mongo document. So that's
+            </span>
+            
+            <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:04:14,240'); seek(254.0)">
+              how we are going to migrate data from Mongo to postgres.
+            </span>
+            
+            <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:04:18,304'); seek(258.0)">
+              If you think about how does it translate into from JSON
+            </span>
+            
+            <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:04:21,808'); seek(261.0)">
+              to SQL, this is how it looks like. So for the id column
+            </span>
+            
+            <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:04:26,278'); seek(266.0)">
+              in our id field in Mongo, we are going to create an
+            </span>
+            
+            <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:04:30,270'); seek(270.0)">
+              insert table record in student table. The same id
+            </span>
+            
+            <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:04:34,118'); seek(274.0)">
+              will then get replicated as foreign key of sorts
+            </span>
+            
+            <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:04:37,654'); seek(277.0)">
+              as part of the student id table,
+            </span>
+            
+            <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:04:40,854'); seek(280.0)">
+              a column in the in postgres and same for the
+            </span>
+            
+            <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:04:44,318'); seek(284.0)">
+              phone record. So how does MongoDB
+            </span>
+            
+            <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:04:47,974'); seek(287.0)">
+              JSOn data maps to Sql? We just saw
+            </span>
+            
+            <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:04:51,678'); seek(291.0)">
+              one Mongo document can map to N SQL statements,
+            </span>
+            
+            <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:04:55,686'); seek(295.0)">
+              right? So a nested array of JSON
+            </span>
+            
+            <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:05:00,134'); seek(300.0)">
+              objects or further array of objects in Mongo,
+            </span>
+            
+            <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:05:04,142'); seek(304.0)">
+              they get translated into relevant tables in
+            </span>
+            
+            <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:05:07,278'); seek(307.0)">
+              postgres and are recorded with primary key and
+            </span>
+            
+            <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:05:10,806'); seek(310.0)">
+              foreign key relationships with some logical key constraint.
+            </span>
+            
+            <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:05:15,054'); seek(315.0)">
+              Well, inserts are cool, but I. How do we do updates
+            </span>
+            
+            <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:05:18,738'); seek(318.0)">
+              and deletes in Mongo? Right? We also have updates to
+            </span>
+            
+            <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:05:21,970'); seek(321.0)">
+              records and deletes. Well, for updates there can
+            </span>
+            
+            <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:05:25,330'); seek(325.0)">
+              be two types of update. One is we have an update SQL statement
+            </span>
+            
+            <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:05:29,154'); seek(329.0)">
+              wherein a particular documents, some records get updated
+            </span>
+            
+            <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:05:32,690'); seek(332.0)">
+              or some column get updated in postgres,
+            </span>
+            
+            <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:05:36,434'); seek(336.0)">
+              which is update table, set column value
+            </span>
+            
+            <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:05:40,258'); seek(340.0)">
+              kind of command in SQL. Because Mongo doesn't have
+            </span>
+            
+            <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:05:43,930'); seek(343.0)">
+              schema, a fixed schema and postgres or any relational database has a
+            </span>
+            
+            <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:05:47,696'); seek(347.0)">
+              schema, a new key added to JSON
+            </span>
+            
+            <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:05:50,928'); seek(350.0)">
+              document that will translate into alter table statement
+            </span>
+            
+            <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:05:54,272'); seek(354.0)">
+              in Mongo, in postgres, right? Which will have a schema change essentially.
+            </span>
+            
+            <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:05:58,744'); seek(358.0)">
+              So for delete, it's going to be a simple delete SQL statement
+            </span>
+            
+            <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:06:02,544'); seek(362.0)">
+              from a table. Then we have two choices of migrating
+            </span>
+            
+            <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:06:06,976'); seek(366.0)">
+              data. One is a bulk one time migrate where we
+            </span>
+            
+            <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:06:10,628'); seek(370.0)">
+              just move all the data from Mongo to postgres in this fashion, where we copy
+            </span>
+            
+            <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:06:14,748'); seek(374.0)">
+              data from Mongo, create proper SQL schema,
+            </span>
+            
+            <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:06:19,156'); seek(379.0)">
+              create insert statements, and just copy data.
+            </span>
+            
+            <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:06:23,204'); seek(383.0)">
+              But we can't stop our production mongo and
+            </span>
+            
+            <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:06:26,772'); seek(386.0)">
+              migrate everything and then just migrate to postgres. For example,
+            </span>
+            
+            <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:06:30,492'); seek(390.0)">
+              we would have to have some streaming data fashion as well where
+            </span>
+            
+            <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:06:34,636'); seek(394.0)">
+              we would migrate one time the initial data, and after that
+            </span>
+            
+            <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:06:38,528'); seek(398.0)">
+              we are going to need to rely on updates
+            </span>
+            
+            <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:06:42,016'); seek(402.0)">
+              to mongo or new inserts to mongo or deletes to Mongo to be
+            </span>
+            
+            <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:06:45,744'); seek(405.0)">
+              also translated to postgres. So that has to be done in a streaming
+            </span>
+            
+            <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:06:49,224'); seek(409.0)">
+              fashion. What if we want both options,
+            </span>
+            
+            <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:06:53,584'); seek(413.0)">
+              which is where we need a reliable way to track all the
+            </span>
+            
+            <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:06:56,968'); seek(416.0)">
+              updates to Mongo database so that we can
+            </span>
+            
+            <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:07:00,224'); seek(420.0)">
+              use that to migrate to postgres. Any thoughts that
+            </span>
+            
+            <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:07:03,960'); seek(423.0)">
+              come to mind? What kind of Mongo feature we can use? You guessed
+            </span>
+            
+            <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:07:07,960'); seek(427.0)">
+              it, it's called Mongo Uplog. In the Mongo operation,
+            </span>
+            
+            <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:07:12,088'); seek(432.0)">
+              log is a logical collection. It's a capped collection in MongoDB.
+            </span>
+            
+            <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:07:16,136'); seek(436.0)">
+              It's in the local database. What it does is it kind of
+            </span>
+            
+            <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:07:19,640'); seek(439.0)">
+              think of it like a write ahead log for MongoDB.
+            </span>
+            
+            <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:07:22,552'); seek(442.0)">
+              It tracks all the edits to the database,
+            </span>
+            
+            <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:07:26,104'); seek(446.0)">
+              whether it's insert updates or deletes. And you're going to be
+            </span>
+            
+            <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:07:29,818'); seek(449.0)">
+              able to look at whatever is happening to the database in
+            </span>
+            
+            <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:07:33,306'); seek(453.0)">
+              terms of updates or inserts or deletes. So what
+            </span>
+            
+            <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:07:36,810'); seek(456.0)">
+              we could do is we could use Oplog to
+            </span>
+            
+            <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:07:41,250'); seek(461.0)">
+              translate data or transfer data from Mongo to postgres. So let's look
+            </span>
+            
+            <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:07:45,298'); seek(465.0)">
+              at how it looks like in practice. What does the Oplog record look
+            </span>
+            
+            <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:07:48,890'); seek(468.0)">
+              like? Here is the sample insert oplog. You've got the
+            </span>
+            
+            <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:07:52,762'); seek(472.0)">
+              op as the operation, which is insert. Here I stands for insert.
+            </span>
+            
+            <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:07:56,474'); seek(476.0)">
+              The namespace stands for a database and a collection
+            </span>
+            
+            <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:07:59,746'); seek(479.0)">
+              combination. So you got test as a database name and student as
+            </span>
+            
+            <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:08:03,082'); seek(483.0)">
+              the collection name. Then you've got the proper
+            </span>
+            
+            <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:08:06,650'); seek(486.0)">
+              insert object, which contains the actual object that is
+            </span>
+            
+            <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:08:10,290'); seek(490.0)">
+              being inserted in MongoDB. Similarly for
+            </span>
+            
+            <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:08:13,370'); seek(493.0)">
+              update, you've got operation as update, you've got the namespace
+            </span>
+            
+            <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:08:17,466'); seek(497.0)">
+              and you get a set of field value pairs,
+            </span>
+            
+            <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:08:20,818'); seek(500.0)">
+              right? What is being updated, for example, and you get the actual
+            </span>
+            
+            <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:08:24,246'); seek(504.0)">
+              updated object. So imagine this to be you want to update based
+            </span>
+            
+            <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:08:27,822'); seek(507.0)">
+              on some key and you want to set some new set of values.
+            </span>
+            
+            <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:08:31,382'); seek(511.0)">
+              So that's what you get in the update oplog. And similarly, you'll have delete
+            </span>
+            
+            <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:08:34,870'); seek(514.0)">
+              as well. You might be wondering when are we really getting
+            </span>
+            
+            <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:08:38,334'); seek(518.0)">
+              to the concurrency and the go part of it? So, well, the wait is over.
+            </span>
+            
+            <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:08:42,614'); seek(522.0)">
+              Here is the sequential pipeline. What looks like. So fundamentally our
+            </span>
+            
+            <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:08:46,670'); seek(526.0)">
+              idea is to migrate data from MongoDB on one side to postgres on
+            </span>
+            
+            <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:08:50,326'); seek(530.0)">
+              the other. The way we do this is we think of writing
+            </span>
+            
+            <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:08:54,254'); seek(534.0)">
+              a utility or a program called, let's call it Oplog to SQL.
+            </span>
+            
+            <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:08:59,334'); seek(539.0)">
+              What that program is going to do is it's going to read the oplogs from
+            </span>
+            
+            <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:09:02,518'); seek(542.0)">
+              MongoDB sequentially as it comes is going
+            </span>
+            
+            <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:09:05,718'); seek(545.0)">
+              to, there is going to be a go routine which can read these oplogs.
+            </span>
+            
+            <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:09:09,030'); seek(549.0)">
+              It's going to then put these records, put these oplogs into a channel.
+            </span>
+            
+            <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:09:12,910'); seek(552.0)">
+              There will be another go routine which will read from this channel which will
+            </span>
+            
+            <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:09:16,350'); seek(556.0)">
+              convert process oplogs in some sort of
+            </span>
+            
+            <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:09:19,680'); seek(559.0)">
+              SQL format. That's what we saw just now, right, how we can convert a single
+            </span>
+            
+            <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:09:23,472'); seek(563.0)">
+              oplog into N SQL statements. So we are going to cover,
+            </span>
+            
+            <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:09:27,304'); seek(567.0)">
+              convert and process and convert an oplog to
+            </span>
+            
+            <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:09:30,904'); seek(570.0)">
+              a bunch of SQL statements. Once that's done, we put them
+            </span>
+            
+            <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:09:34,920'); seek(574.0)">
+              into another channel from this channel, another go
+            </span>
+            
+            <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:09:38,920'); seek(578.0)">
+              routine picks up these values, these SQL statements, and then it
+            </span>
+            
+            <span id="chunk-151" class="transcript-chunks" onclick="console.log('00:09:42,264'); seek(582.0)">
+              just basically does raw inserts in postgres, right?
+            </span>
+            
+            <span id="chunk-152" class="transcript-chunks" onclick="console.log('00:09:45,596'); seek(585.0)">
+              So imagine we wrote this program with this
+            </span>
+            
+            <span id="chunk-153" class="transcript-chunks" onclick="console.log('00:09:48,892'); seek(588.0)">
+              kind of sequential data pipeline. We will be able to migrate
+            </span>
+            
+            <span id="chunk-154" class="transcript-chunks" onclick="console.log('00:09:52,532'); seek(592.0)">
+              data from Mongo to postgres both in streaming and in the
+            </span>
+            
+            <span id="chunk-155" class="transcript-chunks" onclick="console.log('00:09:56,068'); seek(596.0)">
+              bulk fashion, assuming we have access to those set of oplogs from
+            </span>
+            
+            <span id="chunk-156" class="transcript-chunks" onclick="console.log('00:09:59,700'); seek(599.0)">
+              that time. So here you can consider
+            </span>
+            
+            <span id="chunk-157" class="transcript-chunks" onclick="console.log('00:10:02,932'); seek(602.0)">
+              these as go routines and these channels,
+            </span>
+            
+            <span id="chunk-158" class="transcript-chunks" onclick="console.log('00:10:07,564'); seek(607.0)">
+              these sort of pipes as channels essentially.
+            </span>
+            
+            <span id="chunk-159" class="transcript-chunks" onclick="console.log('00:10:10,594'); seek(610.0)">
+              So this is how our Mongo oplog looks like. Here is
+            </span>
+            
+            <span id="chunk-160" class="transcript-chunks" onclick="console.log('00:10:14,010'); seek(614.0)">
+              how corresponding postgres database table would look like.
+            </span>
+            
+            <span id="chunk-161" class="transcript-chunks" onclick="console.log('00:10:16,906'); seek(616.0)">
+              Similarly, you've got this namespace and you've got
+            </span>
+            
+            <span id="chunk-162" class="transcript-chunks" onclick="console.log('00:10:20,890'); seek(620.0)">
+              table that translates into database schema
+            </span>
+            
+            <span id="chunk-163" class="transcript-chunks" onclick="console.log('00:10:24,450'); seek(624.0)">
+              and table name. In postgres, the data
+            </span>
+            
+            <span id="chunk-164" class="transcript-chunks" onclick="console.log('00:10:27,810'); seek(627.0)">
+              gets translated into particular table.
+            </span>
+            
+            <span id="chunk-165" class="transcript-chunks" onclick="console.log('00:10:31,234'); seek(631.0)">
+              So to be able to translate or move this data
+            </span>
+            
+            <span id="chunk-166" class="transcript-chunks" onclick="console.log('00:10:34,402'); seek(634.0)">
+              from Mongo to postgres, we are going to have to create schema,
+            </span>
+            
+            <span id="chunk-167" class="transcript-chunks" onclick="console.log('00:10:37,628'); seek(637.0)">
+              we are going to have to create a table and then we are going to
+            </span>
+            
+            <span id="chunk-168" class="transcript-chunks" onclick="console.log('00:10:40,380'); seek(640.0)">
+              insert data into that table. Once we insert this
+            </span>
+            
+            <span id="chunk-169" class="transcript-chunks" onclick="console.log('00:10:43,820'); seek(643.0)">
+              data, this is what it looks like. We have the schema, the table
+            </span>
+            
+            <span id="chunk-170" class="transcript-chunks" onclick="console.log('00:10:47,788'); seek(647.0)">
+              and the insert statements. Well,
+            </span>
+            
+            <span id="chunk-171" class="transcript-chunks" onclick="console.log('00:10:50,900'); seek(650.0)">
+              imagine we have two oplogs, two insert oplogs
+            </span>
+            
+            <span id="chunk-172" class="transcript-chunks" onclick="console.log('00:10:54,020'); seek(654.0)">
+              on the same mongo collection. Well, we can't go and
+            </span>
+            
+            <span id="chunk-173" class="transcript-chunks" onclick="console.log('00:10:57,660'); seek(657.0)">
+              create new schema and new table all the time.
+            </span>
+            
+            <span id="chunk-174" class="transcript-chunks" onclick="console.log('00:11:01,260'); seek(661.0)">
+              We shouldn't actually. So we're going to create schema
+            </span>
+            
+            <span id="chunk-175" class="transcript-chunks" onclick="console.log('00:11:04,394'); seek(664.0)">
+              and table only once and perform n number of
+            </span>
+            
+            <span id="chunk-176" class="transcript-chunks" onclick="console.log('00:11:07,730'); seek(667.0)">
+              inserts, right? So that's what we look at
+            </span>
+            
+            <span id="chunk-177" class="transcript-chunks" onclick="console.log('00:11:10,922'); seek(670.0)">
+              here. So one insert goes here and then the second insert goes here.
+            </span>
+            
+            <span id="chunk-178" class="transcript-chunks" onclick="console.log('00:11:14,610'); seek(674.0)">
+              So we have to also maintain some sort of state to be able to not
+            </span>
+            
+            <span id="chunk-179" class="transcript-chunks" onclick="console.log('00:11:19,226'); seek(679.0)">
+              create schema and table multiple times.
+            </span>
+            
+            <span id="chunk-180" class="transcript-chunks" onclick="console.log('00:11:22,594'); seek(682.0)">
+              For now, given this is a talk related to
+            </span>
+            
+            <span id="chunk-181" class="transcript-chunks" onclick="console.log('00:11:26,362'); seek(686.0)">
+              concurrency, we'll skip all the details and edge cases related to updates
+            </span>
+            
+            <span id="chunk-182" class="transcript-chunks" onclick="console.log('00:11:30,114'); seek(690.0)">
+              and deletes. You can trust me that I've got it handled.
+            </span>
+            
+            <span id="chunk-183" class="transcript-chunks" onclick="console.log('00:11:33,674'); seek(693.0)">
+              So here is what our pipeline looks like.
+            </span>
+            
+            <span id="chunk-184" class="transcript-chunks" onclick="console.log('00:11:36,834'); seek(696.0)">
+              Let's say we run this pipeline, right? What we get
+            </span>
+            
+            <span id="chunk-185" class="transcript-chunks" onclick="console.log('00:11:40,234'); seek(700.0)">
+              for about 3.6 million records. I ran this pipeline
+            </span>
+            
+            <span id="chunk-186" class="transcript-chunks" onclick="console.log('00:11:43,874'); seek(703.0)">
+              on my sort of MacBook with basic specs.
+            </span>
+            
+            <span id="chunk-187" class="transcript-chunks" onclick="console.log('00:11:47,314'); seek(707.0)">
+              It ran for about nine hour 20 minutes.
+            </span>
+            
+            <span id="chunk-188" class="transcript-chunks" onclick="console.log('00:11:51,834'); seek(711.0)">
+              So let's think about how we can improve the performance of the system.
+            </span>
+            
+            <span id="chunk-189" class="transcript-chunks" onclick="console.log('00:11:55,994'); seek(715.0)">
+              Typically if you think about it, we can probably
+            </span>
+            
+            <span id="chunk-190" class="transcript-chunks" onclick="console.log('00:11:59,798'); seek(719.0)">
+              add some worker pool to be able to speed up things.
+            </span>
+            
+            <span id="chunk-191" class="transcript-chunks" onclick="console.log('00:12:03,094'); seek(723.0)">
+              But where? Which parts of the program
+            </span>
+            
+            <span id="chunk-192" class="transcript-chunks" onclick="console.log('00:12:06,750'); seek(726.0)">
+              can be parallelized? Where can we add concurrency?
+            </span>
+            
+            <span id="chunk-193" class="transcript-chunks" onclick="console.log('00:12:10,214'); seek(730.0)">
+              Typically the process and the convert Oplog to SQL. That's the go
+            </span>
+            
+            <span id="chunk-194" class="transcript-chunks" onclick="console.log('00:12:13,902'); seek(733.0)">
+              routine. That seems like it's doing too much work and
+            </span>
+            
+            <span id="chunk-195" class="transcript-chunks" onclick="console.log('00:12:17,238'); seek(737.0)">
+              it could use some help. So let's
+            </span>
+            
+            <span id="chunk-196" class="transcript-chunks" onclick="console.log('00:12:20,854'); seek(740.0)">
+              modify the program to add worker pools.
+            </span>
+            
+            <span id="chunk-197" class="transcript-chunks" onclick="console.log('00:12:24,198'); seek(744.0)">
+              What we have done in this case is we are reading the oplogs in a
+            </span>
+            
+            <span id="chunk-198" class="transcript-chunks" onclick="console.log('00:12:27,296'); seek(747.0)">
+              single go routine. We are pushing the oplogs in the oplogs
+            </span>
+            
+            <span id="chunk-199" class="transcript-chunks" onclick="console.log('00:12:30,720'); seek(750.0)">
+              channel. From there we have an orchestration where
+            </span>
+            
+            <span id="chunk-200" class="transcript-chunks" onclick="console.log('00:12:34,664'); seek(754.0)">
+              we are creating n number of worker pools or worker go
+            </span>
+            
+            <span id="chunk-201" class="transcript-chunks" onclick="console.log('00:12:38,240'); seek(758.0)">
+              routines to be able to process these oplogs concurrently.
+            </span>
+            
+            <span id="chunk-202" class="transcript-chunks" onclick="console.log('00:12:41,728'); seek(761.0)">
+              And hopefully if you have multiple cpu cores we can
+            </span>
+            
+            <span id="chunk-203" class="transcript-chunks" onclick="console.log('00:12:45,232'); seek(765.0)">
+              also run them in parallel. Once all of these worker go
+            </span>
+            
+            <span id="chunk-204" class="transcript-chunks" onclick="console.log('00:12:48,752'); seek(768.0)">
+              routines run there Oplog processing
+            </span>
+            
+            <span id="chunk-205" class="transcript-chunks" onclick="console.log('00:12:52,034'); seek(772.0)">
+              and conversion operations, they will convert these into
+            </span>
+            
+            <span id="chunk-206" class="transcript-chunks" onclick="console.log('00:12:55,306'); seek(775.0)">
+              SQL statements. Those SQL statements will go into this SQL
+            </span>
+            
+            <span id="chunk-207" class="transcript-chunks" onclick="console.log('00:12:59,234'); seek(779.0)">
+              statements channel. The execute
+            </span>
+            
+            <span id="chunk-208" class="transcript-chunks" onclick="console.log('00:13:02,530'); seek(782.0)">
+              SQL go routine is going to then pick up and run
+            </span>
+            
+            <span id="chunk-209" class="transcript-chunks" onclick="console.log('00:13:06,354'); seek(786.0)">
+              these SQL statements in postgres. We've got
+            </span>
+            
+            <span id="chunk-210" class="transcript-chunks" onclick="console.log('00:13:09,890'); seek(789.0)">
+              one design, but can we do better? Can we add more worker pools?
+            </span>
+            
+            <span id="chunk-211" class="transcript-chunks" onclick="console.log('00:13:13,338'); seek(793.0)">
+              Well, I think the SQL Go routine execution can
+            </span>
+            
+            <span id="chunk-212" class="transcript-chunks" onclick="console.log('00:13:16,972'); seek(796.0)">
+              also be parallelized and can also use some concurrency, right?
+            </span>
+            
+            <span id="chunk-213" class="transcript-chunks" onclick="console.log('00:13:20,284'); seek(800.0)">
+              So it could also use some help. So let's modify
+            </span>
+            
+            <span id="chunk-214" class="transcript-chunks" onclick="console.log('00:13:23,396'); seek(803.0)">
+              the program to be able to have more go routines. Now in
+            </span>
+            
+            <span id="chunk-215" class="transcript-chunks" onclick="console.log('00:13:27,268'); seek(807.0)">
+              this case we have same, but what we've done is for each go
+            </span>
+            
+            <span id="chunk-216" class="transcript-chunks" onclick="console.log('00:13:31,204'); seek(811.0)">
+              routine which handles the incoming oplog,
+            </span>
+            
+            <span id="chunk-217" class="transcript-chunks" onclick="console.log('00:13:35,164'); seek(815.0)">
+              it creates a set of SQL statements and it pushes
+            </span>
+            
+            <span id="chunk-218" class="transcript-chunks" onclick="console.log('00:13:39,052'); seek(819.0)">
+              the SQL statements in its own channel which another
+            </span>
+            
+            <span id="chunk-219" class="transcript-chunks" onclick="console.log('00:13:42,564'); seek(822.0)">
+              guru team can read from. This way we have
+            </span>
+            
+            <span id="chunk-220" class="transcript-chunks" onclick="console.log('00:13:45,620'); seek(825.0)">
+              maximum concurrency. And by the way, I can tell you like no go routines,
+            </span>
+            
+            <span id="chunk-221" class="transcript-chunks" onclick="console.log('00:13:49,676'); seek(829.0)">
+              gophers are harmed in this exercise. So we are good.
+            </span>
+            
+            <span id="chunk-222" class="transcript-chunks" onclick="console.log('00:13:54,484'); seek(834.0)">
+              So we ran this program. What happens
+            </span>
+            
+            <span id="chunk-223" class="transcript-chunks" onclick="console.log('00:13:57,580'); seek(837.0)">
+              is it runs in about for the same number of same
+            </span>
+            
+            <span id="chunk-224" class="transcript-chunks" onclick="console.log('00:14:02,324'); seek(842.0)">
+              number of oplogs. 3.6 million. It runs
+            </span>
+            
+            <span id="chunk-225" class="transcript-chunks" onclick="console.log('00:14:06,260'); seek(846.0)">
+              concurrently in about 2 hours 18 minutes.
+            </span>
+            
+            <span id="chunk-226" class="transcript-chunks" onclick="console.log('00:14:09,684'); seek(849.0)">
+              And that's actually four X performance
+            </span>
+            
+            <span id="chunk-227" class="transcript-chunks" onclick="console.log('00:14:13,466'); seek(853.0)">
+              improvement over the sequential one. So we've already gotten like four
+            </span>
+            
+            <span id="chunk-228" class="transcript-chunks" onclick="console.log('00:14:17,042'); seek(857.0)">
+              X performance improvements. That's amazing.
+            </span>
+            
+            <span id="chunk-229" class="transcript-chunks" onclick="console.log('00:14:19,754'); seek(859.0)">
+              Before we do something more, we just realize something
+            </span>
+            
+            <span id="chunk-230" class="transcript-chunks" onclick="console.log('00:14:23,338'); seek(863.0)">
+              is wrong. So what could be wrong? So again,
+            </span>
+            
+            <span id="chunk-231" class="transcript-chunks" onclick="console.log('00:14:27,026'); seek(867.0)">
+              remember we have this oplog channel where you are getting all the oplogs
+            </span>
+            
+            <span id="chunk-232" class="transcript-chunks" onclick="console.log('00:14:30,738'); seek(870.0)">
+              one by one. And there is multiple go routines which are
+            </span>
+            
+            <span id="chunk-233" class="transcript-chunks" onclick="console.log('00:14:34,290'); seek(874.0)">
+              processing these oplogs concurrently. If you use go
+            </span>
+            
+            <span id="chunk-234" class="transcript-chunks" onclick="console.log('00:14:37,652'); seek(877.0)">
+              routines multiple times, you will probably know that
+            </span>
+            
+            <span id="chunk-235" class="transcript-chunks" onclick="console.log('00:14:41,092'); seek(881.0)">
+              you can't guarantee ordering of independent go routines.
+            </span>
+            
+            <span id="chunk-236" class="transcript-chunks" onclick="console.log('00:14:44,876'); seek(884.0)">
+              You can't really have synchronizations across go
+            </span>
+            
+            <span id="chunk-237" class="transcript-chunks" onclick="console.log('00:14:48,132'); seek(888.0)">
+              routines. So what does that mean?
+            </span>
+            
+            <span id="chunk-238" class="transcript-chunks" onclick="console.log('00:14:51,380'); seek(891.0)">
+              That means this insert and update in the output
+            </span>
+            
+            <span id="chunk-239" class="transcript-chunks" onclick="console.log('00:14:55,444'); seek(895.0)">
+              can actually also become update and insert. Well it can also become delete
+            </span>
+            
+            <span id="chunk-240" class="transcript-chunks" onclick="console.log('00:14:59,588'); seek(899.0)">
+              and insert. This is a problem. How does
+            </span>
+            
+            <span id="chunk-241" class="transcript-chunks" onclick="console.log('00:15:03,612'); seek(903.0)">
+              this cause a problem? So think about our pipeline.
+            </span>
+            
+            <span id="chunk-242" class="transcript-chunks" onclick="console.log('00:15:07,284'); seek(907.0)">
+              We read the oplogs, we put them in a channel. There is bunch of go
+            </span>
+            
+            <span id="chunk-243" class="transcript-chunks" onclick="console.log('00:15:10,972'); seek(910.0)">
+              routine workers which process these oplogs.
+            </span>
+            
+            <span id="chunk-244" class="transcript-chunks" onclick="console.log('00:15:14,884'); seek(914.0)">
+              So imagine we have a single document which is being inserted
+            </span>
+            
+            <span id="chunk-245" class="transcript-chunks" onclick="console.log('00:15:18,620'); seek(918.0)">
+              and immediately after is being updated sequential
+            </span>
+            
+            <span id="chunk-246" class="transcript-chunks" onclick="console.log('00:15:22,556'); seek(922.0)">
+              oplog entries, one for insert and one for update of the same
+            </span>
+            
+            <span id="chunk-247" class="transcript-chunks" onclick="console.log('00:15:26,164'); seek(926.0)">
+              document. What could happen with this setup is that
+            </span>
+            
+            <span id="chunk-248" class="transcript-chunks" onclick="console.log('00:15:29,916'); seek(929.0)">
+              the SQL statement for insert would be generated and similar
+            </span>
+            
+            <span id="chunk-249" class="transcript-chunks" onclick="console.log('00:15:33,152'); seek(933.0)">
+              SQL statement for update would be generated. But we can't guarantee
+            </span>
+            
+            <span id="chunk-250" class="transcript-chunks" onclick="console.log('00:15:37,232'); seek(937.0)">
+              the ordering of these results. That means it
+            </span>
+            
+            <span id="chunk-251" class="transcript-chunks" onclick="console.log('00:15:40,600'); seek(940.0)">
+              could end up happening that the update SQL runs first and then
+            </span>
+            
+            <span id="chunk-252" class="transcript-chunks" onclick="console.log('00:15:44,280'); seek(944.0)">
+              it tries to run the insert SQL. Well that would result in SQL
+            </span>
+            
+            <span id="chunk-253" class="transcript-chunks" onclick="console.log('00:15:47,584'); seek(947.0)">
+              error. So we can't really
+            </span>
+            
+            <span id="chunk-254" class="transcript-chunks" onclick="console.log('00:15:50,688'); seek(950.0)">
+              throw worker pulls at a problem, right? Like the data integrity
+            </span>
+            
+            <span id="chunk-255" class="transcript-chunks" onclick="console.log('00:15:54,456'); seek(954.0)">
+              gets compromised and we have a correctness
+            </span>
+            
+            <span id="chunk-256" class="transcript-chunks" onclick="console.log('00:15:58,676'); seek(958.0)">
+              issue. So we need to always write correct program first. Then we
+            </span>
+            
+            <span id="chunk-257" class="transcript-chunks" onclick="console.log('00:16:02,308'); seek(962.0)">
+              can make it performant. So this is a program that
+            </span>
+            
+            <span id="chunk-258" class="transcript-chunks" onclick="console.log('00:16:05,916'); seek(965.0)">
+              is performant but it's not really correct. So then
+            </span>
+            
+            <span id="chunk-259" class="transcript-chunks" onclick="console.log('00:16:09,468'); seek(969.0)">
+              do we go back to drawing board or what do we do? And again,
+            </span>
+            
+            <span id="chunk-260" class="transcript-chunks" onclick="console.log('00:16:12,796'); seek(972.0)">
+              imagine we have n number of databases in Mongo and each database
+            </span>
+            
+            <span id="chunk-261" class="transcript-chunks" onclick="console.log('00:16:17,036'); seek(977.0)">
+              has m collections. What we could do is we
+            </span>
+            
+            <span id="chunk-262" class="transcript-chunks" onclick="console.log('00:16:20,420'); seek(980.0)">
+              could fan out for each database and fan
+            </span>
+            
+            <span id="chunk-263" class="transcript-chunks" onclick="console.log('00:16:24,412'); seek(984.0)">
+              in for SQL. That's an option. So for example,
+            </span>
+            
+            <span id="chunk-264" class="transcript-chunks" onclick="console.log('00:16:28,292'); seek(988.0)">
+              what we would do is again we would read the same in
+            </span>
+            
+            <span id="chunk-265" class="transcript-chunks" onclick="console.log('00:16:32,268'); seek(992.0)">
+              a single go routine. Remember from MongoDB we push this into the
+            </span>
+            
+            <span id="chunk-266" class="transcript-chunks" onclick="console.log('00:16:36,412'); seek(996.0)">
+              same channel, same oplox channel. But on the other side
+            </span>
+            
+            <span id="chunk-267" class="transcript-chunks" onclick="console.log('00:16:40,372'); seek(1000.0)">
+              we have a go routine, a single go routine which will fan
+            </span>
+            
+            <span id="chunk-268" class="transcript-chunks" onclick="console.log('00:16:44,244'); seek(1004.0)">
+              out these oplogs based on per database.
+            </span>
+            
+            <span id="chunk-269" class="transcript-chunks" onclick="console.log('00:16:47,644'); seek(1007.0)">
+              So essentially what we are doing is we are segregating per database.
+            </span>
+            
+            <span id="chunk-270" class="transcript-chunks" onclick="console.log('00:16:51,810'); seek(1011.0)">
+              So if you have n databases, we are going to create n number of channels
+            </span>
+            
+            <span id="chunk-271" class="transcript-chunks" onclick="console.log('00:16:55,994'); seek(1015.0)">
+              on the other side, right side of the oplogs for each database
+            </span>
+            
+            <span id="chunk-272" class="transcript-chunks" onclick="console.log('00:16:59,962'); seek(1019.0)">
+              we will have a go routine that will consume these oplogs.
+            </span>
+            
+            <span id="chunk-273" class="transcript-chunks" onclick="console.log('00:17:04,554'); seek(1024.0)">
+              Remember, each go routine consumes oplogs from only one database.
+            </span>
+            
+            <span id="chunk-274" class="transcript-chunks" onclick="console.log('00:17:07,882'); seek(1027.0)">
+              So for example, that go routine only processes DB one Oplog.
+            </span>
+            
+            <span id="chunk-275" class="transcript-chunks" onclick="console.log('00:17:12,322'); seek(1032.0)">
+              This go routine only processes DB two Oplog and vice versa.
+            </span>
+            
+            <span id="chunk-276" class="transcript-chunks" onclick="console.log('00:17:16,562'); seek(1036.0)">
+              So we have n number of go routines based
+            </span>
+            
+            <span id="chunk-277" class="transcript-chunks" onclick="console.log('00:17:19,812'); seek(1039.0)">
+              on the number of databases. And ultimately all these go
+            </span>
+            
+            <span id="chunk-278" class="transcript-chunks" onclick="console.log('00:17:23,212'); seek(1043.0)">
+              routines would then fan in and send all the SQL
+            </span>
+            
+            <span id="chunk-279" class="transcript-chunks" onclick="console.log('00:17:26,916'); seek(1046.0)">
+              updates or statements to a single channel, from which we
+            </span>
+            
+            <span id="chunk-280" class="transcript-chunks" onclick="console.log('00:17:30,700'); seek(1050.0)">
+              could then execute the SQL to postgres.
+            </span>
+            
+            <span id="chunk-281" class="transcript-chunks" onclick="console.log('00:17:34,044'); seek(1054.0)">
+              Well, you could theoretically say that that
+            </span>
+            
+            <span id="chunk-282" class="transcript-chunks" onclick="console.log('00:17:38,244'); seek(1058.0)">
+              single go routine on the who is executing the SQL
+            </span>
+            
+            <span id="chunk-283" class="transcript-chunks" onclick="console.log('00:17:42,428'); seek(1062.0)">
+              on database, that could become the bottleneck and it could use some help.
+            </span>
+            
+            <span id="chunk-284" class="transcript-chunks" onclick="console.log('00:17:46,814'); seek(1066.0)">
+              So we could modify this design and we could
+            </span>
+            
+            <span id="chunk-285" class="transcript-chunks" onclick="console.log('00:17:50,486'); seek(1070.0)">
+              fan out for each database without fanning in all the coroutines
+            </span>
+            
+            <span id="chunk-286" class="transcript-chunks" onclick="console.log('00:17:54,270'); seek(1074.0)">
+              into a single without fanning
+            </span>
+            
+            <span id="chunk-287" class="transcript-chunks" onclick="console.log('00:17:57,830'); seek(1077.0)">
+              in all the SQL statements into a single channel.
+            </span>
+            
+            <span id="chunk-288" class="transcript-chunks" onclick="console.log('00:18:00,854'); seek(1080.0)">
+              So this would, this is how it looks like.
+            </span>
+            
+            <span id="chunk-289" class="transcript-chunks" onclick="console.log('00:18:03,294'); seek(1083.0)">
+              Similarly we have those n databases, right? We have n go routines,
+            </span>
+            
+            <span id="chunk-290" class="transcript-chunks" onclick="console.log('00:18:07,054'); seek(1087.0)">
+              but instead of fanning them all in into a single channel,
+            </span>
+            
+            <span id="chunk-291" class="transcript-chunks" onclick="console.log('00:18:11,302'); seek(1091.0)">
+              we are creating a channel for each go routine.
+            </span>
+            
+            <span id="chunk-292" class="transcript-chunks" onclick="console.log('00:18:15,454'); seek(1095.0)">
+              And similarly to be able to insert records
+            </span>
+            
+            <span id="chunk-293" class="transcript-chunks" onclick="console.log('00:18:19,190'); seek(1099.0)">
+              in postgres, we are going to create n number of Go routines on
+            </span>
+            
+            <span id="chunk-294" class="transcript-chunks" onclick="console.log('00:18:23,038'); seek(1103.0)">
+              the database also, right? So we will have one go routine
+            </span>
+            
+            <span id="chunk-295" class="transcript-chunks" onclick="console.log('00:18:26,702'); seek(1106.0)">
+              per database and we'll have one go routine
+            </span>
+            
+            <span id="chunk-296" class="transcript-chunks" onclick="console.log('00:18:30,246'); seek(1110.0)">
+              per SQL insert, update or whatever. The total
+            </span>
+            
+            <span id="chunk-297" class="transcript-chunks" onclick="console.log('00:18:33,598'); seek(1113.0)">
+              number of go routines that we'll end up having is two nice. Plus obviously
+            </span>
+            
+            <span id="chunk-298" class="transcript-chunks" onclick="console.log('00:18:36,910'); seek(1116.0)">
+              there are two go routines that we have, one for reading the Oplog and one
+            </span>
+            
+            <span id="chunk-299" class="transcript-chunks" onclick="console.log('00:18:40,030'); seek(1120.0)">
+              for orchestrating the fan out. But basically
+            </span>
+            
+            <span id="chunk-300" class="transcript-chunks" onclick="console.log('00:18:44,030'); seek(1124.0)">
+              if we have n databases, we are typically going to have twice the number of
+            </span>
+            
+            <span id="chunk-301" class="transcript-chunks" onclick="console.log('00:18:47,758'); seek(1127.0)">
+              Go routines. If we take this idea even further
+            </span>
+            
+            <span id="chunk-302" class="transcript-chunks" onclick="console.log('00:18:51,934'); seek(1131.0)">
+              and we say well, why don't we create go routines
+            </span>
+            
+            <span id="chunk-303" class="transcript-chunks" onclick="console.log('00:18:55,830'); seek(1135.0)">
+              for each database and collection combination?
+            </span>
+            
+            <span id="chunk-304" class="transcript-chunks" onclick="console.log('00:18:59,358'); seek(1139.0)">
+              Also, right now we were only creating
+            </span>
+            
+            <span id="chunk-305" class="transcript-chunks" onclick="console.log('00:19:02,542'); seek(1142.0)">
+              go routines per database, but each database has
+            </span>
+            
+            <span id="chunk-306" class="transcript-chunks" onclick="console.log('00:19:06,240'); seek(1146.0)">
+              m or some collections, right? So what if we
+            </span>
+            
+            <span id="chunk-307" class="transcript-chunks" onclick="console.log('00:19:09,480'); seek(1149.0)">
+              create go routines per database collection combination?
+            </span>
+            
+            <span id="chunk-308" class="transcript-chunks" onclick="console.log('00:19:13,208'); seek(1153.0)">
+              That will be a truly concurrent and massively parallelized
+            </span>
+            
+            <span id="chunk-309" class="transcript-chunks" onclick="console.log('00:19:17,784'); seek(1157.0)">
+              solution, right? So this is what,
+            </span>
+            
+            <span id="chunk-310" class="transcript-chunks" onclick="console.log('00:19:20,712'); seek(1160.0)">
+              what we end up with. We have a concurrent data pipeline. We've got
+            </span>
+            
+            <span id="chunk-311" class="transcript-chunks" onclick="console.log('00:19:24,152'); seek(1164.0)">
+              Mongodb. The diagram was so huge to fit horizontally that
+            </span>
+            
+            <span id="chunk-312" class="transcript-chunks" onclick="console.log('00:19:27,608'); seek(1167.0)">
+              I had to fit it vertically, right? So we have Mongodb on top.
+            </span>
+            
+            <span id="chunk-313" class="transcript-chunks" onclick="console.log('00:19:30,864'); seek(1170.0)">
+              Then we have this oplog to SQL program where we have,
+            </span>
+            
+            <span id="chunk-314" class="transcript-chunks" onclick="console.log('00:19:34,704'); seek(1174.0)">
+              we read the oplogs in a single go routine. We push them into a channel.
+            </span>
+            
+            <span id="chunk-315" class="transcript-chunks" onclick="console.log('00:19:38,840'); seek(1178.0)">
+              On the receiving end we have a orchestrator go routine which is going to fan
+            </span>
+            
+            <span id="chunk-316" class="transcript-chunks" onclick="console.log('00:19:42,584'); seek(1182.0)">
+              out per database. So it's going to create n channels
+            </span>
+            
+            <span id="chunk-317" class="transcript-chunks" onclick="console.log('00:19:46,720'); seek(1186.0)">
+              every time it encounters a new database. It's going to create a new channel and
+            </span>
+            
+            <span id="chunk-318" class="transcript-chunks" onclick="console.log('00:19:50,608'); seek(1190.0)">
+              it's going to push all the values, all the oplogs for that
+            </span>
+            
+            <span id="chunk-319" class="transcript-chunks" onclick="console.log('00:19:53,864'); seek(1193.0)">
+              database in that channel. Then we have the
+            </span>
+            
+            <span id="chunk-320" class="transcript-chunks" onclick="console.log('00:19:57,822'); seek(1197.0)">
+              fan out oplogs per collection. So we have those
+            </span>
+            
+            <span id="chunk-321" class="transcript-chunks" onclick="console.log('00:20:01,174'); seek(1201.0)">
+              n go routines, one for each database as and when
+            </span>
+            
+            <span id="chunk-322" class="transcript-chunks" onclick="console.log('00:20:04,590'); seek(1204.0)">
+              they encounter an oplog for a different collection in the
+            </span>
+            
+            <span id="chunk-323" class="transcript-chunks" onclick="console.log('00:20:08,038'); seek(1208.0)">
+              database, they are going to create M such collections
+            </span>
+            
+            <span id="chunk-324" class="transcript-chunks" onclick="console.log('00:20:12,182'); seek(1212.0)">
+              oplogs or m such channels.
+            </span>
+            
+            <span id="chunk-325" class="transcript-chunks" onclick="console.log('00:20:15,174'); seek(1215.0)">
+              Goroutine will then process oplogs
+            </span>
+            
+            <span id="chunk-326" class="transcript-chunks" onclick="console.log('00:20:19,414'); seek(1219.0)">
+              for that only which channel
+            </span>
+            
+            <span id="chunk-327" class="transcript-chunks" onclick="console.log('00:20:22,626'); seek(1222.0)">
+              specifies for a database and a collection combination.
+            </span>
+            
+            <span id="chunk-328" class="transcript-chunks" onclick="console.log('00:20:26,514'); seek(1226.0)">
+              So this go routine is going to work on only,
+            </span>
+            
+            <span id="chunk-329" class="transcript-chunks" onclick="console.log('00:20:30,410'); seek(1230.0)">
+              let's say DB one collection one combination. The next coroutine
+            </span>
+            
+            <span id="chunk-330" class="transcript-chunks" onclick="console.log('00:20:34,242'); seek(1234.0)">
+              will work on DB one, collection two, db one
+            </span>
+            
+            <span id="chunk-331" class="transcript-chunks" onclick="console.log('00:20:37,442'); seek(1237.0)">
+              collection three likewise. And then a new set of go
+            </span>
+            
+            <span id="chunk-332" class="transcript-chunks" onclick="console.log('00:20:40,882'); seek(1240.0)">
+              routines will work on DB two, collection one, db two collection two,
+            </span>
+            
+            <span id="chunk-333" class="transcript-chunks" onclick="console.log('00:20:44,274'); seek(1244.0)">
+              etcetera. So we've essentially got m into
+            </span>
+            
+            <span id="chunk-334" class="transcript-chunks" onclick="console.log('00:20:47,586'); seek(1247.0)">
+              n kind of go routines. Each of them
+            </span>
+            
+            <span id="chunk-335" class="transcript-chunks" onclick="console.log('00:20:51,412'); seek(1251.0)">
+              write create SQL statements. Each of them push these
+            </span>
+            
+            <span id="chunk-336" class="transcript-chunks" onclick="console.log('00:20:55,140'); seek(1255.0)">
+              SQL statements into another channel,
+            </span>
+            
+            <span id="chunk-337" class="transcript-chunks" onclick="console.log('00:20:58,244'); seek(1258.0)">
+              which we will have again a SQL execution go routine which
+            </span>
+            
+            <span id="chunk-338" class="transcript-chunks" onclick="console.log('00:21:02,100'); seek(1262.0)">
+              will execute all these SQL statements onto postgres.
+            </span>
+            
+            <span id="chunk-339" class="transcript-chunks" onclick="console.log('00:21:05,124'); seek(1265.0)">
+              So essentially when we run this program,
+            </span>
+            
+            <span id="chunk-340" class="transcript-chunks" onclick="console.log('00:21:08,492'); seek(1268.0)">
+              we see that it runs in about like 1 hour 36 minutes
+            </span>
+            
+            <span id="chunk-341" class="transcript-chunks" onclick="console.log('00:21:14,364'); seek(1274.0)">
+              and 30 seconds for the same number of oplogs.
+            </span>
+            
+            <span id="chunk-342" class="transcript-chunks" onclick="console.log('00:21:18,750'); seek(1278.0)">
+              So we had about 3.6 million oplogs. The sequential
+            </span>
+            
+            <span id="chunk-343" class="transcript-chunks" onclick="console.log('00:21:22,454'); seek(1282.0)">
+              operation ran in nine hour 20 minutes and the concurrent one
+            </span>
+            
+            <span id="chunk-344" class="transcript-chunks" onclick="console.log('00:21:26,150'); seek(1286.0)">
+              ran in 1 hour 36 minutes.
+            </span>
+            
+            <span id="chunk-345" class="transcript-chunks" onclick="console.log('00:21:29,334'); seek(1289.0)">
+              Have in terms of resource utilization though, for this is that,
+            </span>
+            
+            <span id="chunk-346" class="transcript-chunks" onclick="console.log('00:21:32,926'); seek(1292.0)">
+              imagine we have 16 databases and we have
+            </span>
+            
+            <span id="chunk-347" class="transcript-chunks" onclick="console.log('00:21:36,550'); seek(1296.0)">
+              128 collections per database,
+            </span>
+            
+            <span id="chunk-348" class="transcript-chunks" onclick="console.log('00:21:39,974'); seek(1299.0)">
+              right? That's on the higher side, but let's imagine that. So the total
+            </span>
+            
+            <span id="chunk-349" class="transcript-chunks" onclick="console.log('00:21:43,278'); seek(1303.0)">
+              number of go routines that we'll have is we going to have n
+            </span>
+            
+            <span id="chunk-350" class="transcript-chunks" onclick="console.log('00:21:47,062'); seek(1307.0)">
+              number of fan out oplogs per database,
+            </span>
+            
+            <span id="chunk-351" class="transcript-chunks" onclick="console.log('00:21:50,462'); seek(1310.0)">
+              right? So we have got n goroutines like this. Then we
+            </span>
+            
+            <span id="chunk-352" class="transcript-chunks" onclick="console.log('00:21:53,966'); seek(1313.0)">
+              have got, for each database we are going to create m go routines.
+            </span>
+            
+            <span id="chunk-353" class="transcript-chunks" onclick="console.log('00:21:57,726'); seek(1317.0)">
+              So there will be n multiplied by m of those
+            </span>
+            
+            <span id="chunk-354" class="transcript-chunks" onclick="console.log('00:22:01,614'); seek(1321.0)">
+              yellow go routines. And lastly, for execution
+            </span>
+            
+            <span id="chunk-355" class="transcript-chunks" onclick="console.log('00:22:05,214'); seek(1325.0)">
+              of SQL, we are going to have one go routine per database collection combination.
+            </span>
+            
+            <span id="chunk-356" class="transcript-chunks" onclick="console.log('00:22:09,510'); seek(1329.0)">
+              That means n multiplied by m. Again, if we
+            </span>
+            
+            <span id="chunk-357" class="transcript-chunks" onclick="console.log('00:22:12,708'); seek(1332.0)">
+              just consider 16 databases and 128 collections, we are
+            </span>
+            
+            <span id="chunk-358" class="transcript-chunks" onclick="console.log('00:22:16,676'); seek(1336.0)">
+              going to end up with 2048 database connections
+            </span>
+            
+            <span id="chunk-359" class="transcript-chunks" onclick="console.log('00:22:21,124'); seek(1341.0)">
+              because each coroutine will actually form a connection to postgres.
+            </span>
+            
+            <span id="chunk-360" class="transcript-chunks" onclick="console.log('00:22:25,604'); seek(1345.0)">
+              That's going to be quite some number of connections and it's going to hog the
+            </span>
+            
+            <span id="chunk-361" class="transcript-chunks" onclick="console.log('00:22:29,588'); seek(1349.0)">
+              cpu and probably even cause
+            </span>
+            
+            <span id="chunk-362" class="transcript-chunks" onclick="console.log('00:22:33,132'); seek(1353.0)">
+              problems with postgres if we have so many open connections.
+            </span>
+            
+            <span id="chunk-363" class="transcript-chunks" onclick="console.log('00:22:37,534'); seek(1357.0)">
+              So while this program is performant, it is not utilizing the resources
+            </span>
+            
+            <span id="chunk-364" class="transcript-chunks" onclick="console.log('00:22:41,526'); seek(1361.0)">
+              or it is over utilizing or overburdening postgres.
+            </span>
+            
+            <span id="chunk-365" class="transcript-chunks" onclick="console.log('00:22:45,102'); seek(1365.0)">
+              What can we do? Can we do better? Right?
+            </span>
+            
+            <span id="chunk-366" class="transcript-chunks" onclick="console.log('00:22:48,694'); seek(1368.0)">
+              So what we do in this case is we keep the most of
+            </span>
+            
+            <span id="chunk-367" class="transcript-chunks" onclick="console.log('00:22:52,038'); seek(1372.0)">
+              the pipeline, the same, but instead of fanning
+            </span>
+            
+            <span id="chunk-368" class="transcript-chunks" onclick="console.log('00:22:55,606'); seek(1375.0)">
+              out for postgres writes we fan
+            </span>
+            
+            <span id="chunk-369" class="transcript-chunks" onclick="console.log('00:22:58,854'); seek(1378.0)">
+              them in. Remember, we don't need to create n
+            </span>
+            
+            <span id="chunk-370" class="transcript-chunks" onclick="console.log('00:23:03,506'); seek(1383.0)">
+              multiplied by m connections to database if we can
+            </span>
+            
+            <span id="chunk-371" class="transcript-chunks" onclick="console.log('00:23:06,962'); seek(1386.0)">
+              limit it to just n connections, one connection per database,
+            </span>
+            
+            <span id="chunk-372" class="transcript-chunks" onclick="console.log('00:23:10,290'); seek(1390.0)">
+              that's good enough, and that's what we'll do here. So from
+            </span>
+            
+            <span id="chunk-373" class="transcript-chunks" onclick="console.log('00:23:14,594'); seek(1394.0)">
+              all the go routines which process a single databases,
+            </span>
+            
+            <span id="chunk-374" class="transcript-chunks" onclick="console.log('00:23:18,418'); seek(1398.0)">
+              records, all of them will funnel the data back
+            </span>
+            
+            <span id="chunk-375" class="transcript-chunks" onclick="console.log('00:23:22,154'); seek(1402.0)">
+              into a single channel, and that channel will
+            </span>
+            
+            <span id="chunk-376" class="transcript-chunks" onclick="console.log('00:23:25,610'); seek(1405.0)">
+              have another go routine which will execute all those SQL
+            </span>
+            
+            <span id="chunk-377" class="transcript-chunks" onclick="console.log('00:23:28,762'); seek(1408.0)">
+              updates, inserts, etcetera on the postgres. So essentially we are going to create
+            </span>
+            
+            <span id="chunk-378" class="transcript-chunks" onclick="console.log('00:23:33,434'); seek(1413.0)">
+              n number of go routines for handling database
+            </span>
+            
+            <span id="chunk-379" class="transcript-chunks" onclick="console.log('00:23:36,786'); seek(1416.0)">
+              connections to postgres and that's where we limit the number of
+            </span>
+            
+            <span id="chunk-380" class="transcript-chunks" onclick="console.log('00:23:40,298'); seek(1420.0)">
+              go routines prol that happens. So if you consider
+            </span>
+            
+            <span id="chunk-381" class="transcript-chunks" onclick="console.log('00:23:44,610'); seek(1424.0)">
+              16 databases and 128 collections per database before
+            </span>
+            
+            <span id="chunk-382" class="transcript-chunks" onclick="console.log('00:23:48,890'); seek(1428.0)">
+              we had a massive fan out where we would
+            </span>
+            
+            <span id="chunk-383" class="transcript-chunks" onclick="console.log('00:23:52,402'); seek(1432.0)">
+              end up with 2048 database connections on
+            </span>
+            
+            <span id="chunk-384" class="transcript-chunks" onclick="console.log('00:23:57,418'); seek(1437.0)">
+              the right side after the modification, what we have is
+            </span>
+            
+            <span id="chunk-385" class="transcript-chunks" onclick="console.log('00:24:00,714'); seek(1440.0)">
+              we are fanning them in again to per database.
+            </span>
+            
+            <span id="chunk-386" class="transcript-chunks" onclick="console.log('00:24:04,734'); seek(1444.0)">
+              That means we have only 16 number of
+            </span>
+            
+            <span id="chunk-387" class="transcript-chunks" onclick="console.log('00:24:09,334'); seek(1449.0)">
+              connections to database. So we don't create
+            </span>
+            
+            <span id="chunk-388" class="transcript-chunks" onclick="console.log('00:24:12,686'); seek(1452.0)">
+              massive database connections and cause database to hang and perform slow,
+            </span>
+            
+            <span id="chunk-389" class="transcript-chunks" onclick="console.log('00:24:16,446'); seek(1456.0)">
+              but we instead create only 16 connections to database.
+            </span>
+            
+            <span id="chunk-390" class="transcript-chunks" onclick="console.log('00:24:20,934'); seek(1460.0)">
+              So if you were to then compare this improved performance,
+            </span>
+            
+            <span id="chunk-391" class="transcript-chunks" onclick="console.log('00:24:24,366'); seek(1464.0)">
+              you will see that in my case it ran a
+            </span>
+            
+            <span id="chunk-392" class="transcript-chunks" onclick="console.log('00:24:27,978'); seek(1467.0)">
+              bit faster because it's probably utilizing the database and overall
+            </span>
+            
+            <span id="chunk-393" class="transcript-chunks" onclick="console.log('00:24:32,138'); seek(1472.0)">
+              machine properly. So it was definitely better than
+            </span>
+            
+            <span id="chunk-394" class="transcript-chunks" onclick="console.log('00:24:36,234'); seek(1476.0)">
+              concurrent implementation earlier, but it wasn't
+            </span>
+            
+            <span id="chunk-395" class="transcript-chunks" onclick="console.log('00:24:40,354'); seek(1480.0)">
+              so much better. But in terms of resource utilization it was
+            </span>
+            
+            <span id="chunk-396" class="transcript-chunks" onclick="console.log('00:24:43,746'); seek(1483.0)">
+              massively so. This is what our final concurrent
+            </span>
+            
+            <span id="chunk-397" class="transcript-chunks" onclick="console.log('00:24:47,482'); seek(1487.0)">
+              data pipeline looks like we've got. We're reading
+            </span>
+            
+            <span id="chunk-398" class="transcript-chunks" onclick="console.log('00:24:51,442'); seek(1491.0)">
+              those from Mongolia. We are fanning out into
+            </span>
+            
+            <span id="chunk-399" class="transcript-chunks" onclick="console.log('00:24:54,582'); seek(1494.0)">
+              n number of Go routines, one for each database
+            </span>
+            
+            <span id="chunk-400" class="transcript-chunks" onclick="console.log('00:24:58,934'); seek(1498.0)">
+              for each of them. We are fanning them out again into m number of collections
+            </span>
+            
+            <span id="chunk-401" class="transcript-chunks" onclick="console.log('00:25:02,590'); seek(1502.0)">
+              and m number of Go routines, one for each database collection combination.
+            </span>
+            
+            <span id="chunk-402" class="transcript-chunks" onclick="console.log('00:25:06,894'); seek(1506.0)">
+              Ultimately then we fan in again. We don't have a go routine
+            </span>
+            
+            <span id="chunk-403" class="transcript-chunks" onclick="console.log('00:25:10,542'); seek(1510.0)">
+              sprawl. We fan them in into collecting all
+            </span>
+            
+            <span id="chunk-404" class="transcript-chunks" onclick="console.log('00:25:14,238'); seek(1514.0)">
+              SQL updates, inserts, deletes all sqls basically
+            </span>
+            
+            <span id="chunk-405" class="transcript-chunks" onclick="console.log('00:25:18,174'); seek(1518.0)">
+              for one database into a single go routine and a single channel.
+            </span>
+            
+            <span id="chunk-406" class="transcript-chunks" onclick="console.log('00:25:22,038'); seek(1522.0)">
+              And then that go routine will perform updates, insert and
+            </span>
+            
+            <span id="chunk-407" class="transcript-chunks" onclick="console.log('00:25:25,428'); seek(1525.0)">
+              delete to Mongo to postgres database. That's what our final
+            </span>
+            
+            <span id="chunk-408" class="transcript-chunks" onclick="console.log('00:25:29,276'); seek(1529.0)">
+              concurrent pipeline looks like. Think about what we
+            </span>
+            
+            <span id="chunk-409" class="transcript-chunks" onclick="console.log('00:25:32,700'); seek(1532.0)">
+              just did overall as a solution, right? We understood
+            </span>
+            
+            <span id="chunk-410" class="transcript-chunks" onclick="console.log('00:25:35,932'); seek(1535.0)">
+              the problem domain. We didn't.
+            </span>
+            
+            <span id="chunk-411" class="transcript-chunks" onclick="console.log('00:25:39,564'); seek(1539.0)">
+              We said that the solution is in context of
+            </span>
+            
+            <span id="chunk-412" class="transcript-chunks" onclick="console.log('00:25:43,028'); seek(1543.0)">
+              what the problem that we are solving. So our problem was
+            </span>
+            
+            <span id="chunk-413" class="transcript-chunks" onclick="console.log('00:25:46,324'); seek(1546.0)">
+              MongoDB to database postgres data migration.
+            </span>
+            
+            <span id="chunk-414" class="transcript-chunks" onclick="console.log('00:25:49,804'); seek(1549.0)">
+              We built the working solution first, which is a sequential
+            </span>
+            
+            <span id="chunk-415" class="transcript-chunks" onclick="console.log('00:25:53,124'); seek(1553.0)">
+              data pipeline. Agreed that it ran very much slow,
+            </span>
+            
+            <span id="chunk-416" class="transcript-chunks" onclick="console.log('00:25:56,476'); seek(1556.0)">
+              but we first always have a working solution before we try to optimize
+            </span>
+            
+            <span id="chunk-417" class="transcript-chunks" onclick="console.log('00:25:59,988'); seek(1559.0)">
+              something, we identify possible
+            </span>
+            
+            <span id="chunk-418" class="transcript-chunks" onclick="console.log('00:26:03,948'); seek(1563.0)">
+              parallel portions of the program. Not every program can
+            </span>
+            
+            <span id="chunk-419" class="transcript-chunks" onclick="console.log('00:26:07,564'); seek(1567.0)">
+              be parallelized, right? So you have to identify what
+            </span>
+            
+            <span id="chunk-420" class="transcript-chunks" onclick="console.log('00:26:11,236'); seek(1571.0)">
+              parts of the program can actually be improved. We have
+            </span>
+            
+            <span id="chunk-421" class="transcript-chunks" onclick="console.log('00:26:14,948'); seek(1574.0)">
+              to avoid blindly applying concurrency patterns.
+            </span>
+            
+            <span id="chunk-422" class="transcript-chunks" onclick="console.log('00:26:18,540'); seek(1578.0)">
+              For example, we tried to apply worker pools without really thinking too
+            </span>
+            
+            <span id="chunk-423" class="transcript-chunks" onclick="console.log('00:26:22,052'); seek(1582.0)">
+              much, and then it didn't work out,
+            </span>
+            
+            <span id="chunk-424" class="transcript-chunks" onclick="console.log('00:26:24,692'); seek(1584.0)">
+              right? The program was concurrent, but it wasn't performing.
+            </span>
+            
+            <span id="chunk-425" class="transcript-chunks" onclick="console.log('00:26:29,012'); seek(1589.0)">
+              I mean, it was performing well, but we did not have correctness.
+            </span>
+            
+            <span id="chunk-426" class="transcript-chunks" onclick="console.log('00:26:32,812'); seek(1592.0)">
+              And without correctness, no optimization helps.
+            </span>
+            
+            <span id="chunk-427" class="transcript-chunks" onclick="console.log('00:26:36,964'); seek(1596.0)">
+              We have to also consider Amdahl's law, where what parts of the
+            </span>
+            
+            <span id="chunk-428" class="transcript-chunks" onclick="console.log('00:26:40,380'); seek(1600.0)">
+              program can be parallelized and what's the sequential only portion
+            </span>
+            
+            <span id="chunk-429" class="transcript-chunks" onclick="console.log('00:26:43,992'); seek(1603.0)">
+              of the program, right, which cannot be parallelized. So no matter
+            </span>
+            
+            <span id="chunk-430" class="transcript-chunks" onclick="console.log('00:26:47,760'); seek(1607.0)">
+              how much hardware you throw at the parallelizable portion of the program.
+            </span>
+            
+            <span id="chunk-431" class="transcript-chunks" onclick="console.log('00:26:51,168'); seek(1611.0)">
+              But if it's not more than some percentage of the
+            </span>
+            
+            <span id="chunk-432" class="transcript-chunks" onclick="console.log('00:26:54,800'); seek(1614.0)">
+              remaining program, which is the sequential program, it's not going to help out much.
+            </span>
+            
+            <span id="chunk-433" class="transcript-chunks" onclick="console.log('00:26:58,528'); seek(1618.0)">
+              So always like consider Amdahl's law, and also consider its
+            </span>
+            
+            <span id="chunk-434" class="transcript-chunks" onclick="console.log('00:27:02,720'); seek(1622.0)">
+              sort of variant and even more broader law, which is universal
+            </span>
+            
+            <span id="chunk-435" class="transcript-chunks" onclick="console.log('00:27:06,312'); seek(1626.0)">
+              scalability law. Fundamentally, like simplicity may
+            </span>
+            
+            <span id="chunk-436" class="transcript-chunks" onclick="console.log('00:27:10,260'); seek(1630.0)">
+              be more valuable, and keeping things simple may be more valuable for
+            </span>
+            
+            <span id="chunk-437" class="transcript-chunks" onclick="console.log('00:27:14,540'); seek(1634.0)">
+              the maintenance and runtime of the program. And then premature optimization,
+            </span>
+            
+            <span id="chunk-438" class="transcript-chunks" onclick="console.log('00:27:19,068'); seek(1639.0)">
+              right? And premature performance gains that
+            </span>
+            
+            <span id="chunk-439" class="transcript-chunks" onclick="console.log('00:27:22,564'); seek(1642.0)">
+              you may gain beyond certain point.
+            </span>
+            
+            <span id="chunk-440" class="transcript-chunks" onclick="console.log('00:27:25,724'); seek(1645.0)">
+              So finally we ended up with a performant concurrent
+            </span>
+            
+            <span id="chunk-441" class="transcript-chunks" onclick="console.log('00:27:29,652'); seek(1649.0)">
+              implementation with fan in for database, to be able to limit the
+            </span>
+            
+            <span id="chunk-442" class="transcript-chunks" onclick="console.log('00:27:33,854'); seek(1653.0)">
+              the go routine sprawl and to be able to limit the number of database
+            </span>
+            
+            <span id="chunk-443" class="transcript-chunks" onclick="console.log('00:27:37,262'); seek(1657.0)">
+              connections. So that's it. I hope you learned
+            </span>
+            
+            <span id="chunk-444" class="transcript-chunks" onclick="console.log('00:27:40,902'); seek(1660.0)">
+              something. Connect with me on Chen Mai 185
+            </span>
+            
+            <span id="chunk-445" class="transcript-chunks" onclick="console.log('00:27:45,414'); seek(1665.0)">
+              and check out our website at 120. Here is
+            </span>
+            
+            <span id="chunk-446" class="transcript-chunks" onclick="console.log('00:27:48,790'); seek(1668.0)">
+              a link to our playbook and specifically link to this particular
+            </span>
+            
+            <span id="chunk-447" class="transcript-chunks" onclick="console.log('00:27:52,846'); seek(1672.0)">
+              problem where I've dumbed down this problem into set of stories
+            </span>
+            
+            <span id="chunk-448" class="transcript-chunks" onclick="console.log('00:27:56,790'); seek(1676.0)">
+              that you can implement yourself and try out various concurrency
+            </span>
+            
+            <span id="chunk-449" class="transcript-chunks" onclick="console.log('00:28:00,622'); seek(1680.0)">
+              features of Google. I've broken this problem down into multiple
+            </span>
+            
+            <span id="chunk-450" class="transcript-chunks" onclick="console.log('00:28:04,532'); seek(1684.0)">
+              small stories so that you can incrementally work on those.
+            </span>
+            
+            <span id="chunk-451" class="transcript-chunks" onclick="console.log('00:28:09,724'); seek(1689.0)">
+              Thanks. Hope you have a nice conference.
+            </span>
             
             </div>
           </div>
