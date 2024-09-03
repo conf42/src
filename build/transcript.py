@@ -20,7 +20,7 @@ def parse_srt(transcript):
         try:
             split_elemts = elem.split("\n")
             time_line = split_elemts[1]
-            text = split_elemts[2:]
+            text = split_elemts[2:].join(" ")
         except Exception as ex:
             print(f"Unexpected format ({ex}): {elem}")
         time_start = time_line.split(" ")[0]
