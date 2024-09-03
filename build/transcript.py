@@ -17,7 +17,12 @@ def parse_srt(transcript):
         # handle extra whitespace
         if not elem.strip():
             continue
-        _, time_line, text = elem.split("\n")
+        try:
+            split_elemts = elem.split("\n")
+            time_line = split_elemts[1]
+            text = split_elemts[2:]
+        except Exception as ex:
+            print(f"Unexpected format ({ex}): {elem}")
         time_start = time_line.split(" ")[0]
         seconds = parse_time_start(time_start)
         chunks.append(dict(
