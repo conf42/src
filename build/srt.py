@@ -14,6 +14,7 @@ def read_srt_transcript(name, event):
         with open(path, "r") as f:
             print(f"found transcript at {path}")
             transcript["srt"] = f.read()
+        transcript["path"] = path
     except:
         print(f"nothing at {path}")
         return None

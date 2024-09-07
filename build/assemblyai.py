@@ -74,10 +74,12 @@ def read_transcript(yt_id):
     ]
 
     # read the srt, if present, and parse for easy usage
+    path = get_transcript_path(yt_id, extension=".srt")
     try:
-        with open(get_transcript_path(yt_id, extension=".srt"), "r") as f:
+        with open(path, "r") as f:
             transcript["srt"] = f.read()
         transcript["chunks"] = parse_srt(transcript["srt"])
+        transcript["path"] = path
     except:
         pass
     return transcript
