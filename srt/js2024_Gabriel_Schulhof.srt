@@ -1,0 +1,2985 @@
+1
+00:00:00,190 --> 00:00:04,340
+Hello, my name is Gabriel Schulhoff, and
+I'll be talking about how we improved
+
+2
+00:00:04,370 --> 00:00:06,940
+the performance of resolvers at auction.
+
+3
+00:00:06,940 --> 00:00:08,769
+com's subscription service.
+
+4
+00:00:09,269 --> 00:00:14,870
+The problem we faced was that, in
+the course of operations, the Node.
+
+5
+00:00:14,870 --> 00:00:17,390
+js process would, reach its heap limit.
+
+6
+00:00:17,830 --> 00:00:22,220
+so the heap is a data structure that
+the JavaScript engine maintains.
+
+7
+00:00:22,570 --> 00:00:27,130
+and it imposes a limit on it, which
+can be configured, but of course you
+
+8
+00:00:27,130 --> 00:00:29,200
+cannot use an infinite amount of heap.
+
+9
+00:00:29,900 --> 00:00:34,010
+So we have it configured to two gigs
+or so, and it was reaching that limit.
+
+10
+00:00:34,040 --> 00:00:35,250
+And, that was a problem.
+
+11
+00:00:35,340 --> 00:00:40,900
+So this is the story of how we
+tried different things and we
+
+12
+00:00:40,990 --> 00:00:42,440
+managed to knock it down a bit.
+
+13
+00:00:42,940 --> 00:00:45,430
+So the background, at auction.
+
+14
+00:00:45,620 --> 00:00:50,290
+com, we have a GraphQL service
+that serves pretty much.
+
+15
+00:00:50,830 --> 00:00:53,650
+Like 85 percent of the client's needs.
+
+16
+00:00:54,060 --> 00:00:57,990
+There are a few places where,
+clients issue requests to services
+
+17
+00:00:58,000 --> 00:01:02,040
+other than graph, but 85 percent
+of the time it goes to graph and
+
+18
+00:01:02,040 --> 00:01:03,780
+we have request response type.
+
+19
+00:01:04,010 --> 00:01:05,660
+operations with Graphen.
+
+20
+00:01:05,670 --> 00:01:08,390
+We also have WebSockets,
+which serve subscriptions.
+
+21
+00:01:09,050 --> 00:01:12,610
+The subscriptions themselves,
+are mostly not all of them.
+
+22
+00:01:12,610 --> 00:01:15,959
+some subscriptions, have different
+content, but most of them are
+
+23
+00:01:15,970 --> 00:01:19,730
+basically, rebroadcast Kafka
+messages coming from the background.
+
+24
+00:01:20,230 --> 00:01:24,370
+And for those messages, we perform some
+transformations and then we send them to
+
+25
+00:01:24,370 --> 00:01:30,210
+Redis and if Redis decides that we have
+subscribers, then it sends it back to us.
+
+26
+00:01:30,750 --> 00:01:33,800
+And the reason for that is obviously
+because we have multiple pods in, Redis.
+
+27
+00:01:34,500 --> 00:01:39,490
+in production and the Kafka sends the
+message to only one of those pods.
+
+28
+00:01:39,490 --> 00:01:42,540
+And so if that pod happens not to have
+any subscribers for that particular
+
+29
+00:01:42,540 --> 00:01:46,000
+message, but some other pod does,
+then we need Redis to regulate this.
+
+30
+00:01:46,500 --> 00:01:51,910
+to reproduce this out of memory
+condition or rather to investigate Ways
+
+31
+00:01:51,920 --> 00:01:56,270
+of, reducing memory consumption and,
+just improving performance in general.
+
+32
+00:01:56,670 --> 00:02:00,340
+what I did was to set
+everything up locally on my Mac.
+
+33
+00:02:00,380 --> 00:02:06,800
+Namely, I ran a broker locally, I
+ran graph locally, I connected 4,
+
+34
+00:02:06,800 --> 00:02:10,280
+000 WebSockets locally, and then
+I used KCAD to basically flood,
+
+35
+00:02:10,600 --> 00:02:13,040
+the graph with Kafka messages.
+
+36
+00:02:13,180 --> 00:02:14,480
+There was only one message, but.
+
+37
+00:02:14,600 --> 00:02:18,190
+just sent it repeatedly and see
+what, see where it gets hung up
+
+38
+00:02:18,190 --> 00:02:19,840
+and what uses all that memory.
+
+39
+00:02:20,340 --> 00:02:20,740
+All right.
+
+40
+00:02:20,740 --> 00:02:22,990
+So this is what I measured at first.
+
+41
+00:02:22,990 --> 00:02:27,790
+When I first tried this, I broke down the
+measurement into three different phases.
+
+42
+00:02:27,790 --> 00:02:30,370
+The first one is just like run graph.
+
+43
+00:02:31,160 --> 00:02:34,840
+And that's it, just node and graph,
+no sockets, no activity, nothing.
+
+44
+00:02:35,580 --> 00:02:39,540
+Then, in the second phase, I connected
+4, 000 sockets, and you can see that
+
+45
+00:02:39,540 --> 00:02:40,900
+the memory consumption increased.
+
+46
+00:02:41,475 --> 00:02:44,975
+And then leveled off to
+accommodate 4, 000 idle sockets.
+
+47
+00:02:44,985 --> 00:02:48,235
+so this is the overhead of
+maintaining 4, 000 sockets.
+
+48
+00:02:48,735 --> 00:02:52,985
+And then two minutes later, I started
+sending messages for the next four minutes
+
+49
+00:02:53,085 --> 00:02:58,985
+and measured how many messages, were,
+received or it was able to receive and
+
+50
+00:02:58,985 --> 00:03:01,005
+how many messages it was able to send out.
+
+51
+00:03:01,835 --> 00:03:02,895
+And these are the results.
+
+52
+00:03:03,325 --> 00:03:04,315
+It's not very good.
+
+53
+00:03:04,315 --> 00:03:06,265
+16 Kafka messages in four minutes.
+
+54
+00:03:06,265 --> 00:03:07,205
+That's not very good.
+
+55
+00:03:07,205 --> 00:03:10,495
+That's 15 seconds processing
+a single message and sending
+
+56
+00:03:10,495 --> 00:03:11,785
+it out to 4, 000 clients.
+
+57
+00:03:12,375 --> 00:03:13,365
+We need to do better.
+
+58
+00:03:14,185 --> 00:03:16,865
+And so what did we do to make
+things better, both memory
+
+59
+00:03:16,865 --> 00:03:18,625
+wise and, performance wise?
+
+60
+00:03:19,125 --> 00:03:21,825
+So memory wise, the first
+thing that we noticed was that,
+
+61
+00:03:22,145 --> 00:03:23,805
+this being GraphQL, right?
+
+62
+00:03:23,905 --> 00:03:29,215
+Answering, the subscription
+with a single, response means
+
+63
+00:03:29,255 --> 00:03:31,855
+executing GraphQL, GraphQL, right?
+
+64
+00:03:31,855 --> 00:03:33,365
+Performing a GraphQL execution.
+
+65
+00:03:33,365 --> 00:03:36,085
+Now, every GraphQL execution
+has an associated context.
+
+66
+00:03:36,505 --> 00:03:41,155
+The context is there to store the
+information that it, that pertains
+
+67
+00:03:41,155 --> 00:03:43,285
+to that particular execution.
+
+68
+00:03:43,285 --> 00:03:47,425
+And in the case of subscriptions, repeated
+executions, but either way that it's
+
+69
+00:03:47,425 --> 00:03:48,995
+particular to the one connection, right?
+
+70
+00:03:49,495 --> 00:03:55,035
+And one of the things that, GraphQL
+sometimes does is, it starts out with
+
+71
+00:03:55,035 --> 00:03:59,575
+a certain object received by some
+means, in this case, Kafka, and if the
+
+72
+00:03:59,575 --> 00:04:04,875
+subscription specifies that, it needs
+certain fields that cannot be found
+
+73
+00:04:04,875 --> 00:04:09,455
+on that object, but for which there
+is a resolver, meaning that GraphQL is
+
+74
+00:04:09,455 --> 00:04:13,205
+aware of a solution for providing those
+fields, even without, even though they
+
+75
+00:04:13,205 --> 00:04:15,065
+are not on the original backend object.
+
+76
+00:04:15,935 --> 00:04:20,325
+Then, it will reach out to backends
+and it, which are pre configured
+
+77
+00:04:20,385 --> 00:04:21,985
+to provide that information.
+
+78
+00:04:21,985 --> 00:04:24,725
+Then it massages that information
+and then returns the result
+
+79
+00:04:24,725 --> 00:04:26,395
+and the client is happy.
+
+80
+00:04:26,895 --> 00:04:29,655
+we have 32 different backends at auction.
+
+81
+00:04:29,885 --> 00:04:34,125
+Each backend has, five different,
+methods being HTTP and all.
+
+82
+00:04:34,485 --> 00:04:39,035
+and so we have these wrappers on the
+context for reaching out to the backends.
+
+83
+00:04:39,375 --> 00:04:41,135
+basically the, it looks like this.
+
+84
+00:04:41,135 --> 00:04:44,245
+so we have a backends object, which
+encapsulates all our backends.
+
+85
+00:04:44,245 --> 00:04:47,725
+And then we, for each backend, we
+have it by name and then by method.
+
+86
+00:04:48,565 --> 00:04:53,545
+And We construct this path
+whenever we construct the context.
+
+87
+00:04:53,745 --> 00:04:57,505
+So every context has 160 objects on it.
+
+88
+00:04:58,005 --> 00:05:03,245
+And that's a problem because we have 4,
+000 contexts coexisting right in our test.
+
+89
+00:05:03,245 --> 00:05:05,205
+And each one has 160 objects.
+
+90
+00:05:05,205 --> 00:05:06,295
+That's a lot of objects.
+
+91
+00:05:06,345 --> 00:05:11,495
+And chances are that, any one,
+response isn't going to cause.
+
+92
+00:05:11,740 --> 00:05:16,220
+the executor to access every single
+method on every single backend.
+
+93
+00:05:16,220 --> 00:05:17,210
+Quite the contrary.
+
+94
+00:05:17,380 --> 00:05:19,460
+It's usually five, six accesses.
+
+95
+00:05:19,460 --> 00:05:23,749
+if it's any more than that, then you need
+to worry about, Oh, is it N plus one?
+
+96
+00:05:23,939 --> 00:05:25,419
+am I causing too much traffic?
+
+97
+00:05:26,009 --> 00:05:28,619
+So either way, you're not
+going to need 160 objects.
+
+98
+00:05:29,439 --> 00:05:29,719
+okay.
+
+99
+00:05:29,719 --> 00:05:30,319
+what to do?
+
+100
+00:05:30,689 --> 00:05:31,829
+let's make it lazy.
+
+101
+00:05:31,859 --> 00:05:32,399
+Why not?
+
+102
+00:05:32,559 --> 00:05:35,329
+JavaScript has this wonderful
+thing called a proxy object.
+
+103
+00:05:35,889 --> 00:05:40,629
+Which basically is an object that pretends
+to have any number of, of, fields set.
+
+104
+00:05:41,294 --> 00:05:45,174
+But it doesn't really have them set
+because what it means for a field,
+
+105
+00:05:45,324 --> 00:05:49,164
+what it means to retrieve a field
+is up to a certain callback, right?
+
+106
+00:05:49,194 --> 00:05:52,774
+Instead of just being like a property
+access, it's actually a function
+
+107
+00:05:52,774 --> 00:05:56,564
+invocation where it's given the name
+of the property and the function
+
+108
+00:05:56,564 --> 00:06:00,544
+can decide what to do about the fact
+that somebody wants that property.
+
+109
+00:06:01,474 --> 00:06:05,264
+And so you don't necessarily need
+to store all possible values.
+
+110
+00:06:05,564 --> 00:06:06,704
+And that's exactly what we did.
+
+111
+00:06:07,024 --> 00:06:09,074
+when somebody asks for, UAA.
+
+112
+00:06:09,854 --> 00:06:13,794
+And they ask for post and we
+create the UAA backend on the
+
+113
+00:06:13,794 --> 00:06:15,564
+fly as they are asking for it.
+
+114
+00:06:15,584 --> 00:06:19,584
+And then we create the wrapper for the
+post method as they are asking for it.
+
+115
+00:06:20,154 --> 00:06:23,144
+And it's not as if we're delaying
+the response by this because we
+
+116
+00:06:23,144 --> 00:06:25,934
+would have created these things
+anyway, when the execution happened.
+
+117
+00:06:25,934 --> 00:06:27,884
+So the response is not going to be slower.
+
+118
+00:06:27,884 --> 00:06:30,514
+In fact, it's going to be faster
+because we're not creating 160 of these.
+
+119
+00:06:30,514 --> 00:06:32,724
+We're only creating maybe
+a total of four or five.
+
+120
+00:06:33,224 --> 00:06:34,434
+So we're saving time.
+
+121
+00:06:34,774 --> 00:06:36,234
+We're saying we're saving memory.
+
+122
+00:06:37,114 --> 00:06:38,484
+Now let's see what this got us.
+
+123
+00:06:39,034 --> 00:06:44,594
+turns out that the improvements here are
+in terms of throughput, aren't that great.
+
+124
+00:06:44,714 --> 00:06:49,044
+So there's probably another bottleneck
+somewhere, creating 160 objects was not
+
+125
+00:06:49,044 --> 00:06:51,014
+that expensive in terms of execution time.
+
+126
+00:06:51,694 --> 00:06:53,434
+But it was pretty expensive
+in terms of memory.
+
+127
+00:06:53,434 --> 00:06:56,494
+Like you can see that we
+lowered the plateau here.
+
+128
+00:06:56,739 --> 00:07:01,789
+because, the, these contexts,
+which were causing this rise are
+
+129
+00:07:01,789 --> 00:07:07,149
+now causing a lower rise because,
+we're not creating any, backends.
+
+130
+00:07:07,149 --> 00:07:10,269
+And in fact, for this
+particular subscription, It
+
+131
+00:07:10,269 --> 00:07:11,829
+doesn't take any backends.
+
+132
+00:07:11,879 --> 00:07:12,639
+You'll see later.
+
+133
+00:07:12,639 --> 00:07:15,529
+All it does is basically take the
+object that comes in over Kafka and
+
+134
+00:07:15,529 --> 00:07:17,029
+transforms the keys and that's it.
+
+135
+00:07:17,029 --> 00:07:18,099
+And then it sends it out.
+
+136
+00:07:18,149 --> 00:07:19,429
+It doesn't need any backends.
+
+137
+00:07:19,929 --> 00:07:23,829
+so then, okay, this is maybe a
+little optimistic because it's like
+
+138
+00:07:23,849 --> 00:07:27,179
+maximally reduced, but it doesn't
+matter because it's going to be
+
+139
+00:07:27,179 --> 00:07:29,089
+reduced in pretty much all cases.
+
+140
+00:07:29,589 --> 00:07:29,979
+All right.
+
+141
+00:07:29,979 --> 00:07:31,769
+So what else can we do?
+
+142
+00:07:31,769 --> 00:07:33,499
+We've lowered memory consumption.
+
+143
+00:07:33,499 --> 00:07:34,019
+Sure.
+
+144
+00:07:34,344 --> 00:07:37,874
+But can we do more, lower
+it in different ways?
+
+145
+00:07:37,884 --> 00:07:44,074
+So one of the things that, we explored
+was, If we make the execution more
+
+146
+00:07:44,074 --> 00:07:47,954
+efficient, then maybe the memory usage
+is going to go down because we're
+
+147
+00:07:47,954 --> 00:07:52,074
+using, more modern, style code that,
+that doesn't require so much support
+
+148
+00:07:52,074 --> 00:07:54,994
+from the engine might even be leaner.
+
+149
+00:07:55,104 --> 00:07:57,584
+it might be optimized, whereas
+the old code was not optimized.
+
+150
+00:07:57,584 --> 00:07:59,664
+And so it doesn't need to
+create so many temporary objects
+
+151
+00:07:59,674 --> 00:08:02,004
+to address, the execution.
+
+152
+00:08:02,704 --> 00:08:05,554
+and so in this particular case,
+we have this one function called
+
+153
+00:08:05,554 --> 00:08:06,904
+convert obj to snake keys.
+
+154
+00:08:06,904 --> 00:08:09,194
+I told you earlier that,
+that we have objects that.
+
+155
+00:08:09,434 --> 00:08:13,524
+That look like this when they
+come in from, Kafka and we need to
+
+156
+00:08:13,534 --> 00:08:17,534
+convert them basically because our
+convention is that GraphQL fields,
+
+157
+00:08:17,544 --> 00:08:19,194
+output fields are snake case.
+
+158
+00:08:19,744 --> 00:08:23,474
+So we have this thing that converts
+a deep object to snake case.
+
+159
+00:08:24,024 --> 00:08:25,534
+and that function.
+
+160
+00:08:26,239 --> 00:08:30,199
+What's using low dash a lot because
+it's an old function that nobody has
+
+161
+00:08:30,219 --> 00:08:34,399
+really touched because it works just
+fine And back in those days there was
+
+162
+00:08:34,399 --> 00:08:41,249
+no like map there was no object entries
+that kind of thing so okay, so let's
+
+163
+00:08:41,249 --> 00:08:42,789
+see if we can speed things up, right?
+
+164
+00:08:43,289 --> 00:08:47,109
+let's replace all these calls to
+load dash and let's use some of the
+
+165
+00:08:47,109 --> 00:08:51,039
+stuff that the engine has locally and
+natively, to accomplish the same thing.
+
+166
+00:08:51,039 --> 00:08:53,499
+And so we made, we transformed
+the code like this.
+
+167
+00:08:53,519 --> 00:09:00,489
+And the result was that performance
+was back into the positives relative
+
+168
+00:09:00,489 --> 00:09:04,499
+to that 16 message baseline that I
+showed you on one of the first slides.
+
+169
+00:09:04,999 --> 00:09:09,129
+we retained a little bit of a lowered
+plateau here because we're still not.
+
+170
+00:09:09,279 --> 00:09:12,259
+So we're not doing any of those contacts,
+but because we're doing more work,
+
+171
+00:09:12,529 --> 00:09:17,109
+memory consumption in the busy case
+has actually resumed where it was.
+
+172
+00:09:17,129 --> 00:09:19,639
+It's a little tiny bit lower,
+but not as much as we'd like.
+
+173
+00:09:20,139 --> 00:09:20,449
+All right.
+
+174
+00:09:20,449 --> 00:09:21,379
+Let's see what else we can do.
+
+175
+00:09:22,189 --> 00:09:26,579
+So I told you that we're using Redis
+because we have a situation where we
+
+176
+00:09:26,579 --> 00:09:30,139
+have multiple graph pods like this,
+and they're declared as a single
+
+177
+00:09:30,139 --> 00:09:33,699
+consumer group by Kafka, meaning
+Kafka will partition messages that
+
+178
+00:09:33,699 --> 00:09:37,989
+are addressed to the consumer group
+among the members of the group.
+
+179
+00:09:38,499 --> 00:09:44,260
+And so let's say, if, If G2 retrieves,
+receives the green message, then
+
+180
+00:09:44,480 --> 00:09:48,949
+G2 can satisfy, C4 and C5 because
+they request the green message.
+
+181
+00:09:49,209 --> 00:09:51,379
+But how can C2 be satisfied?
+
+182
+00:09:51,629 --> 00:09:55,169
+C2, G1 never got the green
+message and yet somehow it still
+
+183
+00:09:55,169 --> 00:09:56,689
+has to send it to C2, right?
+
+184
+00:09:57,359 --> 00:10:01,249
+So the way we reconcile that is
+we send all the messages to Redis.
+
+185
+00:10:01,519 --> 00:10:05,059
+And then Redis is does G1 have a
+subscriber for, this green message?
+
+186
+00:10:05,059 --> 00:10:06,199
+Oh yeah, they do.
+
+187
+00:10:06,199 --> 00:10:06,449
+Okay.
+
+188
+00:10:06,449 --> 00:10:07,379
+Then I better forward it.
+
+189
+00:10:07,579 --> 00:10:10,019
+So Redis doesn't just blindly
+forward everything to everyone
+
+190
+00:10:10,019 --> 00:10:13,069
+because then we could just get rid
+of Redis entirely and just declare
+
+191
+00:10:13,069 --> 00:10:16,999
+every graph instance to be its own
+consumer group, but it does filter.
+
+192
+00:10:16,999 --> 00:10:21,209
+And so it does reduce traffic versus
+just like the Christmas tree case.
+
+193
+00:10:21,609 --> 00:10:24,029
+while at the same time, allowing this.
+
+194
+00:10:24,669 --> 00:10:28,549
+this, GRAF service to appear to be
+like a unified service rather than,
+
+195
+00:10:28,789 --> 00:10:31,789
+being able to tell, Oh, I'm con I
+must be connected to pod number two
+
+196
+00:10:31,789 --> 00:10:33,349
+because I can't see this and that.
+
+197
+00:10:33,409 --> 00:10:35,309
+So it, it ensures correctness.
+
+198
+00:10:35,509 --> 00:10:36,669
+It reduces traffic.
+
+199
+00:10:37,169 --> 00:10:38,479
+and so that's why we use it.
+
+200
+00:10:38,489 --> 00:10:39,799
+And I figured, okay.
+
+201
+00:10:39,899 --> 00:10:42,209
+GRAFQL subs GraphQL Redis subscriptions.
+
+202
+00:10:42,219 --> 00:10:46,089
+It does a lot of, serializing,
+deserializing a lot of streaming.
+
+203
+00:10:46,449 --> 00:10:50,159
+And so So, can we improve
+it just by upgrading it?
+
+204
+00:10:50,179 --> 00:10:54,469
+maybe, folks upstream, doing wonderful
+open source work have realized
+
+205
+00:10:54,479 --> 00:10:57,089
+that there are better ways of doing
+what they're already doing without
+
+206
+00:10:57,219 --> 00:10:58,649
+actually breaking compatibility.
+
+207
+00:10:59,179 --> 00:11:03,379
+So we upgraded it and no, not quite.
+
+208
+00:11:03,439 --> 00:11:04,009
+it's okay.
+
+209
+00:11:04,579 --> 00:11:05,509
+it's worth a shot.
+
+210
+00:11:05,510 --> 00:11:07,672
+It was worth a shot.
+
+211
+00:11:07,672 --> 00:11:08,969
+the plateau remains.
+
+212
+00:11:08,969 --> 00:11:12,429
+This memory consumption,
+is pretty much the same.
+
+213
+00:11:12,429 --> 00:11:13,894
+Performance improved a little bit.
+
+214
+00:11:14,149 --> 00:11:16,029
+but not spectacularly.
+
+215
+00:11:16,069 --> 00:11:16,379
+okay.
+
+216
+00:11:16,379 --> 00:11:16,929
+We tried it.
+
+217
+00:11:16,929 --> 00:11:18,479
+At least now we have the
+latest and greatest GraphQL
+
+218
+00:11:18,479 --> 00:11:19,909
+Redis subscriptions, right?
+
+219
+00:11:19,909 --> 00:11:22,419
+Or we did at the time
+and that can never hurt.
+
+220
+00:11:22,959 --> 00:11:28,739
+so then let's see, can we do more
+to improve this wonderful, convert
+
+221
+00:11:28,759 --> 00:11:30,219
+object to snake keys function?
+
+222
+00:11:30,219 --> 00:11:31,129
+can we make it leaner?
+
+223
+00:11:31,129 --> 00:11:34,719
+Because to be honest, I keep
+coming back to this function
+
+224
+00:11:34,729 --> 00:11:37,309
+because, I was running node clinic.
+
+225
+00:11:37,549 --> 00:11:41,689
+on the whole workload, just to see
+what it is that's holding up the show.
+
+226
+00:11:41,689 --> 00:11:45,849
+why is it performing so poorly
+with the sort of quote unquote
+
+227
+00:11:46,209 --> 00:11:49,829
+on ulterior motive to actually
+try to reduce memory consumption.
+
+228
+00:11:50,339 --> 00:11:52,259
+node clinic is not a
+memory consumption tool.
+
+229
+00:11:52,259 --> 00:11:55,369
+It's a, it's an execution
+time measuring tool.
+
+230
+00:11:55,369 --> 00:11:57,229
+It's a flame graph for execution time.
+
+231
+00:11:57,239 --> 00:11:58,809
+Where is your.
+
+232
+00:11:59,299 --> 00:12:01,959
+app spending most of its time,
+that's the question that it answers.
+
+233
+00:12:01,989 --> 00:12:06,229
+And time and again, when I ran it, it
+came back with convert apps to snake key.
+
+234
+00:12:06,229 --> 00:12:07,129
+So I'm like, okay, fine.
+
+235
+00:12:07,189 --> 00:12:08,929
+let's get that off the way.
+
+236
+00:12:08,979 --> 00:12:13,099
+And so I went back and, was thinking to
+myself, we have objects like these, right?
+
+237
+00:12:13,129 --> 00:12:15,839
+And we're converting them, to Snakey.
+
+238
+00:12:15,839 --> 00:12:18,959
+So we're not touching the values at all,
+unless the value is an object or an array.
+
+239
+00:12:19,269 --> 00:12:21,589
+And so it's a deep thing and
+we recurse, but otherwise we're
+
+240
+00:12:21,589 --> 00:12:22,789
+not touching the values at all.
+
+241
+00:12:22,789 --> 00:12:24,629
+we're just touching the
+keys all the time, right?
+
+242
+00:12:25,369 --> 00:12:28,959
+we are a company, we do
+stuff with data, right?
+
+243
+00:12:28,959 --> 00:12:31,259
+Like every other company
+that does stuff with data.
+
+244
+00:12:31,279 --> 00:12:34,489
+And so the data in this case
+is key value pairs, right?
+
+245
+00:12:34,519 --> 00:12:38,459
+And, the keys can refer to all kinds of
+like business related things, You can
+
+246
+00:12:38,459 --> 00:12:42,799
+see right here, for example, fallout
+history and, is auction status change.
+
+247
+00:12:42,799 --> 00:12:44,359
+it's business related stuff, right?
+
+248
+00:12:44,889 --> 00:12:46,579
+But these words, these are keywords.
+
+249
+00:12:46,579 --> 00:12:50,109
+These are like variables that
+programmers use, to get the data
+
+250
+00:12:50,109 --> 00:12:51,489
+at that particular location.
+
+251
+00:12:51,499 --> 00:12:55,969
+And so, these names, they're
+not generated automatically.
+
+252
+00:12:55,999 --> 00:13:00,599
+we agree on them and then we use them,
+So in terms of, processing them, into
+
+253
+00:13:00,599 --> 00:13:05,229
+snake keys, once, once I've read days
+on market and I've turned it into snake
+
+254
+00:13:05,239 --> 00:13:06,839
+keys, and this is what it looks like.
+
+255
+00:13:07,139 --> 00:13:09,779
+The next time I encountered this
+days on market thing, and I need to
+
+256
+00:13:09,789 --> 00:13:13,679
+turn it into snake case, why do I
+need to run that computation again?
+
+257
+00:13:13,679 --> 00:13:15,089
+I already know how to do it.
+
+258
+00:13:15,119 --> 00:13:16,529
+I've done it once, right?
+
+259
+00:13:16,809 --> 00:13:20,179
+So why don't I just record the result
+and then not do it the second time?
+
+260
+00:13:20,189 --> 00:13:21,679
+This is called memorization, right?
+
+261
+00:13:22,179 --> 00:13:24,039
+and that's exactly where
+this is going, right?
+
+262
+00:13:24,069 --> 00:13:25,409
+just memoize everything.
+
+263
+00:13:25,409 --> 00:13:29,559
+And then, no matter where you find a
+key named external identifiers, you,
+
+264
+00:13:29,569 --> 00:13:31,279
+you've already done it and that's it.
+
+265
+00:13:31,279 --> 00:13:33,209
+Then you just look up
+the result and reuse it.
+
+266
+00:13:33,709 --> 00:13:35,139
+So that's what we did here.
+
+267
+00:13:35,979 --> 00:13:36,689
+We memoized it.
+
+268
+00:13:36,699 --> 00:13:40,679
+It's, it was a super simple change,
+like literally just like practically
+
+269
+00:13:40,739 --> 00:13:43,469
+two lines, like one, one addition
+and one replacement, and that's it.
+
+270
+00:13:43,469 --> 00:13:44,859
+The rest is just like gravy.
+
+271
+00:13:45,669 --> 00:13:49,699
+And, Incredibly performance
+went from up 20 percent versus
+
+272
+00:13:49,699 --> 00:13:52,129
+the original baseline to up.
+
+273
+00:13:52,754 --> 00:13:55,044
+331%, 0.
+
+274
+00:13:55,104 --> 00:13:55,464
+3.
+
+275
+00:13:55,654 --> 00:13:56,144
+Okay.
+
+276
+00:13:56,624 --> 00:13:58,054
+So that was a huge improvement.
+
+277
+00:13:58,514 --> 00:14:02,274
+and you can see here the curve that, you
+can see that it's not struggling so much
+
+278
+00:14:02,304 --> 00:14:07,894
+to, to deliver these messages because it's
+the new curve is like the old curve, but.
+
+279
+00:14:07,960 --> 00:14:13,028
+And many people are facing that
+issue of doing transcripts as well.
+
+280
+00:14:13,028 --> 00:14:18,519
+And so what we've seen, the problem
+with the, and during the process
+
+281
+00:14:18,519 --> 00:14:23,588
+of delivering those transcripts, we
+actually see some errors, a lot of
+
+282
+00:14:23,588 --> 00:14:28,656
+typo errors, a lot of typos, some
+sheets are missing or something,
+
+283
+00:14:28,706 --> 00:14:30,606
+A plateau, because it's more flat.
+
+284
+00:14:30,606 --> 00:14:33,196
+And if the height of the plateau
+goes down, okay, then we've
+
+285
+00:14:33,196 --> 00:14:35,846
+improved something across the board
+in terms of memory consumption.
+
+286
+00:14:36,346 --> 00:14:39,916
+Whereas here it's very difficult to
+judge, because we don't have a plateau
+
+287
+00:14:39,986 --> 00:14:43,356
+that we could systematically lower
+and observe that it's being lowered.
+
+288
+00:14:43,856 --> 00:14:44,266
+All right.
+
+289
+00:14:44,326 --> 00:14:46,326
+So let's see, what did we do next?
+
+290
+00:14:46,826 --> 00:14:49,556
+okay, we can't, we step back
+a little bit and we're like,
+
+291
+00:14:49,556 --> 00:14:51,046
+okay, so these pods are dying.
+
+292
+00:14:51,046 --> 00:14:51,266
+Okay.
+
+293
+00:14:51,266 --> 00:14:52,496
+That's the fundamental problem.
+
+294
+00:14:52,496 --> 00:14:54,386
+that's what got us started
+on this whole process.
+
+295
+00:14:54,736 --> 00:14:59,066
+So let's see if we can
+spread out the load.
+
+296
+00:14:59,136 --> 00:15:01,596
+we see that the memory
+is rising precipitously.
+
+297
+00:15:02,111 --> 00:15:05,981
+Because, of some activity that is
+causing that, that is completely
+
+298
+00:15:06,001 --> 00:15:07,501
+valid business activity.
+
+299
+00:15:08,241 --> 00:15:09,891
+And, it's not able to keep up.
+
+300
+00:15:09,891 --> 00:15:12,531
+okay, let's quickly add more
+pods and then maybe now then
+
+301
+00:15:12,531 --> 00:15:13,811
+it's going to be able to keep up.
+
+302
+00:15:14,691 --> 00:15:18,481
+And so we did, we keyed the
+upscaling on memory consumption
+
+303
+00:15:18,481 --> 00:15:19,951
+and equally the downscaling.
+
+304
+00:15:19,961 --> 00:15:21,291
+And, it was okay.
+
+305
+00:15:21,656 --> 00:15:24,656
+Um, it handled it a little bit better.
+
+306
+00:15:24,696 --> 00:15:27,226
+Restarts went down a little
+bit, nothing spectacular.
+
+307
+00:15:27,776 --> 00:15:29,216
+so then, okay.
+
+308
+00:15:29,276 --> 00:15:32,806
+what else can we do about, by the
+way, aside from this precipitous
+
+309
+00:15:32,816 --> 00:15:35,376
+increase and so forth, we also
+had a slow memory leak that would
+
+310
+00:15:35,546 --> 00:15:37,986
+accumulate over like days on end.
+
+311
+00:15:38,676 --> 00:15:41,086
+And so we also had to address that.
+
+312
+00:15:41,146 --> 00:15:43,876
+And, the way we did that
+is drum roll, please.
+
+313
+00:15:44,376 --> 00:15:45,896
+just restarted every night.
+
+314
+00:15:45,926 --> 00:15:49,486
+Cause like we couldn't figure out where
+the leak was coming from, it doesn't
+
+315
+00:15:49,486 --> 00:15:54,506
+matter you, this is a perfectly valid
+way of handling it because nobody's
+
+316
+00:15:54,546 --> 00:15:56,586
+watching their web sockets at like 2 AM.
+
+317
+00:15:56,586 --> 00:15:58,086
+So why not restart the service?
+
+318
+00:15:58,556 --> 00:16:01,706
+And besides you, there are
+no auctions going on at 2 AM.
+
+319
+00:16:01,796 --> 00:16:04,586
+Everybody's practically
+asleep all over the U S.
+
+320
+00:16:05,046 --> 00:16:10,406
+And our clients, the, not the people,
+but the apps that they use and, the
+
+321
+00:16:10,406 --> 00:16:14,406
+website that they use, those clients
+are designed to reconnect very quickly.
+
+322
+00:16:14,426 --> 00:16:16,876
+So within a matter of seconds,
+they, they would reconnect their web
+
+323
+00:16:16,876 --> 00:16:19,536
+sockets and continue to get data.
+
+324
+00:16:20,036 --> 00:16:25,646
+So yeah, we quote unquote addressed
+this particular memory leak anyway.
+
+325
+00:16:25,646 --> 00:16:29,886
+so back to the quest of lowering
+memory consumption, one of
+
+326
+00:16:29,886 --> 00:16:31,466
+the things that I didn't.
+
+327
+00:16:32,086 --> 00:16:36,006
+I'm going to add in my background
+slide is that, the way we deploy
+
+328
+00:16:36,026 --> 00:16:40,476
+graph is we do a bunch of like
+transformations on the source code, right?
+
+329
+00:16:40,476 --> 00:16:42,346
+Like we, we have TypeScript in there.
+
+330
+00:16:42,346 --> 00:16:46,816
+So of course we compile that to,
+or transpile that to JavaScript.
+
+331
+00:16:47,376 --> 00:16:52,346
+But we also have this legacy sort of
+bundling system that is basically designed
+
+332
+00:16:52,346 --> 00:16:56,006
+for clients, but that we also use on
+the server, which just puts everything
+
+333
+00:16:56,006 --> 00:16:59,616
+through Babel and generates this one
+big file that is the entire server.
+
+334
+00:17:00,336 --> 00:17:00,896
+And.
+
+335
+00:17:01,396 --> 00:17:07,196
+that, that the configuration of that
+process was such that there, it made no
+
+336
+00:17:07,196 --> 00:17:11,006
+distinction between whether it creates
+a client bundle or a server bundle.
+
+337
+00:17:11,506 --> 00:17:15,146
+And with this optimization mindset, I went
+in there and I was like, okay, so let's
+
+338
+00:17:15,166 --> 00:17:19,186
+introduce such a distinction because, the
+client bundle has to address all kinds of
+
+339
+00:17:19,186 --> 00:17:22,906
+browsers with all kinds of capabilities
+and legacy browsers and all that.
+
+340
+00:17:22,906 --> 00:17:27,451
+And so it needs to be bulletproof and be
+able to function in no matter what level
+
+341
+00:17:27,451 --> 00:17:32,081
+of ECMA script is running on that browser,
+but that's not true for the server, right?
+
+342
+00:17:32,081 --> 00:17:32,311
+Node.
+
+343
+00:17:32,311 --> 00:17:34,801
+js, we know exactly what version of Node.
+
+344
+00:17:34,801 --> 00:17:40,421
+js we're going to have, 20 in this case,
+and so the translation algorithm might
+
+345
+00:17:40,421 --> 00:17:44,601
+as well target that version and leave a
+lot of the native stuff in place instead
+
+346
+00:17:44,601 --> 00:17:46,601
+of replacing it with polyfills, right?
+
+347
+00:17:46,631 --> 00:17:47,991
+Unnecessarily in this case.
+
+348
+00:17:48,491 --> 00:17:51,981
+So we did that and you can see that
+the curve has gotten a lot flatter.
+
+349
+00:17:51,981 --> 00:17:56,051
+if you look at this one, the peaks
+and the valleys are a lot smaller,
+
+350
+00:17:56,401 --> 00:18:01,091
+we've improved things a little bit and
+the performance went up by another 0.
+
+351
+00:18:01,091 --> 00:18:01,981
+3 X, right?
+
+352
+00:18:02,011 --> 00:18:02,651
+We're at 3.
+
+353
+00:18:02,691 --> 00:18:04,571
+6 X now versus the original.
+
+354
+00:18:04,911 --> 00:18:05,401
+okay.
+
+355
+00:18:05,451 --> 00:18:05,981
+it's good.
+
+356
+00:18:06,231 --> 00:18:08,361
+Memory consumption is a
+little more predictable.
+
+357
+00:18:08,621 --> 00:18:10,151
+Performance is slightly up.
+
+358
+00:18:10,841 --> 00:18:11,521
+Can't complain.
+
+359
+00:18:11,771 --> 00:18:14,391
+Except of course that we haven't
+really lowered this plateau.
+
+360
+00:18:14,391 --> 00:18:18,141
+It's still, hovering
+around just above one gig.
+
+361
+00:18:19,001 --> 00:18:19,321
+okay.
+
+362
+00:18:19,321 --> 00:18:19,711
+Let's see.
+
+363
+00:18:19,711 --> 00:18:20,051
+What else?
+
+364
+00:18:20,051 --> 00:18:20,801
+What else can we do?
+
+365
+00:18:21,271 --> 00:18:21,561
+Okay.
+
+366
+00:18:21,561 --> 00:18:24,671
+So back to optimizing this guy.
+
+367
+00:18:25,521 --> 00:18:29,251
+And, If you remember the code, we
+had a bunch of like object entries
+
+368
+00:18:29,251 --> 00:18:32,791
+and object from entries and map
+in there and that generates a
+
+369
+00:18:32,791 --> 00:18:34,651
+lot of temporary objects, right?
+
+370
+00:18:35,001 --> 00:18:40,581
+because, object entries converts an object
+to a map, to, to an array, and then from
+
+371
+00:18:40,581 --> 00:18:42,866
+entries converts that array back to a map.
+
+372
+00:18:42,936 --> 00:18:44,876
+An object, and that creates a new object.
+
+373
+00:18:44,876 --> 00:18:46,826
+Then you have the old
+object in the new object.
+
+374
+00:18:46,826 --> 00:18:48,636
+You have this array,
+which then gets destroyed.
+
+375
+00:18:48,806 --> 00:18:49,666
+Same thing with map.
+
+376
+00:18:49,696 --> 00:18:51,916
+It creates a new array and
+destroys the old array.
+
+377
+00:18:51,966 --> 00:18:54,086
+why don't, why do we do that?
+
+378
+00:18:54,086 --> 00:18:56,756
+why don't we just do things
+in place whenever we can.
+
+379
+00:18:56,756 --> 00:19:01,216
+So for objects, it's difficult to do
+things in place because with objects.
+
+380
+00:19:01,691 --> 00:19:03,521
+You would have to replace the keys.
+
+381
+00:19:03,581 --> 00:19:05,061
+and that's really difficult to do.
+
+382
+00:19:05,061 --> 00:19:08,371
+Cause you have to insert a new key,
+which is snake case, delete the old
+
+383
+00:19:08,371 --> 00:19:11,141
+key, which is, camel case and so forth.
+
+384
+00:19:11,161 --> 00:19:13,931
+It's much easier to just create an
+empty object, fill it in with the
+
+385
+00:19:14,041 --> 00:19:16,121
+converted keys, And then return that.
+
+386
+00:19:16,131 --> 00:19:17,331
+And then that is the object.
+
+387
+00:19:17,351 --> 00:19:19,261
+So okay, yes, we're creating a new object.
+
+388
+00:19:19,641 --> 00:19:22,121
+But in the case of an array, we
+can completely save ourselves that
+
+389
+00:19:22,121 --> 00:19:23,451
+because we're not touching the keys.
+
+390
+00:19:23,451 --> 00:19:24,831
+We're only touching the values, right?
+
+391
+00:19:25,111 --> 00:19:29,191
+So just replace the values with the
+snake case ified version of themselves.
+
+392
+00:19:29,201 --> 00:19:29,641
+And that's it.
+
+393
+00:19:29,651 --> 00:19:31,231
+And you can still use that same array.
+
+394
+00:19:32,211 --> 00:19:37,151
+And so when we deployed this, lo
+and behold, performance went from 3.
+
+395
+00:19:37,151 --> 00:19:37,311
+6x to 6.
+
+396
+00:19:37,311 --> 00:19:38,381
+3x.
+
+397
+00:19:38,391 --> 00:19:40,501
+So we tripled performance again.
+
+398
+00:19:40,991 --> 00:19:44,381
+memory consumption is very
+nice and flat now, but it's
+
+399
+00:19:44,381 --> 00:19:46,661
+still hovering at around a gig.
+
+400
+00:19:47,161 --> 00:19:47,631
+Okay.
+
+401
+00:19:47,631 --> 00:19:50,311
+all So then break out the
+big guns, so to speak.
+
+402
+00:19:50,361 --> 00:19:55,391
+this is Chrome DevTools, the memory
+tab, as you can see, because we're
+
+403
+00:19:55,431 --> 00:19:59,361
+looking at memory consumption and it
+has this wonderful feature called a heap
+
+404
+00:19:59,361 --> 00:20:01,471
+snapshot that you can use with Node.
+
+405
+00:20:01,481 --> 00:20:01,951
+js.
+
+406
+00:20:02,831 --> 00:20:06,611
+Now a heap snapshot will basically, as
+you might think, as you might imagine,
+
+407
+00:20:06,611 --> 00:20:08,301
+it'll take a snapshot of the heap, i.
+
+408
+00:20:08,341 --> 00:20:08,571
+e.
+
+409
+00:20:08,581 --> 00:20:13,131
+it'll tell you all the objects that are
+on the heap at that time, by their type.
+
+410
+00:20:14,001 --> 00:20:19,191
+And then, one of the best features here,
+of this tool is not only that it can
+
+411
+00:20:19,191 --> 00:20:23,596
+take these snapshots, but if you take two
+of them of the same process, earlier in
+
+412
+00:20:23,596 --> 00:20:28,246
+the process, later in the process, then,
+you can actually get, the difference.
+
+413
+00:20:28,246 --> 00:20:30,936
+Like what have I created
+since my last snapshot?
+
+414
+00:20:30,946 --> 00:20:33,266
+What have I destroyed
+since my last snapshot?
+
+415
+00:20:33,686 --> 00:20:36,346
+And so of course you, you'd
+want either zero or lots of
+
+416
+00:20:36,346 --> 00:20:38,876
+negatives, but unfortunately,
+that's not what we were seeing.
+
+417
+00:20:39,566 --> 00:20:43,806
+We took a snapshot at the point where
+the 4, 000 sockets were there, but idle.
+
+418
+00:20:44,016 --> 00:20:45,376
+And then we took another snapshot.
+
+419
+00:20:45,556 --> 00:20:45,946
+I'm sorry.
+
+420
+00:20:45,946 --> 00:20:48,626
+We took a, the first snapshot
+is where everything is idle.
+
+421
+00:20:48,626 --> 00:20:48,806
+Node.
+
+422
+00:20:48,806 --> 00:20:51,046
+js is just sitting there
+doing absolutely nothing.
+
+423
+00:20:51,346 --> 00:20:55,436
+The second snapshot is after, the
+sockets were connected, but before
+
+424
+00:20:55,436 --> 00:20:56,776
+there were any messages coming through.
+
+425
+00:20:57,776 --> 00:21:03,346
+And the difference is, for example,
+among other things that some more
+
+426
+00:21:03,346 --> 00:21:08,686
+recognizable things is that there
+are 261, 968 location objects.
+
+427
+00:21:08,696 --> 00:21:11,426
+Now, what is a location object and
+why do we have so many of them?
+
+428
+00:21:12,291 --> 00:21:18,831
+it turns out the location object is
+an artifact that is created whenever,
+
+429
+00:21:18,871 --> 00:21:23,431
+an incoming request, such as a
+subscription is processed by GraphQL.
+
+430
+00:21:23,691 --> 00:21:30,051
+It creates a syntax tree for it, an
+AST, and unless you ask otherwise,
+
+431
+00:21:30,361 --> 00:21:34,321
+it will attach to each AST node,
+it will attach the location of that
+
+432
+00:21:34,331 --> 00:21:38,831
+node in the original source codes,
+so row five, column 29, that's where
+
+433
+00:21:38,951 --> 00:21:40,571
+something starts, some kind of token.
+
+434
+00:21:41,001 --> 00:21:44,891
+And that token is stored in an
+object in the AST, and associated
+
+435
+00:21:44,891 --> 00:21:49,561
+to that token is a location object
+that will allow you to go to that
+
+436
+00:21:49,561 --> 00:21:51,091
+location and do something interesting.
+
+437
+00:21:52,061 --> 00:21:54,976
+we're worried about,
+answering these queries.
+
+438
+00:21:54,976 --> 00:21:57,046
+We're worried about giving
+responses to these queries.
+
+439
+00:21:57,046 --> 00:22:01,656
+We don't actually care where in the
+query string, something is located.
+
+440
+00:22:02,086 --> 00:22:04,026
+So we don't need these locations at all.
+
+441
+00:22:04,796 --> 00:22:07,016
+And we configured the parser.
+
+442
+00:22:07,056 --> 00:22:10,816
+We kind of monkey patched it at
+first, but then we found better ways.
+
+443
+00:22:11,086 --> 00:22:14,666
+We configured it so that, we actually
+had to reach into subscriptions,
+
+444
+00:22:14,666 --> 00:22:19,246
+transport WS at first and basically
+just tell it, okay, please don't.
+
+445
+00:22:19,306 --> 00:22:22,320
+And I can do the same thing with a std.
+
+446
+00:22:22,320 --> 00:22:25,636
+So I can then say, oh,
+where can I convert it?
+
+447
+00:22:25,636 --> 00:22:28,349
+Or I can give it a
+transcription, a transaction.
+
+448
+00:22:28,349 --> 00:22:30,760
+I can give it a
+transcription, a transaction.
+
+449
+00:22:30,760 --> 00:22:34,679
+And that's basically the kind of
+thing that we're going to be doing.
+
+450
+00:22:34,679 --> 00:22:39,803
+And what I mean by that is I'm not going
+to be converting that logic into, say,
+
+451
+00:22:39,803 --> 00:22:43,721
+a translation disk, but I'm going to
+be converting it into a transcription
+
+452
+00:22:43,721 --> 00:22:45,831
+of some sort of, a state definition.
+
+453
+00:22:47,041 --> 00:22:49,291
+it didn't take very long to get
+through the one gig barrier.
+
+454
+00:22:49,291 --> 00:22:51,281
+Whereas now it barely makes it to one gig.
+
+455
+00:22:51,381 --> 00:22:54,701
+we got some performance in terms
+of memory consumption reduction.
+
+456
+00:22:55,011 --> 00:22:55,341
+Great.
+
+457
+00:22:55,711 --> 00:22:59,191
+And the execution performance
+hasn't really decreased.
+
+458
+00:22:59,191 --> 00:23:00,131
+it's pretty good.
+
+459
+00:23:00,151 --> 00:23:04,351
+In fact, If I think about it,
+it's actually gone up from 5.
+
+460
+00:23:04,371 --> 00:23:06,151
+So, not so bad.
+
+461
+00:23:06,651 --> 00:23:08,031
+but is there anything else we can do?
+
+462
+00:23:08,051 --> 00:23:11,471
+let's see how low we can go, all So
+the next thing we did was we went
+
+463
+00:23:11,471 --> 00:23:14,441
+back to the context and we're like,
+okay, can we lower this plateau a
+
+464
+00:23:14,441 --> 00:23:16,111
+little more like in the idle case?
+
+465
+00:23:16,111 --> 00:23:17,611
+Because if it's low in the idle.
+
+466
+00:23:17,941 --> 00:23:22,561
+It's going to be proportionally
+lower in the case of execution,
+
+467
+00:23:22,571 --> 00:23:23,741
+or at least most of the time.
+
+468
+00:23:24,241 --> 00:23:29,361
+we realized that in addition to backends,
+the other thing on our context is
+
+469
+00:23:29,361 --> 00:23:31,311
+something called data loaders and primers.
+
+470
+00:23:31,621 --> 00:23:38,581
+So a data loader is basically just a kind
+of a backend where, you ask it for a bunch
+
+471
+00:23:38,581 --> 00:23:40,471
+of things and you ask it one at a time.
+
+472
+00:23:40,521 --> 00:23:42,911
+And it pretends to answer right away.
+
+473
+00:23:42,921 --> 00:23:46,651
+But really, one of its most important
+features is that it batches those
+
+474
+00:23:46,661 --> 00:23:52,101
+requests and then it issues a single
+backend call saying, give me all of
+
+475
+00:23:52,101 --> 00:23:54,401
+these things, if the backend is capable.
+
+476
+00:23:54,401 --> 00:23:58,931
+And then when the backend responds, it
+doles out the various objects that it was
+
+477
+00:23:58,931 --> 00:24:02,011
+requested to, to provide as they come in.
+
+478
+00:24:02,531 --> 00:24:06,361
+And so it's a great tool for
+avoiding N plus one situations.
+
+479
+00:24:07,191 --> 00:24:08,231
+And we have lots of them.
+
+480
+00:24:08,251 --> 00:24:11,601
+Like we, we load, we use data
+loaders for lots of different things.
+
+481
+00:24:12,331 --> 00:24:15,961
+and we have 50 of them and primers,
+which prime the data loaders when
+
+482
+00:24:15,971 --> 00:24:19,131
+the execution knows that it's going
+to subsequently need that data.
+
+483
+00:24:19,651 --> 00:24:20,991
+of those we have even more.
+
+484
+00:24:21,541 --> 00:24:23,441
+and we store them all like this.
+
+485
+00:24:23,851 --> 00:24:27,101
+the name of the loader and then the
+function that creates the loader,
+
+486
+00:24:27,101 --> 00:24:29,571
+then the name of the loader and the
+function that creates the loader.
+
+487
+00:24:29,581 --> 00:24:32,131
+and the result of these function
+calls is always an object.
+
+488
+00:24:32,751 --> 00:24:35,291
+And so again, we were in the same
+situation as with backends, where
+
+489
+00:24:35,291 --> 00:24:38,071
+we were creating like hundreds of
+these objects, if not thousands,
+
+490
+00:24:38,441 --> 00:24:42,301
+for the data loaders, and for the
+primers for every single context.
+
+491
+00:24:42,851 --> 00:24:47,711
+But unlike the backends, this required
+a little more subtle solution to, to
+
+492
+00:24:47,711 --> 00:24:52,581
+transform into a lazy object because,
+it's a much bigger sort of object
+
+493
+00:24:52,591 --> 00:24:55,001
+and it's constructed statically.
+
+494
+00:24:55,021 --> 00:24:58,061
+So the backends, they're actually
+constructed in a loop, but this
+
+495
+00:24:58,061 --> 00:25:01,551
+object is literally just a big
+giant object literal declaration.
+
+496
+00:25:02,291 --> 00:25:05,261
+And so we didn't want to turn
+this into like complicated code
+
+497
+00:25:05,261 --> 00:25:06,341
+that looks like this, right?
+
+498
+00:25:06,791 --> 00:25:10,091
+while at the same time, wanting
+that, that laziness about it
+
+499
+00:25:10,091 --> 00:25:11,281
+so that we might save memory.
+
+500
+00:25:12,211 --> 00:25:15,831
+And so what we did since we're,
+since, as I explained earlier, we run
+
+501
+00:25:15,831 --> 00:25:19,301
+through these build steps to convert
+things and run Babel on them and so
+
+502
+00:25:19,301 --> 00:25:20,911
+forth until it's just one big file.
+
+503
+00:25:21,421 --> 00:25:23,121
+Babel has these things called plugins.
+
+504
+00:25:23,131 --> 00:25:27,391
+So why don't we make a that takes one
+of these objects and turns it into.
+
+505
+00:25:27,461 --> 00:25:29,872
+In the end, the output of the
+package starts from the statement,
+
+506
+00:25:29,872 --> 00:25:32,284
+which is something like this,
+which is the name of the parameter,
+
+507
+00:25:32,284 --> 00:25:35,097
+which is the name of the function,
+which is the name of the function.
+
+508
+00:25:35,097 --> 00:25:37,508
+This is the number, which is the
+value of this specific function.
+
+509
+00:25:37,508 --> 00:25:39,115
+So it's basically the
+name of the function.
+
+510
+00:25:39,115 --> 00:25:41,928
+Every function that you have in the
+database, and the name of the function,
+
+511
+00:25:41,928 --> 00:25:46,341
+which are actually one of the properties
+in this object is actually primers,
+
+512
+00:25:46,371 --> 00:25:48,851
+which itself is a, lazy object.
+
+513
+00:25:48,851 --> 00:25:50,781
+So it gets complicated quickly.
+
+514
+00:25:50,781 --> 00:25:53,081
+And so better, better to
+use that Babel plugin.
+
+515
+00:25:53,081 --> 00:25:54,671
+And so the Babel plugin works like this.
+
+516
+00:25:54,671 --> 00:25:56,681
+It looks for instances of proxy.
+
+517
+00:25:56,951 --> 00:25:58,071
+lazy in the code.
+
+518
+00:25:58,621 --> 00:26:04,111
+which, proxy is a perfectly valid,
+JavaScript or ECMA script, specified,
+
+519
+00:26:04,121 --> 00:26:07,851
+global, but that global doesn't
+have a static function called lazy.
+
+520
+00:26:07,871 --> 00:26:10,321
+That's fictitious that we
+invented that function, right?
+
+521
+00:26:10,841 --> 00:26:15,881
+But with Babel, that can be turned into
+quote unquote, a real function by virtue
+
+522
+00:26:15,881 --> 00:26:20,531
+of the fact that, we create code to
+satisfy this and to turn this into an
+
+523
+00:26:20,531 --> 00:26:22,541
+object literal, that is really a proxy.
+
+524
+00:26:22,541 --> 00:26:25,561
+so that's basically our excuse
+is to find this word lazy here.
+
+525
+00:26:26,261 --> 00:26:28,191
+And so that's our hook actually.
+
+526
+00:26:28,601 --> 00:26:29,051
+And okay.
+
+527
+00:26:29,051 --> 00:26:33,201
+So then that turns the code into something
+like this, where if you're asking for
+
+528
+00:26:33,201 --> 00:26:35,831
+key one, then you call function one,
+if you're asking for key two, you call
+
+529
+00:26:35,831 --> 00:26:38,601
+function two, but you also memoize, right?
+
+530
+00:26:38,601 --> 00:26:39,991
+So originally.
+
+531
+00:26:40,596 --> 00:26:43,896
+You have all the keys because
+the object still has to look
+
+532
+00:26:43,896 --> 00:26:45,176
+like it has all the keys, right?
+
+533
+00:26:45,386 --> 00:26:49,876
+But each key has only like this the
+symbol assigned to it, which is one
+
+534
+00:26:49,876 --> 00:26:54,576
+symbol that is getting reused for all
+keys Instead of having one symbol per key
+
+535
+00:26:54,586 --> 00:26:59,526
+that's a big savings while not affecting
+the look and feel of the object And
+
+536
+00:26:59,526 --> 00:27:04,006
+then when, you want one of these data
+loaders, then you just ask for the key.
+
+537
+00:27:04,036 --> 00:27:07,956
+It checks, Oh, geez, the key is a, is one
+of these symbols, then I better create it.
+
+538
+00:27:07,956 --> 00:27:10,536
+So it creates it and then it
+replaces the symbol with the
+
+539
+00:27:10,536 --> 00:27:12,206
+result of the function call, i.
+
+540
+00:27:12,206 --> 00:27:12,356
+e.
+
+541
+00:27:12,366 --> 00:27:13,136
+memorization.
+
+542
+00:27:13,636 --> 00:27:14,296
+and that's it.
+
+543
+00:27:15,056 --> 00:27:17,096
+And let's see what ha what
+happened when we did that.
+
+544
+00:27:17,186 --> 00:27:18,416
+we did another thing first too.
+
+545
+00:27:18,916 --> 00:27:20,466
+we introduced a query cache.
+
+546
+00:27:20,726 --> 00:27:24,446
+Because, we didn't want to have 4,
+000 copies of an AST if we could
+
+547
+00:27:24,446 --> 00:27:26,146
+avoid it, why not just have one copy?
+
+548
+00:27:26,161 --> 00:27:32,101
+And we also added, JITing, which
+basically creates a function for every,
+
+549
+00:27:32,301 --> 00:27:34,571
+document, every AST that comes in.
+
+550
+00:27:34,571 --> 00:27:38,631
+It creates a function, which when
+called will have exactly the same
+
+551
+00:27:38,631 --> 00:27:43,471
+effect as if you had called execute
+with that particular AST only this
+
+552
+00:27:43,471 --> 00:27:48,091
+being a single JavaScript function,
+created from like a string that happens
+
+553
+00:27:48,091 --> 00:27:50,986
+to be valid JavaScript, that is very
+carefully constructed to, to execute.
+
+554
+00:27:51,036 --> 00:27:55,956
+the JavaScript engine can optimize that
+it can actually turn it into native code.
+
+555
+00:27:55,956 --> 00:28:00,796
+So it really has a very good chance of
+being running as native code rather than,
+
+556
+00:28:00,886 --> 00:28:05,556
+lots of interpretations and then jumping
+around on the AST and all that stuff.
+
+557
+00:28:06,466 --> 00:28:10,156
+So what we did was, okay, we introduced
+a cache when the query comes in and we
+
+558
+00:28:10,176 --> 00:28:16,176
+parse it, we create this compilation
+artifact for it And then when it's
+
+559
+00:28:16,176 --> 00:28:21,136
+time to execute the query, we grab
+the compilation artifact from the AST
+
+560
+00:28:21,196 --> 00:28:23,236
+upon which we stored it during parse.
+
+561
+00:28:23,706 --> 00:28:26,706
+And, if for some reason during parse,
+the creation of the compilation
+
+562
+00:28:26,706 --> 00:28:28,486
+artifact failed, no big deal.
+
+563
+00:28:28,486 --> 00:28:31,076
+We'll just go back and run the
+query the old fashioned way.
+
+564
+00:28:31,086 --> 00:28:33,446
+Otherwise we'll run a
+JIT and it'll be faster.
+
+565
+00:28:33,946 --> 00:28:37,496
+So with these two things put
+together, this is what we achieved.
+
+566
+00:28:37,926 --> 00:28:43,216
+So we went from this guy to this guy.
+
+567
+00:28:43,841 --> 00:28:45,941
+Again, perfect memory savings, right?
+
+568
+00:28:46,001 --> 00:28:48,391
+The, this plateau genuinely got lower.
+
+569
+00:28:48,391 --> 00:28:51,441
+and look at the difference between
+the original plateau and this plateau.
+
+570
+00:28:51,441 --> 00:28:53,571
+Like it, it's substantially less.
+
+571
+00:28:53,581 --> 00:28:56,111
+Like we went from 600 megs to 300 megs.
+
+572
+00:28:56,111 --> 00:28:58,091
+we have the idle consumption.
+
+573
+00:28:58,851 --> 00:29:02,201
+performance unaffected
+essentially and much lower memory.
+
+574
+00:29:02,221 --> 00:29:07,661
+we got some ways towards our goal and
+that's, the scope of this presentation.
+
+575
+00:29:07,721 --> 00:29:09,141
+things have happened since then.
+
+576
+00:29:09,541 --> 00:29:13,541
+And, one of the future directions here
+was to upgrade packages and believe
+
+577
+00:29:13,541 --> 00:29:17,001
+it or not, that actually solved the
+problem for us because it turns out
+
+578
+00:29:17,001 --> 00:29:20,671
+that we did have a package in the
+mix in, in, in our supply chain that
+
+579
+00:29:20,691 --> 00:29:23,971
+was basically, wasteful with memory.
+
+580
+00:29:23,971 --> 00:29:29,156
+And then after switching to yarn
+four, whereupon we upgraded all our
+
+581
+00:29:29,156 --> 00:29:33,646
+dependencies, that package either
+got, shoved aside because some of the
+
+582
+00:29:33,646 --> 00:29:37,116
+package got hoisted instead, or some of
+the version of the package got hoisted
+
+583
+00:29:37,126 --> 00:29:41,336
+instead, either way, Yarn 4 got rid of
+a lot of our, duplicate dependencies in
+
+584
+00:29:41,336 --> 00:29:46,786
+terms of same package, different versions,
+and somehow a newer version ended up and.
+
+585
+00:29:47,301 --> 00:29:48,181
+it solved the problem.
+
+586
+00:29:48,661 --> 00:29:51,141
+But that doesn't mean that these
+future directions for any sort
+
+587
+00:29:51,141 --> 00:29:55,161
+of, memory consumption reduction
+aren't a good idea, right?
+
+588
+00:29:55,451 --> 00:29:59,141
+So using heap diffs, see
+what else we can shave off.
+
+589
+00:29:59,441 --> 00:30:02,261
+We could still, just because
+a problem doesn't happen
+
+590
+00:30:02,261 --> 00:30:03,481
+anymore, we don't have restarts.
+
+591
+00:30:03,541 --> 00:30:05,561
+That doesn't mean that, you
+can't improve memory consumption.
+
+592
+00:30:05,591 --> 00:30:06,541
+It's never a bad idea.
+
+593
+00:30:07,041 --> 00:30:08,091
+Promise objects.
+
+594
+00:30:08,331 --> 00:30:08,591
+Okay.
+
+595
+00:30:08,591 --> 00:30:12,261
+I didn't really cover this in this
+talk, but basically we found that.
+
+596
+00:30:12,746 --> 00:30:17,086
+if you treat promises and primitives,
+equally, then you're going to end up
+
+597
+00:30:17,086 --> 00:30:21,236
+with a lot of extra code that, that
+gets executed, and a lot of memory
+
+598
+00:30:21,236 --> 00:30:24,136
+because all these promise objects
+need to live somewhere that, that
+
+599
+00:30:24,136 --> 00:30:25,076
+gets used that doesn't need to.
+
+600
+00:30:25,076 --> 00:30:26,576
+So for example, if you
+have something like.
+
+601
+00:30:26,781 --> 00:30:29,961
+Await function call, and that
+function call returns something,
+
+602
+00:30:30,011 --> 00:30:31,361
+anything other than a promise.
+
+603
+00:30:31,361 --> 00:30:34,681
+If it returns a number five, then you
+don't want to await that function call.
+
+604
+00:30:34,681 --> 00:30:38,531
+You only want to call a wait on a
+function or dot then or whatever.
+
+605
+00:30:38,831 --> 00:30:41,711
+If you can be absolutely a
+hundred percent sure that function
+
+606
+00:30:41,711 --> 00:30:42,691
+is going to return a promise.
+
+607
+00:30:42,691 --> 00:30:44,521
+If not, then just call it directly.
+
+608
+00:30:44,521 --> 00:30:48,391
+Don't use await because that creates like
+three promises every time you use await.
+
+609
+00:30:49,281 --> 00:30:52,491
+so that, that will save you memory
+and it'll save you execution time.
+
+610
+00:30:52,901 --> 00:30:55,391
+Upgrading packages, like I
+said, That did it for us.
+
+611
+00:30:55,811 --> 00:30:57,181
+And, this is still good.
+
+612
+00:30:57,381 --> 00:30:59,771
+creating a realistic subscriptions
+load test, not just one
+
+613
+00:30:59,781 --> 00:31:01,321
+message, have multiple messages.
+
+614
+00:31:01,321 --> 00:31:05,181
+So you have some heterogeneity,
+in your workload.
+
+615
+00:31:05,521 --> 00:31:09,721
+yeah, we can still do these things,
+but of course the impetus now is
+
+616
+00:31:09,721 --> 00:31:11,171
+a lot less than it used to be.
+
+617
+00:31:11,671 --> 00:31:13,551
+so these are some of the
+insights that we gained.
+
+618
+00:31:14,111 --> 00:31:16,171
+choose very carefully what
+you attach to your context.
+
+619
+00:31:16,221 --> 00:31:18,071
+That's never a bad idea.
+
+620
+00:31:18,201 --> 00:31:19,211
+keep your context lean.
+
+621
+00:31:19,271 --> 00:31:23,231
+and by the way, some of these insights,
+they apply to request response graph
+
+622
+00:31:23,231 --> 00:31:24,461
+as well, not just to subscriptions.
+
+623
+00:31:24,461 --> 00:31:27,791
+Like the fact that we made all these
+things lazy, reduce memory consumption
+
+624
+00:31:27,801 --> 00:31:31,131
+on the request response side as
+well, not just the WebSocket side.
+
+625
+00:31:31,671 --> 00:31:36,381
+So it's generally not a bad idea to, to
+have a lean context for graph execution.
+
+626
+00:31:36,821 --> 00:31:40,451
+then, Execution efficiency
+and memory usage efficiency
+
+627
+00:31:40,451 --> 00:31:41,581
+are not entirely orthogonal.
+
+628
+00:31:41,611 --> 00:31:45,151
+Like we saw, we improved execution
+efficiency and memory consumption
+
+629
+00:31:45,181 --> 00:31:48,321
+actually went up instead of
+stay, staying where it was.
+
+630
+00:31:48,721 --> 00:31:52,191
+so yeah, they're not, yeah,
+they're not independent.
+
+631
+00:31:52,601 --> 00:31:56,791
+they are related, which can be related
+in a positive way or a negative way.
+
+632
+00:31:56,801 --> 00:32:00,431
+So improving execution efficiency is never
+a bad idea, but if it kills your memory
+
+633
+00:32:00,431 --> 00:32:04,191
+consumption, then, you might want to think
+twice about it or find out why, of course.
+
+634
+00:32:04,191 --> 00:32:04,231
+Yeah.
+
+635
+00:32:04,991 --> 00:32:09,621
+node clinic I mentioned earlier, it's
+great for improving execution efficiency.
+
+636
+00:32:10,146 --> 00:32:15,226
+And as a result of the previous statement,
+maybe memory consumption, efficiency,
+
+637
+00:32:15,236 --> 00:32:17,676
+but definitely execution efficiency.
+
+638
+00:32:17,736 --> 00:32:21,166
+it, it does a great job showing you,
+okay, there's a huge plateau here.
+
+639
+00:32:21,176 --> 00:32:22,356
+You keep calling this function.
+
+640
+00:32:22,366 --> 00:32:22,796
+Why?
+
+641
+00:32:23,436 --> 00:32:25,246
+Stop calling it or,
+make it more efficient.
+
+642
+00:32:25,246 --> 00:32:27,966
+It really points squarely at the culprit.
+
+643
+00:32:28,466 --> 00:32:30,806
+and then heap snapshots
+came in very handy.
+
+644
+00:32:31,366 --> 00:32:35,086
+especially the differential ones, because,
+they pointed squarely at the thing that
+
+645
+00:32:35,116 --> 00:32:37,056
+you could remove, we don't need this.
+
+646
+00:32:37,236 --> 00:32:37,726
+Goodbye.
+
+647
+00:32:38,086 --> 00:32:39,196
+it's a great tool for that.
+
+648
+00:32:39,696 --> 00:32:40,006
+All right.
+
+649
+00:32:40,026 --> 00:32:41,546
+That concludes my presentation.
+
+650
+00:32:41,556 --> 00:32:45,556
+If you have any questions, I think we have
+a means of answering them, but, either
+
+651
+00:32:45,556 --> 00:32:47,026
+way, thank you so much for your attention.
+
