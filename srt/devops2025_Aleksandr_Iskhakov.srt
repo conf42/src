@@ -1,0 +1,996 @@
+1
+00:00:00,130 --> 00:00:03,500
+Hi, my name is Alexander Kharkov and
+I'm the CTO at Tools for Workers.
+
+2
+00:00:03,660 --> 00:00:06,090
+And today I'm talking
+about optimizing container
+
+3
+00:00:06,130 --> 00:00:08,050
+synchronization for frequent writes.
+
+4
+00:00:08,470 --> 00:00:12,829
+I know the name of the speech is pretty
+mouthful, so let's dive straight into the
+
+5
+00:00:12,850 --> 00:00:15,470
+topic to see what lies behind this title.
+
+6
+00:00:16,080 --> 00:00:20,230
+And actually, it's a very important
+aspect of a multi threaded
+
+7
+00:00:20,260 --> 00:00:21,870
+environment, synchronization.
+
+8
+00:00:22,860 --> 00:00:26,650
+Well, here comes the time when the
+bottlenecks cannot be resolved with
+
+9
+00:00:26,650 --> 00:00:30,900
+just architecture or some buying
+some new hardware, but should be
+
+10
+00:00:30,910 --> 00:00:34,670
+done with optimization of actual
+handling of the data in code.
+
+11
+00:00:35,109 --> 00:00:39,549
+So we will look at some common practices
+in container synchronization and how
+
+12
+00:00:39,550 --> 00:00:44,110
+they struggle to address the not really
+uncommon situation of frequent write
+
+13
+00:00:44,120 --> 00:00:48,340
+operation for multiple threads and
+what can actually be done about it.
+
+14
+00:00:48,960 --> 00:00:53,250
+I will illustrate my speech with
+a bit of c plus plus, but I will
+
+15
+00:00:53,250 --> 00:00:57,670
+keep the conversation high level
+enough because principles, that we,
+
+16
+00:00:57,740 --> 00:01:01,790
+today are discussing can be applied
+in any language of your choice.
+
+17
+00:01:02,500 --> 00:01:04,240
+And we'll start with the.
+
+18
+00:01:04,740 --> 00:01:09,270
+example, by changing some abstract
+container, for something real that
+
+19
+00:01:09,300 --> 00:01:11,120
+maybe hits home for some of you.
+
+20
+00:01:11,480 --> 00:01:13,390
+it's, some, transactional cash.
+
+21
+00:01:13,690 --> 00:01:18,260
+let's have a map, well, a dictionary
+with the key being user ID.
+
+22
+00:01:18,570 --> 00:01:22,720
+And, a value, is, so dynamic
+array of transactions.
+
+23
+00:01:23,120 --> 00:01:26,790
+you can see that, transactions
+actually extracts, transactional
+
+24
+00:01:26,800 --> 00:01:31,770
+data, and it's actually just some
+data about the transaction, such
+
+25
+00:01:31,770 --> 00:01:33,910
+as date, amount, type, whatsoever.
+
+26
+00:01:33,930 --> 00:01:35,780
+It's not really important
+to the conversation.
+
+27
+00:01:36,100 --> 00:01:41,690
+What's important is, that maps in
+C are binary search trees, and, The
+
+28
+00:01:41,690 --> 00:01:46,110
+important thing to know about that is
+that we can access or remove an array
+
+29
+00:01:46,150 --> 00:01:51,760
+of transactions of each user by ID in
+logarithmic time, which is pretty great
+
+30
+00:01:51,780 --> 00:01:57,300
+because that makes this particular
+cache applicable in many situations.
+
+31
+00:01:57,300 --> 00:02:01,575
+And, let's say that, we
+have three cache operations.
+
+32
+00:02:01,645 --> 00:02:04,435
+So read when we just reading.
+
+33
+00:02:04,880 --> 00:02:10,880
+this array, by some, user ID, right
+where we put transaction in the,
+
+34
+00:02:11,090 --> 00:02:17,750
+cash and, pop, where we just retract
+accumulated transaction from the cash for.
+
+35
+00:02:18,280 --> 00:02:19,880
+for example, following processing.
+
+36
+00:02:20,540 --> 00:02:27,080
+And if the cache is accessed by different
+threads, for example, by tasks in some
+
+37
+00:02:27,140 --> 00:02:29,570
+thread pool, you'll need synchronization.
+
+38
+00:02:29,900 --> 00:02:35,880
+Otherwise, alongside with obvious data
+races, you'll keep getting all sorts of
+
+39
+00:02:35,920 --> 00:02:41,690
+errors in situations like, for example,
+when the tree balances itself after pop
+
+40
+00:02:41,690 --> 00:02:47,225
+operation and simultaneously you try
+to write new transaction By, well, no
+
+41
+00:02:47,225 --> 00:02:49,865
+longer valid, X, no longer valid address.
+
+42
+00:02:50,275 --> 00:02:52,815
+So you need synchronization.
+
+43
+00:02:53,445 --> 00:02:57,134
+The simplest approach, is to
+lock the container with, mutex.
+
+44
+00:02:57,924 --> 00:03:02,054
+The lock can be acquired by one
+operation at a time, and other
+
+45
+00:03:02,054 --> 00:03:06,304
+operations will have to wait to
+acquire the lock for themselves.
+
+46
+00:03:07,254 --> 00:03:08,834
+This is pretty easily done.
+
+47
+00:03:09,124 --> 00:03:14,264
+In C you just use lock guard,
+locking the dedicated mutex.
+
+48
+00:03:14,265 --> 00:03:17,145
+and, This will work in
+terms of synchronization.
+
+49
+00:03:17,205 --> 00:03:20,925
+It will synchronize your data and avoid
+the situation I described earlier.
+
+50
+00:03:21,305 --> 00:03:26,535
+But if load increases, the operations
+will have to spend more and more
+
+51
+00:03:26,535 --> 00:03:28,655
+time waiting on locked mutex.
+
+52
+00:03:28,905 --> 00:03:32,625
+And more and more threads in your pool
+will do nothing but wait for the lock.
+
+53
+00:03:33,585 --> 00:03:37,805
+So, sequentially, transactions
+in your systems are being
+
+54
+00:03:37,805 --> 00:03:38,945
+processed with significant delay.
+
+55
+00:03:39,445 --> 00:03:43,645
+That's, well, that's not right,
+and we have to do something.
+
+56
+00:03:44,235 --> 00:03:46,055
+What can we do to improve the situation?
+
+57
+00:03:46,815 --> 00:03:51,015
+one of the approaches, I would say
+it's a next level approach, is to
+
+58
+00:03:51,015 --> 00:03:53,835
+lose, is to use radius writer lock.
+
+59
+00:03:54,510 --> 00:03:58,660
+It's, it's done by, using shared
+mutex and the shared lock.
+
+60
+00:03:59,190 --> 00:04:01,740
+and let's actually head back for a moment.
+
+61
+00:04:02,030 --> 00:04:07,330
+Let's say that, here, a load, is caused
+by constant need to check transactions.
+
+62
+00:04:07,380 --> 00:04:12,920
+So, most of the time that, Most of
+operation in this load, actually read
+
+63
+00:04:12,950 --> 00:04:15,240
+operations that not changes the cache.
+
+64
+00:04:15,700 --> 00:04:19,410
+And, Redis, writer lock, works
+perfectly here because it
+
+65
+00:04:19,490 --> 00:04:21,810
+allows two types of locking.
+
+66
+00:04:22,150 --> 00:04:25,760
+first one is unique locking that
+we use for write operations.
+
+67
+00:04:26,120 --> 00:04:30,610
+it's actually done with the same
+log guard, as, with a simple mutex.
+
+68
+00:04:30,990 --> 00:04:37,410
+and, Mutex lock by this unique lock,
+actually, behaves, just the same.
+
+69
+00:04:37,710 --> 00:04:40,910
+So both readers and
+writers wait for the lock.
+
+70
+00:04:41,240 --> 00:04:46,080
+But if, but what we have,
+different in shared mutex is that
+
+71
+00:04:46,120 --> 00:04:48,050
+it also loves shared locking.
+
+72
+00:04:48,340 --> 00:04:53,010
+and, in this scenario, when the shared
+lock is acquired, all the shared
+
+73
+00:04:53,010 --> 00:04:55,240
+locks can be, acquired simultaneously.
+
+74
+00:04:55,530 --> 00:05:00,240
+that's why reading can, acquire
+simultaneously and, we spend less
+
+75
+00:05:00,260 --> 00:05:05,144
+time, to wait, for lock to be freed.
+
+76
+00:05:05,194 --> 00:05:12,044
+In C we can use shared locking
+by just, well, using std
+
+77
+00:05:12,044 --> 00:05:14,854
+shared lock with, paired mutex.
+
+78
+00:05:15,354 --> 00:05:19,404
+And, this, actually works like a
+charm in read heavy environments.
+
+79
+00:05:19,784 --> 00:05:24,144
+basically while you have read
+operation, they are done.
+
+80
+00:05:24,844 --> 00:05:30,374
+Simultaneously, without any locking,
+just as is there no mutex whatsoever,
+
+81
+00:05:31,034 --> 00:05:39,364
+well, to put it simply, of course,
+we occasionally have to look uniquely
+
+82
+00:05:39,624 --> 00:05:43,404
+and all operations have to wait
+for the right operation to pass.
+
+83
+00:05:43,744 --> 00:05:46,964
+but if right operation are not
+frequent, that's pretty much it.
+
+84
+00:05:47,464 --> 00:05:48,536
+Not a problem.
+
+85
+00:05:48,536 --> 00:05:50,884
+But let's imagine another scenario.
+
+86
+00:05:51,384 --> 00:05:53,724
+What if we have read heavy environment?
+
+87
+00:05:54,034 --> 00:05:58,124
+Obviously, the benefit of the
+Readers Writer log doesn't work here.
+
+88
+00:05:58,634 --> 00:06:00,284
+And we have to be more creative.
+
+89
+00:06:00,604 --> 00:06:05,664
+But, first of all, let's, define this
+read heavy, write heavy environment.
+
+90
+00:06:06,224 --> 00:06:12,404
+And, We can, just, do that by simply
+removing a read operation whatsoever,
+
+91
+00:06:12,904 --> 00:06:15,264
+just by having a write and pop operation.
+
+92
+00:06:15,284 --> 00:06:19,904
+For example, we have a cache,
+where we need to, store a lot
+
+93
+00:06:19,904 --> 00:06:24,884
+of, transactions that being bar
+bombarded from all different threats.
+
+94
+00:06:25,124 --> 00:06:30,394
+And then, occasionally we have
+to, acquire, collected, operation,
+
+95
+00:06:30,454 --> 00:06:34,364
+and remove them from the cache
+for, for the purposes, for the
+
+96
+00:06:34,364 --> 00:06:36,414
+processing, with the POP, operation.
+
+97
+00:06:37,074 --> 00:06:42,136
+And, both, Pop, functions,
+changing the cache.
+
+98
+00:06:42,626 --> 00:06:46,606
+that's why, we are dealing with the
+heavy, that's why we are dealing with
+
+99
+00:06:46,766 --> 00:06:51,246
+right heavy environment, As we mentioned
+earlier, radius writer lock is pointless
+
+100
+00:06:51,246 --> 00:06:56,676
+here, and we are back with a simple
+mutex with one operation at a time, and
+
+101
+00:06:56,786 --> 00:06:58,946
+we have to somehow improve from here.
+
+102
+00:06:59,666 --> 00:07:03,316
+and to improve, from here,
+let's look at the data structure
+
+103
+00:07:03,426 --> 00:07:04,846
+and how we work with data.
+
+104
+00:07:05,476 --> 00:07:12,806
+you can, well, actually notice that
+each operation works with only one user.
+
+105
+00:07:13,316 --> 00:07:18,456
+And, well, the approach that asking
+to be implemented, at, It's, if we
+
+106
+00:07:18,456 --> 00:07:20,426
+could, process each user separately.
+
+107
+00:07:20,766 --> 00:07:26,716
+that naive approach, is to divide our
+cache, to a lot of, caches with just
+
+108
+00:07:26,716 --> 00:07:30,006
+one user, and, separate UX for each one.
+
+109
+00:07:30,326 --> 00:07:35,436
+But then of course we have to, put all
+these caches into one container and this
+
+110
+00:07:35,436 --> 00:07:37,751
+container of, caches would have to be.
+
+111
+00:07:38,471 --> 00:07:39,401
+synchronized too.
+
+112
+00:07:39,911 --> 00:07:45,621
+And, that's when we are back with the,
+where we just, began thinking about
+
+113
+00:07:45,621 --> 00:07:50,461
+it, so I have a better solution, but
+it roughly follows the same principle.
+
+114
+00:07:50,961 --> 00:07:55,601
+Actually, you may be heard of
+the word sharding before, and you
+
+115
+00:07:55,601 --> 00:08:00,401
+probably heard this term in the
+realm of databases, but in it's
+
+116
+00:08:00,411 --> 00:08:02,391
+perfectly applicable in our scenario.
+
+117
+00:08:03,066 --> 00:08:07,186
+so like in the previous naive approach,
+we're still splitting our original
+
+118
+00:08:07,186 --> 00:08:11,666
+cache, but, we are splitting it
+to a preselected number of shards.
+
+119
+00:08:12,066 --> 00:08:16,076
+and, then we just have to
+decide how the data would be
+
+120
+00:08:16,076 --> 00:08:18,296
+distributed, but by those shards.
+
+121
+00:08:18,776 --> 00:08:23,496
+and, let's say that in our example,
+distribution of transaction among user
+
+122
+00:08:23,496 --> 00:08:28,436
+is pretty homogenous and, well, we
+want to split, cash to four shards.
+
+123
+00:08:28,936 --> 00:08:33,396
+Of course, we can split the range
+of, our user to four parts, just
+
+124
+00:08:33,406 --> 00:08:37,476
+to start, then the second quarter,
+third quarter and the last quarter.
+
+125
+00:08:37,876 --> 00:08:39,296
+But, if we are talking about.
+
+126
+00:08:39,801 --> 00:08:44,691
+at least somehow, realistic scenario,
+the users with lesser ID are probably
+
+127
+00:08:44,901 --> 00:08:49,561
+registered earlier and maybe less active
+than the users with ID closer to the top.
+
+128
+00:08:49,941 --> 00:08:54,701
+So to combat this, let's just use
+module four as a distribution function.
+
+129
+00:08:55,251 --> 00:08:57,361
+so here we have it for shards.
+
+130
+00:08:57,421 --> 00:09:03,311
+And, when we have user ID, we just,
+decide in which shard it goes,
+
+131
+00:09:03,341 --> 00:09:06,541
+just by applying modular operation.
+
+132
+00:09:07,041 --> 00:09:11,301
+of course, all of those, four
+caches should be wrapped into
+
+133
+00:09:11,301 --> 00:09:14,411
+interface, to appear just as
+one cache, but it's pretty easy.
+
+134
+00:09:15,086 --> 00:09:15,776
+easy to do.
+
+135
+00:09:16,426 --> 00:09:20,236
+well, we have a vector of
+array of four pointers.
+
+136
+00:09:20,616 --> 00:09:27,996
+and, we figure out necessary index, of
+index in the vector by modular operation.
+
+137
+00:09:28,706 --> 00:09:33,336
+That's, what's important to note,
+is that we don't need additional
+
+138
+00:09:33,336 --> 00:09:38,386
+synchronization for the vector itself,
+because no matter how writes and pops
+
+139
+00:09:38,436 --> 00:09:44,226
+we do, those four maps are always there
+by the same address, and, yeah, we
+
+140
+00:09:44,226 --> 00:09:48,956
+just, If we synchronize each of them
+with their own mutex, we are fine here.
+
+141
+00:09:49,456 --> 00:09:52,986
+and, look, now we have four
+simultaneous operations.
+
+142
+00:09:53,466 --> 00:09:56,156
+what if we think that four is not enough?
+
+143
+00:09:56,416 --> 00:09:58,666
+Can we have 10 or 100 shards?
+
+144
+00:09:59,146 --> 00:10:01,056
+would it practically help?
+
+145
+00:10:01,566 --> 00:10:04,016
+that's where I have to run
+the tests and check it.
+
+146
+00:10:04,516 --> 00:10:12,546
+here you can see the comparison between
+using just a simple mutex and sharding
+
+147
+00:10:12,566 --> 00:10:14,556
+with the different amounts of shards.
+
+148
+00:10:15,046 --> 00:10:20,326
+load here is around 2000 write
+operations, 300 operations per
+
+149
+00:10:20,326 --> 00:10:22,966
+second, and the concurrency is eight.
+
+150
+00:10:23,316 --> 00:10:29,136
+the concurrency is the amount of, threads
+that can be run, simultaneously, in,
+
+151
+00:10:29,236 --> 00:10:31,406
+the environment that I'm testing on.
+
+152
+00:10:32,176 --> 00:10:33,726
+so here you can.
+
+153
+00:10:34,166 --> 00:10:39,066
+Clearly see relatively how much time
+each operation wastes on waiting
+
+154
+00:10:39,066 --> 00:10:40,846
+for the log in the first scenario.
+
+155
+00:10:41,376 --> 00:10:46,916
+of course, in all of the scenarios,
+the average time to process
+
+156
+00:10:46,916 --> 00:10:49,096
+separation is less than a millisecond.
+
+157
+00:10:49,646 --> 00:10:55,266
+but this is just, demonstrative,
+tests, in, real systems, that data is
+
+158
+00:10:55,416 --> 00:11:00,276
+often much complex and the processing
+of them is much more sophisticated.
+
+159
+00:11:00,596 --> 00:11:05,556
+it may require additional computations,
+access to other data, other caches,
+
+160
+00:11:05,856 --> 00:11:09,996
+and this, can significantly increase
+the time on the operation itself.
+
+161
+00:11:10,296 --> 00:11:13,696
+So it's good to spend as little
+time on, synchronization.
+
+162
+00:11:14,046 --> 00:11:14,826
+as possible.
+
+163
+00:11:15,056 --> 00:11:20,406
+And in this regard, we can see that,
+sharding approach, will basically,
+
+164
+00:11:20,666 --> 00:11:24,076
+eliminates all the waiting for the lock.
+
+165
+00:11:24,576 --> 00:11:31,046
+but in regarding to, different shard
+sites, sizes, we see that miters
+
+166
+00:11:31,096 --> 00:11:32,826
+don't show significant difference.
+
+167
+00:11:33,136 --> 00:11:38,756
+I suspect that the minimal effective,
+value is tied to system concurrency.
+
+168
+00:11:39,091 --> 00:11:42,131
+and, my, concurrency on the test is eight.
+
+169
+00:11:42,421 --> 00:11:46,501
+but of course, on modern server
+machines, it can be much higher.
+
+170
+00:11:46,921 --> 00:11:52,761
+And, shards size in this
+scenarios, will, be even better.
+
+171
+00:11:53,001 --> 00:11:59,141
+If we, increase our sites from
+four, to some, numbers closer to
+
+172
+00:11:59,181 --> 00:12:04,391
+the concurrency of this, machine, of
+course, that's just my, hypothesis.
+
+173
+00:12:04,411 --> 00:12:05,471
+and, I.
+
+174
+00:12:05,971 --> 00:12:10,261
+we'll share the code for the tests at the
+end of the presentation, and I would like
+
+175
+00:12:10,281 --> 00:12:16,501
+to, hear maybe your feedback whether this
+game gets, claim gets proven or disproven.
+
+176
+00:12:17,201 --> 00:12:21,456
+You can also know that the
+largest size, tested, 100, 000.
+
+177
+00:12:21,566 --> 00:12:25,926
+effectively matches the mentioned earlier
+approach of assigning a mutex to each
+
+178
+00:12:25,936 --> 00:12:32,491
+user, because in the tests, user ID
+generated within a range of 100, 000.
+
+179
+00:12:32,716 --> 00:12:36,456
+I've not seen any advantage in
+the processing speed, although
+
+180
+00:12:36,466 --> 00:12:39,886
+this approach obviously more
+demanding in terms of memory.
+
+181
+00:12:40,506 --> 00:12:47,011
+So we can write this naive approach
+off and just simply use sharding.
+
+182
+00:12:47,511 --> 00:12:53,436
+Also, I've run other tests with a
+lower load, just 500 writes and less
+
+183
+00:12:53,436 --> 00:12:55,901
+than 100 pop operations per second.
+
+184
+00:12:56,651 --> 00:13:00,731
+And you can see that effectiveness
+of sharding optimization decreases.
+
+185
+00:13:01,231 --> 00:13:05,181
+It's important to remember that the
+difference between a simple mutex
+
+186
+00:13:05,241 --> 00:13:09,981
+and the sharding approach exists
+only because, only because of a large
+
+187
+00:13:10,011 --> 00:13:14,951
+number of transactions of the same
+times, causing a queue to build up.
+
+188
+00:13:15,491 --> 00:13:19,651
+When we don't have this queue, of
+operation waiting, for the lock,
+
+189
+00:13:19,981 --> 00:13:24,511
+to free, to be freed and, then,
+to acquire it and actually do the
+
+190
+00:13:24,511 --> 00:13:28,181
+operation, simple mutex, do do the job.
+
+191
+00:13:28,581 --> 00:13:32,871
+and, this is yet another reminder,
+that premature optimization
+
+192
+00:13:32,921 --> 00:13:36,881
+can complicate the code without
+significantly impacting the results.
+
+193
+00:13:37,381 --> 00:13:42,091
+to wrap everything up, here's,
+main points of the presentations.
+
+194
+00:13:42,601 --> 00:13:47,821
+First of all, if you have data with
+predictable distribution and allow
+
+195
+00:13:47,881 --> 00:13:53,951
+parallelism by specific key, you can
+use sharding to significantly optimize
+
+196
+00:13:53,991 --> 00:13:56,391
+processing time and avoid bottlenecks.
+
+197
+00:13:57,091 --> 00:14:02,786
+Second thought, this is just one
+example how analyzing the data that you
+
+198
+00:14:02,796 --> 00:14:05,266
+have can help you with optimization.
+
+199
+00:14:05,676 --> 00:14:13,516
+So be creative and maybe, try other
+ways, how, to approach synchronization.
+
+200
+00:14:14,016 --> 00:14:17,326
+and, at last beware of,
+premature optimization.
+
+201
+00:14:17,866 --> 00:14:23,816
+I know that, maybe it sounds contradictory
+to the previous, point, but actually
+
+202
+00:14:24,036 --> 00:14:26,306
+they work, even better together.
+
+203
+00:14:26,706 --> 00:14:29,896
+It's crucial to understand,
+the application requirements
+
+204
+00:14:30,036 --> 00:14:31,276
+and, expected load.
+
+205
+00:14:31,776 --> 00:14:33,686
+And, that would be it for today.
+
+206
+00:14:33,846 --> 00:14:37,976
+here's a link to the GitHub where you
+can find the implementation of all
+
+207
+00:14:37,976 --> 00:14:42,266
+of the caches that mentioned in the
+presentation, and, a code for the tests.
+
+208
+00:14:42,266 --> 00:14:45,726
+So you can write, you
+could run it yourself.
+
+209
+00:14:46,166 --> 00:14:52,346
+And if you have any questions or maybe
+you stumbled across something interesting
+
+210
+00:14:52,366 --> 00:14:58,271
+in your tests, you can write me and,
+well, I would be glad to hear from you.
+
+211
+00:14:58,881 --> 00:15:00,001
+Thank you for your attention.
+
+212
+00:15:00,321 --> 00:15:04,851
+Thanks to Con 42 for the
+opportunity and have a great day.
+
