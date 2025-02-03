@@ -1,0 +1,586 @@
+1
+00:00:00,010 --> 00:00:00,690
+Hey everybody.
+
+2
+00:00:00,960 --> 00:00:03,520
+My name is Dmitry Volkov and I'm
+here to tell you about Python
+
+3
+00:00:03,550 --> 00:00:04,560
+packaging for busy people.
+
+4
+00:00:05,040 --> 00:00:08,060
+And what I mean by that is tools that
+save you time and don't annoy you.
+
+5
+00:00:08,559 --> 00:00:10,690
+And you might be starting to
+suspect something at this point.
+
+6
+00:00:10,690 --> 00:00:14,729
+So let me tell you upfront that this
+talk is going to include some opinions.
+
+7
+00:00:15,254 --> 00:00:19,115
+This is not the only way to do things, but
+I hope it's one that will save you time.
+
+8
+00:00:19,615 --> 00:00:21,705
+For some background on
+where I'm coming from.
+
+9
+00:00:22,335 --> 00:00:26,094
+I used to do some build engineering
+for projects like Ton, KasperskyOS,
+
+10
+00:00:26,095 --> 00:00:29,724
+and VNet, and the upshot is that
+these are large polyglot projects
+
+11
+00:00:29,735 --> 00:00:30,845
+which are annoying to build.
+
+12
+00:00:31,644 --> 00:00:38,325
+Say, VNet is a large C codebase with
+Go, Rust, and C vendor submodules, which
+
+13
+00:00:38,595 --> 00:00:44,285
+On top of that ships a fork of mobile
+Firefox and really it's a pain and
+
+14
+00:00:44,285 --> 00:00:49,305
+sometimes a pain to build developers are
+unhappy and it's hard to ship things.
+
+15
+00:00:49,474 --> 00:00:52,935
+So the intent of my work there was
+to improve developer experience
+
+16
+00:00:52,985 --> 00:00:54,234
+to let people ship faster.
+
+17
+00:00:54,734 --> 00:00:58,515
+and what I'm going to do today
+is tell you about how to do the
+
+18
+00:00:58,515 --> 00:00:59,985
+same for your Python projects.
+
+19
+00:01:00,485 --> 00:01:03,895
+If you're going to take one thing
+away from this talk, it's use UV.
+
+20
+00:01:04,714 --> 00:01:06,695
+Now, let me get to some details.
+
+21
+00:01:07,195 --> 00:01:10,425
+If you've been at it for a while,
+and, build things in Python for a
+
+22
+00:01:10,425 --> 00:01:14,435
+while and try to map out the space
+of concepts you came in contact with,
+
+23
+00:01:14,445 --> 00:01:15,765
+it might look something like this.
+
+24
+00:01:16,245 --> 00:01:21,760
+So there is pip and point trees, and
+there is Eggs and wheels, and this is
+
+25
+00:01:21,760 --> 00:01:26,380
+all a little confusing, so let's try to
+structure it with a nice graphics diagram.
+
+26
+00:01:26,880 --> 00:01:32,090
+This is what it looks like for the ways
+to specify dependencies in Python, the way
+
+27
+00:01:32,090 --> 00:01:34,900
+it progressed, and this is actually great.
+
+28
+00:01:35,070 --> 00:01:39,890
+What this tells you is that you can always
+use PyProjectTunnel and you're golden.
+
+29
+00:01:40,390 --> 00:01:44,550
+However, if you do the same chart
+for tools, it's not so great because
+
+30
+00:01:44,720 --> 00:01:46,160
+there is like 10 competing tools.
+
+31
+00:01:46,690 --> 00:01:48,290
+and, pip still works.
+
+32
+00:01:49,210 --> 00:01:51,200
+So, that's confusing.
+
+33
+00:01:51,500 --> 00:01:52,590
+let's try to break it down.
+
+34
+00:01:53,090 --> 00:01:57,280
+The way that we're going to break it down
+is to look through the use cases and see
+
+35
+00:01:57,280 --> 00:01:58,930
+how the tools match to the use cases.
+
+36
+00:01:59,430 --> 00:02:01,820
+So, say I want a library.
+
+37
+00:02:02,660 --> 00:02:04,160
+I pip install.
+
+38
+00:02:04,660 --> 00:02:06,940
+Say I want to share my
+project with friends.
+
+39
+00:02:07,425 --> 00:02:09,595
+I write the library down in requirements.
+
+40
+00:02:09,595 --> 00:02:10,155
+txt.
+
+41
+00:02:10,925 --> 00:02:11,225
+Easy.
+
+42
+00:02:11,725 --> 00:02:16,065
+Say, I want my project to work in half a
+year's time from now when NumPy updates.
+
+43
+00:02:16,635 --> 00:02:18,075
+I just write down the version.
+
+44
+00:02:18,615 --> 00:02:18,975
+Easy.
+
+45
+00:02:19,655 --> 00:02:23,475
+say I also want environment to sync
+with requirements automatically.
+
+46
+00:02:23,605 --> 00:02:24,355
+I use pbmf.
+
+47
+00:02:24,855 --> 00:02:25,825
+So that's good, right?
+
+48
+00:02:26,325 --> 00:02:29,124
+We should talk about reproducibility.
+
+49
+00:02:29,805 --> 00:02:35,635
+so this write down the version only
+works or is guaranteed to with PyPy.
+
+50
+00:02:36,135 --> 00:02:41,525
+The why is that PyPy enforces that
+when you upload a package with
+
+51
+00:02:41,525 --> 00:02:43,415
+a version, you can't change it.
+
+52
+00:02:43,825 --> 00:02:46,315
+You can only push a new version
+with something different.
+
+53
+00:02:46,815 --> 00:02:49,855
+However, as a practitioner, you
+often get stuff from elsewhere.
+
+54
+00:02:50,075 --> 00:02:53,175
+For example, if you install Torch,
+you get it from their own, registry.
+
+55
+00:02:53,675 --> 00:02:57,785
+So, if you want your project to
+work in a year's time the same way
+
+56
+00:02:57,785 --> 00:02:59,555
+you left it, you should pin a hash.
+
+57
+00:02:59,835 --> 00:03:00,645
+That's foolproof.
+
+58
+00:03:01,335 --> 00:03:02,695
+And there is a bunch
+of tools that do that.
+
+59
+00:03:03,180 --> 00:03:07,440
+you might have heard of some like Poetry
+or Condalock in the Conda ecosystem.
+
+60
+00:03:07,940 --> 00:03:13,330
+There are some gotchas with
+tools, or pain points, and let
+
+61
+00:03:13,330 --> 00:03:14,070
+me go through them for you.
+
+62
+00:03:14,570 --> 00:03:16,980
+So, first off is pip and piptools.
+
+63
+00:03:17,170 --> 00:03:22,420
+And the first thing you should
+know about that is that old pip can
+
+64
+00:03:22,460 --> 00:03:24,100
+just install incompatible packages.
+
+65
+00:03:24,720 --> 00:03:28,970
+So, if two of your dependencies want
+different versions of the same thing,
+
+66
+00:03:29,050 --> 00:03:30,600
+you just get a broken environment.
+
+67
+00:03:31,100 --> 00:03:33,130
+This is fixed though, in new versions.
+
+68
+00:03:33,630 --> 00:03:39,850
+Now, if you want to pin things like we
+discussed, the endorsed way is to generate
+
+69
+00:03:39,860 --> 00:03:41,460
+a log file on each platform manually.
+
+70
+00:03:41,620 --> 00:03:46,360
+what this comes down to is if you have a
+build for Mac OS and Windows and Linux,
+
+71
+00:03:46,710 --> 00:03:51,090
+you're supposed to have three build
+boxes, which each, generates log files
+
+72
+00:03:51,090 --> 00:03:52,340
+and commit them to version control.
+
+73
+00:03:52,660 --> 00:03:54,200
+So, no cross support.
+
+74
+00:03:54,350 --> 00:04:00,499
+And finally, in today's failure
+of technical communication, PIP's,
+
+75
+00:04:00,519 --> 00:04:04,159
+documentation literally includes
+a section telling you that a
+
+76
+00:04:04,199 --> 00:04:08,519
+secure way to use PIP is to use a
+flag you probably never heard of.
+
+77
+00:04:09,019 --> 00:04:13,539
+What the flag does is it disables
+PIP's dependency resolution logic.
+
+78
+00:04:13,809 --> 00:04:17,429
+Because you are supposed to have
+pre resolved the dependencies and
+
+79
+00:04:17,439 --> 00:04:20,329
+locked them and committed them to
+version control Because of some
+
+80
+00:04:20,329 --> 00:04:21,869
+details of how setuptools works.
+
+81
+00:04:22,369 --> 00:04:24,359
+Okay, so that was PIP.
+
+82
+00:04:24,360 --> 00:04:28,719
+The next item on the list is
+Poetry And let me tell you I
+
+83
+00:04:28,899 --> 00:04:30,459
+really wanted to love Poetry.
+
+84
+00:04:31,159 --> 00:04:36,814
+However, there were some pain points and
+here are some So the first thing is Poetry
+
+85
+00:04:36,824 --> 00:04:38,704
+has no command to upgrade dependencies.
+
+86
+00:04:38,774 --> 00:04:42,064
+So you wrote down the version, you wrote
+down the hash, you want to bump it.
+
+87
+00:04:42,504 --> 00:04:44,474
+Well, no built in command.
+
+88
+00:04:45,434 --> 00:04:49,914
+the next thing is we discussed
+that PyProjectToml is the standard
+
+89
+00:04:50,134 --> 00:04:55,064
+right now in, in the way Producer
+described, and the standard is going
+
+90
+00:04:55,064 --> 00:04:59,314
+to have different implementations
+and PIP and implementations and
+
+91
+00:04:59,314 --> 00:05:00,784
+they might differ sometimes.
+
+92
+00:05:01,094 --> 00:05:02,204
+this is going to bite you.
+
+93
+00:05:02,704 --> 00:05:10,394
+finally, for about a year in 2022, if
+you ctrl c poetry install, or if you run
+
+94
+00:05:10,434 --> 00:05:14,424
+two parallel poetry installs, like two
+projects you're installing dependencies
+
+95
+00:05:14,424 --> 00:05:19,034
+for at the same time, you get corrupted
+cache and poetry doesn't work anymore.
+
+96
+00:05:20,034 --> 00:05:21,544
+This was when I reached quit poetry.
+
+97
+00:05:22,044 --> 00:05:29,839
+Okay, so, On to conda and if you look at
+conda's website you will learn that conda
+
+98
+00:05:29,879 --> 00:05:39,209
+is an ecosystem and a philosophy which
+works for a project of any complexity and
+
+99
+00:05:39,239 --> 00:05:43,439
+if you don't run away screaming at that
+point let me tell you that google has 2
+
+100
+00:05:43,589 --> 00:05:50,439
+million hits for conda slow and this is
+for a Now, CondaLock inherits the reason,
+
+101
+00:05:50,649 --> 00:05:54,779
+though you can absolutely make it better
+with libmamba solver, and you should,
+
+102
+00:05:55,279 --> 00:05:56,979
+and it also inherits another reason.
+
+103
+00:05:57,479 --> 00:06:02,789
+It wants to support PIP requirements, and
+to do that, it ships a vendored poetry.
+
+104
+00:06:03,259 --> 00:06:04,429
+There are a few issues with that.
+
+105
+00:06:04,929 --> 00:06:09,639
+First off, vendored poetry can be
+old, like two years out of date,
+
+106
+00:06:09,719 --> 00:06:11,649
+which means you don't get the fixes.
+
+107
+00:06:12,304 --> 00:06:17,764
+In, say, PyProject compatibility, and
+Poetry is not the same as Pip, so a
+
+108
+00:06:17,994 --> 00:06:22,864
+project which, Pip installs, Quandalog
+will not necessarily install, and finally,
+
+109
+00:06:23,444 --> 00:06:28,574
+the vendor Poetry has been known to mess
+with, global, external Poetry sometimes.
+
+110
+00:06:29,074 --> 00:06:31,914
+So, I aired my grievances.
+
+111
+00:06:32,149 --> 00:06:35,909
+Now it's time to hear my praises,
+and my praise is that uv is good.
+
+112
+00:06:36,869 --> 00:06:41,089
+It solves some of the issues I discussed
+above with some design choices,
+
+113
+00:06:41,159 --> 00:06:45,969
+and it also has the great developer
+selling point of being very fast.
+
+114
+00:06:46,389 --> 00:06:48,019
+So fast I use it in drenv.
+
+115
+00:06:48,614 --> 00:06:53,404
+Which I couldn't with PEEP and absolutely,
+God forbid, could not with Conda.
+
+116
+00:06:53,904 --> 00:06:59,064
+there is still a gotcha, which is that
+UV is, has been pre released for a while.
+
+117
+00:06:59,514 --> 00:07:03,064
+because they're iterating on,
+on, on, on the format and don't
+
+118
+00:07:03,064 --> 00:07:04,994
+want to commit to a stable API.
+
+119
+00:07:05,614 --> 00:07:11,634
+So things sometimes really break, but I
+have found it to be absolutely worth it.
+
+120
+00:07:11,684 --> 00:07:13,284
+and the time I spent fixing.
+
+121
+00:07:13,549 --> 00:07:17,369
+breaks like that to be trivial
+as compared to the time I spent
+
+122
+00:07:17,369 --> 00:07:18,579
+fixing some of the issues above.
+
+123
+00:07:19,079 --> 00:07:23,519
+So, if you want to use pip, use uv.
+
+124
+00:07:24,019 --> 00:07:27,179
+If you conda, consider using pixie.
+
+125
+00:07:27,579 --> 00:07:30,719
+This is something that, condalock
+developers are considering
+
+126
+00:07:30,719 --> 00:07:32,519
+endorsing instead of condalock.
+
+127
+00:07:33,019 --> 00:07:38,409
+Okay, so, instead of pip, uv,
+instead of conda, maybe pixie.
+
+128
+00:07:38,589 --> 00:07:40,149
+Hope that saves you time, and thank you.
+
