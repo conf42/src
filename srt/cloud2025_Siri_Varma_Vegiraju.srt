@@ -1,0 +1,1285 @@
+1
+00:00:00,010 --> 00:00:00,710
+Hello everyone.
+
+2
+00:00:00,940 --> 00:00:04,880
+Welcome to this talk on writing
+efficient and long running workflows.
+
+3
+00:00:05,320 --> 00:00:11,100
+As part of this topic, we'll go over
+how we can write long running and
+
+4
+00:00:11,100 --> 00:00:16,760
+fault tolerant workflows with minimal
+effort using some of the open source
+
+5
+00:00:16,760 --> 00:00:18,499
+and cloud native tools available.
+
+6
+00:00:18,999 --> 00:00:21,650
+Before we deep dive a
+little bit about myself.
+
+7
+00:00:22,069 --> 00:00:24,299
+My name is Siddivarma Vaigiraju.
+
+8
+00:00:24,709 --> 00:00:27,419
+I'm currently working as a
+software engineer at Microsoft.
+
+9
+00:00:27,835 --> 00:00:32,415
+And previously I worked with oracle
+In my five plus years of experience.
+
+10
+00:00:32,415 --> 00:00:36,154
+I worked with different cloud native
+tools like ubernetas open telemetry
+
+11
+00:00:36,154 --> 00:00:42,684
+and orco And I also worked with
+petascale petabyte scale ingestion
+
+12
+00:00:42,685 --> 00:00:45,035
+systems like observability systems.
+
+13
+00:00:46,015 --> 00:00:50,964
+In my free time, I love to contribute
+to open source and go on hikes.
+
+14
+00:00:51,525 --> 00:00:53,365
+This is my LinkedIn and email.
+
+15
+00:00:53,764 --> 00:00:57,934
+Please feel free to reach out to me if
+you have any questions or suggestions
+
+16
+00:00:58,025 --> 00:01:02,885
+regarding the talk, or if you want to talk
+about software engineering in general.
+
+17
+00:01:03,384 --> 00:01:04,404
+Coming to the agenda.
+
+18
+00:01:04,619 --> 00:01:08,389
+We'll first look at the problem
+statement or the scenario at hand.
+
+19
+00:01:09,199 --> 00:01:15,599
+Then we look into what are some of the
+difficulties or what are some of the pain
+
+20
+00:01:15,619 --> 00:01:18,509
+points when working with the scenario.
+
+21
+00:01:19,099 --> 00:01:23,879
+Then we look into how distributed
+application runtime, one of the open
+
+22
+00:01:23,880 --> 00:01:27,080
+source tool or dapper helps solve them.
+
+23
+00:01:27,580 --> 00:01:31,950
+Third, we'll look at a live
+example and then conclude the talk.
+
+24
+00:01:32,450 --> 00:01:34,470
+workflows are not new concepts.
+
+25
+00:01:34,480 --> 00:01:38,210
+They have been there for a while
+and we have been writing these
+
+26
+00:01:38,210 --> 00:01:40,734
+workflows for a while as well.
+
+27
+00:01:40,734 --> 00:01:44,800
+There are mainly two kinds
+of workflows, I would say.
+
+28
+00:01:44,869 --> 00:01:49,160
+One is the long running workflow
+and the other is Short running
+
+29
+00:01:49,160 --> 00:01:51,280
+workflows with long running.
+
+30
+00:01:51,290 --> 00:01:57,180
+They can be your etl jobs extract
+transform and load jobs that take
+
+31
+00:01:57,180 --> 00:02:02,610
+data from a place transform it and
+then Store them on a destination
+
+32
+00:02:02,610 --> 00:02:09,379
+store now These can run for multiple
+hours and, or multiple days as well.
+
+33
+00:02:10,099 --> 00:02:15,439
+Then, we have the short running
+workflows, which are your CI or CD jobs,
+
+34
+00:02:15,829 --> 00:02:19,169
+or your integration tests, and so on.
+
+35
+00:02:19,669 --> 00:02:24,449
+One common characteristic among all these
+workflows is having a retry mechanism
+
+36
+00:02:24,769 --> 00:02:28,299
+and a way to save and retrieve progress.
+
+37
+00:02:29,129 --> 00:02:30,749
+Let's look at one such scenario.
+
+38
+00:02:31,249 --> 00:02:35,699
+Imagine you have a storage account
+and the storage account has a bunch of
+
+39
+00:02:35,709 --> 00:02:40,959
+files, maybe around 10 files, and each
+of the files have around 100, 000 rows.
+
+40
+00:02:41,859 --> 00:02:46,609
+And those 100, 000 rows
+attribute to VM IDs.
+
+41
+00:02:47,549 --> 00:02:53,119
+And my goal is to fetch The
+instance details or the service
+
+42
+00:02:53,119 --> 00:02:56,269
+details that this VM belongs to.
+
+43
+00:02:56,539 --> 00:03:00,349
+For example, the VM one might
+belong to service a VM two, might
+
+44
+00:03:00,349 --> 00:03:03,199
+belong to service B and so on.
+
+45
+00:03:03,699 --> 00:03:09,429
+Once we start processing, let's say we
+have 10, 10 files and we FET the first
+
+46
+00:03:09,429 --> 00:03:13,779
+file, processed the a hundred thousand
+dose, and then we came to the second file.
+
+47
+00:03:14,139 --> 00:03:19,329
+Processed the 50, 000 rows and then
+the pod somehow dies because this
+
+48
+00:03:19,329 --> 00:03:20,729
+whole thing is running in a pod.
+
+49
+00:03:21,229 --> 00:03:27,769
+When the workflow restarts, if I
+have to start from the 0th offset
+
+50
+00:03:27,789 --> 00:03:32,969
+again in the second find, that
+is a lot of redundant processing.
+
+51
+00:03:33,289 --> 00:03:37,019
+That means, in addition to the
+50, 000 rows that I did not
+
+52
+00:03:37,029 --> 00:03:42,199
+process, I'm processing the 50,
+000 rows I have already processed.
+
+53
+00:03:42,914 --> 00:03:45,154
+Again, will this strategy scale?
+
+54
+00:03:46,124 --> 00:03:48,254
+That would depend on the number of files.
+
+55
+00:03:48,414 --> 00:03:53,334
+For example, if there are 20 to 30 files,
+maybe in a day, then yeah, definitely.
+
+56
+00:03:53,394 --> 00:03:54,404
+It should not be an issue.
+
+57
+00:03:54,864 --> 00:04:00,754
+But if there are around, if the number
+of files are around hundreds or in
+
+58
+00:04:00,754 --> 00:04:05,534
+the order of thousands, then this
+strategy will definitely not scale.
+
+59
+00:04:05,974 --> 00:04:11,269
+The reason being with cloud
+workloads, Failures are inherent
+
+60
+00:04:11,319 --> 00:04:14,099
+part of, are inherently part of it.
+
+61
+00:04:14,489 --> 00:04:19,429
+And for every failure, if we just
+start from scratch again, that
+
+62
+00:04:19,439 --> 00:04:22,079
+strategy is not, of course, optimal.
+
+63
+00:04:22,579 --> 00:04:28,634
+One way to fix it is, what if I can,
+If I do the checkpointing at the offset
+
+64
+00:04:28,634 --> 00:04:33,844
+level, so whenever I download a file, I
+checkpoint which file I have processed
+
+65
+00:04:33,904 --> 00:04:40,084
+till and till which offset so that when
+I, when the pod recovers from a failure,
+
+66
+00:04:40,154 --> 00:04:44,954
+it is able to Go to the store, pick
+up the offset that it has previously
+
+67
+00:04:44,964 --> 00:04:47,514
+processed and start from there, right?
+
+68
+00:04:47,634 --> 00:04:52,094
+That is an optimal strategy and
+that will of course reduce the
+
+69
+00:04:52,094 --> 00:04:53,544
+amount of reprocessing we do.
+
+70
+00:04:54,044 --> 00:04:57,684
+So what we have concluded is towards
+building a checkpointing engine.
+
+71
+00:04:58,204 --> 00:05:02,644
+Now is checkpointing, is building
+a checkpointing engine really easy?
+
+72
+00:05:03,444 --> 00:05:05,354
+You have to think about schema.
+
+73
+00:05:05,654 --> 00:05:08,474
+You have to think about
+how the transactions occur.
+
+74
+00:05:08,884 --> 00:05:11,204
+You have to think about
+the underlying database.
+
+75
+00:05:11,704 --> 00:05:14,164
+What is the versioning
+strategy for the schema?
+
+76
+00:05:14,704 --> 00:05:17,214
+How will observability work?
+
+77
+00:05:17,534 --> 00:05:21,264
+And what happens if the
+checkpointing engine fails?
+
+78
+00:05:21,574 --> 00:05:23,284
+Will you also fail your workflow?
+
+79
+00:05:23,794 --> 00:05:26,614
+all these things are something
+we will have to consider.
+
+80
+00:05:27,254 --> 00:05:33,214
+And building such an engine that is
+agnostic and works with multiple different
+
+81
+00:05:33,274 --> 00:05:36,224
+workflow types is a multi month effort.
+
+82
+00:05:36,724 --> 00:05:37,824
+How do we fix this?
+
+83
+00:05:38,324 --> 00:05:41,334
+If I think about it, checkpointing
+is not something new.
+
+84
+00:05:41,669 --> 00:05:45,859
+It has been there for a while
+and we are not the first
+
+85
+00:05:45,859 --> 00:05:47,589
+service to use this strategy.
+
+86
+00:05:48,239 --> 00:05:53,589
+I want, so there are two things I
+want to, there are two things I need.
+
+87
+00:05:53,649 --> 00:05:56,119
+First, I want to recover from failures.
+
+88
+00:05:56,499 --> 00:06:01,859
+And second, I want to abstract away the
+concept of building the checkpointing
+
+89
+00:06:01,869 --> 00:06:06,929
+engine and see if there are any
+out of the box solutions available.
+
+90
+00:06:07,429 --> 00:06:11,614
+This is where there are A bunch of
+different open source tools available
+
+91
+00:06:12,044 --> 00:06:18,119
+and one such open source tool is
+distributed application runtime Or dapper.
+
+92
+00:06:18,879 --> 00:06:25,199
+Simply put, this is an engine that runs
+as a sidecar along with your service
+
+93
+00:06:25,819 --> 00:06:28,839
+and does all the necessary actions.
+
+94
+00:06:29,179 --> 00:06:34,089
+For example, if you have 3000 pods
+running and your service is deployed in
+
+95
+00:06:34,089 --> 00:06:39,899
+the 3000 pods, then you have the dapper
+sidecar running along with your sidecar.
+
+96
+00:06:40,309 --> 00:06:43,759
+Along with the service
+in all these 3, 000 pods.
+
+97
+00:06:44,259 --> 00:06:48,439
+If you look at the architecture diagram
+here, we have the application itself,
+
+98
+00:06:48,559 --> 00:06:50,799
+which is nothing but our service.
+
+99
+00:06:51,309 --> 00:06:53,709
+It can be written in any
+programming language.
+
+100
+00:06:53,919 --> 00:06:58,239
+Go, Node, Python, NET, Java, and so on.
+
+101
+00:06:59,169 --> 00:07:01,129
+Then, you have the sidecar.
+
+102
+00:07:01,629 --> 00:07:06,949
+Now, your service communicates with
+the sidecar using the HTTP or the
+
+103
+00:07:06,949 --> 00:07:14,329
+gRPC APIs, because the communication
+is through a HTTP or gRPC.
+
+104
+00:07:14,939 --> 00:07:18,559
+It makes the workflows
+programming language agnostic.
+
+105
+00:07:19,069 --> 00:07:24,769
+That means your service can be in
+any language and the sidecar can
+
+106
+00:07:24,779 --> 00:07:26,219
+be in a different language as well.
+
+107
+00:07:26,719 --> 00:07:29,739
+Along with the work, along
+with the scenario we discussed.
+
+108
+00:07:30,239 --> 00:07:33,269
+Dapr also supports some
+other features as well.
+
+109
+00:07:33,769 --> 00:07:37,269
+One such feature is the service
+to service invocation API.
+
+110
+00:07:37,769 --> 00:07:42,309
+It is normal that we call any
+downstream or upstream services.
+
+111
+00:07:42,669 --> 00:07:49,199
+As part of our workload, maybe we call
+identity To authenticate or authorize the
+
+112
+00:07:49,199 --> 00:07:55,109
+request and so on And some of the things
+that are required when you're calling
+
+113
+00:07:55,119 --> 00:08:02,179
+the api is retry strategies and also You
+want to make sure your service has the
+
+114
+00:08:02,179 --> 00:08:05,419
+permissions to call the specific API.
+
+115
+00:08:05,919 --> 00:08:11,899
+All of this can be offloaded to the
+Dapr Service to Service Invocation API.
+
+116
+00:08:11,899 --> 00:08:16,639
+What you need to do is just call the
+Dapr sidecar, and sidecar takes care
+
+117
+00:08:16,639 --> 00:08:22,099
+of the retry strategies and any of the
+permissions required to call these APIs.
+
+118
+00:08:22,599 --> 00:08:25,579
+Then, you have the publish
+and subscribe pattern.
+
+119
+00:08:26,034 --> 00:08:30,594
+This is also a common pattern that is
+used as part of our distributed systems.
+
+120
+00:08:31,094 --> 00:08:37,334
+Now, you can configure the runtime
+to produce and consume to a message
+
+121
+00:08:37,334 --> 00:08:41,834
+broker of your choice and deliver
+the events to a specific API.
+
+122
+00:08:42,334 --> 00:08:44,304
+That is also something Dapr supports.
+
+123
+00:08:44,804 --> 00:08:49,504
+And today, what we'll be
+discussing is about Dapr workflows.
+
+124
+00:08:50,169 --> 00:08:54,439
+With the Dapr Workflow building
+block, you can write fault tolerant
+
+125
+00:08:54,549 --> 00:08:58,669
+and long running workflows with
+most of the things abstracted away.
+
+126
+00:08:59,039 --> 00:09:01,969
+For example, the thing we
+discussed is checkpointing.
+
+127
+00:09:01,969 --> 00:09:06,259
+The Dapr Workflow engine
+inherently takes care of this.
+
+128
+00:09:06,649 --> 00:09:07,039
+How?
+
+129
+00:09:07,479 --> 00:09:08,709
+Let's take a look at that.
+
+130
+00:09:09,209 --> 00:09:12,229
+Coming to the Dapr Workflows,
+there are mainly three things.
+
+131
+00:09:12,629 --> 00:09:15,009
+First is the Workflow SDK.
+
+132
+00:09:15,779 --> 00:09:24,019
+Because The checkpointing is taken care by
+the workflow engine and it needs, and for
+
+133
+00:09:24,029 --> 00:09:29,869
+that it enforces certain rules that the
+app, that the application needs to follow.
+
+134
+00:09:30,459 --> 00:09:32,909
+SDK is the one that curates those rules.
+
+135
+00:09:33,289 --> 00:09:37,599
+It has certain set of interfaces and
+contracts that your service needs to
+
+136
+00:09:37,599 --> 00:09:42,109
+follow so that the workflow engine can
+automatically do the checkpointing.
+
+137
+00:09:43,009 --> 00:09:47,569
+Then you have the workflow engine
+itself, which the SDK talks to,
+
+138
+00:09:47,569 --> 00:09:52,939
+to notify the progress made till
+now and the workflow engine stores
+
+139
+00:09:52,989 --> 00:09:54,639
+the progress in the state store.
+
+140
+00:09:55,179 --> 00:10:01,359
+The state store is simply put a database
+where the, pro, where the data is stored.
+
+141
+00:10:01,449 --> 00:10:08,639
+The state store can either be a Cosmos
+DB or Redis or Firebase or Cassandra.
+
+142
+00:10:09,139 --> 00:10:13,929
+Now, one good thing here is Tomorrow,
+if tomorrow, if you have to change the
+
+143
+00:10:13,929 --> 00:10:20,729
+state store, it is as easy as changing
+the state store, building block.
+
+144
+00:10:20,739 --> 00:10:23,459
+You just have to change the, YAML file.
+
+145
+00:10:23,959 --> 00:10:26,279
+That is configured and everything else.
+
+146
+00:10:26,319 --> 00:10:31,979
+The workflow is workflow takes care of
+the reason for this is the state store
+
+147
+00:10:32,079 --> 00:10:38,629
+in Internals are not exposed to the
+SDK the dapper runtime takes care of it
+
+148
+00:10:39,129 --> 00:10:45,169
+Now, let's look at what a dapper workflow
+looks like the most basic unit in the
+
+149
+00:10:45,169 --> 00:10:50,234
+workflow is called an activity That is
+the one that actually performs the action.
+
+150
+00:10:50,584 --> 00:10:57,214
+For example, if you have to call a
+specific API or do some complex business
+
+151
+00:10:57,264 --> 00:11:00,364
+logic, that is performed in the activity.
+
+152
+00:11:00,864 --> 00:11:05,694
+Then a workflow is made
+up of multiple activities.
+
+153
+00:11:05,944 --> 00:11:11,204
+So you can think of the workflow
+as an orchestrator and activity as
+
+154
+00:11:11,204 --> 00:11:12,709
+the one that is doing the action.
+
+155
+00:11:13,209 --> 00:11:19,079
+Now, if we consider the scenario we have
+discussed previously, where we have a,
+
+156
+00:11:19,089 --> 00:11:27,069
+where we give a storage location and the
+activity has to perform, has to retrieve
+
+157
+00:11:27,079 --> 00:11:34,029
+the service details of the particular
+VM, the in, there is each workflow
+
+158
+00:11:34,049 --> 00:11:36,419
+or activity has an input and output.
+
+159
+00:11:37,059 --> 00:11:40,779
+So the input in this case is
+the object store file name.
+
+160
+00:11:41,564 --> 00:11:43,114
+That we are passing to the workflow.
+
+161
+00:11:43,944 --> 00:11:48,914
+Now, there can be one activity that
+can return all the rows in the file.
+
+162
+00:11:49,514 --> 00:11:58,194
+Then each individual activity has input
+as the VM ID and output as a service name.
+
+163
+00:11:58,604 --> 00:12:03,094
+For example, if there are 100, 000 rows,
+then there will be 100, 000 activities.
+
+164
+00:12:03,594 --> 00:12:07,584
+And each of this activity would
+have the input as the VM ID and
+
+165
+00:12:07,584 --> 00:12:08,814
+the output as a service name.
+
+166
+00:12:09,314 --> 00:12:13,164
+So we also discussed that,
+the dapper workflow is able
+
+167
+00:12:13,164 --> 00:12:15,614
+to resume in case of failures.
+
+168
+00:12:15,714 --> 00:12:23,364
+So what ends up happening is for each
+input activity combination, the progress
+
+169
+00:12:23,364 --> 00:12:25,964
+is saved inside the stage store.
+
+170
+00:12:26,214 --> 00:12:31,984
+For example, for VM1 and for activity
+A, if there was an output, the
+
+171
+00:12:31,984 --> 00:12:33,764
+progress is stored in the stage store.
+
+172
+00:12:34,264 --> 00:12:40,394
+When there's a failure, what ends up
+happening is Dapper would check For this
+
+173
+00:12:40,394 --> 00:12:42,694
+combination if there is already an output.
+
+174
+00:12:43,094 --> 00:12:50,404
+So after For example after for this VM
+ID VM 1 if you have already performed
+
+175
+00:12:50,404 --> 00:12:58,204
+the activity when there's a failure
+and the workflow resumes Dapper already
+
+176
+00:12:58,204 --> 00:12:59,824
+knows that for this combination.
+
+177
+00:12:59,834 --> 00:13:01,444
+There is already an output available.
+
+178
+00:13:01,794 --> 00:13:07,354
+So instead of Performing this activity
+again, it would just return the output.
+
+179
+00:13:07,694 --> 00:13:13,254
+That is how it, it is able to
+checkpoint and resume without
+
+180
+00:13:13,274 --> 00:13:14,694
+performing the activity again.
+
+181
+00:13:15,194 --> 00:13:18,814
+In order to better understand this,
+let's look at a small example.
+
+182
+00:13:19,314 --> 00:13:21,674
+As part of this example,
+this is what we'll do.
+
+183
+00:13:22,344 --> 00:13:25,464
+We'll first understand what the
+workflow console app is doing.
+
+184
+00:13:26,064 --> 00:13:28,784
+Then we'll run the Dapr sidecard.
+
+185
+00:13:29,734 --> 00:13:33,894
+Third, we will look at the We
+will run the workflow console app.
+
+186
+00:13:34,714 --> 00:13:37,244
+Fourth, we will create
+an artificial failure.
+
+187
+00:13:37,584 --> 00:13:42,934
+And fifth, we will run the app
+again to see that it resumes
+
+188
+00:13:43,284 --> 00:13:44,694
+from the previous failure point.
+
+189
+00:13:45,194 --> 00:13:46,904
+Okay, starting with the first step.
+
+190
+00:13:47,204 --> 00:13:53,854
+What we see here is a dependency injection
+with registering workflows and activities.
+
+191
+00:13:54,744 --> 00:14:01,309
+As part of registering workflow, we have
+Multiple activities and as we discussed
+
+192
+00:14:01,329 --> 00:14:06,319
+previously, workflow is nothing but the
+orchestrator for the activities inside it.
+
+193
+00:14:06,819 --> 00:14:13,319
+The first activity here takes the
+file path as input and returns all the
+
+194
+00:14:13,359 --> 00:14:16,149
+rows in the file as list of strings.
+
+195
+00:14:16,319 --> 00:14:19,909
+For example, if there are 10
+rows, then we return 10 strings.
+
+196
+00:14:20,489 --> 00:14:25,389
+Then for each of them, because
+they are the VM IDs, we are gonna,
+
+197
+00:14:25,579 --> 00:14:30,639
+we are going to pass them to the
+VM metadata fetch activity to get
+
+198
+00:14:30,699 --> 00:14:33,019
+the corresponding service details.
+
+199
+00:14:33,519 --> 00:14:39,239
+Because there are 10 rows, there will
+be 10 activities created with the
+
+200
+00:14:39,739 --> 00:14:41,989
+input name and activity combination.
+
+201
+00:14:42,489 --> 00:14:48,629
+For brevity purposes, I am not making
+an API call but just writing a console.
+
+202
+00:14:48,659 --> 00:14:54,899
+writeLine to make sure, we know when the,
+when this activity has been triggered.
+
+203
+00:14:55,399 --> 00:14:57,624
+Similarly, there is a console.
+
+204
+00:14:57,624 --> 00:15:02,729
+writeLine trigger here as well
+which happens when the rows
+
+205
+00:15:02,729 --> 00:15:03,509
+are fetched from the file.
+
+206
+00:15:04,009 --> 00:15:08,809
+Once this is done, we set the
+environment variable for dapper grpc
+
+207
+00:15:08,829 --> 00:15:14,789
+port to be 4001, so that once the
+console app starts up, it communicates
+
+208
+00:15:14,809 --> 00:15:16,929
+to the dapper sidecar on this port.
+
+209
+00:15:17,599 --> 00:15:22,219
+Then, we get the workflow metadata
+instance, sorry, we get the
+
+210
+00:15:22,249 --> 00:15:24,419
+dapper workflow client instance.
+
+211
+00:15:24,939 --> 00:15:29,809
+Schedule a workflow here, the
+using the name of the work, name of
+
+212
+00:15:29,809 --> 00:15:32,889
+the workflow, and then the input.
+
+213
+00:15:33,129 --> 00:15:38,079
+Input from where the content needs
+to be read and the instance ID
+
+214
+00:15:38,079 --> 00:15:39,819
+name, which is unique per workflow.
+
+215
+00:15:40,319 --> 00:15:45,029
+Then we wait for it to start and
+finally wait for it to complete.
+
+216
+00:15:45,529 --> 00:15:47,689
+This is what is happening
+as part of the console app.
+
+217
+00:15:48,189 --> 00:15:50,199
+Now let's start our side card.
+
+218
+00:15:50,699 --> 00:15:54,499
+This is the command we used to
+run the Tapper side card here.
+
+219
+00:15:55,084 --> 00:16:00,694
+I'm specifying the HTTP port to be 3
+5 0 0 and the GRPC port to be 4 0 0 1.
+
+220
+00:16:01,194 --> 00:16:01,584
+Awesome.
+
+221
+00:16:01,824 --> 00:16:03,654
+The sidecar is up and running.
+
+222
+00:16:04,624 --> 00:16:07,384
+Next it is time to run our service.
+
+223
+00:16:07,884 --> 00:16:10,134
+So I remove the break point here.
+
+224
+00:16:10,494 --> 00:16:12,594
+I'll remove the break point here as well.
+
+225
+00:16:13,094 --> 00:16:19,674
+Now from the console, what we see is
+we have fetched the VM data and we
+
+226
+00:16:19,674 --> 00:16:21,294
+have fetched the row from the file.
+
+227
+00:16:21,794 --> 00:16:23,984
+So we completed fetching
+the rows from the file.
+
+228
+00:16:24,634 --> 00:16:25,114
+Now.
+
+229
+00:16:25,624 --> 00:16:31,794
+If I stop the app here and
+resume it, I should not see this
+
+230
+00:16:31,794 --> 00:16:34,574
+activity being executed again.
+
+231
+00:16:34,974 --> 00:16:38,994
+That means, I should also
+not see these console.
+
+232
+00:16:39,164 --> 00:16:39,934
+title lines again.
+
+233
+00:16:40,899 --> 00:16:43,989
+Now what we'll do is because
+we have already scheduled the
+
+234
+00:16:43,989 --> 00:16:48,539
+workflow, we'll not schedule it
+again and then we'll run the app.
+
+235
+00:16:49,039 --> 00:16:53,539
+So what we are seeing here is it takes
+a bit of time to, for the workflow app
+
+236
+00:16:53,539 --> 00:16:58,209
+to itself start, but once it starts,
+you will see that it directly goes
+
+237
+00:16:58,209 --> 00:17:04,589
+to the second activity and does not
+start the start fetching rose from
+
+238
+00:17:04,589 --> 00:17:07,529
+the file again because for that input.
+
+239
+00:17:07,819 --> 00:17:11,859
+And the file name, for the input
+and output combination, Dapr already
+
+240
+00:17:12,389 --> 00:17:16,379
+determines on the state store
+that the output already exists.
+
+241
+00:17:16,879 --> 00:17:22,929
+So as you can see here, we are,
+we have not seen the output of
+
+242
+00:17:23,429 --> 00:17:25,369
+fetch rows from file here again.
+
+243
+00:17:25,459 --> 00:17:29,249
+We have just seen that we
+have fetched the VM metadata.
+
+244
+00:17:29,729 --> 00:17:34,679
+So that means when the Dapr
+workflow resumed, it did not
+
+245
+00:17:34,689 --> 00:17:37,259
+start from that activity again
+because it already determined.
+
+246
+00:17:38,059 --> 00:17:41,969
+That activity is already complete and
+it resumed from the next activity.
+
+247
+00:17:42,469 --> 00:17:45,109
+What you're seeing here
+is an example of a setup.
+
+248
+00:17:45,424 --> 00:17:53,124
+That my team uses when running dapper
+on kubernetes so when we Install dapper.
+
+249
+00:17:53,244 --> 00:17:57,684
+We also get the dapper sentry service,
+which is responsible for distributing
+
+250
+00:17:57,684 --> 00:18:02,964
+certificates And so on and then there is
+also the dapper placement service which
+
+251
+00:18:02,964 --> 00:18:08,724
+is responsible for distributing your
+workflows or the activities inside the
+
+252
+00:18:08,724 --> 00:18:11,524
+workflows across multiple dapper hosts.
+
+253
+00:18:12,234 --> 00:18:18,024
+And then, the dapper itself
+running in the side pod has to
+
+254
+00:18:18,024 --> 00:18:19,924
+communicate to the state store.
+
+255
+00:18:20,304 --> 00:18:25,794
+In this case, it is the Azure Cosmos DB
+state store using the managed identity.
+
+256
+00:18:26,294 --> 00:18:31,989
+And then finally, All the metrics and
+logs coming, all the metrics and logs
+
+257
+00:18:31,989 --> 00:18:34,449
+coming from the Kubernetes infrastructure.
+
+258
+00:18:35,174 --> 00:18:41,174
+are sent to Prometheus for metrics
+and application insights for logging.
+
+259
+00:18:41,674 --> 00:18:46,374
+And when running on Azure, it is generally
+recommended to use managed identity.
+
+260
+00:18:47,054 --> 00:18:52,314
+And one thing to keep in mind
+when using the MSI is the
+
+261
+00:18:52,314 --> 00:18:54,544
+dap, dapper container takes.
+
+262
+00:18:55,364 --> 00:19:01,124
+A bit more time when authenticate with
+msi So the default timeout would not
+
+263
+00:19:01,154 --> 00:19:06,314
+work and you have to configure And
+you have to increase the timeout value
+
+264
+00:19:06,814 --> 00:19:13,039
+to conclude we talked about the problems
+we run into when Use when running
+
+265
+00:19:13,049 --> 00:19:21,149
+workflows, for example, how we need
+quick recovery and how checkpointing is
+
+266
+00:19:21,149 --> 00:19:25,919
+something that is abstracted away and
+looking for out of the box solution helps.
+
+267
+00:19:26,509 --> 00:19:30,989
+Then we looked into how Tapper, in
+addition to other building blocks,
+
+268
+00:19:31,689 --> 00:19:37,129
+the workflow building blocks
+helps curate long running and
+
+269
+00:19:37,129 --> 00:19:39,689
+fault tolerant workflows with it.
+
+270
+00:19:40,364 --> 00:19:45,984
+Eventing mechanisms, and then
+finally, we looked at how we can run
+
+271
+00:19:45,984 --> 00:19:47,864
+Dapr in the Kubernetes environment.
+
+272
+00:19:48,604 --> 00:19:49,524
+That's it, folks.
+
+273
+00:19:49,624 --> 00:19:52,474
+I hope you enjoyed the talk,
+and I hope you enjoy the rest
+
+274
+00:19:52,474 --> 00:19:53,604
+of the conference as well.
+
+275
+00:19:54,244 --> 00:19:54,724
+Thank you.
+
