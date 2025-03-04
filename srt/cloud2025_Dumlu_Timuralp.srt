@@ -1,0 +1,3072 @@
+1
+00:00:00,150 --> 00:00:00,870
+Hello everyone.
+
+2
+00:00:01,080 --> 00:00:06,330
+Welcome to this com 42 cloudnative
+session on life of a packet in Amazon EKS.
+
+3
+00:00:06,480 --> 00:00:07,770
+My name is Do Tim Rap.
+
+4
+00:00:07,860 --> 00:00:12,930
+I'm a solutions architect at AWS helping
+global financial services customers
+
+5
+00:00:13,620 --> 00:00:17,610
+architect scale and optimize their
+business applications on AWS Cloud.
+
+6
+00:00:18,210 --> 00:00:21,570
+My background is in networking
+and security infrastructure
+
+7
+00:00:21,570 --> 00:00:25,740
+engineering, and I've been in the
+industry for over 20 years now.
+
+8
+00:00:26,240 --> 00:00:29,830
+in the past, throughout my career,
+I worked at various systems
+
+9
+00:00:29,830 --> 00:00:35,860
+integrators and vendors such as
+Nortel Networks, Brocade, and VMware.
+
+10
+00:00:36,610 --> 00:00:41,660
+In, I've been in different roles in like
+network solutions architect, network
+
+11
+00:00:41,660 --> 00:00:43,880
+support engineers, solutions engineer.
+
+12
+00:00:44,380 --> 00:00:45,550
+And Solutions Architect.
+
+13
+00:00:45,550 --> 00:00:50,860
+Recently in this session, I will walk
+you through the various packet walks in
+
+14
+00:00:50,860 --> 00:00:56,710
+Amazon EKS, diving deep into the container
+network traffic forwarding in Kubernetes.
+
+15
+00:00:57,610 --> 00:01:01,630
+Here's a quick disclaimer, basically
+stating that all the points that
+
+16
+00:01:01,630 --> 00:01:05,670
+I'm providing in this session,
+I've observed and obtained, using
+
+17
+00:01:05,670 --> 00:01:09,570
+public tools and anything that I
+mention in the session represents
+
+18
+00:01:09,570 --> 00:01:12,000
+my own opinions and not my employer.
+
+19
+00:01:12,500 --> 00:01:13,970
+So I'm gonna.
+
+20
+00:01:14,765 --> 00:01:18,455
+Quickly touch upon Kubernetes and
+Amazon EKS, high level architecture.
+
+21
+00:01:19,115 --> 00:01:22,835
+I'm gonna talk about Kubernetes
+network model and port connectivity.
+
+22
+00:01:23,315 --> 00:01:26,795
+I'm gonna do deep dive packet
+walks, and then I'll introduce
+
+23
+00:01:26,795 --> 00:01:28,475
+Kubernetes services and ingress.
+
+24
+00:01:28,565 --> 00:01:32,645
+And, with those concepts, introduced,
+I'll do some more packet walks.
+
+25
+00:01:33,145 --> 00:01:36,715
+there are things that I kept out of
+scope in the interest of time, but
+
+26
+00:01:36,715 --> 00:01:41,835
+also to emphasize the foundational
+concepts, for you to focus on.
+
+27
+00:01:42,335 --> 00:01:44,495
+So let's start with
+Kubernetes architecture.
+
+28
+00:01:44,795 --> 00:01:49,595
+Kubernetes is comprised of two main
+components, a highly available control
+
+29
+00:01:49,595 --> 00:01:54,365
+plane, which is comprised of two or
+more nodes and a data plane, which could
+
+30
+00:01:54,365 --> 00:01:56,285
+be comprised of thousands of nodes.
+
+31
+00:01:56,765 --> 00:02:01,115
+And within the com control plane,
+there's an API server, which exposes the
+
+32
+00:02:01,115 --> 00:02:03,455
+Kubernetes API to the external world.
+
+33
+00:02:04,025 --> 00:02:06,575
+It's the front end for the
+Kubernetes control plane.
+
+34
+00:02:06,940 --> 00:02:10,540
+And then there is HCD, which
+is the key value store that
+
+35
+00:02:10,540 --> 00:02:14,050
+keeps all the configuration and
+state of the Kubernetes cluster.
+
+36
+00:02:14,770 --> 00:02:18,520
+And then there is scheduler
+which decides on which node an
+
+37
+00:02:18,520 --> 00:02:20,140
+application port should run.
+
+38
+00:02:20,710 --> 00:02:24,130
+There is controller manager, which
+is comprised of various controllers.
+
+39
+00:02:24,905 --> 00:02:29,285
+And in Kubernetes, a controller's
+responsibilities to make sure that the
+
+40
+00:02:29,585 --> 00:02:34,385
+actual resources implemented in the
+cluster always matches the desired state,
+
+41
+00:02:34,415 --> 00:02:36,845
+which the admin and the developer defines.
+
+42
+00:02:37,345 --> 00:02:42,505
+There is cloud controller manager, which
+embeds cloud's specific control logic.
+
+43
+00:02:42,955 --> 00:02:46,975
+It allows the Kubernetes cluster to
+provision cloud native resources.
+
+44
+00:02:47,405 --> 00:02:52,085
+Provision, monitor and remote, and
+also remove those resources required
+
+45
+00:02:52,085 --> 00:02:53,465
+for the operation of the cluster.
+
+46
+00:02:54,305 --> 00:02:58,955
+All these components in the control plane
+are implemented with high availability.
+
+47
+00:02:59,375 --> 00:03:03,905
+There's a lead reelection process
+that takes place for each of them, and
+
+48
+00:03:03,965 --> 00:03:08,495
+within the data plane, you would have
+the worker nodes where your application
+
+49
+00:03:08,495 --> 00:03:10,865
+workloads run in the form of Kubernetes.
+
+50
+00:03:10,865 --> 00:03:16,565
+Pos, keep in mind that a pod in Kubernetes
+is the smallest deployment unit and.
+
+51
+00:03:16,645 --> 00:03:19,585
+A pod can consist of multiple containers.
+
+52
+00:03:20,245 --> 00:03:24,345
+There's an agent called culet running
+on each node, and it's responsible
+
+53
+00:03:24,345 --> 00:03:28,395
+to run the pods, which are assigned
+to the node and check their health.
+
+54
+00:03:29,025 --> 00:03:32,745
+And lastly, there is cube prox
+agent running on each node.
+
+55
+00:03:32,865 --> 00:03:37,665
+It configures and maintains network rules
+with regards to the traffic destined to
+
+56
+00:03:37,665 --> 00:03:42,255
+a Kubernetes service, a concept which I'm
+gonna explain later on in the session.
+
+57
+00:03:42,905 --> 00:03:47,105
+Let's now look at how this architecture
+is implemented in Amazon EKS.
+
+58
+00:03:47,945 --> 00:03:54,605
+The control plane is implemented in your
+VPC, sorry, in A VPC, which is owned
+
+59
+00:03:54,605 --> 00:03:57,395
+and managed by the Amazon EKS service.
+
+60
+00:03:58,085 --> 00:04:00,485
+It's spans across multiple AZs.
+
+61
+00:04:00,985 --> 00:04:05,845
+It runs a minimum of two API
+server instances, which also
+
+62
+00:04:05,845 --> 00:04:09,505
+run the cube scheduler and cube
+controller manager components.
+
+63
+00:04:10,255 --> 00:04:14,155
+There are three eight CD instances,
+which are spread across all three
+
+64
+00:04:14,155 --> 00:04:17,154
+AZs, and one thing to mention is that.
+
+65
+00:04:17,225 --> 00:04:21,715
+These, control plane notes,
+these instances actually run in
+
+66
+00:04:21,715 --> 00:04:26,005
+an AWS autoscaling group, EC2
+autoscaling group for simplicity.
+
+67
+00:04:26,005 --> 00:04:28,985
+Reason, I kept it out of
+the scope of this diagram.
+
+68
+00:04:29,855 --> 00:04:34,085
+The Kubernetes API is exposed
+to the public internet by an
+
+69
+00:04:34,085 --> 00:04:35,885
+AWS network load balancer.
+
+70
+00:04:36,385 --> 00:04:38,275
+So next is data Plane.
+
+71
+00:04:38,785 --> 00:04:43,105
+In the data plane, you run
+your work nodes in your VPC.
+
+72
+00:04:43,855 --> 00:04:47,245
+The way these work nodes
+communicate with the Kubernetes
+
+73
+00:04:47,245 --> 00:04:50,155
+API is through the cross account.
+
+74
+00:04:50,155 --> 00:04:57,015
+Eni, also called X ENI that are
+implemented across at least two A. Let's
+
+75
+00:04:57,015 --> 00:04:59,625
+explain the Kubernetes network model.
+
+76
+00:05:00,284 --> 00:05:03,645
+Kubernetes imposes a few
+fundamental requirements.
+
+77
+00:05:04,145 --> 00:05:09,370
+Each port gets its own IP address In
+Kubernetes, pods can communicate with each
+
+78
+00:05:09,370 --> 00:05:11,709
+other without na, as a network address.
+
+79
+00:05:11,709 --> 00:05:17,169
+Translation, agents on a node can
+communicate with all the ports on that
+
+80
+00:05:17,169 --> 00:05:23,789
+node, and a pod can consist of basically
+multiple containers in Kubernetes.
+
+81
+00:05:24,405 --> 00:05:26,534
+It would have a loop back interface.
+
+82
+00:05:27,344 --> 00:05:31,215
+The containers would communicate
+with each other through this loop
+
+83
+00:05:31,215 --> 00:05:36,224
+back interface in a pod, and this is
+also called localized communication.
+
+84
+00:05:37,064 --> 00:05:43,309
+The port would also have an E zero
+interface and the containers in the pod
+
+85
+00:05:43,364 --> 00:05:48,314
+would communicate with the other resources
+through this eight zero interface.
+
+86
+00:05:48,814 --> 00:05:51,994
+Let's now look at how
+pod connectivity works.
+
+87
+00:05:52,744 --> 00:05:57,214
+So you have the network interface of
+the node itself, which runs in the
+
+88
+00:05:57,214 --> 00:05:58,984
+root network, namespace of the node.
+
+89
+00:05:59,764 --> 00:06:03,964
+Then you have a separate dedicated
+networks namespace for the pod.
+
+90
+00:06:04,924 --> 00:06:08,794
+The way the pod network namespace
+is connected to the root network
+
+91
+00:06:08,824 --> 00:06:14,044
+namespace is through a Linux construct
+called V pair and a V interface.
+
+92
+00:06:14,544 --> 00:06:20,124
+The same approach is used for the other
+pods on the node as well, and the way
+
+93
+00:06:20,274 --> 00:06:26,214
+the V interfaces connect to the Linux IP
+stack differs across different solutions.
+
+94
+00:06:26,634 --> 00:06:30,294
+This is because various computer
+environments may have different
+
+95
+00:06:30,294 --> 00:06:33,924
+connectivity characteristics
+and requirements, and because of
+
+96
+00:06:33,924 --> 00:06:38,364
+that reason, Kubernetes itself
+does not own the configuration
+
+97
+00:06:38,364 --> 00:06:39,954
+of the port connectivity part.
+
+98
+00:06:40,374 --> 00:06:44,514
+Instead, there's a specification
+called Container network Interface,
+
+99
+00:06:44,664 --> 00:06:50,874
+CNI, in short, which leverages plugins
+to implement port connectivity.
+
+100
+00:06:51,594 --> 00:06:52,524
+There are default.
+
+101
+00:06:52,944 --> 00:06:58,944
+CNI plugins like Loop Back Bridge, IPV
+lan, as well as third party plugins like
+
+102
+00:06:59,004 --> 00:07:03,414
+Calico Cilium or Amazon V-P-C-C-N-I-C-N-I.
+
+103
+00:07:03,414 --> 00:07:09,504
+Plugin is basically an executable
+file which runs on each node and it
+
+104
+00:07:09,504 --> 00:07:11,574
+is responsible for various tasks.
+
+105
+00:07:12,234 --> 00:07:15,534
+It adds and deletes the
+network interface of the pod.
+
+106
+00:07:16,034 --> 00:07:20,774
+It calls the IPAM plugin to assign an
+IP to the network interface of the port,
+
+107
+00:07:21,464 --> 00:07:28,454
+and also it sets up the V pair to connect
+the PO network namespace to the host.
+
+108
+00:07:28,954 --> 00:07:35,734
+This is, how it looks like with EKS
+and what tasks The VPCC and I perform.
+
+109
+00:07:36,484 --> 00:07:39,514
+EPCC and I implements
+the pod connectivity.
+
+110
+00:07:40,444 --> 00:07:45,454
+It leverages either the secondary
+IP address or prefix mode
+
+111
+00:07:45,454 --> 00:07:47,674
+capabilities of the EC2 service.
+
+112
+00:07:48,064 --> 00:07:53,974
+In order to assign an IP to the pods
+from the VPC Sider, basically, in
+
+113
+00:07:53,974 --> 00:08:02,044
+essence, the pod ips are mapped to the
+specific Ennis and as scale grows VPCC.
+
+114
+00:08:02,044 --> 00:08:06,994
+And I also needs to add or delete Ennis
+on the node to make sure that there are
+
+115
+00:08:06,994 --> 00:08:09,524
+enough available ips, for the ports.
+
+116
+00:08:10,024 --> 00:08:10,804
+E-P-C-C-N.
+
+117
+00:08:10,804 --> 00:08:15,334
+I also configures the respective
+routing entries in the node and it
+
+118
+00:08:15,334 --> 00:08:20,314
+also configures routing and ARP entries
+in the pod network namespace as well.
+
+119
+00:08:20,814 --> 00:08:24,594
+Let's examine various interfaces
+on the node and the pod.
+
+120
+00:08:25,344 --> 00:08:31,014
+So we got two ENI on this note, and
+when you look at the pod network
+
+121
+00:08:31,014 --> 00:08:33,414
+interfaces, there's a look back interface.
+
+122
+00:08:33,774 --> 00:08:38,004
+and eight zero interface as
+mentioned previously, and notice
+
+123
+00:08:38,004 --> 00:08:41,994
+that the subnet mask of the eight
+zero IP in this pod is slash 32.
+
+124
+00:08:42,494 --> 00:08:50,026
+So routing table of the pod is set up with
+a default gateway of 1 69, 2 54 0.1 0.1.
+
+125
+00:08:50,894 --> 00:08:55,904
+And this is basically the next top IP
+that is configured as a local next stop.
+
+126
+00:08:56,144 --> 00:09:01,234
+With the Scope Link perimeter,
+the Our Pantry for this default
+
+127
+00:09:01,234 --> 00:09:05,674
+gateway IP is configured as a
+manual entry by the V-P-C-C-N.
+
+128
+00:09:05,674 --> 00:09:09,219
+I notice the m notation
+in the flags mass column.
+
+129
+00:09:09,719 --> 00:09:13,979
+And when you check the interfaces of
+the node, you would notice that the
+
+130
+00:09:13,979 --> 00:09:17,939
+default gateway Mac address you have
+seen in the arc table of the port
+
+131
+00:09:18,389 --> 00:09:23,789
+earlier actually belongs to the V
+interface in the root network namespace.
+
+132
+00:09:24,659 --> 00:09:31,799
+So the interface ID you see here on
+the top right is the actual V id.
+
+133
+00:09:32,299 --> 00:09:36,259
+We will now examine ingress
+and egress traffic on a node
+
+134
+00:09:36,319 --> 00:09:38,389
+with ports in this diagram.
+
+135
+00:09:38,719 --> 00:09:45,289
+PO 50 ones IP is a secondary
+IP on ENI one and PO 60 ones.
+
+136
+00:09:45,289 --> 00:09:48,049
+IP is a secondary IP on ENI two.
+
+137
+00:09:49,039 --> 00:09:51,924
+Let's imagine traffic
+coming ingress to the north.
+
+138
+00:09:52,579 --> 00:09:59,089
+Destined for PO 61 ip, the node
+performs a root lookup in its policy
+
+139
+00:09:59,089 --> 00:10:03,469
+based routing table and matches the
+traffic to the highlighted entry.
+
+140
+00:10:04,039 --> 00:10:08,689
+And that entry requires to perform a
+root lookup in the main routing table.
+
+141
+00:10:09,189 --> 00:10:10,929
+So in the main routing table.
+
+142
+00:10:11,429 --> 00:10:16,319
+The traffic matches the highlighted
+entry and the traffic gets
+
+143
+00:10:16,319 --> 00:10:19,669
+forwarded to PO 61 at this stage.
+
+144
+00:10:19,879 --> 00:10:24,199
+Notice the third entry in this
+main routing table please 'cause
+
+145
+00:10:24,259 --> 00:10:29,629
+it's for the direct connected
+subnet on the eight zero interface.
+
+146
+00:10:30,259 --> 00:10:32,419
+This will become relevant
+in the next packet.
+
+147
+00:10:32,419 --> 00:10:32,809
+Walk.
+
+148
+00:10:33,679 --> 00:10:37,099
+Next, let's imagine traffic generated by.
+
+149
+00:10:37,429 --> 00:10:41,539
+PO 61 would send traffic
+to a destination IP.
+
+150
+00:10:41,539 --> 00:10:47,179
+In the VPC, the node performs a
+route lookup in its policy-based
+
+151
+00:10:47,179 --> 00:10:51,229
+routing table and matches the
+traffic highlighted in the entry.
+
+152
+00:10:51,769 --> 00:10:56,509
+And that entry requires to perform
+a root lookup in the routing table.
+
+153
+00:10:56,539 --> 00:11:00,849
+Number two, in that routing
+table, there is only a single
+
+154
+00:11:00,849 --> 00:11:02,589
+entry for the default gateway.
+
+155
+00:11:03,204 --> 00:11:06,924
+Through ENI one, which
+is the secondary ENI.
+
+156
+00:11:07,424 --> 00:11:11,954
+So the traffic will be sent through
+ENI one to the default gateway.
+
+157
+00:11:12,434 --> 00:11:15,464
+And this is regardless of
+whether the destination of the
+
+158
+00:11:15,464 --> 00:11:17,129
+traffic is on the same subnet as.
+
+159
+00:11:17,579 --> 00:11:19,379
+PO 61 or not.
+
+160
+00:11:19,739 --> 00:11:23,339
+'cause there's a single routing
+entry, which points out through
+
+161
+00:11:23,399 --> 00:11:25,389
+routing table, number two.
+
+162
+00:11:25,749 --> 00:11:27,219
+And in that routing table.
+
+163
+00:11:27,219 --> 00:11:32,049
+Number two, that single routing
+entry just points out to the E one,
+
+164
+00:11:32,229 --> 00:11:34,749
+which is the ENI two in on this, no.
+
+165
+00:11:35,249 --> 00:11:38,924
+So let's now look at port to
+port traffic on the same node.
+
+166
+00:11:39,424 --> 00:11:43,474
+Pod 51 generates traffic
+destined for Pod 61.
+
+167
+00:11:44,164 --> 00:11:48,814
+Notice the source Mac is the
+pod 51 Mac, and the destination
+
+168
+00:11:48,814 --> 00:11:50,704
+Mac is the V interface.
+
+169
+00:11:50,704 --> 00:11:51,064
+Mac.
+
+170
+00:11:51,934 --> 00:11:57,004
+The note performs a root lookup in its
+policy-based routing table and matches
+
+171
+00:11:57,004 --> 00:11:59,524
+the traffic to the highlighted entry.
+
+172
+00:11:59,704 --> 00:12:04,354
+And that entry requires to perform a
+root lookup in the main routing table.
+
+173
+00:12:05,014 --> 00:12:06,964
+So in the main routing table.
+
+174
+00:12:07,474 --> 00:12:12,154
+The traffic matches the highlighted
+entry and the traffic gets
+
+175
+00:12:12,154 --> 00:12:17,944
+forwarded to the pod 61 through
+the respective V interface source.
+
+176
+00:12:17,944 --> 00:12:24,514
+Mac becomes the V Mac and the destination
+Mac address becomes the PO 61 Mac.
+
+177
+00:12:25,014 --> 00:12:26,814
+This time we will look at.
+
+178
+00:12:27,314 --> 00:12:33,874
+Port to pod traffic across nodes PO 51
+generates traffic destined for PO 81.
+
+179
+00:12:34,374 --> 00:12:40,314
+The node performs a route lookup in its
+policy based routing table and matches
+
+180
+00:12:40,314 --> 00:12:46,044
+the traffic to the highlighted routing
+entry, and that entry requires to perform
+
+181
+00:12:46,044 --> 00:12:48,444
+a root lookup in the main routing table.
+
+182
+00:12:48,944 --> 00:12:54,464
+And in the main routing table, the
+traffic matches the highlighted entry.
+
+183
+00:12:54,824 --> 00:12:59,534
+'cause the pod 80 ones IP is on
+the same subnet as the ENI one
+
+184
+00:12:59,534 --> 00:13:04,094
+interface of the node and the
+traffic gets forwarded by the node.
+
+185
+00:13:04,814 --> 00:13:10,454
+Notice the source and destination
+max become the ENI max ENI
+
+186
+00:13:10,454 --> 00:13:12,494
+of the respective notes.
+
+187
+00:13:12,994 --> 00:13:17,014
+The receiving note performs a
+root lookup in its policy-based
+
+188
+00:13:17,014 --> 00:13:21,184
+routing table and matches the
+traffic to the highlighted entry.
+
+189
+00:13:22,164 --> 00:13:27,114
+and then that entry requires to perform
+a root lookup in the main routing table.
+
+190
+00:13:27,984 --> 00:13:32,094
+So in the main routing table, the
+traffic matches the highlighted entry
+
+191
+00:13:32,664 --> 00:13:35,004
+and the traffic gets forwarded to.
+
+192
+00:13:35,859 --> 00:13:39,519
+The pod 81 through the
+respective V interface.
+
+193
+00:13:40,089 --> 00:13:44,559
+So here, source Mac becomes
+the V Mac and the destination
+
+194
+00:13:44,559 --> 00:13:46,629
+Mac becomes the pod 81 Mac.
+
+195
+00:13:47,129 --> 00:13:49,589
+Now let's have a look at the return flow.
+
+196
+00:13:50,219 --> 00:13:54,839
+So POD 81, response to the
+previous request from PO 51.
+
+197
+00:13:55,829 --> 00:14:01,079
+The node performs a route lookup in its
+policy-based routing table and matches
+
+198
+00:14:01,079 --> 00:14:03,029
+the traffic to the highlighted entry.
+
+199
+00:14:03,924 --> 00:14:06,804
+in that, and that entry
+requires to perform a route
+
+200
+00:14:06,804 --> 00:14:08,934
+lookup in the routing table.
+
+201
+00:14:08,964 --> 00:14:14,654
+Number two, in the routing table two, the
+traffic matches the highlighted entry,
+
+202
+00:14:15,194 --> 00:14:20,804
+so the node actually sends the traffic
+to default gateway, even though port
+
+203
+00:14:20,804 --> 00:14:23,504
+81 and port 51 are in the same subnet.
+
+204
+00:14:24,224 --> 00:14:25,244
+This means if a pod.
+
+205
+00:14:25,744 --> 00:14:28,774
+Is a secondary IP of the secondary NI.
+
+206
+00:14:29,524 --> 00:14:33,124
+Then the traffic would always be
+sent through the default gateway.
+
+207
+00:14:33,694 --> 00:14:36,934
+This would apply even if the port
+and the destination is on the same
+
+208
+00:14:36,934 --> 00:14:39,094
+subnet as you can see on this diagram.
+
+209
+00:14:40,024 --> 00:14:43,204
+Then the default gateway forwards
+the traffic to the other node.
+
+210
+00:14:43,834 --> 00:14:47,704
+The default gateway here that
+you see would be the VPC router
+
+211
+00:14:48,124 --> 00:14:53,734
+that is maintained and run by AWS
+implicitly to you as the end user.
+
+212
+00:14:54,234 --> 00:14:59,724
+So the receiving node performs a
+root lookup in its policy-based
+
+213
+00:14:59,724 --> 00:15:02,784
+routing table and matches the
+traffic to the highlighted entry.
+
+214
+00:15:03,084 --> 00:15:07,404
+And that entry requires a root
+lookup in the main routing table.
+
+215
+00:15:08,154 --> 00:15:09,804
+In the main routing table.
+
+216
+00:15:09,864 --> 00:15:14,034
+The traffic matches the highlighted
+entry, and finally the traffic
+
+217
+00:15:14,034 --> 00:15:18,474
+gets forwarded to the port 51
+through the respective V interface.
+
+218
+00:15:18,974 --> 00:15:25,414
+So now I'm gonna explain the concept
+of, called Kubernetes service.
+
+219
+00:15:26,104 --> 00:15:30,614
+Imagine we have a Kubernetes,
+deployment manifest shown at the top.
+
+220
+00:15:31,334 --> 00:15:35,834
+This deployment manifest basically
+represents a stateless microservice
+
+221
+00:15:35,834 --> 00:15:39,734
+application, which has three
+identical pods also called replicas.
+
+222
+00:15:40,574 --> 00:15:47,804
+These pods have labels as metadata, which
+are just like resource tags in AWS, and
+
+223
+00:15:47,804 --> 00:15:53,174
+each port is running the same application
+on the same port like TCP port 80.
+
+224
+00:15:53,674 --> 00:15:56,854
+And in a typical scenario, you
+would expose your application
+
+225
+00:15:56,854 --> 00:16:00,814
+to other applications and
+sometimes to external clients.
+
+226
+00:16:01,474 --> 00:16:06,114
+So this in the Kubernetes, context,
+this brings up an interesting point
+
+227
+00:16:06,204 --> 00:16:11,004
+because where you would need to
+consider how to make these individual
+
+228
+00:16:11,004 --> 00:16:15,504
+pods in the application accessible
+in an efficient and optimum way.
+
+229
+00:16:16,479 --> 00:16:22,404
+Because in Kubernetes, every pod gets its
+own IP address, but pods are considered
+
+230
+00:16:22,404 --> 00:16:25,194
+to be FML rather than durable entities.
+
+231
+00:16:25,884 --> 00:16:32,424
+So meaning that when any of the pods
+in this application, one gets killed or
+
+232
+00:16:32,424 --> 00:16:38,009
+terminated as a result of a failure or an
+upgrade, then the deployment controllers.
+
+233
+00:16:38,849 --> 00:16:43,979
+automatically would instantiate new POS
+as replacements in order to match the
+
+234
+00:16:43,979 --> 00:16:49,015
+actual state to the desired state, which
+is the controller's main job, however.
+
+235
+00:16:49,515 --> 00:16:54,914
+The new ports would come with a
+new ip, and this sequence of events
+
+236
+00:16:54,914 --> 00:16:59,614
+might happen thousands of times, in
+a day due to the, nature of the agile
+
+237
+00:16:59,614 --> 00:17:01,295
+software development principles.
+
+238
+00:17:01,955 --> 00:17:07,359
+Hence, there must be a stable and
+consistent way to access these, respective
+
+239
+00:17:07,359 --> 00:17:12,399
+microservice applications at a single
+address every time in a seamless manner.
+
+240
+00:17:12,899 --> 00:17:16,050
+So that takes us to the what piece.
+
+241
+00:17:16,919 --> 00:17:23,490
+So a Kubernetes service, in essence, is
+an abstraction, which basically groups the
+
+242
+00:17:23,490 --> 00:17:26,699
+pods together based on label selectors.
+
+243
+00:17:27,119 --> 00:17:31,800
+Here you can see the pods, which have
+the label of name called on App one
+
+244
+00:17:31,949 --> 00:17:34,169
+become part of the Kubernetes service.
+
+245
+00:17:34,860 --> 00:17:36,780
+The Kubernetes service provides.
+
+246
+00:17:37,455 --> 00:17:42,615
+A front end for those pos and pos
+are actually called endpoints in
+
+247
+00:17:42,615 --> 00:17:47,055
+Kubernetes service terminology,
+and yet another controller.
+
+248
+00:17:47,625 --> 00:17:52,815
+Called Endpoints Controller is
+responsible for keeping an up-to-date
+
+249
+00:17:52,815 --> 00:17:58,665
+list of these endpoints in case of
+any failures or instantiations making
+
+250
+00:17:58,665 --> 00:18:03,615
+the application highly resilient and
+Kubernetes service constructs supports
+
+251
+00:18:03,615 --> 00:18:06,435
+T-C-P-U-D-P and A CTP protocols.
+
+252
+00:18:07,060 --> 00:18:12,670
+So any request that comes into the
+inbound to the DNS name or IP address
+
+253
+00:18:12,670 --> 00:18:18,430
+of the service basically gets forwarded
+to one of the ports that is part of that
+
+254
+00:18:18,430 --> 00:18:20,950
+service or that is backing that service.
+
+255
+00:18:20,950 --> 00:18:22,030
+Sometimes it's called.
+
+256
+00:18:22,450 --> 00:18:24,070
+So it's just like a load balancer.
+
+257
+00:18:24,850 --> 00:18:30,230
+So there are different types of,
+Services, Kubernetes service types such
+
+258
+00:18:30,230 --> 00:18:32,960
+as cluster ip, not port or load balancer.
+
+259
+00:18:33,920 --> 00:18:37,280
+These service types address
+different communication patterns.
+
+260
+00:18:37,760 --> 00:18:41,660
+We will now go through those
+communication patterns one by one.
+
+261
+00:18:42,650 --> 00:18:45,010
+Now service type cluster ip.
+
+262
+00:18:45,355 --> 00:18:48,475
+This is the default
+service type in Kubernetes.
+
+263
+00:18:48,775 --> 00:18:54,025
+It's used to expose your application
+on a service virtual IP address that
+
+264
+00:18:54,025 --> 00:18:56,635
+is only internal to that cluster.
+
+265
+00:18:57,355 --> 00:19:01,315
+So this virtual IP is
+the same on each node.
+
+266
+00:19:01,840 --> 00:19:06,850
+And it's not shared or announced
+anywhere than the cluster itself.
+
+267
+00:19:07,510 --> 00:19:10,720
+So access to this service is
+only from within the cluster.
+
+268
+00:19:11,220 --> 00:19:14,090
+And let's take further,
+into how it's implemented.
+
+269
+00:19:15,050 --> 00:19:19,280
+When you post a cluster IP type of
+service manifest to the Kubernetes A
+
+270
+00:19:19,280 --> 00:19:26,260
+PIA component called Q proxy, which
+exists on all the nodes, watches the.
+
+271
+00:19:26,725 --> 00:19:31,915
+Kubernetes API and detects that
+a new service is just configured.
+
+272
+00:19:32,665 --> 00:19:38,425
+Then it configures the virtual IP
+address of the service and a bunch
+
+273
+00:19:38,425 --> 00:19:43,705
+of forwarding rules in Linux IP
+tables on every node, and at this
+
+274
+00:19:43,705 --> 00:19:48,355
+stage, you have the service available
+for access from within the cluster.
+
+275
+00:19:48,855 --> 00:19:49,845
+On a side note.
+
+276
+00:19:50,220 --> 00:19:55,770
+Kubernetes has its own DNS, which
+automatically assigns an internal DNS name
+
+277
+00:19:56,280 --> 00:19:59,310
+to each service using a predefined format.
+
+278
+00:19:59,810 --> 00:20:07,705
+So when a request comes to the
+service, I. Virtual IP on a given
+
+279
+00:20:07,705 --> 00:20:14,245
+node, it'll be destination netted
+to the IP address of one of the
+
+280
+00:20:14,245 --> 00:20:16,465
+ports, which is part of that service.
+
+281
+00:20:17,275 --> 00:20:19,735
+The algorithm for this is round robin.
+
+282
+00:20:20,350 --> 00:20:25,930
+And as a side note, Q proxy functionality
+can be implemented using other
+
+283
+00:20:25,930 --> 00:20:32,200
+data plane options such as, Linux,
+IPVS, IP Virtual Server, or EBPF,
+
+284
+00:20:32,470 --> 00:20:34,150
+extended Berkeley packet filters.
+
+285
+00:20:34,960 --> 00:20:38,320
+This can enhance the characteristics
+of this load balancing algorithm
+
+286
+00:20:38,380 --> 00:20:42,460
+and decision, although for
+simplicity purposes, it's
+
+287
+00:20:42,460 --> 00:20:44,080
+not depicted in this diagram.
+
+288
+00:20:44,620 --> 00:20:45,640
+Keep in mind that.
+
+289
+00:20:45,955 --> 00:20:52,495
+The pod that is part of the application
+two and the port and the pod that
+
+290
+00:20:52,495 --> 00:20:54,175
+is part of the application one.
+
+291
+00:20:54,985 --> 00:20:59,965
+These can be on the same note and
+this flow could still be the same.
+
+292
+00:21:00,415 --> 00:21:03,386
+So let's do a packet work in this
+scenario to understand that better.
+
+293
+00:21:03,886 --> 00:21:08,386
+PO 51 generates traffic destined
+to the service virtual ip.
+
+294
+00:21:09,376 --> 00:21:11,266
+The IP table is on Node 51.
+
+295
+00:21:11,701 --> 00:21:14,041
+Performs three tasks at this stage.
+
+296
+00:21:14,791 --> 00:21:20,251
+First one is load balancing the traffic
+to one of the PO ips part of that service.
+
+297
+00:21:20,971 --> 00:21:27,991
+And in this instance, it sends the
+traffic to PO 71, but it's extremely
+
+298
+00:21:27,991 --> 00:21:32,401
+important to know that as shown in
+this diagram, even if there was a
+
+299
+00:21:32,401 --> 00:21:38,011
+pod part of that service running
+on the same node, which is node 51.
+
+300
+00:21:38,511 --> 00:21:45,261
+IP tables load balancing algorithm could
+still send the traffic to Port 71 or
+
+301
+00:21:45,261 --> 00:21:51,371
+any other remote port IP tables does not
+differentiate between local and remote
+
+302
+00:21:51,371 --> 00:21:53,591
+ports, which are part of that service.
+
+303
+00:21:54,131 --> 00:22:01,476
+So the second task, is that IP tables also
+applies destination net to the traffic.
+
+304
+00:22:01,976 --> 00:22:07,016
+Third task is since IP tables
+is a stateful engine, it
+
+305
+00:22:07,136 --> 00:22:08,846
+keeps state of the flows.
+
+306
+00:22:08,906 --> 00:22:13,436
+It needs to keep state of the
+flows, so it marks this flow to be
+
+307
+00:22:13,436 --> 00:22:15,566
+able to match any return traffic.
+
+308
+00:22:16,066 --> 00:22:21,556
+The node 51 forwards the traffic
+to node 71 and notice that
+
+309
+00:22:21,556 --> 00:22:23,491
+the IP becomes about 71 ip.
+
+310
+00:22:23,991 --> 00:22:29,001
+And note 71 traffic gets
+forward to apologies.
+
+311
+00:22:29,001 --> 00:22:33,141
+Note 71 traffic gets forward to Port 71.
+
+312
+00:22:34,071 --> 00:22:39,951
+Now keep in mind that in this
+scenario, IP tables work alongside I.
+
+313
+00:22:40,491 --> 00:22:43,791
+All the policy routing tables
+and other routing table logic
+
+314
+00:22:43,791 --> 00:22:45,231
+that we explained previously.
+
+315
+00:22:45,731 --> 00:22:50,891
+Another thing worth mentioning
+is Port 51 would not know the
+
+316
+00:22:50,891 --> 00:22:54,201
+services virtual IP out of the box.
+
+317
+00:22:54,831 --> 00:22:55,466
+It would first.
+
+318
+00:22:56,121 --> 00:23:00,141
+Need to resolve the services
+DNS name to its virtual ip.
+
+319
+00:23:00,711 --> 00:23:08,061
+So for that, it's important to highlight
+that the Kubernetes DNS itself actually
+
+320
+00:23:08,061 --> 00:23:10,701
+runs on a cluster IP service as well.
+
+321
+00:23:11,151 --> 00:23:11,991
+So in reality.
+
+322
+00:23:12,446 --> 00:23:18,656
+To walk you through it really quick, what
+happens is Port 51 in this topology would
+
+323
+00:23:18,656 --> 00:23:24,566
+generate a DNS request for the respective
+services DNS name, and then that DNS
+
+324
+00:23:24,566 --> 00:23:32,666
+request is also sent to the Kubernetes
+DNS services virtual ip, which then.
+
+325
+00:23:33,066 --> 00:23:39,396
+Gets load balance to one of the DNS
+ports in the cluster, and then port 51
+
+326
+00:23:39,396 --> 00:23:43,236
+would receive the virtual IP address
+of the Kubernetes service that it
+
+327
+00:23:43,506 --> 00:23:45,966
+wants to access from the first place.
+
+328
+00:23:46,466 --> 00:23:49,406
+So let's have a look at
+the return flow here.
+
+329
+00:23:50,396 --> 00:23:56,716
+Port 71 responds to the previous
+request from PO 51 and then.
+
+330
+00:23:57,226 --> 00:24:02,086
+Node 71 forwards the traffic to node 51.
+
+331
+00:24:03,076 --> 00:24:09,586
+The IP tables on node 51 first
+identifies this traffic as return
+
+332
+00:24:09,586 --> 00:24:11,236
+traffic of an existing flow.
+
+333
+00:24:11,761 --> 00:24:16,891
+So it applies source net or
+snet in short to the traffic.
+
+334
+00:24:17,491 --> 00:24:21,031
+And it basically swaps the source
+IP of the packet with the virtual
+
+335
+00:24:21,031 --> 00:24:26,461
+IP of the service because Port 51
+originally was communicating with
+
+336
+00:24:26,641 --> 00:24:32,461
+the Bernet service, virtual ip, not
+Port seven one directly, and then
+
+337
+00:24:33,091 --> 00:24:35,941
+this traffic gets forwarded to PO 51.
+
+338
+00:24:36,441 --> 00:24:40,251
+Let's explain what
+Northport type of services.
+
+339
+00:24:40,911 --> 00:24:44,931
+Northport is basically used to
+expose your applications to external
+
+340
+00:24:44,931 --> 00:24:47,001
+resources for testing purposes.
+
+341
+00:24:47,781 --> 00:24:50,241
+It's built on top of cluster ip.
+
+342
+00:24:51,021 --> 00:24:54,141
+All the characteristics that I
+mentioned for the service type
+
+343
+00:24:54,141 --> 00:24:56,391
+cluster IP apply here as well.
+
+344
+00:24:57,201 --> 00:25:01,581
+But there are also additional points
+that enabled node port capability,
+
+345
+00:25:02,031 --> 00:25:04,311
+so let's explain how that works.
+
+346
+00:25:05,256 --> 00:25:09,426
+You post a note port type of
+service manifest to the API.
+
+347
+00:25:09,926 --> 00:25:16,376
+The Q proxy watches the API and detects
+that there is a new service and then it
+
+348
+00:25:16,376 --> 00:25:21,146
+configures forwarding rules and network
+address translation rules in Linux tables.
+
+349
+00:25:21,776 --> 00:25:27,476
+But this time it actually configures
+an additional rules for two reasons.
+
+350
+00:25:28,466 --> 00:25:29,036
+First.
+
+351
+00:25:29,471 --> 00:25:34,891
+To process the requests that come
+to a specific port on the node and
+
+352
+00:25:35,251 --> 00:25:40,201
+second to forward those requests
+to the actual Kubernetes service.
+
+353
+00:25:40,921 --> 00:25:46,101
+Keep in mind that the port
+configured, on the nodes are all
+
+354
+00:25:46,101 --> 00:25:49,881
+the same on every node and the port.
+
+355
+00:25:50,181 --> 00:25:54,411
+That port has to be from a specific
+range, which is shown on the top
+
+356
+00:25:54,411 --> 00:25:56,901
+right hand side of the diagram here.
+
+357
+00:25:57,401 --> 00:26:02,771
+So let's do a packet walk in the
+Kubernetes service type note port.
+
+358
+00:26:03,271 --> 00:26:07,321
+This time request comes from
+an external client or service
+
+359
+00:26:07,621 --> 00:26:09,151
+destined to the norde port.
+
+360
+00:26:09,151 --> 00:26:14,751
+On note 51, the IP tables on
+note 51 performs four tasks.
+
+361
+00:26:14,751 --> 00:26:20,781
+This time it first load balances
+the traffic to one of the pod ips.
+
+362
+00:26:21,516 --> 00:26:22,806
+Part of that service.
+
+363
+00:26:23,526 --> 00:26:28,356
+And as mentioned in cluster IP section,
+please keep in mind that even when there
+
+364
+00:26:28,356 --> 00:26:35,046
+is a local pod on North 51, part of that
+Kubernetes service, IP tables may still
+
+365
+00:26:35,586 --> 00:26:37,626
+forward the traffic to a remote po.
+
+366
+00:26:38,126 --> 00:26:43,821
+And in this instance, let's assume
+that it sends the traffic to Port 71.
+
+367
+00:26:44,481 --> 00:26:51,531
+It then applies destination net or
+dnet to the traffic, and it then has
+
+368
+00:26:51,531 --> 00:26:58,071
+to apply snet or source net to the
+traffic as well to implement symmetry
+
+369
+00:26:58,071 --> 00:27:03,321
+for the flow, basically, so that the
+client would not receive the response
+
+370
+00:27:03,321 --> 00:27:06,201
+traffic from the port IP directly.
+
+371
+00:27:06,591 --> 00:27:10,881
+Which would break the flow 'cause the
+client originally is communicating
+
+372
+00:27:10,881 --> 00:27:13,881
+with the north port of the North 51.
+
+373
+00:27:14,661 --> 00:27:20,901
+So since IP tables keeps the state
+of the flows, the fourth task is IP
+
+374
+00:27:20,901 --> 00:27:25,551
+tables marks this flow to be able
+to match any future return traffic.
+
+375
+00:27:26,271 --> 00:27:30,621
+Then note 51 forwards
+the traffic to note 71.
+
+376
+00:27:31,121 --> 00:27:37,321
+The node 71 then forwards the
+traffic locally to the pod 71.
+
+377
+00:27:38,311 --> 00:27:44,881
+Now it's worth mentioning that the client
+IP would always be S netted or source
+
+378
+00:27:44,881 --> 00:27:51,091
+netted, even when the destination pod was
+running on the same node with Port 51.
+
+379
+00:27:51,841 --> 00:27:53,551
+Something to keep in mind.
+
+380
+00:27:54,051 --> 00:27:57,051
+The return traffic would look like this.
+
+381
+00:27:57,861 --> 00:28:00,791
+Port 71 responds to the request.
+
+382
+00:28:01,571 --> 00:28:05,621
+The note 71 forwards
+the traffic to note 51.
+
+383
+00:28:06,371 --> 00:28:11,351
+The IP tables on Note 51 first
+identifies the traffic as return
+
+384
+00:28:11,351 --> 00:28:16,751
+traffic of an existing flow, and
+then it applies both destination net.
+
+385
+00:28:17,516 --> 00:28:23,696
+Swaps the destination IP with the
+Port 51 IP and also apply source net
+
+386
+00:28:23,996 --> 00:28:31,346
+swaps, the source IP as the service
+virtual ip, and then the non 51
+
+387
+00:28:31,556 --> 00:28:33,746
+sends the traffic back to the client.
+
+388
+00:28:34,601 --> 00:28:37,931
+The downside of the node port
+is that you are supposed to
+
+389
+00:28:38,021 --> 00:28:42,161
+send the requests explicitly to
+the node IP on the node port.
+
+390
+00:28:42,791 --> 00:28:47,831
+This means you need to figure out the
+IP address of the individual nodes and
+
+391
+00:28:47,831 --> 00:28:52,271
+keep track of them in case of one of
+the nodes fails, or you know you need
+
+392
+00:28:52,271 --> 00:28:56,711
+to do perform upgrades, et cetera,
+and then additional consideration.
+
+393
+00:28:57,371 --> 00:29:02,081
+Would be how to distribute the client
+requests across different nodes.
+
+394
+00:29:02,801 --> 00:29:06,831
+Sounds we need an external load
+balancer 'cause that would be
+
+395
+00:29:06,831 --> 00:29:11,781
+the perfect solution to cover the
+node failure or upgrade scenarios.
+
+396
+00:29:12,351 --> 00:29:17,021
+Let's look at how, the load
+balancer type of service, is used.
+
+397
+00:29:17,591 --> 00:29:22,291
+So load balances type of service,
+is we use this type of service
+
+398
+00:29:22,291 --> 00:29:26,821
+to expose the applications to
+clients external to the cluster.
+
+399
+00:29:27,571 --> 00:29:32,251
+It's built on top of the node port,
+and when you post the load balance
+
+400
+00:29:32,371 --> 00:29:34,501
+type of service manifest to the API.
+
+401
+00:29:34,501 --> 00:29:39,391
+As you can see, all the things we have
+explained previously is configured
+
+402
+00:29:39,451 --> 00:29:44,731
+within the Kubernetes cluster and work
+exactly the same way to be more specific.
+
+403
+00:29:45,121 --> 00:29:49,051
+Requests that hit the node
+port on any of the nodes get
+
+404
+00:29:49,051 --> 00:29:50,611
+forwarded to one of the ports.
+
+405
+00:29:51,391 --> 00:29:54,691
+But this time Kubernetes expects.
+
+406
+00:29:55,176 --> 00:30:03,066
+An external component to detect the
+new service and configure external
+
+407
+00:30:03,066 --> 00:30:08,196
+load balancer on the fly so that
+load balancer starts forwarding the
+
+408
+00:30:08,196 --> 00:30:10,446
+requests from the clients to the nodes.
+
+409
+00:30:11,226 --> 00:30:13,056
+That external component.
+
+410
+00:30:13,446 --> 00:30:19,416
+Is a Kubernetes controller called
+Service Controller, which comes as
+
+411
+00:30:19,416 --> 00:30:24,496
+part of the Kubernetes distribution,
+the open source Kubernetes, code.
+
+412
+00:30:25,216 --> 00:30:29,716
+It's actually a controller bundled
+within the controller manager component
+
+413
+00:30:29,746 --> 00:30:33,761
+that I mentioned when I was introducing
+high level Kubernetes architecture.
+
+414
+00:30:34,261 --> 00:30:38,921
+And, AWS currently maintains
+two such controllers.
+
+415
+00:30:39,401 --> 00:30:43,571
+One is the one that I just mentioned,
+service controller, which comes as
+
+416
+00:30:43,571 --> 00:30:45,401
+part of Kubernetes out of the box.
+
+417
+00:30:45,701 --> 00:30:49,001
+And the other one is
+AWS load ER controller.
+
+418
+00:30:49,621 --> 00:30:54,661
+Which is a Kubernetes special interest
+group, SIG in short project on
+
+419
+00:30:54,661 --> 00:30:57,271
+GitHub that anyone can contribute to.
+
+420
+00:30:57,931 --> 00:31:02,641
+You can install this AWS load balance
+controller to replace the service
+
+421
+00:31:02,641 --> 00:31:07,321
+controller as it has additional
+capabilities such as Kubernetes,
+
+422
+00:31:07,321 --> 00:31:12,811
+ingress support, and also target type
+IP support, both of which I'm going
+
+423
+00:31:12,811 --> 00:31:14,521
+to explain later on in this session.
+
+424
+00:31:15,021 --> 00:31:20,001
+Kubernetes service is a layer
+four construct, so it does not
+
+425
+00:31:20,001 --> 00:31:22,191
+address layer seven load balancing.
+
+426
+00:31:22,221 --> 00:31:28,401
+So whenever you configure a service type
+of load balancer, then the controller
+
+427
+00:31:28,401 --> 00:31:33,081
+provisions and AWS classic load
+balancer type of elastic load balancer.
+
+428
+00:31:33,441 --> 00:31:38,601
+So this service controller that you see on
+this slide, it is capable of configuring
+
+429
+00:31:38,961 --> 00:31:41,601
+classic load balancer by default.
+
+430
+00:31:42,456 --> 00:31:45,606
+And classic load er is
+a legacy type of load.
+
+431
+00:31:46,116 --> 00:31:50,686
+Er, it can also configure,
+a network load er, as well.
+
+432
+00:31:51,226 --> 00:31:56,916
+And, the network load balancer
+is, it can perform health checks
+
+433
+00:31:56,916 --> 00:31:59,346
+against the node port on each node.
+
+434
+00:31:59,976 --> 00:32:05,466
+So here you see that we are instructing
+the service controller to configure an
+
+435
+00:32:05,826 --> 00:32:09,126
+NLB to provision an NLB rather than.
+
+436
+00:32:09,571 --> 00:32:15,181
+CLB, the legacy type of load balancer,
+but in short, Kubernetes service
+
+437
+00:32:15,181 --> 00:32:17,461
+type is for layer four traffic.
+
+438
+00:32:17,961 --> 00:32:21,591
+So let's do a packet walk with
+the load balancer scenario.
+
+439
+00:32:22,091 --> 00:32:27,641
+The request comes from an external client
+or service destined to NLB listener,
+
+440
+00:32:27,641 --> 00:32:34,151
+port on the listener IP Lord er has
+all the nodes in its target group and
+
+441
+00:32:34,151 --> 00:32:36,491
+performs health checks on the node port.
+
+442
+00:32:37,481 --> 00:32:43,031
+And important thing to know, here is
+that old nodes, including the ones
+
+443
+00:32:43,481 --> 00:32:49,261
+which do not have a pod, part of that
+respective service would look healthy.
+
+444
+00:32:49,666 --> 00:32:53,936
+So all the nodes would, look as
+healthy nodes in the network.
+
+445
+00:32:53,936 --> 00:32:59,726
+Node balancer target group, which
+means node 51 would also be a
+
+446
+00:32:59,726 --> 00:33:04,676
+healthy target from NL B'S point
+of view, ready to receive traffic.
+
+447
+00:33:05,276 --> 00:33:10,186
+So let's assume that NLB
+forwards the traffic to note 51.
+
+448
+00:33:10,686 --> 00:33:13,716
+So note 51 receives the
+traffic on its note port.
+
+449
+00:33:14,706 --> 00:33:18,696
+And rest of the flow would be
+almost identical to the node flow.
+
+450
+00:33:19,146 --> 00:33:26,706
+The node port flow that we saw earlier,
+the IP tables on the node 51 performs four
+
+451
+00:33:26,706 --> 00:33:34,076
+tasks, and as you can see, the destination
+Kubernetes service, there are no ports on
+
+452
+00:33:34,076 --> 00:33:37,046
+Node 51, part of that Kubernetes service.
+
+453
+00:33:37,226 --> 00:33:40,366
+So what would happen is the.
+
+454
+00:33:40,866 --> 00:33:45,036
+note 51 when it receives the traffic
+on a sport and when the IP tables on
+
+455
+00:33:45,036 --> 00:33:52,146
+Note 51 performs its tasks, the IP
+tables on Note 51 first load balances
+
+456
+00:33:52,146 --> 00:33:54,666
+the traffic to one of the port ips.
+
+457
+00:33:54,996 --> 00:33:56,916
+that is part of that service.
+
+458
+00:33:57,516 --> 00:34:03,576
+And keep in mind that I'm showing the
+most suboptimal forwarding scenarios
+
+459
+00:34:03,696 --> 00:34:05,436
+in this session intentionally.
+
+460
+00:34:05,936 --> 00:34:11,756
+If there is a local port on North 51
+part of the respective service, then
+
+461
+00:34:11,816 --> 00:34:18,986
+IP tables may select that local port
+as the destination, or IP tables may
+
+462
+00:34:18,986 --> 00:34:24,566
+still select Port 71 or any other
+remote port as the destination.
+
+463
+00:34:24,926 --> 00:34:27,806
+So there is no guarantee
+that it'll always.
+
+464
+00:34:28,526 --> 00:34:32,876
+Pick a pod that is part of the
+service that is on the same node
+
+465
+00:34:33,266 --> 00:34:34,736
+where you received your traffic.
+
+466
+00:34:35,276 --> 00:34:41,936
+But let's assume that IP tables picks
+the POD 71 as the destination pod
+
+467
+00:34:42,266 --> 00:34:44,216
+being part of the destination service.
+
+468
+00:34:44,726 --> 00:34:51,746
+So next thing is the IP tables would
+perform dnet destination net to swap
+
+469
+00:34:51,746 --> 00:34:54,806
+the destination IP with the Port 71 ip.
+
+470
+00:34:55,526 --> 00:34:56,396
+And also.
+
+471
+00:34:57,026 --> 00:35:03,956
+It applies IP tables applies source
+net so that it swaps the source IP
+
+472
+00:35:03,956 --> 00:35:07,426
+of the traffic with the Node 51 ip.
+
+473
+00:35:07,996 --> 00:35:12,916
+So lastly, the IP tables marks
+this flow to be able to match
+
+474
+00:35:12,946 --> 00:35:14,656
+any feature return traffic.
+
+475
+00:35:15,286 --> 00:35:22,576
+So note 51, then forwards the
+traffic to note 71 and note 71
+
+476
+00:35:22,756 --> 00:35:24,076
+when it receives the traffic.
+
+477
+00:35:24,496 --> 00:35:28,006
+It forwards the traffic
+locally to port 71.
+
+478
+00:35:28,506 --> 00:35:31,206
+Now let's look at the return traffic.
+
+479
+00:35:31,746 --> 00:35:34,206
+Port 71 responds to the request.
+
+480
+00:35:34,926 --> 00:35:38,736
+The node 71 forwards
+the traffic to note 51.
+
+481
+00:35:39,546 --> 00:35:45,066
+The IP tables on no 51 first
+identifies this traffic as return
+
+482
+00:35:45,066 --> 00:35:49,896
+traffic of an existing flow, and
+it then applies both destination
+
+483
+00:35:49,896 --> 00:35:53,166
+net and source net to the traffic.
+
+484
+00:35:54,081 --> 00:36:01,041
+And then North 51 sends the
+traffic back to the NLB and NLB
+
+485
+00:36:01,341 --> 00:36:02,871
+responds back to the client.
+
+486
+00:36:03,741 --> 00:36:09,291
+Let's now tackle this suboptimal traffic
+pattern that I keep repeating from the NLB
+
+487
+00:36:09,291 --> 00:36:15,471
+to the North 51, which does not have any
+local port that is part of that service.
+
+488
+00:36:16,251 --> 00:36:21,321
+So previously we saw that there could
+be traffic tromboning happening between
+
+489
+00:36:21,321 --> 00:36:24,466
+the NLB, then across nodes and the pod.
+
+490
+00:36:25,046 --> 00:36:30,381
+In addition, the traffic also gets
+source netted to achieve flow symmetry.
+
+491
+00:36:31,131 --> 00:36:34,491
+So in the cloud, that tromboning actually.
+
+492
+00:36:35,226 --> 00:36:41,316
+Manifest could manifest itself as a
+gross AZ traffic across availability
+
+493
+00:36:41,316 --> 00:36:47,346
+zone traffic, which could add latency and
+also could incur data transfer charges.
+
+494
+00:36:48,156 --> 00:36:50,016
+So external traffic policy.
+
+495
+00:36:50,361 --> 00:36:54,711
+Is a Kubernetes feature that can
+be configured in the spec section
+
+496
+00:36:54,711 --> 00:36:56,571
+of the Kubernetes service manifest.
+
+497
+00:36:57,291 --> 00:37:03,771
+And when it is set to local, basically
+the load balancer would send requests
+
+498
+00:37:04,041 --> 00:37:10,491
+only to the nodes, which have pods that
+are part of that Kubernetes service.
+
+499
+00:37:11,151 --> 00:37:15,861
+So basically, this feature makes sure
+that the traffic would be forwarded
+
+500
+00:37:16,131 --> 00:37:19,341
+to the pods local on those nodes only.
+
+501
+00:37:19,971 --> 00:37:25,401
+And additionally, the traffic no
+longer gets snotted by the note, so the
+
+502
+00:37:25,401 --> 00:37:27,981
+application can see the actual client ip.
+
+503
+00:37:28,941 --> 00:37:32,301
+So let's do a packet walk to
+better understand this scenario.
+
+504
+00:37:33,111 --> 00:37:38,301
+Client sends the traffic to the
+NLV, and this time the load balancer
+
+505
+00:37:38,361 --> 00:37:43,161
+performs an additional health
+check on a port different than the
+
+506
+00:37:43,161 --> 00:37:46,281
+node port if the respective node.
+
+507
+00:37:46,836 --> 00:37:53,496
+Does not have any local pods that are
+part of that Kubernetes service, then this
+
+508
+00:37:53,496 --> 00:37:55,836
+additional health checks fail on the node.
+
+509
+00:37:56,106 --> 00:38:01,376
+So in our case here, this
+means that NLB would never load
+
+510
+00:38:01,376 --> 00:38:03,176
+balance the traffic to node 51.
+
+511
+00:38:03,971 --> 00:38:09,641
+And let's assume that NLB load balances
+the traffic to North 71 on its north port.
+
+512
+00:38:10,631 --> 00:38:14,741
+This time IP tables on North 71
+load balances the traffic to the
+
+513
+00:38:14,741 --> 00:38:20,291
+local port, which is port 71, and
+it would not pick a remote port.
+
+514
+00:38:20,651 --> 00:38:23,231
+It just applies destination net.
+
+515
+00:38:23,981 --> 00:38:29,501
+Lastly, the traffic gets forwarded
+to the POD 71, but as you can see
+
+516
+00:38:29,951 --> 00:38:32,381
+there is still IP tables process.
+
+517
+00:38:32,881 --> 00:38:39,601
+On Note 71, which basically swaps the
+destination IP with the Port 71 ip.
+
+518
+00:38:40,201 --> 00:38:43,801
+So can we make it even
+more efficient than that?
+
+519
+00:38:44,611 --> 00:38:45,571
+Let's look at that.
+
+520
+00:38:46,471 --> 00:38:53,011
+That is possible with a feature called
+Target ip, or Target type IP feature
+
+521
+00:38:53,521 --> 00:38:56,191
+of the AWS Elastic Load balancers.
+
+522
+00:38:56,941 --> 00:38:57,961
+If you deploy.
+
+523
+00:38:58,461 --> 00:39:04,791
+And use AWS load balancer controller
+instead of the service controller, which
+
+524
+00:39:04,791 --> 00:39:06,711
+comes out of the box with Kubernetes.
+
+525
+00:39:06,831 --> 00:39:09,681
+Then target type IP
+feature is fully supported.
+
+526
+00:39:09,681 --> 00:39:14,841
+So basically for this feature, you need
+AWS load balancer controller in this mode.
+
+527
+00:39:15,681 --> 00:39:20,781
+The ports that are part of the service
+become targets in the target group
+
+528
+00:39:20,781 --> 00:39:25,641
+of the AWS network load balancer,
+and neither the note port nor the
+
+529
+00:39:25,641 --> 00:39:27,891
+IP tables is used in this scenario.
+
+530
+00:39:28,551 --> 00:39:34,101
+However, you need to keep in mind the
+ELB elastic load balancer service quotas.
+
+531
+00:39:34,581 --> 00:39:38,811
+'cause if you have, for
+instance, a service of 99 500.
+
+532
+00:39:39,711 --> 00:39:44,601
+Ports, then it could, this could
+lead to many targets being part of
+
+533
+00:39:44,601 --> 00:39:46,911
+the same target group on the A ELB.
+
+534
+00:39:47,541 --> 00:39:51,021
+I'll provide the ELB service quotas
+link at the end of the session.
+
+535
+00:39:51,711 --> 00:39:54,081
+So let's do a packet walk
+and see the difference here.
+
+536
+00:39:54,581 --> 00:39:59,551
+Client sends traffic to the NLB listener
+IP on the listener port ER has the
+
+537
+00:39:59,551 --> 00:40:02,401
+pos as targets in its target group.
+
+538
+00:40:03,301 --> 00:40:05,431
+And let's assume that the.
+
+539
+00:40:05,956 --> 00:40:11,686
+NLB sends the traffic to Port 71
+North 71 receives the traffic,
+
+540
+00:40:11,956 --> 00:40:16,486
+but this time IP tables does not
+play any role for this traffic.
+
+541
+00:40:16,666 --> 00:40:20,776
+'cause the destination IP and the
+IP that is already port 71 ip.
+
+542
+00:40:21,466 --> 00:40:23,866
+So the traffic gets forward to port 71.
+
+543
+00:40:24,366 --> 00:40:29,016
+it's worth mentioning that in this
+session, the assumption is default
+
+544
+00:40:29,016 --> 00:40:32,196
+settings are used with the load
+balance, with the network load balance.
+
+545
+00:40:32,886 --> 00:40:35,886
+So in this flow, you might
+have noticed that the source
+
+546
+00:40:35,886 --> 00:40:39,246
+IP becomes the NLV ip, however.
+
+547
+00:40:39,746 --> 00:40:44,336
+If the application needs to track the
+client ip, then this can be achieved
+
+548
+00:40:44,336 --> 00:40:50,876
+by enabling the AWS network, broadband
+attribute called Preserve client ip, which
+
+549
+00:40:50,926 --> 00:40:56,236
+is an other, not notation, annotation,
+sorry, in the Kubernetes service manifest.
+
+550
+00:40:57,046 --> 00:41:01,966
+Having said that, let's move on to
+the last topic, which is ingress.
+
+551
+00:41:02,866 --> 00:41:08,666
+So you may be asking, Wasn't what we just
+investigated with North Port or load er.
+
+552
+00:41:09,536 --> 00:41:10,886
+Also ingress traffic.
+
+553
+00:41:11,396 --> 00:41:15,726
+the way Kubernetes community, uses
+the, ingress in the terminology is
+
+554
+00:41:15,726 --> 00:41:17,486
+a little bit, slightly different.
+
+555
+00:41:17,636 --> 00:41:19,976
+Ingress is a different
+mechanism than service.
+
+556
+00:41:20,476 --> 00:41:24,136
+Ingress is to implement layer
+seven load balancing and routing
+
+557
+00:41:24,136 --> 00:41:28,946
+rules, such as host name, URL,
+path based routing, definitions.
+
+558
+00:41:29,396 --> 00:41:33,236
+And as seen in this manifest here,
+it enables you to expose your
+
+559
+00:41:33,236 --> 00:41:41,036
+Kubernetes services through HTTP or
+Htt PS route here HT TP requests,
+
+560
+00:41:41,706 --> 00:41:47,946
+to order service would be forwarded
+to the, sorry, the HTTP requests as.
+
+561
+00:41:48,756 --> 00:41:55,236
+Slash order would be forwarded to the
+order service and requests like slash
+
+562
+00:41:55,236 --> 00:41:59,586
+rating would be forwarded to the rating
+service in this ingress manifest.
+
+563
+00:41:59,646 --> 00:42:00,636
+That's the definition.
+
+564
+00:42:01,506 --> 00:42:03,846
+So when you apply this manifest.
+
+565
+00:42:04,161 --> 00:42:05,451
+To the Kubernetes API.
+
+566
+00:42:05,481 --> 00:42:10,101
+Just like in the previous section,
+Kubernetes would expect an external
+
+567
+00:42:10,101 --> 00:42:15,621
+component to implement a load
+balancer, which can process the client
+
+568
+00:42:15,621 --> 00:42:19,881
+traffic according to the layer seven
+routing definitions that you put
+
+569
+00:42:19,881 --> 00:42:22,761
+in place, that external component.
+
+570
+00:42:23,346 --> 00:42:26,886
+Is a custom controller provided
+by the respective solution.
+
+571
+00:42:27,486 --> 00:42:33,756
+So I talked about AWS load ER controller,
+provisioning an AWS network load balancer.
+
+572
+00:42:33,756 --> 00:42:34,446
+Previously.
+
+573
+00:42:35,136 --> 00:42:41,916
+In this context, AWS load ER controller
+is also capable of provisioning
+
+574
+00:42:41,916 --> 00:42:48,116
+an AWS application load balancer
+to fulfill the Kubernetes ingress.
+
+575
+00:42:48,836 --> 00:42:49,436
+Request.
+
+576
+00:42:50,036 --> 00:42:52,826
+So let's do a quick and simple packet.
+
+577
+00:42:52,826 --> 00:42:54,266
+Walk with the ingress.
+
+578
+00:42:54,366 --> 00:42:54,936
+as well,
+
+579
+00:42:55,436 --> 00:43:01,286
+this will be a scenario where target type
+IP is used, as I mentioned previously in
+
+580
+00:43:01,286 --> 00:43:06,866
+this mode, the pods that are part of the
+service become the targets of the AWS
+
+581
+00:43:06,866 --> 00:43:11,926
+application, nor neither nor port nor
+the IP tables is used in this scenario.
+
+582
+00:43:12,541 --> 00:43:15,091
+Let's do a packet walk
+and see how it looks like.
+
+583
+00:43:15,781 --> 00:43:22,471
+So we do have an ingress manifest applied
+on the top left and also a cluster
+
+584
+00:43:22,471 --> 00:43:24,691
+IP service manifest is also applied.
+
+585
+00:43:25,471 --> 00:43:30,391
+So client sends the traffic
+to the A-L-B-A-L-B decides to
+
+586
+00:43:30,451 --> 00:43:33,031
+load this traffic to port 71.
+
+587
+00:43:33,031 --> 00:43:37,681
+A LB always applies SNA to the request.
+
+588
+00:43:37,801 --> 00:43:41,041
+So the source IP always is the A LB ip.
+
+589
+00:43:41,896 --> 00:43:47,656
+You cannot pre, you cannot preserve the
+client IP through a LV, but you can use
+
+590
+00:43:47,866 --> 00:43:55,066
+if, capabilities like X forwarder in
+the HT TP headers and then the, node
+
+591
+00:43:55,066 --> 00:43:57,766
+itself would bypass the IP tables.
+
+592
+00:43:58,006 --> 00:44:02,116
+It does an IP tables does not
+perform anything, and the traffic
+
+593
+00:44:02,356 --> 00:44:07,906
+gets, the packet gets forwarded
+to port 71 on the node directly.
+
+594
+00:44:08,406 --> 00:44:12,996
+Let's examine the return flow
+PO 71 response to the traffic.
+
+595
+00:44:13,446 --> 00:44:20,056
+And then again, IP tables is just,
+bypassed the node, sends the traffic
+
+596
+00:44:20,056 --> 00:44:23,806
+to the application node balancer,
+and then the application node
+
+597
+00:44:23,806 --> 00:44:28,936
+balance sends the traffic back to
+the client again with its own ip.
+
+598
+00:44:29,896 --> 00:44:35,056
+Let's stitch it all together in
+the context of AWS completely.
+
+599
+00:44:35,686 --> 00:44:41,206
+So client sends a DNS request for
+an application DNS record, let's
+
+600
+00:44:41,206 --> 00:44:47,206
+say portal.example.com, and the
+domain is hosted on Route 53.
+
+601
+00:44:47,706 --> 00:44:53,136
+Portal example.com record is
+an alias record on Route 53,
+
+602
+00:44:53,136 --> 00:44:55,056
+and it points out to the A IB.
+
+603
+00:44:55,611 --> 00:45:02,421
+So Route 53 actually responds with a
+multi value where all the public ips
+
+604
+00:45:02,541 --> 00:45:04,821
+of the A LB would be in the response.
+
+605
+00:45:05,751 --> 00:45:11,301
+Client picks one of the public ips
+in the DNS response and sends the
+
+606
+00:45:11,301 --> 00:45:13,221
+actual request to the application.
+
+607
+00:45:13,881 --> 00:45:16,881
+Let's say the client picks
+the public IP number three.
+
+608
+00:45:16,881 --> 00:45:21,641
+In this scenario, internet gateway
+would apply destination net.
+
+609
+00:45:22,346 --> 00:45:27,536
+To the request by swapping the destination
+IP of the traffic with the private IP
+
+610
+00:45:27,536 --> 00:45:30,626
+of the A LB in availability, zone three.
+
+611
+00:45:31,046 --> 00:45:35,846
+So basically here, the original
+destination IP in the client request
+
+612
+00:45:35,846 --> 00:45:40,466
+was public IP number three, but the
+internet gateway swapped that with the
+
+613
+00:45:40,466 --> 00:45:45,626
+private IP of the A LB rather than the
+public IP of the A LB. The private IP
+
+614
+00:45:45,626 --> 00:45:47,906
+of the A LB would be the destination.
+
+615
+00:45:48,211 --> 00:45:53,761
+of the traffic and a LB performs a
+load balancing decision and decides to
+
+616
+00:45:53,761 --> 00:45:56,191
+forward the request to one of the pods.
+
+617
+00:45:56,401 --> 00:45:59,761
+It could be any of the pods in
+the, any of the available zones.
+
+618
+00:46:00,721 --> 00:46:05,551
+It's important to note that by
+default, cross zone load balancing
+
+619
+00:46:05,581 --> 00:46:11,011
+is enabled on a LB. So A LB may
+decide to forward this request to
+
+620
+00:46:11,011 --> 00:46:12,901
+any of the pods in the other AZs.
+
+621
+00:46:12,961 --> 00:46:13,771
+That's the reason.
+
+622
+00:46:14,221 --> 00:46:19,981
+But if you'd like to force a LB. To
+forward the requests to the availability
+
+623
+00:46:19,981 --> 00:46:25,381
+zone, local resources, then you can
+disable the cross load, cross zone
+
+624
+00:46:25,381 --> 00:46:27,301
+load balancing feature if you'd like.
+
+625
+00:46:27,801 --> 00:46:35,101
+So to make it easier for the novice, user
+or admin, everything works out of the box
+
+626
+00:46:35,101 --> 00:46:38,581
+with V-P-C-C-N-I, especially in terms of.
+
+627
+00:46:39,376 --> 00:46:41,326
+When I say everything,
+let me rephrase that.
+
+628
+00:46:41,776 --> 00:46:46,696
+Everything as in PO generated traffic,
+PO initiated, PO generated traffic
+
+629
+00:46:46,696 --> 00:46:48,646
+would always work in V-P-C-C-N-I.
+
+630
+00:46:48,646 --> 00:46:54,706
+The reason is out of the box,
+V-P-C-C-N-I applies SNET source net
+
+631
+00:46:55,066 --> 00:47:00,676
+to all the pod initiated traffic,
+which is destined to external subnets
+
+632
+00:47:00,706 --> 00:47:05,116
+or non V-P-C-C-D, CIDRs or siders.
+
+633
+00:47:05,566 --> 00:47:08,026
+So when put in this slide.
+
+634
+00:47:08,626 --> 00:47:16,936
+The 1 92 1 1 68, 1 51 ip, the port
+sends some traffic destined to a
+
+635
+00:47:16,936 --> 00:47:23,296
+public IP on the internet VPCC, and
+I automatically swaps the source IP
+
+636
+00:47:23,296 --> 00:47:25,516
+with the nodes primary E and i's.
+
+637
+00:47:25,986 --> 00:47:32,526
+primary ip, which is DOT 50 in this
+scenario, again, it swaps the source IP
+
+638
+00:47:32,526 --> 00:47:39,816
+of the traffic with the nodes primary,
+Ennis primary ip, which is DOT 50.
+
+639
+00:47:39,816 --> 00:47:41,496
+In this scenario then.
+
+640
+00:47:42,486 --> 00:47:49,386
+dot 50 source IP gets source netted
+again, but this time by IGW to
+
+641
+00:47:49,386 --> 00:47:54,806
+the, public IP that is, that which
+is associated with the DOT 50 ip.
+
+642
+00:47:55,226 --> 00:48:00,441
+As the public subnets always
+mapped the instance IP to a
+
+643
+00:48:00,441 --> 00:48:03,651
+public ip, so this is the way.
+
+644
+00:48:04,356 --> 00:48:05,136
+Code initiated.
+
+645
+00:48:05,136 --> 00:48:07,806
+Traffic automatically always works.
+
+646
+00:48:08,306 --> 00:48:13,406
+I am sharing additional resources
+on this slide, especially when
+
+647
+00:48:13,406 --> 00:48:15,481
+it comes to cross AZ traffic.
+
+648
+00:48:16,061 --> 00:48:16,441
+How to?
+
+649
+00:48:17,411 --> 00:48:23,381
+Localize the traffic within each az, even
+when the Kubernetes traffic patterns are,
+
+650
+00:48:23,651 --> 00:48:26,891
+as, complex as this or as hope by hope.
+
+651
+00:48:26,941 --> 00:48:32,521
+like this, please have a look at the,
+these resources, which I believe it
+
+652
+00:48:32,521 --> 00:48:37,181
+would help, tremendously help you, and
+especially E Ks Best Practices Guide
+
+653
+00:48:37,181 --> 00:48:42,341
+also goes through some of the scenarios
+that I mentioned here with that.
+
+654
+00:48:43,271 --> 00:48:49,211
+Thank you so much for joining my session
+today and I hope you find it useful.
+
+655
+00:48:50,021 --> 00:48:52,031
+Thanks again and have a great day.
+
