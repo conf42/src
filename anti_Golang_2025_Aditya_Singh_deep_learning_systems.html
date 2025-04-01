@@ -451,6 +451,8 @@
 
             <script>
               
+              var transcript = [{"text": "Hi everyone.", "timestamp": "00:00:00,210", "timestamp_s": 0.0}, {"text": "thanks for tuning in.", "timestamp": "00:00:01,150", "timestamp_s": 1.0}, {"text": "we will talk about, the architectural evolution that has happened in distributed", "timestamp": "00:00:02,530", "timestamp_s": 2.0}, {"text": "training over the past decade, actually.", "timestamp": "00:00:07,340", "timestamp_s": 7.0}, {"text": "so today we\u0027ll explore how distributed training has evolved to keep up with", "timestamp": "00:00:11,129", "timestamp_s": 11.0}, {"text": "the explosive growth in model size.", "timestamp": "00:00:14,324", "timestamp_s": 14.0}, {"text": "The deep learning models have grown from millions parameters to trillions", "timestamp": "00:00:16,799", "timestamp_s": 16.0}, {"text": "of parameters, and as models have scale, so have the challenges.", "timestamp": "00:00:20,189", "timestamp_s": 20.0}, {"text": "So memory limits, communication, resource usage, all of these have some issues.", "timestamp": "00:00:24,540", "timestamp_s": 24.0}, {"text": "And there have been many things that have been built to, get around", "timestamp": "00:00:30,599", "timestamp_s": 30.0}, {"text": "those issues, fix those issues.", "timestamp": "00:00:35,200", "timestamp_s": 35.0}, {"text": "We\u0027ll walk through some architectural milestones, from parameter server", "timestamp": "00:00:36,580", "timestamp_s": 36.0}, {"text": "to ring all reduce pipeline parallelism and zero along the way.", "timestamp": "00:00:41,240", "timestamp_s": 41.0}, {"text": "We\u0027ll see how these advances work alongside optimizers, like Lars", "timestamp": "00:00:45,320", "timestamp_s": 45.0}, {"text": "and Lamb, to train larger models faster and more efficiently.", "timestamp": "00:00:49,870", "timestamp_s": 49.0}, {"text": "let\u0027s begin.", "timestamp": "00:00:54,110", "timestamp_s": 54.0}, {"text": "between 2012 and 2020 model sizes skyrocketed.", "timestamp": "00:00:55,220", "timestamp_s": 55.0}, {"text": "A g single GPU couldn\u0027t just keep up.", "timestamp": "00:00:59,240", "timestamp_s": 59.0}, {"text": "we needed distributor training, splitting work across devices,", "timestamp": "00:01:02,520", "timestamp_s": 62.0}, {"text": "but that created new problems.", "timestamp": "00:01:05,520", "timestamp_s": 65.0}, {"text": "Early systems use data parallelism.", "timestamp": "00:01:07,400", "timestamp_s": 67.0}, {"text": "each device persist a batch and synced with others.", "timestamp": "00:01:10,510", "timestamp_s": 70.0}, {"text": "Sounds simple, but syncing meant a lot of communication, especially for big", "timestamp": "00:01:13,540", "timestamp_s": 73.0}, {"text": "models as GPUs waited on each other or the network efficiency tanked.", "timestamp": "00:01:18,010", "timestamp_s": 78.0}, {"text": "And the other issue was memory.", "timestamp": "00:01:23,810", "timestamp_s": 83.0}, {"text": "So as models grew, so did the need to store parameters, gradients,", "timestamp": "00:01:25,820", "timestamp_s": 85.0}, {"text": "and optimizer states that meant memory often became the bottleneck.", "timestamp": "00:01:29,540", "timestamp_s": 89.0}, {"text": "Even with multiple devices.", "timestamp": "00:01:34,940", "timestamp_s": 94.0}, {"text": "So then came in the parameter server architecture, and this was done, this", "timestamp": "00:01:37,450", "timestamp_s": 97.0}, {"text": "came in to coordinate multiple workers.", "timestamp": "00:01:42,970", "timestamp_s": 102.0}, {"text": "The parameter server emerged a central node holding the model workers who would", "timestamp": "00:01:45,160", "timestamp_s": 105.0}, {"text": "compute gradients and send them to the server, which would then update the model.", "timestamp": "00:01:49,330", "timestamp_s": 109.0}, {"text": "it had two sync modes, synchronous and async in the synchronous when", "timestamp": "00:01:53,600", "timestamp_s": 113.0}, {"text": "all workers wait and update together.", "timestamp": "00:01:57,620", "timestamp_s": 117.0}, {"text": "Simple but slow.", "timestamp": "00:02:00,080", "timestamp_s": 120.0}, {"text": "Asynchronous worker move at their own PAs faster, but, it doesn\u0027t optimize as", "timestamp": "00:02:01,699", "timestamp_s": 121.0}, {"text": "good and there are some inconsistencies.", "timestamp": "00:02:07,409", "timestamp_s": 127.0}, {"text": "so while useful learning on the centralized server became a choke", "timestamp": "00:02:10,149", "timestamp_s": 130.0}, {"text": "point, and you guessed it because there was a centralized server, As", "timestamp": "00:02:13,539", "timestamp_s": 133.0}, {"text": "you scale to dozens or hundreds of workers, the server got overloaded.", "timestamp": "00:02:17,559", "timestamp_s": 137.0}, {"text": "Much like everything, trying to exit a stadium through one door.", "timestamp": "00:02:21,009", "timestamp_s": 141.0}, {"text": "plus it introduced a single point of failure.", "timestamp": "00:02:25,129", "timestamp_s": 145.0}, {"text": "So we scaled up.", "timestamp": "00:02:28,339", "timestamp_s": 148.0}, {"text": "The architecture started to fall apart.", "timestamp": "00:02:29,329", "timestamp_s": 149.0}, {"text": "then, early optimization challenges.", "timestamp": "00:02:31,619", "timestamp_s": 151.0}, {"text": "Specifically stood out and, these were, communication overhead.", "timestamp": "00:02:34,694", "timestamp_s": 154.0}, {"text": "The frequent, syncing of massive tensor over tensors overwhelm the", "timestamp": "00:02:39,914", "timestamp_s": 159.0}, {"text": "bandwidth, the straggler effect.", "timestamp": "00:02:44,264", "timestamp_s": 164.0}, {"text": "So in the synchronous setup, slow workers held everyone back, like", "timestamp": "00:02:46,764", "timestamp_s": 166.0}, {"text": "waiting for the last hiker in the group.", "timestamp": "00:02:51,294", "timestamp_s": 171.0}, {"text": "And the third one, idle resources.", "timestamp": "00:02:53,564", "timestamp_s": 173.0}, {"text": "So GPU spent time waiting instead of computing, especially", "timestamp": "00:02:55,274", "timestamp_s": 175.0}, {"text": "in mixed hardware setups.", "timestamp": "00:02:58,884", "timestamp_s": 178.0}, {"text": "So we needed smart, smarter ways to share data, memory and manage the", "timestamp": "00:03:01,404", "timestamp_s": 181.0}, {"text": "memory and keep the hardware busy.", "timestamp": "00:03:05,244", "timestamp_s": 185.0}, {"text": "then came in, ring reduced, which was basically a better way to sing.", "timestamp": "00:03:07,474", "timestamp_s": 187.0}, {"text": "To get the rid of the central server bottleneck, we turn to ring all.", "timestamp": "00:03:11,419", "timestamp_s": 191.0}, {"text": "Reduce and imagine arranging all GPUs in a ring instead of syncing with a server.", "timestamp": "00:03:15,979", "timestamp_s": 195.0}, {"text": "Each GPU talks only to its neighbors, so gradients are passed around the", "timestamp": "00:03:21,649", "timestamp_s": 201.0}, {"text": "ring gradually summed and shared.", "timestamp": "00:03:26,509", "timestamp_s": 206.0}, {"text": "this, reduces network congestion and scales well.", "timestamp": "00:03:29,339", "timestamp_s": 209.0}, {"text": "Each node does equal work.", "timestamp": "00:03:32,309", "timestamp_s": 212.0}, {"text": "No bottlenecks.", "timestamp": "00:03:34,019", "timestamp_s": 214.0}, {"text": "It\u0027s like replacing a traffic jam at one big intersection with", "timestamp": "00:03:35,834", "timestamp_s": 215.0}, {"text": "a smooth flowing roundabout.", "timestamp": "00:03:39,014", "timestamp_s": 219.0}, {"text": "How\u0027s that for an analogy?", "timestamp": "00:03:41,294", "timestamp_s": 221.0}, {"text": "So the result, better bandwidth use and near linear scaling, add", "timestamp": "00:03:43,994", "timestamp_s": 223.0}, {"text": "more GPUs and training speeds up proportionally and up to a point.", "timestamp": "00:03:50,035", "timestamp_s": 230.0}, {"text": "Sound good?", "timestamp": "00:03:54,805", "timestamp_s": 234.0}, {"text": "Next came in, pipeline parallelism.", "timestamp": "00:03:56,274", "timestamp_s": 236.0}, {"text": "this was basically done to fit bigger models.", "timestamp": "00:03:58,945", "timestamp_s": 238.0}, {"text": "even with Ring already fitting huge models on a single device was still tough.", "timestamp": "00:04:01,535", "timestamp_s": 241.0}, {"text": "That\u0027s where, pipeline parallelism helps.", "timestamp": "00:04:06,625", "timestamp_s": 246.0}, {"text": "we basically here in this approach, split the model layers across devices.", "timestamp": "00:04:09,285", "timestamp_s": 249.0}, {"text": "So let\u0027s say GPU one handles layers, one to 10.", "timestamp": "00:04:14,305", "timestamp_s": 254.0}, {"text": "GP U2 handles layers, 11 to 20 and so on.", "timestamp": "00:04:19,585", "timestamp_s": 259.0}, {"text": "you take the model, you divide up the layers and, hand them off to,", "timestamp": "00:04:23,175", "timestamp_s": 263.0}, {"text": "different compute nodes or GPUs.", "timestamp": "00:04:28,205", "timestamp_s": 268.0}, {"text": "it\u0027s like an assembly line.", "timestamp": "00:04:31,345", "timestamp_s": 271.0}, {"text": "Data flows from one GPU to the next, during forward and backward passes.", "timestamp": "00:04:32,545", "timestamp_s": 272.0}, {"text": "we use, micro batches to keep all GPUs busy.", "timestamp": "00:04:36,875", "timestamp_s": 276.0}, {"text": "just like feeding the items down the pipeline so no station is idle.", "timestamp": "00:04:39,795", "timestamp_s": 279.0}, {"text": "this dramatically reduced, memory per device, memory usage per", "timestamp": "00:04:44,245", "timestamp_s": 284.0}, {"text": "device, letting a strain, much larger models without hitting,", "timestamp": "00:04:49,175", "timestamp_s": 289.0}, {"text": "memory walls or memory constraints.", "timestamp": "00:04:52,745", "timestamp_s": 292.0}, {"text": "next came in the approach of, zero, this was done to basically kill the redundancy.", "timestamp": "00:04:55,875", "timestamp_s": 295.0}, {"text": "so traditional data parallelism meant each GPU would keep full", "timestamp": "00:05:01,145", "timestamp_s": 301.0}, {"text": "copies of the models of the model gradients and optimizer, states.", "timestamp": "00:05:05,315", "timestamp_s": 305.0}, {"text": "And it was, as you can see, it was wasteful.", "timestamp": "00:05:10,425", "timestamp_s": 310.0}, {"text": "I. So zero fixes this by splitting those elements across devices.", "timestamp": "00:05:13,635", "timestamp_s": 313.0}, {"text": "Now each GPU only stores a slice of model and data.", "timestamp": "00:05:18,495", "timestamp_s": 318.0}, {"text": "So it\u0027s like dividing a textbook among students instead of", "timestamp": "00:05:22,025", "timestamp_s": 322.0}, {"text": "everyone carrying all of them.", "timestamp": "00:05:25,325", "timestamp_s": 325.0}, {"text": "this leads to eight x better memory efficiency, and making trillion", "timestamp": "00:05:27,105", "timestamp_s": 327.0}, {"text": "parameter models more trainable.", "timestamp": "00:05:32,564", "timestamp_s": 332.0}, {"text": "So I would just go back to the analogy.", "timestamp": "00:05:34,544", "timestamp_s": 334.0}, {"text": "It\u0027s like dividing.", "timestamp": "00:05:36,974", "timestamp_s": 336.0}, {"text": "The textbooks for a day across students.", "timestamp": "00:05:38,849", "timestamp_s": 338.0}, {"text": "So History book is brought by a student.", "timestamp": "00:05:42,960", "timestamp_s": 342.0}, {"text": "The maths book is brought by another student.", "timestamp": "00:05:46,109", "timestamp_s": 346.0}, {"text": "Instead of all students carrying all copies of all the books.", "timestamp": "00:05:47,909", "timestamp_s": 347.0}, {"text": "each student copying his or her copy of each book.", "timestamp": "00:05:52,254", "timestamp_s": 352.0}, {"text": "So it led to a significant memory efficiency and models that could be", "timestamp": "00:05:56,064", "timestamp_s": 356.0}, {"text": "trained got significantly bigger in size.", "timestamp": "00:06:00,984", "timestamp_s": 360.0}, {"text": "It also didn\u0027t hurt performance.", "timestamp": "00:06:04,404", "timestamp_s": 364.0}, {"text": "it\u0027s smart enough to fetch or share data as needed while keeping everything stable.", "timestamp": "00:06:06,114", "timestamp_s": 366.0}, {"text": "So this was a good thing to come along.", "timestamp": "00:06:10,374", "timestamp_s": 370.0}, {"text": "Now next what happened was, we enabled a large scale batch, large batch training.", "timestamp": "00:06:12,514", "timestamp_s": 372.0}, {"text": "Not large scale, but large batch training.", "timestamp": "00:06:19,034", "timestamp_s": 379.0}, {"text": "So batch sizes, larger batch sizes, increase efficiency, and faster training", "timestamp": "00:06:21,134", "timestamp_s": 381.0}, {"text": "is achieved through, bigger bat sizes.", "timestamp": "00:06:27,215", "timestamp_s": 387.0}, {"text": "but they can hurt convergence if you\u0027re not careful.", "timestamp": "00:06:30,254", "timestamp_s": 390.0}, {"text": "So there are two.", "timestamp": "00:06:32,835", "timestamp_s": 392.0}, {"text": "Optimizers specifically designed for this, these are larges and lamb larges are just", "timestamp": "00:06:35,025", "timestamp_s": 395.0}, {"text": "learning rates for each layer based on the weight to gradient ratio, so keeping", "timestamp": "00:06:39,674", "timestamp_s": 399.0}, {"text": "layers balanced during training, and then lamb builds on that with added adaptivity", "timestamp": "00:06:43,814", "timestamp_s": 403.0}, {"text": "for deep models like transformers.", "timestamp": "00:06:50,715", "timestamp_s": 410.0}, {"text": "So LAMB is specifically there to help with transformer type models.", "timestamp": "00:06:52,934", "timestamp_s": 412.0}, {"text": "Now these models make training with 32,000 plus path size,", "timestamp": "00:06:57,754", "timestamp_s": 417.0}, {"text": "practical without losing accuracy or spending weeks on tuning, frankly.", "timestamp": "00:07:02,614", "timestamp_s": 422.0}, {"text": "So they are key to keeping training stable at scale.", "timestamp": "00:07:08,914", "timestamp_s": 428.0}, {"text": "Next, communication optimization.", "timestamp": "00:07:12,939", "timestamp_s": 432.0}, {"text": "basically.", "timestamp": "00:07:15,169", "timestamp_s": 435.0}, {"text": "And less talk, more work.", "timestamp": "00:07:16,029", "timestamp_s": 436.0}, {"text": "So even with Google Architectures, communication is still costly.", "timestamp": "00:07:18,279", "timestamp_s": 438.0}, {"text": "And so we, what, we did was compress and quantize the gradients, gradient", "timestamp": "00:07:22,079", "timestamp_s": 442.0}, {"text": "compression, was done and it helps, drop or delays, communicating tiny values.", "timestamp": "00:07:27,879", "timestamp_s": 447.0}, {"text": "And quantization uses fewer widths for each number, like jpeg for gradient.", "timestamp": "00:07:35,580", "timestamp_s": 455.0}, {"text": "These, all these, both of these reduce communication without", "timestamp": "00:07:39,999", "timestamp_s": 459.0}, {"text": "hurting accuracy if tuned properly.", "timestamp": "00:07:43,149", "timestamp_s": 463.0}, {"text": "And the goal is to spend less time waiting on data and more time training the model.", "timestamp": "00:07:46,209", "timestamp_s": 466.0}, {"text": "Sounds good.", "timestamp": "00:07:50,339", "timestamp_s": 470.0}, {"text": "what did we cover?", "timestamp": "00:07:51,309", "timestamp_s": 471.0}, {"text": "We covered communication optimization.", "timestamp": "00:07:52,059", "timestamp_s": 472.0}, {"text": "Yeah.", "timestamp": "00:07:53,679", "timestamp_s": 473.0}, {"text": "putting it all together, what\u0027s the impact?", "timestamp": "00:07:54,529", "timestamp_s": 474.0}, {"text": "so the impact is that the training time for the same size of model I. and", "timestamp": "00:07:57,179", "timestamp_s": 477.0}, {"text": "the memory efficiency, the training time has come down with each one", "timestamp": "00:08:02,794", "timestamp_s": 482.0}, {"text": "of these milestones that we covered starting from parameter servers.", "timestamp": "00:08:07,624", "timestamp_s": 487.0}, {"text": "for this reference, the, the model that has been used to", "timestamp": "00:08:12,404", "timestamp_s": 492.0}, {"text": "compare the, is the same model.", "timestamp": "00:08:16,074", "timestamp_s": 496.0}, {"text": "So if we just had the earlier milestone of parameter server, and if this", "timestamp": "00:08:17,844", "timestamp_s": 497.0}, {"text": "model is used, is trained using that approach, it would, The training time", "timestamp": "00:08:23,004", "timestamp_s": 503.0}, {"text": "would be basically 30 a month, and the memory efficiency would be low.", "timestamp": "00:08:27,664", "timestamp_s": 507.0}, {"text": "And with each one of these milestones, the training time drops and the", "timestamp": "00:08:31,565", "timestamp_s": 511.0}, {"text": "memory efficiency increases.", "timestamp": "00:08:37,115", "timestamp_s": 517.0}, {"text": "These numbers are not hypothetical thanks to these methods.", "timestamp": "00:08:38,585", "timestamp_s": 518.0}, {"text": "Australian parameter models are now a reality, and they\u0027re powering", "timestamp": "00:08:41,735", "timestamp_s": 521.0}, {"text": "cutting at science language, morals, and climate simulations.", "timestamp": "00:08:46,925", "timestamp_s": 526.0}, {"text": "So distributor training is no longer a limiting factor.", "timestamp": "00:08:50,405", "timestamp_s": 530.0}, {"text": "It\u0027s a launchpad.", "timestamp": "00:08:54,335", "timestamp_s": 534.0}];
+              
 
               var tag = document.createElement('script');
 
@@ -559,6 +561,632 @@
           </div>
 
           
+          
+
+          <div class="col-12 mb-5">
+            <h3>
+              Summary
+            </h3>
+            <ul>
+              
+            </ul>
+          </div>
+
+          <div class="col-12 mb-5">
+            <h3>
+              Transcript
+            </h3>
+            <span class="text-muted">
+              This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/./srt/golang2025_Aditya_Singh.srt" target="_blank">submit a PR</a>.
+            </span>
+            <div>
+            
+            <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:00,210'); seek(0.0)">
+              Hi everyone.
+            </span>
+            
+            <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:01,150'); seek(1.0)">
+              thanks for tuning in.
+            </span>
+            
+            <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:02,530'); seek(2.0)">
+              we will talk about, the architectural evolution that has happened in distributed
+            </span>
+            
+            <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:07,340'); seek(7.0)">
+              training over the past decade, actually.
+            </span>
+            
+            <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:11,129'); seek(11.0)">
+              so today we'll explore how distributed training has evolved to keep up with
+            </span>
+            
+            <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:14,324'); seek(14.0)">
+              the explosive growth in model size.
+            </span>
+            
+            <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:16,799'); seek(16.0)">
+              The deep learning models have grown from millions parameters to trillions
+            </span>
+            
+            <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:20,189'); seek(20.0)">
+              of parameters, and as models have scale, so have the challenges.
+            </span>
+            
+            <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:24,540'); seek(24.0)">
+              So memory limits, communication, resource usage, all of these have some issues.
+            </span>
+            
+            <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:00:30,599'); seek(30.0)">
+              And there have been many things that have been built to, get around
+            </span>
+            
+            <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:00:35,200'); seek(35.0)">
+              those issues, fix those issues.
+            </span>
+            
+            <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:00:36,580'); seek(36.0)">
+              We'll walk through some architectural milestones, from parameter server
+            </span>
+            
+            <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:00:41,240'); seek(41.0)">
+              to ring all reduce pipeline parallelism and zero along the way.
+            </span>
+            
+            <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:00:45,320'); seek(45.0)">
+              We'll see how these advances work alongside optimizers, like Lars
+            </span>
+            
+            <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:00:49,870'); seek(49.0)">
+              and Lamb, to train larger models faster and more efficiently.
+            </span>
+            
+            <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:00:54,110'); seek(54.0)">
+              let's begin.
+            </span>
+            
+            <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:00:55,220'); seek(55.0)">
+              between 2012 and 2020 model sizes skyrocketed.
+            </span>
+            
+            <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:00:59,240'); seek(59.0)">
+              A g single GPU couldn't just keep up.
+            </span>
+            
+            <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:01:02,520'); seek(62.0)">
+              we needed distributor training, splitting work across devices,
+            </span>
+            
+            <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:01:05,520'); seek(65.0)">
+              but that created new problems.
+            </span>
+            
+            <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:07,400'); seek(67.0)">
+              Early systems use data parallelism.
+            </span>
+            
+            <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:10,510'); seek(70.0)">
+              each device persist a batch and synced with others.
+            </span>
+            
+            <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:13,540'); seek(73.0)">
+              Sounds simple, but syncing meant a lot of communication, especially for big
+            </span>
+            
+            <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:18,010'); seek(78.0)">
+              models as GPUs waited on each other or the network efficiency tanked.
+            </span>
+            
+            <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:23,810'); seek(83.0)">
+              And the other issue was memory.
+            </span>
+            
+            <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:01:25,820'); seek(85.0)">
+              So as models grew, so did the need to store parameters, gradients,
+            </span>
+            
+            <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:01:29,540'); seek(89.0)">
+              and optimizer states that meant memory often became the bottleneck.
+            </span>
+            
+            <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:01:34,940'); seek(94.0)">
+              Even with multiple devices.
+            </span>
+            
+            <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:01:37,450'); seek(97.0)">
+              So then came in the parameter server architecture, and this was done, this
+            </span>
+            
+            <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:01:42,970'); seek(102.0)">
+              came in to coordinate multiple workers.
+            </span>
+            
+            <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:01:45,160'); seek(105.0)">
+              The parameter server emerged a central node holding the model workers who would
+            </span>
+            
+            <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:01:49,330'); seek(109.0)">
+              compute gradients and send them to the server, which would then update the model.
+            </span>
+            
+            <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:01:53,600'); seek(113.0)">
+              it had two sync modes, synchronous and async in the synchronous when
+            </span>
+            
+            <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:01:57,620'); seek(117.0)">
+              all workers wait and update together.
+            </span>
+            
+            <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:02:00,080'); seek(120.0)">
+              Simple but slow.
+            </span>
+            
+            <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:02:01,699'); seek(121.0)">
+              Asynchronous worker move at their own PAs faster, but, it doesn't optimize as
+            </span>
+            
+            <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:07,409'); seek(127.0)">
+              good and there are some inconsistencies.
+            </span>
+            
+            <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:10,149'); seek(130.0)">
+              so while useful learning on the centralized server became a choke
+            </span>
+            
+            <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:13,539'); seek(133.0)">
+              point, and you guessed it because there was a centralized server, As
+            </span>
+            
+            <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:17,559'); seek(137.0)">
+              you scale to dozens or hundreds of workers, the server got overloaded.
+            </span>
+            
+            <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:02:21,009'); seek(141.0)">
+              Much like everything, trying to exit a stadium through one door.
+            </span>
+            
+            <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:02:25,129'); seek(145.0)">
+              plus it introduced a single point of failure.
+            </span>
+            
+            <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:02:28,339'); seek(148.0)">
+              So we scaled up.
+            </span>
+            
+            <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:02:29,329'); seek(149.0)">
+              The architecture started to fall apart.
+            </span>
+            
+            <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:02:31,619'); seek(151.0)">
+              then, early optimization challenges.
+            </span>
+            
+            <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:02:34,694'); seek(154.0)">
+              Specifically stood out and, these were, communication overhead.
+            </span>
+            
+            <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:02:39,914'); seek(159.0)">
+              The frequent, syncing of massive tensor over tensors overwhelm the
+            </span>
+            
+            <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:02:44,264'); seek(164.0)">
+              bandwidth, the straggler effect.
+            </span>
+            
+            <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:02:46,764'); seek(166.0)">
+              So in the synchronous setup, slow workers held everyone back, like
+            </span>
+            
+            <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:02:51,294'); seek(171.0)">
+              waiting for the last hiker in the group.
+            </span>
+            
+            <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:02:53,564'); seek(173.0)">
+              And the third one, idle resources.
+            </span>
+            
+            <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:02:55,274'); seek(175.0)">
+              So GPU spent time waiting instead of computing, especially
+            </span>
+            
+            <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:02:58,884'); seek(178.0)">
+              in mixed hardware setups.
+            </span>
+            
+            <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:01,404'); seek(181.0)">
+              So we needed smart, smarter ways to share data, memory and manage the
+            </span>
+            
+            <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:05,244'); seek(185.0)">
+              memory and keep the hardware busy.
+            </span>
+            
+            <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:03:07,474'); seek(187.0)">
+              then came in, ring reduced, which was basically a better way to sing.
+            </span>
+            
+            <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:03:11,419'); seek(191.0)">
+              To get the rid of the central server bottleneck, we turn to ring all.
+            </span>
+            
+            <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:03:15,979'); seek(195.0)">
+              Reduce and imagine arranging all GPUs in a ring instead of syncing with a server.
+            </span>
+            
+            <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:03:21,649'); seek(201.0)">
+              Each GPU talks only to its neighbors, so gradients are passed around the
+            </span>
+            
+            <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:03:26,509'); seek(206.0)">
+              ring gradually summed and shared.
+            </span>
+            
+            <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:03:29,339'); seek(209.0)">
+              this, reduces network congestion and scales well.
+            </span>
+            
+            <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:03:32,309'); seek(212.0)">
+              Each node does equal work.
+            </span>
+            
+            <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:03:34,019'); seek(214.0)">
+              No bottlenecks.
+            </span>
+            
+            <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:03:35,834'); seek(215.0)">
+              It's like replacing a traffic jam at one big intersection with
+            </span>
+            
+            <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:03:39,014'); seek(219.0)">
+              a smooth flowing roundabout.
+            </span>
+            
+            <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:03:41,294'); seek(221.0)">
+              How's that for an analogy?
+            </span>
+            
+            <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:03:43,994'); seek(223.0)">
+              So the result, better bandwidth use and near linear scaling, add
+            </span>
+            
+            <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:03:50,035'); seek(230.0)">
+              more GPUs and training speeds up proportionally and up to a point.
+            </span>
+            
+            <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:03:54,805'); seek(234.0)">
+              Sound good?
+            </span>
+            
+            <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:03:56,274'); seek(236.0)">
+              Next came in, pipeline parallelism.
+            </span>
+            
+            <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:03:58,945'); seek(238.0)">
+              this was basically done to fit bigger models.
+            </span>
+            
+            <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:04:01,535'); seek(241.0)">
+              even with Ring already fitting huge models on a single device was still tough.
+            </span>
+            
+            <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:04:06,625'); seek(246.0)">
+              That's where, pipeline parallelism helps.
+            </span>
+            
+            <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:04:09,285'); seek(249.0)">
+              we basically here in this approach, split the model layers across devices.
+            </span>
+            
+            <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:04:14,305'); seek(254.0)">
+              So let's say GPU one handles layers, one to 10.
+            </span>
+            
+            <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:04:19,585'); seek(259.0)">
+              GP U2 handles layers, 11 to 20 and so on.
+            </span>
+            
+            <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:04:23,175'); seek(263.0)">
+              you take the model, you divide up the layers and, hand them off to,
+            </span>
+            
+            <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:04:28,205'); seek(268.0)">
+              different compute nodes or GPUs.
+            </span>
+            
+            <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:04:31,345'); seek(271.0)">
+              it's like an assembly line.
+            </span>
+            
+            <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:04:32,545'); seek(272.0)">
+              Data flows from one GPU to the next, during forward and backward passes.
+            </span>
+            
+            <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:04:36,875'); seek(276.0)">
+              we use, micro batches to keep all GPUs busy.
+            </span>
+            
+            <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:04:39,795'); seek(279.0)">
+              just like feeding the items down the pipeline so no station is idle.
+            </span>
+            
+            <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:04:44,245'); seek(284.0)">
+              this dramatically reduced, memory per device, memory usage per
+            </span>
+            
+            <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:04:49,175'); seek(289.0)">
+              device, letting a strain, much larger models without hitting,
+            </span>
+            
+            <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:04:52,745'); seek(292.0)">
+              memory walls or memory constraints.
+            </span>
+            
+            <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:04:55,875'); seek(295.0)">
+              next came in the approach of, zero, this was done to basically kill the redundancy.
+            </span>
+            
+            <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:05:01,145'); seek(301.0)">
+              so traditional data parallelism meant each GPU would keep full
+            </span>
+            
+            <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:05:05,315'); seek(305.0)">
+              copies of the models of the model gradients and optimizer, states.
+            </span>
+            
+            <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:05:10,425'); seek(310.0)">
+              And it was, as you can see, it was wasteful.
+            </span>
+            
+            <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:05:13,635'); seek(313.0)">
+              I. So zero fixes this by splitting those elements across devices.
+            </span>
+            
+            <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:05:18,495'); seek(318.0)">
+              Now each GPU only stores a slice of model and data.
+            </span>
+            
+            <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:05:22,025'); seek(322.0)">
+              So it's like dividing a textbook among students instead of
+            </span>
+            
+            <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:05:25,325'); seek(325.0)">
+              everyone carrying all of them.
+            </span>
+            
+            <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:05:27,105'); seek(327.0)">
+              this leads to eight x better memory efficiency, and making trillion
+            </span>
+            
+            <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:05:32,564'); seek(332.0)">
+              parameter models more trainable.
+            </span>
+            
+            <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:05:34,544'); seek(334.0)">
+              So I would just go back to the analogy.
+            </span>
+            
+            <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:05:36,974'); seek(336.0)">
+              It's like dividing.
+            </span>
+            
+            <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:05:38,849'); seek(338.0)">
+              The textbooks for a day across students.
+            </span>
+            
+            <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:05:42,960'); seek(342.0)">
+              So History book is brought by a student.
+            </span>
+            
+            <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:05:46,109'); seek(346.0)">
+              The maths book is brought by another student.
+            </span>
+            
+            <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:05:47,909'); seek(347.0)">
+              Instead of all students carrying all copies of all the books.
+            </span>
+            
+            <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:05:52,254'); seek(352.0)">
+              each student copying his or her copy of each book.
+            </span>
+            
+            <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:05:56,064'); seek(356.0)">
+              So it led to a significant memory efficiency and models that could be
+            </span>
+            
+            <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:06:00,984'); seek(360.0)">
+              trained got significantly bigger in size.
+            </span>
+            
+            <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:06:04,404'); seek(364.0)">
+              It also didn't hurt performance.
+            </span>
+            
+            <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:06:06,114'); seek(366.0)">
+              it's smart enough to fetch or share data as needed while keeping everything stable.
+            </span>
+            
+            <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:06:10,374'); seek(370.0)">
+              So this was a good thing to come along.
+            </span>
+            
+            <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:06:12,514'); seek(372.0)">
+              Now next what happened was, we enabled a large scale batch, large batch training.
+            </span>
+            
+            <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:06:19,034'); seek(379.0)">
+              Not large scale, but large batch training.
+            </span>
+            
+            <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:06:21,134'); seek(381.0)">
+              So batch sizes, larger batch sizes, increase efficiency, and faster training
+            </span>
+            
+            <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:06:27,215'); seek(387.0)">
+              is achieved through, bigger bat sizes.
+            </span>
+            
+            <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:06:30,254'); seek(390.0)">
+              but they can hurt convergence if you're not careful.
+            </span>
+            
+            <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:06:32,835'); seek(392.0)">
+              So there are two.
+            </span>
+            
+            <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:06:35,025'); seek(395.0)">
+              Optimizers specifically designed for this, these are larges and lamb larges are just
+            </span>
+            
+            <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:06:39,674'); seek(399.0)">
+              learning rates for each layer based on the weight to gradient ratio, so keeping
+            </span>
+            
+            <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:06:43,814'); seek(403.0)">
+              layers balanced during training, and then lamb builds on that with added adaptivity
+            </span>
+            
+            <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:06:50,715'); seek(410.0)">
+              for deep models like transformers.
+            </span>
+            
+            <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:06:52,934'); seek(412.0)">
+              So LAMB is specifically there to help with transformer type models.
+            </span>
+            
+            <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:06:57,754'); seek(417.0)">
+              Now these models make training with 32,000 plus path size,
+            </span>
+            
+            <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:07:02,614'); seek(422.0)">
+              practical without losing accuracy or spending weeks on tuning, frankly.
+            </span>
+            
+            <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:07:08,914'); seek(428.0)">
+              So they are key to keeping training stable at scale.
+            </span>
+            
+            <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:07:12,939'); seek(432.0)">
+              Next, communication optimization.
+            </span>
+            
+            <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:07:15,169'); seek(435.0)">
+              basically.
+            </span>
+            
+            <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:07:16,029'); seek(436.0)">
+              And less talk, more work.
+            </span>
+            
+            <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:07:18,279'); seek(438.0)">
+              So even with Google Architectures, communication is still costly.
+            </span>
+            
+            <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:07:22,079'); seek(442.0)">
+              And so we, what, we did was compress and quantize the gradients, gradient
+            </span>
+            
+            <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:07:27,879'); seek(447.0)">
+              compression, was done and it helps, drop or delays, communicating tiny values.
+            </span>
+            
+            <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:07:35,580'); seek(455.0)">
+              And quantization uses fewer widths for each number, like jpeg for gradient.
+            </span>
+            
+            <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:07:39,999'); seek(459.0)">
+              These, all these, both of these reduce communication without
+            </span>
+            
+            <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:07:43,149'); seek(463.0)">
+              hurting accuracy if tuned properly.
+            </span>
+            
+            <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:07:46,209'); seek(466.0)">
+              And the goal is to spend less time waiting on data and more time training the model.
+            </span>
+            
+            <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:07:50,339'); seek(470.0)">
+              Sounds good.
+            </span>
+            
+            <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:07:51,309'); seek(471.0)">
+              what did we cover?
+            </span>
+            
+            <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:07:52,059'); seek(472.0)">
+              We covered communication optimization.
+            </span>
+            
+            <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:07:53,679'); seek(473.0)">
+              Yeah.
+            </span>
+            
+            <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:07:54,529'); seek(474.0)">
+              putting it all together, what's the impact?
+            </span>
+            
+            <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:07:57,179'); seek(477.0)">
+              so the impact is that the training time for the same size of model I. and
+            </span>
+            
+            <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:08:02,794'); seek(482.0)">
+              the memory efficiency, the training time has come down with each one
+            </span>
+            
+            <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:08:07,624'); seek(487.0)">
+              of these milestones that we covered starting from parameter servers.
+            </span>
+            
+            <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:08:12,404'); seek(492.0)">
+              for this reference, the, the model that has been used to
+            </span>
+            
+            <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:08:16,074'); seek(496.0)">
+              compare the, is the same model.
+            </span>
+            
+            <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:08:17,844'); seek(497.0)">
+              So if we just had the earlier milestone of parameter server, and if this
+            </span>
+            
+            <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:08:23,004'); seek(503.0)">
+              model is used, is trained using that approach, it would, The training time
+            </span>
+            
+            <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:08:27,664'); seek(507.0)">
+              would be basically 30 a month, and the memory efficiency would be low.
+            </span>
+            
+            <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:08:31,565'); seek(511.0)">
+              And with each one of these milestones, the training time drops and the
+            </span>
+            
+            <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:08:37,115'); seek(517.0)">
+              memory efficiency increases.
+            </span>
+            
+            <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:08:38,585'); seek(518.0)">
+              These numbers are not hypothetical thanks to these methods.
+            </span>
+            
+            <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:08:41,735'); seek(521.0)">
+              Australian parameter models are now a reality, and they're powering
+            </span>
+            
+            <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:08:46,925'); seek(526.0)">
+              cutting at science language, morals, and climate simulations.
+            </span>
+            
+            <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:08:50,405'); seek(530.0)">
+              So distributor training is no longer a limiting factor.
+            </span>
+            
+            <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:08:54,335'); seek(534.0)">
+              It's a launchpad.
+            </span>
+            
+            </div>
+          </div>
           
           
 
