@@ -1,0 +1,1039 @@
+1
+00:00:00,500 --> 00:00:01,519
+Good morning everyone.
+
+2
+00:00:02,149 --> 00:00:06,400
+My name is, I work as a director of
+software engineering at MasterCard,
+
+3
+00:00:06,789 --> 00:00:12,550
+and my primary focus is in the system,
+resiliency, scalability, and performance.
+
+4
+00:00:13,330 --> 00:00:16,509
+I bring with me about 15 years
+of industry experience in these
+
+5
+00:00:16,509 --> 00:00:20,005
+domains with a particular focus
+on site reliability, engineering.
+
+6
+00:00:20,505 --> 00:00:24,945
+And today I'd like to talk about one
+of these patterns that improve system
+
+7
+00:00:24,945 --> 00:00:29,985
+resilience and help us fail fast and
+recover faster, which is to harness
+
+8
+00:00:29,985 --> 00:00:34,145
+cascading system timeouts throughout
+the system to improve resilience.
+
+9
+00:00:34,645 --> 00:00:37,975
+In this session today, we're gonna
+talk about how these timeouts play
+
+10
+00:00:37,975 --> 00:00:42,265
+an important role, especially in
+large scale distributed systems.
+
+11
+00:00:43,045 --> 00:00:45,490
+Timeouts are vital for
+performance and resilience.
+
+12
+00:00:45,990 --> 00:00:50,370
+When they're misconfigured or poorly
+managed, they can introduce critical
+
+13
+00:00:50,370 --> 00:00:56,190
+issues such as resource exhaustion,
+incorrectly set timeouts can hold
+
+14
+00:00:56,280 --> 00:01:00,330
+vital system resources leading to
+their depletion and instability.
+
+15
+00:01:01,230 --> 00:01:07,020
+Delayed failure detection, overly generous
+timeouts, prevent rapid identification
+
+16
+00:01:07,020 --> 00:01:11,935
+of unresponsive services, masking
+the actual problems, and prolonging
+
+17
+00:01:12,005 --> 00:01:13,414
+outages and hindering recovery.
+
+18
+00:01:13,914 --> 00:01:18,234
+Cascading service degradation,
+improper timeouts allow single
+
+19
+00:01:18,234 --> 00:01:22,764
+service failures to propagate leading
+to widespread system degradation.
+
+20
+00:01:23,264 --> 00:01:27,194
+These challenges are particularly acute
+in highly transactional environment
+
+21
+00:01:27,914 --> 00:01:29,924
+where system stability is paramount.
+
+22
+00:01:30,734 --> 00:01:34,634
+And in today's session, we will
+detail how these prevalent, timeout
+
+23
+00:01:34,754 --> 00:01:36,854
+anti-patterns can be tackled.
+
+24
+00:01:37,354 --> 00:01:40,684
+We will explored what a principled
+implementation of cascading
+
+25
+00:01:40,684 --> 00:01:45,274
+timeout looks like, a strategy for
+building more resilient performance
+
+26
+00:01:45,274 --> 00:01:46,864
+and robust infrastructure.
+
+27
+00:01:47,734 --> 00:01:51,964
+We'll go over some foundational principles
+and practical deployment strategies
+
+28
+00:01:51,964 --> 00:01:57,214
+across distributed system layers and
+the measurable impact of these changes.
+
+29
+00:01:57,714 --> 00:02:01,285
+You will learn to proactively design
+systems that fail fast when issues
+
+30
+00:02:01,285 --> 00:02:05,335
+arise, enabling them to recover
+faster and minimize downtime.
+
+31
+00:02:05,835 --> 00:02:09,524
+Today's agenda, we'll talk about
+the problem, which is the timeout
+
+32
+00:02:09,555 --> 00:02:15,135
+antipas exploring why common timeout
+strategies fail, and their impact and
+
+33
+00:02:15,135 --> 00:02:20,045
+system stability, cascading timeout
+principles, understanding the core
+
+34
+00:02:20,105 --> 00:02:24,850
+theory and methodology behind cascading
+timeouts, how we implement them across
+
+35
+00:02:24,895 --> 00:02:29,575
+system layers, practical examples and
+strategies for deployment in a production
+
+36
+00:02:29,575 --> 00:02:32,035
+environment, and lessons learned.
+
+37
+00:02:32,425 --> 00:02:34,765
+Keen sites on implementation and guidance.
+
+38
+00:02:35,265 --> 00:02:38,685
+So let's talk about the problem,
+which are timeout antipas.
+
+39
+00:02:39,185 --> 00:02:42,905
+There's a, there are a few common
+timeout antipas that we have
+
+40
+00:02:42,905 --> 00:02:48,624
+observed, such as uniform timeouts
+using identical timeout values
+
+41
+00:02:48,624 --> 00:02:52,614
+across all service layers regardless
+of hierarchy or dependency claim.
+
+42
+00:02:53,114 --> 00:02:58,005
+Inverted timeouts when we are configuring
+outer services to timeout before inner
+
+43
+00:02:58,005 --> 00:03:03,254
+services leading to resources getting
+blocked and clients getting timed
+
+44
+00:03:03,254 --> 00:03:05,084
+out before they could get a response.
+
+45
+00:03:05,864 --> 00:03:10,814
+Excessive timeouts setting excessively
+long timeouts, for example, 30 sec
+
+46
+00:03:11,254 --> 00:03:16,084
+plus seconds that exhaust threads and
+connection pools during system failures.
+
+47
+00:03:16,584 --> 00:03:21,505
+These antipas are particularly
+pragmatic in ML inference pipelines
+
+48
+00:03:21,714 --> 00:03:24,114
+where resource efficiency is critical.
+
+49
+00:03:24,614 --> 00:03:28,454
+The impact of poor timeout
+management is basically stress
+
+50
+00:03:28,454 --> 00:03:29,799
+on the system in various ways.
+
+51
+00:03:30,030 --> 00:03:35,640
+Such threat pool exhaustion, database
+connection, starvation, slow failure
+
+52
+00:03:35,750 --> 00:03:40,200
+detection, complete service outages,
+and degraded user experience.
+
+53
+00:03:40,700 --> 00:03:42,640
+So prior to implementing
+cascading timeout.
+
+54
+00:03:42,950 --> 00:03:48,829
+We recommend that we perform analysis
+of incident and latency data to infer
+
+55
+00:03:48,829 --> 00:03:52,399
+how poorly configured timeouts are
+responsible for major incidents.
+
+56
+00:03:52,899 --> 00:03:54,969
+So what are cascading timeouts?
+
+57
+00:03:55,659 --> 00:03:59,979
+Cascading timeouts define a systematic
+approach to configuring timeout
+
+58
+00:03:59,984 --> 00:04:04,059
+values and distributed systems
+based on one fundamental rule.
+
+59
+00:04:04,989 --> 00:04:08,319
+All upstream service calls
+must have a longer timeout than
+
+60
+00:04:08,319 --> 00:04:09,579
+their downstream dependencies.
+
+61
+00:04:10,079 --> 00:04:13,829
+This is the opposite of the inverted
+timeouts issue that we just discussed,
+
+62
+00:04:13,919 --> 00:04:20,379
+where an upstream client times out before
+its downstream dependency, and when we
+
+63
+00:04:20,379 --> 00:04:25,149
+do not ensure that the downstream systems
+are releasing their resources properly,
+
+64
+00:04:25,719 --> 00:04:31,349
+we end up getting into a situation
+where a downstream system is waiting
+
+65
+00:04:31,349 --> 00:04:35,144
+to get data where while an upstream
+system times out and they're paying.
+
+66
+00:04:35,819 --> 00:04:38,879
+Giving the user end user a
+really bad user experience.
+
+67
+00:04:39,779 --> 00:04:45,419
+So having these timeouts help re release
+resources promptly at every layer
+
+68
+00:04:45,929 --> 00:04:50,729
+and systematically longer timeouts
+higher up the call stack enable rapid
+
+69
+00:04:50,729 --> 00:04:55,649
+fault isolation, efficient resource
+management, and graceful degradation.
+
+70
+00:04:56,369 --> 00:05:00,239
+This leads to more resilient and
+responsive microservice architecture.
+
+71
+00:05:00,739 --> 00:05:02,239
+Let's look at the timeout principle.
+
+72
+00:05:02,239 --> 00:05:03,679
+The cascading timeout principle.
+
+73
+00:05:04,024 --> 00:05:07,984
+It dictates assigning progressively
+shorter timeouts from the
+
+74
+00:05:07,984 --> 00:05:11,164
+sister's outermost edge inward.
+
+75
+00:05:11,734 --> 00:05:13,024
+So what does that look like?
+
+76
+00:05:13,084 --> 00:05:16,774
+Let's take the simple system
+where we have a load balancer, we
+
+77
+00:05:16,774 --> 00:05:20,194
+have a microservice gateway, and
+then we have a database, right?
+
+78
+00:05:20,824 --> 00:05:25,684
+And as you see, the timeouts are set
+in a progressively shorter manner,
+
+79
+00:05:26,044 --> 00:05:30,994
+ensuring that the user at the end who's
+connecting through the load balancer.
+
+80
+00:05:31,384 --> 00:05:36,574
+It's given enough time for each layer to
+actually fetch the data, cascade it up so
+
+81
+00:05:36,574 --> 00:05:38,224
+that the user eventually gets the data.
+
+82
+00:05:38,944 --> 00:05:43,774
+And if for some reason the data is
+not able to be fetched properly, a
+
+83
+00:05:43,774 --> 00:05:48,634
+timeout occurs, ensuring that all
+the layers don't hold up resources,
+
+84
+00:05:48,934 --> 00:05:53,084
+they're able to a retry, they're able
+to try to fetch the data again, send a
+
+85
+00:05:53,084 --> 00:05:58,594
+proper error code, whatever it is that
+ensures a smooth user experience, so
+
+86
+00:05:58,594 --> 00:06:03,514
+failures gets surfaced quickly to the
+client Downstream systems can recover
+
+87
+00:06:03,514 --> 00:06:05,644
+gracefully without tying up resources.
+
+88
+00:06:06,514 --> 00:06:10,324
+Exhaustion is prevented during
+partial outages, and the system
+
+89
+00:06:10,324 --> 00:06:13,894
+fails in a predictable, controlled
+manner, which is really the
+
+90
+00:06:13,894 --> 00:06:15,484
+lifeblood of our engineers, right?
+
+91
+00:06:15,874 --> 00:06:19,234
+To be able to predict during chaos.
+
+92
+00:06:19,734 --> 00:06:23,934
+And implementing these cascading
+timeouts establishes a strict hierarchy.
+
+93
+00:06:24,714 --> 00:06:29,004
+Assigning each successive downstream
+layer of timeout of at least 500
+
+94
+00:06:29,004 --> 00:06:31,344
+milliseconds shorter than the layer above.
+
+95
+00:06:32,244 --> 00:06:35,874
+This crucial buffer accounts for
+network latency and processing overhead.
+
+96
+00:06:36,594 --> 00:06:40,104
+It ensures efficient resource
+management and prevents bottlenecks.
+
+97
+00:06:40,604 --> 00:06:43,844
+This methodology prevents threat
+pool exhaustion and connection
+
+98
+00:06:44,024 --> 00:06:48,169
+duration by ensuring upstream
+services release resources promptly.
+
+99
+00:06:48,669 --> 00:06:51,999
+This discipline reduction in
+timeout values contains issues.
+
+100
+00:06:52,899 --> 00:06:56,709
+And prevents them from propagating,
+mitigating bottlenecks.
+
+101
+00:06:57,309 --> 00:07:00,369
+And the systematic approach
+enables swift failure detection and
+
+102
+00:07:00,369 --> 00:07:04,749
+control responses leading to a more
+resilient and responsive microservice
+
+103
+00:07:04,749 --> 00:07:06,899
+architecture implementation layer.
+
+104
+00:07:06,949 --> 00:07:10,589
+Let's look at the edge, for example,
+the ingress or the load balancer.
+
+105
+00:07:11,579 --> 00:07:14,429
+You could implement something
+similar configure the proxy
+
+106
+00:07:14,579 --> 00:07:15,869
+route to 3000 milliseconds.
+
+107
+00:07:16,369 --> 00:07:19,669
+And the backend proxy time
+out to 2,500 milliseconds.
+
+108
+00:07:20,479 --> 00:07:24,049
+We could integrate circuit breakers
+to prevent excessive reconnections,
+
+109
+00:07:24,559 --> 00:07:28,429
+and we could introduce custom
+response codes for timeout scenarios.
+
+110
+00:07:28,489 --> 00:07:32,199
+Enhancing observability
+as the outer most layer.
+
+111
+00:07:32,319 --> 00:07:36,189
+These timeouts are the longest in
+the system, so we have to ensure that
+
+112
+00:07:36,189 --> 00:07:40,749
+these systems are designed to have
+enough resources to be able to hold.
+
+113
+00:07:41,249 --> 00:07:42,599
+Transactions for that long.
+
+114
+00:07:43,379 --> 00:07:47,819
+And also this ensures the clients, the
+end users receive timely responses even
+
+115
+00:07:47,819 --> 00:07:49,499
+during internal system degradation.
+
+116
+00:07:49,999 --> 00:07:53,029
+Now look, let's look at the service
+layer, which could be like the
+
+117
+00:07:53,029 --> 00:07:57,139
+API gateway application services
+database connections, right?
+
+118
+00:07:57,499 --> 00:08:00,919
+We are setting progressively shorter
+timeout, right from the load balance.
+
+119
+00:08:00,919 --> 00:08:04,729
+As you get to the gateway, you're
+setting a time out of 2000 milliseconds.
+
+120
+00:08:05,229 --> 00:08:09,669
+And you could implement a retry
+policy with one retry, an exponential
+
+121
+00:08:09,669 --> 00:08:14,919
+back off so that we are not failing
+the transaction on the first try.
+
+122
+00:08:14,919 --> 00:08:18,669
+We're giving it another chance, but
+then we are not creating a retry storm.
+
+123
+00:08:19,189 --> 00:08:24,349
+And also enable error response
+caching for known failures to
+
+124
+00:08:24,349 --> 00:08:26,239
+enable the system to respond faster.
+
+125
+00:08:26,689 --> 00:08:30,949
+At the application layer, we could
+set a time out to 1500 milliseconds.
+
+126
+00:08:31,449 --> 00:08:36,609
+And we concise threat rules based on
+anticipated request patterns, implement
+
+127
+00:08:36,609 --> 00:08:40,689
+resiliency for j type of circuit
+breaker pattern to recognize failures
+
+128
+00:08:40,689 --> 00:08:43,539
+and to implement resiliency, right?
+
+129
+00:08:43,539 --> 00:08:47,394
+In taking a service out of rotation
+or side of rotation, whatever it
+
+130
+00:08:47,394 --> 00:08:50,074
+is that is possible in your case.
+
+131
+00:08:50,795 --> 00:08:54,694
+And now coming to the database, which is
+supposed to be the fastest layer, right?
+
+132
+00:08:54,814 --> 00:08:57,785
+We typically have databases
+responding in milliseconds.
+
+133
+00:08:58,384 --> 00:08:59,524
+Subseconds for sure.
+
+134
+00:09:00,244 --> 00:09:03,334
+And we typically manage
+JDBC connection timeouts.
+
+135
+00:09:03,334 --> 00:09:08,834
+We are a pool such as the Hickory
+Connection pool, so we could set statement
+
+136
+00:09:08,834 --> 00:09:13,604
+timeouts at the connection pool lever,
+configure separate query timeouts for
+
+137
+00:09:13,604 --> 00:09:18,285
+read and write operations, and thereby
+manage the database, connect connectivity
+
+138
+00:09:18,404 --> 00:09:22,574
+and ensure that for some reason if
+the database is beginning to degrade,
+
+139
+00:09:23,084 --> 00:09:25,874
+we're able to let the application know.
+
+140
+00:09:26,535 --> 00:09:31,694
+And get ourselves out of a situation
+where we're stuck waiting and we're
+
+141
+00:09:31,694 --> 00:09:33,314
+never telling the client what's going on.
+
+142
+00:09:33,814 --> 00:09:38,584
+Now, coming to speci special
+considerations for ML pipelines, right?
+
+143
+00:09:39,444 --> 00:09:43,045
+Machine Learning Inference Services
+requires specific timeout handling due
+
+144
+00:09:43,045 --> 00:09:45,865
+to their pretty unique characteristics.
+
+145
+00:09:46,795 --> 00:09:51,745
+Separate the model loading operations
+from inference, each with distinct
+
+146
+00:09:51,775 --> 00:09:57,115
+timeout strategies and configure batch
+prediction jobs with longer timeouts
+
+147
+00:09:57,115 --> 00:09:58,885
+compared to real time inference.
+
+148
+00:09:59,385 --> 00:10:02,625
+Introduce graceful degradation
+through fallback models when the
+
+149
+00:10:02,625 --> 00:10:04,515
+primary models experience timeout.
+
+150
+00:10:05,015 --> 00:10:09,455
+Introduce a cache layer caching layer for
+recent predictions to maintain service
+
+151
+00:10:09,455 --> 00:10:11,285
+availability during degraded state.
+
+152
+00:10:12,155 --> 00:10:15,575
+And additionally implement separate
+circuit breakers for different
+
+153
+00:10:15,575 --> 00:10:20,345
+model types, tailoring them to their
+specific resource consumption profiles.
+
+154
+00:10:20,845 --> 00:10:25,705
+So we talked about a lot of different
+layers and how we could implement timeouts
+
+155
+00:10:25,705 --> 00:10:30,895
+everywhere, and what considerations we
+need to take or make at every layer, and
+
+156
+00:10:30,895 --> 00:10:33,325
+how it applies to machine learning models.
+
+157
+00:10:34,045 --> 00:10:35,575
+Let's just do a recap, right?
+
+158
+00:10:36,205 --> 00:10:38,120
+What are the lessons that we
+learned through this journey?
+
+159
+00:10:38,830 --> 00:10:41,950
+That everything starts
+and ends with data, right?
+
+160
+00:10:42,010 --> 00:10:47,680
+We need data to look at product
+production volumes, production patterns,
+
+161
+00:10:47,920 --> 00:10:52,300
+and then we need to test and tune
+and continuously look at the data and
+
+162
+00:10:52,300 --> 00:10:55,360
+simulate delays to verify this behavior.
+
+163
+00:10:55,750 --> 00:10:58,900
+It's not enough to just set
+time outs progressively lower.
+
+164
+00:10:59,320 --> 00:11:02,320
+We need to ensure that we are
+giving enough time for each layer.
+
+165
+00:11:02,365 --> 00:11:07,495
+To do its core work and add a buffer
+on top of it to account for any
+
+166
+00:11:08,125 --> 00:11:14,755
+degradation due to increased load,
+due to some bad queries, bad plans
+
+167
+00:11:14,845 --> 00:11:16,405
+at the database layer, for example.
+
+168
+00:11:16,675 --> 00:11:21,445
+So always simulate delays, verify
+behavior, and refine configurations,
+
+169
+00:11:21,505 --> 00:11:26,725
+iteratively on actual performance data,
+load tests, and incident analysis.
+
+170
+00:11:27,225 --> 00:11:31,185
+Tailor your strategies to different
+service types and business context.
+
+171
+00:11:31,455 --> 00:11:35,475
+For example, data processing pipelines
+require longer timeouts than latency
+
+172
+00:11:35,475 --> 00:11:37,485
+sensitive transactional services, right?
+
+173
+00:11:37,995 --> 00:11:42,435
+Or it's the simple batch versus
+OLTP processing differences.
+
+174
+00:11:42,675 --> 00:11:45,825
+So always account for those and use those.
+
+175
+00:11:46,545 --> 00:11:48,495
+Standardize and monitoring, right?
+
+176
+00:11:49,305 --> 00:11:53,145
+Your system can be doing really
+well or really bad, but without
+
+177
+00:11:53,145 --> 00:11:54,765
+the proper observability.
+
+178
+00:11:55,380 --> 00:11:59,189
+We really don't know what's going
+on, so establish clear, documented
+
+179
+00:11:59,189 --> 00:12:04,079
+timeout policies for new services,
+implement robust monitoring and
+
+180
+00:12:04,079 --> 00:12:07,920
+alerting to quickly identify and
+proactively resolve timeout related
+
+181
+00:12:07,920 --> 00:12:10,859
+issues, enabling continuous refinement.
+
+182
+00:12:10,949 --> 00:12:12,569
+All of this needs to be iterative.
+
+183
+00:12:13,079 --> 00:12:16,469
+Everything goes hand in hand,
+and that's how in the end, we're
+
+184
+00:12:16,469 --> 00:12:18,329
+able to realize resiliency.
+
+185
+00:12:18,579 --> 00:12:21,699
+We'll just go over the implementation
+playbook another time, right?
+
+186
+00:12:22,209 --> 00:12:26,679
+Step one is to map service topology,
+understand all the dependencies,
+
+187
+00:12:27,099 --> 00:12:31,359
+document them, talk about, think
+through the flow of request through
+
+188
+00:12:31,359 --> 00:12:34,629
+your system, and identify critical
+paths and potential bottlenecks.
+
+189
+00:12:35,349 --> 00:12:37,989
+Step two, measure baselines.
+
+190
+00:12:38,679 --> 00:12:40,599
+Look at your current metrics, right?
+
+191
+00:12:40,719 --> 00:12:45,739
+Be it response times, be
+it error codes, be it.
+
+192
+00:12:46,519 --> 00:12:47,779
+Thread pool usage.
+
+193
+00:12:47,869 --> 00:12:49,459
+JVM usage, right?
+
+194
+00:12:49,459 --> 00:12:53,329
+Everything that tells you how the
+system behaves under average load
+
+195
+00:12:53,329 --> 00:12:54,919
+conditions and baseline them.
+
+196
+00:12:55,430 --> 00:12:56,959
+Now, design the timeout strategy.
+
+197
+00:12:57,589 --> 00:13:01,159
+Assign preliminary timeout values by
+starting from the innermost layers.
+
+198
+00:13:01,159 --> 00:13:05,180
+Example the databases, caches and
+progressively working outward.
+
+199
+00:13:05,300 --> 00:13:07,159
+Adding buffer time at each step.
+
+200
+00:13:07,659 --> 00:13:12,279
+Implement and test iteratively deploy
+changes incrementally and conduct.
+
+201
+00:13:12,699 --> 00:13:17,139
+Thorough performance and chaos testing
+to verify system behavior under
+
+202
+00:13:17,259 --> 00:13:23,019
+various failure scenarios, and five,
+monitor and continuously refine.
+
+203
+00:13:23,829 --> 00:13:25,209
+Observe the system behavior.
+
+204
+00:13:25,569 --> 00:13:28,959
+It ably adjust time out values
+based on real world performance
+
+205
+00:13:28,959 --> 00:13:30,759
+data and production insights.
+
+206
+00:13:31,259 --> 00:13:34,244
+The key takeaways are always
+designed for resilience.
+
+207
+00:13:34,649 --> 00:13:38,459
+And this is one such strategy to
+achieve resilience in your system.
+
+208
+00:13:38,489 --> 00:13:43,079
+Implementing cascade timeouts
+from inward to outward.
+
+209
+00:13:43,579 --> 00:13:47,429
+And this design prevents resource
+exhaustion, cascading failures.
+
+210
+00:13:47,489 --> 00:13:51,179
+It ensures graceful degradation
+and rapid system recovery, right?
+
+211
+00:13:51,629 --> 00:13:53,699
+Validate and monitor proactively.
+
+212
+00:13:53,699 --> 00:13:55,139
+Test timeout behaviors.
+
+213
+00:13:55,639 --> 00:13:59,419
+Ensure you have robust monitoring
+for real time observability
+
+214
+00:13:59,419 --> 00:14:01,219
+and swift issue resolution.
+
+215
+00:14:02,044 --> 00:14:06,454
+Implemented refinement, analyze
+performance data, instrument reports,
+
+216
+00:14:06,954 --> 00:14:12,474
+allow for refinement throughout
+your process and keep optimizing the
+
+217
+00:14:12,474 --> 00:14:14,154
+system resilience and performance.
+
+218
+00:14:14,654 --> 00:14:18,039
+Thank you for this opportunity
+and please feel free to reach out
+
+219
+00:14:18,039 --> 00:14:19,329
+to me if you have any questions.
+
+220
+00:14:19,779 --> 00:14:20,119
+Thank you.
+
