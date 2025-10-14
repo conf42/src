@@ -1,0 +1,1059 @@
+1
+00:00:00,500 --> 00:00:07,890
+Hi everyone, I'm Ra Herra, and today we
+are going to end to end on cube native
+
+2
+00:00:07,950 --> 00:00:14,100
+ETL at scale, specifically how to make
+PI spark plus airflow fast, reliable, and
+
+3
+00:00:15,000 --> 00:00:17,880
+cost efficient in a cloud native in Beran.
+
+4
+00:00:18,780 --> 00:00:22,350
+So I'll start with the
+architecture that keeps us stable.
+
+5
+00:00:23,025 --> 00:00:26,565
+Then the spark tuning that
+actually moves the needle.
+
+6
+00:00:27,055 --> 00:00:32,365
+Then the orchestration PA patterns
+that reduce operational pain.
+
+7
+00:00:32,665 --> 00:00:35,515
+And I'll finish with the phased rollout.
+
+8
+00:00:35,515 --> 00:00:37,075
+You can start next week.
+
+9
+00:00:37,885 --> 00:00:41,605
+My goal is zero fluff
+and maximum practicality.
+
+10
+00:00:41,935 --> 00:00:47,460
+Let's align on the route and we'll take,
+so each section builds on the last.
+
+11
+00:00:47,960 --> 00:00:52,700
+Here's the agenda and we'll move
+through five building blocks.
+
+12
+00:00:53,330 --> 00:00:58,770
+So the first one the cloud native ETL
+architecture where we'll discuss the
+
+13
+00:00:58,770 --> 00:01:01,290
+containers, Kubernetes and the IEC.
+
+14
+00:01:01,290 --> 00:01:03,660
+So we stop the firefighting in me.
+
+15
+00:01:04,160 --> 00:01:09,590
+Second, the Bipar performance
+opt optimization, where we'll
+
+16
+00:01:09,590 --> 00:01:13,880
+talk about the memory join and
+strategies and how to tame skew.
+
+17
+00:01:14,380 --> 00:01:18,640
+Third, the airflow orchestration
+techniques where we have the
+
+18
+00:01:18,640 --> 00:01:24,460
+dynamic dags resilient patterns and
+monitoring to stay ahead of failures.
+
+19
+00:01:24,940 --> 00:01:27,010
+Fourth, a real world scale.
+
+20
+00:01:27,250 --> 00:01:31,870
+What a multi terabyte pipeline would
+look like when this is done well.
+
+21
+00:01:32,370 --> 00:01:38,210
+Fifth and implementation roadmap
+faced steps to adopt safely
+
+22
+00:01:38,210 --> 00:01:39,770
+without risking production.
+
+23
+00:01:40,535 --> 00:01:45,604
+Before the how, let's be
+honest and discuss about why,
+
+24
+00:01:45,695 --> 00:01:47,285
+what breaks at the scale.
+
+25
+00:01:47,785 --> 00:01:51,085
+These are the ETL scaling
+challenges that we face.
+
+26
+00:01:51,325 --> 00:01:57,414
+And when the data volume and the velocity
+climb, the same four issues resurface.
+
+27
+00:01:58,134 --> 00:02:00,714
+One, the resource misallocation.
+
+28
+00:02:01,074 --> 00:02:06,604
+So clusters are either over provisioned
+or expensive or under provisioned
+
+29
+00:02:06,634 --> 00:02:12,124
+and unreliable because sizing is
+guesswork and provisioning is slow.
+
+30
+00:02:12,874 --> 00:02:17,464
+Two, limited visibility
+and complex dependencies.
+
+31
+00:02:17,914 --> 00:02:23,224
+When a job fails at 2:00 AM
+you can't see lineage or timing
+
+32
+00:02:23,314 --> 00:02:26,344
+clearly, so recovery is manual.
+
+33
+00:02:27,184 --> 00:02:33,094
+Three, there is brittle monoliths,
+so small changes like a new column,
+
+34
+00:02:33,244 --> 00:02:36,635
+can ripple through a monster
+script and break everything.
+
+35
+00:02:37,549 --> 00:02:39,649
+Four exploding data volumes.
+
+36
+00:02:40,010 --> 00:02:47,229
+More data increases shuffle cost, storage
+cost, and blast radius of bad input.
+
+37
+00:02:47,589 --> 00:02:51,819
+Together these costs, delays
+and unpredictable costs
+
+38
+00:02:51,819 --> 00:02:54,639
+and reactive firefighting.
+
+39
+00:02:55,239 --> 00:02:59,679
+So a better way is agile, automated
+and scalable architecture.
+
+40
+00:03:00,179 --> 00:03:04,649
+Resources flex with load
+dependencies are explicit, and
+
+41
+00:03:04,649 --> 00:03:07,559
+reliability is a feature, not luck.
+
+42
+00:03:08,209 --> 00:03:12,889
+Let's pour a stable foundation first
+and then we'll talk about speed.
+
+43
+00:03:13,389 --> 00:03:17,289
+So we rely on three mutual
+reinforcing pillars.
+
+44
+00:03:17,789 --> 00:03:21,089
+So the first pillar is the container.
+
+45
+00:03:21,449 --> 00:03:27,899
+So where here the code is packaged
+and dependencies together.
+
+46
+00:03:28,169 --> 00:03:32,789
+So the jobs are reproducible
+across dev test and fraud.
+
+47
+00:03:33,179 --> 00:03:38,399
+That alone eliminates the works
+on my machine surprises and lets
+
+48
+00:03:38,429 --> 00:03:43,744
+each pipeline declare exactly the
+CPU memory and the JVM it needs.
+
+49
+00:03:44,244 --> 00:03:48,144
+Pillar number two is Kubernetes
+as a compute fabrics.
+
+50
+00:03:48,414 --> 00:03:51,024
+So namespace isolate teams.
+
+51
+00:03:51,474 --> 00:03:58,314
+Autoscaling expands worker
+pods under loads and core task.
+
+52
+00:03:58,314 --> 00:04:02,634
+Keep noisy S in check for
+multi-tenant analytics.
+
+53
+00:04:02,634 --> 00:04:04,104
+This is essential.
+
+54
+00:04:04,604 --> 00:04:08,024
+Number three is the
+infrastructure as code.
+
+55
+00:04:08,634 --> 00:04:13,564
+We've used Terraform and H and this
+helps to deploy the platform and airflow
+
+56
+00:04:13,834 --> 00:04:20,464
+declaratively so we can review the changes
+via request and promote via jet tops.
+
+57
+00:04:20,764 --> 00:04:25,804
+Turns infrastructure into
+version and testable artifacts.
+
+58
+00:04:26,644 --> 00:04:28,264
+Here's a quick example.
+
+59
+00:04:28,264 --> 00:04:34,144
+So if a team needs a Python upgrade
+or a new connector, you shape a
+
+60
+00:04:34,144 --> 00:04:39,919
+new connector container and roll
+it out safely through Helm values.
+
+61
+00:04:40,499 --> 00:04:45,424
+No Snowflake servers, no drift with the
+runway built and the plane is sparked.
+
+62
+00:04:45,474 --> 00:04:47,209
+Let's tune it to fly.
+
+63
+00:04:47,709 --> 00:04:52,599
+So the spark performance reduces
+two, three layers, right?
+
+64
+00:04:53,319 --> 00:04:56,799
+So the first is memory,
+then the joints and skew.
+
+65
+00:04:57,299 --> 00:05:01,799
+When it comes to memory, you can
+start by right sizing the executors.
+
+66
+00:05:02,109 --> 00:05:08,019
+Approximately four to eight GB per
+executor is a p pragmatic range.
+
+67
+00:05:08,809 --> 00:05:08,829
+Cash.
+
+68
+00:05:09,364 --> 00:05:12,544
+Sparsing with persist only.
+
+69
+00:05:12,574 --> 00:05:14,524
+Wear a reuse payoff.
+
+70
+00:05:14,884 --> 00:05:18,664
+Set memory fractions around 0.64.
+
+71
+00:05:18,664 --> 00:05:26,104
+Execution and 0.2 for storage as baseline
+adjust with real metrics, not hunches.
+
+72
+00:05:26,604 --> 00:05:28,219
+And then coming to joins.
+
+73
+00:05:28,219 --> 00:05:34,129
+Use broadcast hash joins for
+small dimensions for about like
+
+74
+00:05:34,129 --> 00:05:37,639
+less than a hundred MD two steps.
+
+75
+00:05:37,699 --> 00:05:41,809
+Sidestep shuffles for
+a large fact to fact.
+
+76
+00:05:41,809 --> 00:05:47,869
+Joints lean on short merge and
+reduce the number of wide stage.
+
+77
+00:05:48,319 --> 00:05:52,879
+If you see ballooning shuffle
+read times your joint strategy
+
+78
+00:05:52,879 --> 00:05:53,954
+is usually the culprit.
+
+79
+00:05:54,454 --> 00:06:01,654
+Then coming to this queue, a handful
+of hotkey can stall an entire job,
+
+80
+00:06:02,104 --> 00:06:09,334
+use salting or pre aggregation on
+hotkey to, so the partitions finish
+
+81
+00:06:09,334 --> 00:06:12,874
+at similar times, reliability touches.
+
+82
+00:06:13,324 --> 00:06:18,424
+So add checkpointing to cut
+lineage depth, right and enable.
+
+83
+00:06:19,349 --> 00:06:24,359
+Predicate push downs and dynamic
+partition discovery to trim io
+
+84
+00:06:25,049 --> 00:06:27,599
+and make all rights item potent.
+
+85
+00:06:27,819 --> 00:06:31,509
+K eights aware retries
+don't double, right?
+
+86
+00:06:32,009 --> 00:06:33,899
+So here's a mini story.
+
+87
+00:06:34,199 --> 00:06:38,799
+We had a dimension table at
+60 MB moving to broadcast.
+
+88
+00:06:38,799 --> 00:06:42,219
+Join at a stage from 19 minutes to three.
+
+89
+00:06:42,719 --> 00:06:46,289
+Another pipeline had a
+single customer representing.
+
+90
+00:06:46,699 --> 00:06:54,589
+40% of the rows a simple salt with 16
+buckets, level the partition and remove
+
+91
+00:06:54,589 --> 00:06:58,669
+the straggler, but don't trust wipes.
+
+92
+00:06:58,729 --> 00:06:59,359
+Prove it.
+
+93
+00:07:00,289 --> 00:07:03,019
+So always take a baseline.
+
+94
+00:07:03,379 --> 00:07:06,079
+So driver or executor counts, right?
+
+95
+00:07:06,949 --> 00:07:08,944
+Memory, shuffle, read or write.
+
+96
+00:07:09,629 --> 00:07:15,599
+Stage times and spill metrics
+change one variable at a time.
+
+97
+00:07:15,809 --> 00:07:18,329
+You'll typically see
+winds from fewer shuffle.
+
+98
+00:07:18,829 --> 00:07:22,729
+And better executor
+sizing and smarter joints.
+
+99
+00:07:23,089 --> 00:07:29,299
+When you confirm a win, bake it into the
+project templates, so the next pipeline
+
+100
+00:07:29,299 --> 00:07:31,639
+inherits the improvement by default.
+
+101
+00:07:32,509 --> 00:07:40,314
+Now let us see, let's orchestrate at scale
+without turning sari into a midnight hub.
+
+102
+00:07:40,814 --> 00:07:43,994
+So here is like the airflow on Kubernetes.
+
+103
+00:07:44,434 --> 00:07:49,569
+So running the airflow on Kubernetes
+aligns the control plane With data
+
+104
+00:07:49,569 --> 00:07:52,449
+plane, you get scheduler, scalability.
+
+105
+00:07:52,594 --> 00:07:57,874
+2000 plus DAC runs per
+day pod level isolation.
+
+106
+00:07:58,114 --> 00:08:06,064
+So each tasks de declares CPU and memory
+workload, identity and manage secrets for
+
+107
+00:08:06,064 --> 00:08:13,554
+built in security and cloud native logging
+or monitoring out of the box in practice
+
+108
+00:08:13,554 --> 00:08:22,379
+teams around 99.9% scheduler uptime with
+drastically less operational overhead.
+
+109
+00:08:22,879 --> 00:08:25,129
+So here's a practical tip.
+
+110
+00:08:25,129 --> 00:08:29,489
+You get to define a small
+set of pot templates.
+
+111
+00:08:29,589 --> 00:08:33,999
+A small I. Heavy joints
+and machine learnings.
+
+112
+00:08:34,719 --> 00:08:38,379
+So tasks, pick the right
+shape by convention.
+
+113
+00:08:38,879 --> 00:08:44,899
+So orchestration is more than just
+scheduling and it's patterns that's.
+
+114
+00:08:44,994 --> 00:08:46,434
+Scale people.
+
+115
+00:08:46,934 --> 00:08:54,064
+So here are the few advanced airflow
+patterns for resilient ETLs adopt these
+
+116
+00:08:54,064 --> 00:08:59,039
+four patterns to raise reliability
+without raising head counts.
+
+117
+00:08:59,539 --> 00:09:04,754
+First one is the dynamic tag
+generation, so keep the ConX.
+
+118
+00:09:05,254 --> 00:09:12,064
+In S3 or GCS and programmatically
+generate the tags, hundreds of similar
+
+119
+00:09:12,064 --> 00:09:14,734
+pipelines with minimal copy base.
+
+120
+00:09:15,234 --> 00:09:20,914
+Second is the intelligent branching
+here you can use, a branch Python
+
+121
+00:09:20,914 --> 00:09:27,184
+operator to route around known bad data
+or to choose the light path versus the
+
+122
+00:09:27,184 --> 00:09:29,584
+heavy path based on the input sizes.
+
+123
+00:09:30,544 --> 00:09:32,434
+Three, backfill design.
+
+124
+00:09:33,154 --> 00:09:36,544
+So drive jobs by logical run dates.
+
+125
+00:09:36,664 --> 00:09:42,904
+Make each step item potent and
+separate compute from storage, so
+
+126
+00:09:43,009 --> 00:09:45,429
+all runs can be pre-processed safely.
+
+127
+00:09:45,929 --> 00:09:46,759
+Four SLA.
+
+128
+00:09:47,019 --> 00:09:54,669
+Monitoring, we custom callbacks into
+a Datadog or Prometheus alert on
+
+129
+00:09:54,669 --> 00:10:00,889
+lateness and on leading indicators like
+raising retries, not just the failures.
+
+130
+00:10:01,389 --> 00:10:04,659
+And so here's a micro example.
+
+131
+00:10:04,999 --> 00:10:08,149
+A media pipeline checks volume at a fan.
+
+132
+00:10:08,149 --> 00:10:13,339
+Instead, if today's volume is
+greater than 1.5 times the.
+
+133
+00:10:13,839 --> 00:10:19,699
+Day seven median it auto branches
+to a wider executor profile and
+
+134
+00:10:19,699 --> 00:10:21,589
+adds a midstream checkpoint.
+
+135
+00:10:22,129 --> 00:10:28,429
+So of course, all of these still
+lives and dies by the executor sizing.
+
+136
+00:10:28,929 --> 00:10:35,109
+So here is a chart of the
+spark executor sizing.
+
+137
+00:10:35,349 --> 00:10:38,564
+It is basically the art of
+the resource allocation.
+
+138
+00:10:39,064 --> 00:10:41,914
+Think of the sizing as
+a curve, not a point.
+
+139
+00:10:42,694 --> 00:10:49,984
+Large executors mean fewer JVMs and
+strong throughput, but risk long GC
+
+140
+00:10:49,984 --> 00:10:55,884
+process and amplify SKU when coming to
+the medium or balanced executors are
+
+141
+00:10:55,974 --> 00:10:58,914
+good default for mixed load workload.
+
+142
+00:10:59,904 --> 00:11:06,054
+Tiny executors start fast and pack
+the cluster with parallelism, but
+
+143
+00:11:06,114 --> 00:11:12,294
+management overhead and shuffle
+plan out can dominate your safety.
+
+144
+00:11:12,319 --> 00:11:13,859
+Net is dynamic.
+
+145
+00:11:14,359 --> 00:11:18,079
+Allocation with sensible
+minimum or maximum bonds.
+
+146
+00:11:18,409 --> 00:11:24,119
+So the cluster scales under
+load, but never trashes.
+
+147
+00:11:24,359 --> 00:11:27,869
+Target the speed spot
+where utilization is high.
+
+148
+00:11:28,109 --> 00:11:31,064
+Spills are rare and shuffle stages don't.
+
+149
+00:11:31,564 --> 00:11:39,004
+Here's the field trick If medium task
+time is low, but the P 95 is awful.
+
+150
+00:11:39,574 --> 00:11:40,924
+Suspect skew.
+
+151
+00:11:41,194 --> 00:11:47,374
+If both median and P 95 are high, you
+are under resourced or over shuffling.
+
+152
+00:11:48,004 --> 00:11:50,464
+You can't tune what you can't see.
+
+153
+00:11:50,944 --> 00:11:54,654
+So let's wire observability
+in from the start.
+
+154
+00:11:55,154 --> 00:12:00,584
+So here's the monitoring and
+observability, and this is actually the
+
+155
+00:12:00,584 --> 00:12:03,554
+reliability foundation, as you can say.
+
+156
+00:12:04,194 --> 00:12:06,834
+So it comes down to the metrics.
+
+157
+00:12:07,224 --> 00:12:12,684
+So use Prometheus to capture cluster
+health and spark app metrics.
+
+158
+00:12:12,894 --> 00:12:21,014
+Watch executor, active time shuffle, read
+bytes, and spill spills and tasks cues.
+
+159
+00:12:21,899 --> 00:12:28,549
+And then logs and traces emit
+structured JSON logs with correlation
+
+160
+00:12:28,549 --> 00:12:35,689
+IDs add open telemetry tracing to
+switch airflow tasks and sparks to,
+
+161
+00:12:35,929 --> 00:12:39,159
+into a single story data quality.
+
+162
+00:12:39,759 --> 00:12:43,654
+It automate profiling
+with great expectations.
+
+163
+00:12:44,419 --> 00:12:48,489
+And get critical steps on expectations.
+
+164
+00:12:48,489 --> 00:12:50,979
+Use alert on KPIs.
+
+165
+00:12:51,219 --> 00:12:56,829
+The business cares about, not
+just the technical counts, costs.
+
+166
+00:12:57,489 --> 00:13:04,689
+Track the per app and per tag costs
+so you can right size continuously.
+
+167
+00:13:05,189 --> 00:13:08,409
+Now we've got the what and the how.
+
+168
+00:13:08,784 --> 00:13:13,074
+Now, how do you adapt this
+without breaking production?
+
+169
+00:13:13,574 --> 00:13:16,214
+So here's the modernization journey.
+
+170
+00:13:16,894 --> 00:13:21,304
+Here you can following this from
+phase one to phase five, you can
+
+171
+00:13:21,304 --> 00:13:26,909
+build a legacy batch to a cloud
+native a. Use the five phase part.
+
+172
+00:13:26,909 --> 00:13:30,689
+So risk stays low and momentum stays high.
+
+173
+00:13:31,289 --> 00:13:33,299
+Phase one assessment.
+
+174
+00:13:34,199 --> 00:13:40,769
+Here you can inventory jobs, profile
+performance map dependencies, choose
+
+175
+00:13:40,769 --> 00:13:46,399
+candidates by business impact, and
+phase two is the containerization.
+
+176
+00:13:46,899 --> 00:13:54,159
+And so this splits monoliths into modules
+package with multi-stage docker for
+
+177
+00:13:54,159 --> 00:14:02,989
+smaller, faster images, and followed by
+orchestration, so clean D dependencies
+
+178
+00:14:03,229 --> 00:14:08,824
+and manage environment specific
+configurations via airflow variables.
+
+179
+00:14:09,324 --> 00:14:14,154
+And for optimization, right
+size, tuned joints or memories
+
+180
+00:14:14,394 --> 00:14:17,004
+and rebo retry or recover.
+
+181
+00:14:17,814 --> 00:14:23,904
+And coming to operationalization,
+we can use CICD monitoring SLAs,
+
+182
+00:14:24,624 --> 00:14:27,114
+documentation, and knowledge trans.
+
+183
+00:14:27,614 --> 00:14:29,054
+Small bet approach.
+
+184
+00:14:29,054 --> 00:14:33,014
+So migrate one medium
+impact pipeline per sprint.
+
+185
+00:14:33,374 --> 00:14:35,894
+Compare baselines versus new.
+
+186
+00:14:36,764 --> 00:14:39,284
+Publish the win repeat.
+
+187
+00:14:39,974 --> 00:14:43,484
+Now as you roll out,
+dos the classic traps.
+
+188
+00:14:43,984 --> 00:14:49,334
+So we have the common pitfalls
+and it's better to avoid them.
+
+189
+00:14:50,024 --> 00:14:53,054
+So the first one is the
+resource misallocation.
+
+190
+00:14:53,654 --> 00:14:57,584
+Over provisioning wastes money
+and under provision fails.
+
+191
+00:14:57,584 --> 00:15:02,984
+Jobs enforced dynamic allocation
+bonds, and alert on ideal time.
+
+192
+00:15:03,484 --> 00:15:08,434
+Excessive shuffling, often skew
+or unnecessary repartition.
+
+193
+00:15:08,644 --> 00:15:14,704
+Use spark UI and stage metrics
+to pinpoint hot keys, salt, or
+
+194
+00:15:14,764 --> 00:15:17,434
+pre aggregate wrong formats.
+
+195
+00:15:17,914 --> 00:15:25,234
+So switch large data sets from CSV
+or JSON to packet or ORC for three
+
+196
+00:15:25,234 --> 00:15:29,659
+to five times the gains through
+column nerve storage and compression.
+
+197
+00:15:30,159 --> 00:15:35,889
+For orphan resources, failed
+jobs can leave like pods or
+
+198
+00:15:36,009 --> 00:15:42,169
+persistent volumes and add cleanup
+hooks and quotas as guardrails.
+
+199
+00:15:42,669 --> 00:15:49,649
+So let's land this with a concrete startup
+plan and three messages to remember.
+
+200
+00:15:50,149 --> 00:15:52,339
+Here's the implementation roadmap.
+
+201
+00:15:52,669 --> 00:15:54,739
+If you are planning on getting started.
+
+202
+00:15:55,489 --> 00:16:01,130
+So this is how you, your
+implementation would look like.
+
+203
+00:16:02,090 --> 00:16:07,990
+So week one you can pick on
+safe pipeline, record base line,
+
+204
+00:16:08,050 --> 00:16:09,970
+runtime, and shuffle and cost.
+
+205
+00:16:10,870 --> 00:16:15,040
+Week two, stand up a
+small K eights node pool.
+
+206
+00:16:15,790 --> 00:16:20,500
+Deploy air flows with helm
+set workload identity secrets.
+
+207
+00:16:20,800 --> 00:16:22,840
+Week three, containerize.
+
+208
+00:16:22,890 --> 00:16:29,460
+The pipeline add dynamic allocation switch
+joins appropriately and add checkpoints.
+
+209
+00:16:30,180 --> 00:16:35,550
+Week four, wire metrics, logs
+or quality checks run new.
+
+210
+00:16:36,145 --> 00:16:37,075
+This is Legacy.
+
+211
+00:16:37,075 --> 00:16:41,845
+In parallel, compare and publish
+results, capture lessons in
+
+212
+00:16:41,945 --> 00:16:43,955
+spark or Airflow playbook.
+
+213
+00:16:44,435 --> 00:16:50,335
+And if you only take three ideas
+with you, here is the key takeaways.
+
+214
+00:16:50,835 --> 00:16:52,495
+The key takeaways are.
+
+215
+00:16:52,995 --> 00:16:59,205
+Architectural discipline, performance
+optimization, resilient orchestration,
+
+216
+00:16:59,625 --> 00:17:01,305
+and operational excellence.
+
+217
+00:17:01,885 --> 00:17:06,775
+Coming to the architecture first,
+it depends on the containers,
+
+218
+00:17:06,865 --> 00:17:08,995
+Kubernetes and the IAC.
+
+219
+00:17:09,705 --> 00:17:13,035
+This gives the stability
+and speed of change.
+
+220
+00:17:14,025 --> 00:17:16,485
+The spice part, tuning pace.
+
+221
+00:17:16,785 --> 00:17:23,475
+So focusing on memory joints and SKUs
+routinely yields approximately 30
+
+222
+00:17:23,865 --> 00:17:27,165
+to 50% of efficiency improvements.
+
+223
+00:17:27,665 --> 00:17:35,835
+And then coming to the observability trust
+or metric logs, traces quality and cost.
+
+224
+00:17:35,925 --> 00:17:39,885
+Visibility, makes pipeline
+dependable and defensible.
+
+225
+00:17:40,385 --> 00:17:45,875
+Thanks for spending this time and if
+you would like the sizing templates,
+
+226
+00:17:46,145 --> 00:17:51,275
+dynamic DAG patterns or migration
+checklist, I'm happy to share.
+
+227
+00:17:51,675 --> 00:17:52,995
+Thank you so much.
+
+228
+00:17:53,495 --> 00:17:53,615
+I.
+
