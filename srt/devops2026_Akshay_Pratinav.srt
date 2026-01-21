@@ -1,0 +1,926 @@
+1
+00:00:00,500 --> 00:00:01,340
+Speaker 2: Hi everyone.
+
+2
+00:00:01,400 --> 00:00:03,200
+I'm Akha Prana from Intuit.
+
+3
+00:00:03,530 --> 00:00:08,120
+Today I want to talk about a topic
+that most of us only think about
+
+4
+00:00:08,120 --> 00:00:11,600
+when things are already going
+wrong, that is regional failover.
+
+5
+00:00:12,250 --> 00:00:17,380
+Specifically how failover becomes
+exponentially harder in modern
+
+6
+00:00:17,380 --> 00:00:21,940
+microservice architectures where
+you're not just dealing with stateless
+
+7
+00:00:21,940 --> 00:00:27,280
+APIs, but databases, async pipelines,
+bad jobs, and routing layers.
+
+8
+00:00:28,045 --> 00:00:31,255
+All of which behave very
+differently during failure.
+
+9
+00:00:32,065 --> 00:00:35,485
+This talk isn't about a
+specific product or tool.
+
+10
+00:00:35,785 --> 00:00:40,645
+It's about patterns we learned
+while trying to make failover
+
+11
+00:00:40,705 --> 00:00:42,775
+predictable and ideally boring.
+
+12
+00:00:43,275 --> 00:00:44,925
+Here is a high level agenda.
+
+13
+00:00:45,375 --> 00:00:48,255
+We'll go over problem
+statement and motivation.
+
+14
+00:00:49,095 --> 00:00:53,115
+Then we will align on few
+principles and mental model.
+
+15
+00:00:53,850 --> 00:00:59,160
+Then we are going to talk about platform
+architecture outcomes and key takeaways
+
+16
+00:00:59,660 --> 00:01:04,460
+Before we go into architecture or
+solution, I want to level set on the
+
+17
+00:01:04,460 --> 00:01:06,590
+problem we are actually trying to solve.
+
+18
+00:01:07,090 --> 00:01:09,790
+By now, I think we can
+all agree on one thing.
+
+19
+00:01:10,480 --> 00:01:11,740
+Outages are normal.
+
+20
+00:01:12,400 --> 00:01:13,600
+Cloud regions fail.
+
+21
+00:01:13,960 --> 00:01:15,760
+Managed services have bad days.
+
+22
+00:01:16,260 --> 00:01:20,640
+Even highly reliable systems
+eventually hit failure modes.
+
+23
+00:01:20,970 --> 00:01:26,000
+They didn't anticipate what really
+hurts business and customer isn't
+
+24
+00:01:26,000 --> 00:01:28,580
+outage itself, it's the recovery.
+
+25
+00:01:29,540 --> 00:01:35,510
+When recovery is slow, manual and
+chaotic, customer trusts erodes quickly.
+
+26
+00:01:36,010 --> 00:01:39,340
+So the real question isn't
+how do we prevent outages?
+
+27
+00:01:39,880 --> 00:01:42,010
+It's how do we recover from them.
+
+28
+00:01:42,510 --> 00:01:43,770
+In a predictable way.
+
+29
+00:01:44,270 --> 00:01:49,040
+Microservices gave us a scale
+and velocity, but they also
+
+30
+00:01:49,040 --> 00:01:53,060
+changed the failure landscape
+during a regional outage.
+
+31
+00:01:53,390 --> 00:01:55,490
+You're not just failing over one thing.
+
+32
+00:01:56,090 --> 00:02:00,410
+APIs might come up quickly,
+but background workers may lag
+
+33
+00:02:00,910 --> 00:02:02,530
+databases, may need promotion.
+
+34
+00:02:03,030 --> 00:02:09,260
+Async pipelines may replay or stall,
+and all of these components have a
+
+35
+00:02:09,260 --> 00:02:11,180
+different recovery characteristics.
+
+36
+00:02:12,020 --> 00:02:17,330
+The key lesson we learned is this,
+your system only recovers as fast as
+
+37
+00:02:17,330 --> 00:02:20,095
+the slowest workload in the stack.
+
+38
+00:02:20,595 --> 00:02:24,345
+So when we look at major
+incidents, the outage itself is
+
+39
+00:02:24,350 --> 00:02:26,210
+really the most damaging part.
+
+40
+00:02:27,050 --> 00:02:31,610
+What actually determines customer
+impact is how quickly and predictably
+
+41
+00:02:31,820 --> 00:02:34,760
+the system recovers and under pressure.
+
+42
+00:02:35,120 --> 00:02:39,740
+Humans become the weakest link,
+not because they are bad ingenious,
+
+43
+00:02:39,830 --> 00:02:45,560
+but because of stress, fatigue and
+incomplete information lead to mistakes.
+
+44
+00:02:46,250 --> 00:02:51,350
+This is why automation and standardization
+matters so much in disaster recovery.
+
+45
+00:02:51,850 --> 00:02:56,260
+In many organization, failover
+vol evolves organically.
+
+46
+00:02:56,760 --> 00:03:01,830
+Each team builds what they think
+is good enough for their service.
+
+47
+00:03:02,330 --> 00:03:07,610
+Over time, you end up with dozens or
+hundreds of different DR strategies.
+
+48
+00:03:08,110 --> 00:03:11,620
+The problem isn't that these
+solutions are bad individually.
+
+49
+00:03:12,250 --> 00:03:16,030
+The problem is that they
+don't de, they don't compose.
+
+50
+00:03:16,530 --> 00:03:21,200
+During a real outage, fragmentation
+turns into confusion, and
+
+51
+00:03:21,200 --> 00:03:22,970
+confusion turns into delay.
+
+52
+00:03:23,470 --> 00:03:27,790
+So runbooks are often treated as a
+safety net, but during a real outage,
+
+53
+00:03:27,850 --> 00:03:32,020
+engineers are context switching,
+debugging incomplete signals,
+
+54
+00:03:32,290 --> 00:03:34,420
+and coordinating across teams.
+
+55
+00:03:35,200 --> 00:03:38,445
+That's a terrible time to
+follow a multi-page checklist.
+
+56
+00:03:38,945 --> 00:03:43,445
+The more your recovery depends on
+human memory, the less reliable
+
+57
+00:03:43,505 --> 00:03:46,385
+it becomes, especially at scale.
+
+58
+00:03:46,885 --> 00:03:50,185
+Now that we have talked about
+the problem, I want to go over
+
+59
+00:03:50,185 --> 00:03:55,465
+a few principles that went into
+building disaster recovery platform.
+
+60
+00:03:55,965 --> 00:03:59,295
+When we say boring failover, we
+are not minimizing its importance.
+
+61
+00:04:00,195 --> 00:04:04,725
+We mean that failer should be so
+predictable and well-rehearsed,
+
+62
+00:04:04,995 --> 00:04:07,155
+that it doesn't require heroics.
+
+63
+00:04:07,905 --> 00:04:09,915
+No one should be scrambling for runbooks.
+
+64
+00:04:10,365 --> 00:04:15,125
+No one should be manually scaling
+clusters at 3:00 AM boring.
+
+65
+00:04:15,125 --> 00:04:18,365
+Failer is a sign of engineering maturity.
+
+66
+00:04:18,865 --> 00:04:21,895
+One of the design principle
+is declarative intent.
+
+67
+00:04:22,395 --> 00:04:26,715
+The biggest shift we made
+was moving from imperative
+
+68
+00:04:26,715 --> 00:04:28,905
+procedures to declarative intent.
+
+69
+00:04:29,405 --> 00:04:35,255
+Instead of telling teams how to fail
+over, we asked them to declare what
+
+70
+00:04:35,255 --> 00:04:41,065
+they need, capacity dependencies,
+data requirements, and criticality.
+
+71
+00:04:41,565 --> 00:04:44,145
+The platform then owns the mechanics.
+
+72
+00:04:44,925 --> 00:04:47,205
+This removes a huge cognitive burden.
+
+73
+00:04:47,670 --> 00:04:52,500
+From service teams and creates
+consistency across the organization.
+
+74
+00:04:53,000 --> 00:04:56,870
+Another design principle is
+to fail over the entire stack.
+
+75
+00:04:57,370 --> 00:05:00,250
+A partial failover is usually
+worse than no failover.
+
+76
+00:05:00,750 --> 00:05:06,030
+If your API fails over, but your
+async workers don't, you can corrupt
+
+77
+00:05:06,030 --> 00:05:08,910
+state or build up massive backlogs.
+
+78
+00:05:09,410 --> 00:05:14,480
+We learned that failover has to
+be treated as a full stack event.
+
+79
+00:05:15,410 --> 00:05:21,470
+That is compute, async,
+workload, data, and routing layer
+
+80
+00:05:21,620 --> 00:05:24,260
+executed in a coordinated way.
+
+81
+00:05:24,760 --> 00:05:26,860
+Anything less creates hidden risk.
+
+82
+00:05:27,360 --> 00:05:30,180
+Remember that failover
+is not a point solution.
+
+83
+00:05:30,600 --> 00:05:32,850
+It needs to be end to end.
+
+84
+00:05:33,350 --> 00:05:36,770
+So standardization doesn't mean
+treating every workload the same.
+
+85
+00:05:37,770 --> 00:05:42,299
+A customer facing API has very
+different recovery requirement
+
+86
+00:05:42,450 --> 00:05:43,680
+than a nightly batch job.
+
+87
+00:05:44,180 --> 00:05:49,490
+The key is providing a common
+framework where services can
+
+88
+00:05:49,490 --> 00:05:51,175
+express those differences.
+
+89
+00:05:51,740 --> 00:05:54,790
+Declaratively, the
+platform adapts behavior.
+
+90
+00:05:55,554 --> 00:05:58,255
+Without teams reinventing the wheel.
+
+91
+00:05:58,755 --> 00:06:01,905
+Another design principle
+is prescale capacity.
+
+92
+00:06:02,405 --> 00:06:08,315
+Another major source of downtime is
+cold capacity in the secondary region.
+
+93
+00:06:08,815 --> 00:06:14,155
+Instead of guessing how much capacity
+we might need, we prescale based on live
+
+94
+00:06:14,155 --> 00:06:16,855
+traffic patterns from the primary region.
+
+95
+00:06:17,355 --> 00:06:21,885
+That way when failover happens,
+capacity is already there.
+
+96
+00:06:22,385 --> 00:06:28,895
+Now recovery becomes more about traffic
+movement, not infrastructure readiness.
+
+97
+00:06:29,395 --> 00:06:31,465
+Compute can usually be restarted.
+
+98
+00:06:31,765 --> 00:06:33,955
+Data is where things get dangerous.
+
+99
+00:06:34,855 --> 00:06:40,045
+Promoting a database or cache
+involves consistency, ordering,
+
+100
+00:06:40,165 --> 00:06:41,215
+and correctness guarantee.
+
+101
+00:06:41,715 --> 00:06:46,245
+Automation here isn't about
+speed alone, it's about safety.
+
+102
+00:06:47,235 --> 00:06:51,825
+By encoding these steps into the
+platform, we reduce the risk of human
+
+103
+00:06:51,825 --> 00:06:55,455
+error during high stress incidents.
+
+104
+00:06:55,955 --> 00:07:00,125
+Traffic routing is often treated as
+the final step, but it's actually
+
+105
+00:07:00,125 --> 00:07:05,059
+a core control mechanism, whether
+you use DNS or a service mesh.
+
+106
+00:07:05,710 --> 00:07:11,739
+Traffic should move based on health
+signals, not manual decisions.
+
+107
+00:07:12,700 --> 00:07:17,289
+This makes failover, observable,
+reversible, and far less risky.
+
+108
+00:07:17,790 --> 00:07:22,920
+Traffic routing becomes part of
+the system, not an emergency lever.
+
+109
+00:07:23,420 --> 00:07:27,410
+One mistake we often see is
+treating phlo like a switch.
+
+110
+00:07:27,979 --> 00:07:29,570
+In reality, it's a workflow.
+
+111
+00:07:30,080 --> 00:07:35,719
+You scale, promote, validate health,
+shift traffic and verify things.
+
+112
+00:07:36,379 --> 00:07:42,289
+Skipping steps is how incidents
+turn into big outages.
+
+113
+00:07:42,789 --> 00:07:47,259
+Remember that toggles don't
+recover systems, but workflows too.
+
+114
+00:07:47,759 --> 00:07:50,909
+So up to this point, we have talked
+about problems and principles.
+
+115
+00:07:51,329 --> 00:07:55,139
+Now I want to ground these
+ideas in a concrete system.
+
+116
+00:07:55,639 --> 00:08:00,649
+So let's look at Dr procedure
+yaml example for an active passive
+
+117
+00:08:01,099 --> 00:08:03,349
+microservice that uses our database.
+
+118
+00:08:03,849 --> 00:08:05,979
+So in this example, we have four stages.
+
+119
+00:08:06,399 --> 00:08:11,139
+So stage one, as you can see, is a
+Prescale East stage that basically
+
+120
+00:08:11,169 --> 00:08:16,659
+pre scales Kubernetes PO in the
+failover region and matches the
+
+121
+00:08:16,659 --> 00:08:18,639
+capacity with existing region.
+
+122
+00:08:19,139 --> 00:08:21,689
+This is done by updating
+HPM and replica value.
+
+123
+00:08:22,189 --> 00:08:27,769
+Stage two is promoting database
+to primary in failover region.
+
+124
+00:08:28,269 --> 00:08:33,479
+Stage three is about dialing traffic
+in failover region, and the last
+
+125
+00:08:33,479 --> 00:08:37,859
+stage is a stage four, which is
+resetting HPM and replica value.
+
+126
+00:08:38,534 --> 00:08:42,674
+Two original value so that teams
+don't pay for extra compute
+
+127
+00:08:42,674 --> 00:08:45,014
+costs after traffic reduces.
+
+128
+00:08:45,514 --> 00:08:50,554
+All these stages run in a sequence
+that is stage two starts after
+
+129
+00:08:50,554 --> 00:08:53,674
+stage one has completed, and so on.
+
+130
+00:08:54,174 --> 00:08:56,544
+So let's take a look at
+high level architecture.
+
+131
+00:08:57,414 --> 00:09:00,384
+So here there's a user who
+is executing a DR. Plan.
+
+132
+00:09:00,804 --> 00:09:04,464
+Using ui and this DR.
+Plan has three stages.
+
+133
+00:09:04,884 --> 00:09:07,944
+That is prescale, dial and reset.
+
+134
+00:09:08,444 --> 00:09:10,094
+It sends requests to the backend.
+
+135
+00:09:10,094 --> 00:09:11,314
+API, backend.
+
+136
+00:09:11,434 --> 00:09:13,234
+API Starts state machine.
+
+137
+00:09:13,734 --> 00:09:19,824
+State machine sends event to Kafka Topic,
+as you can see on the screen, Prescale
+
+138
+00:09:19,824 --> 00:09:23,154
+stage has been sent to Kafka topic.
+
+139
+00:09:23,654 --> 00:09:28,034
+We have different agents like database
+agent that performs failover operation
+
+140
+00:09:28,034 --> 00:09:33,554
+on a database, and we have capacity
+agent that analyzes compute capacity
+
+141
+00:09:33,824 --> 00:09:35,774
+and performs scaling operation.
+
+142
+00:09:36,274 --> 00:09:41,374
+After agent receives event in Kafka
+topic, the right agent picks the
+
+143
+00:09:41,374 --> 00:09:46,804
+task or the stage and it creates
+a lock in SEMA for service.
+
+144
+00:09:47,304 --> 00:09:48,894
+Now state machine pulls.
+
+145
+00:09:49,404 --> 00:09:54,164
+For SEMA four service lock status
+only after SEMA four is unlocked,
+
+146
+00:09:54,584 --> 00:09:59,264
+it sends the next stage to Kafka
+topic ensuring consistent execution
+
+147
+00:09:59,264 --> 00:10:02,204
+of stages in the expected order.
+
+148
+00:10:02,704 --> 00:10:09,574
+So on every Kubernetes cluster there is
+in cluster add-on running that prescale
+
+149
+00:10:09,574 --> 00:10:12,874
+spot on receiving pre-cal request.
+
+150
+00:10:13,374 --> 00:10:17,694
+Those agents also rely on
+external monitoring tool to
+
+151
+00:10:17,694 --> 00:10:19,494
+verify status of every action.
+
+152
+00:10:20,334 --> 00:10:25,584
+For example, after pos have pre
+scaled metrics and monitoring tool
+
+153
+00:10:25,644 --> 00:10:27,144
+should reflect that information.
+
+154
+00:10:28,014 --> 00:10:34,404
+This gives an indication for agent to
+unlock SEMA four so that state machine
+
+155
+00:10:34,404 --> 00:10:37,194
+can safely proceed to next stage.
+
+156
+00:10:37,694 --> 00:10:42,044
+As you can see, platform has both
+frontend and backend component.
+
+157
+00:10:42,704 --> 00:10:47,024
+Frontend component is built using
+React, and for backend component,
+
+158
+00:10:47,264 --> 00:10:49,694
+we are using Golan and Python.
+
+159
+00:10:50,194 --> 00:10:56,254
+Let's go over safety and operation that
+turns a fast failover into a reliable one.
+
+160
+00:10:56,754 --> 00:10:59,874
+So speed alone is in the goal.
+
+161
+00:11:00,374 --> 00:11:04,094
+Fast but unsafe failover can
+be worse than staying down.
+
+162
+00:11:04,594 --> 00:11:08,434
+Guardrails like health
+gate dependency validation.
+
+163
+00:11:08,944 --> 00:11:13,534
+They ensure we only move traffic
+when the system is actually ready.
+
+164
+00:11:14,254 --> 00:11:17,854
+And equally important,
+every step is reversible.
+
+165
+00:11:18,354 --> 00:11:21,114
+So automation only works
+if the system is ready.
+
+166
+00:11:21,544 --> 00:11:25,414
+That means requiring healthcare
+dependency check and drift detection.
+
+167
+00:11:25,914 --> 00:11:28,374
+We must eliminate Dr. Only Confis.
+
+168
+00:11:28,874 --> 00:11:32,624
+No special flags You flip once a year.
+
+169
+00:11:33,124 --> 00:11:34,624
+Production should always be failover.
+
+170
+00:11:34,624 --> 00:11:35,194
+Already.
+
+171
+00:11:36,094 --> 00:11:38,524
+Failover shouldn't depend on hope.
+
+172
+00:11:39,024 --> 00:11:44,474
+Regular game days completely changed
+how teams think about failover because
+
+173
+00:11:44,474 --> 00:11:49,004
+it's automated and standardized
+drills are low stress and repeatable.
+
+174
+00:11:49,504 --> 00:11:53,344
+The first time you fail over should
+never be during a real outage.
+
+175
+00:11:53,844 --> 00:11:58,555
+So to wrap things up, I want to step back
+and talk about outcomes and takeaways.
+
+176
+00:11:59,055 --> 00:12:01,785
+So antipas to avoid intrude ad hoc strips.
+
+177
+00:12:01,995 --> 00:12:05,265
+Ad hoc gear solutions don't
+usually fail during design.
+
+178
+00:12:06,015 --> 00:12:07,214
+They fail during execution.
+
+179
+00:12:07,979 --> 00:12:09,329
+Inconsistency.
+
+180
+00:12:09,509 --> 00:12:13,979
+Cognitive overload and
+untested assumptions show up
+
+181
+00:12:13,979 --> 00:12:15,569
+at the worst possible time.
+
+182
+00:12:16,069 --> 00:12:20,000
+Standardization isn't about
+control, it's about safety.
+
+183
+00:12:20,500 --> 00:12:23,470
+So when failovers is
+standardized, a few things happen.
+
+184
+00:12:23,970 --> 00:12:25,200
+Recovery gets faster.
+
+185
+00:12:25,890 --> 00:12:27,780
+Operational overhead drops.
+
+186
+00:12:28,350 --> 00:12:33,720
+Teams spend less time preparing for
+disasters and more time building features.
+
+187
+00:12:34,650 --> 00:12:40,470
+Most importantly, incidents become
+manageable instead of chaotic.
+
+188
+00:12:40,970 --> 00:12:45,890
+So one unexpected benefit of
+standardizing failover was
+
+189
+00:12:45,890 --> 00:12:49,100
+the cultural shift it created.
+
+190
+00:12:50,060 --> 00:12:54,470
+When ingenious trust the system,
+they are more willing to practice,
+
+191
+00:12:54,470 --> 00:12:56,480
+experiment, and improve it.
+
+192
+00:12:57,380 --> 00:12:59,870
+So failover stops being
+something people fear.
+
+193
+00:13:00,370 --> 00:13:07,630
+And starts being something they understand
+that confidence compounds over time.
+
+194
+00:13:08,130 --> 00:13:13,920
+If there's one message to take away, it's
+this standardized failover across all
+
+195
+00:13:13,920 --> 00:13:17,249
+workloads and use declarative intent.
+
+196
+00:13:18,119 --> 00:13:23,339
+Also, prescale capacity
+intelligently and practice regularly.
+
+197
+00:13:24,314 --> 00:13:28,755
+Boring, fail lower is a key
+sign of a mature system.
+
+198
+00:13:29,255 --> 00:13:30,185
+Thank you everyone.
+
+199
+00:13:30,425 --> 00:13:35,824
+Feel free to connect with me via email
+or LinkedIn if you have any questions.
+
+200
+00:13:36,324 --> 00:13:36,444
+I.
+
