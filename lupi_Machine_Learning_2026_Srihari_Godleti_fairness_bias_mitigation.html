@@ -437,6 +437,8 @@
 
             <script>
               
+              var transcript = [{"text": "Hi everyone.", "timestamp": "00:00:00,500", "timestamp_s": 0.0}, {"text": "Good morning and good afternoon.", "timestamp": "00:00:01,599", "timestamp_s": 1.0}, {"text": "So myself, was Ari.", "timestamp": "00:00:04,299", "timestamp_s": 4.0}, {"text": "Good lady.", "timestamp": "00:00:05,709", "timestamp_s": 5.0}, {"text": "I am currently working as a tech lead with Roku.", "timestamp": "00:00:06,459", "timestamp_s": 6.0}, {"text": "A streaming company which everybody\u0027s familiar, most of the people.", "timestamp": "00:00:10,074", "timestamp_s": 10.0}, {"text": "And today I\u0027m gonna talk about how we do, how to handle a data skew in a production", "timestamp": "00:00:15,094", "timestamp_s": 15.0}, {"text": "ML pipelines, and what are the challenges that we have and uncover encounter,", "timestamp": "00:00:21,904", "timestamp_s": 21.0}, {"text": "and then how we mitigated those issues technically and in a step by step process.", "timestamp": "00:00:28,084", "timestamp_s": 28.0}, {"text": "So I try to cover.", "timestamp": "00:00:34,664", "timestamp_s": 34.0}, {"text": "As much as I can in these next 25 to 30 minutes.", "timestamp": "00:00:36,299", "timestamp_s": 36.0}, {"text": "And so let\u0027s get started.", "timestamp": "00:00:40,359", "timestamp_s": 40.0}, {"text": "As I mentioned Roku is a streaming company and in the streaming", "timestamp": "00:00:43,349", "timestamp_s": 43.0}, {"text": "business, like we process a billions of watch events and ad impressions", "timestamp": "00:00:47,559", "timestamp_s": 47.0}, {"text": "every single day and every play.", "timestamp": "00:00:52,389", "timestamp_s": 52.0}, {"text": "Pause or recommendation, impression and ad.", "timestamp": "00:00:55,554", "timestamp_s": 55.0}, {"text": "Click feeds into spa pipelines, powering like personalized models, embedded", "timestamp": "00:00:58,254", "timestamp_s": 58.0}, {"text": "generation, and also ad ranking systems.", "timestamp": "00:01:05,214", "timestamp_s": 65.0}, {"text": "So these are the different machine learning pipelines we run to understand", "timestamp": "00:01:07,794", "timestamp_s": 67.0}, {"text": "the user\u0027s behavior while watching these shows or any television programs.", "timestamp": "00:01:11,984", "timestamp_s": 71.0}, {"text": "On paper, like everything looks scalable, distributed computing and partition", "timestamp": "00:01:18,274", "timestamp_s": 78.0}, {"text": "at the storage level, auto-scaling clusters, but can solve any many problems.", "timestamp": "00:01:25,054", "timestamp_s": 85.0}, {"text": "But again, like in reality, what we have observed is jobs that normally", "timestamp": "00:01:30,194", "timestamp_s": 90.0}, {"text": "runs in 40 minutes or less than an hour.", "timestamp": "00:01:34,804", "timestamp_s": 94.0}, {"text": "Surely it started taking like nearly three hours.", "timestamp": "00:01:37,624", "timestamp_s": 97.0}, {"text": "Without any code change, any infra changes.", "timestamp": "00:01:41,269", "timestamp_s": 101.0}, {"text": "We started seeing such a long running jobs and when we investigated.", "timestamp": "00:01:44,899", "timestamp_s": 104.0}, {"text": "That why these jobs are taking a lot of time and it\u0027s many it\u0027s a case with the", "timestamp": "00:01:50,725", "timestamp_s": 110.0}, {"text": "many other teams and whoever is using a spark for their ETL compute and all that.", "timestamp": "00:01:55,805", "timestamp_s": 115.0}, {"text": "We saw extreme task duration variance.", "timestamp": "00:02:02,115", "timestamp_s": 122.0}, {"text": "That\u0027s because we en encountered a silent performance bottleneck", "timestamp": "00:02:04,965", "timestamp_s": 124.0}, {"text": "that\u0027s called a data skew today.", "timestamp": "00:02:09,065", "timestamp_s": 129.0}, {"text": "I\u0027m going to walk you through the skew manifestation in the manifest in the real", "timestamp": "00:02:12,235", "timestamp_s": 132.0}, {"text": "ML pipelines and how systematically we can medicate the, those kind of risks.", "timestamp": "00:02:17,125", "timestamp_s": 137.0}, {"text": "Let\u0027s jump in.", "timestamp": "00:02:22,585", "timestamp_s": 142.0}, {"text": "So the first question, why these why everybody have a question in the", "timestamp": "00:02:24,045", "timestamp_s": 144.0}, {"text": "mind, like, why these ML models trying slowly earlier they were running good.", "timestamp": "00:02:28,835", "timestamp_s": 148.0}, {"text": "So the ML pipelines are performance bottleneck is like ML plugged by", "timestamp": "00:02:33,495", "timestamp_s": 153.0}, {"text": "the Ian Performance Killer that turns these minutes into hours and", "timestamp": "00:02:38,535", "timestamp_s": 158.0}, {"text": "training jobs extend indefinitely and model deployments get delayed.", "timestamp": "00:02:44,265", "timestamp_s": 164.0}, {"text": "And so in turn what we have seen is like our cloud costs burn through the budgets.", "timestamp": "00:02:49,275", "timestamp_s": 169.0}, {"text": "So then who is the culprit here again, when we investigate, we saw data skew.", "timestamp": "00:02:56,160", "timestamp_s": 176.0}, {"text": "So it\u0027s not just about the bad code, it\u0027s about like uneven data distribution", "timestamp": "00:03:00,910", "timestamp_s": 180.0}, {"text": "or any spike in the events or watch events that basically distribution", "timestamp": "00:03:06,910", "timestamp_s": 186.0}, {"text": "across these partitions silent.", "timestamp": "00:03:12,980", "timestamp_s": 192.0}, {"text": "Stab sabotaging your pipeline efficiency.", "timestamp": "00:03:15,095", "timestamp_s": 195.0}, {"text": "So when we click it, it, when we click down into more technicality of this", "timestamp": "00:03:18,005", "timestamp_s": 198.0}, {"text": "problem, and we see in the spark a stage when the spark has different", "timestamp": "00:03:24,215", "timestamp_s": 204.0}, {"text": "stages, the if you know about the spark process and so a stage only completes", "timestamp": "00:03:29,005", "timestamp_s": 209.0}, {"text": "when the slowest task finishes.", "timestamp": "00:03:36,255", "timestamp_s": 216.0}, {"text": "In on the, in the retraining jobs, we have observed that 95% of the task is completed", "timestamp": "00:03:38,940", "timestamp_s": 218.0}, {"text": "like quickly within seconds, minutes, but one executor ran significantly longer.", "timestamp": "00:03:45,430", "timestamp_s": 225.0}, {"text": "And processing nearly more than 10 x of more shuffle data than any", "timestamp": "00:03:50,955", "timestamp_s": 230.0}, {"text": "other executor in, in that stage.", "timestamp": "00:03:55,935", "timestamp_s": 235.0}, {"text": "And shuffle spills has been increased and garbage collection", "timestamp": "00:03:58,425", "timestamp_s": 238.0}, {"text": "pauses and CP utilization is a hundred percent and cluster dropped", "timestamp": "00:04:02,355", "timestamp_s": 242.0}, {"text": "because of the other executors who are cluster users is dropped.", "timestamp": "00:04:06,825", "timestamp_s": 246.0}, {"text": "And executors were idle.", "timestamp": "00:04:10,470", "timestamp_s": 250.0}, {"text": "And this is a significant effect of a data skew problem, even though most", "timestamp": "00:04:12,660", "timestamp_s": 252.0}, {"text": "partitions finish quickly, but anti job waits for one single partition.", "timestamp": "00:04:17,970", "timestamp_s": 257.0}, {"text": "So let\u0027s look at what is this data skew in general?", "timestamp": "00:04:22,500", "timestamp_s": 262.0}, {"text": "So a data skew.", "timestamp": "00:04:27,830", "timestamp_s": 267.0}, {"text": "In a simple words, what I call it as like the unbalanced workload problem.", "timestamp": "00:04:29,900", "timestamp_s": 269.0}, {"text": "So your executors taking uneven data to process uneven partitions to process.", "timestamp": "00:04:35,060", "timestamp_s": 275.0}, {"text": "But what is the expectation in the ideal world is like we want to distribute", "timestamp": "00:04:40,925", "timestamp_s": 280.0}, {"text": "this data evenly spread across all the executors, all workers processing", "timestamp": "00:04:46,205", "timestamp_s": 286.0}, {"text": "similar data volumes and power processing because the spark itself is a distributor", "timestamp": "00:04:51,245", "timestamp_s": 291.0}, {"text": "parallel power processing ETL engine, and we want it\u0027s full processing at a full", "timestamp": "00:04:56,525", "timestamp_s": 296.0}, {"text": "efficiency and predictable completion times given the scale of the data.", "timestamp": "00:05:01,415", "timestamp_s": 301.0}, {"text": "But in reality with the skew problem, some executors process gigabytes", "timestamp": "00:05:06,110", "timestamp_s": 306.0}, {"text": "while the other handle megabytes, the entire job waits for one.", "timestamp": "00:05:12,650", "timestamp_s": 312.0}, {"text": "Particular or like the slowest executor and the job times like", "timestamp": "00:05:17,600", "timestamp_s": 317.0}, {"text": "take like very much longer.", "timestamp": "00:05:22,010", "timestamp_s": 322.0}, {"text": "And the downstream, it has an impact of the downstream jobs and it gives the", "timestamp": "00:05:23,600", "timestamp_s": 323.0}, {"text": "entire the pipeline processing performance and the sources, the resources is like", "timestamp": "00:05:28,070", "timestamp_s": 328.0}, {"text": "the, these executors, it idle until the other worker completes his job.", "timestamp": "00:05:34,265", "timestamp_s": 334.0}, {"text": "So when you talk about like the more, deep dive into what what has happening is", "timestamp": "00:05:39,065", "timestamp_s": 339.0}, {"text": "like a spark uses like hash partitioning during these shuffle operations and data", "timestamp": "00:05:45,355", "timestamp_s": 345.0}, {"text": "is distributed based on these hash numb partitions, but the real world behavior", "timestamp": "00:05:50,215", "timestamp_s": 350.0}, {"text": "follows the power law distribution.", "timestamp": "00:05:56,395", "timestamp_s": 356.0}, {"text": "That means.", "timestamp": "00:05:59,065", "timestamp_s": 359.0}, {"text": "For an example, as this is a streaming company, one user have one user", "timestamp": "00:06:00,310", "timestamp_s": 360.0}, {"text": "watches like a little program, so the other user watches a lot of programs", "timestamp": "00:06:04,240", "timestamp_s": 364.0}, {"text": "and clicks on and different things while he is watching the program.", "timestamp": "00:06:09,010", "timestamp_s": 369.0}, {"text": "And for the use case, like one user has two interactions, another user has.", "timestamp": "00:06:12,490", "timestamp_s": 372.0}, {"text": "Say 150 interactions.", "timestamp": "00:06:17,700", "timestamp_s": 377.0}, {"text": "And when we group this data based on the user\u0027s behavior and then and the", "timestamp": "00:06:19,620", "timestamp_s": 379.0}, {"text": "heavy user dominates one partition, that partition spills to dis and it", "timestamp": "00:06:23,990", "timestamp_s": 383.0}, {"text": "overall increases the shuffle read time, and causes the prolonged task runtime.", "timestamp": "00:06:29,750", "timestamp_s": 389.0}, {"text": "And in this case, the parallelism breaks because of the workload is uneven.", "timestamp": "00:06:34,500", "timestamp_s": 394.0}, {"text": "So how this is going to impact the production pipelines is.", "timestamp": "00:06:39,310", "timestamp_s": 399.0}, {"text": "The impact of the production purpose.", "timestamp": "00:06:44,400", "timestamp_s": 404.0}, {"text": "I can categorize into two different categories.", "timestamp": "00:06:45,900", "timestamp_s": 405.0}, {"text": "One is a technical performance impact.", "timestamp": "00:06:48,600", "timestamp_s": 408.0}, {"text": "The other one is the bigger business impact.", "timestamp": "00:06:51,120", "timestamp_s": 411.0}, {"text": "So when I talk about the technical performance impact is the future", "timestamp": "00:06:53,890", "timestamp_s": 413.0}, {"text": "engineering bottleneck, so you slow down on a features engineering", "timestamp": "00:06:58,760", "timestamp_s": 418.0}, {"text": "just because your jobs are running and you need to handle these.", "timestamp": "00:07:01,895", "timestamp_s": 421.0}, {"text": "Issues and extended model training times, and we want this job to", "timestamp": "00:07:04,875", "timestamp_s": 424.0}, {"text": "be completed in 30 minutes, but it is taking three to four hours.", "timestamp": "00:07:09,135", "timestamp_s": 429.0}, {"text": "It\u0027s a, it is a bigger problem there and delayed experimental psych and model", "timestamp": "00:07:12,285", "timestamp_s": 432.0}, {"text": "freshness, most importantly, as in, in case of the recommendation systems.", "timestamp": "00:07:16,995", "timestamp_s": 436.0}, {"text": "And we want to process the data within fraction of seconds.", "timestamp": "00:07:21,285", "timestamp_s": 441.0}, {"text": "And the business impact that I can see because of these technical difficulties", "timestamp": "00:07:25,164", "timestamp_s": 445.0}, {"text": "and technical performance issues is a higher cloud infrastructure cost.", "timestamp": "00:07:29,405", "timestamp_s": 449.0}, {"text": "Just because, like you, your resources is just idle and", "timestamp": "00:07:33,335", "timestamp_s": 453.0}, {"text": "you are wasting money on them.", "timestamp": "00:07:36,965", "timestamp_s": 456.0}, {"text": "And then slower time to market for models and reduce the data science productivity.", "timestamp": "00:07:38,854", "timestamp_s": 458.0}, {"text": "Of course the ML model is running longer than they used to and we need to", "timestamp": "00:07:44,824", "timestamp_s": 464.0}, {"text": "compromise on these SLAs and all that.", "timestamp": "00:07:49,825", "timestamp_s": 469.0}, {"text": "Score.", "timestamp": "00:07:52,320", "timestamp_s": 472.0}, {"text": "So basically sku when we talk about the data skew, is it\u0027s not only increases", "timestamp": "00:07:53,040", "timestamp_s": 473.0}, {"text": "the shuffle read size and specific task, it also have execut imbalances", "timestamp": "00:07:58,370", "timestamp_s": 478.0}, {"text": "and also a lot of technicality in terms of like long garbage collection cycles.", "timestamp": "00:08:04,070", "timestamp_s": 484.0}, {"text": "Most importantly in recommendation systems, as I", "timestamp": "00:08:10,490", "timestamp_s": 490.0}, {"text": "mentioned, as a business impact.", "timestamp": "00:08:13,635", "timestamp_s": 493.0}, {"text": "The delayed retraining reduces personalized freshness, meaning, so", "timestamp": "00:08:15,694", "timestamp_s": 495.0}, {"text": "basically you want to recommend as in when the user coming in and want you watching", "timestamp": "00:08:21,064", "timestamp_s": 501.0}, {"text": "a program and you want to recommend him, like a similar kind of a content.", "timestamp": "00:08:25,224", "timestamp_s": 505.0}, {"text": "And then thus that freshness and personalization is something it reduces.", "timestamp": "00:08:29,724", "timestamp_s": 509.0}, {"text": "And in the ad ranking systems, like sometimes we have seen a 20% inefficiency", "timestamp": "00:08:35,215", "timestamp_s": 515.0}, {"text": "just because of this data skew problem.", "timestamp": "00:08:40,435", "timestamp_s": 520.0}, {"text": "When it when we talk about the business impact for this issue is", "timestamp": "00:08:42,845", "timestamp_s": 522.0}, {"text": "like we can translate into millions annually in a compute cost, just for", "timestamp": "00:08:46,615", "timestamp_s": 526.0}, {"text": "the scale of 20% inefficiency and.", "timestamp": "00:08:51,465", "timestamp_s": 531.0}, {"text": "So how, like when we categorize these problems in the machine", "timestamp": "00:08:55,055", "timestamp_s": 535.0}, {"text": "learning pri pipelines how we can classify these problems?", "timestamp": "00:08:58,620", "timestamp_s": 538.0}, {"text": "So one is there are different pipelines, ML pipelines and", "timestamp": "00:09:02,589", "timestamp_s": 542.0}, {"text": "that we are running currently.", "timestamp": "00:09:06,029", "timestamp_s": 546.0}, {"text": "We have recommendation systems and we have classification models", "timestamp": "00:09:07,379", "timestamp_s": 547.0}, {"text": "that we run, and also the computer vision pipelines that we run.", "timestamp": "00:09:10,529", "timestamp_s": 550.0}, {"text": "So in, in general in recommendation systems, a small number of", "timestamp": "00:09:15,144", "timestamp_s": 555.0}, {"text": "power users are a viral content.", "timestamp": "00:09:18,534", "timestamp_s": 558.0}, {"text": "For example, super Bowl last week is a like so many people", "timestamp": "00:09:21,324", "timestamp_s": 561.0}, {"text": "watches and a lot of interactions which can overload those specific", "timestamp": "00:09:25,154", "timestamp_s": 565.0}, {"text": "partitions in classification models.", "timestamp": "00:09:29,144", "timestamp_s": 569.0}, {"text": "Majority of those classes dominate the data set, creating imbalance", "timestamp": "00:09:31,644", "timestamp_s": 571.0}, {"text": "and uneven executor workloads.", "timestamp": "00:09:35,844", "timestamp_s": 575.0}, {"text": "John.", "timestamp": "00:09:38,244", "timestamp_s": 578.0}, {"text": "Similarly, in the computer vision SKUs shows up both up", "timestamp": "00:09:38,664", "timestamp_s": 578.0}, {"text": "in uneven class distribution, variable image crossing times.", "timestamp": "00:09:42,624", "timestamp_s": 582.0}, {"text": "This leads to the computational imbalance and.", "timestamp": "00:09:47,074", "timestamp_s": 587.0}, {"text": "The key takeaway with this is we need to, the skew is not an accident.", "timestamp": "00:09:50,569", "timestamp_s": 590.0}, {"text": "It is a natural outcome of real world events or data patterns that we", "timestamp": "00:09:55,239", "timestamp_s": 595.0}, {"text": "are seeing if not handled properly.", "timestamp": "00:09:59,769", "timestamp_s": 599.0}, {"text": "This is going to cost a lot of millions of dollars for the companies.", "timestamp": "00:10:02,229", "timestamp_s": 602.0}, {"text": "And at the scale of billions and billions of regards we process", "timestamp": "00:10:06,659", "timestamp_s": 606.0}, {"text": "for these recommendation systems and these classification models.", "timestamp": "00:10:10,749", "timestamp_s": 610.0}, {"text": "So let\u0027s deep dive into what are the, like different root causes this", "timestamp": "00:10:14,299", "timestamp_s": 614.0}, {"text": "could the data skew should have.", "timestamp": "00:10:19,729", "timestamp_s": 619.0}, {"text": "The first root cause I can think of is the natural imbalance.", "timestamp": "00:10:22,414", "timestamp_s": 622.0}, {"text": "As I mentioned this could be because of the bigger events like", "timestamp": "00:10:26,224", "timestamp_s": 626.0}, {"text": "Super Bowl and where we get a lot of traffic into into the system.", "timestamp": "00:10:29,644", "timestamp_s": 629.0}, {"text": "And training data naturally reflects these real world patterns where user behavior", "timestamp": "00:10:34,694", "timestamp_s": 634.0}, {"text": "follows the power law distribution.", "timestamp": "00:10:39,914", "timestamp_s": 639.0}, {"text": "So that means that the customers can concentrate, concentrate", "timestamp": "00:10:42,204", "timestamp_s": 642.0}, {"text": "geographically and seasonal patterns create temporal IM imbalance.", "timestamp": "00:10:45,734", "timestamp_s": 645.0}, {"text": "Like any event or formula One or Superbowl any event can create that imbalance.", "timestamp": "00:10:49,514", "timestamp_s": 649.0}, {"text": "So the, in that case, the most ML training data reflects these power", "timestamp": "00:10:56,334", "timestamp_s": 656.0}, {"text": "law distributions where a small number of users, products, and regions", "timestamp": "00:11:01,104", "timestamp_s": 661.0}, {"text": "generate the majority of activity.", "timestamp": "00:11:05,904", "timestamp_s": 665.0}, {"text": "This create a skewed source data.", "timestamp": "00:11:08,334", "timestamp_s": 668.0}, {"text": "From the start, such as popular products and like we have these", "timestamp": "00:11:10,899", "timestamp_s": 670.0}, {"text": "ads category and highly active users dominating these data sets.", "timestamp": "00:11:15,519", "timestamp_s": 675.0}, {"text": "When the partition data on these hotkeys, certain partitions become overloaded.", "timestamp": "00:11:19,639", "timestamp_s": 679.0}, {"text": "When, while others remain underutilized.", "timestamp": "00:11:25,399", "timestamp_s": 685.0}, {"text": "So the problem often like propagates downstream into feature stores and", "timestamp": "00:11:27,829", "timestamp_s": 687.0}, {"text": "model training pipelines, amplifying the performance bottlenecks.", "timestamp": "00:11:32,509", "timestamp_s": 692.0}, {"text": "So this is one of the biggest problems that we have seen.", "timestamp": "00:11:36,409", "timestamp_s": 696.0}, {"text": "And the key takeaways that SKU is not a system bug originates from", "timestamp": "00:11:39,769", "timestamp_s": 699.0}, {"text": "the, again it\u0027s from the real world behavior patterns and must be", "timestamp": "00:11:43,729", "timestamp_s": 703.0}, {"text": "anticipated in these pipelines design.", "timestamp": "00:11:48,049", "timestamp_s": 708.0}, {"text": "So the other root cause that I can, that I see most commonly for this data skew", "timestamp": "00:11:50,359", "timestamp_s": 710.0}, {"text": "problem is the joint keys and aggregation of these data on these joint keys.", "timestamp": "00:11:57,649", "timestamp_s": 717.0}, {"text": "So basically like in this one the join and aggregation operations,", "timestamp": "00:12:03,629", "timestamp_s": 723.0}, {"text": "during this feature engineering, when we join user features.", "timestamp": "00:12:08,359", "timestamp_s": 728.0}, {"text": "With the behavioral data, certain popular or highly active I user IDs can", "timestamp": "00:12:12,184", "timestamp_s": 732.0}, {"text": "dominate the data set, creating these hard partitions and uneven workloads.", "timestamp": "00:12:17,374", "timestamp_s": 737.0}, {"text": "This is known as a joint key sku.", "timestamp": "00:12:22,999", "timestamp_s": 742.0}, {"text": "Similarly aggregation, a similarly aggregation operations like group", "timestamp": "00:12:26,509", "timestamp_s": 746.0}, {"text": "by or reduced by key can suffer when a small number of keys contain", "timestamp": "00:12:30,799", "timestamp_s": 750.0}, {"text": "disproportionately large volumes of the data and temporary aggregation,", "timestamp": "00:12:36,619", "timestamp_s": 756.0}, {"text": "such as daily, weekly summaries that we do and often amplify this effect", "timestamp": "00:12:42,049", "timestamp_s": 762.0}, {"text": "because of the activity levels.", "timestamp": "00:12:46,669", "timestamp_s": 766.0}, {"text": "Can vary significantly across time.", "timestamp": "00:12:48,529", "timestamp_s": 768.0}, {"text": "The key takeaway is that even the raw data looks manageable, but joints", "timestamp": "00:12:51,689", "timestamp_s": 771.0}, {"text": "and aggregations can concentrate data and in unexpected ways and create", "timestamp": "00:12:57,569", "timestamp_s": 777.0}, {"text": "serious performance bottleneck all because of these data skew problem", "timestamp": "00:13:02,579", "timestamp_s": 782.0}, {"text": "if you are not handled rightly.", "timestamp": "00:13:07,029", "timestamp_s": 787.0}, {"text": "One another one that I can see is a computational skew.", "timestamp": "00:13:09,559", "timestamp_s": 789.0}, {"text": "Which means the text vector in case of these machine learning", "timestamp": "00:13:14,144", "timestamp_s": 794.0}, {"text": "models, text vectorization, future engineering, embedding generation", "timestamp": "00:13:17,644", "timestamp_s": 797.0}, {"text": "is a deep learning vary in computation cost based on the input", "timestamp": "00:13:22,564", "timestamp_s": 802.0}, {"text": "characteristics and model complexity.", "timestamp": "00:13:26,344", "timestamp_s": 806.0}, {"text": "So even so as we talk earlier, like even though we feel the data is right and when", "timestamp": "00:13:29,134", "timestamp_s": 809.0}, {"text": "we actually join this data, we have seen.", "timestamp": "00:13:35,134", "timestamp_s": 815.0}, {"text": "Imbalances in terms of these partitions and these joints", "timestamp": "00:13:37,549", "timestamp_s": 817.0}, {"text": "is taking longer, much longer.", "timestamp": "00:13:41,429", "timestamp_s": 821.0}, {"text": "So even in this case, like even the data is even distributed across the partitions", "timestamp": "00:13:44,399", "timestamp_s": 824.0}, {"text": "and workload imbalances can still occur.", "timestamp": "00:13:50,069", "timestamp_s": 830.0}, {"text": "And NLP models handle variable length documents and longer sequences require", "timestamp": "00:13:52,739", "timestamp_s": 832.0}, {"text": "significantly more compute time in future engineering and complex transformations", "timestamp": "00:13:57,899", "timestamp_s": 837.0}, {"text": "on these high cardinality category data create uneven processing loads.", "timestamp": "00:14:02,849", "timestamp_s": 842.0}, {"text": "So this is like one of the and we have seen these very frequently, which", "timestamp": "00:14:08,549", "timestamp_s": 848.0}, {"text": "silently creates these performance bottleneck in these distributed system.", "timestamp": "00:14:15,019", "timestamp_s": 855.0}, {"text": "So as we have seen so far, what is the data skew and how, what are those", "timestamp": "00:14:20,169", "timestamp_s": 860.0}, {"text": "different root causes that we see the way data skew can decide and hide?", "timestamp": "00:14:24,979", "timestamp_s": 864.0}, {"text": "So now we talk about more about how we can basically like mitigate these problems,", "timestamp": "00:14:30,769", "timestamp_s": 870.0}, {"text": "data skew problems in a step by step.", "timestamp": "00:14:38,159", "timestamp_s": 878.0}, {"text": "The number one solution I can think of is repartitioning.", "timestamp": "00:14:40,934", "timestamp_s": 880.0}, {"text": "So this is the concept like where we, instead of we give the system to", "timestamp": "00:14:44,554", "timestamp_s": 884.0}, {"text": "distribute the data, we explicitly redistribute the data across the", "timestamp": "00:14:49,634", "timestamp_s": 889.0}, {"text": "cluster by specifying the partition count and the column as I given in the", "timestamp": "00:14:54,704", "timestamp_s": 894.0}, {"text": "code snippet in this one, based on the user ID and given the repartitioning.", "timestamp": "00:14:58,984", "timestamp_s": 898.0}, {"text": "Count is like a hundred.", "timestamp": "00:15:03,964", "timestamp_s": 903.0}, {"text": "I want the system, I want the spark to redistribute the", "timestamp": "00:15:05,614", "timestamp_s": 905.0}, {"text": "data across the executors.", "timestamp": "00:15:08,104", "timestamp_s": 908.0}, {"text": "These forces spark to rebalance the workload through hash partitioning.", "timestamp": "00:15:10,424", "timestamp_s": 910.0}, {"text": "And this is mostly best for moderately skewed data sets and multi-stage", "timestamp": "00:15:14,564", "timestamp_s": 914.0}, {"text": "ML pipelines and future engine workflows, training data reprocessing.", "timestamp": "00:15:20,134", "timestamp_s": 920.0}, {"text": "So this is most importantly this is one of the best technique that we", "timestamp": "00:15:24,394", "timestamp_s": 924.0}, {"text": "can use when we have a moderately.", "timestamp": "00:15:28,634", "timestamp_s": 928.0}, {"text": "Less queue data.", "timestamp": "00:15:30,704", "timestamp_s": 930.0}, {"text": "The key takeaways that Repartitioning gives us the control over the data", "timestamp": "00:15:32,089", "timestamp_s": 932.0}, {"text": "distribution and the better workload balance before expensive transformations", "timestamp": "00:15:36,569", "timestamp_s": 936.0}, {"text": "like joins and aggregations.", "timestamp": "00:15:41,759", "timestamp_s": 941.0}, {"text": "Let\u0027s move on to the next slide.", "timestamp": "00:15:44,309", "timestamp_s": 944.0}, {"text": "So the repartitioning, so when and how to apply.", "timestamp": "00:15:46,314", "timestamp_s": 946.0}, {"text": "So the optimal setting for this one is a partition count two", "timestamp": "00:15:50,124", "timestamp_s": 950.0}, {"text": "to three x total core count.", "timestamp": "00:15:53,784", "timestamp_s": 953.0}, {"text": "When it all depends on which, how big is your cluster, how many codes", "timestamp": "00:15:55,394", "timestamp_s": 955.0}, {"text": "that you are working with, and the partition size is ideally a hundred", "timestamp": "00:15:59,444", "timestamp_s": 959.0}, {"text": "to 200 mb is a, is our sweet spot in terms of the partitioning size count", "timestamp": "00:16:03,914", "timestamp_s": 963.0}, {"text": "and balance parallelism with overhead.", "timestamp": "00:16:08,754", "timestamp_s": 968.0}, {"text": "So when we talk about the limitations and inter introduces a shuffle operation,", "timestamp": "00:16:10,854", "timestamp_s": 970.0}, {"text": "so as you are redistributing the data.", "timestamp": "00:16:16,584", "timestamp_s": 976.0}, {"text": "Hash partitioning does not change the key frequency.", "timestamp": "00:16:18,714", "timestamp_s": 978.0}, {"text": "Eff ineffective for the extreme.", "timestamp": "00:16:22,074", "timestamp_s": 982.0}, {"text": "Skew scenarios like when you have a large data, large skew for one particular region", "timestamp": "00:16:24,544", "timestamp_s": 984.0}, {"text": "or something, then you need to think about other techniques to redistribute the data.", "timestamp": "00:16:29,794", "timestamp_s": 989.0}, {"text": "So the performance gains, like more rate, performance gain, and most effective", "timestamp": "00:16:35,139", "timestamp_s": 995.0}, {"text": "in future pipeline stages and all that.", "timestamp": "00:16:39,579", "timestamp_s": 999.0}, {"text": "So in our case, we absorb with the redistribution repartitioning", "timestamp": "00:16:41,559", "timestamp_s": 1001.0}, {"text": "strategy, and we have 30% implement in our repro pre-processing stages.", "timestamp": "00:16:45,859", "timestamp_s": 1005.0}, {"text": "However, repartitioning does not change key frequency.", "timestamp": "00:16:50,839", "timestamp_s": 1010.0}, {"text": "Extreme hard keys still remain dominant, as I mentioned in the slide.", "timestamp": "00:16:54,589", "timestamp_s": 1014.0}, {"text": "And optimal, partion size is like a hundred to 200 mb Move on.", "timestamp": "00:16:58,999", "timestamp_s": 1018.0}, {"text": "Moving on.", "timestamp": "00:17:04,119", "timestamp_s": 1024.0}, {"text": "The second solution that we, that\u0027s most recommended and most popular", "timestamp": "00:17:04,659", "timestamp_s": 1024.0}, {"text": "is a key salting me meaning like so you identify the hard key,", "timestamp": "00:17:09,209", "timestamp_s": 1029.0}, {"text": "which is improper distribution.", "timestamp": "00:17:13,399", "timestamp_s": 1033.0}, {"text": "You add us all to it, you add a random number or.", "timestamp": "00:17:15,539", "timestamp_s": 1035.0}, {"text": "Some number and spread those partitions.", "timestamp": "00:17:18,829", "timestamp_s": 1038.0}, {"text": "So in, in that example I just added like a random of some random number", "timestamp": "00:17:21,959", "timestamp_s": 1041.0}, {"text": "into multiply by 10 with the user ID and then redistributing the data.", "timestamp": "00:17:26,579", "timestamp_s": 1046.0}, {"text": "So this gives so when certain keys such as high AQ user IDs dominate the dataset,", "timestamp": "00:17:30,929", "timestamp_s": 1050.0}, {"text": "repartitioning alone may not be enough.", "timestamp": "00:17:36,979", "timestamp_s": 1056.0}, {"text": "Key salting works by adding a small random value as I mentioned,", "timestamp": "00:17:39,709", "timestamp_s": 1059.0}, {"text": "the key mentioned in the slide.", "timestamp": "00:17:43,239", "timestamp_s": 1063.0}, {"text": "Effectively spliting the single hot key into multiple smaller keys,", "timestamp": "00:17:45,479", "timestamp_s": 1065.0}, {"text": "spreads the workload across multiple partitions, breaks up hotspots.", "timestamp": "00:17:49,399", "timestamp_s": 1069.0}, {"text": "So the key takeaways that salting allows us.", "timestamp": "00:17:54,679", "timestamp_s": 1074.0}, {"text": "Proactively distribute the extreme skew when basic is, are responsible for", "timestamp": "00:17:57,849", "timestamp_s": 1077.0}, {"text": "overwhelming data overwhelming the cluster with the, a large partition of data and", "timestamp": "00:18:02,709", "timestamp_s": 1082.0}, {"text": "one executor taking that entire load.", "timestamp": "00:18:08,739", "timestamp_s": 1088.0}, {"text": "So what are the best scenarios like when we can use like low salt?", "timestamp": "00:18:11,129", "timestamp_s": 1091.0}, {"text": "So there are like two to four.", "timestamp": "00:18:16,439", "timestamp_s": 1096.0}, {"text": "Keys like that.", "timestamp": "00:18:19,119", "timestamp_s": 1099.0}, {"text": "And the and we need to do 34, so resolve for extreme skew.", "timestamp": "00:18:20,129", "timestamp_s": 1100.0}, {"text": "So when a single dominant value, so as I mentioned, like there\u0027s a", "timestamp": "00:18:23,719", "timestamp_s": 1103.0}, {"text": "dominant key, hot keys will be there.", "timestamp": "00:18:27,049", "timestamp_s": 1107.0}, {"text": "And so what we do, we basically we I append the random salt keys to", "timestamp": "00:18:29,419", "timestamp_s": 1109.0}, {"text": "heavy user IDs before aggregation.", "timestamp": "00:18:33,829", "timestamp_s": 1113.0}, {"text": "Large partition reduces from eight gig, like in our case, like eight gig to", "timestamp": "00:18:36,259", "timestamp_s": 1116.0}, {"text": "600 mb or training runtime reduced like nearly 50% in some cases, and salting", "timestamp": "00:18:40,119", "timestamp_s": 1120.0}, {"text": "requires an additional aggregation stage.", "timestamp": "00:18:46,149", "timestamp_s": 1126.0}, {"text": "But s the workloads significantly.", "timestamp": "00:18:48,099", "timestamp_s": 1128.0}, {"text": "And the last one here I have is the broadcast joint.", "timestamp": "00:18:51,839", "timestamp_s": 1131.0}, {"text": "This is also very significant in terms of improving the.", "timestamp": "00:18:55,669", "timestamp_s": 1135.0}, {"text": "Spark jobs, performance and skew.", "timestamp": "00:18:59,299", "timestamp_s": 1139.0}, {"text": "When we have a skew data.", "timestamp": "00:19:02,039", "timestamp_s": 1142.0}, {"text": "So it\u0027s always ideal to send the small, smallest table into the memory.", "timestamp": "00:19:03,299", "timestamp_s": 1143.0}, {"text": "So send the small table to all executor to join and it increases", "timestamp": "00:19:09,179", "timestamp_s": 1149.0}, {"text": "the joints per joint performance.", "timestamp": "00:19:13,809", "timestamp_s": 1153.0}, {"text": "And also this eliminates the shuffle.", "timestamp": "00:19:15,729", "timestamp_s": 1155.0}, {"text": "That is a big thing of your large dataset entirely as mentioned in the code snippet", "timestamp": "00:19:18,929", "timestamp_s": 1158.0}, {"text": "here, we just need to use the broadcast.", "timestamp": "00:19:23,989", "timestamp_s": 1163.0}, {"text": "It it under spark will understand.", "timestamp": "00:19:26,689", "timestamp_s": 1166.0}, {"text": "This is a small table.", "timestamp": "00:19:28,709", "timestamp_s": 1168.0}, {"text": "This is the table that need to be sent to memory for all the executors", "timestamp": "00:19:29,789", "timestamp_s": 1169.0}, {"text": "and it\u0027ll broadcast the data.", "timestamp": "00:19:34,449", "timestamp_s": 1174.0}, {"text": "So basically essentially what you are, what we are trying to do is like", "timestamp": "00:19:36,249", "timestamp_s": 1176.0}, {"text": "we try to avoid redistributing the large data sets across the cluster.", "timestamp": "00:19:39,639", "timestamp_s": 1179.0}, {"text": "This, drastically or drastically reduce the network overhead.", "timestamp": "00:19:44,319", "timestamp_s": 1184.0}, {"text": "Broadcast joints are affect you in future engineering pipelines,", "timestamp": "00:19:49,259", "timestamp_s": 1189.0}, {"text": "whereas large behavioral data is joined with a relatively small", "timestamp": "00:19:53,009", "timestamp_s": 1193.0}, {"text": "dimension or lookup data table.", "timestamp": "00:19:57,389", "timestamp_s": 1197.0}, {"text": "The key takeaway is that in this one in stuff moving.", "timestamp": "00:19:59,279", "timestamp_s": 1199.0}, {"text": "Massive data across the cluster.", "timestamp": "00:20:03,674", "timestamp_s": 1203.0}, {"text": "We move the smaller table once and process the joint more eff", "timestamp": "00:20:05,984", "timestamp_s": 1205.0}, {"text": "effectively and efficiently.", "timestamp": "00:20:10,424", "timestamp_s": 1210.0}, {"text": "This way our model performance, like the pipeline performance", "timestamp": "00:20:12,344", "timestamp_s": 1212.0}, {"text": "is significantly improved.", "timestamp": "00:20:15,854", "timestamp_s": 1215.0}, {"text": "So here are some guidelines and best practices that we can", "timestamp": "00:20:18,004", "timestamp_s": 1218.0}, {"text": "use, keep the broadcast table.", "timestamp": "00:20:21,514", "timestamp_s": 1221.0}, {"text": "Under 10 mb there\u0027s a typical limit, use a maximum of 20, 21% off.", "timestamp": "00:20:24,074", "timestamp_s": 1224.0}, {"text": "Execute memory to avoid GC garbage pressure during training and a significant", "timestamp": "00:20:28,654", "timestamp_s": 1228.0}, {"text": "data size disparity between tables.", "timestamp": "00:20:34,934", "timestamp_s": 1234.0}, {"text": "So that means like when you are joining a hundred gig table with", "timestamp": "00:20:36,914", "timestamp_s": 1236.0}, {"text": "a one g, one GB of data set.", "timestamp": "00:20:40,754", "timestamp_s": 1240.0}, {"text": "So that\u0027s when the broadcast will be very helpful and handy.", "timestamp": "00:20:43,104", "timestamp_s": 1243.0}, {"text": "And then we can send these a small table into memory for a more efficient join.", "timestamp": "00:20:47,534", "timestamp_s": 1247.0}, {"text": "And performance impact.", "timestamp": "00:20:52,594", "timestamp_s": 1252.0}, {"text": "It eliminates the, as I mentioned it, eliminate a lot of network traffic", "timestamp": "00:20:53,854", "timestamp_s": 1253.0}, {"text": "and network shuffle, and the scale with the table size, difference", "timestamp": "00:20:57,884", "timestamp_s": 1257.0}, {"text": "and critical for maintaining model freshness in production systems.", "timestamp": "00:21:02,174", "timestamp_s": 1262.0}, {"text": "So in this case this as I mentioned before this is a shuffle of large data", "timestamp": "00:21:06,894", "timestamp_s": 1266.0}, {"text": "sets and one enrichment stage drop.", "timestamp": "00:21:11,904", "timestamp_s": 1271.0}, {"text": "Like in our case, like 90.", "timestamp": "00:21:14,784", "timestamp_s": 1274.0}, {"text": "90 minutes to almost 10, close to 10 minutes ensures the broadcast join size", "timestamp": "00:21:17,064", "timestamp_s": 1277.0}, {"text": "remains under 20, 25% executor memory to prevent these gc warhead issue.", "timestamp": "00:21:22,684", "timestamp_s": 1282.0}, {"text": "So overall, the key takeaway so we understand what is the data", "timestamp": "00:21:28,404", "timestamp_s": 1288.0}, {"text": "skew and how it is going to impact our production ML skews.", "timestamp": "00:21:33,824", "timestamp_s": 1293.0}, {"text": "What are the root causes and what are those like medications", "timestamp": "00:21:38,839", "timestamp_s": 1298.0}, {"text": "that we can do in terms of avoid this data skew and handle it.", "timestamp": "00:21:42,159", "timestamp_s": 1302.0}, {"text": "We can\u0027t avoid the data skew.", "timestamp": "00:21:45,779", "timestamp_s": 1305.0}, {"text": "We can handle the data skew in a right way.", "timestamp": "00:21:47,219", "timestamp_s": 1307.0}, {"text": "And so basically like I, as I said use the rep partitioning when the data SKU is like", "timestamp": "00:21:49,769", "timestamp_s": 1309.0}, {"text": "moderate sku or if you have a larger sku.", "timestamp": "00:21:55,959", "timestamp_s": 1315.0}, {"text": "In most of the cases we have used mostly the salting.", "timestamp": "00:21:59,199", "timestamp_s": 1319.0}, {"text": "In terms of skew data and broadcast joints, which helped significantly", "timestamp": "00:22:02,659", "timestamp_s": 1322.0}, {"text": "optimizes selective targeting specific bottlenecks rather than rather than", "timestamp": "00:22:07,679", "timestamp_s": 1327.0}, {"text": "over engineering the entire pipeline.", "timestamp": "00:22:12,259", "timestamp_s": 1332.0}, {"text": "Finally.", "timestamp": "00:22:14,299", "timestamp_s": 1334.0}, {"text": "So I would say when implemented correctly these, these techniques", "timestamp": "00:22:15,409", "timestamp_s": 1335.0}, {"text": "lead to faster model training.", "timestamp": "00:22:19,159", "timestamp_s": 1339.0}, {"text": "So it saves a lot of cost and time and also freshness of the,", "timestamp": "00:22:21,229", "timestamp_s": 1341.0}, {"text": "keep the freshness of the data and better resource utilization, lower", "timestamp": "00:22:26,259", "timestamp_s": 1346.0}, {"text": "infrastructure costs and also it\u0027ll help to do a quicker development cycles.", "timestamp": "00:22:30,009", "timestamp_s": 1350.0}, {"text": "So with that we are also currently working on how we can leverage", "timestamp": "00:22:36,019", "timestamp_s": 1356.0}, {"text": "ai in terms of identifying.", "timestamp": "00:22:41,619", "timestamp_s": 1361.0}, {"text": "These gaps in a pre hand.", "timestamp": "00:22:44,659", "timestamp_s": 1364.0}, {"text": "And help us suggest like when there is a data skew that\u0027s going to happen,", "timestamp": "00:22:47,119", "timestamp_s": 1367.0}, {"text": "we want to scan through these data sets and help suggest these are the", "timestamp": "00:22:50,869", "timestamp_s": 1370.0}, {"text": "hotkey or these other, this is where the data has being distributed heavily.", "timestamp": "00:22:55,169", "timestamp_s": 1375.0}, {"text": "So then we so that, like with the help of ai, we are experimenting", "timestamp": "00:23:00,279", "timestamp_s": 1380.0}, {"text": "with models trying on historical spark metrics to predict a data skew.", "timestamp": "00:23:04,789", "timestamp_s": 1384.0}, {"text": "Risk before stage execution.", "timestamp": "00:23:09,819", "timestamp_s": 1389.0}, {"text": "These models could recommend partition counts, as I said, and salting factors", "timestamp": "00:23:12,119", "timestamp_s": 1392.0}, {"text": "and broadcast strategies dynamically.", "timestamp": "00:23:16,529", "timestamp_s": 1396.0}, {"text": "This this represents a shift towards self optimizing distributed ml P ML pipelines.", "timestamp": "00:23:18,709", "timestamp_s": 1398.0}, {"text": "That\u0027s where, that\u0027s what we are planning to achieve with that.", "timestamp": "00:23:24,879", "timestamp_s": 1404.0}, {"text": "Thank you everyone and hope you like the content.", "timestamp": "00:23:29,354", "timestamp_s": 1409.0}, {"text": "If you want me to really want to connect on LinkedIn you can type good", "timestamp": "00:23:32,794", "timestamp_s": 1412.0}, {"text": "lady, and I\u0027m happy to talk more.", "timestamp": "00:23:37,214", "timestamp_s": 1417.0}, {"text": "Thank you.", "timestamp": "00:23:40,514", "timestamp_s": 1420.0}];
+              
 
               var tag = document.createElement('script');
 
@@ -545,6 +547,1452 @@
           </div>
 
           
+          
+
+          <div class="col-12 mb-5">
+            <h3>
+              Summary
+            </h3>
+            <ul>
+              
+            </ul>
+          </div>
+
+          <div class="col-12 mb-5">
+            <h3>
+              Transcript
+            </h3>
+            <span class="text-muted">
+              This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/./srt/ml2026_Srihari_Godleti.srt" target="_blank">submit a PR</a>.
+            </span>
+            <div>
+            
+            <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:00,500'); seek(0.0)">
+              Hi everyone.
+            </span>
+            
+            <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:01,599'); seek(1.0)">
+              Good morning and good afternoon.
+            </span>
+            
+            <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:04,299'); seek(4.0)">
+              So myself, was Ari.
+            </span>
+            
+            <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:05,709'); seek(5.0)">
+              Good lady.
+            </span>
+            
+            <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:06,459'); seek(6.0)">
+              I am currently working as a tech lead with Roku.
+            </span>
+            
+            <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:10,074'); seek(10.0)">
+              A streaming company which everybody's familiar, most of the people.
+            </span>
+            
+            <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:15,094'); seek(15.0)">
+              And today I'm gonna talk about how we do, how to handle a data skew in a production
+            </span>
+            
+            <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:21,904'); seek(21.0)">
+              ML pipelines, and what are the challenges that we have and uncover encounter,
+            </span>
+            
+            <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:28,084'); seek(28.0)">
+              and then how we mitigated those issues technically and in a step by step process.
+            </span>
+            
+            <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:00:34,664'); seek(34.0)">
+              So I try to cover.
+            </span>
+            
+            <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:00:36,299'); seek(36.0)">
+              As much as I can in these next 25 to 30 minutes.
+            </span>
+            
+            <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:00:40,359'); seek(40.0)">
+              And so let's get started.
+            </span>
+            
+            <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:00:43,349'); seek(43.0)">
+              As I mentioned Roku is a streaming company and in the streaming
+            </span>
+            
+            <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:00:47,559'); seek(47.0)">
+              business, like we process a billions of watch events and ad impressions
+            </span>
+            
+            <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:00:52,389'); seek(52.0)">
+              every single day and every play.
+            </span>
+            
+            <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:00:55,554'); seek(55.0)">
+              Pause or recommendation, impression and ad.
+            </span>
+            
+            <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:00:58,254'); seek(58.0)">
+              Click feeds into spa pipelines, powering like personalized models, embedded
+            </span>
+            
+            <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:01:05,214'); seek(65.0)">
+              generation, and also ad ranking systems.
+            </span>
+            
+            <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:01:07,794'); seek(67.0)">
+              So these are the different machine learning pipelines we run to understand
+            </span>
+            
+            <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:01:11,984'); seek(71.0)">
+              the user's behavior while watching these shows or any television programs.
+            </span>
+            
+            <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:18,274'); seek(78.0)">
+              On paper, like everything looks scalable, distributed computing and partition
+            </span>
+            
+            <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:25,054'); seek(85.0)">
+              at the storage level, auto-scaling clusters, but can solve any many problems.
+            </span>
+            
+            <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:30,194'); seek(90.0)">
+              But again, like in reality, what we have observed is jobs that normally
+            </span>
+            
+            <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:34,804'); seek(94.0)">
+              runs in 40 minutes or less than an hour.
+            </span>
+            
+            <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:37,624'); seek(97.0)">
+              Surely it started taking like nearly three hours.
+            </span>
+            
+            <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:01:41,269'); seek(101.0)">
+              Without any code change, any infra changes.
+            </span>
+            
+            <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:01:44,899'); seek(104.0)">
+              We started seeing such a long running jobs and when we investigated.
+            </span>
+            
+            <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:01:50,725'); seek(110.0)">
+              That why these jobs are taking a lot of time and it's many it's a case with the
+            </span>
+            
+            <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:01:55,805'); seek(115.0)">
+              many other teams and whoever is using a spark for their ETL compute and all that.
+            </span>
+            
+            <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:02:02,115'); seek(122.0)">
+              We saw extreme task duration variance.
+            </span>
+            
+            <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:02:04,965'); seek(124.0)">
+              That's because we en encountered a silent performance bottleneck
+            </span>
+            
+            <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:02:09,065'); seek(129.0)">
+              that's called a data skew today.
+            </span>
+            
+            <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:02:12,235'); seek(132.0)">
+              I'm going to walk you through the skew manifestation in the manifest in the real
+            </span>
+            
+            <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:02:17,125'); seek(137.0)">
+              ML pipelines and how systematically we can medicate the, those kind of risks.
+            </span>
+            
+            <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:02:22,585'); seek(142.0)">
+              Let's jump in.
+            </span>
+            
+            <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:02:24,045'); seek(144.0)">
+              So the first question, why these why everybody have a question in the
+            </span>
+            
+            <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:28,835'); seek(148.0)">
+              mind, like, why these ML models trying slowly earlier they were running good.
+            </span>
+            
+            <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:33,495'); seek(153.0)">
+              So the ML pipelines are performance bottleneck is like ML plugged by
+            </span>
+            
+            <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:38,535'); seek(158.0)">
+              the Ian Performance Killer that turns these minutes into hours and
+            </span>
+            
+            <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:44,265'); seek(164.0)">
+              training jobs extend indefinitely and model deployments get delayed.
+            </span>
+            
+            <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:02:49,275'); seek(169.0)">
+              And so in turn what we have seen is like our cloud costs burn through the budgets.
+            </span>
+            
+            <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:02:56,160'); seek(176.0)">
+              So then who is the culprit here again, when we investigate, we saw data skew.
+            </span>
+            
+            <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:03:00,910'); seek(180.0)">
+              So it's not just about the bad code, it's about like uneven data distribution
+            </span>
+            
+            <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:03:06,910'); seek(186.0)">
+              or any spike in the events or watch events that basically distribution
+            </span>
+            
+            <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:03:12,980'); seek(192.0)">
+              across these partitions silent.
+            </span>
+            
+            <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:03:15,095'); seek(195.0)">
+              Stab sabotaging your pipeline efficiency.
+            </span>
+            
+            <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:03:18,005'); seek(198.0)">
+              So when we click it, it, when we click down into more technicality of this
+            </span>
+            
+            <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:03:24,215'); seek(204.0)">
+              problem, and we see in the spark a stage when the spark has different
+            </span>
+            
+            <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:03:29,005'); seek(209.0)">
+              stages, the if you know about the spark process and so a stage only completes
+            </span>
+            
+            <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:03:36,255'); seek(216.0)">
+              when the slowest task finishes.
+            </span>
+            
+            <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:03:38,940'); seek(218.0)">
+              In on the, in the retraining jobs, we have observed that 95% of the task is completed
+            </span>
+            
+            <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:03:45,430'); seek(225.0)">
+              like quickly within seconds, minutes, but one executor ran significantly longer.
+            </span>
+            
+            <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:03:50,955'); seek(230.0)">
+              And processing nearly more than 10 x of more shuffle data than any
+            </span>
+            
+            <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:55,935'); seek(235.0)">
+              other executor in, in that stage.
+            </span>
+            
+            <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:58,425'); seek(238.0)">
+              And shuffle spills has been increased and garbage collection
+            </span>
+            
+            <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:04:02,355'); seek(242.0)">
+              pauses and CP utilization is a hundred percent and cluster dropped
+            </span>
+            
+            <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:04:06,825'); seek(246.0)">
+              because of the other executors who are cluster users is dropped.
+            </span>
+            
+            <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:04:10,470'); seek(250.0)">
+              And executors were idle.
+            </span>
+            
+            <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:04:12,660'); seek(252.0)">
+              And this is a significant effect of a data skew problem, even though most
+            </span>
+            
+            <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:04:17,970'); seek(257.0)">
+              partitions finish quickly, but anti job waits for one single partition.
+            </span>
+            
+            <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:04:22,500'); seek(262.0)">
+              So let's look at what is this data skew in general?
+            </span>
+            
+            <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:04:27,830'); seek(267.0)">
+              So a data skew.
+            </span>
+            
+            <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:04:29,900'); seek(269.0)">
+              In a simple words, what I call it as like the unbalanced workload problem.
+            </span>
+            
+            <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:04:35,060'); seek(275.0)">
+              So your executors taking uneven data to process uneven partitions to process.
+            </span>
+            
+            <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:04:40,925'); seek(280.0)">
+              But what is the expectation in the ideal world is like we want to distribute
+            </span>
+            
+            <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:04:46,205'); seek(286.0)">
+              this data evenly spread across all the executors, all workers processing
+            </span>
+            
+            <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:04:51,245'); seek(291.0)">
+              similar data volumes and power processing because the spark itself is a distributor
+            </span>
+            
+            <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:04:56,525'); seek(296.0)">
+              parallel power processing ETL engine, and we want it's full processing at a full
+            </span>
+            
+            <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:05:01,415'); seek(301.0)">
+              efficiency and predictable completion times given the scale of the data.
+            </span>
+            
+            <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:05:06,110'); seek(306.0)">
+              But in reality with the skew problem, some executors process gigabytes
+            </span>
+            
+            <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:05:12,650'); seek(312.0)">
+              while the other handle megabytes, the entire job waits for one.
+            </span>
+            
+            <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:05:17,600'); seek(317.0)">
+              Particular or like the slowest executor and the job times like
+            </span>
+            
+            <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:05:22,010'); seek(322.0)">
+              take like very much longer.
+            </span>
+            
+            <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:05:23,600'); seek(323.0)">
+              And the downstream, it has an impact of the downstream jobs and it gives the
+            </span>
+            
+            <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:05:28,070'); seek(328.0)">
+              entire the pipeline processing performance and the sources, the resources is like
+            </span>
+            
+            <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:05:34,265'); seek(334.0)">
+              the, these executors, it idle until the other worker completes his job.
+            </span>
+            
+            <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:05:39,065'); seek(339.0)">
+              So when you talk about like the more, deep dive into what what has happening is
+            </span>
+            
+            <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:05:45,355'); seek(345.0)">
+              like a spark uses like hash partitioning during these shuffle operations and data
+            </span>
+            
+            <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:05:50,215'); seek(350.0)">
+              is distributed based on these hash numb partitions, but the real world behavior
+            </span>
+            
+            <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:05:56,395'); seek(356.0)">
+              follows the power law distribution.
+            </span>
+            
+            <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:05:59,065'); seek(359.0)">
+              That means.
+            </span>
+            
+            <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:06:00,310'); seek(360.0)">
+              For an example, as this is a streaming company, one user have one user
+            </span>
+            
+            <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:06:04,240'); seek(364.0)">
+              watches like a little program, so the other user watches a lot of programs
+            </span>
+            
+            <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:06:09,010'); seek(369.0)">
+              and clicks on and different things while he is watching the program.
+            </span>
+            
+            <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:06:12,490'); seek(372.0)">
+              And for the use case, like one user has two interactions, another user has.
+            </span>
+            
+            <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:06:17,700'); seek(377.0)">
+              Say 150 interactions.
+            </span>
+            
+            <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:06:19,620'); seek(379.0)">
+              And when we group this data based on the user's behavior and then and the
+            </span>
+            
+            <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:06:23,990'); seek(383.0)">
+              heavy user dominates one partition, that partition spills to dis and it
+            </span>
+            
+            <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:06:29,750'); seek(389.0)">
+              overall increases the shuffle read time, and causes the prolonged task runtime.
+            </span>
+            
+            <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:06:34,500'); seek(394.0)">
+              And in this case, the parallelism breaks because of the workload is uneven.
+            </span>
+            
+            <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:06:39,310'); seek(399.0)">
+              So how this is going to impact the production pipelines is.
+            </span>
+            
+            <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:06:44,400'); seek(404.0)">
+              The impact of the production purpose.
+            </span>
+            
+            <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:06:45,900'); seek(405.0)">
+              I can categorize into two different categories.
+            </span>
+            
+            <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:06:48,600'); seek(408.0)">
+              One is a technical performance impact.
+            </span>
+            
+            <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:06:51,120'); seek(411.0)">
+              The other one is the bigger business impact.
+            </span>
+            
+            <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:06:53,890'); seek(413.0)">
+              So when I talk about the technical performance impact is the future
+            </span>
+            
+            <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:06:58,760'); seek(418.0)">
+              engineering bottleneck, so you slow down on a features engineering
+            </span>
+            
+            <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:07:01,895'); seek(421.0)">
+              just because your jobs are running and you need to handle these.
+            </span>
+            
+            <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:07:04,875'); seek(424.0)">
+              Issues and extended model training times, and we want this job to
+            </span>
+            
+            <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:07:09,135'); seek(429.0)">
+              be completed in 30 minutes, but it is taking three to four hours.
+            </span>
+            
+            <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:07:12,285'); seek(432.0)">
+              It's a, it is a bigger problem there and delayed experimental psych and model
+            </span>
+            
+            <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:07:16,995'); seek(436.0)">
+              freshness, most importantly, as in, in case of the recommendation systems.
+            </span>
+            
+            <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:07:21,285'); seek(441.0)">
+              And we want to process the data within fraction of seconds.
+            </span>
+            
+            <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:07:25,164'); seek(445.0)">
+              And the business impact that I can see because of these technical difficulties
+            </span>
+            
+            <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:07:29,405'); seek(449.0)">
+              and technical performance issues is a higher cloud infrastructure cost.
+            </span>
+            
+            <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:07:33,335'); seek(453.0)">
+              Just because, like you, your resources is just idle and
+            </span>
+            
+            <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:07:36,965'); seek(456.0)">
+              you are wasting money on them.
+            </span>
+            
+            <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:07:38,854'); seek(458.0)">
+              And then slower time to market for models and reduce the data science productivity.
+            </span>
+            
+            <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:07:44,824'); seek(464.0)">
+              Of course the ML model is running longer than they used to and we need to
+            </span>
+            
+            <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:07:49,825'); seek(469.0)">
+              compromise on these SLAs and all that.
+            </span>
+            
+            <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:07:52,320'); seek(472.0)">
+              Score.
+            </span>
+            
+            <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:07:53,040'); seek(473.0)">
+              So basically sku when we talk about the data skew, is it's not only increases
+            </span>
+            
+            <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:07:58,370'); seek(478.0)">
+              the shuffle read size and specific task, it also have execut imbalances
+            </span>
+            
+            <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:08:04,070'); seek(484.0)">
+              and also a lot of technicality in terms of like long garbage collection cycles.
+            </span>
+            
+            <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:08:10,490'); seek(490.0)">
+              Most importantly in recommendation systems, as I
+            </span>
+            
+            <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:08:13,635'); seek(493.0)">
+              mentioned, as a business impact.
+            </span>
+            
+            <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:08:15,694'); seek(495.0)">
+              The delayed retraining reduces personalized freshness, meaning, so
+            </span>
+            
+            <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:08:21,064'); seek(501.0)">
+              basically you want to recommend as in when the user coming in and want you watching
+            </span>
+            
+            <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:08:25,224'); seek(505.0)">
+              a program and you want to recommend him, like a similar kind of a content.
+            </span>
+            
+            <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:08:29,724'); seek(509.0)">
+              And then thus that freshness and personalization is something it reduces.
+            </span>
+            
+            <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:08:35,215'); seek(515.0)">
+              And in the ad ranking systems, like sometimes we have seen a 20% inefficiency
+            </span>
+            
+            <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:08:40,435'); seek(520.0)">
+              just because of this data skew problem.
+            </span>
+            
+            <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:08:42,845'); seek(522.0)">
+              When it when we talk about the business impact for this issue is
+            </span>
+            
+            <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:08:46,615'); seek(526.0)">
+              like we can translate into millions annually in a compute cost, just for
+            </span>
+            
+            <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:08:51,465'); seek(531.0)">
+              the scale of 20% inefficiency and.
+            </span>
+            
+            <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:08:55,055'); seek(535.0)">
+              So how, like when we categorize these problems in the machine
+            </span>
+            
+            <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:08:58,620'); seek(538.0)">
+              learning pri pipelines how we can classify these problems?
+            </span>
+            
+            <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:09:02,589'); seek(542.0)">
+              So one is there are different pipelines, ML pipelines and
+            </span>
+            
+            <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:09:06,029'); seek(546.0)">
+              that we are running currently.
+            </span>
+            
+            <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:09:07,379'); seek(547.0)">
+              We have recommendation systems and we have classification models
+            </span>
+            
+            <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:09:10,529'); seek(550.0)">
+              that we run, and also the computer vision pipelines that we run.
+            </span>
+            
+            <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:09:15,144'); seek(555.0)">
+              So in, in general in recommendation systems, a small number of
+            </span>
+            
+            <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:09:18,534'); seek(558.0)">
+              power users are a viral content.
+            </span>
+            
+            <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:09:21,324'); seek(561.0)">
+              For example, super Bowl last week is a like so many people
+            </span>
+            
+            <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:09:25,154'); seek(565.0)">
+              watches and a lot of interactions which can overload those specific
+            </span>
+            
+            <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:09:29,144'); seek(569.0)">
+              partitions in classification models.
+            </span>
+            
+            <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:09:31,644'); seek(571.0)">
+              Majority of those classes dominate the data set, creating imbalance
+            </span>
+            
+            <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:09:35,844'); seek(575.0)">
+              and uneven executor workloads.
+            </span>
+            
+            <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:09:38,244'); seek(578.0)">
+              John.
+            </span>
+            
+            <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:09:38,664'); seek(578.0)">
+              Similarly, in the computer vision SKUs shows up both up
+            </span>
+            
+            <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:09:42,624'); seek(582.0)">
+              in uneven class distribution, variable image crossing times.
+            </span>
+            
+            <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:09:47,074'); seek(587.0)">
+              This leads to the computational imbalance and.
+            </span>
+            
+            <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:09:50,569'); seek(590.0)">
+              The key takeaway with this is we need to, the skew is not an accident.
+            </span>
+            
+            <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:09:55,239'); seek(595.0)">
+              It is a natural outcome of real world events or data patterns that we
+            </span>
+            
+            <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:09:59,769'); seek(599.0)">
+              are seeing if not handled properly.
+            </span>
+            
+            <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:10:02,229'); seek(602.0)">
+              This is going to cost a lot of millions of dollars for the companies.
+            </span>
+            
+            <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:10:06,659'); seek(606.0)">
+              And at the scale of billions and billions of regards we process
+            </span>
+            
+            <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:10:10,749'); seek(610.0)">
+              for these recommendation systems and these classification models.
+            </span>
+            
+            <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:10:14,299'); seek(614.0)">
+              So let's deep dive into what are the, like different root causes this
+            </span>
+            
+            <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:10:19,729'); seek(619.0)">
+              could the data skew should have.
+            </span>
+            
+            <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:10:22,414'); seek(622.0)">
+              The first root cause I can think of is the natural imbalance.
+            </span>
+            
+            <span id="chunk-151" class="transcript-chunks" onclick="console.log('00:10:26,224'); seek(626.0)">
+              As I mentioned this could be because of the bigger events like
+            </span>
+            
+            <span id="chunk-152" class="transcript-chunks" onclick="console.log('00:10:29,644'); seek(629.0)">
+              Super Bowl and where we get a lot of traffic into into the system.
+            </span>
+            
+            <span id="chunk-153" class="transcript-chunks" onclick="console.log('00:10:34,694'); seek(634.0)">
+              And training data naturally reflects these real world patterns where user behavior
+            </span>
+            
+            <span id="chunk-154" class="transcript-chunks" onclick="console.log('00:10:39,914'); seek(639.0)">
+              follows the power law distribution.
+            </span>
+            
+            <span id="chunk-155" class="transcript-chunks" onclick="console.log('00:10:42,204'); seek(642.0)">
+              So that means that the customers can concentrate, concentrate
+            </span>
+            
+            <span id="chunk-156" class="transcript-chunks" onclick="console.log('00:10:45,734'); seek(645.0)">
+              geographically and seasonal patterns create temporal IM imbalance.
+            </span>
+            
+            <span id="chunk-157" class="transcript-chunks" onclick="console.log('00:10:49,514'); seek(649.0)">
+              Like any event or formula One or Superbowl any event can create that imbalance.
+            </span>
+            
+            <span id="chunk-158" class="transcript-chunks" onclick="console.log('00:10:56,334'); seek(656.0)">
+              So the, in that case, the most ML training data reflects these power
+            </span>
+            
+            <span id="chunk-159" class="transcript-chunks" onclick="console.log('00:11:01,104'); seek(661.0)">
+              law distributions where a small number of users, products, and regions
+            </span>
+            
+            <span id="chunk-160" class="transcript-chunks" onclick="console.log('00:11:05,904'); seek(665.0)">
+              generate the majority of activity.
+            </span>
+            
+            <span id="chunk-161" class="transcript-chunks" onclick="console.log('00:11:08,334'); seek(668.0)">
+              This create a skewed source data.
+            </span>
+            
+            <span id="chunk-162" class="transcript-chunks" onclick="console.log('00:11:10,899'); seek(670.0)">
+              From the start, such as popular products and like we have these
+            </span>
+            
+            <span id="chunk-163" class="transcript-chunks" onclick="console.log('00:11:15,519'); seek(675.0)">
+              ads category and highly active users dominating these data sets.
+            </span>
+            
+            <span id="chunk-164" class="transcript-chunks" onclick="console.log('00:11:19,639'); seek(679.0)">
+              When the partition data on these hotkeys, certain partitions become overloaded.
+            </span>
+            
+            <span id="chunk-165" class="transcript-chunks" onclick="console.log('00:11:25,399'); seek(685.0)">
+              When, while others remain underutilized.
+            </span>
+            
+            <span id="chunk-166" class="transcript-chunks" onclick="console.log('00:11:27,829'); seek(687.0)">
+              So the problem often like propagates downstream into feature stores and
+            </span>
+            
+            <span id="chunk-167" class="transcript-chunks" onclick="console.log('00:11:32,509'); seek(692.0)">
+              model training pipelines, amplifying the performance bottlenecks.
+            </span>
+            
+            <span id="chunk-168" class="transcript-chunks" onclick="console.log('00:11:36,409'); seek(696.0)">
+              So this is one of the biggest problems that we have seen.
+            </span>
+            
+            <span id="chunk-169" class="transcript-chunks" onclick="console.log('00:11:39,769'); seek(699.0)">
+              And the key takeaways that SKU is not a system bug originates from
+            </span>
+            
+            <span id="chunk-170" class="transcript-chunks" onclick="console.log('00:11:43,729'); seek(703.0)">
+              the, again it's from the real world behavior patterns and must be
+            </span>
+            
+            <span id="chunk-171" class="transcript-chunks" onclick="console.log('00:11:48,049'); seek(708.0)">
+              anticipated in these pipelines design.
+            </span>
+            
+            <span id="chunk-172" class="transcript-chunks" onclick="console.log('00:11:50,359'); seek(710.0)">
+              So the other root cause that I can, that I see most commonly for this data skew
+            </span>
+            
+            <span id="chunk-173" class="transcript-chunks" onclick="console.log('00:11:57,649'); seek(717.0)">
+              problem is the joint keys and aggregation of these data on these joint keys.
+            </span>
+            
+            <span id="chunk-174" class="transcript-chunks" onclick="console.log('00:12:03,629'); seek(723.0)">
+              So basically like in this one the join and aggregation operations,
+            </span>
+            
+            <span id="chunk-175" class="transcript-chunks" onclick="console.log('00:12:08,359'); seek(728.0)">
+              during this feature engineering, when we join user features.
+            </span>
+            
+            <span id="chunk-176" class="transcript-chunks" onclick="console.log('00:12:12,184'); seek(732.0)">
+              With the behavioral data, certain popular or highly active I user IDs can
+            </span>
+            
+            <span id="chunk-177" class="transcript-chunks" onclick="console.log('00:12:17,374'); seek(737.0)">
+              dominate the data set, creating these hard partitions and uneven workloads.
+            </span>
+            
+            <span id="chunk-178" class="transcript-chunks" onclick="console.log('00:12:22,999'); seek(742.0)">
+              This is known as a joint key sku.
+            </span>
+            
+            <span id="chunk-179" class="transcript-chunks" onclick="console.log('00:12:26,509'); seek(746.0)">
+              Similarly aggregation, a similarly aggregation operations like group
+            </span>
+            
+            <span id="chunk-180" class="transcript-chunks" onclick="console.log('00:12:30,799'); seek(750.0)">
+              by or reduced by key can suffer when a small number of keys contain
+            </span>
+            
+            <span id="chunk-181" class="transcript-chunks" onclick="console.log('00:12:36,619'); seek(756.0)">
+              disproportionately large volumes of the data and temporary aggregation,
+            </span>
+            
+            <span id="chunk-182" class="transcript-chunks" onclick="console.log('00:12:42,049'); seek(762.0)">
+              such as daily, weekly summaries that we do and often amplify this effect
+            </span>
+            
+            <span id="chunk-183" class="transcript-chunks" onclick="console.log('00:12:46,669'); seek(766.0)">
+              because of the activity levels.
+            </span>
+            
+            <span id="chunk-184" class="transcript-chunks" onclick="console.log('00:12:48,529'); seek(768.0)">
+              Can vary significantly across time.
+            </span>
+            
+            <span id="chunk-185" class="transcript-chunks" onclick="console.log('00:12:51,689'); seek(771.0)">
+              The key takeaway is that even the raw data looks manageable, but joints
+            </span>
+            
+            <span id="chunk-186" class="transcript-chunks" onclick="console.log('00:12:57,569'); seek(777.0)">
+              and aggregations can concentrate data and in unexpected ways and create
+            </span>
+            
+            <span id="chunk-187" class="transcript-chunks" onclick="console.log('00:13:02,579'); seek(782.0)">
+              serious performance bottleneck all because of these data skew problem
+            </span>
+            
+            <span id="chunk-188" class="transcript-chunks" onclick="console.log('00:13:07,029'); seek(787.0)">
+              if you are not handled rightly.
+            </span>
+            
+            <span id="chunk-189" class="transcript-chunks" onclick="console.log('00:13:09,559'); seek(789.0)">
+              One another one that I can see is a computational skew.
+            </span>
+            
+            <span id="chunk-190" class="transcript-chunks" onclick="console.log('00:13:14,144'); seek(794.0)">
+              Which means the text vector in case of these machine learning
+            </span>
+            
+            <span id="chunk-191" class="transcript-chunks" onclick="console.log('00:13:17,644'); seek(797.0)">
+              models, text vectorization, future engineering, embedding generation
+            </span>
+            
+            <span id="chunk-192" class="transcript-chunks" onclick="console.log('00:13:22,564'); seek(802.0)">
+              is a deep learning vary in computation cost based on the input
+            </span>
+            
+            <span id="chunk-193" class="transcript-chunks" onclick="console.log('00:13:26,344'); seek(806.0)">
+              characteristics and model complexity.
+            </span>
+            
+            <span id="chunk-194" class="transcript-chunks" onclick="console.log('00:13:29,134'); seek(809.0)">
+              So even so as we talk earlier, like even though we feel the data is right and when
+            </span>
+            
+            <span id="chunk-195" class="transcript-chunks" onclick="console.log('00:13:35,134'); seek(815.0)">
+              we actually join this data, we have seen.
+            </span>
+            
+            <span id="chunk-196" class="transcript-chunks" onclick="console.log('00:13:37,549'); seek(817.0)">
+              Imbalances in terms of these partitions and these joints
+            </span>
+            
+            <span id="chunk-197" class="transcript-chunks" onclick="console.log('00:13:41,429'); seek(821.0)">
+              is taking longer, much longer.
+            </span>
+            
+            <span id="chunk-198" class="transcript-chunks" onclick="console.log('00:13:44,399'); seek(824.0)">
+              So even in this case, like even the data is even distributed across the partitions
+            </span>
+            
+            <span id="chunk-199" class="transcript-chunks" onclick="console.log('00:13:50,069'); seek(830.0)">
+              and workload imbalances can still occur.
+            </span>
+            
+            <span id="chunk-200" class="transcript-chunks" onclick="console.log('00:13:52,739'); seek(832.0)">
+              And NLP models handle variable length documents and longer sequences require
+            </span>
+            
+            <span id="chunk-201" class="transcript-chunks" onclick="console.log('00:13:57,899'); seek(837.0)">
+              significantly more compute time in future engineering and complex transformations
+            </span>
+            
+            <span id="chunk-202" class="transcript-chunks" onclick="console.log('00:14:02,849'); seek(842.0)">
+              on these high cardinality category data create uneven processing loads.
+            </span>
+            
+            <span id="chunk-203" class="transcript-chunks" onclick="console.log('00:14:08,549'); seek(848.0)">
+              So this is like one of the and we have seen these very frequently, which
+            </span>
+            
+            <span id="chunk-204" class="transcript-chunks" onclick="console.log('00:14:15,019'); seek(855.0)">
+              silently creates these performance bottleneck in these distributed system.
+            </span>
+            
+            <span id="chunk-205" class="transcript-chunks" onclick="console.log('00:14:20,169'); seek(860.0)">
+              So as we have seen so far, what is the data skew and how, what are those
+            </span>
+            
+            <span id="chunk-206" class="transcript-chunks" onclick="console.log('00:14:24,979'); seek(864.0)">
+              different root causes that we see the way data skew can decide and hide?
+            </span>
+            
+            <span id="chunk-207" class="transcript-chunks" onclick="console.log('00:14:30,769'); seek(870.0)">
+              So now we talk about more about how we can basically like mitigate these problems,
+            </span>
+            
+            <span id="chunk-208" class="transcript-chunks" onclick="console.log('00:14:38,159'); seek(878.0)">
+              data skew problems in a step by step.
+            </span>
+            
+            <span id="chunk-209" class="transcript-chunks" onclick="console.log('00:14:40,934'); seek(880.0)">
+              The number one solution I can think of is repartitioning.
+            </span>
+            
+            <span id="chunk-210" class="transcript-chunks" onclick="console.log('00:14:44,554'); seek(884.0)">
+              So this is the concept like where we, instead of we give the system to
+            </span>
+            
+            <span id="chunk-211" class="transcript-chunks" onclick="console.log('00:14:49,634'); seek(889.0)">
+              distribute the data, we explicitly redistribute the data across the
+            </span>
+            
+            <span id="chunk-212" class="transcript-chunks" onclick="console.log('00:14:54,704'); seek(894.0)">
+              cluster by specifying the partition count and the column as I given in the
+            </span>
+            
+            <span id="chunk-213" class="transcript-chunks" onclick="console.log('00:14:58,984'); seek(898.0)">
+              code snippet in this one, based on the user ID and given the repartitioning.
+            </span>
+            
+            <span id="chunk-214" class="transcript-chunks" onclick="console.log('00:15:03,964'); seek(903.0)">
+              Count is like a hundred.
+            </span>
+            
+            <span id="chunk-215" class="transcript-chunks" onclick="console.log('00:15:05,614'); seek(905.0)">
+              I want the system, I want the spark to redistribute the
+            </span>
+            
+            <span id="chunk-216" class="transcript-chunks" onclick="console.log('00:15:08,104'); seek(908.0)">
+              data across the executors.
+            </span>
+            
+            <span id="chunk-217" class="transcript-chunks" onclick="console.log('00:15:10,424'); seek(910.0)">
+              These forces spark to rebalance the workload through hash partitioning.
+            </span>
+            
+            <span id="chunk-218" class="transcript-chunks" onclick="console.log('00:15:14,564'); seek(914.0)">
+              And this is mostly best for moderately skewed data sets and multi-stage
+            </span>
+            
+            <span id="chunk-219" class="transcript-chunks" onclick="console.log('00:15:20,134'); seek(920.0)">
+              ML pipelines and future engine workflows, training data reprocessing.
+            </span>
+            
+            <span id="chunk-220" class="transcript-chunks" onclick="console.log('00:15:24,394'); seek(924.0)">
+              So this is most importantly this is one of the best technique that we
+            </span>
+            
+            <span id="chunk-221" class="transcript-chunks" onclick="console.log('00:15:28,634'); seek(928.0)">
+              can use when we have a moderately.
+            </span>
+            
+            <span id="chunk-222" class="transcript-chunks" onclick="console.log('00:15:30,704'); seek(930.0)">
+              Less queue data.
+            </span>
+            
+            <span id="chunk-223" class="transcript-chunks" onclick="console.log('00:15:32,089'); seek(932.0)">
+              The key takeaways that Repartitioning gives us the control over the data
+            </span>
+            
+            <span id="chunk-224" class="transcript-chunks" onclick="console.log('00:15:36,569'); seek(936.0)">
+              distribution and the better workload balance before expensive transformations
+            </span>
+            
+            <span id="chunk-225" class="transcript-chunks" onclick="console.log('00:15:41,759'); seek(941.0)">
+              like joins and aggregations.
+            </span>
+            
+            <span id="chunk-226" class="transcript-chunks" onclick="console.log('00:15:44,309'); seek(944.0)">
+              Let's move on to the next slide.
+            </span>
+            
+            <span id="chunk-227" class="transcript-chunks" onclick="console.log('00:15:46,314'); seek(946.0)">
+              So the repartitioning, so when and how to apply.
+            </span>
+            
+            <span id="chunk-228" class="transcript-chunks" onclick="console.log('00:15:50,124'); seek(950.0)">
+              So the optimal setting for this one is a partition count two
+            </span>
+            
+            <span id="chunk-229" class="transcript-chunks" onclick="console.log('00:15:53,784'); seek(953.0)">
+              to three x total core count.
+            </span>
+            
+            <span id="chunk-230" class="transcript-chunks" onclick="console.log('00:15:55,394'); seek(955.0)">
+              When it all depends on which, how big is your cluster, how many codes
+            </span>
+            
+            <span id="chunk-231" class="transcript-chunks" onclick="console.log('00:15:59,444'); seek(959.0)">
+              that you are working with, and the partition size is ideally a hundred
+            </span>
+            
+            <span id="chunk-232" class="transcript-chunks" onclick="console.log('00:16:03,914'); seek(963.0)">
+              to 200 mb is a, is our sweet spot in terms of the partitioning size count
+            </span>
+            
+            <span id="chunk-233" class="transcript-chunks" onclick="console.log('00:16:08,754'); seek(968.0)">
+              and balance parallelism with overhead.
+            </span>
+            
+            <span id="chunk-234" class="transcript-chunks" onclick="console.log('00:16:10,854'); seek(970.0)">
+              So when we talk about the limitations and inter introduces a shuffle operation,
+            </span>
+            
+            <span id="chunk-235" class="transcript-chunks" onclick="console.log('00:16:16,584'); seek(976.0)">
+              so as you are redistributing the data.
+            </span>
+            
+            <span id="chunk-236" class="transcript-chunks" onclick="console.log('00:16:18,714'); seek(978.0)">
+              Hash partitioning does not change the key frequency.
+            </span>
+            
+            <span id="chunk-237" class="transcript-chunks" onclick="console.log('00:16:22,074'); seek(982.0)">
+              Eff ineffective for the extreme.
+            </span>
+            
+            <span id="chunk-238" class="transcript-chunks" onclick="console.log('00:16:24,544'); seek(984.0)">
+              Skew scenarios like when you have a large data, large skew for one particular region
+            </span>
+            
+            <span id="chunk-239" class="transcript-chunks" onclick="console.log('00:16:29,794'); seek(989.0)">
+              or something, then you need to think about other techniques to redistribute the data.
+            </span>
+            
+            <span id="chunk-240" class="transcript-chunks" onclick="console.log('00:16:35,139'); seek(995.0)">
+              So the performance gains, like more rate, performance gain, and most effective
+            </span>
+            
+            <span id="chunk-241" class="transcript-chunks" onclick="console.log('00:16:39,579'); seek(999.0)">
+              in future pipeline stages and all that.
+            </span>
+            
+            <span id="chunk-242" class="transcript-chunks" onclick="console.log('00:16:41,559'); seek(1001.0)">
+              So in our case, we absorb with the redistribution repartitioning
+            </span>
+            
+            <span id="chunk-243" class="transcript-chunks" onclick="console.log('00:16:45,859'); seek(1005.0)">
+              strategy, and we have 30% implement in our repro pre-processing stages.
+            </span>
+            
+            <span id="chunk-244" class="transcript-chunks" onclick="console.log('00:16:50,839'); seek(1010.0)">
+              However, repartitioning does not change key frequency.
+            </span>
+            
+            <span id="chunk-245" class="transcript-chunks" onclick="console.log('00:16:54,589'); seek(1014.0)">
+              Extreme hard keys still remain dominant, as I mentioned in the slide.
+            </span>
+            
+            <span id="chunk-246" class="transcript-chunks" onclick="console.log('00:16:58,999'); seek(1018.0)">
+              And optimal, partion size is like a hundred to 200 mb Move on.
+            </span>
+            
+            <span id="chunk-247" class="transcript-chunks" onclick="console.log('00:17:04,119'); seek(1024.0)">
+              Moving on.
+            </span>
+            
+            <span id="chunk-248" class="transcript-chunks" onclick="console.log('00:17:04,659'); seek(1024.0)">
+              The second solution that we, that's most recommended and most popular
+            </span>
+            
+            <span id="chunk-249" class="transcript-chunks" onclick="console.log('00:17:09,209'); seek(1029.0)">
+              is a key salting me meaning like so you identify the hard key,
+            </span>
+            
+            <span id="chunk-250" class="transcript-chunks" onclick="console.log('00:17:13,399'); seek(1033.0)">
+              which is improper distribution.
+            </span>
+            
+            <span id="chunk-251" class="transcript-chunks" onclick="console.log('00:17:15,539'); seek(1035.0)">
+              You add us all to it, you add a random number or.
+            </span>
+            
+            <span id="chunk-252" class="transcript-chunks" onclick="console.log('00:17:18,829'); seek(1038.0)">
+              Some number and spread those partitions.
+            </span>
+            
+            <span id="chunk-253" class="transcript-chunks" onclick="console.log('00:17:21,959'); seek(1041.0)">
+              So in, in that example I just added like a random of some random number
+            </span>
+            
+            <span id="chunk-254" class="transcript-chunks" onclick="console.log('00:17:26,579'); seek(1046.0)">
+              into multiply by 10 with the user ID and then redistributing the data.
+            </span>
+            
+            <span id="chunk-255" class="transcript-chunks" onclick="console.log('00:17:30,929'); seek(1050.0)">
+              So this gives so when certain keys such as high AQ user IDs dominate the dataset,
+            </span>
+            
+            <span id="chunk-256" class="transcript-chunks" onclick="console.log('00:17:36,979'); seek(1056.0)">
+              repartitioning alone may not be enough.
+            </span>
+            
+            <span id="chunk-257" class="transcript-chunks" onclick="console.log('00:17:39,709'); seek(1059.0)">
+              Key salting works by adding a small random value as I mentioned,
+            </span>
+            
+            <span id="chunk-258" class="transcript-chunks" onclick="console.log('00:17:43,239'); seek(1063.0)">
+              the key mentioned in the slide.
+            </span>
+            
+            <span id="chunk-259" class="transcript-chunks" onclick="console.log('00:17:45,479'); seek(1065.0)">
+              Effectively spliting the single hot key into multiple smaller keys,
+            </span>
+            
+            <span id="chunk-260" class="transcript-chunks" onclick="console.log('00:17:49,399'); seek(1069.0)">
+              spreads the workload across multiple partitions, breaks up hotspots.
+            </span>
+            
+            <span id="chunk-261" class="transcript-chunks" onclick="console.log('00:17:54,679'); seek(1074.0)">
+              So the key takeaways that salting allows us.
+            </span>
+            
+            <span id="chunk-262" class="transcript-chunks" onclick="console.log('00:17:57,849'); seek(1077.0)">
+              Proactively distribute the extreme skew when basic is, are responsible for
+            </span>
+            
+            <span id="chunk-263" class="transcript-chunks" onclick="console.log('00:18:02,709'); seek(1082.0)">
+              overwhelming data overwhelming the cluster with the, a large partition of data and
+            </span>
+            
+            <span id="chunk-264" class="transcript-chunks" onclick="console.log('00:18:08,739'); seek(1088.0)">
+              one executor taking that entire load.
+            </span>
+            
+            <span id="chunk-265" class="transcript-chunks" onclick="console.log('00:18:11,129'); seek(1091.0)">
+              So what are the best scenarios like when we can use like low salt?
+            </span>
+            
+            <span id="chunk-266" class="transcript-chunks" onclick="console.log('00:18:16,439'); seek(1096.0)">
+              So there are like two to four.
+            </span>
+            
+            <span id="chunk-267" class="transcript-chunks" onclick="console.log('00:18:19,119'); seek(1099.0)">
+              Keys like that.
+            </span>
+            
+            <span id="chunk-268" class="transcript-chunks" onclick="console.log('00:18:20,129'); seek(1100.0)">
+              And the and we need to do 34, so resolve for extreme skew.
+            </span>
+            
+            <span id="chunk-269" class="transcript-chunks" onclick="console.log('00:18:23,719'); seek(1103.0)">
+              So when a single dominant value, so as I mentioned, like there's a
+            </span>
+            
+            <span id="chunk-270" class="transcript-chunks" onclick="console.log('00:18:27,049'); seek(1107.0)">
+              dominant key, hot keys will be there.
+            </span>
+            
+            <span id="chunk-271" class="transcript-chunks" onclick="console.log('00:18:29,419'); seek(1109.0)">
+              And so what we do, we basically we I append the random salt keys to
+            </span>
+            
+            <span id="chunk-272" class="transcript-chunks" onclick="console.log('00:18:33,829'); seek(1113.0)">
+              heavy user IDs before aggregation.
+            </span>
+            
+            <span id="chunk-273" class="transcript-chunks" onclick="console.log('00:18:36,259'); seek(1116.0)">
+              Large partition reduces from eight gig, like in our case, like eight gig to
+            </span>
+            
+            <span id="chunk-274" class="transcript-chunks" onclick="console.log('00:18:40,119'); seek(1120.0)">
+              600 mb or training runtime reduced like nearly 50% in some cases, and salting
+            </span>
+            
+            <span id="chunk-275" class="transcript-chunks" onclick="console.log('00:18:46,149'); seek(1126.0)">
+              requires an additional aggregation stage.
+            </span>
+            
+            <span id="chunk-276" class="transcript-chunks" onclick="console.log('00:18:48,099'); seek(1128.0)">
+              But s the workloads significantly.
+            </span>
+            
+            <span id="chunk-277" class="transcript-chunks" onclick="console.log('00:18:51,839'); seek(1131.0)">
+              And the last one here I have is the broadcast joint.
+            </span>
+            
+            <span id="chunk-278" class="transcript-chunks" onclick="console.log('00:18:55,669'); seek(1135.0)">
+              This is also very significant in terms of improving the.
+            </span>
+            
+            <span id="chunk-279" class="transcript-chunks" onclick="console.log('00:18:59,299'); seek(1139.0)">
+              Spark jobs, performance and skew.
+            </span>
+            
+            <span id="chunk-280" class="transcript-chunks" onclick="console.log('00:19:02,039'); seek(1142.0)">
+              When we have a skew data.
+            </span>
+            
+            <span id="chunk-281" class="transcript-chunks" onclick="console.log('00:19:03,299'); seek(1143.0)">
+              So it's always ideal to send the small, smallest table into the memory.
+            </span>
+            
+            <span id="chunk-282" class="transcript-chunks" onclick="console.log('00:19:09,179'); seek(1149.0)">
+              So send the small table to all executor to join and it increases
+            </span>
+            
+            <span id="chunk-283" class="transcript-chunks" onclick="console.log('00:19:13,809'); seek(1153.0)">
+              the joints per joint performance.
+            </span>
+            
+            <span id="chunk-284" class="transcript-chunks" onclick="console.log('00:19:15,729'); seek(1155.0)">
+              And also this eliminates the shuffle.
+            </span>
+            
+            <span id="chunk-285" class="transcript-chunks" onclick="console.log('00:19:18,929'); seek(1158.0)">
+              That is a big thing of your large dataset entirely as mentioned in the code snippet
+            </span>
+            
+            <span id="chunk-286" class="transcript-chunks" onclick="console.log('00:19:23,989'); seek(1163.0)">
+              here, we just need to use the broadcast.
+            </span>
+            
+            <span id="chunk-287" class="transcript-chunks" onclick="console.log('00:19:26,689'); seek(1166.0)">
+              It it under spark will understand.
+            </span>
+            
+            <span id="chunk-288" class="transcript-chunks" onclick="console.log('00:19:28,709'); seek(1168.0)">
+              This is a small table.
+            </span>
+            
+            <span id="chunk-289" class="transcript-chunks" onclick="console.log('00:19:29,789'); seek(1169.0)">
+              This is the table that need to be sent to memory for all the executors
+            </span>
+            
+            <span id="chunk-290" class="transcript-chunks" onclick="console.log('00:19:34,449'); seek(1174.0)">
+              and it'll broadcast the data.
+            </span>
+            
+            <span id="chunk-291" class="transcript-chunks" onclick="console.log('00:19:36,249'); seek(1176.0)">
+              So basically essentially what you are, what we are trying to do is like
+            </span>
+            
+            <span id="chunk-292" class="transcript-chunks" onclick="console.log('00:19:39,639'); seek(1179.0)">
+              we try to avoid redistributing the large data sets across the cluster.
+            </span>
+            
+            <span id="chunk-293" class="transcript-chunks" onclick="console.log('00:19:44,319'); seek(1184.0)">
+              This, drastically or drastically reduce the network overhead.
+            </span>
+            
+            <span id="chunk-294" class="transcript-chunks" onclick="console.log('00:19:49,259'); seek(1189.0)">
+              Broadcast joints are affect you in future engineering pipelines,
+            </span>
+            
+            <span id="chunk-295" class="transcript-chunks" onclick="console.log('00:19:53,009'); seek(1193.0)">
+              whereas large behavioral data is joined with a relatively small
+            </span>
+            
+            <span id="chunk-296" class="transcript-chunks" onclick="console.log('00:19:57,389'); seek(1197.0)">
+              dimension or lookup data table.
+            </span>
+            
+            <span id="chunk-297" class="transcript-chunks" onclick="console.log('00:19:59,279'); seek(1199.0)">
+              The key takeaway is that in this one in stuff moving.
+            </span>
+            
+            <span id="chunk-298" class="transcript-chunks" onclick="console.log('00:20:03,674'); seek(1203.0)">
+              Massive data across the cluster.
+            </span>
+            
+            <span id="chunk-299" class="transcript-chunks" onclick="console.log('00:20:05,984'); seek(1205.0)">
+              We move the smaller table once and process the joint more eff
+            </span>
+            
+            <span id="chunk-300" class="transcript-chunks" onclick="console.log('00:20:10,424'); seek(1210.0)">
+              effectively and efficiently.
+            </span>
+            
+            <span id="chunk-301" class="transcript-chunks" onclick="console.log('00:20:12,344'); seek(1212.0)">
+              This way our model performance, like the pipeline performance
+            </span>
+            
+            <span id="chunk-302" class="transcript-chunks" onclick="console.log('00:20:15,854'); seek(1215.0)">
+              is significantly improved.
+            </span>
+            
+            <span id="chunk-303" class="transcript-chunks" onclick="console.log('00:20:18,004'); seek(1218.0)">
+              So here are some guidelines and best practices that we can
+            </span>
+            
+            <span id="chunk-304" class="transcript-chunks" onclick="console.log('00:20:21,514'); seek(1221.0)">
+              use, keep the broadcast table.
+            </span>
+            
+            <span id="chunk-305" class="transcript-chunks" onclick="console.log('00:20:24,074'); seek(1224.0)">
+              Under 10 mb there's a typical limit, use a maximum of 20, 21% off.
+            </span>
+            
+            <span id="chunk-306" class="transcript-chunks" onclick="console.log('00:20:28,654'); seek(1228.0)">
+              Execute memory to avoid GC garbage pressure during training and a significant
+            </span>
+            
+            <span id="chunk-307" class="transcript-chunks" onclick="console.log('00:20:34,934'); seek(1234.0)">
+              data size disparity between tables.
+            </span>
+            
+            <span id="chunk-308" class="transcript-chunks" onclick="console.log('00:20:36,914'); seek(1236.0)">
+              So that means like when you are joining a hundred gig table with
+            </span>
+            
+            <span id="chunk-309" class="transcript-chunks" onclick="console.log('00:20:40,754'); seek(1240.0)">
+              a one g, one GB of data set.
+            </span>
+            
+            <span id="chunk-310" class="transcript-chunks" onclick="console.log('00:20:43,104'); seek(1243.0)">
+              So that's when the broadcast will be very helpful and handy.
+            </span>
+            
+            <span id="chunk-311" class="transcript-chunks" onclick="console.log('00:20:47,534'); seek(1247.0)">
+              And then we can send these a small table into memory for a more efficient join.
+            </span>
+            
+            <span id="chunk-312" class="transcript-chunks" onclick="console.log('00:20:52,594'); seek(1252.0)">
+              And performance impact.
+            </span>
+            
+            <span id="chunk-313" class="transcript-chunks" onclick="console.log('00:20:53,854'); seek(1253.0)">
+              It eliminates the, as I mentioned it, eliminate a lot of network traffic
+            </span>
+            
+            <span id="chunk-314" class="transcript-chunks" onclick="console.log('00:20:57,884'); seek(1257.0)">
+              and network shuffle, and the scale with the table size, difference
+            </span>
+            
+            <span id="chunk-315" class="transcript-chunks" onclick="console.log('00:21:02,174'); seek(1262.0)">
+              and critical for maintaining model freshness in production systems.
+            </span>
+            
+            <span id="chunk-316" class="transcript-chunks" onclick="console.log('00:21:06,894'); seek(1266.0)">
+              So in this case this as I mentioned before this is a shuffle of large data
+            </span>
+            
+            <span id="chunk-317" class="transcript-chunks" onclick="console.log('00:21:11,904'); seek(1271.0)">
+              sets and one enrichment stage drop.
+            </span>
+            
+            <span id="chunk-318" class="transcript-chunks" onclick="console.log('00:21:14,784'); seek(1274.0)">
+              Like in our case, like 90.
+            </span>
+            
+            <span id="chunk-319" class="transcript-chunks" onclick="console.log('00:21:17,064'); seek(1277.0)">
+              90 minutes to almost 10, close to 10 minutes ensures the broadcast join size
+            </span>
+            
+            <span id="chunk-320" class="transcript-chunks" onclick="console.log('00:21:22,684'); seek(1282.0)">
+              remains under 20, 25% executor memory to prevent these gc warhead issue.
+            </span>
+            
+            <span id="chunk-321" class="transcript-chunks" onclick="console.log('00:21:28,404'); seek(1288.0)">
+              So overall, the key takeaway so we understand what is the data
+            </span>
+            
+            <span id="chunk-322" class="transcript-chunks" onclick="console.log('00:21:33,824'); seek(1293.0)">
+              skew and how it is going to impact our production ML skews.
+            </span>
+            
+            <span id="chunk-323" class="transcript-chunks" onclick="console.log('00:21:38,839'); seek(1298.0)">
+              What are the root causes and what are those like medications
+            </span>
+            
+            <span id="chunk-324" class="transcript-chunks" onclick="console.log('00:21:42,159'); seek(1302.0)">
+              that we can do in terms of avoid this data skew and handle it.
+            </span>
+            
+            <span id="chunk-325" class="transcript-chunks" onclick="console.log('00:21:45,779'); seek(1305.0)">
+              We can't avoid the data skew.
+            </span>
+            
+            <span id="chunk-326" class="transcript-chunks" onclick="console.log('00:21:47,219'); seek(1307.0)">
+              We can handle the data skew in a right way.
+            </span>
+            
+            <span id="chunk-327" class="transcript-chunks" onclick="console.log('00:21:49,769'); seek(1309.0)">
+              And so basically like I, as I said use the rep partitioning when the data SKU is like
+            </span>
+            
+            <span id="chunk-328" class="transcript-chunks" onclick="console.log('00:21:55,959'); seek(1315.0)">
+              moderate sku or if you have a larger sku.
+            </span>
+            
+            <span id="chunk-329" class="transcript-chunks" onclick="console.log('00:21:59,199'); seek(1319.0)">
+              In most of the cases we have used mostly the salting.
+            </span>
+            
+            <span id="chunk-330" class="transcript-chunks" onclick="console.log('00:22:02,659'); seek(1322.0)">
+              In terms of skew data and broadcast joints, which helped significantly
+            </span>
+            
+            <span id="chunk-331" class="transcript-chunks" onclick="console.log('00:22:07,679'); seek(1327.0)">
+              optimizes selective targeting specific bottlenecks rather than rather than
+            </span>
+            
+            <span id="chunk-332" class="transcript-chunks" onclick="console.log('00:22:12,259'); seek(1332.0)">
+              over engineering the entire pipeline.
+            </span>
+            
+            <span id="chunk-333" class="transcript-chunks" onclick="console.log('00:22:14,299'); seek(1334.0)">
+              Finally.
+            </span>
+            
+            <span id="chunk-334" class="transcript-chunks" onclick="console.log('00:22:15,409'); seek(1335.0)">
+              So I would say when implemented correctly these, these techniques
+            </span>
+            
+            <span id="chunk-335" class="transcript-chunks" onclick="console.log('00:22:19,159'); seek(1339.0)">
+              lead to faster model training.
+            </span>
+            
+            <span id="chunk-336" class="transcript-chunks" onclick="console.log('00:22:21,229'); seek(1341.0)">
+              So it saves a lot of cost and time and also freshness of the,
+            </span>
+            
+            <span id="chunk-337" class="transcript-chunks" onclick="console.log('00:22:26,259'); seek(1346.0)">
+              keep the freshness of the data and better resource utilization, lower
+            </span>
+            
+            <span id="chunk-338" class="transcript-chunks" onclick="console.log('00:22:30,009'); seek(1350.0)">
+              infrastructure costs and also it'll help to do a quicker development cycles.
+            </span>
+            
+            <span id="chunk-339" class="transcript-chunks" onclick="console.log('00:22:36,019'); seek(1356.0)">
+              So with that we are also currently working on how we can leverage
+            </span>
+            
+            <span id="chunk-340" class="transcript-chunks" onclick="console.log('00:22:41,619'); seek(1361.0)">
+              ai in terms of identifying.
+            </span>
+            
+            <span id="chunk-341" class="transcript-chunks" onclick="console.log('00:22:44,659'); seek(1364.0)">
+              These gaps in a pre hand.
+            </span>
+            
+            <span id="chunk-342" class="transcript-chunks" onclick="console.log('00:22:47,119'); seek(1367.0)">
+              And help us suggest like when there is a data skew that's going to happen,
+            </span>
+            
+            <span id="chunk-343" class="transcript-chunks" onclick="console.log('00:22:50,869'); seek(1370.0)">
+              we want to scan through these data sets and help suggest these are the
+            </span>
+            
+            <span id="chunk-344" class="transcript-chunks" onclick="console.log('00:22:55,169'); seek(1375.0)">
+              hotkey or these other, this is where the data has being distributed heavily.
+            </span>
+            
+            <span id="chunk-345" class="transcript-chunks" onclick="console.log('00:23:00,279'); seek(1380.0)">
+              So then we so that, like with the help of ai, we are experimenting
+            </span>
+            
+            <span id="chunk-346" class="transcript-chunks" onclick="console.log('00:23:04,789'); seek(1384.0)">
+              with models trying on historical spark metrics to predict a data skew.
+            </span>
+            
+            <span id="chunk-347" class="transcript-chunks" onclick="console.log('00:23:09,819'); seek(1389.0)">
+              Risk before stage execution.
+            </span>
+            
+            <span id="chunk-348" class="transcript-chunks" onclick="console.log('00:23:12,119'); seek(1392.0)">
+              These models could recommend partition counts, as I said, and salting factors
+            </span>
+            
+            <span id="chunk-349" class="transcript-chunks" onclick="console.log('00:23:16,529'); seek(1396.0)">
+              and broadcast strategies dynamically.
+            </span>
+            
+            <span id="chunk-350" class="transcript-chunks" onclick="console.log('00:23:18,709'); seek(1398.0)">
+              This this represents a shift towards self optimizing distributed ml P ML pipelines.
+            </span>
+            
+            <span id="chunk-351" class="transcript-chunks" onclick="console.log('00:23:24,879'); seek(1404.0)">
+              That's where, that's what we are planning to achieve with that.
+            </span>
+            
+            <span id="chunk-352" class="transcript-chunks" onclick="console.log('00:23:29,354'); seek(1409.0)">
+              Thank you everyone and hope you like the content.
+            </span>
+            
+            <span id="chunk-353" class="transcript-chunks" onclick="console.log('00:23:32,794'); seek(1412.0)">
+              If you want me to really want to connect on LinkedIn you can type good
+            </span>
+            
+            <span id="chunk-354" class="transcript-chunks" onclick="console.log('00:23:37,214'); seek(1417.0)">
+              lady, and I'm happy to talk more.
+            </span>
+            
+            <span id="chunk-355" class="transcript-chunks" onclick="console.log('00:23:40,514'); seek(1420.0)">
+              Thank you.
+            </span>
+            
+            </div>
+          </div>
           
           
 
