@@ -1,0 +1,988 @@
+1
+00:00:00,000 --> 00:00:00,270
+Speaker 19: hi.
+
+2
+00:00:00,270 --> 00:00:05,670
+I am pa and today I'll talk about a
+practical problem that many developers
+
+3
+00:00:05,980 --> 00:00:08,950
+face when orchestrating workflows.
+
+4
+00:00:09,550 --> 00:00:11,799
+It's time consuming flows that fail late.
+
+5
+00:00:12,299 --> 00:00:18,890
+Imagine a flow that takes 30 minutes or
+two hours to complete, and you only learn
+
+6
+00:00:19,160 --> 00:00:20,840
+that it's going to fail after the fact.
+
+7
+00:00:20,840 --> 00:00:21,230
+It fails.
+
+8
+00:00:21,730 --> 00:00:26,930
+The question is then what if
+we can predict that the flow is
+
+9
+00:00:26,930 --> 00:00:31,040
+going to fail after the first or
+second minute of it's running?
+
+10
+00:00:31,760 --> 00:00:37,370
+And can we do something about it, like
+a board reroute or warn the developer
+
+11
+00:00:37,820 --> 00:00:40,310
+ideally with a reason why the flow failed?
+
+12
+00:00:41,120 --> 00:00:44,860
+And this is what this talk is about using.
+
+13
+00:00:45,334 --> 00:00:48,095
+Early science and signals inside Perfect.
+
+14
+00:00:48,554 --> 00:00:52,915
+To predict risk before the
+expensive work starts, very quickly.
+
+15
+00:00:53,035 --> 00:00:57,724
+Perfect is a workflow orchestrator,
+as I said previously in
+
+16
+00:00:57,724 --> 00:00:59,254
+which you can define a flow.
+
+17
+00:00:59,824 --> 00:01:04,285
+It's a. Basic entity of prefect
+and it consists of tasks.
+
+18
+00:01:04,854 --> 00:01:12,575
+Basically task is a unit of work and
+the cool features of prefect are that
+
+19
+00:01:12,575 --> 00:01:19,755
+it's allowing to schedule task that
+can implement retries caching of flows.
+
+20
+00:01:20,175 --> 00:01:25,155
+And you can see the execution of
+flows in the UI and you can interact
+
+21
+00:01:25,244 --> 00:01:27,399
+in d ui with this flows expand.
+
+22
+00:01:27,899 --> 00:01:28,410
+Collapse.
+
+23
+00:01:28,910 --> 00:01:33,440
+You can also see the parameters, logs,
+timings, and failures of the flows.
+
+24
+00:01:33,940 --> 00:01:38,080
+And the reason perfect matters for
+this project is that it sits at
+
+25
+00:01:38,080 --> 00:01:39,610
+the perfect point of the system.
+
+26
+00:01:39,870 --> 00:01:41,460
+So right at the start of the flow.
+
+27
+00:01:41,710 --> 00:01:42,070
+Perfect.
+
+28
+00:01:42,100 --> 00:01:44,350
+Already knows a lot about
+what's going to happen.
+
+29
+00:01:44,710 --> 00:01:47,920
+It knows the parameters, the
+environment, and meta metadata.
+
+30
+00:01:48,420 --> 00:01:54,370
+And after the first task or second
+task, we can cheaply compute the
+
+31
+00:01:54,580 --> 00:02:00,649
+quality fingerprints of data and
+collect earlier runtime signals.
+
+32
+00:02:01,150 --> 00:02:07,390
+So instead of waiting for the expensive
+stage to burn the compute, we can
+
+33
+00:02:07,490 --> 00:02:10,520
+generate the score of the risk.
+
+34
+00:02:10,520 --> 00:02:13,370
+It's going to fail early in the system.
+
+35
+00:02:13,870 --> 00:02:19,179
+And perfect has mechanisms that allow
+us to take action on this score.
+
+36
+00:02:19,429 --> 00:02:23,639
+So to keep this to keep things
+concrete, I'll define failure as
+
+37
+00:02:23,639 --> 00:02:26,279
+an SLA breach just for simplicity.
+
+38
+00:02:27,029 --> 00:02:31,889
+And we just going to explore this
+particular definition of failure.
+
+39
+00:02:32,799 --> 00:02:38,039
+So the SLAs, when the runtime
+exceeds certain threshold, and
+
+40
+00:02:38,039 --> 00:02:39,689
+that's a common operational pain.
+
+41
+00:02:40,189 --> 00:02:42,449
+And we want a prediction.
+
+42
+00:02:43,154 --> 00:02:47,924
+Of that event early in the
+system, ideally on the runtime
+
+43
+00:02:48,504 --> 00:02:49,974
+sorry, on, on the submit time.
+
+44
+00:02:50,274 --> 00:02:58,714
+And if we can predict earlier, we can do
+not just alerting, but we can do other
+
+45
+00:02:58,714 --> 00:03:05,604
+things like completely stop the run or
+maybe, request a better machine that's
+
+46
+00:03:05,604 --> 00:03:11,874
+used these particular parameters, and we
+can then distribute the compute better.
+
+47
+00:03:12,794 --> 00:03:18,634
+Or we can simply yeah, fail and tell
+the developer what exactly went wrong.
+
+48
+00:03:19,204 --> 00:03:23,364
+And that allows us to develop
+in much quicker cycles.
+
+49
+00:03:23,864 --> 00:03:28,074
+In this particular presentation, I'm
+going to talk about a financial setting.
+
+50
+00:03:28,849 --> 00:03:33,419
+Specifically portfolio risk
+computation and the flow.
+
+51
+00:03:33,719 --> 00:03:34,979
+Looks like this.
+
+52
+00:03:34,979 --> 00:03:37,229
+So we generate a metrics of returns.
+
+53
+00:03:37,439 --> 00:03:42,239
+The first step, then compute some
+statistics, and after that there's a
+
+54
+00:03:42,239 --> 00:03:46,219
+heavy step that needs to be predicted
+if it's going to fail or not.
+
+55
+00:03:46,969 --> 00:03:50,779
+It's a covar estimation
+and some other simulations.
+
+56
+00:03:51,579 --> 00:03:54,579
+So we exploit the fact that
+useful signals exist earlier.
+
+57
+00:03:55,429 --> 00:03:57,949
+At flow start, we already know.
+
+58
+00:03:58,564 --> 00:04:05,534
+Some of the data which are number of
+assets number of days, simulations, and
+
+59
+00:04:05,534 --> 00:04:09,074
+other metrics like data quality measuring.
+
+60
+00:04:10,034 --> 00:04:15,994
+Also we know the version of the code,
+which is going to impact how we use
+
+61
+00:04:15,994 --> 00:04:18,034
+these parameters in our calculations.
+
+62
+00:04:18,934 --> 00:04:20,854
+And after the first step is completed.
+
+63
+00:04:21,354 --> 00:04:26,244
+We can compute metrics for returns
+and measure the time that it
+
+64
+00:04:26,244 --> 00:04:28,224
+took to calculate the first step.
+
+65
+00:04:28,724 --> 00:04:34,364
+So in the end, I have defined 11 fields
+to form the feature vector and I don't
+
+66
+00:04:34,364 --> 00:04:36,694
+use anything after the heavy step.
+
+67
+00:04:36,944 --> 00:04:39,544
+So only this 11, then.
+
+68
+00:04:40,414 --> 00:04:45,914
+Right after the first task, we can run
+inference to get the probability that our
+
+69
+00:04:45,914 --> 00:04:49,659
+runtime of heavy step will breach the SLA.
+
+70
+00:04:50,399 --> 00:04:54,984
+And we attach the score to the
+run and we can lock the top
+
+71
+00:04:54,984 --> 00:04:57,114
+drivers for in interpretability.
+
+72
+00:04:57,624 --> 00:05:01,344
+So the top features that
+contributed to this prediction.
+
+73
+00:05:02,184 --> 00:05:04,014
+And only after that we can proceed to the.
+
+74
+00:05:04,514 --> 00:05:09,714
+Now we run an actual perfect flow,
+end-to-end, and the first task
+
+75
+00:05:09,774 --> 00:05:14,934
+generates correlated returns, injects
+the missing values and outliers,
+
+76
+00:05:15,564 --> 00:05:17,364
+and computes chip statistics.
+
+77
+00:05:17,754 --> 00:05:22,049
+Then they have a task does
+the real CPU work, and this is
+
+78
+00:05:22,049 --> 00:05:24,719
+where we can avoid wasting time.
+
+79
+00:05:25,219 --> 00:05:30,139
+And the parameters are not just
+linearly contributing to the runtime.
+
+80
+00:05:30,869 --> 00:05:37,599
+So it's just the synthetic setup to
+test how we can learn models to predict
+
+81
+00:05:37,929 --> 00:05:40,299
+more closely to what is in production.
+
+82
+00:05:40,799 --> 00:05:45,929
+While this is synthetic, but the
+idea is to show how can this apply?
+
+83
+00:05:45,994 --> 00:05:51,514
+How can this be applied to perfect and to
+actual production system, which involve
+
+84
+00:05:51,514 --> 00:05:53,874
+non-linear, non-linear workflow behavior.
+
+85
+00:05:54,124 --> 00:05:58,964
+When it comes to model choice cat Boost
+is a natural pick for this task because
+
+86
+00:05:58,964 --> 00:06:01,314
+this is a classic Tableau risk modeling.
+
+87
+00:06:01,814 --> 00:06:05,444
+We have mixed numerical features plus.
+
+88
+00:06:05,999 --> 00:06:11,369
+Some categorical features such as code,
+version and cat boost tends to be a strong
+
+89
+00:06:11,699 --> 00:06:18,339
+peak here because it involves minimal
+pre-processing and it can learn non-linear
+
+90
+00:06:18,579 --> 00:06:21,219
+interactions between features naturally.
+
+91
+00:06:21,719 --> 00:06:25,284
+So I benchmark it against
+a list of other models.
+
+92
+00:06:25,784 --> 00:06:28,724
+With the exact data and feature set.
+
+93
+00:06:29,304 --> 00:06:35,854
+So I use logistic regression random
+forest xj, boost the histogram, gradient
+
+94
+00:06:35,854 --> 00:06:40,024
+boosting, and just to have a sanity check.
+
+95
+00:06:40,654 --> 00:06:49,864
+I also include a rule in which we just cut
+this threshold on a particular feature.
+
+96
+00:06:50,164 --> 00:06:50,794
+And for.
+
+97
+00:06:51,199 --> 00:06:58,679
+Validation I use rock ho metric and for
+interpret interpretation of predictions.
+
+98
+00:06:58,979 --> 00:07:06,489
+I use shop to explain why individual
+columns contribute to the prediction and
+
+99
+00:07:06,489 --> 00:07:08,569
+how can we signal that to developers.
+
+100
+00:07:08,819 --> 00:07:09,359
+Basically.
+
+101
+00:07:09,859 --> 00:07:19,719
+I have done some testing of the system
+and I have run the system 5,000 times to
+
+102
+00:07:19,749 --> 00:07:27,509
+get the data and I've created a dataset
+in which the SLA you speak the way.
+
+103
+00:07:28,009 --> 00:07:32,989
+That we have balanced classes of
+failures and success EV events.
+
+104
+00:07:33,249 --> 00:07:38,809
+And after training and testing on
+the holdout set this is the leader
+
+105
+00:07:39,179 --> 00:07:40,769
+leaderboard that you can see.
+
+106
+00:07:41,129 --> 00:07:45,569
+So the cat boost is the best
+model and it's course around
+
+107
+00:07:45,699 --> 00:07:48,849
+zero point 87 on rock oak.
+
+108
+00:07:49,699 --> 00:07:56,969
+And we see that other boosting models also
+score quite, high risk sorry, high scores.
+
+109
+00:07:57,689 --> 00:08:04,299
+And also logistic regression is
+also scoring above 80% on rock oak.
+
+110
+00:08:04,589 --> 00:08:11,839
+A risk score alone isn't enough in our
+case because in practice we want to.
+
+111
+00:08:12,259 --> 00:08:16,859
+Tell developers why this particular
+run is going to fail because.
+
+112
+00:08:17,359 --> 00:08:21,779
+If we know this information, we
+can click quickly understand if
+
+113
+00:08:21,859 --> 00:08:26,059
+we're missing something in the
+either input data or in the code.
+
+114
+00:08:26,359 --> 00:08:29,119
+So we can compute per run explanations.
+
+115
+00:08:29,809 --> 00:08:36,029
+In this example, the model predicted
+about 95% risk score before the
+
+116
+00:08:36,029 --> 00:08:40,109
+heavy task with the shop and the.
+
+117
+00:08:40,359 --> 00:08:47,829
+Explanation of particular, features that
+contributed to this score at listed here.
+
+118
+00:08:48,309 --> 00:08:54,279
+So in this case the returns had
+more extreme spikes than normal.
+
+119
+00:08:54,529 --> 00:09:00,119
+And that make a variance
+simulation less stable and also
+
+120
+00:09:00,239 --> 00:09:01,739
+a lot of values are missing.
+
+121
+00:09:02,384 --> 00:09:07,774
+Had to be filled during the first step,
+which also contributed to instability.
+
+122
+00:09:08,274 --> 00:09:13,544
+And this explain, this explanation
+can immediately suggest developers
+
+123
+00:09:14,054 --> 00:09:15,914
+actions as I talked previously.
+
+124
+00:09:16,414 --> 00:09:23,434
+Okay, so this is the UI of Perfect and
+as in dashboard, it looks like that.
+
+125
+00:09:23,794 --> 00:09:30,484
+And it shows latest runs as you can see
+now, we have 13,000 runs because I used to
+
+126
+00:09:30,484 --> 00:09:33,694
+train models and generate data for that.
+
+127
+00:09:34,504 --> 00:09:40,434
+And if we go to deployments, we can see
+there are successful try two deployments.
+
+128
+00:09:40,434 --> 00:09:43,014
+One is for successful runs and one for.
+
+129
+00:09:43,874 --> 00:09:51,804
+Failures and the difference is between
+only parameters that are provided to the
+
+130
+00:09:51,804 --> 00:09:54,774
+runs, but the underlying code is the same.
+
+131
+00:09:55,284 --> 00:10:02,684
+So we go to successful run, we can
+trigger a new run like that, and if we go
+
+132
+00:10:03,314 --> 00:10:05,894
+inside, we should be able to monitor it.
+
+133
+00:10:06,684 --> 00:10:11,854
+And at the moment, it's
+pending, so it'll start soon.
+
+134
+00:10:12,514 --> 00:10:17,164
+If we click into parameters, we can
+see we have numerical parameters and
+
+135
+00:10:17,164 --> 00:10:19,564
+the categorical one, such as version.
+
+136
+00:10:20,434 --> 00:10:23,434
+We see that the model here is used.
+
+137
+00:10:24,274 --> 00:10:29,464
+The model we use here is a Cabos model,
+and now we see that the run is completed.
+
+138
+00:10:29,554 --> 00:10:33,394
+We have the generation return step,
+and then they heavy computation.
+
+139
+00:10:33,894 --> 00:10:39,474
+If we go to the logs, we can
+see the run logs and the earlier
+
+140
+00:10:39,774 --> 00:10:42,694
+risk predicted is very low.
+
+141
+00:10:43,354 --> 00:10:44,704
+Doesn't pass the threshold.
+
+142
+00:10:45,424 --> 00:10:48,694
+That's why we didn't stop earlier.
+
+143
+00:10:49,264 --> 00:10:54,724
+So let's go into the second deployment
+which is there is deployment.
+
+144
+00:10:55,224 --> 00:11:00,914
+And here we can look into the parameters
+and see that there are different
+
+145
+00:11:01,414 --> 00:11:05,744
+and we also can trigger any run.
+
+146
+00:11:06,244 --> 00:11:09,174
+And see what, what will
+happen in this case.
+
+147
+00:11:09,674 --> 00:11:12,374
+We have said here that it'll not fail.
+
+148
+00:11:12,874 --> 00:11:15,004
+On the model prediction by default.
+
+149
+00:11:15,484 --> 00:11:22,744
+So it should just tell us the probability
+of breaching and it'll not stop.
+
+150
+00:11:23,014 --> 00:11:27,594
+It'll, as you can see,
+continue the calculations here.
+
+151
+00:11:28,094 --> 00:11:30,654
+But, the, early risk prediction.
+
+152
+00:11:31,164 --> 00:11:32,394
+Prediction is very high.
+
+153
+00:11:33,114 --> 00:11:38,784
+It's above the threshold, so ideally
+it should be stopped and we can see
+
+154
+00:11:38,784 --> 00:11:42,814
+the top drivers for our prediction.
+
+155
+00:11:43,174 --> 00:11:46,924
+Basically, we can use that for
+interpretability and tell what
+
+156
+00:11:46,924 --> 00:11:49,074
+contributed to this prediction.
+
+157
+00:11:49,824 --> 00:11:50,124
+Yeah.
+
+158
+00:11:50,994 --> 00:11:54,234
+And that will run for
+maybe minutes or two.
+
+159
+00:11:55,164 --> 00:11:58,094
+We can actually suspend
+it, or let's cancel it.
+
+160
+00:11:58,594 --> 00:12:05,014
+And if we are going to set the
+parameter to actually stop.
+
+161
+00:12:05,514 --> 00:12:11,484
+When the prediction is above threshold, we
+can see that it's going to fail the run.
+
+162
+00:12:11,544 --> 00:12:11,994
+Let's see.
+
+163
+00:12:12,494 --> 00:12:13,844
+So we click into the new run.
+
+164
+00:12:14,344 --> 00:12:17,314
+Okay, so this is the run
+that we have triggered.
+
+165
+00:12:18,124 --> 00:12:19,774
+And as you can see, it has failed.
+
+166
+00:12:20,764 --> 00:12:24,964
+And if we see the logs, we see
+that earlier risk predicted.
+
+167
+00:12:25,759 --> 00:12:28,249
+Is high, it's about threshold.
+
+168
+00:12:28,909 --> 00:12:36,379
+We see the top drivers for that risk, and
+we see that the model enabled prediction
+
+169
+00:12:36,679 --> 00:12:39,319
+breached because of this threshold.
+
+170
+00:12:39,829 --> 00:12:41,359
+That's why the run has failed.
+
+171
+00:12:41,859 --> 00:12:43,899
+So yeah, this is how it works.
+
+172
+00:12:44,149 --> 00:12:50,939
+So how do we actually take this from
+a synthetic demo to a production flow?
+
+173
+00:12:51,349 --> 00:12:53,689
+That can actually change over time.
+
+174
+00:12:54,479 --> 00:12:57,744
+For that we need to take
+into account that the code.
+
+175
+00:12:58,244 --> 00:13:02,804
+Can change and many regressions
+are actually conditional.
+
+176
+00:13:03,014 --> 00:13:09,114
+The same inputs can be okay in the first
+version of the code, and in the second
+
+177
+00:13:09,114 --> 00:13:10,644
+version of the code, they can fail.
+
+178
+00:13:11,574 --> 00:13:11,914
+So we need.
+
+179
+00:13:12,819 --> 00:13:17,889
+Information about the changes, and we
+can get that either from Git commits
+
+180
+00:13:18,249 --> 00:13:24,619
+or from the Git itself, and we can use
+the DAST and for reference, there are
+
+181
+00:13:24,829 --> 00:13:30,859
+such tools as conventional change log
+or change distiller that looks into the
+
+182
+00:13:30,859 --> 00:13:38,099
+A ST. Also we need to roll out safely
+start in shadow mode and roll out.
+
+183
+00:13:38,879 --> 00:13:44,999
+Only like features similar to
+alerting, and only when it's safe
+
+184
+00:13:44,999 --> 00:13:47,609
+we can trigger the gating actuals.
+
+185
+00:13:48,109 --> 00:13:51,189
+Finally we need to monitor
+the drift of the system.
+
+186
+00:13:51,979 --> 00:13:52,354
+We can log.
+
+187
+00:13:53,299 --> 00:14:00,769
+Predictions historically and the outcomes
+that we took of these predictions.
+
+188
+00:14:01,549 --> 00:14:06,299
+And that gives us the loop to retrain
+and calibrate these thresholds.
+
+189
+00:14:06,549 --> 00:14:11,269
+And we also should utilize the
+sliding window for retraining
+
+190
+00:14:11,299 --> 00:14:15,959
+the model because we want to get
+rid of our data to data points.
+
+191
+00:14:16,459 --> 00:14:21,559
+And in real world applications
+that can actually also be used.
+
+192
+00:14:22,509 --> 00:14:28,199
+Cut and the pattern actually generalizes
+beyond this synthetic financial example.
+
+193
+00:14:28,709 --> 00:14:33,609
+Actually any long running workflow
+where failures are costly can
+
+194
+00:14:33,609 --> 00:14:35,679
+be used for example, ETL jobs.
+
+195
+00:14:36,459 --> 00:14:43,899
+Large batch scoring ML models training
+or CI pipelines that fail after hours
+
+196
+00:14:44,679 --> 00:14:50,709
+and like scientific workflows that
+need a lot of compute and CPU time.
+
+197
+00:14:51,009 --> 00:14:54,549
+And the action is broader
+than just aborting.
+
+198
+00:14:55,295 --> 00:14:57,635
+Sometimes the best action is rerouting.
+
+199
+00:14:58,055 --> 00:15:02,994
+We can send the route that predicted
+to fail on this particular machine
+
+200
+00:15:02,994 --> 00:15:04,764
+to a different worker pool.
+
+201
+00:15:05,345 --> 00:15:10,335
+We can reduce the workload and switch
+to for example, good implementation
+
+202
+00:15:10,335 --> 00:15:11,445
+that we know it's gonna work.
+
+203
+00:15:11,745 --> 00:15:16,095
+And we can tell the engineers
+what specific features
+
+204
+00:15:16,095 --> 00:15:17,895
+contributed to this dec decision.
+
+205
+00:15:18,395 --> 00:15:25,615
+Also SLA breaches is not just one
+particular example of predictions.
+
+206
+00:15:26,255 --> 00:15:30,635
+Another very practical label
+is retry success probability.
+
+207
+00:15:31,055 --> 00:15:34,845
+If a task fails should we
+retry, will it succeed?
+
+208
+00:15:35,485 --> 00:15:40,085
+Or we are just likely to burn
+some more compute if it won't
+
+209
+00:15:40,085 --> 00:15:44,525
+succeed, and we can predict the
+probability of freeze dry success.
+
+210
+00:15:44,825 --> 00:15:49,835
+The main takeaway is that if you can
+predict risk earlier, you can turn
+
+211
+00:15:49,835 --> 00:15:54,525
+perfect from just being a passive
+orchestrator into an active control
+
+212
+00:15:54,525 --> 00:16:01,605
+loop so we can save compute on time
+and make failures much easier to debug.
+
+213
+00:16:02,385 --> 00:16:04,465
+That's the main idea.
+
+214
+00:16:05,305 --> 00:16:05,785
+So yeah.
+
+215
+00:16:06,085 --> 00:16:07,645
+Thank you for your attention.
+

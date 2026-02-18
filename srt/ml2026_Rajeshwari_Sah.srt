@@ -1,0 +1,4171 @@
+1
+00:00:00,500 --> 00:00:01,310
+Speaker 22: Hello everyone.
+
+2
+00:00:01,640 --> 00:00:05,900
+I am Raje Za, and in this session we
+are going to talk about orchestrating
+
+3
+00:00:05,900 --> 00:00:11,000
+agent state machines with RAF,
+using a practical use case that is
+
+4
+00:00:11,000 --> 00:00:12,830
+automating clinical documentation.
+
+5
+00:00:13,190 --> 00:00:15,230
+Let me unpack the title in a grounded way.
+
+6
+00:00:15,855 --> 00:00:19,215
+So when people say agentic, it
+can sound like the model is doing
+
+7
+00:00:19,215 --> 00:00:23,415
+independent reasoning, like a person
+that's not framing that I use.
+
+8
+00:00:23,685 --> 00:00:28,194
+Here's agentic meaning in a more,
+much more engineering friendly way.
+
+9
+00:00:28,555 --> 00:00:32,305
+We break a complex task into
+specialized testable step.
+
+10
+00:00:32,695 --> 00:00:37,464
+Each step is implemented as a node
+that transformed a shared state,
+
+11
+00:00:37,794 --> 00:00:41,245
+and we use a graph to decide what
+happens next based on that state.
+
+12
+00:00:41,845 --> 00:00:46,615
+So the agency comes from a workflow
+design, conditional routing, retries,
+
+13
+00:00:46,644 --> 00:00:50,785
+and quality checks rather than a
+single prompt that we hope works.
+
+14
+00:00:50,934 --> 00:00:51,835
+Now the problem.
+
+15
+00:00:52,255 --> 00:00:57,225
+So clinic clinicians have doctor patient
+conversations and those conversation
+
+16
+00:00:57,225 --> 00:00:59,205
+needs to become some clinical nodes.
+
+17
+00:00:59,745 --> 00:01:01,485
+One common format is soap.
+
+18
+00:01:01,880 --> 00:01:05,450
+Which stands for subjective
+objective Assessment and Plan.
+
+19
+00:01:06,110 --> 00:01:10,460
+This is a classic structure for
+documentation because it separates
+
+20
+00:01:10,520 --> 00:01:14,630
+what patient says, what we observe
+and what we think is happening
+
+21
+00:01:15,050 --> 00:01:17,270
+and what we plan to do, right?
+
+22
+00:01:17,390 --> 00:01:22,430
+So the challenge is that the conversation
+is messy and human, while the note must
+
+23
+00:01:22,430 --> 00:01:24,500
+be structured, accurate and reviewable.
+
+24
+00:01:25,070 --> 00:01:30,080
+So in this talk, we'll build a prototype
+medical scribe agent with four agents.
+
+25
+00:01:30,530 --> 00:01:34,340
+The first one being the transcription,
+which converts an audio to
+
+26
+00:01:34,340 --> 00:01:37,610
+text or accept text directly.
+
+27
+00:01:38,270 --> 00:01:42,080
+Then the information extraction,
+which will convert the transcript
+
+28
+00:01:42,080 --> 00:01:44,150
+into a structured entities.
+
+29
+00:01:44,540 --> 00:01:49,010
+Then the summarization agent that
+takes in the structured entities
+
+30
+00:01:49,010 --> 00:01:50,870
+and converts them into soap notes.
+
+31
+00:01:50,900 --> 00:01:53,990
+And then finally, we'll have a
+con consistency checking agent
+
+32
+00:01:54,350 --> 00:01:58,310
+that compares the entities
+versus a note and flag problems.
+
+33
+00:01:58,810 --> 00:02:03,880
+And we orca orchestrate all of these
+with land graph, which let us build
+
+34
+00:02:03,930 --> 00:02:06,190
+state machines which is nothing.
+
+35
+00:02:06,190 --> 00:02:11,240
+But these the cumulative sum of
+nodes plus edges, plus conditional
+
+36
+00:02:11,240 --> 00:02:13,100
+routing and optional loops.
+
+37
+00:02:13,580 --> 00:02:17,030
+So if you want to inspect the
+implementation later, the GitHub
+
+38
+00:02:17,360 --> 00:02:19,160
+repo is shown on the slide.
+
+39
+00:02:19,220 --> 00:02:23,780
+And I'll reference key concepts and
+pattern so you can map them to code.
+
+40
+00:02:24,500 --> 00:02:28,520
+Quick disclaimer before we go further,
+this is an educational prototype.
+
+41
+00:02:28,520 --> 00:02:32,030
+In real clinical setting, you
+need thorough validation, privacy
+
+42
+00:02:32,030 --> 00:02:33,710
+control, and clinician oversight.
+
+43
+00:02:34,010 --> 00:02:38,660
+Nothing here is medical advice and output
+should not be used for real patient care
+
+44
+00:02:38,660 --> 00:02:40,520
+without proper governance and review.
+
+45
+00:02:41,120 --> 00:02:45,420
+Alright, let's talk about
+what, why this matters now.
+
+46
+00:02:45,520 --> 00:02:50,380
+So clinical documentation is
+one of the biggest productivity
+
+47
+00:02:50,380 --> 00:02:54,190
+bottlenecks in healthcare, and
+it also contributes to burnout.
+
+48
+00:02:54,580 --> 00:02:58,210
+There are three stable truths
+that motivate this work.
+
+49
+00:02:58,300 --> 00:03:03,730
+First time multiple studies have
+found that physicians spend a large
+
+50
+00:03:03,730 --> 00:03:08,440
+amount of time on EHR and desk work
+related to patient facing time.
+
+51
+00:03:08,859 --> 00:03:13,900
+Often reported around two hours of
+desk time for every one hour of patient
+
+52
+00:03:13,900 --> 00:03:19,510
+time, even if the ex exact number varies
+By setting the pattern is consistent.
+
+53
+00:03:19,870 --> 00:03:23,590
+Documentation consumes a
+major share of clinician time.
+
+54
+00:03:24,090 --> 00:03:25,980
+Second burnout, right?
+
+55
+00:03:26,100 --> 00:03:31,590
+So burnout rates vary by survey and
+year, but commonly hover around about
+
+56
+00:03:31,590 --> 00:03:35,910
+half of patient physicians reporting
+at least one symptom of burnout.
+
+57
+00:03:36,450 --> 00:03:42,450
+Documentation burden is consistently cited
+as the major driver because it extends
+
+58
+00:03:42,540 --> 00:03:48,040
+the workday fractures attention and reduce
+time for meaningful patient interaction.
+
+59
+00:03:48,610 --> 00:03:50,470
+And the third is the system impact.
+
+60
+00:03:50,890 --> 00:03:56,050
+So the burnout correlates with turnover
+and reduce clinical hours, which
+
+61
+00:03:56,050 --> 00:03:58,420
+impact patient access and continuity.
+
+62
+00:03:58,990 --> 00:04:03,220
+There are large economic
+estimates tied to burnout, related
+
+63
+00:04:03,220 --> 00:04:05,680
+turnovers and reduced hours.
+
+64
+00:04:06,070 --> 00:04:10,630
+The key takeaway is documentation
+is not just a inconvenience,
+
+65
+00:04:10,899 --> 00:04:12,490
+it's a system level issue.
+
+66
+00:04:13,060 --> 00:04:16,930
+So why not just use an LLM
+and call it a day, right?
+
+67
+00:04:17,769 --> 00:04:21,160
+Because healthcare nodes are
+high stake artifacts, you
+
+68
+00:04:21,160 --> 00:04:23,140
+can't optimize for speed alone.
+
+69
+00:04:23,740 --> 00:04:26,530
+Nodes must be accurate.
+
+70
+00:04:27,190 --> 00:04:30,289
+No hallucinated meds,
+diagnosis, or vitals.
+
+71
+00:04:30,619 --> 00:04:32,059
+It should also be auditable.
+
+72
+00:04:32,299 --> 00:04:36,950
+We need to know what happened at each
+steps, and it should also be correctable.
+
+73
+00:04:37,099 --> 00:04:40,039
+That is human must be
+able to review and fix.
+
+74
+00:04:40,700 --> 00:04:45,469
+So this is where architecture
+matters and one huge prompt approach
+
+75
+00:04:45,559 --> 00:04:49,669
+tends to produce something that
+looks plausible, but it is hard to
+
+76
+00:04:49,669 --> 00:04:52,369
+inspect and hard to improve safely.
+
+77
+00:04:53,030 --> 00:04:53,960
+If it's wrong.
+
+78
+00:04:54,020 --> 00:04:56,905
+You often don't know where
+we went wrong, right?
+
+79
+00:04:57,484 --> 00:04:58,669
+So did the transcription.
+
+80
+00:04:59,210 --> 00:05:03,499
+Miss here, did trans, does the,
+did the extraction miss a symptom?
+
+81
+00:05:03,859 --> 00:05:06,229
+Did a summarization, omit a detail?
+
+82
+00:05:06,710 --> 00:05:09,289
+Did the model invent a medication?
+
+83
+00:05:09,710 --> 00:05:14,280
+So in this talk I'm going to
+emphasize transparent stateful
+
+84
+00:05:14,339 --> 00:05:19,639
+orchestration, which will be each
+agent has a narrow responsibility.
+
+85
+00:05:19,999 --> 00:05:24,919
+All inter intermediate artifacts are
+preserved in a state, and a final
+
+86
+00:05:24,919 --> 00:05:27,619
+consistency check makes error visible.
+
+87
+00:05:28,309 --> 00:05:33,759
+So that's the mindset shift from
+generate a node to build a workflow
+
+88
+00:05:33,819 --> 00:05:35,949
+that can be debugged and trusted.
+
+89
+00:05:36,679 --> 00:05:41,599
+To understand why we are using a
+multi-agent state machines, it helps
+
+90
+00:05:41,599 --> 00:05:46,069
+to understand why clinical nodes
+are uniquely challenging compared
+
+91
+00:05:46,069 --> 00:05:48,019
+to normal summarization, right?
+
+92
+00:05:48,319 --> 00:05:54,479
+A clinical encounter is not just a story,
+it's a mixture of subjective, parent
+
+93
+00:05:54,509 --> 00:06:00,539
+narrative, patient narrative, objective
+measurements, clinic chin interpretation,
+
+94
+00:06:00,749 --> 00:06:03,749
+and action item with safety implic.
+
+95
+00:06:04,139 --> 00:06:07,049
+Right, and the raw
+conversation is very messy.
+
+96
+00:06:07,799 --> 00:06:13,259
+Patient patients can jump topics,
+clinicians ask clarifying questions.
+
+97
+00:06:13,619 --> 00:06:18,809
+There are abbreviations and shorthands,
+and the critical facts can appear
+
+98
+00:06:18,809 --> 00:06:20,729
+once and never to be repeated.
+
+99
+00:06:20,780 --> 00:06:26,210
+So on top of that, clinical language has
+special structure that LMS can mishandle.
+
+100
+00:06:26,710 --> 00:06:30,579
+Basically a negation denies
+chest pain versus chest pain.
+
+101
+00:06:31,119 --> 00:06:34,389
+There can also be temporality,
+which is started last week,
+
+102
+00:06:34,389 --> 00:06:35,979
+which versus what is ongoing.
+
+103
+00:06:36,459 --> 00:06:38,169
+Then there can be some uncertainty.
+
+104
+00:06:38,169 --> 00:06:42,039
+For example, if the phrase is
+like, possible viral URI versus
+
+105
+00:06:42,039 --> 00:06:43,849
+confirmed new pneumonia, right?
+
+106
+00:06:44,269 --> 00:06:47,619
+And there can also be issues with
+context like family history of
+
+107
+00:06:47,619 --> 00:06:49,929
+diabetes versus patient has histories.
+
+108
+00:06:50,259 --> 00:06:55,119
+So if you compress everything into one
+prompt, you are asking the model to
+
+109
+00:06:55,149 --> 00:07:01,659
+transcribe, interpret, extract, facts,
+decide what's important, format as soap
+
+110
+00:07:01,839 --> 00:07:04,749
+and validate consistency all at once.
+
+111
+00:07:05,229 --> 00:07:07,629
+That tends to create brittle behavior.
+
+112
+00:07:08,019 --> 00:07:11,929
+And when it fails silently
+by separating steps.
+
+113
+00:07:12,259 --> 00:07:15,259
+We assign each complexity
+to the right place.
+
+114
+00:07:15,759 --> 00:07:18,909
+That is transcription, handles,
+formatting, and clarity.
+
+115
+00:07:19,409 --> 00:07:25,739
+Extraction handles, fact and negations
+summarization handles narrative structure
+
+116
+00:07:25,799 --> 00:07:31,179
+and clinical tone and consistency checking
+catches, mismatches and omissions.
+
+117
+00:07:31,809 --> 00:07:36,759
+And because we keep intermediate artifacts
+in state, we can audit and debug.
+
+118
+00:07:37,259 --> 00:07:42,149
+This is especially important in
+healthcare because plausible but
+
+119
+00:07:42,149 --> 00:07:44,669
+wrong is worse than no output.
+
+120
+00:07:45,239 --> 00:07:47,639
+So we design for safe failures.
+
+121
+00:07:48,029 --> 00:07:50,879
+If we can't extract reliability, we stop.
+
+122
+00:07:51,359 --> 00:07:54,419
+That's the real motivation
+behind the architecture
+
+123
+00:07:54,419 --> 00:07:55,829
+you'll see in the next slides.
+
+124
+00:07:56,329 --> 00:07:59,509
+So let's define exactly
+what we are building, right?
+
+125
+00:08:00,139 --> 00:08:04,059
+So the input is either an
+audio recording of a clinical
+
+126
+00:08:04,149 --> 00:08:09,599
+conversation or a text transcript
+for easier iteration and testing.
+
+127
+00:08:09,959 --> 00:08:13,499
+Right, and the output
+is a clean transcript.
+
+128
+00:08:13,949 --> 00:08:20,249
+Structured extracted entities in typed
+J-S-O-N-A structured soap note, a
+
+129
+00:08:20,249 --> 00:08:23,909
+consistency report, plus per node logs.
+
+130
+00:08:24,689 --> 00:08:30,679
+And on the right here you see the
+pipeline, the transcription followed by
+
+131
+00:08:30,739 --> 00:08:35,329
+extraction, followed by summarization,
+and then comes consistency.
+
+132
+00:08:35,829 --> 00:08:38,470
+These are the two
+foundational design choice.
+
+133
+00:08:38,500 --> 00:08:44,179
+There are basically the choice One
+is specialized agents instead of one
+
+134
+00:08:44,179 --> 00:08:47,300
+mega agent, each node does one job.
+
+135
+00:08:47,850 --> 00:08:51,450
+So basically transcription
+should not try to diagnose.
+
+136
+00:08:51,810 --> 00:08:53,670
+Extraction, should not try to.
+
+137
+00:08:54,010 --> 00:08:57,610
+Write prose and summarization
+should not try to invent fact.
+
+138
+00:08:57,970 --> 00:09:00,940
+And finally, consistency checking
+should not silently fix things
+
+139
+00:09:00,940 --> 00:09:02,140
+without reporting, right?
+
+140
+00:09:02,470 --> 00:09:05,170
+So this separation creates
+an engineering advantage.
+
+141
+00:09:05,440 --> 00:09:09,100
+You can improve one node
+without destabilizing the other.
+
+142
+00:09:09,790 --> 00:09:14,170
+For example, if we improve the
+extraction prompt and schema description
+
+143
+00:09:14,700 --> 00:09:18,520
+without changing the summarization
+or prompt or summarization,
+
+144
+00:09:18,520 --> 00:09:19,900
+prompt of formatting, right?
+
+145
+00:09:20,380 --> 00:09:22,960
+The second choice that we
+have is a shared state.
+
+146
+00:09:23,350 --> 00:09:27,610
+So every node reads and
+writes a single shared object.
+
+147
+00:09:28,030 --> 00:09:31,750
+That shared object is the
+system's memory and audit trail.
+
+148
+00:09:32,350 --> 00:09:35,800
+So to make that concrete,
+here's a tiny example.
+
+149
+00:09:36,160 --> 00:09:37,060
+So basically, if.
+
+150
+00:09:37,560 --> 00:09:39,790
+A doctor says what brings you in?
+
+151
+00:09:39,849 --> 00:09:46,250
+And the patient's re response is dry cough
+for a week low fever for a few days ago.
+
+152
+00:09:46,280 --> 00:09:49,060
+And the doctor's again says,
+any shortness of breath and
+
+153
+00:09:49,060 --> 00:09:50,650
+the patient's response with no.
+
+154
+00:09:51,190 --> 00:09:56,200
+So in a monolithic approach,
+you get a soap note, right?
+
+155
+00:09:56,290 --> 00:10:00,100
+But you can't easily verify
+whether the negation, no
+
+156
+00:10:00,100 --> 00:10:02,350
+shortness of breath is preserved.
+
+157
+00:10:03,100 --> 00:10:08,830
+The fever value is accurate, or the plan
+that addresses the cuff in our approach.
+
+158
+00:10:08,950 --> 00:10:10,360
+You can inspect this.
+
+159
+00:10:10,690 --> 00:10:15,280
+The transcript, the extracted
+symptom list, including shortness
+
+160
+00:10:15,280 --> 00:10:18,610
+of breath, denied the soap node
+and the consistency report.
+
+161
+00:10:18,670 --> 00:10:20,280
+All of it is traceable.
+
+162
+00:10:21,090 --> 00:10:26,910
+This makes the system not only more
+trustworthy, but also easier to evaluate.
+
+163
+00:10:27,450 --> 00:10:31,230
+And we can evaluate extraction
+independently from summarization,
+
+164
+00:10:31,230 --> 00:10:32,310
+which is very critical.
+
+165
+00:10:32,810 --> 00:10:37,880
+At the end, we'll also cover
+how to run a demo via Streamlet
+
+166
+00:10:37,880 --> 00:10:39,800
+and how to run evaluations.
+
+167
+00:10:40,140 --> 00:10:44,880
+I've also recorded a live video
+of our running application.
+
+168
+00:10:45,450 --> 00:10:50,590
+And I will go over it in the,
+in few of the upcoming slides.
+
+169
+00:10:51,130 --> 00:10:55,790
+So even if you don't know to run the code
+and the architecture the architecture
+
+170
+00:10:55,790 --> 00:10:58,700
+should be directly reusable, right?
+
+171
+00:10:58,700 --> 00:11:00,770
+So let me move on to the next slide.
+
+172
+00:11:01,270 --> 00:11:03,760
+So now the question is why land graph.
+
+173
+00:11:04,260 --> 00:11:08,850
+If you have built LLM workflows, you've
+likely built linear chains, right?
+
+174
+00:11:08,910 --> 00:11:14,520
+Step A, then step B, and then
+step C chains work for simple
+
+175
+00:11:14,520 --> 00:11:16,410
+flows, but they become fragile.
+
+176
+00:11:16,470 --> 00:11:22,080
+As soon as you add branching logic,
+retries, fallbacks and auditing,
+
+177
+00:11:22,590 --> 00:11:27,280
+clinical documentation is full of
+real world failure modes, right?
+
+178
+00:11:27,550 --> 00:11:32,610
+Missing audios practic partial
+transcripts extraction that fails.
+
+179
+00:11:32,610 --> 00:11:38,520
+Schema validation, summarization that
+omits key facts, inconsistent notes
+
+180
+00:11:38,760 --> 00:11:41,070
+where vital in objective don't match.
+
+181
+00:11:41,340 --> 00:11:45,690
+Don't match extracted vitals
+or plans that don't addresses
+
+182
+00:11:45,690 --> 00:11:46,770
+the chief complaint, right?
+
+183
+00:11:47,130 --> 00:11:52,140
+In a chain, you often end up with
+if else, logic scattered everywhere.
+
+184
+00:11:52,830 --> 00:11:57,695
+Now, over time, it becomes hard to
+reason about what happens in each case.
+
+185
+00:11:58,195 --> 00:12:03,145
+A state machine is a better mental
+model and land graph gives us a first
+
+186
+00:12:03,145 --> 00:12:08,875
+ca first class abstraction of first
+state machines, a shared object node
+
+187
+00:12:08,875 --> 00:12:14,845
+as state transformer transformers,
+edges defining flows and conditional
+
+188
+00:12:14,845 --> 00:12:17,005
+edges to decide what happens next.
+
+189
+00:12:17,695 --> 00:12:20,605
+This gives us three engineering benefits.
+
+190
+00:12:20,605 --> 00:12:23,545
+The first one is explicit control flow.
+
+191
+00:12:24,235 --> 00:12:26,965
+That is routing becomes a clear function.
+
+192
+00:12:27,115 --> 00:12:29,785
+You can read it and understand
+the system behavior.
+
+193
+00:12:30,325 --> 00:12:32,845
+Second is recover recoverability.
+
+194
+00:12:33,205 --> 00:12:38,055
+So if extraction fails any
+validation, you can retry once.
+
+195
+00:12:38,385 --> 00:12:40,965
+If it still fails, stop safely.
+
+196
+00:12:41,880 --> 00:12:45,480
+And if transcription is missing,
+we can exit early, right?
+
+197
+00:12:46,230 --> 00:12:51,540
+If the consistency check finds
+issues, we route to a revised
+
+198
+00:12:51,540 --> 00:12:53,280
+step or flag for review.
+
+199
+00:12:54,180 --> 00:12:57,060
+The third important point
+is traceability, right?
+
+200
+00:12:57,450 --> 00:13:02,920
+So because each node logs
+actions to a shared state, you
+
+201
+00:13:02,920 --> 00:13:04,780
+can reconstruct what happened.
+
+202
+00:13:05,280 --> 00:13:08,880
+A practical point can be like in
+healthcare, auditability right is
+
+203
+00:13:08,880 --> 00:13:11,160
+not nice to, is not a nice to have.
+
+204
+00:13:11,490 --> 00:13:17,730
+If you can't see the system, like what the
+system did, you can't safely deploy it.
+
+205
+00:13:18,300 --> 00:13:22,800
+So line graph is very valuable, not
+just because it's cool, but because it
+
+206
+00:13:23,130 --> 00:13:29,520
+lets us express a workflow that matches
+reality with stateful, brandable, debug
+
+207
+00:13:29,520 --> 00:13:31,589
+able and measurable properties, right?
+
+208
+00:13:32,189 --> 00:13:37,620
+So next we'll look at the shared
+state object that makes this possible.
+
+209
+00:13:38,130 --> 00:13:43,640
+And if you're new to graph here's a quick
+vocabulary map for the rest of the talks.
+
+210
+00:13:43,939 --> 00:13:48,349
+So basically, a state is a single
+python object, often pedantic
+
+211
+00:13:48,349 --> 00:13:52,639
+model or a type deck that represent
+everything we know so far.
+
+212
+00:13:53,300 --> 00:13:57,759
+And in our case, it includes a
+transcript, extracted encounter,
+
+213
+00:13:57,759 --> 00:13:59,679
+soap notes, log and error field.
+
+214
+00:14:00,399 --> 00:14:01,029
+Node.
+
+215
+00:14:01,704 --> 00:14:06,014
+A basically a node is a function that
+takes a state and returns a state.
+
+216
+00:14:06,494 --> 00:14:10,994
+You can think it, think of it
+like a step in a pipeline except
+
+217
+00:14:10,994 --> 00:14:15,134
+it's explicit, explicitly typed
+and designed to be compostable.
+
+218
+00:14:15,634 --> 00:14:21,934
+And a good node has clear required
+inputs, clear outputs, and
+
+219
+00:14:22,084 --> 00:14:24,334
+predictable failure behavior.
+
+220
+00:14:24,834 --> 00:14:28,584
+And edge is basically a transition
+from one node to another.
+
+221
+00:14:29,154 --> 00:14:33,144
+And in a linear change, edges are
+very implicit, but in graph edges
+
+222
+00:14:33,144 --> 00:14:35,334
+are explicit and very read readable.
+
+223
+00:14:35,874 --> 00:14:39,294
+There is something called conditional
+edge, which is where a router function
+
+224
+00:14:39,294 --> 00:14:44,864
+decides where to go next, and the router
+typically inspect states and returns
+
+225
+00:14:44,864 --> 00:14:48,914
+a label like, extract, summarize,
+and something like that, right?
+
+226
+00:14:49,334 --> 00:14:53,354
+This is a mechanism that makes work
+flow very robust because you can
+
+227
+00:14:53,384 --> 00:14:56,384
+encode safe failures and fall back.
+
+228
+00:14:56,514 --> 00:14:59,744
+Parts there is something also
+called cycle, which is pretty
+
+229
+00:14:59,804 --> 00:15:01,424
+pretty convenient to know.
+
+230
+00:15:01,424 --> 00:15:05,414
+Like cycle is basically simply an edge
+that route back to an earlier node.
+
+231
+00:15:05,914 --> 00:15:10,074
+Yeah, and, why does this matter
+for an agent taking medical stripe?
+
+232
+00:15:10,074 --> 00:15:14,264
+Because you know the problems you face,
+missing inputs, validation, failure,
+
+233
+00:15:14,264 --> 00:15:18,854
+revision needs are all naturally ex
+expressed as state fields, routing
+
+234
+00:15:18,854 --> 00:15:20,384
+conditions and optional loop, right?
+
+235
+00:15:20,654 --> 00:15:24,134
+So instead of scattering control
+flow across your code base, you
+
+236
+00:15:24,134 --> 00:15:27,054
+centralized it in a graph definition.
+
+237
+00:15:27,534 --> 00:15:31,554
+And that's the main reason, this
+approach scales and it keeps the
+
+238
+00:15:31,554 --> 00:15:33,534
+workflow understandable as it grows.
+
+239
+00:15:34,254 --> 00:15:34,524
+Okay?
+
+240
+00:15:34,524 --> 00:15:37,644
+Now we have got land graph
+vocabulary, so let's look at
+
+241
+00:15:37,644 --> 00:15:40,674
+what we have in store and why.
+
+242
+00:15:41,664 --> 00:15:47,804
+So everything revolves around a. A
+object called Medical scribed Street.
+
+243
+00:15:48,404 --> 00:15:54,774
+The the state object holds input,
+intermediate artifacts, outputs,
+
+244
+00:15:55,014 --> 00:16:02,194
+logs, and errors at a high level input
+text is an optional text transcript.
+
+245
+00:16:02,764 --> 00:16:07,364
+Audio path is basically the path
+to audio intermediate outputs.
+
+246
+00:16:07,814 --> 00:16:11,914
+Then we have transcript, which is
+basically cleaned text of the transcript
+
+247
+00:16:12,154 --> 00:16:14,314
+encounter between patient and a doctor.
+
+248
+00:16:14,764 --> 00:16:16,654
+Then we have a clinical encounter.
+
+249
+00:16:17,234 --> 00:16:22,034
+We also have soap notes, consistency
+report and cross cutting fields.
+
+250
+00:16:22,094 --> 00:16:25,034
+And then we have logs, which
+is list of audit trails.
+
+251
+00:16:25,154 --> 00:16:28,034
+And then we have errors, which
+is a string of errors, right?
+
+252
+00:16:28,304 --> 00:16:32,024
+So this single shared state
+is what enables orchestration.
+
+253
+00:16:32,999 --> 00:16:34,289
+You may ask why, right?
+
+254
+00:16:34,709 --> 00:16:39,089
+Because every node becomes a pure
+transformation, which is state in
+
+255
+00:16:39,179 --> 00:16:44,669
+and state out that pure function
+property is incredibly valuable.
+
+256
+00:16:45,169 --> 00:16:47,359
+You can unit test each node.
+
+257
+00:16:47,719 --> 00:16:54,439
+You can replay runs, you can
+diff states across versions, and
+
+258
+00:16:54,439 --> 00:16:56,209
+you can build a regression test.
+
+259
+00:16:57,059 --> 00:17:03,259
+On the right here you see an add
+log helper that add structured
+
+260
+00:17:03,259 --> 00:17:06,349
+log retries with a timestamp.
+
+261
+00:17:06,739 --> 00:17:11,119
+In real system logging is where
+reliability is one or lost
+
+262
+00:17:11,509 --> 00:17:13,399
+some example of log details.
+
+263
+00:17:13,449 --> 00:17:18,429
+Important are important and matters a
+lot like, which model and prompt versions
+
+264
+00:17:18,429 --> 00:17:22,984
+were used, how long each node took, how
+many extracted entities were produced.
+
+265
+00:17:23,484 --> 00:17:28,735
+Whether validation failed and how
+many retries occurred, and whether a
+
+266
+00:17:28,735 --> 00:17:30,655
+revision loops were triggered or not.
+
+267
+00:17:31,155 --> 00:17:36,165
+So a key engineering rule is basically
+node should not crash the workflow.
+
+268
+00:17:36,555 --> 00:17:42,105
+If a node fails, it should
+set a state dot error, log the
+
+269
+00:17:42,105 --> 00:17:44,295
+failure and return the state.
+
+270
+00:17:44,504 --> 00:17:46,784
+So that should, how, that
+is how it should behave.
+
+271
+00:17:47,565 --> 00:17:52,125
+And then the router can decide, whether
+to stop retry or route to fallback.
+
+272
+00:17:52,695 --> 00:17:55,845
+This is what makes
+failure very manageable.
+
+273
+00:17:56,235 --> 00:18:00,495
+They become part of a state machines
+rather than random exception.
+
+274
+00:18:00,995 --> 00:18:05,285
+Let me spend a bit more time on
+this shared state idea, because it's
+
+275
+00:18:05,345 --> 00:18:09,035
+easy to underestimate how much it
+changes the engineering story, right?
+
+276
+00:18:09,485 --> 00:18:14,375
+So when you build an LLM app as a
+chain of prompts, you often end up
+
+277
+00:18:14,495 --> 00:18:16,535
+with a bunch of implicit variables.
+
+278
+00:18:16,995 --> 00:18:18,885
+The transcript is somewhere in memory.
+
+279
+00:18:18,885 --> 00:18:21,645
+The extracted entities
+are buried in Jason Blob.
+
+280
+00:18:21,975 --> 00:18:25,605
+The no text is in another string,
+and the debug information lives
+
+281
+00:18:25,635 --> 00:18:27,045
+in a scattered log, right?
+
+282
+00:18:27,465 --> 00:18:31,524
+That makes it hard to answer
+basic questions like, what
+
+283
+00:18:31,524 --> 00:18:33,595
+did the model see at step two?
+
+284
+00:18:33,955 --> 00:18:37,645
+What did it produce at step
+two, did we validate the output?
+
+285
+00:18:37,675 --> 00:18:38,995
+Which prompt version ran.
+
+286
+00:18:39,504 --> 00:18:45,774
+So a shared typed state object turns
+those question into simple inspection.
+
+287
+00:18:46,074 --> 00:18:50,075
+And now from a testing perspective,
+state testing perspective
+
+288
+00:18:50,075 --> 00:18:52,115
+also state is a gift, right?
+
+289
+00:18:52,145 --> 00:18:55,294
+You can, you need test each
+node with synthetic state input.
+
+290
+00:18:55,715 --> 00:18:59,435
+You can snapshot the output state
+and compare it across version.
+
+291
+00:18:59,645 --> 00:19:02,915
+You can also build golden set
+hand, handful of transcript and
+
+292
+00:19:02,915 --> 00:19:04,925
+expected intermediate artifacts.
+
+293
+00:19:05,585 --> 00:19:08,975
+So basically you can run
+regression test when you update
+
+294
+00:19:08,975 --> 00:19:10,385
+prompts, models, or any schemas.
+
+295
+00:19:10,885 --> 00:19:15,264
+So here's a pattern that I can recommend
+is basically you create a dictionary
+
+296
+00:19:15,264 --> 00:19:20,995
+of test cases with transcript input
+the expected extracted entities, and
+
+297
+00:19:21,024 --> 00:19:23,034
+optionally a reference soap note.
+
+298
+00:19:23,665 --> 00:19:29,254
+You run a graph end to produce a
+state compare basically the extracted
+
+299
+00:19:29,254 --> 00:19:36,544
+clinical encounter against gold using
+entity level metrics and then soap
+
+300
+00:19:36,544 --> 00:19:42,294
+nodes against reference using rogues
+or plus, or, consistency check.
+
+301
+00:19:42,804 --> 00:19:48,084
+So this gives you a very tight feedback
+loop and you can change one component
+
+302
+00:19:48,134 --> 00:19:49,934
+and immediately see what broke.
+
+303
+00:19:50,774 --> 00:19:53,204
+Another benefit of shared
+state is human review.
+
+304
+00:19:53,444 --> 00:19:57,374
+So in a clinical workflow, you really
+want to auto chart without review.
+
+305
+00:19:57,434 --> 00:19:58,934
+Instead, you want to.
+
+306
+00:19:59,319 --> 00:20:04,599
+Present the transcript, extracting
+entities and everything so a
+
+307
+00:20:04,599 --> 00:20:06,819
+clinician can verify and correct.
+
+308
+00:20:06,869 --> 00:20:10,189
+So the state makes this very
+straightforward because those
+
+309
+00:20:10,249 --> 00:20:11,839
+artifacts already exist.
+
+310
+00:20:12,259 --> 00:20:15,569
+And finally, state, encourages
+a clean separation of concerns.
+
+311
+00:20:15,569 --> 00:20:19,409
+Basically, agents do the work
+and write results into a state.
+
+312
+00:20:19,889 --> 00:20:24,849
+Routers decide which flow based
+on the state, and the UI reads the
+
+313
+00:20:24,849 --> 00:20:26,469
+state and renders the output, right?
+
+314
+00:20:26,949 --> 00:20:29,559
+And basically the, and in the
+end, the evaluation reads the
+
+315
+00:20:29,559 --> 00:20:31,329
+states and compute the metrics.
+
+316
+00:20:31,809 --> 00:20:35,879
+So the state object becomes the
+backbone that connects engineering,
+
+317
+00:20:36,209 --> 00:20:38,189
+ux, and evaluation in a coherent way.
+
+318
+00:20:39,089 --> 00:20:39,479
+Okay?
+
+319
+00:20:39,569 --> 00:20:43,839
+So with that foundation, we can move
+into schemas and structured extraction.
+
+320
+00:20:44,339 --> 00:20:46,289
+So now we need structure, right?
+
+321
+00:20:46,619 --> 00:20:51,659
+So if you want reliability, don't
+let model output unstructured text.
+
+322
+00:20:52,169 --> 00:20:56,129
+When you need data, we, so
+we define pedantic models for
+
+323
+00:20:56,129 --> 00:20:57,479
+the entities we care about.
+
+324
+00:20:57,959 --> 00:20:58,319
+Here.
+
+325
+00:20:58,319 --> 00:21:03,554
+We care about symptoms, vital diagnosis,
+medication test, follow up instructions,
+
+326
+00:21:04,134 --> 00:21:07,829
+and then we combine them into composite
+model called clinical encounter.
+
+327
+00:21:08,329 --> 00:21:14,179
+This is the key clinical encounter becomes
+a typed intermediate representation
+
+328
+00:21:15,169 --> 00:21:16,909
+and why it matters, you may ask.
+
+329
+00:21:17,329 --> 00:21:20,809
+So schema becomes a part
+of your instruction.
+
+330
+00:21:21,139 --> 00:21:25,669
+When you request a structured
+output, the model is guided
+
+331
+00:21:25,699 --> 00:21:27,709
+strongly on what to produce.
+
+332
+00:21:28,039 --> 00:21:33,509
+So validation catches errors, early
+missing fields any malformed structure.
+
+333
+00:21:33,539 --> 00:21:34,739
+These become explicit error.
+
+334
+00:21:35,429 --> 00:21:38,849
+And downstream logic also
+becomes simpler and safer.
+
+335
+00:21:39,539 --> 00:21:45,989
+Summarization can also reference encounter
+symptoms, encounter vitals, et cetera.
+
+336
+00:21:46,379 --> 00:21:50,399
+And it doesn't have to infer
+facts from raw transcript again.
+
+337
+00:21:50,759 --> 00:21:54,899
+And one more advantage, like evaluation
+becomes feasible because entities
+
+338
+00:21:54,899 --> 00:21:57,869
+are very explicit and you can
+compute entity level metrics, right?
+
+339
+00:21:58,739 --> 00:22:04,259
+So basically a practical notice like
+schema design can encode clinical nuances.
+
+340
+00:22:04,779 --> 00:22:09,729
+For example, if you have to represent
+negation explicitly, that is, for
+
+341
+00:22:09,729 --> 00:22:14,349
+example, denies shortness of breath,
+include units of vitals and keep
+
+342
+00:22:14,449 --> 00:22:18,319
+like uncertain field optional to
+avoid forcing any guesses, right?
+
+343
+00:22:18,709 --> 00:22:21,259
+So the field description
+also matters a lot.
+
+344
+00:22:21,559 --> 00:22:25,129
+If you describe what belongs in
+a field, you reduce ambiguity
+
+345
+00:22:25,129 --> 00:22:26,989
+and improve extraction quality.
+
+346
+00:22:27,489 --> 00:22:30,099
+So how do we implement each node?
+
+347
+00:22:30,099 --> 00:22:31,449
+So the system is reliable.
+
+348
+00:22:32,439 --> 00:22:36,009
+We, what we do is we use
+a universal pat pattern.
+
+349
+00:22:36,579 --> 00:22:37,059
+First.
+
+350
+00:22:37,059 --> 00:22:41,199
+We log a start, then we validate input.
+
+351
+00:22:41,949 --> 00:22:43,869
+We call LLM structure.
+
+352
+00:22:44,369 --> 00:22:48,479
+We update state, then
+we log success metadata.
+
+353
+00:22:48,979 --> 00:22:52,909
+Then we catch some
+validation errors, if at all.
+
+354
+00:22:53,299 --> 00:22:58,609
+We catch some unexpected errors and
+we always return a state, right?
+
+355
+00:22:59,599 --> 00:23:02,749
+So this pattern is boring,
+but it is very powerful.
+
+356
+00:23:03,139 --> 00:23:06,259
+It ensures that every
+node behaves consistently.
+
+357
+00:23:06,829 --> 00:23:11,359
+Errors are surface phased in the same
+way, and the system is easy to trace.
+
+358
+00:23:11,859 --> 00:23:14,109
+There are two practical refinements.
+
+359
+00:23:14,109 --> 00:23:16,719
+So control retries for validations.
+
+360
+00:23:17,019 --> 00:23:21,939
+So if structured output fails,
+validation retry once or twice with
+
+361
+00:23:22,269 --> 00:23:27,549
+stricter prompt stop, like after a
+limit and surface the error, right?
+
+362
+00:23:28,119 --> 00:23:30,699
+The second thing is prompt
+version metadata, right?
+
+363
+00:23:30,699 --> 00:23:35,199
+So we can store prompt version on
+hash in logs and you can correlate
+
+364
+00:23:35,409 --> 00:23:37,359
+co or relate behavior changes.
+
+365
+00:23:37,989 --> 00:23:43,179
+So this node template becomes the
+standard for adding future nodes
+
+366
+00:23:43,539 --> 00:23:46,059
+like retrieval, grounding, or coding.
+
+367
+00:23:46,389 --> 00:23:49,799
+It also keeps the workflow
+very maintainable, right?
+
+368
+00:23:50,749 --> 00:23:53,369
+Moving on to different agents, right?
+
+369
+00:23:53,369 --> 00:23:55,679
+So transcription is a first agent.
+
+370
+00:23:56,309 --> 00:24:02,539
+It accepts either a audio
+path or a pres supplied text.
+
+371
+00:24:03,114 --> 00:24:08,364
+And the main responsibility is
+to produce transcript, normalize
+
+372
+00:24:08,394 --> 00:24:16,294
+speaker turns, clean conversations
+and write state or transcript right?
+
+373
+00:24:16,534 --> 00:24:20,974
+And the key point here is transcription
+should be deterministic and conservative.
+
+374
+00:24:21,544 --> 00:24:25,054
+We don't improve the transcript
+in ways that change, meaning
+
+375
+00:24:25,654 --> 00:24:27,394
+also negations matter.
+
+376
+00:24:27,694 --> 00:24:29,374
+So clean phrasing matters.
+
+377
+00:24:29,404 --> 00:24:34,054
+If you lose denies terms like
+denies, you can in word the meaning.
+
+378
+00:24:34,624 --> 00:24:38,284
+Also, transcription is
+often the most expensive.
+
+379
+00:24:38,344 --> 00:24:43,475
+And the slowest step in production,
+you'll often cache, transcript
+
+380
+00:24:43,534 --> 00:24:48,455
+or store them secure securely
+and reuse them whenever possible.
+
+381
+00:24:48,955 --> 00:24:51,294
+So for the demo, the key is the interface.
+
+382
+00:24:51,324 --> 00:24:54,415
+Regardless of transcription
+method, the output is a string
+
+383
+00:24:54,725 --> 00:24:56,375
+transcript instate, right?
+
+384
+00:24:56,875 --> 00:24:58,075
+Moving on to next slide.
+
+385
+00:24:58,135 --> 00:25:00,205
+The next agent is extraction.
+
+386
+00:25:00,475 --> 00:25:03,685
+So this is where we go
+from narrative to data.
+
+387
+00:25:04,235 --> 00:25:08,585
+So the input is here is the transcript
+that we extracted in the first agent.
+
+388
+00:25:08,945 --> 00:25:12,365
+The output is a validated
+clinical encounter.
+
+389
+00:25:12,865 --> 00:25:19,465
+And we combine basically a clear
+extraction specification with a structured
+
+390
+00:25:19,465 --> 00:25:23,185
+output validation, which is the pedantic
+structure that we had defined before.
+
+391
+00:25:23,915 --> 00:25:30,515
+Extraction prompt principle would be like,
+we prefer empty or unknown over guessing.
+
+392
+00:25:30,785 --> 00:25:38,045
+We do not invent diagnosis meds or vitals,
+and we handle ations explicitly extract
+
+393
+00:25:38,045 --> 00:25:40,705
+exact numerical values when present.
+
+394
+00:25:41,035 --> 00:25:44,125
+Also, some of the schema principle
+for this agent could be like, list
+
+395
+00:25:44,125 --> 00:25:49,625
+of re reputable entities optional
+fields for often missing in form.
+
+396
+00:25:50,075 --> 00:25:54,305
+We include units of numerical
+values and also consider
+
+397
+00:25:54,335 --> 00:25:56,135
+adding evidence fields later.
+
+398
+00:25:56,635 --> 00:25:59,845
+And moving on to some of the
+implementation principle for
+
+399
+00:25:59,845 --> 00:26:03,115
+this agent could be like, we
+should validate required input.
+
+400
+00:26:03,505 --> 00:26:06,675
+That is transcription should, must exist.
+
+401
+00:26:06,825 --> 00:26:09,735
+And then we call the LLM
+with a response field.
+
+402
+00:26:10,020 --> 00:26:14,690
+And then we update the state
+encounter, whatever was encountered.
+
+403
+00:26:14,690 --> 00:26:15,200
+Extracted.
+
+404
+00:26:15,200 --> 00:26:19,810
+We updated and then we log the
+counts and timings on any failures.
+
+405
+00:26:19,810 --> 00:26:22,830
+And we set state errors
+in case of any errors.
+
+406
+00:26:22,910 --> 00:26:26,330
+So what, why extraction
+first helps, right?
+
+407
+00:26:26,750 --> 00:26:29,240
+It makes summarization much safer.
+
+408
+00:26:29,750 --> 00:26:33,410
+Summarization doesn't
+have to repart raw script.
+
+409
+00:26:33,890 --> 00:26:38,640
+It reads a structured truth
+structured truth object.
+
+410
+00:26:39,090 --> 00:26:42,180
+This also makes evaluation
+and debugging very easier.
+
+411
+00:26:42,690 --> 00:26:44,570
+If you use if you see.
+
+412
+00:26:44,855 --> 00:26:46,085
+Wrong info.
+
+413
+00:26:46,085 --> 00:26:50,975
+In the final soak notes, you can
+check whether it originated from
+
+414
+00:26:51,035 --> 00:26:53,075
+extraction or from summarization.
+
+415
+00:26:53,615 --> 00:26:57,905
+On this extraction step, I want
+to go one level deeper because
+
+416
+00:26:58,385 --> 00:27:03,135
+this is where most medical scribe
+prototype actually succeeds or fail.
+
+417
+00:27:03,615 --> 00:27:09,495
+So if you ask a model to extract
+entities in free from j free from JSON,
+
+418
+00:27:09,855 --> 00:27:12,355
+you'll see common failure modes, right?
+
+419
+00:27:12,355 --> 00:27:18,835
+We can have missing keys, inconsistent
+nesting values in wrong types, partial
+
+420
+00:27:18,835 --> 00:27:23,365
+output, and basically any helpful
+additions that weren't in the transcript.
+
+421
+00:27:24,235 --> 00:27:27,955
+The fix is to treat extraction
+like an API contract.
+
+422
+00:27:28,285 --> 00:27:30,865
+So how what we do is
+basically we define a schema.
+
+423
+00:27:31,105 --> 00:27:35,005
+We ask for that schema, we validate
+the output, and then we retry
+
+424
+00:27:35,005 --> 00:27:37,525
+or fail cleanly when validation.
+
+425
+00:27:38,025 --> 00:27:42,075
+So in this project, basically
+pedantic plays two roles.
+
+426
+00:27:42,405 --> 00:27:47,805
+It describes the expected structure,
+and it also validates actual output.
+
+427
+00:27:48,305 --> 00:27:51,940
+So the practical implementation
+practic practically looks we build
+
+428
+00:27:51,940 --> 00:27:57,040
+a system from that says you are an
+information extraction specialist.
+
+429
+00:27:57,110 --> 00:27:57,710
+Specialist.
+
+430
+00:27:58,010 --> 00:28:04,490
+We build a user prompt with the transcript
+and explicit rules that call the model
+
+431
+00:28:04,490 --> 00:28:09,740
+and request structured output in a
+way that maps to your pedantic model.
+
+432
+00:28:10,730 --> 00:28:13,790
+And also pars and validate
+into a typed object.
+
+433
+00:28:14,360 --> 00:28:19,210
+So now what happens when,
+validation fails, right?
+
+434
+00:28:19,480 --> 00:28:23,010
+This is where agent takes
+state machines actually shines.
+
+435
+00:28:23,310 --> 00:28:29,000
+So if validation failure is not an
+exception, you ignore, it becomes
+
+436
+00:28:29,120 --> 00:28:30,770
+basically a state you handle.
+
+437
+00:28:31,220 --> 00:28:34,910
+So a robust approach is
+basically the first attempt.
+
+438
+00:28:34,970 --> 00:28:40,850
+We do normal extraction, prompt If
+validation fails, retry once with stricter
+
+439
+00:28:40,850 --> 00:28:44,210
+prompt, for example, output must be valid.
+
+440
+00:28:44,210 --> 00:28:48,320
+JSON do not include commentary if
+unknown use null or empty list.
+
+441
+00:28:48,950 --> 00:28:54,020
+So if it still fails, set state
+dot error and then log failure
+
+442
+00:28:54,020 --> 00:28:55,730
+and then just stop, right?
+
+443
+00:28:56,150 --> 00:29:00,320
+Importantly that you should
+always log the validation.
+
+444
+00:29:00,370 --> 00:29:04,900
+Basically you should always log whatever
+validation at failed and the error.
+
+445
+00:29:05,740 --> 00:29:10,270
+Oh, like what the error category was
+and whether, retry, succeeded or not.
+
+446
+00:29:11,020 --> 00:29:14,560
+That log becomes actually
+gold when you debug.
+
+447
+00:29:15,190 --> 00:29:20,380
+And another thing extraction needs
+is, clinical text is basically
+
+448
+00:29:20,500 --> 00:29:21,640
+negation handling, right?
+
+449
+00:29:21,910 --> 00:29:24,640
+So clinical language
+contains many negation.
+
+450
+00:29:25,140 --> 00:29:27,900
+Something like denies chest
+pain, no shortness of breath,
+
+451
+00:29:27,960 --> 00:29:29,430
+not taking any medication.
+
+452
+00:29:29,760 --> 00:29:34,190
+So if you treat negation ni in
+naively right, you inward the meaning.
+
+453
+00:29:34,550 --> 00:29:36,800
+So there are two strategies here.
+
+454
+00:29:37,100 --> 00:29:41,200
+We encode negation
+explicitly in in our schema.
+
+455
+00:29:41,590 --> 00:29:44,710
+Basically, symptom dot present
+can be true or false, right?
+
+456
+00:29:45,040 --> 00:29:48,910
+And also instruct the model
+explicitly like denies.
+
+457
+00:29:48,940 --> 00:29:50,590
+X means X is absent.
+
+458
+00:29:51,580 --> 00:29:55,600
+So e, even without a dedicated
+negation field, you can preserve
+
+459
+00:29:55,600 --> 00:29:59,220
+this by representing denied
+symptoms like separately.
+
+460
+00:29:59,700 --> 00:30:03,580
+Similarly you'll see temporal
+qualifiers like for three days
+
+461
+00:30:03,580 --> 00:30:05,530
+started last week was at night.
+
+462
+00:30:05,800 --> 00:30:09,040
+So these are clinically relevant,
+and adding them to schema
+
+463
+00:30:09,040 --> 00:30:10,480
+improves the node quality.
+
+464
+00:30:11,170 --> 00:30:15,880
+Now because the extraction
+output is typed, you can also do
+
+465
+00:30:15,880 --> 00:30:17,650
+deterministic post-processing.
+
+466
+00:30:18,220 --> 00:30:20,860
+Which is normalized in units.
+
+467
+00:30:21,200 --> 00:30:26,930
+Standardized medication names, map
+common synonyms like SOB, shortness
+
+468
+00:30:27,050 --> 00:30:31,920
+to shortness of breath and do do that
+without, involving an LLM to every call.
+
+469
+00:30:31,920 --> 00:30:37,085
+Finally these structured extractions
+sets you up for solid evaluations.
+
+470
+00:30:37,625 --> 00:30:40,385
+And you can compute
+entity level precision.
+
+471
+00:30:40,385 --> 00:30:46,135
+Recall if one for each category, be
+it symptoms, vital diagnosis meds,
+
+472
+00:30:46,555 --> 00:30:51,115
+and you can actually see exactly where
+your system needs to work, right?
+
+473
+00:30:52,105 --> 00:30:56,515
+So this is architecturally, this
+is why, architecturally I treat
+
+474
+00:30:56,515 --> 00:30:58,795
+extraction as core truth layer.
+
+475
+00:30:59,245 --> 00:31:03,875
+So if extraction is strong
+summarization becomes much safer.
+
+476
+00:31:04,375 --> 00:31:04,615
+Okay.
+
+477
+00:31:04,615 --> 00:31:10,095
+Next week turn the structure note
+into a clinician facing SOAP notes,
+
+478
+00:31:10,155 --> 00:31:12,525
+which is our summarization agent.
+
+479
+00:31:12,565 --> 00:31:18,265
+Summarization turns a structured
+entity into clinician friendly note.
+
+480
+00:31:19,255 --> 00:31:24,265
+The input here is the clinical encounter
+and the output is a Sno soap notes with
+
+481
+00:31:24,265 --> 00:31:26,995
+subjective objective assessment and plan.
+
+482
+00:31:27,495 --> 00:31:30,245
+Some of the safety principle is
+some summarization should not
+
+483
+00:31:30,245 --> 00:31:35,165
+invent fact, it should format
+and synthesize extracted facts.
+
+484
+00:31:35,835 --> 00:31:39,955
+The prompt constraint could be like
+use only extracted information,
+
+485
+00:31:39,985 --> 00:31:45,145
+cl key clinical tone, cover chief
+complaint, and also ensure that
+
+486
+00:31:45,145 --> 00:31:46,855
+the plan addresses symptoms.
+
+487
+00:31:47,285 --> 00:31:50,225
+Also include follow up if
+present, something like that.
+
+488
+00:31:50,275 --> 00:31:53,545
+And some of the engineer engineering
+choices is could be like te
+
+489
+00:31:54,115 --> 00:32:00,955
+basically temperature can be zero
+for determinism output as a schema.
+
+490
+00:32:00,955 --> 00:32:03,445
+So the sections are also editable.
+
+491
+00:32:03,945 --> 00:32:08,815
+So because we output structured section
+you can display them separately in the
+
+492
+00:32:08,815 --> 00:32:14,895
+UI and allow targeted edits if you want,
+now let's talk about hallucination hall.
+
+493
+00:32:15,355 --> 00:32:19,975
+Hallucination risk because it's the
+elephant in the room whenever we generate
+
+494
+00:32:19,975 --> 00:32:24,255
+medical text, in this architecture,
+there are three deliberate choices
+
+495
+00:32:24,255 --> 00:32:26,085
+that reduce hall hallucinations.
+
+496
+00:32:26,625 --> 00:32:30,265
+Choice number one is summarize
+from structured entities,
+
+497
+00:32:30,265 --> 00:32:31,795
+not from raw transcript.
+
+498
+00:32:32,295 --> 00:32:36,615
+The model is not trying to parse
+messy conversations while also
+
+499
+00:32:36,615 --> 00:32:41,565
+generating a note so it reads A
+structured clinical encounter.
+
+500
+00:32:41,625 --> 00:32:47,045
+Objects and formats is choice number two
+is constrain the prompt with no new facts.
+
+501
+00:32:47,705 --> 00:32:49,800
+If information is missing, do not guess.
+
+502
+00:32:50,640 --> 00:32:54,450
+Do not add any medication diagnosis
+or lab values if not provided.
+
+503
+00:32:55,110 --> 00:32:57,330
+Choice number three is
+keep the temperature low.
+
+504
+00:32:57,420 --> 00:33:00,960
+So for documentation,
+determinism is often a feature.
+
+505
+00:33:01,410 --> 00:33:05,550
+If a note changes materially
+between runs, that's hard to govern.
+
+506
+00:33:06,150 --> 00:33:10,890
+And beyond these choices, here are
+some, prompt patterns that can help.
+
+507
+00:33:11,220 --> 00:33:14,640
+Basically ask the model to mirror
+structure, like put vitals under
+
+508
+00:33:14,640 --> 00:33:17,910
+objective, put diagnosis under assessment.
+
+509
+00:33:18,420 --> 00:33:22,160
+So these prevent content from
+drifting across sections.
+
+510
+00:33:22,660 --> 00:33:27,350
+Also we can ask for coverage like, ensure
+each symptoms in the encounter is either
+
+511
+00:33:27,350 --> 00:33:29,960
+addressed in assessment or planned those.
+
+512
+00:33:29,960 --> 00:33:33,020
+So these kind of prompts
+pushes for completeness.
+
+513
+00:33:33,290 --> 00:33:37,010
+We can also ask for clinical
+tone constraints, something like
+
+514
+00:33:37,010 --> 00:33:41,780
+use concise clinician tone and
+avoid any conversational fillers.
+
+515
+00:33:42,230 --> 00:33:45,100
+So this makes notes very easier to review.
+
+516
+00:33:45,790 --> 00:33:48,250
+We can also ask for explicit uncertainty.
+
+517
+00:33:48,250 --> 00:33:51,610
+So if diagnosis is uncertain, state
+is like differentiable and not
+
+518
+00:33:51,610 --> 00:33:53,840
+of fact this also very critical.
+
+519
+00:33:53,930 --> 00:33:57,560
+Another engineering trick is to
+make summarization output itself
+
+520
+00:33:57,560 --> 00:34:02,240
+structured basically a soap notes
+schema rather than a single text block.
+
+521
+00:34:02,780 --> 00:34:05,450
+This makes human review way easier.
+
+522
+00:34:05,900 --> 00:34:09,920
+A clinical clinician can just
+scan objective section quickly,
+
+523
+00:34:09,920 --> 00:34:13,520
+and also highlight fields
+that changed after revisions.
+
+524
+00:34:13,940 --> 00:34:17,535
+Finally, one practical workflow
+approach is like after generating soap.
+
+525
+00:34:18,485 --> 00:34:23,045
+Notes you run a consistency
+check and then display both
+
+526
+00:34:23,045 --> 00:34:25,235
+soap and the issue side by side.
+
+527
+00:34:25,625 --> 00:34:30,845
+So that turns the system into drafting
+assessment with the critique and which is
+
+528
+00:34:30,845 --> 00:34:33,725
+like way much like safer than auto writer.
+
+529
+00:34:33,775 --> 00:34:33,955
+Yeah.
+
+530
+00:34:33,955 --> 00:34:38,665
+So now let's talk about the consistency
+agent itself and what it checks.
+
+531
+00:34:39,165 --> 00:34:42,855
+So the consistency agent
+compares the structured encounter
+
+532
+00:34:42,855 --> 00:34:44,475
+to the generated soap node.
+
+533
+00:34:44,925 --> 00:34:48,865
+It outputs a structured
+report consistent or not.
+
+534
+00:34:49,405 --> 00:34:52,375
+Issues found or recommendation, right?
+
+535
+00:34:52,615 --> 00:34:55,825
+It also checks for any omissions,
+contradictions, invented
+
+536
+00:34:55,825 --> 00:34:58,165
+facts, mismatched assessment.
+
+537
+00:34:58,225 --> 00:35:02,675
+Any diagnosis, also like plans that
+doesn't address any symptoms, right?
+
+538
+00:35:03,005 --> 00:35:05,615
+So the reports can be
+used in two main ways.
+
+539
+00:35:05,825 --> 00:35:09,695
+It can flag clinician review
+or it can trigger a revision
+
+540
+00:35:09,695 --> 00:35:11,825
+loop even without revision.
+
+541
+00:35:11,825 --> 00:35:13,445
+It increases transparency.
+
+542
+00:35:13,835 --> 00:35:19,595
+So instead of maybe wrong, you get
+these are mismatched or something
+
+543
+00:35:19,595 --> 00:35:21,005
+mismatched or detected, right?
+
+544
+00:35:21,365 --> 00:35:24,935
+So this also gives you a
+evaluation signal, right?
+
+545
+00:35:24,965 --> 00:35:27,605
+Basic basically issues per note.
+
+546
+00:35:28,105 --> 00:35:32,215
+So let me make the consistency
+check also more concrete.
+
+547
+00:35:32,620 --> 00:35:36,490
+Because it is easy to think
+of it as another LLM call, but
+
+548
+00:35:36,490 --> 00:35:38,350
+it's really a design pattern.
+
+549
+00:35:38,860 --> 00:35:41,980
+So there are three categories
+of checks that you can do here.
+
+550
+00:35:42,070 --> 00:35:44,740
+Category one is hard and
+deterministic checks.
+
+551
+00:35:45,190 --> 00:35:48,950
+These are checks you can do
+without an LLM for example.
+
+552
+00:35:49,460 --> 00:35:54,230
+So if the objective lists a blood
+pressure, does it match with
+
+553
+00:35:54,230 --> 00:35:55,820
+the extracted BP or node, right?
+
+554
+00:35:56,180 --> 00:35:59,960
+So if the encounter has a temperature,
+does the node contain a temperature value?
+
+555
+00:36:00,380 --> 00:36:01,400
+Things like that, right?
+
+556
+00:36:01,550 --> 00:36:05,060
+So these are essentially string
+field comparison and very
+
+557
+00:36:05,060 --> 00:36:06,890
+cheap and reliable, right?
+
+558
+00:36:07,160 --> 00:36:10,190
+Category number two is
+soft semantic check.
+
+559
+00:36:10,460 --> 00:36:13,370
+These checks are where
+wording varies, right?
+
+560
+00:36:13,610 --> 00:36:17,060
+So does the assessment align
+with the extractive diagnosis?
+
+561
+00:36:17,360 --> 00:36:19,430
+Does the plan addresses
+the chief complaint?
+
+562
+00:36:19,790 --> 00:36:22,520
+Are the follow up instruction
+present when needed.
+
+563
+00:36:23,000 --> 00:36:28,300
+So basically, yes, where an LLM
+can be useful as in semantic judge,
+
+564
+00:36:28,630 --> 00:36:32,810
+especially if you constraint it to
+output a structured report, right?
+
+565
+00:36:32,900 --> 00:36:37,580
+And pattern number three is basically
+safety checks, which is that look
+
+566
+00:36:37,650 --> 00:36:42,860
+for risky content like invented any
+medic medicines or disease, whether
+
+567
+00:36:42,860 --> 00:36:48,530
+the output invented any abnormal
+labs or contradicted recommendations,
+
+568
+00:36:48,530 --> 00:36:49,520
+something like that, right?
+
+569
+00:36:49,880 --> 00:36:54,470
+So in a demo, you may not
+implement full safety checks,
+
+570
+00:36:54,620 --> 00:36:57,860
+but it's useful to recognize them
+as a distinct category, right?
+
+571
+00:36:57,980 --> 00:37:03,800
+And once you have a report, you need
+a policy for what happens next, right?
+
+572
+00:37:04,400 --> 00:37:10,190
+So this simple policy is if issue
+found is empty we accept note as
+
+573
+00:37:10,190 --> 00:37:14,990
+a draft and if issue found was
+are minor, we accept draft, but
+
+574
+00:37:14,990 --> 00:37:17,240
+highlight issues for clinical review.
+
+575
+00:37:17,960 --> 00:37:23,800
+And if the issue or severe, we
+require a revision or block output.
+
+576
+00:37:24,310 --> 00:37:28,060
+One of the most more advanced
+policy, it could be like, route back
+
+577
+00:37:28,060 --> 00:37:31,900
+into revision group with issues as
+feedback, but still require human
+
+578
+00:37:31,900 --> 00:37:33,610
+sign off, something like that.
+
+579
+00:37:34,180 --> 00:37:37,600
+So this is a key point because
+a consistency checking does
+
+580
+00:37:37,600 --> 00:37:38,890
+not replace human review.
+
+581
+00:37:38,890 --> 00:37:42,620
+It makes human review faster
+by pointing, likely problems.
+
+582
+00:37:43,340 --> 00:37:48,020
+And because we stored the report in a
+state, we can also measure it over time.
+
+583
+00:37:48,020 --> 00:37:52,190
+So if you push issues per note
+down, your system is improving in
+
+584
+00:37:52,190 --> 00:37:54,110
+a way that matters operationally.
+
+585
+00:37:54,860 --> 00:37:56,150
+So yeah.
+
+586
+00:37:56,150 --> 00:38:01,130
+So now we'll use graph routing to
+orchestrate all of these nodes safely.
+
+587
+00:38:01,630 --> 00:38:01,690
+Yeah.
+
+588
+00:38:02,380 --> 00:38:07,660
+So to orchestrate nodes with land
+graph we build a state graph, right?
+
+589
+00:38:08,610 --> 00:38:09,420
+What does it do?
+
+590
+00:38:09,450 --> 00:38:12,630
+We add nodes for
+transcription, extraction,
+
+591
+00:38:12,630 --> 00:38:14,460
+summarization, and consistency.
+
+592
+00:38:14,910 --> 00:38:21,090
+Set an entry point, add conditional
+edges, so the router decides which
+
+593
+00:38:21,090 --> 00:38:23,400
+node next, or whether to end it.
+
+594
+00:38:23,670 --> 00:38:27,940
+Router logic typically checks,
+a state error and presence
+
+595
+00:38:27,940 --> 00:38:29,680
+of required outputs, right?
+
+596
+00:38:30,040 --> 00:38:33,630
+Benefits could be like, early
+exits prevents garbage output.
+
+597
+00:38:33,700 --> 00:38:38,740
+Routing logic is also very readable, and
+failure modes are very explicit, right?
+
+598
+00:38:39,070 --> 00:38:43,900
+So in production you can also add like
+checkpointing and streaming, but the core
+
+599
+00:38:43,900 --> 00:38:46,000
+workflow remains very simple and explicit.
+
+600
+00:38:46,245 --> 00:38:50,175
+So let's go deeper on the routing
+because, conditional edges are where
+
+601
+00:38:50,505 --> 00:38:52,845
+RAF really earns its keep, right?
+
+602
+00:38:53,205 --> 00:38:59,265
+So in many agentic demos, agents call
+other agents in an ad hoc way, right?
+
+603
+00:38:59,325 --> 00:39:03,235
+So in production that becomes
+hard to reason about, right?
+
+604
+00:39:03,715 --> 00:39:06,255
+With land graph routing is explicit.
+
+605
+00:39:06,615 --> 00:39:10,125
+So after each node, a routing
+function decides the next transition
+
+606
+00:39:10,125 --> 00:39:11,745
+based on the state, right?
+
+607
+00:39:12,375 --> 00:39:15,495
+So a typical routing
+function checks, right?
+
+608
+00:39:15,495 --> 00:39:18,375
+If the state error is set, then it end.
+
+609
+00:39:18,645 --> 00:39:22,245
+If the required output is missing,
+then also it ends the execution.
+
+610
+00:39:22,425 --> 00:39:24,315
+Otherwise it continues to next date.
+
+611
+00:39:24,815 --> 00:39:27,515
+That sounds very simple,
+but it has a huge effect.
+
+612
+00:39:27,845 --> 00:39:31,985
+It prevents the system from
+producing outputs based on incomplete
+
+613
+00:39:31,985 --> 00:39:33,980
+truth incomplete inputs, right?
+
+614
+00:39:34,430 --> 00:39:37,280
+And in healthcare you
+want like safe failures.
+
+615
+00:39:37,280 --> 00:39:42,080
+So basically if I cannot generate a
+node because a transcript is missing, is
+
+616
+00:39:42,590 --> 00:39:48,800
+acceptable, and, but here is a confident
+node invented from nothing, that kind
+
+617
+00:39:48,800 --> 00:39:50,510
+of answer is unacceptable, right?
+
+618
+00:39:51,010 --> 00:39:53,350
+So now how do you debug a run, right?
+
+619
+00:39:53,410 --> 00:39:58,110
+Because every node logs to state
+and you can also reconstruct, right?
+
+620
+00:39:58,140 --> 00:39:59,310
+Which node ran.
+
+621
+00:40:00,050 --> 00:40:03,020
+What did, what they did and
+what output they produced.
+
+622
+00:40:03,050 --> 00:40:08,400
+So the debugging workflow is is look at
+the final state if any errors was found.
+
+623
+00:40:08,430 --> 00:40:09,720
+Did we get any soap nodes?
+
+624
+00:40:10,020 --> 00:40:11,730
+We scan for log entries.
+
+625
+00:40:12,090 --> 00:40:17,190
+So which node last and successfully
+inspect intermediate artifacts from the
+
+626
+00:40:17,190 --> 00:40:19,440
+step in transcript and counter soap nodes.
+
+627
+00:40:19,770 --> 00:40:25,170
+And if something looks wrong, unit test
+the node with the same input state, right?
+
+628
+00:40:25,440 --> 00:40:26,220
+So very simple.
+
+629
+00:40:26,220 --> 00:40:29,340
+So this is where the state machine
+approach feels almost like normal
+
+630
+00:40:29,340 --> 00:40:30,810
+software engineering again, right?
+
+631
+00:40:31,170 --> 00:40:32,280
+You can also add.
+
+632
+00:40:32,415 --> 00:40:36,045
+Operational metrics easily right
+count validation failures per day
+
+633
+00:40:36,045 --> 00:40:40,515
+track, average latency per node track
+average consistency issues per node.
+
+634
+00:40:40,965 --> 00:40:45,134
+So these become dashboards that can tell
+you where to improve over time, right?
+
+635
+00:40:45,615 --> 00:40:49,365
+Finally, conditional routing is also
+where you add optional features.
+
+636
+00:40:49,575 --> 00:40:55,095
+So if retrieval counting is enabled route
+to coding nodes, so all of that, right?
+
+637
+00:40:55,365 --> 00:40:59,385
+So the graph stays very read
+readable because routing logic is
+
+638
+00:40:59,385 --> 00:41:01,715
+centralized and explicit, right?
+
+639
+00:41:02,015 --> 00:41:07,265
+So now that we understand orchestration,
+we can talk about evaluation
+
+640
+00:41:07,265 --> 00:41:08,765
+and production readiness, right?
+
+641
+00:41:09,265 --> 00:41:13,525
+But before that we, I'm going to
+show you the system end to end with
+
+642
+00:41:13,525 --> 00:41:17,725
+a short recorded demo so you can see
+what orchestration actually produces.
+
+643
+00:41:18,145 --> 00:41:20,065
+So in this demo watch.
+
+644
+00:41:20,465 --> 00:41:24,005
+Three things like how system moves
+through the state, what gets written
+
+645
+00:41:24,005 --> 00:41:27,295
+into a shared memory, and how we
+end up into a structured mode.
+
+646
+00:41:27,295 --> 00:41:31,135
+So I'll play the recording and
+I'll also narrate in the recording
+
+647
+00:41:31,135 --> 00:41:32,605
+what's happening as we go.
+
+648
+00:41:33,105 --> 00:41:34,515
+Speaker 23: So this is
+
+649
+00:41:34,565 --> 00:41:37,985
+Speaker 22: the live demo
+for our medical scribe agent.
+
+650
+00:41:38,675 --> 00:41:42,545
+As mentioned before, you can find the
+code for this in my GitHub report.
+
+651
+00:41:43,045 --> 00:41:43,525
+Yeah.
+
+652
+00:41:44,125 --> 00:41:46,030
+So in here you can.
+
+653
+00:41:46,720 --> 00:41:53,950
+Either have some predefined,
+script uploaded between these
+
+654
+00:41:53,950 --> 00:41:57,100
+scripts are basically interaction
+between a doctor patient.
+
+655
+00:41:57,549 --> 00:42:00,940
+So if you can see, this is for
+upper respiratory infection
+
+656
+00:42:01,420 --> 00:42:05,260
+where the patient is having a
+persistent cough for about a week.
+
+657
+00:42:05,260 --> 00:42:07,540
+And there is some symptoms
+described about it.
+
+658
+00:42:08,290 --> 00:42:12,250
+So in this setup, you can
+either select some predefined
+
+659
+00:42:12,300 --> 00:42:14,210
+transcripts between doctor patient.
+
+660
+00:42:14,210 --> 00:42:19,030
+You can also give your your own text here,
+or you can also upload and audio file.
+
+661
+00:42:19,330 --> 00:42:25,560
+So let's say if I upload this
+audio file, then let me go through
+
+662
+00:42:25,560 --> 00:42:27,030
+one of the audio files, right?
+
+663
+00:42:27,030 --> 00:42:30,480
+So this is one of the audio
+files if you hear this.
+
+664
+00:42:30,930 --> 00:42:31,470
+So
+
+665
+00:42:32,400 --> 00:42:34,890
+Speaker 23: what brings
+you in today, patient?
+
+666
+00:42:35,160 --> 00:42:36,060
+Hi doctor.
+
+667
+00:42:36,300 --> 00:42:39,660
+I've been having this persistent
+cough for about a week now.
+
+668
+00:42:40,080 --> 00:42:40,740
+Doctor.
+
+669
+00:42:40,830 --> 00:42:41,160
+Speaker 22: Yeah.
+
+670
+00:42:41,160 --> 00:42:45,390
+So this is also a conversation
+between doctor and patient
+
+671
+00:42:45,390 --> 00:42:47,270
+about a respiratory infection.
+
+672
+00:42:47,780 --> 00:42:53,130
+So if you transcribe the, if you click
+on transcribe the audio, then we trigger
+
+673
+00:42:53,130 --> 00:42:58,170
+a model that is trans transcribing the
+interaction between doctor and patient.
+
+674
+00:42:58,170 --> 00:43:03,520
+If you, and if you go to the logs,
+you can see that, the whisper
+
+675
+00:43:03,520 --> 00:43:08,319
+models was called and then it was
+the transcription was generated.
+
+676
+00:43:09,220 --> 00:43:14,980
+So once you have this, you can
+run your medical script pipeline
+
+677
+00:43:15,340 --> 00:43:17,560
+and it'll run all the four agents.
+
+678
+00:43:17,980 --> 00:43:22,090
+So yeah, the first, yeah, the sec,
+the, and you can check the logs
+
+679
+00:43:22,090 --> 00:43:23,680
+which agent it is currently running.
+
+680
+00:43:23,680 --> 00:43:27,960
+So it is extracting the clinical
+information right now and.
+
+681
+00:43:28,460 --> 00:43:29,750
+Yeah, it's on step two.
+
+682
+00:43:30,080 --> 00:43:35,120
+And currently the LLM that is
+being called is locally hosted
+
+683
+00:43:35,120 --> 00:43:38,810
+on my local, which is Quinn 2.7.
+
+684
+00:43:38,920 --> 00:43:42,220
+Yeah seven B model and
+it's hosted on my Ulama.
+
+685
+00:43:42,280 --> 00:43:47,055
+So it's calling a locally hosted LLM
+model and it extracting the clinical
+
+686
+00:43:47,055 --> 00:43:49,095
+information from the transcript uploaded.
+
+687
+00:43:49,815 --> 00:43:52,935
+And you can also simul
+simultaneously check the ui.
+
+688
+00:43:53,235 --> 00:43:54,675
+It's saying the similar thing.
+
+689
+00:43:54,765 --> 00:43:58,815
+It's using Quin 2.57 B model and it is
+processing the transcript right now.
+
+690
+00:43:59,235 --> 00:44:02,475
+This process can take about
+two, three minutes for the demo.
+
+691
+00:44:02,815 --> 00:44:07,075
+And in the meanwhile, we can check
+all the progress in our log here.
+
+692
+00:44:07,075 --> 00:44:08,365
+So let's just wait.
+
+693
+00:44:08,415 --> 00:44:13,005
+Let's see what information it is
+extracting from the clinical information.
+
+694
+00:44:13,005 --> 00:44:16,965
+And if you can go back to the
+transcript, you can, you feel free
+
+695
+00:44:16,965 --> 00:44:18,795
+to read through it in the meanwhile.
+
+696
+00:44:19,650 --> 00:44:19,920
+Yeah.
+
+697
+00:44:19,920 --> 00:44:22,350
+So the patient was
+having persistent cough.
+
+698
+00:44:22,840 --> 00:44:25,000
+Doctor asked him to describe the cough.
+
+699
+00:44:25,420 --> 00:44:26,650
+Was it a dry cough?
+
+700
+00:44:26,650 --> 00:44:27,490
+The patient?
+
+701
+00:44:27,610 --> 00:44:32,380
+Yeah, he mentioned that it's a dry
+cough and it was getting worse at night,
+
+702
+00:44:32,950 --> 00:44:35,500
+and he's also had low grade fever.
+
+703
+00:44:36,049 --> 00:44:38,660
+Then the doctor is asking
+when did the fever start?
+
+704
+00:44:39,080 --> 00:44:43,520
+So the patient says it started about
+three days ago and it's not too high.
+
+705
+00:44:44,240 --> 00:44:45,650
+About a hundred degrees.
+
+706
+00:44:46,259 --> 00:44:46,470
+Yeah.
+
+707
+00:44:46,470 --> 00:44:50,080
+Then he just, then he, the patient
+when goes on to describe some of
+
+708
+00:44:50,080 --> 00:44:53,620
+the symptoms, like sore throat, body
+aches, this is all in the audio file.
+
+709
+00:44:53,670 --> 00:44:57,240
+And it's been trans
+transcripted by our wispa model.
+
+710
+00:44:57,290 --> 00:44:57,710
+Yeah.
+
+711
+00:44:58,040 --> 00:45:04,610
+And then, yeah, then you want, goes
+on to describe certain, symptoms.
+
+712
+00:45:05,060 --> 00:45:09,440
+Then yeah, then the doctor
+says, based on your system, this
+
+713
+00:45:09,980 --> 00:45:14,090
+symptoms, this looks like a wire
+upper in respiratory infection.
+
+714
+00:45:14,510 --> 00:45:18,890
+And then he goes on, the doctor goes
+on to prescribe some medi medications.
+
+715
+00:45:19,880 --> 00:45:23,420
+So that was the audio or transcription.
+
+716
+00:45:23,450 --> 00:45:25,520
+We are just waiting on the extraction.
+
+717
+00:45:25,520 --> 00:45:30,779
+I think it can take about one to
+two minutes to run the entire thing.
+
+718
+00:45:30,779 --> 00:45:32,459
+So we are just waiting for that.
+
+719
+00:45:33,240 --> 00:45:34,134
+I'll pause here.
+
+720
+00:45:34,634 --> 00:45:34,904
+Yeah.
+
+721
+00:45:34,904 --> 00:45:41,424
+So if you see the extraction was
+completed and the symptoms, it
+
+722
+00:45:41,424 --> 00:45:46,794
+extracted symptoms, six symptoms, three
+vital signs, and then one diagnosis
+
+723
+00:45:46,794 --> 00:45:49,824
+by the doctor, and then the two
+prescription that the doctor prescribed.
+
+724
+00:45:49,824 --> 00:45:53,894
+So this is what the structured
+extraction I was talking about
+
+725
+00:45:53,894 --> 00:45:56,384
+from the unstructured text.
+
+726
+00:45:56,664 --> 00:46:01,374
+So this is, we can see that the model is
+running perfectly and is able to extract
+
+727
+00:46:01,854 --> 00:46:04,764
+now it is generating the soap notes.
+
+728
+00:46:05,214 --> 00:46:08,474
+Again, it is calling 2.57 B model.
+
+729
+00:46:09,074 --> 00:46:14,084
+So if I go back to the ui Yeah,
+so it's going to confined seven
+
+730
+00:46:14,084 --> 00:46:15,404
+B model, which is locally host.
+
+731
+00:46:15,404 --> 00:46:17,594
+So we'll wait for it to complete.
+
+732
+00:46:18,164 --> 00:46:18,404
+Yeah.
+
+733
+00:46:18,904 --> 00:46:22,484
+So as you can see, the soap
+notes was also generated.
+
+734
+00:46:22,944 --> 00:46:26,214
+It generated subjective,
+objective and assessment and plan.
+
+735
+00:46:26,664 --> 00:46:30,894
+And we can all see that in
+the UI once all of it is run.
+
+736
+00:46:31,474 --> 00:46:31,804
+Yeah.
+
+737
+00:46:32,164 --> 00:46:36,984
+And the, it's now at the last step,
+which is the consistency checking.
+
+738
+00:46:36,984 --> 00:46:40,434
+So that's also an LLM call
+to a locally hosted model.
+
+739
+00:46:40,764 --> 00:46:41,964
+Let's wait for it to run.
+
+740
+00:46:42,464 --> 00:46:47,234
+We can see now that the, our entire
+pipeline has been run successfully.
+
+741
+00:46:47,654 --> 00:46:50,274
+So let's go to a pipeline.
+
+742
+00:46:50,724 --> 00:46:54,984
+So it says, it was able to extract
+the six symptoms like about a week.
+
+743
+00:46:55,014 --> 00:46:55,824
+Dry cough.
+
+744
+00:46:56,304 --> 00:46:59,664
+Then symptoms, they also had
+fever, so throat body aches.
+
+745
+00:46:59,664 --> 00:47:03,684
+So you can see that all the
+key symptoms are extracted in
+
+746
+00:47:03,684 --> 00:47:05,124
+a structured format, right?
+
+747
+00:47:05,424 --> 00:47:11,194
+And then vital signs were also extracted
+properly in diagnostics and medication.
+
+748
+00:47:11,614 --> 00:47:13,654
+So next, the soap note, right?
+
+749
+00:47:13,654 --> 00:47:16,904
+So soap notes it gen it was
+able to successfully generate a
+
+750
+00:47:16,904 --> 00:47:21,174
+subjective objective assessment
+and plan of the diagnosis above.
+
+751
+00:47:21,684 --> 00:47:24,144
+And then there was also some
+consistency check, right?
+
+752
+00:47:24,144 --> 00:47:29,134
+So from the soap notes generated, so
+consistency agent says that, something
+
+753
+00:47:29,134 --> 00:47:32,794
+was omitted like difficult breathing
+was not mentioned in subjective section.
+
+754
+00:47:33,064 --> 00:47:36,034
+We can see that our, even the
+validator consistency, agent
+
+755
+00:47:36,034 --> 00:47:37,174
+is performing really well.
+
+756
+00:47:37,744 --> 00:47:41,374
+And then, yeah, this is all the
+logs that we can check, like each
+
+757
+00:47:41,374 --> 00:47:45,374
+and every step, like how long
+it took, what's the transcript,
+
+758
+00:47:45,374 --> 00:47:47,534
+print, and, granular detail of it.
+
+759
+00:47:47,534 --> 00:47:52,184
+So yeah, this was about the demo
+that we have coded in this repo.
+
+760
+00:47:52,574 --> 00:47:54,004
+Yeah, thanks.
+
+761
+00:47:54,504 --> 00:47:54,744
+Okay.
+
+762
+00:47:54,744 --> 00:47:59,094
+So now that we have seen the memo,
+let's move on to the next slide,
+
+763
+00:47:59,124 --> 00:48:00,864
+which is the retrieval grounding.
+
+764
+00:48:01,374 --> 00:48:05,724
+So grounding maps, diagnosis
+to standardized terminologies
+
+765
+00:48:05,724 --> 00:48:08,034
+like ICD 10 or nomad, right?
+
+766
+00:48:08,094 --> 00:48:11,944
+And a node between extraction
+and summarization, right?
+
+767
+00:48:11,974 --> 00:48:15,064
+Basically add an, if you want to add
+a node to extraction summarization,
+
+768
+00:48:15,364 --> 00:48:19,444
+we retrieve a candidate code, we
+attach best codes some evidences
+
+769
+00:48:19,444 --> 00:48:20,884
+and write back to the state, right?
+
+770
+00:48:21,244 --> 00:48:27,084
+So treat grounding like any other
+node input, outputs, logs, errors.
+
+771
+00:48:27,354 --> 00:48:31,364
+This keep, keeps it testable
+and also like auditable, right?
+
+772
+00:48:31,904 --> 00:48:32,294
+Yeah.
+
+773
+00:48:32,999 --> 00:48:36,929
+Then we are moving on to the next
+slide, which is measuring quality.
+
+774
+00:48:37,439 --> 00:48:39,869
+What we do is we evaluate
+per agent, right?
+
+775
+00:48:39,869 --> 00:48:45,169
+So extraction agent could have
+like level precision recall, F1 on
+
+776
+00:48:45,169 --> 00:48:47,779
+symptoms, vitals, diagnosis and meds.
+
+777
+00:48:48,449 --> 00:48:53,579
+Then summarization can have, rogue L which
+is a rough signal that can also track
+
+778
+00:48:53,609 --> 00:48:59,129
+omissions, contra contradictions, read
+readability, consistency issues per note.
+
+779
+00:48:59,629 --> 00:49:04,219
+Then we also start with a small
+annotated dataset, and we iterate.
+
+780
+00:49:04,519 --> 00:49:08,929
+So even 2050 samples can
+reveal where, a system failed.
+
+781
+00:49:09,599 --> 00:49:13,499
+I also want to spend few times on
+the evaluation because it's where
+
+782
+00:49:13,499 --> 00:49:15,419
+many prototypes stall, right?
+
+783
+00:49:15,419 --> 00:49:21,449
+So a good evaluation set for a system
+usually includes a transcript, a gold
+
+784
+00:49:21,479 --> 00:49:26,799
+extracted encounter, and an optionally
+it'll reference soap nodes, right?
+
+785
+00:49:27,159 --> 00:49:31,729
+So if you don't reference soap nodes,
+you can still evaluate extraction
+
+786
+00:49:31,759 --> 00:49:36,109
+strongly and use consistency
+issues as a proxy for node quality.
+
+787
+00:49:36,859 --> 00:49:40,069
+So here's a practical approach
+to building a starter data set.
+
+788
+00:49:40,119 --> 00:49:40,959
+Start small.
+
+789
+00:49:41,409 --> 00:49:43,299
+Pick 2050 conversations.
+
+790
+00:49:43,449 --> 00:49:45,309
+They can be simulated if you're in a demo.
+
+791
+00:49:45,309 --> 00:49:45,819
+Settings.
+
+792
+00:49:46,129 --> 00:49:49,939
+The goal is to cover a variety
+of visit types, like respiratory
+
+793
+00:49:49,939 --> 00:49:53,909
+complaint, medication, referrals,
+anything defined annotations, right?
+
+794
+00:49:53,909 --> 00:49:57,539
+So guidelines, for example, what counts
+as symptoms, how to repeat negotiation
+
+795
+00:49:57,749 --> 00:50:02,124
+negotiations, how to represent
+possible diagnosis, et cetera, right?
+
+796
+00:50:02,579 --> 00:50:02,999
+Basically.
+
+797
+00:50:02,999 --> 00:50:05,789
+And then you also
+annotate extraction first.
+
+798
+00:50:06,179 --> 00:50:09,179
+And then extraction
+evaluation is often easier.
+
+799
+00:50:09,899 --> 00:50:12,299
+And more stable than,
+note evaluation, right?
+
+800
+00:50:12,299 --> 00:50:15,389
+So you can compute entity
+level F1 by categories and see
+
+801
+00:50:15,389 --> 00:50:17,309
+what's weak and what's strong.
+
+802
+00:50:17,699 --> 00:50:20,729
+You can evaluate if summarization
+also very separately.
+
+803
+00:50:20,729 --> 00:50:24,089
+So rogel is a starting point, but
+in clinical text you should also
+
+804
+00:50:24,089 --> 00:50:28,109
+look at omissions, contradictions,
+readability, and formatting.
+
+805
+00:50:28,799 --> 00:50:34,559
+Then you use the consistency report
+as a signal, even if LLM if it is LLM
+
+806
+00:50:34,559 --> 00:50:39,199
+based tracking issue per note over
+time can, show improvement trends.
+
+807
+00:50:39,889 --> 00:50:44,569
+And once you have those metrics, you
+can iterate surgically, if symptom
+
+808
+00:50:44,569 --> 00:50:49,639
+extraction is weak, improve symptoms,
+schema description and prompt example.
+
+809
+00:50:49,639 --> 00:50:53,059
+If vitals are some missing, then
+improve transcription, formatting
+
+810
+00:50:53,059 --> 00:50:54,829
+and extraction infrastructure.
+
+811
+00:50:55,329 --> 00:50:58,149
+So yeah, those are some of
+the inputs that you can use.
+
+812
+00:50:58,389 --> 00:51:03,279
+The most important idea is evaluate each
+agent's output, not just the final note.
+
+813
+00:51:03,759 --> 00:51:07,659
+And that's exactly why we built
+the workflow as a state machines.
+
+814
+00:51:08,159 --> 00:51:11,309
+Moving on to next slide, which is
+like production buckets, right?
+
+815
+00:51:11,579 --> 00:51:14,069
+So we have like safety
+and compliance, right?
+
+816
+00:51:14,069 --> 00:51:16,379
+So we have PHI handling human review.
+
+817
+00:51:16,859 --> 00:51:18,689
+We also have like readability, right?
+
+818
+00:51:18,719 --> 00:51:23,439
+Which is like of validation plus retries,
+observ, we have like observability
+
+819
+00:51:23,439 --> 00:51:25,449
+and also cost and latency, right?
+
+820
+00:51:25,749 --> 00:51:30,879
+So assume like adversarial
+inputs and protect your retrieval
+
+821
+00:51:30,879 --> 00:51:32,709
+and logging pipelines, right?
+
+822
+00:51:32,709 --> 00:51:38,479
+So basically what I want to add practical
+model like, practical threat model lenses,
+
+823
+00:51:38,529 --> 00:51:43,029
+because production, medical documentation
+workflows are security sensitive.
+
+824
+00:51:43,419 --> 00:51:49,239
+PHI handling, handling a retention assumed
+transcripts and notes contain like PHI.
+
+825
+00:51:49,749 --> 00:51:52,599
+That means you should like,
+minimize what you store, encrypt
+
+826
+00:51:52,599 --> 00:51:56,619
+what you should, you must store
+and then define retention window.
+
+827
+00:51:57,039 --> 00:52:01,959
+In many setup you avoid storing raw
+audio entirely and store only derived
+
+828
+00:52:01,989 --> 00:52:03,999
+outputs where policies allowed.
+
+829
+00:52:04,499 --> 00:52:07,824
+Second thing is that redaction
+as a node is a powerful pattern
+
+830
+00:52:07,824 --> 00:52:09,564
+in a state machines and.
+
+831
+00:52:10,104 --> 00:52:14,284
+It is helpful to add a redaction
+note before, logs are persisted or
+
+832
+00:52:14,284 --> 00:52:18,314
+before artifacts are expo exported
+because it's a no, it's testable
+
+833
+00:52:18,314 --> 00:52:20,474
+and observable like everything else.
+
+834
+00:52:21,134 --> 00:52:22,754
+Third thing is like
+prompt injection, right?
+
+835
+00:52:22,754 --> 00:52:24,044
+And adversarial text, right?
+
+836
+00:52:24,044 --> 00:52:28,204
+So it sounds weird in healthcare, but it
+matters like if you ingest user provided
+
+837
+00:52:28,204 --> 00:52:31,744
+text, it can also include instruction
+like ignore previous instruction, add
+
+838
+00:52:31,744 --> 00:52:33,694
+diagnosis X, something like that, right?
+
+839
+00:52:34,054 --> 00:52:35,674
+So you need to harden your system.
+
+840
+00:52:35,674 --> 00:52:38,644
+Prompt tool usage
+retrieval sources, right?
+
+841
+00:52:38,824 --> 00:52:41,074
+The fourth thing is like
+retrieval safety, right?
+
+842
+00:52:41,074 --> 00:52:45,754
+So if you add ICD or SNOMED retrieval,
+you restrict retrieval to trusted
+
+843
+00:52:45,754 --> 00:52:50,044
+corpora while letting you know any
+model retrieve arbitrary web content.
+
+844
+00:52:50,464 --> 00:52:53,394
+So this makes the record
+very auditable, right?
+
+845
+00:52:54,274 --> 00:52:56,164
+The fifth thing is like
+human in review, right?
+
+846
+00:52:56,464 --> 00:53:00,744
+So human in the loop design
+production, medical Skype tool almost
+
+847
+00:53:00,774 --> 00:53:02,409
+always need a review step, right?
+
+848
+00:53:02,769 --> 00:53:07,329
+So a good workflow is have you have
+a draft node, you highlight extracted
+
+849
+00:53:07,329 --> 00:53:12,879
+entities, show flagged inconsistencies
+have clinician edit, and then
+
+850
+00:53:12,879 --> 00:53:14,739
+clinician also sign off, right?
+
+851
+00:53:14,919 --> 00:53:18,279
+So your state object makes this
+very natural because everything
+
+852
+00:53:18,279 --> 00:53:20,019
+is already in one place, right?
+
+853
+00:53:20,519 --> 00:53:23,579
+Then we also have like monitoring
+and roll back, right in production.
+
+854
+00:53:23,579 --> 00:53:27,659
+So prompts and models change and
+you should also be able to, monitor
+
+855
+00:53:27,659 --> 00:53:31,489
+metrics, detect any regressions,
+and roll back to previous prompt
+
+856
+00:53:31,579 --> 00:53:33,379
+or model versions accordingly.
+
+857
+00:53:33,779 --> 00:53:39,579
+Logging these prompt version metadata
+per run also makes this possible, right?
+
+858
+00:53:40,159 --> 00:53:44,669
+Now if you take one idea from this
+section, let this be let it be this in
+
+859
+00:53:44,669 --> 00:53:49,229
+high stake domains, architecture that
+supports auditing and rollback is just as
+
+860
+00:53:49,229 --> 00:53:51,059
+important as the model you choose, right?
+
+861
+00:53:51,059 --> 00:53:52,049
+So that's very important.
+
+862
+00:53:52,839 --> 00:53:54,249
+Moving on to next slide, right?
+
+863
+00:53:54,579 --> 00:53:57,609
+So this is just like some
+of the logistics, like it's
+
+864
+00:53:57,609 --> 00:53:58,509
+also in the README file.
+
+865
+00:53:58,509 --> 00:54:03,149
+So you set up a virtual environment,
+you install the requirements you
+
+866
+00:54:03,149 --> 00:54:07,379
+configure your ENV, and then you run
+the stream lead demo in the u ui.
+
+867
+00:54:08,039 --> 00:54:10,139
+You can review the
+outputs in order, right?
+
+868
+00:54:10,139 --> 00:54:11,339
+As I showed in the demo.
+
+869
+00:54:11,339 --> 00:54:17,009
+So basically if you like once you
+start the Streamlet app, like with
+
+870
+00:54:17,129 --> 00:54:22,489
+pre-written sample script, you can
+click narrate, you can experiment with
+
+871
+00:54:22,489 --> 00:54:25,699
+the entire app that we have created.
+
+872
+00:54:26,509 --> 00:54:26,989
+Yeah.
+
+873
+00:54:27,319 --> 00:54:28,759
+So moving on to next slide, right?
+
+874
+00:54:28,969 --> 00:54:32,809
+Four of, there is four key takeaways
+that you can take from the stock
+
+875
+00:54:32,839 --> 00:54:38,269
+is basically, the first one is
+shared type state is your contract.
+
+876
+00:54:39,019 --> 00:54:43,899
+Like it is pure function agents
+with logs and errors, right?
+
+877
+00:54:44,229 --> 00:54:47,829
+And then conditional
+routing and optional loops.
+
+878
+00:54:48,249 --> 00:54:51,789
+Also, the fourth thing is like
+you evaluate per agent, which
+
+879
+00:54:51,839 --> 00:54:53,969
+improve the weakest link, right?
+
+880
+00:54:54,329 --> 00:55:00,119
+And yeah, these are the four key
+takeaways that I can think of and the
+
+881
+00:55:00,119 --> 00:55:04,999
+rapport that, that app code is on the
+screen called Medi Medical scribe agent.
+
+882
+00:55:05,719 --> 00:55:07,879
+So yeah, thank you for watching.
+
+883
+00:55:07,909 --> 00:55:12,349
+And one thing to remember is like any
+real clinical issue requires validation,
+
+884
+00:55:12,349 --> 00:55:14,719
+privacy, safeguard, and human oversight.
+
+885
+00:55:15,219 --> 00:55:19,939
+So like before I wrap here, a few
+natural extensions if you want
+
+886
+00:55:19,939 --> 00:55:21,439
+to push this prototype further.
+
+887
+00:55:21,979 --> 00:55:26,089
+So you can take in a clinician
+feedback loop, you can add a review
+
+888
+00:55:26,089 --> 00:55:30,439
+node where clinician edit and
+captures and then use to improve.
+
+889
+00:55:30,489 --> 00:55:33,369
+You can improve like prompts
+and schema over time.
+
+890
+00:55:33,819 --> 00:55:37,449
+You can also do a better grounding
+conversation, chunking, you
+
+891
+00:55:37,449 --> 00:55:40,779
+can implement all of it if you
+want to take this code further.
+
+892
+00:55:41,739 --> 00:55:42,249
+Yeah.
+
+893
+00:55:42,299 --> 00:55:46,379
+So thanks again for watching and
+I hope this gives you a practical,
+
+894
+00:55:46,379 --> 00:55:50,039
+production minded blueprint
+for agent workflow with graph.
+
+895
+00:55:50,729 --> 00:55:51,394
+Thank you everyone.
+
