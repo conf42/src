@@ -1,0 +1,1677 @@
+1
+00:00:00,500 --> 00:00:01,240
+Hi everyone.
+
+2
+00:00:01,599 --> 00:00:03,310
+Good morning and good afternoon.
+
+3
+00:00:04,299 --> 00:00:05,680
+So myself, was Ari.
+
+4
+00:00:05,709 --> 00:00:06,430
+Good lady.
+
+5
+00:00:06,459 --> 00:00:09,670
+I am currently working
+as a tech lead with Roku.
+
+6
+00:00:10,074 --> 00:00:14,404
+A streaming company which everybody's
+familiar, most of the people.
+
+7
+00:00:15,094 --> 00:00:21,904
+And today I'm gonna talk about how we do,
+how to handle a data skew in a production
+
+8
+00:00:21,904 --> 00:00:28,054
+ML pipelines, and what are the challenges
+that we have and uncover encounter,
+
+9
+00:00:28,084 --> 00:00:34,244
+and then how we mitigated those issues
+technically and in a step by step process.
+
+10
+00:00:34,664 --> 00:00:35,894
+So I try to cover.
+
+11
+00:00:36,299 --> 00:00:39,789
+As much as I can in these
+next 25 to 30 minutes.
+
+12
+00:00:40,359 --> 00:00:42,889
+And so let's get started.
+
+13
+00:00:43,349 --> 00:00:47,559
+As I mentioned Roku is a streaming
+company and in the streaming
+
+14
+00:00:47,559 --> 00:00:52,059
+business, like we process a billions
+of watch events and ad impressions
+
+15
+00:00:52,389 --> 00:00:55,149
+every single day and every play.
+
+16
+00:00:55,554 --> 00:00:58,254
+Pause or recommendation,
+impression and ad.
+
+17
+00:00:58,254 --> 00:01:04,494
+Click feeds into spa pipelines, powering
+like personalized models, embedded
+
+18
+00:01:05,214 --> 00:01:07,794
+generation, and also ad ranking systems.
+
+19
+00:01:07,794 --> 00:01:11,984
+So these are the different machine
+learning pipelines we run to understand
+
+20
+00:01:11,984 --> 00:01:17,774
+the user's behavior while watching
+these shows or any television programs.
+
+21
+00:01:18,274 --> 00:01:25,054
+On paper, like everything looks scalable,
+distributed computing and partition
+
+22
+00:01:25,054 --> 00:01:30,194
+at the storage level, auto-scaling
+clusters, but can solve any many problems.
+
+23
+00:01:30,194 --> 00:01:34,804
+But again, like in reality, what we
+have observed is jobs that normally
+
+24
+00:01:34,804 --> 00:01:37,294
+runs in 40 minutes or less than an hour.
+
+25
+00:01:37,624 --> 00:01:40,339
+Surely it started taking
+like nearly three hours.
+
+26
+00:01:41,269 --> 00:01:44,479
+Without any code change,
+any infra changes.
+
+27
+00:01:44,899 --> 00:01:50,049
+We started seeing such a long running
+jobs and when we investigated.
+
+28
+00:01:50,725 --> 00:01:55,805
+That why these jobs are taking a lot of
+time and it's many it's a case with the
+
+29
+00:01:55,805 --> 00:02:01,815
+many other teams and whoever is using a
+spark for their ETL compute and all that.
+
+30
+00:02:02,115 --> 00:02:04,575
+We saw extreme task duration variance.
+
+31
+00:02:04,965 --> 00:02:09,005
+That's because we en encountered
+a silent performance bottleneck
+
+32
+00:02:09,065 --> 00:02:11,945
+that's called a data skew today.
+
+33
+00:02:12,235 --> 00:02:17,125
+I'm going to walk you through the skew
+manifestation in the manifest in the real
+
+34
+00:02:17,125 --> 00:02:22,195
+ML pipelines and how systematically we
+can medicate the, those kind of risks.
+
+35
+00:02:22,585 --> 00:02:23,545
+Let's jump in.
+
+36
+00:02:24,045 --> 00:02:28,835
+So the first question, why these
+why everybody have a question in the
+
+37
+00:02:28,835 --> 00:02:33,165
+mind, like, why these ML models trying
+slowly earlier they were running good.
+
+38
+00:02:33,495 --> 00:02:38,535
+So the ML pipelines are performance
+bottleneck is like ML plugged by
+
+39
+00:02:38,535 --> 00:02:43,935
+the Ian Performance Killer that
+turns these minutes into hours and
+
+40
+00:02:44,265 --> 00:02:49,245
+training jobs extend indefinitely
+and model deployments get delayed.
+
+41
+00:02:49,275 --> 00:02:55,275
+And so in turn what we have seen is like
+our cloud costs burn through the budgets.
+
+42
+00:02:56,160 --> 00:03:00,430
+So then who is the culprit here again,
+when we investigate, we saw data skew.
+
+43
+00:03:00,910 --> 00:03:06,910
+So it's not just about the bad code,
+it's about like uneven data distribution
+
+44
+00:03:06,910 --> 00:03:12,950
+or any spike in the events or watch
+events that basically distribution
+
+45
+00:03:12,980 --> 00:03:14,480
+across these partitions silent.
+
+46
+00:03:15,095 --> 00:03:18,005
+Stab sabotaging your pipeline efficiency.
+
+47
+00:03:18,005 --> 00:03:24,215
+So when we click it, it, when we click
+down into more technicality of this
+
+48
+00:03:24,215 --> 00:03:29,005
+problem, and we see in the spark a
+stage when the spark has different
+
+49
+00:03:29,005 --> 00:03:36,255
+stages, the if you know about the spark
+process and so a stage only completes
+
+50
+00:03:36,255 --> 00:03:37,960
+when the slowest task finishes.
+
+51
+00:03:38,940 --> 00:03:45,430
+In on the, in the retraining jobs, we have
+observed that 95% of the task is completed
+
+52
+00:03:45,430 --> 00:03:50,340
+like quickly within seconds, minutes, but
+one executor ran significantly longer.
+
+53
+00:03:50,955 --> 00:03:55,935
+And processing nearly more than
+10 x of more shuffle data than any
+
+54
+00:03:55,935 --> 00:03:57,945
+other executor in, in that stage.
+
+55
+00:03:58,425 --> 00:04:02,355
+And shuffle spills has been
+increased and garbage collection
+
+56
+00:04:02,355 --> 00:04:06,765
+pauses and CP utilization is a
+hundred percent and cluster dropped
+
+57
+00:04:06,825 --> 00:04:10,035
+because of the other executors
+who are cluster users is dropped.
+
+58
+00:04:10,470 --> 00:04:12,330
+And executors were idle.
+
+59
+00:04:12,660 --> 00:04:17,970
+And this is a significant effect of
+a data skew problem, even though most
+
+60
+00:04:17,970 --> 00:04:22,470
+partitions finish quickly, but anti
+job waits for one single partition.
+
+61
+00:04:22,500 --> 00:04:27,410
+So let's look at what is
+this data skew in general?
+
+62
+00:04:27,830 --> 00:04:29,270
+So a data skew.
+
+63
+00:04:29,900 --> 00:04:35,060
+In a simple words, what I call it as
+like the unbalanced workload problem.
+
+64
+00:04:35,060 --> 00:04:40,425
+So your executors taking uneven data to
+process uneven partitions to process.
+
+65
+00:04:40,925 --> 00:04:46,205
+But what is the expectation in the ideal
+world is like we want to distribute
+
+66
+00:04:46,205 --> 00:04:51,245
+this data evenly spread across all
+the executors, all workers processing
+
+67
+00:04:51,245 --> 00:04:56,495
+similar data volumes and power processing
+because the spark itself is a distributor
+
+68
+00:04:56,525 --> 00:05:01,415
+parallel power processing ETL engine, and
+we want it's full processing at a full
+
+69
+00:05:01,415 --> 00:05:05,705
+efficiency and predictable completion
+times given the scale of the data.
+
+70
+00:05:06,110 --> 00:05:12,650
+But in reality with the skew problem,
+some executors process gigabytes
+
+71
+00:05:12,650 --> 00:05:16,835
+while the other handle megabytes,
+the entire job waits for one.
+
+72
+00:05:17,600 --> 00:05:21,590
+Particular or like the slowest
+executor and the job times like
+
+73
+00:05:22,010 --> 00:05:23,600
+take like very much longer.
+
+74
+00:05:23,600 --> 00:05:28,070
+And the downstream, it has an impact
+of the downstream jobs and it gives the
+
+75
+00:05:28,070 --> 00:05:34,235
+entire the pipeline processing performance
+and the sources, the resources is like
+
+76
+00:05:34,265 --> 00:05:38,885
+the, these executors, it idle until
+the other worker completes his job.
+
+77
+00:05:39,065 --> 00:05:45,355
+So when you talk about like the more,
+deep dive into what what has happening is
+
+78
+00:05:45,355 --> 00:05:50,215
+like a spark uses like hash partitioning
+during these shuffle operations and data
+
+79
+00:05:50,215 --> 00:05:56,365
+is distributed based on these hash numb
+partitions, but the real world behavior
+
+80
+00:05:56,395 --> 00:05:59,065
+follows the power law distribution.
+
+81
+00:05:59,065 --> 00:05:59,785
+That means.
+
+82
+00:06:00,310 --> 00:06:04,240
+For an example, as this is a streaming
+company, one user have one user
+
+83
+00:06:04,240 --> 00:06:09,010
+watches like a little program, so the
+other user watches a lot of programs
+
+84
+00:06:09,010 --> 00:06:12,490
+and clicks on and different things
+while he is watching the program.
+
+85
+00:06:12,490 --> 00:06:17,305
+And for the use case, like one user
+has two interactions, another user has.
+
+86
+00:06:17,700 --> 00:06:19,620
+Say 150 interactions.
+
+87
+00:06:19,620 --> 00:06:23,990
+And when we group this data based on
+the user's behavior and then and the
+
+88
+00:06:23,990 --> 00:06:29,390
+heavy user dominates one partition,
+that partition spills to dis and it
+
+89
+00:06:29,750 --> 00:06:34,070
+overall increases the shuffle read time,
+and causes the prolonged task runtime.
+
+90
+00:06:34,500 --> 00:06:38,790
+And in this case, the parallelism breaks
+because of the workload is uneven.
+
+91
+00:06:39,310 --> 00:06:43,900
+So how this is going to impact
+the production pipelines is.
+
+92
+00:06:44,400 --> 00:06:45,900
+The impact of the production purpose.
+
+93
+00:06:45,900 --> 00:06:48,600
+I can categorize into
+two different categories.
+
+94
+00:06:48,600 --> 00:06:50,760
+One is a technical performance impact.
+
+95
+00:06:51,120 --> 00:06:53,650
+The other one is the
+bigger business impact.
+
+96
+00:06:53,890 --> 00:06:58,760
+So when I talk about the technical
+performance impact is the future
+
+97
+00:06:58,760 --> 00:07:01,895
+engineering bottleneck, so you
+slow down on a features engineering
+
+98
+00:07:01,895 --> 00:07:04,385
+just because your jobs are running
+and you need to handle these.
+
+99
+00:07:04,875 --> 00:07:09,135
+Issues and extended model training
+times, and we want this job to
+
+100
+00:07:09,135 --> 00:07:12,285
+be completed in 30 minutes, but
+it is taking three to four hours.
+
+101
+00:07:12,285 --> 00:07:16,635
+It's a, it is a bigger problem there
+and delayed experimental psych and model
+
+102
+00:07:16,995 --> 00:07:21,285
+freshness, most importantly, as in,
+in case of the recommendation systems.
+
+103
+00:07:21,285 --> 00:07:24,460
+And we want to process the data
+within fraction of seconds.
+
+104
+00:07:25,164 --> 00:07:29,405
+And the business impact that I can see
+because of these technical difficulties
+
+105
+00:07:29,405 --> 00:07:33,335
+and technical performance issues is
+a higher cloud infrastructure cost.
+
+106
+00:07:33,335 --> 00:07:36,965
+Just because, like you, your
+resources is just idle and
+
+107
+00:07:36,965 --> 00:07:38,465
+you are wasting money on them.
+
+108
+00:07:38,854 --> 00:07:44,794
+And then slower time to market for models
+and reduce the data science productivity.
+
+109
+00:07:44,824 --> 00:07:49,825
+Of course the ML model is running
+longer than they used to and we need to
+
+110
+00:07:49,825 --> 00:07:51,520
+compromise on these SLAs and all that.
+
+111
+00:07:52,320 --> 00:07:52,740
+Score.
+
+112
+00:07:53,040 --> 00:07:58,370
+So basically sku when we talk about the
+data skew, is it's not only increases
+
+113
+00:07:58,370 --> 00:08:04,070
+the shuffle read size and specific
+task, it also have execut imbalances
+
+114
+00:08:04,070 --> 00:08:10,010
+and also a lot of technicality in terms
+of like long garbage collection cycles.
+
+115
+00:08:10,490 --> 00:08:13,635
+Most importantly in
+recommendation systems, as I
+
+116
+00:08:13,635 --> 00:08:15,020
+mentioned, as a business impact.
+
+117
+00:08:15,694 --> 00:08:21,064
+The delayed retraining reduces
+personalized freshness, meaning, so
+
+118
+00:08:21,064 --> 00:08:25,224
+basically you want to recommend as in when
+the user coming in and want you watching
+
+119
+00:08:25,224 --> 00:08:28,759
+a program and you want to recommend
+him, like a similar kind of a content.
+
+120
+00:08:29,724 --> 00:08:35,155
+And then thus that freshness and
+personalization is something it reduces.
+
+121
+00:08:35,215 --> 00:08:40,435
+And in the ad ranking systems, like
+sometimes we have seen a 20% inefficiency
+
+122
+00:08:40,435 --> 00:08:42,475
+just because of this data skew problem.
+
+123
+00:08:42,845 --> 00:08:46,615
+When it when we talk about the
+business impact for this issue is
+
+124
+00:08:46,615 --> 00:08:51,465
+like we can translate into millions
+annually in a compute cost, just for
+
+125
+00:08:51,465 --> 00:08:54,555
+the scale of 20% inefficiency and.
+
+126
+00:08:55,055 --> 00:08:58,620
+So how, like when we categorize
+these problems in the machine
+
+127
+00:08:58,620 --> 00:09:02,540
+learning pri pipelines how we
+can classify these problems?
+
+128
+00:09:02,589 --> 00:09:05,949
+So one is there are different
+pipelines, ML pipelines and
+
+129
+00:09:06,029 --> 00:09:07,379
+that we are running currently.
+
+130
+00:09:07,379 --> 00:09:10,529
+We have recommendation systems
+and we have classification models
+
+131
+00:09:10,529 --> 00:09:14,649
+that we run, and also the computer
+vision pipelines that we run.
+
+132
+00:09:15,144 --> 00:09:18,534
+So in, in general in recommendation
+systems, a small number of
+
+133
+00:09:18,534 --> 00:09:21,294
+power users are a viral content.
+
+134
+00:09:21,324 --> 00:09:25,154
+For example, super Bowl last
+week is a like so many people
+
+135
+00:09:25,154 --> 00:09:29,144
+watches and a lot of interactions
+which can overload those specific
+
+136
+00:09:29,144 --> 00:09:31,644
+partitions in classification models.
+
+137
+00:09:31,644 --> 00:09:35,844
+Majority of those classes dominate
+the data set, creating imbalance
+
+138
+00:09:35,844 --> 00:09:37,764
+and uneven executor workloads.
+
+139
+00:09:38,244 --> 00:09:38,634
+John.
+
+140
+00:09:38,664 --> 00:09:42,624
+Similarly, in the computer
+vision SKUs shows up both up
+
+141
+00:09:42,624 --> 00:09:46,584
+in uneven class distribution,
+variable image crossing times.
+
+142
+00:09:47,074 --> 00:09:49,834
+This leads to the
+computational imbalance and.
+
+143
+00:09:50,569 --> 00:09:55,149
+The key takeaway with this is we
+need to, the skew is not an accident.
+
+144
+00:09:55,239 --> 00:09:59,769
+It is a natural outcome of real
+world events or data patterns that we
+
+145
+00:09:59,769 --> 00:10:02,229
+are seeing if not handled properly.
+
+146
+00:10:02,229 --> 00:10:06,659
+This is going to cost a lot of
+millions of dollars for the companies.
+
+147
+00:10:06,659 --> 00:10:10,599
+And at the scale of billions and
+billions of regards we process
+
+148
+00:10:10,749 --> 00:10:13,799
+for these recommendation systems
+and these classification models.
+
+149
+00:10:14,299 --> 00:10:19,729
+So let's deep dive into what are
+the, like different root causes this
+
+150
+00:10:19,729 --> 00:10:21,574
+could the data skew should have.
+
+151
+00:10:22,414 --> 00:10:26,224
+The first root cause I can think
+of is the natural imbalance.
+
+152
+00:10:26,224 --> 00:10:29,644
+As I mentioned this could be
+because of the bigger events like
+
+153
+00:10:29,644 --> 00:10:34,334
+Super Bowl and where we get a lot
+of traffic into into the system.
+
+154
+00:10:34,694 --> 00:10:39,914
+And training data naturally reflects these
+real world patterns where user behavior
+
+155
+00:10:39,914 --> 00:10:42,104
+follows the power law distribution.
+
+156
+00:10:42,204 --> 00:10:45,434
+So that means that the customers
+can concentrate, concentrate
+
+157
+00:10:45,734 --> 00:10:49,514
+geographically and seasonal patterns
+create temporal IM imbalance.
+
+158
+00:10:49,514 --> 00:10:55,374
+Like any event or formula One or Superbowl
+any event can create that imbalance.
+
+159
+00:10:56,334 --> 00:11:01,104
+So the, in that case, the most ML
+training data reflects these power
+
+160
+00:11:01,104 --> 00:11:05,904
+law distributions where a small
+number of users, products, and regions
+
+161
+00:11:05,904 --> 00:11:07,884
+generate the majority of activity.
+
+162
+00:11:08,334 --> 00:11:10,399
+This create a skewed source data.
+
+163
+00:11:10,899 --> 00:11:15,519
+From the start, such as popular
+products and like we have these
+
+164
+00:11:15,519 --> 00:11:19,639
+ads category and highly active
+users dominating these data sets.
+
+165
+00:11:19,639 --> 00:11:24,589
+When the partition data on these hotkeys,
+certain partitions become overloaded.
+
+166
+00:11:25,399 --> 00:11:27,739
+When, while others remain underutilized.
+
+167
+00:11:27,829 --> 00:11:32,509
+So the problem often like propagates
+downstream into feature stores and
+
+168
+00:11:32,509 --> 00:11:36,319
+model training pipelines, amplifying
+the performance bottlenecks.
+
+169
+00:11:36,409 --> 00:11:39,349
+So this is one of the biggest
+problems that we have seen.
+
+170
+00:11:39,769 --> 00:11:43,729
+And the key takeaways that SKU is
+not a system bug originates from
+
+171
+00:11:43,729 --> 00:11:47,659
+the, again it's from the real
+world behavior patterns and must be
+
+172
+00:11:48,049 --> 00:11:50,279
+anticipated in these pipelines design.
+
+173
+00:11:50,359 --> 00:11:57,649
+So the other root cause that I can, that
+I see most commonly for this data skew
+
+174
+00:11:57,649 --> 00:12:03,239
+problem is the joint keys and aggregation
+of these data on these joint keys.
+
+175
+00:12:03,629 --> 00:12:07,849
+So basically like in this one the
+join and aggregation operations,
+
+176
+00:12:08,359 --> 00:12:11,514
+during this feature engineering,
+when we join user features.
+
+177
+00:12:12,184 --> 00:12:17,374
+With the behavioral data, certain
+popular or highly active I user IDs can
+
+178
+00:12:17,374 --> 00:12:22,264
+dominate the data set, creating these
+hard partitions and uneven workloads.
+
+179
+00:12:22,999 --> 00:12:26,479
+This is known as a joint key sku.
+
+180
+00:12:26,509 --> 00:12:30,799
+Similarly aggregation, a similarly
+aggregation operations like group
+
+181
+00:12:30,799 --> 00:12:36,139
+by or reduced by key can suffer
+when a small number of keys contain
+
+182
+00:12:36,619 --> 00:12:42,049
+disproportionately large volumes of
+the data and temporary aggregation,
+
+183
+00:12:42,049 --> 00:12:46,639
+such as daily, weekly summaries that
+we do and often amplify this effect
+
+184
+00:12:46,669 --> 00:12:48,199
+because of the activity levels.
+
+185
+00:12:48,529 --> 00:12:51,059
+Can vary significantly across time.
+
+186
+00:12:51,689 --> 00:12:57,569
+The key takeaway is that even the
+raw data looks manageable, but joints
+
+187
+00:12:57,569 --> 00:13:02,519
+and aggregations can concentrate data
+and in unexpected ways and create
+
+188
+00:13:02,579 --> 00:13:07,029
+serious performance bottleneck all
+because of these data skew problem
+
+189
+00:13:07,029 --> 00:13:08,619
+if you are not handled rightly.
+
+190
+00:13:09,559 --> 00:13:13,644
+One another one that I can
+see is a computational skew.
+
+191
+00:13:14,144 --> 00:13:17,644
+Which means the text vector in
+case of these machine learning
+
+192
+00:13:17,644 --> 00:13:22,534
+models, text vectorization, future
+engineering, embedding generation
+
+193
+00:13:22,564 --> 00:13:26,344
+is a deep learning vary in
+computation cost based on the input
+
+194
+00:13:26,344 --> 00:13:28,354
+characteristics and model complexity.
+
+195
+00:13:29,134 --> 00:13:35,134
+So even so as we talk earlier, like even
+though we feel the data is right and when
+
+196
+00:13:35,134 --> 00:13:37,174
+we actually join this data, we have seen.
+
+197
+00:13:37,549 --> 00:13:41,219
+Imbalances in terms of these
+partitions and these joints
+
+198
+00:13:41,429 --> 00:13:43,739
+is taking longer, much longer.
+
+199
+00:13:44,399 --> 00:13:49,619
+So even in this case, like even the data
+is even distributed across the partitions
+
+200
+00:13:50,069 --> 00:13:52,499
+and workload imbalances can still occur.
+
+201
+00:13:52,739 --> 00:13:57,899
+And NLP models handle variable length
+documents and longer sequences require
+
+202
+00:13:57,899 --> 00:14:02,849
+significantly more compute time in future
+engineering and complex transformations
+
+203
+00:14:02,849 --> 00:14:08,339
+on these high cardinality category
+data create uneven processing loads.
+
+204
+00:14:08,549 --> 00:14:15,019
+So this is like one of the and we
+have seen these very frequently, which
+
+205
+00:14:15,019 --> 00:14:19,419
+silently creates these performance
+bottleneck in these distributed system.
+
+206
+00:14:20,169 --> 00:14:24,979
+So as we have seen so far, what is
+the data skew and how, what are those
+
+207
+00:14:24,979 --> 00:14:30,769
+different root causes that we see the
+way data skew can decide and hide?
+
+208
+00:14:30,769 --> 00:14:37,619
+So now we talk about more about how we can
+basically like mitigate these problems,
+
+209
+00:14:38,159 --> 00:14:40,434
+data skew problems in a step by step.
+
+210
+00:14:40,934 --> 00:14:44,344
+The number one solution I can
+think of is repartitioning.
+
+211
+00:14:44,554 --> 00:14:49,604
+So this is the concept like where
+we, instead of we give the system to
+
+212
+00:14:49,634 --> 00:14:54,704
+distribute the data, we explicitly
+redistribute the data across the
+
+213
+00:14:54,704 --> 00:14:58,984
+cluster by specifying the partition
+count and the column as I given in the
+
+214
+00:14:58,984 --> 00:15:03,454
+code snippet in this one, based on the
+user ID and given the repartitioning.
+
+215
+00:15:03,964 --> 00:15:05,314
+Count is like a hundred.
+
+216
+00:15:05,614 --> 00:15:08,104
+I want the system, I want
+the spark to redistribute the
+
+217
+00:15:08,104 --> 00:15:10,364
+data across the executors.
+
+218
+00:15:10,424 --> 00:15:14,084
+These forces spark to rebalance the
+workload through hash partitioning.
+
+219
+00:15:14,564 --> 00:15:20,134
+And this is mostly best for moderately
+skewed data sets and multi-stage
+
+220
+00:15:20,134 --> 00:15:24,364
+ML pipelines and future engine
+workflows, training data reprocessing.
+
+221
+00:15:24,394 --> 00:15:28,634
+So this is most importantly this is
+one of the best technique that we
+
+222
+00:15:28,634 --> 00:15:30,194
+can use when we have a moderately.
+
+223
+00:15:30,704 --> 00:15:31,844
+Less queue data.
+
+224
+00:15:32,089 --> 00:15:36,569
+The key takeaways that Repartitioning
+gives us the control over the data
+
+225
+00:15:36,569 --> 00:15:41,759
+distribution and the better workload
+balance before expensive transformations
+
+226
+00:15:41,759 --> 00:15:43,409
+like joins and aggregations.
+
+227
+00:15:44,309 --> 00:15:45,929
+Let's move on to the next slide.
+
+228
+00:15:46,314 --> 00:15:49,644
+So the repartitioning,
+so when and how to apply.
+
+229
+00:15:50,124 --> 00:15:53,784
+So the optimal setting for this
+one is a partition count two
+
+230
+00:15:53,784 --> 00:15:55,344
+to three x total core count.
+
+231
+00:15:55,394 --> 00:15:59,444
+When it all depends on which, how
+big is your cluster, how many codes
+
+232
+00:15:59,444 --> 00:16:03,914
+that you are working with, and the
+partition size is ideally a hundred
+
+233
+00:16:03,914 --> 00:16:08,754
+to 200 mb is a, is our sweet spot in
+terms of the partitioning size count
+
+234
+00:16:08,754 --> 00:16:10,614
+and balance parallelism with overhead.
+
+235
+00:16:10,854 --> 00:16:16,554
+So when we talk about the limitations
+and inter introduces a shuffle operation,
+
+236
+00:16:16,584 --> 00:16:18,294
+so as you are redistributing the data.
+
+237
+00:16:18,714 --> 00:16:21,564
+Hash partitioning does not
+change the key frequency.
+
+238
+00:16:22,074 --> 00:16:24,204
+Eff ineffective for the extreme.
+
+239
+00:16:24,544 --> 00:16:29,794
+Skew scenarios like when you have a large
+data, large skew for one particular region
+
+240
+00:16:29,794 --> 00:16:34,639
+or something, then you need to think about
+other techniques to redistribute the data.
+
+241
+00:16:35,139 --> 00:16:39,579
+So the performance gains, like more rate,
+performance gain, and most effective
+
+242
+00:16:39,579 --> 00:16:41,559
+in future pipeline stages and all that.
+
+243
+00:16:41,559 --> 00:16:45,859
+So in our case, we absorb with
+the redistribution repartitioning
+
+244
+00:16:45,859 --> 00:16:50,839
+strategy, and we have 30% implement
+in our repro pre-processing stages.
+
+245
+00:16:50,839 --> 00:16:54,589
+However, repartitioning does
+not change key frequency.
+
+246
+00:16:54,589 --> 00:16:58,939
+Extreme hard keys still remain
+dominant, as I mentioned in the slide.
+
+247
+00:16:58,999 --> 00:17:04,089
+And optimal, partion size is
+like a hundred to 200 mb Move on.
+
+248
+00:17:04,119 --> 00:17:04,659
+Moving on.
+
+249
+00:17:04,659 --> 00:17:09,209
+The second solution that we, that's
+most recommended and most popular
+
+250
+00:17:09,209 --> 00:17:13,399
+is a key salting me meaning like
+so you identify the hard key,
+
+251
+00:17:13,399 --> 00:17:15,209
+which is improper distribution.
+
+252
+00:17:15,539 --> 00:17:18,329
+You add us all to it, you
+add a random number or.
+
+253
+00:17:18,829 --> 00:17:21,719
+Some number and spread those partitions.
+
+254
+00:17:21,959 --> 00:17:26,579
+So in, in that example I just added
+like a random of some random number
+
+255
+00:17:26,579 --> 00:17:30,509
+into multiply by 10 with the user
+ID and then redistributing the data.
+
+256
+00:17:30,929 --> 00:17:36,974
+So this gives so when certain keys such
+as high AQ user IDs dominate the dataset,
+
+257
+00:17:36,979 --> 00:17:39,589
+repartitioning alone may not be enough.
+
+258
+00:17:39,709 --> 00:17:43,239
+Key salting works by adding a
+small random value as I mentioned,
+
+259
+00:17:43,239 --> 00:17:44,979
+the key mentioned in the slide.
+
+260
+00:17:45,479 --> 00:17:48,899
+Effectively spliting the single
+hot key into multiple smaller keys,
+
+261
+00:17:49,399 --> 00:17:53,869
+spreads the workload across multiple
+partitions, breaks up hotspots.
+
+262
+00:17:54,679 --> 00:17:57,349
+So the key takeaways
+that salting allows us.
+
+263
+00:17:57,849 --> 00:18:02,709
+Proactively distribute the extreme
+skew when basic is, are responsible for
+
+264
+00:18:02,709 --> 00:18:08,739
+overwhelming data overwhelming the cluster
+with the, a large partition of data and
+
+265
+00:18:08,739 --> 00:18:10,629
+one executor taking that entire load.
+
+266
+00:18:11,129 --> 00:18:15,629
+So what are the best scenarios
+like when we can use like low salt?
+
+267
+00:18:16,439 --> 00:18:18,619
+So there are like two to four.
+
+268
+00:18:19,119 --> 00:18:20,079
+Keys like that.
+
+269
+00:18:20,129 --> 00:18:23,689
+And the and we need to do 34,
+so resolve for extreme skew.
+
+270
+00:18:23,719 --> 00:18:27,019
+So when a single dominant value,
+so as I mentioned, like there's a
+
+271
+00:18:27,049 --> 00:18:28,849
+dominant key, hot keys will be there.
+
+272
+00:18:29,419 --> 00:18:33,829
+And so what we do, we basically we
+I append the random salt keys to
+
+273
+00:18:33,829 --> 00:18:35,839
+heavy user IDs before aggregation.
+
+274
+00:18:36,259 --> 00:18:40,119
+Large partition reduces from eight gig,
+like in our case, like eight gig to
+
+275
+00:18:40,119 --> 00:18:46,149
+600 mb or training runtime reduced like
+nearly 50% in some cases, and salting
+
+276
+00:18:46,149 --> 00:18:48,099
+requires an additional aggregation stage.
+
+277
+00:18:48,099 --> 00:18:51,339
+But s the workloads significantly.
+
+278
+00:18:51,839 --> 00:18:55,669
+And the last one here I
+have is the broadcast joint.
+
+279
+00:18:55,669 --> 00:18:58,549
+This is also very significant
+in terms of improving the.
+
+280
+00:18:59,299 --> 00:19:01,619
+Spark jobs, performance and skew.
+
+281
+00:19:02,039 --> 00:19:03,299
+When we have a skew data.
+
+282
+00:19:03,299 --> 00:19:09,179
+So it's always ideal to send the
+small, smallest table into the memory.
+
+283
+00:19:09,179 --> 00:19:13,809
+So send the small table to all
+executor to join and it increases
+
+284
+00:19:13,809 --> 00:19:15,699
+the joints per joint performance.
+
+285
+00:19:15,729 --> 00:19:18,929
+And also this eliminates the shuffle.
+
+286
+00:19:18,929 --> 00:19:23,989
+That is a big thing of your large dataset
+entirely as mentioned in the code snippet
+
+287
+00:19:23,989 --> 00:19:26,299
+here, we just need to use the broadcast.
+
+288
+00:19:26,689 --> 00:19:28,709
+It it under spark will understand.
+
+289
+00:19:28,709 --> 00:19:29,789
+This is a small table.
+
+290
+00:19:29,789 --> 00:19:34,029
+This is the table that need to be
+sent to memory for all the executors
+
+291
+00:19:34,449 --> 00:19:35,949
+and it'll broadcast the data.
+
+292
+00:19:36,249 --> 00:19:39,639
+So basically essentially what you
+are, what we are trying to do is like
+
+293
+00:19:39,639 --> 00:19:44,319
+we try to avoid redistributing the
+large data sets across the cluster.
+
+294
+00:19:44,319 --> 00:19:49,169
+This, drastically or drastically
+reduce the network overhead.
+
+295
+00:19:49,259 --> 00:19:53,009
+Broadcast joints are affect you
+in future engineering pipelines,
+
+296
+00:19:53,009 --> 00:19:57,389
+whereas large behavioral data is
+joined with a relatively small
+
+297
+00:19:57,389 --> 00:19:59,039
+dimension or lookup data table.
+
+298
+00:19:59,279 --> 00:20:03,239
+The key takeaway is that in
+this one in stuff moving.
+
+299
+00:20:03,674 --> 00:20:05,954
+Massive data across the cluster.
+
+300
+00:20:05,984 --> 00:20:10,424
+We move the smaller table once
+and process the joint more eff
+
+301
+00:20:10,424 --> 00:20:11,924
+effectively and efficiently.
+
+302
+00:20:12,344 --> 00:20:15,854
+This way our model performance,
+like the pipeline performance
+
+303
+00:20:15,854 --> 00:20:17,504
+is significantly improved.
+
+304
+00:20:18,004 --> 00:20:21,514
+So here are some guidelines
+and best practices that we can
+
+305
+00:20:21,514 --> 00:20:24,004
+use, keep the broadcast table.
+
+306
+00:20:24,074 --> 00:20:28,604
+Under 10 mb there's a typical
+limit, use a maximum of 20, 21% off.
+
+307
+00:20:28,654 --> 00:20:34,934
+Execute memory to avoid GC garbage
+pressure during training and a significant
+
+308
+00:20:34,934 --> 00:20:36,914
+data size disparity between tables.
+
+309
+00:20:36,914 --> 00:20:40,754
+So that means like when you are
+joining a hundred gig table with
+
+310
+00:20:40,754 --> 00:20:42,804
+a one g, one GB of data set.
+
+311
+00:20:43,104 --> 00:20:47,534
+So that's when the broadcast
+will be very helpful and handy.
+
+312
+00:20:47,534 --> 00:20:52,264
+And then we can send these a small table
+into memory for a more efficient join.
+
+313
+00:20:52,594 --> 00:20:53,854
+And performance impact.
+
+314
+00:20:53,854 --> 00:20:57,454
+It eliminates the, as I mentioned it,
+eliminate a lot of network traffic
+
+315
+00:20:57,884 --> 00:21:02,174
+and network shuffle, and the scale
+with the table size, difference
+
+316
+00:21:02,174 --> 00:21:06,394
+and critical for maintaining model
+freshness in production systems.
+
+317
+00:21:06,894 --> 00:21:11,904
+So in this case this as I mentioned
+before this is a shuffle of large data
+
+318
+00:21:11,904 --> 00:21:14,784
+sets and one enrichment stage drop.
+
+319
+00:21:14,784 --> 00:21:16,704
+Like in our case, like 90.
+
+320
+00:21:17,064 --> 00:21:22,684
+90 minutes to almost 10, close to 10
+minutes ensures the broadcast join size
+
+321
+00:21:22,684 --> 00:21:27,904
+remains under 20, 25% executor memory
+to prevent these gc warhead issue.
+
+322
+00:21:28,404 --> 00:21:33,824
+So overall, the key takeaway so
+we understand what is the data
+
+323
+00:21:33,824 --> 00:21:38,254
+skew and how it is going to
+impact our production ML skews.
+
+324
+00:21:38,839 --> 00:21:42,159
+What are the root causes and
+what are those like medications
+
+325
+00:21:42,159 --> 00:21:45,599
+that we can do in terms of avoid
+this data skew and handle it.
+
+326
+00:21:45,779 --> 00:21:47,219
+We can't avoid the data skew.
+
+327
+00:21:47,219 --> 00:21:49,259
+We can handle the data
+skew in a right way.
+
+328
+00:21:49,769 --> 00:21:55,959
+And so basically like I, as I said use the
+rep partitioning when the data SKU is like
+
+329
+00:21:55,959 --> 00:21:58,929
+moderate sku or if you have a larger sku.
+
+330
+00:21:59,199 --> 00:22:02,199
+In most of the cases we have
+used mostly the salting.
+
+331
+00:22:02,659 --> 00:22:07,229
+In terms of skew data and broadcast
+joints, which helped significantly
+
+332
+00:22:07,679 --> 00:22:12,249
+optimizes selective targeting specific
+bottlenecks rather than rather than
+
+333
+00:22:12,259 --> 00:22:14,269
+over engineering the entire pipeline.
+
+334
+00:22:14,299 --> 00:22:14,989
+Finally.
+
+335
+00:22:15,409 --> 00:22:19,159
+So I would say when implemented
+correctly these, these techniques
+
+336
+00:22:19,159 --> 00:22:20,779
+lead to faster model training.
+
+337
+00:22:21,229 --> 00:22:26,259
+So it saves a lot of cost and
+time and also freshness of the,
+
+338
+00:22:26,259 --> 00:22:30,009
+keep the freshness of the data and
+better resource utilization, lower
+
+339
+00:22:30,009 --> 00:22:35,659
+infrastructure costs and also it'll
+help to do a quicker development cycles.
+
+340
+00:22:36,019 --> 00:22:41,559
+So with that we are also currently
+working on how we can leverage
+
+341
+00:22:41,619 --> 00:22:44,299
+ai in terms of identifying.
+
+342
+00:22:44,659 --> 00:22:46,759
+These gaps in a pre hand.
+
+343
+00:22:47,119 --> 00:22:50,869
+And help us suggest like when there
+is a data skew that's going to happen,
+
+344
+00:22:50,869 --> 00:22:54,989
+we want to scan through these data
+sets and help suggest these are the
+
+345
+00:22:55,169 --> 00:22:59,829
+hotkey or these other, this is where
+the data has being distributed heavily.
+
+346
+00:23:00,279 --> 00:23:04,489
+So then we so that, like with the
+help of ai, we are experimenting
+
+347
+00:23:04,789 --> 00:23:09,479
+with models trying on historical
+spark metrics to predict a data skew.
+
+348
+00:23:09,819 --> 00:23:11,879
+Risk before stage execution.
+
+349
+00:23:12,119 --> 00:23:16,529
+These models could recommend partition
+counts, as I said, and salting factors
+
+350
+00:23:16,529 --> 00:23:18,649
+and broadcast strategies dynamically.
+
+351
+00:23:18,709 --> 00:23:24,879
+This this represents a shift towards self
+optimizing distributed ml P ML pipelines.
+
+352
+00:23:24,879 --> 00:23:28,709
+That's where, that's what we are
+planning to achieve with that.
+
+353
+00:23:29,354 --> 00:23:32,434
+Thank you everyone and
+hope you like the content.
+
+354
+00:23:32,794 --> 00:23:37,214
+If you want me to really want to
+connect on LinkedIn you can type good
+
+355
+00:23:37,214 --> 00:23:39,794
+lady, and I'm happy to talk more.
+
+356
+00:23:40,514 --> 00:23:41,054
+Thank you.
+
