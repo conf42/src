@@ -1,0 +1,826 @@
+1
+00:00:00,500 --> 00:00:01,789
+Speaker 4: Hello everyone and welcome.
+
+2
+00:00:01,970 --> 00:00:05,180
+Today we are going to dive deep
+into compute charted stream
+
+3
+00:00:05,180 --> 00:00:06,649
+processing at petabyte scale.
+
+4
+00:00:07,430 --> 00:00:11,659
+It's a critical topic covering
+streaming data pipelines, latency
+
+5
+00:00:11,659 --> 00:00:13,459
+and site reliability issues.
+
+6
+00:00:13,520 --> 00:00:15,260
+I'm thrilled to be presenting this year.
+
+7
+00:00:15,589 --> 00:00:16,610
+Let's get started.
+
+8
+00:00:17,189 --> 00:00:17,934
+Let's go to next slide.
+
+9
+00:00:18,434 --> 00:00:21,164
+Before we jump into the
+details, a quick introduction.
+
+10
+00:00:21,284 --> 00:00:24,794
+I am Aikman a senior software
+engineer at Microsoft.
+
+11
+00:00:25,244 --> 00:00:28,994
+My day-to-day work revolves around
+large scale distributed systems.
+
+12
+00:00:29,174 --> 00:00:33,914
+Specifically my work focuses on realtime
+data pipelines, stream processing
+
+13
+00:00:33,914 --> 00:00:37,485
+architectures, and cybersecurity
+and analytics infrastructure.
+
+14
+00:00:37,995 --> 00:00:41,414
+We spend a lot of time in engineering
+and building fault tolerant data
+
+15
+00:00:41,414 --> 00:00:45,105
+processing architectures and
+SRE oriented system reliability.
+
+16
+00:00:45,605 --> 00:00:48,485
+This is to handle petabyte
+scale telemetry ingestion.
+
+17
+00:00:49,235 --> 00:00:54,095
+Now in the next slide, I will talk over
+the agenda on what we are going to cover.
+
+18
+00:00:54,605 --> 00:00:58,475
+First, we will examine the detection
+latency problem and discuss
+
+19
+00:00:58,504 --> 00:01:04,085
+exactly why batch based seams
+architectures are failing us at scale.
+
+20
+00:01:04,565 --> 00:01:08,945
+Second, we will look into the
+architecture design focusing on compute
+
+21
+00:01:08,945 --> 00:01:10,984
+charted stream processing principles.
+
+22
+00:01:11,555 --> 00:01:13,835
+Third, we will cover
+ingestion and detection.
+
+23
+00:01:14,195 --> 00:01:18,845
+Exploring schema agnostic pipelines
+and hybrid rule ML detections.
+
+24
+00:01:19,384 --> 00:01:24,065
+Fourth, we'll discuss multi-region
+resilience and how we ensure geographic
+
+25
+00:01:24,065 --> 00:01:25,925
+fault tolerance and consistency.
+
+26
+00:01:26,465 --> 00:01:29,675
+And finally, I'll share some
+validation and case studies to
+
+27
+00:01:29,675 --> 00:01:31,685
+highlight measured outcomes.
+
+28
+00:01:32,495 --> 00:01:34,055
+Let's go to next slide.
+
+29
+00:01:34,555 --> 00:01:36,175
+The adversary does not wait.
+
+30
+00:01:36,365 --> 00:01:37,715
+Let's talk about the problem.
+
+31
+00:01:37,715 --> 00:01:41,225
+A bad actor does not
+wait for your batch job.
+
+32
+00:01:41,375 --> 00:01:46,115
+Modern attackers operate with incredible
+speed and automation techniques
+
+33
+00:01:46,115 --> 00:01:50,315
+like lateral movement, credential
+harvesting, and establishing persistence
+
+34
+00:01:50,315 --> 00:01:52,595
+can often be completed in minutes.
+
+35
+00:01:52,925 --> 00:01:56,885
+Unfortunately, this often happens
+with a single batch prow window.
+
+36
+00:01:57,575 --> 00:01:59,915
+This creates a massive detection gap.
+
+37
+00:02:00,155 --> 00:02:05,285
+That cycle introduces minutes to
+hours of latency, which in a window
+
+38
+00:02:05,285 --> 00:02:07,085
+that attackers exploit fully.
+
+39
+00:02:07,655 --> 00:02:12,005
+The alert delay means that by
+the time a traditional seam
+
+40
+00:02:12,005 --> 00:02:13,175
+finally generates an alert.
+
+41
+00:02:14,060 --> 00:02:18,140
+The threat actor may already have
+persistence in your environment.
+
+42
+00:02:18,799 --> 00:02:21,380
+Add this to the severe scale Mismatch.
+
+43
+00:02:21,619 --> 00:02:27,019
+Petabyte Scale Telemetry simply overwhelms
+architecture that are originally designed
+
+44
+00:02:27,019 --> 00:02:30,599
+for gigabyte scale data volume pipelines.
+
+45
+00:02:31,569 --> 00:02:32,484
+Let's go to next slide.
+
+46
+00:02:32,984 --> 00:02:35,170
+Why traditional architectures break.
+
+47
+00:02:35,785 --> 00:02:38,935
+So why do traditional C
+architectures break at scale?
+
+48
+00:02:39,085 --> 00:02:42,085
+Put simply, they were
+designed for a different era.
+
+49
+00:02:42,475 --> 00:02:45,025
+They rely heavily on
+scheduled batch cycles.
+
+50
+00:02:45,055 --> 00:02:47,065
+This introduces structural latency.
+
+51
+00:02:47,065 --> 00:02:49,885
+And to be clear, this
+isn't at tunable latency.
+
+52
+00:02:50,215 --> 00:02:54,745
+It's an architectural latency baked
+deeply into every layer of the pipeline.
+
+53
+00:02:55,135 --> 00:02:59,454
+At petabyte Scale, this structure
+flaw creates compounding problems.
+
+54
+00:02:59,815 --> 00:03:03,864
+Your ingestion queue backs up your
+correlation window growth tail,
+
+55
+00:03:03,864 --> 00:03:07,674
+and ultimately your alert fertility
+severely degrades under the load.
+
+56
+00:03:08,174 --> 00:03:10,834
+Let's go to the next slide
+to solve this problem.
+
+57
+00:03:10,954 --> 00:03:14,224
+The core architecture based on
+compute, charted stream processing.
+
+58
+00:03:14,724 --> 00:03:18,444
+This flow moves from telemetry
+ingestion to compute sharding
+
+59
+00:03:18,474 --> 00:03:21,894
+into parallel processing, and
+finally to detection and response.
+
+60
+00:03:22,314 --> 00:03:26,544
+The brilliance of this system is
+that it distributes both data and
+
+61
+00:03:26,544 --> 00:03:31,254
+computation across independent prosing
+nodes utilizing consistent hashing.
+
+62
+00:03:31,915 --> 00:03:35,124
+Because of this, each chart
+operates autonomously.
+
+63
+00:03:35,484 --> 00:03:40,075
+We are effectively eliminating
+centralized bottleneck while enabling
+
+64
+00:03:40,254 --> 00:03:44,515
+linear horizontal scaling as our
+data volume continues to grow.
+
+65
+00:03:45,015 --> 00:03:45,525
+Next slide.
+
+66
+00:03:46,025 --> 00:03:49,655
+Now let's double click on how
+we distribute work without
+
+67
+00:03:49,715 --> 00:03:51,605
+creating centralized bottleneck.
+
+68
+00:03:51,785 --> 00:03:53,540
+And why do we use consistent ashing?
+
+69
+00:03:54,364 --> 00:03:59,015
+Consistent hashing allow us to assign
+both data and streams and compute
+
+70
+00:03:59,015 --> 00:04:01,265
+workloads to the node in a virtual ring.
+
+71
+00:04:01,594 --> 00:04:04,865
+This gives us predictable
+deterministic shard assignment.
+
+72
+00:04:04,985 --> 00:04:09,875
+The major benefit is elasticity
+when nodes are added or removed,
+
+73
+00:04:10,144 --> 00:04:12,394
+only a minimal subset of key maps.
+
+74
+00:04:12,724 --> 00:04:17,164
+This means we can scale out with
+minimal rebalancing overhead, and
+
+75
+00:04:17,164 --> 00:04:19,565
+with a full reshuffle of the system.
+
+76
+00:04:20,135 --> 00:04:21,485
+It is also highly fault isolated.
+
+77
+00:04:21,985 --> 00:04:25,405
+If a no fails, it only affects
+its specific key range.
+
+78
+00:04:25,465 --> 00:04:29,815
+Finally, it enables a stateful
+stream correlation per shard without
+
+79
+00:04:29,815 --> 00:04:31,435
+the need of global correlation.
+
+80
+00:04:31,935 --> 00:04:33,135
+Let's go to the next slide.
+
+81
+00:04:33,635 --> 00:04:37,025
+Another major hurdle in legacy
+system is data integration.
+
+82
+00:04:37,265 --> 00:04:39,665
+Security telemetry is heterogeneous.
+
+83
+00:04:39,905 --> 00:04:44,135
+You're dealing with firewall logs, EDR
+events, cloud audit trails, network
+
+84
+00:04:44,135 --> 00:04:49,655
+flows, and identity signals requiring
+predefined schemas create a massive
+
+85
+00:04:49,655 --> 00:04:54,305
+integration friction and slows down how
+fast you can expand your threat coverage.
+
+86
+00:04:55,010 --> 00:04:57,800
+Our solution is schema agnostic
+ingestion allowing us to
+
+87
+00:04:57,800 --> 00:04:59,690
+onboard any source intently.
+
+88
+00:05:00,110 --> 00:05:04,100
+We rely on dynamic schema interface,
+meaning the ingestion layer in
+
+89
+00:05:04,100 --> 00:05:05,810
+first structure at run time.
+
+90
+00:05:06,140 --> 00:05:10,010
+This completely eliminates upfront
+schema engineering for new sources.
+
+91
+00:05:10,010 --> 00:05:10,425
+The result is.
+
+92
+00:05:10,795 --> 00:05:12,655
+Faster source integration.
+
+93
+00:05:13,015 --> 00:05:16,525
+New telemetry source can be
+onboarded without pipeline halts
+
+94
+00:05:16,525 --> 00:05:18,775
+or complex schema migration cycles.
+
+95
+00:05:19,195 --> 00:05:23,515
+We apply lightweight normalization at the
+ingestion boundary to ensure downstream
+
+96
+00:05:23,515 --> 00:05:28,045
+processing consistency without bogging
+down the system with heavy pre-processing.
+
+97
+00:05:28,545 --> 00:05:31,625
+Let's go to the next slide,
+continuous stream processing.
+
+98
+00:05:31,805 --> 00:05:33,180
+This brings us to the showdown.
+
+99
+00:05:33,825 --> 00:05:38,055
+Continuous stream processing versus
+bad cycles By moving to streams,
+
+100
+00:05:38,235 --> 00:05:42,795
+structural latency is eliminated
+and bad systems Data is processed in
+
+101
+00:05:42,795 --> 00:05:47,115
+discrete schedule windows, so every
+event has to wait until next cycle runs.
+
+102
+00:05:47,475 --> 00:05:51,285
+Continuous stream processing evaluates
+every single event as it arrives.
+
+103
+00:05:51,615 --> 00:05:54,670
+This enable correlation and detection
+within seconds rather than minutes.
+
+104
+00:05:55,515 --> 00:05:56,895
+Let me emphasize this.
+
+105
+00:05:56,955 --> 00:05:59,355
+The latency gap is not marginal.
+
+106
+00:05:59,595 --> 00:06:04,485
+It is an order of magnitude and that
+the delay compounds across multi
+
+107
+00:06:04,485 --> 00:06:06,285
+hub detection chains pretty easily.
+
+108
+00:06:06,735 --> 00:06:11,265
+That is why it is really important
+to have a stream processing
+
+109
+00:06:11,295 --> 00:06:13,365
+whenever alerts are critical.
+
+110
+00:06:14,175 --> 00:06:15,315
+Let's go to the next slide.
+
+111
+00:06:15,815 --> 00:06:16,865
+Hybrid detections.
+
+112
+00:06:17,225 --> 00:06:19,865
+With the data flowing continuously,
+how do we catch bad actors?
+
+113
+00:06:20,690 --> 00:06:24,290
+We use a hybrid detection model,
+combining rules and machine learning.
+
+114
+00:06:24,710 --> 00:06:30,530
+Not single detection strategy covers hot
+landscape of all the threats that we have.
+
+115
+00:06:30,980 --> 00:06:33,410
+So we deploy two complementary
+detection layers.
+
+116
+00:06:33,470 --> 00:06:35,420
+First, we have rule-based detection.
+
+117
+00:06:35,780 --> 00:06:39,110
+This handles known attack
+signatures, compliance checks,
+
+118
+00:06:39,110 --> 00:06:40,520
+and threshold based alerts.
+
+119
+00:06:40,880 --> 00:06:44,900
+It offers low latency, high precision,
+and well-defined threat patterns.
+
+120
+00:06:45,455 --> 00:06:48,965
+Second, we combine that
+with ML anomaly detection.
+
+121
+00:06:49,295 --> 00:06:53,645
+This maximize our coverage area
+and fidelity by using behavioral
+
+122
+00:06:53,645 --> 00:06:57,455
+baseline, statistical deviation
+and unsupervised clustering.
+
+123
+00:06:57,785 --> 00:07:01,595
+The ML layer catches novel behavior
+and zero day techniques that
+
+124
+00:07:01,595 --> 00:07:03,395
+don't have redefined signatures.
+
+125
+00:07:03,895 --> 00:07:04,855
+Let's go to the next slide.
+
+126
+00:07:05,355 --> 00:07:06,585
+Multi-region resilience.
+
+127
+00:07:07,320 --> 00:07:10,950
+Operating at petabyte scale
+means operating globally.
+
+128
+00:07:11,160 --> 00:07:14,880
+Multi-region deployment is necessary
+for resilience at a global scale.
+
+129
+00:07:15,360 --> 00:07:19,110
+Geographic distribution isn't
+just reliability strategy.
+
+130
+00:07:19,140 --> 00:07:22,080
+It is a strict compliance
+and performance necessity.
+
+131
+00:07:22,080 --> 00:07:26,730
+For global enterprise security operations,
+we ensure geographical resilience
+
+132
+00:07:26,735 --> 00:07:28,830
+through region failure isolation.
+
+133
+00:07:29,190 --> 00:07:33,210
+So region outage does not compromise
+our global detection coverage.
+
+134
+00:07:33,735 --> 00:07:39,075
+We utilize localized processing to meet
+data residency requirement and process
+
+135
+00:07:39,075 --> 00:07:41,235
+telemetry within its designated region.
+
+136
+00:07:41,235 --> 00:07:45,885
+Boundaries to keep everything aligned,
+distributed consensus mechanism,
+
+137
+00:07:45,885 --> 00:07:50,145
+maintain cross region consistency
+for detection rules and state across
+
+138
+00:07:50,145 --> 00:07:53,925
+all active regions without tight
+coupling and for fault tolerance.
+
+139
+00:07:53,925 --> 00:07:56,835
+Automatic shard reassignment,
+and region failover.
+
+140
+00:07:56,835 --> 00:08:01,395
+Ensure processing continue to even
+under node or zone level failures.
+
+141
+00:08:01,895 --> 00:08:02,915
+Let's go to the next slide.
+
+142
+00:08:03,415 --> 00:08:04,405
+Validation and results.
+
+143
+00:08:05,005 --> 00:08:07,135
+So what does architecture
+actually deliver?
+
+144
+00:08:07,405 --> 00:08:10,975
+Validation across our deployment
+environment demonstrate consistent
+
+145
+00:08:11,034 --> 00:08:16,135
+measurable improvement over batch based
+system in all key operation dimensions.
+
+146
+00:08:16,555 --> 00:08:20,725
+For latency reduction detection,
+latency was reduced by an order of
+
+147
+00:08:20,725 --> 00:08:25,315
+magnitude compared to scheduled batch
+cycles for sustained throughput.
+
+148
+00:08:25,405 --> 00:08:29,425
+Our pricing throughput remained
+stable under increasing workload with
+
+149
+00:08:29,425 --> 00:08:31,560
+absolute no de degradation at scale.
+
+150
+00:08:32,060 --> 00:08:36,590
+In terms of resource utilization, we
+saw improvement in compute utilization
+
+151
+00:08:36,650 --> 00:08:40,850
+per unit of telemetry processed when
+compared to centralized architectures.
+
+152
+00:08:41,390 --> 00:08:46,550
+Most importantly, for incidents, we
+achieved a measurable reduction in time to
+
+153
+00:08:46,550 --> 00:08:49,670
+respond across our case study deployments.
+
+154
+00:08:50,170 --> 00:08:51,145
+Let's go to the next.
+
+155
+00:08:51,645 --> 00:08:55,725
+If you are SRE team looking to
+build real-time cybersecurity
+
+156
+00:08:55,725 --> 00:08:59,775
+pipeline at scale in production,
+here are four key architecture
+
+157
+00:08:59,775 --> 00:09:01,905
+principles and operational lessons.
+
+158
+00:09:01,965 --> 00:09:06,795
+Takeaway first design for
+horizontal scale from day one.
+
+159
+00:09:07,395 --> 00:09:11,055
+Vertical scaling hits sailing very
+quickly at petabyte scale volume.
+
+160
+00:09:11,055 --> 00:09:15,165
+Your sharding strategy must be
+first class design vision, not
+
+161
+00:09:15,165 --> 00:09:17,565
+something you try to retrofit later.
+
+162
+00:09:18,225 --> 00:09:18,855
+Second.
+
+163
+00:09:19,244 --> 00:09:23,234
+Decouple ingestion from processing,
+implementing schema, agnostic
+
+164
+00:09:23,234 --> 00:09:27,494
+ingestion layer allow you to expand
+your data sources without pipeline
+
+165
+00:09:27,494 --> 00:09:31,214
+freezes, which is critical for
+maintaining threat coverage velocity.
+
+166
+00:09:31,635 --> 00:09:33,614
+Third, instrumenting everything.
+
+167
+00:09:33,614 --> 00:09:37,064
+Alerts on SLO metrics like
+processing, lags, short
+
+168
+00:09:37,064 --> 00:09:38,834
+rebalanced duration and detection.
+
+169
+00:09:38,834 --> 00:09:41,954
+Pipeline depth, RSRE grade SLAs.
+
+170
+00:09:42,194 --> 00:09:45,675
+You must define these SLOs before
+your production rollout both.
+
+171
+00:09:46,500 --> 00:09:51,120
+Test failures, moan, not just happy
+path, node loss, region partitions,
+
+172
+00:09:51,120 --> 00:09:56,280
+and back pressure cascades across
+multiple systems can create a big
+
+173
+00:09:56,280 --> 00:09:58,319
+mess if things are not working.
+
+174
+00:09:58,650 --> 00:10:02,099
+Remember, resilience is not
+emergent, it is engineered.
+
+175
+00:10:02,599 --> 00:10:06,559
+Let's go to the next slide
+to conclude detection Latency
+
+176
+00:10:06,619 --> 00:10:08,089
+is an architectural vision.
+
+177
+00:10:08,479 --> 00:10:12,739
+We must build systems that are fast
+enough to matter when it counts.
+
+178
+00:10:13,129 --> 00:10:14,269
+Thank you all for your time.
+

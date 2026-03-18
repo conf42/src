@@ -1,0 +1,801 @@
+1
+00:00:00,600 --> 00:00:01,650
+Speaker 2: Hello everyone.
+
+2
+00:00:01,950 --> 00:00:03,030
+Welcome to my talk.
+
+3
+00:00:03,060 --> 00:00:07,740
+The Failures You Do Not See on
+Dashboards, A reliability case study
+
+4
+00:00:07,800 --> 00:00:10,050
+in workflow latency and response time.
+
+5
+00:00:10,830 --> 00:00:13,500
+I'm guessing most of
+us are engineers here.
+
+6
+00:00:13,800 --> 00:00:18,870
+We are great at handling outages,
+the alarms player, the graphs spike.
+
+7
+00:00:19,170 --> 00:00:22,890
+We jump into the incident channel,
+we figure it out and we fix it.
+
+8
+00:00:23,220 --> 00:00:27,570
+But today I want to talk about the
+most expensive reliability failures.
+
+9
+00:00:28,050 --> 00:00:29,400
+They aren't outages.
+
+10
+00:00:29,520 --> 00:00:33,870
+They're the quite and partial
+failures and the slow humans down.
+
+11
+00:00:34,080 --> 00:00:37,769
+While our dashboards look
+completely normal, they look green.
+
+12
+00:00:38,269 --> 00:00:41,209
+Before diving into my talk,
+I'm gonna introduce myself.
+
+13
+00:00:41,209 --> 00:00:42,859
+My name is Aman Val.
+
+14
+00:00:43,189 --> 00:00:48,079
+I'm an engineering team lead at
+Bloomberg for security services.
+
+15
+00:00:48,079 --> 00:00:50,150
+You can reach to me via LinkedIn.
+
+16
+00:00:50,650 --> 00:00:53,615
+Now let's picture a day
+when your system is healthy.
+
+17
+00:00:54,385 --> 00:00:56,605
+All the service level signals are fine.
+
+18
+00:00:56,935 --> 00:01:00,085
+Your errors are low, latency is normal.
+
+19
+00:01:00,325 --> 00:01:04,914
+Your saturation is stable, your
+traffic is flowing Normally, if
+
+20
+00:01:04,914 --> 00:01:09,855
+you're an SRE, that usually means
+that we are safe, but in this case,
+
+21
+00:01:09,885 --> 00:01:12,375
+the response time worsened anyway.
+
+22
+00:01:12,735 --> 00:01:17,145
+Not the response time for the system,
+but the response time for humans.
+
+23
+00:01:18,075 --> 00:01:20,235
+So what does that feel
+like inside the workflow?
+
+24
+00:01:20,925 --> 00:01:23,055
+That's the fog of war.
+
+25
+00:01:23,745 --> 00:01:27,735
+Fog of war isn't panic, it's ambiguity.
+
+26
+00:01:28,235 --> 00:01:30,545
+You are fighting an outage.
+
+27
+00:01:30,545 --> 00:01:32,375
+You are fighting uncertainty.
+
+28
+00:01:32,795 --> 00:01:36,875
+The hardest question becomes, are we
+seeing everything that we should be seeing
+
+29
+00:01:37,355 --> 00:01:43,475
+because of the answer is no, or maybe then
+every conclusion becomes provisional, and
+
+30
+00:01:43,475 --> 00:01:45,665
+that's how the response time stretches.
+
+31
+00:01:46,165 --> 00:01:50,905
+Before we dive into my talk, let's
+set some quick boundaries about
+
+32
+00:01:50,905 --> 00:01:53,785
+what the talk is and what it is not.
+
+33
+00:01:54,265 --> 00:01:58,435
+This is an anonymized case study
+and a reusable SRE pattern.
+
+34
+00:01:59,335 --> 00:02:04,435
+It is not a breed story, not a got
+hacked story, not a proprietary
+
+35
+00:02:04,765 --> 00:02:06,955
+architecture description of Bloomberg.
+
+36
+00:02:07,645 --> 00:02:12,325
+The goal is to take familiar
+SRE practices and extend them
+
+37
+00:02:12,355 --> 00:02:14,035
+to a multi-system workflow.
+
+38
+00:02:14,440 --> 00:02:16,390
+For human in the loop workflows.
+
+39
+00:02:16,890 --> 00:02:21,660
+To show you what I mean, let's take a
+look at a scenario that my team face.
+
+40
+00:02:22,170 --> 00:02:26,250
+We maintain a high volume security
+pipeline, like many of the
+
+41
+00:02:26,250 --> 00:02:28,559
+workflows, it looks like this.
+
+42
+00:02:28,799 --> 00:02:34,440
+The events enter into the system ticket
+process, the results surface in a ui.
+
+43
+00:02:34,940 --> 00:02:38,590
+A human analyst validates them and
+then they take action based on that.
+
+44
+00:02:39,090 --> 00:02:45,589
+But for a long time, everything seemed
+perfect, but then the first crack started
+
+45
+00:02:45,589 --> 00:02:52,329
+to appear in our system, and a low
+severity alert was fired by an analyst.
+
+46
+00:02:52,569 --> 00:02:55,689
+The counts had diverged
+between various stages.
+
+47
+00:02:55,689 --> 00:02:57,069
+We sh we saw earlier.
+
+48
+00:02:57,969 --> 00:03:01,149
+This is where the thriller starts
+because the system is technically
+
+49
+00:03:01,149 --> 00:03:03,459
+up, but the coverage is uncertain.
+
+50
+00:03:04,059 --> 00:03:08,439
+Our edge gateway, which receives
+the events, said it received a
+
+51
+00:03:08,439 --> 00:03:12,699
+hundred thousand events, but the
+downstream analysis engine, which
+
+52
+00:03:12,699 --> 00:03:16,269
+is supposed to process these
+events was only showing 90,000.
+
+53
+00:03:16,269 --> 00:03:19,329
+Even nothing has had crashed until now.
+
+54
+00:03:19,334 --> 00:03:21,004
+Everything is working as it should be.
+
+55
+00:03:21,654 --> 00:03:26,154
+But then there is a gap, and
+in these workflows, uncertainty
+
+56
+00:03:26,154 --> 00:03:28,194
+is operationally expensive.
+
+57
+00:03:28,584 --> 00:03:32,364
+The question becomes, is this
+expected transformation lag or
+
+58
+00:03:32,364 --> 00:03:35,574
+is it a visibility gap here?
+
+59
+00:03:35,634 --> 00:03:36,984
+Why this is a trap.
+
+60
+00:03:37,044 --> 00:03:39,864
+The same system can mean
+two different things.
+
+61
+00:03:39,924 --> 00:03:45,284
+It can be two different realities, and we
+need to figure out what is the true thing.
+
+62
+00:03:45,784 --> 00:03:51,064
+After this alert, we lived in fog of
+war For some time, our management kept
+
+63
+00:03:51,064 --> 00:03:53,254
+asking, are we missing any threats?
+
+64
+00:03:54,154 --> 00:03:56,164
+Luckily, we did not miss anything.
+
+65
+00:03:56,374 --> 00:04:00,484
+Finally, after a log of
+digging, we uncovered the truth.
+
+66
+00:04:01,144 --> 00:04:04,264
+The processing engine
+worked perfectly fine.
+
+67
+00:04:04,594 --> 00:04:10,204
+The safety checks had happened, but the
+telemetry agent had silently failed.
+
+68
+00:04:10,625 --> 00:04:15,995
+And drop the logs before the real R
+UI in which we were seeing the logs.
+
+69
+00:04:16,565 --> 00:04:21,815
+Our compute health was a hundred percent,
+but our cognitive load was overwhelmed.
+
+70
+00:04:22,294 --> 00:04:26,885
+The system worked as it should have,
+but we just couldn't prove that it
+
+71
+00:04:26,885 --> 00:04:28,775
+was working like the way it should.
+
+72
+00:04:29,275 --> 00:04:34,284
+This incident forced us to ask
+a hard question, why didn't our
+
+73
+00:04:34,284 --> 00:04:36,534
+standard SRE alarm catch this?
+
+74
+00:04:37,090 --> 00:04:43,389
+Why did it take a human noticing a volume
+drop and then firing an alert for my team,
+
+75
+00:04:44,109 --> 00:04:46,519
+and then we triggered an investigation.
+
+76
+00:04:47,029 --> 00:04:51,679
+It's because our alarms were
+looking for a long, wrong thing.
+
+77
+00:04:52,519 --> 00:04:55,369
+Ses rely on the golden signals.
+
+78
+00:04:55,429 --> 00:05:00,364
+As we saw earlier, the four golden
+signals, latency, traffic, errors,
+
+79
+00:05:00,424 --> 00:05:02,974
+situation, they all were fine.
+
+80
+00:05:03,004 --> 00:05:05,794
+In our scenario, they answer.
+
+81
+00:05:06,469 --> 00:05:12,229
+Is the system alive, but in a complex
+pipeline like ours, it completely
+
+82
+00:05:12,229 --> 00:05:16,729
+missed The most important question,
+is the workflow explainable?
+
+83
+00:05:17,229 --> 00:05:20,739
+We realize we are measuring
+the wrong type of latency.
+
+84
+00:05:21,099 --> 00:05:24,669
+A service latency measures the
+milliseconds between a request and a
+
+85
+00:05:24,669 --> 00:05:30,369
+response, but we needed to measure a
+workflow latency, the time it takes
+
+86
+00:05:30,369 --> 00:05:32,979
+for a human to go from seeing a signal.
+
+87
+00:05:33,354 --> 00:05:36,775
+To confidently taking an
+action based on that signal.
+
+88
+00:05:37,374 --> 00:05:42,474
+When telemetry drops, workflow
+latency usually skyrockets, and that's
+
+89
+00:05:42,474 --> 00:05:44,574
+what had happened in our scenario.
+
+90
+00:05:45,074 --> 00:05:50,624
+To fix this, we decided to stop
+treating this like a logging issue.
+
+91
+00:05:50,654 --> 00:05:55,364
+We started treating and started
+seeing the entire human workflow
+
+92
+00:05:55,364 --> 00:05:57,074
+like a distributed trace.
+
+93
+00:05:57,884 --> 00:05:59,174
+We needed to measure.
+
+94
+00:05:59,549 --> 00:06:03,509
+End to end latency, including
+the human validation step.
+
+95
+00:06:04,009 --> 00:06:07,729
+Once we shifted our mindset
+to tracking the workflow, the
+
+96
+00:06:07,729 --> 00:06:09,799
+solution became more clear.
+
+97
+00:06:10,129 --> 00:06:14,029
+We implemented three specific
+SLIs to measure the health of the
+
+98
+00:06:14,029 --> 00:06:19,039
+pipeline, and a three design tactics
+to fix the overall architecture.
+
+99
+00:06:19,519 --> 00:06:24,499
+Our first slide was tracking the
+end-to-end duration, not the API speed.
+
+100
+00:06:25,354 --> 00:06:31,744
+But the P 50 P 95 time from the
+moment an event hits the ingestion
+
+101
+00:06:31,804 --> 00:06:36,714
+to exact moment, it is visible to
+the user in the ui, and we started
+
+102
+00:06:36,774 --> 00:06:41,634
+alerting when it is consistently
+worse than the workflow requires, and
+
+103
+00:06:41,634 --> 00:06:43,824
+that's what we would recommend to do.
+
+104
+00:06:44,394 --> 00:06:49,014
+This catches the slow degradation
+even when the service appears healthy.
+
+105
+00:06:49,514 --> 00:06:52,844
+The second SLI we took
+was count integrity.
+
+106
+00:06:53,444 --> 00:06:57,494
+We started comparing the counts
+across the pipeline stages when
+
+107
+00:06:57,554 --> 00:07:03,224
+with an explicit model of expected
+deltas and lags, for example, we
+
+108
+00:07:03,224 --> 00:07:05,654
+don't just alert on a hard mismatch.
+
+109
+00:07:05,714 --> 00:07:08,114
+We define expected lag windows.
+
+110
+00:07:08,489 --> 00:07:15,029
+So if a stage A and stage B diverged by 2%
+for five minute, that's normal divergence.
+
+111
+00:07:15,509 --> 00:07:21,149
+If they diverged by 10% for an
+R, the invariant is broken, and
+
+112
+00:07:21,149 --> 00:07:22,769
+we started alerting on that.
+
+113
+00:07:23,269 --> 00:07:30,979
+The last SLI that we took was about
+seeing if pipeline is truly open or not.
+
+114
+00:07:31,864 --> 00:07:33,844
+We couldn't wait for the real traffic.
+
+115
+00:07:33,964 --> 00:07:39,334
+So we introduce a synthetic canary, a
+known good event, injected continuously
+
+116
+00:07:39,334 --> 00:07:41,524
+to prove the workflow was functioning.
+
+117
+00:07:42,514 --> 00:07:46,504
+If you only take one thing away
+from my talk today, it's this.
+
+118
+00:07:46,984 --> 00:07:50,434
+Introduce a canary and
+verify them at every stage.
+
+119
+00:07:50,644 --> 00:07:55,774
+This tells you not only that the system
+are up, but also if the workflow is
+
+120
+00:07:55,774 --> 00:07:58,654
+producing observable, trustworthy outputs.
+
+121
+00:07:58,924 --> 00:07:59,764
+End to end.
+
+122
+00:08:00,264 --> 00:08:05,724
+Those SR. SLIs that we had said gave us
+visibility, but we also needed to change
+
+123
+00:08:05,754 --> 00:08:07,974
+how the system behaved under pressure.
+
+124
+00:08:08,664 --> 00:08:12,955
+We needed a new architectural
+standard, so we came up with our
+
+125
+00:08:12,955 --> 00:08:18,704
+fifth signal of core of SE and we
+started calling it as collaboration.
+
+126
+00:08:19,034 --> 00:08:23,654
+The system must be able to
+reveal its own coverage gaps
+
+127
+00:08:24,074 --> 00:08:25,904
+and surface its own degradation.
+
+128
+00:08:26,489 --> 00:08:30,319
+When the telemetry is missing, the
+system should say, when the coverage
+
+129
+00:08:30,379 --> 00:08:33,139
+is reduced, the UI should show it.
+
+130
+00:08:33,639 --> 00:08:38,139
+Reliability includes the system's
+ability to explain itself.
+
+131
+00:08:38,639 --> 00:08:42,384
+Now let's dive into some of the design
+tactics or the architectural changes that
+
+132
+00:08:42,384 --> 00:08:45,735
+we can, we learn from our from our system.
+
+133
+00:08:45,735 --> 00:08:47,474
+And then maybe you can take those.
+
+134
+00:08:47,954 --> 00:08:51,104
+The in variance are your
+reliability contracts.
+
+135
+00:08:51,405 --> 00:08:56,564
+Everything received is eventually
+that what gets surfaced within a known
+
+136
+00:08:56,564 --> 00:08:59,145
+time window and with a known transf.
+
+137
+00:08:59,655 --> 00:09:03,525
+So if you make those invariants
+observable, you can turn your
+
+138
+00:09:03,525 --> 00:09:05,444
+ambiguity into a measurable state.
+
+139
+00:09:05,944 --> 00:09:06,754
+Next.
+
+140
+00:09:06,904 --> 00:09:12,154
+What we changed in our design tactic
+was not treating up and down as the
+
+141
+00:09:12,154 --> 00:09:17,314
+only state partial degradation should
+also be treated as a first class state.
+
+142
+00:09:17,704 --> 00:09:23,074
+If the logs drop out, don't just keep UI
+looking normal surface, the telemetry has
+
+143
+00:09:23,074 --> 00:09:25,685
+been delayed, the coverage is reduced.
+
+144
+00:09:25,924 --> 00:09:26,524
+This helps.
+
+145
+00:09:26,524 --> 00:09:31,114
+Usually this prevents false confidence
+and reduces the wasted time.
+
+146
+00:09:31,614 --> 00:09:35,304
+The last one, if the humans
+are a reliability endpoint,
+
+147
+00:09:35,754 --> 00:09:36,954
+measure the friction.
+
+148
+00:09:37,464 --> 00:09:45,234
+You can proxy repeated queries, pivots,
+escalations, reopen rates, proxy them.
+
+149
+00:09:45,654 --> 00:09:50,274
+Before we fix this, we
+watch escalation loops.
+
+150
+00:09:50,274 --> 00:09:55,734
+Multiply tier one analysts couldn't
+trust the RUI, so they escalated
+
+151
+00:09:55,734 --> 00:09:58,794
+everything to the engineering to
+run the manual database queries.
+
+152
+00:09:59,305 --> 00:10:01,255
+The friction was our metric.
+
+153
+00:10:01,675 --> 00:10:03,295
+This is your true error rate.
+
+154
+00:10:03,745 --> 00:10:05,574
+I would recommend to measure it.
+
+155
+00:10:06,074 --> 00:10:09,435
+Now, I have a checklist for
+you which you can apply from.
+
+156
+00:10:09,435 --> 00:10:16,244
+Say like next week, pick one key
+workflow, define your in variance at one
+
+157
+00:10:16,244 --> 00:10:18,944
+synthetic canary instead of workflow, SLO.
+
+158
+00:10:19,484 --> 00:10:20,774
+And that should be able to help.
+
+159
+00:10:21,274 --> 00:10:22,354
+And with that.
+
+160
+00:10:23,059 --> 00:10:24,589
+I'm gonna leave you with one thought.
+
+161
+00:10:24,889 --> 00:10:27,769
+Silent failures don't
+always take the system down.
+
+162
+00:10:28,099 --> 00:10:33,139
+They take the certainty down, so the
+dashboards only measure compute health.
+
+163
+00:10:33,619 --> 00:10:35,839
+We can miss cognitive failures.
+
+164
+00:10:36,409 --> 00:10:39,679
+Reliability is not just keeping
+the system running, it's about
+
+165
+00:10:39,679 --> 00:10:41,089
+keeping the decisions fast.
+
+166
+00:10:42,064 --> 00:10:44,734
+Explainable and
+trustworthy under pressure.
+
+167
+00:10:45,364 --> 00:10:48,544
+You don't need to keep a perfect
+system from start to end.
+
+168
+00:10:49,144 --> 00:10:53,254
+You just need one workflow
+made measurably explainable.
+
+169
+00:10:53,754 --> 00:10:56,334
+With that, thank you
+all for listening to me.
+
+170
+00:10:57,024 --> 00:11:00,504
+If you're interested in learning
+more about Bloomberg, you can
+
+171
+00:11:00,834 --> 00:11:03,024
+check us out@techatbloomberg.com.
+
+172
+00:11:03,474 --> 00:11:06,774
+Or if you're interested in joining
+Bloomberg, you can check us out
+
+173
+00:11:06,774 --> 00:11:10,839
+at bloomberg.com/couriers or
+reach out to me via LinkedIn.
+
+174
+00:11:11,424 --> 00:11:11,904
+Thank you.
+
