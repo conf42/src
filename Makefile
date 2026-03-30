@@ -31,5 +31,8 @@ clean:
 env:
 	python3 -m venv env
 
-all: deps jpeg generate transcribe summarize verify previews
-.PHONY: deps jpeg generate transcribe summarize verify previews
+optimize:
+	python optimize_images.py
+
+all: deps jpeg generate transcribe summarize verify previews optimize
+.PHONY: deps jpeg generate transcribe summarize verify previews optimize
