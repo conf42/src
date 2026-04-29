@@ -31,5 +31,10 @@ clean:
 env:
 	python3 -m venv env
 
+optimize:
+	pngquant --quality=65-80 --force --ext .png --skip-if-larger docs/assets/sponsors/*.png || true
+	pngquant --quality=65-80 --force --ext .png --skip-if-larger docs/assets/conf42/*.png || true
+	pngquant --quality=65-80 --force --ext .png --skip-if-larger docs/assets/custom/*.png || true
+
 all: deps jpeg generate transcribe summarize verify previews
-.PHONY: deps jpeg generate transcribe summarize verify previews
+.PHONY: deps jpeg generate transcribe summarize verify previews optimize
