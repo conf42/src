@@ -1,0 +1,3777 @@
+1
+00:00:00,870 --> 00:00:03,710
+Speaker 21: Welcome to my talk on
+modularizing a 10-year monolith.
+
+2
+00:00:03,910 --> 00:00:05,289
+My name is Victor Luboslavsky.
+
+3
+00:00:05,289 --> 00:00:08,500
+I've been in tech for over 25 years,
+and I'm currently a principal software
+
+4
+00:00:08,500 --> 00:00:10,119
+engineer at Fleet Device Management.
+
+5
+00:00:10,500 --> 00:00:14,000
+At Fleet, we make endpoint telemetry
+for corporate security teams and device
+
+6
+00:00:14,000 --> 00:00:15,539
+management for corporate IT teams.
+
+7
+00:00:16,039 --> 00:00:19,670
+In my current job, it took me roughly
+a year to figure out the code base, get
+
+8
+00:00:19,670 --> 00:00:22,810
+familiar with the programming language,
+and understand our business domain.
+
+9
+00:00:23,410 --> 00:00:26,990
+So around that time, I started to
+notice a consistent issue whenever
+
+10
+00:00:26,990 --> 00:00:28,539
+working on our service package.
+
+11
+00:00:29,039 --> 00:00:31,189
+A package in Go is a compile unit.
+
+12
+00:00:31,689 --> 00:00:34,619
+This service package was the
+biggest one in our code base,
+
+13
+00:00:34,739 --> 00:00:39,200
+and every time I recompiled its
+tests, it took about 30 seconds.
+
+14
+00:00:39,419 --> 00:00:42,869
+Even changing one character in
+a string meant waiting again.
+
+15
+00:00:43,559 --> 00:00:45,520
+That is a very specific kind of delay.
+
+16
+00:00:45,680 --> 00:00:49,750
+It's not long enough to switch tasks,
+and it's not short enough to ignore.
+
+17
+00:00:50,070 --> 00:00:51,980
+It just interrupts your thinking.
+
+18
+00:00:52,410 --> 00:00:55,469
+You wait, your attention drifts,
+and then you have to load the
+
+19
+00:00:55,469 --> 00:00:57,399
+problem in your head again.
+
+20
+00:00:57,910 --> 00:01:00,149
+And that happens over and over.
+
+21
+00:01:00,649 --> 00:01:04,839
+When your thinking loop breaks,
+you lose context, and getting that
+
+22
+00:01:04,839 --> 00:01:06,789
+context back is the expensive part.
+
+23
+00:01:07,379 --> 00:01:08,739
+The wait is not the real problem.
+
+24
+00:01:08,779 --> 00:01:10,849
+The problem is the
+broken train of thought.
+
+25
+00:01:11,349 --> 00:01:12,479
+So I did a little digging.
+
+26
+00:01:12,819 --> 00:01:15,509
+The Go programming language is
+known for fast compile times.
+
+27
+00:01:15,819 --> 00:01:20,499
+However, the linking phase of the
+compile still occurs largely in series.
+
+28
+00:01:21,019 --> 00:01:24,889
+In my experiments tracing the build
+process, most of that recompile was
+
+29
+00:01:24,889 --> 00:01:27,179
+stuck waiting for a single thread.
+
+30
+00:01:27,669 --> 00:01:31,920
+This means if we have a large number of
+packages to link together, the linking
+
+31
+00:01:31,920 --> 00:01:33,999
+phase will dominate the compile time.
+
+32
+00:01:34,539 --> 00:01:36,830
+From this analysis, the issue was obvious.
+
+33
+00:01:37,010 --> 00:01:40,789
+Our service package was too big
+and had too many dependencies.
+
+34
+00:01:41,289 --> 00:01:42,959
+So I asked myself a simple question.
+
+35
+00:01:43,629 --> 00:01:45,539
+What am I actually trying to do here?
+
+36
+00:01:45,739 --> 00:01:49,459
+I'm not trying to fight a build system
+or wrestle with a giant package.
+
+37
+00:01:49,789 --> 00:01:51,389
+I'm just trying to write good software.
+
+38
+00:01:52,369 --> 00:01:55,109
+And it shouldn't take 30 seconds
+of self-therapy every time
+
+39
+00:01:55,109 --> 00:01:56,389
+I change a string literal.
+
+40
+00:01:56,889 --> 00:01:58,149
+What about AI agents?
+
+41
+00:01:58,309 --> 00:02:00,569
+They aren't as concerned about
+waiting 30 seconds for the
+
+42
+00:02:00,569 --> 00:02:01,979
+code and compile loop, right?
+
+43
+00:02:02,479 --> 00:02:06,019
+So if I'm using an AI agent, I
+can let it handle the coding while
+
+44
+00:02:06,019 --> 00:02:07,899
+I switch to another task, right?
+
+45
+00:02:08,399 --> 00:02:09,959
+That doesn't fully solve the problem.
+
+46
+00:02:10,519 --> 00:02:14,769
+If I need to do a small code change, I
+can do it faster than an agent right now.
+
+47
+00:02:15,269 --> 00:02:17,899
+This means using an AI agent
+for some tasks will actually
+
+48
+00:02:17,899 --> 00:02:19,129
+slow me down even more.
+
+49
+00:02:19,649 --> 00:02:24,879
+Second, if an AI agent-- second, an
+AI agent often runs the test cycle
+
+50
+00:02:24,879 --> 00:02:27,239
+way more times than a human developer.
+
+51
+00:02:27,749 --> 00:02:30,369
+And in our case, the
+tests are the bottleneck.
+
+52
+00:02:31,189 --> 00:02:34,379
+So it's arguably even more
+important to reduce the compile
+
+53
+00:02:34,379 --> 00:02:36,719
+time to speed up our AI friends.
+
+54
+00:02:37,219 --> 00:02:40,729
+So if I just wanna write good
+software, what needs to change?
+
+55
+00:02:41,279 --> 00:02:45,639
+I want a code base that feels light,
+understandable, and fast, one that helps
+
+56
+00:02:45,639 --> 00:02:47,629
+me think instead of slowing me down.
+
+57
+00:02:48,119 --> 00:02:52,549
+And I realized the only way to get there
+was to make the code base itself smaller.
+
+58
+00:02:53,259 --> 00:02:55,039
+So we tried modularizing.
+
+59
+00:02:55,539 --> 00:02:59,109
+Next, let's discuss our first
+attempt at modularization, where,
+
+60
+00:02:59,139 --> 00:03:03,029
+as you might guess, things didn't
+quite go as smooth as we hoped.
+
+61
+00:03:03,529 --> 00:03:04,659
+Let's talk about our code base.
+
+62
+00:03:05,069 --> 00:03:08,369
+Fleet Device Management is
+primarily MIT licensed open source.
+
+63
+00:03:08,659 --> 00:03:12,299
+We also maintain a small set of
+advanced features in a clearly separated
+
+64
+00:03:12,299 --> 00:03:13,779
+directory under a different license.
+
+65
+00:03:14,209 --> 00:03:18,029
+Our code base is roughly ten years
+old with about eight hundred thousand
+
+66
+00:03:18,029 --> 00:03:20,209
+lines of Go code and growing.
+
+67
+00:03:20,709 --> 00:03:23,639
+This is a much simplified picture
+of the core of our service layer.
+
+68
+00:03:24,039 --> 00:03:27,479
+We have a su- single huge Go
+package for the API layer.
+
+69
+00:03:27,679 --> 00:03:28,739
+It's our service package.
+
+70
+00:03:28,989 --> 00:03:32,209
+It includes controllers and the
+service containing our business logic.
+
+71
+00:03:32,579 --> 00:03:34,809
+This API layer calls
+the persistence layer.
+
+72
+00:03:35,109 --> 00:03:37,609
+The persistence layer is
+another huge Go package.
+
+73
+00:03:37,889 --> 00:03:42,359
+It constructs the SQL queries and
+executes them against our MySQL database.
+
+74
+00:03:43,159 --> 00:03:47,249
+We also have an in-memory cache, a React
+front end, a CLI, and a bunch of smaller
+
+75
+00:03:47,249 --> 00:03:49,289
+components which are not pictured here.
+
+76
+00:03:49,789 --> 00:03:53,939
+So at one of our engineering all hand-
+hands meetings, I gave a presentation.
+
+77
+00:03:54,209 --> 00:03:58,739
+I described how we could scale our code
+base to a more modular architecture.
+
+78
+00:03:59,239 --> 00:04:02,289
+The core idea of my presentation
+was that when working on a major
+
+79
+00:04:02,289 --> 00:04:07,089
+new feature, we could create a
+new module, a vertical slice.
+
+80
+00:04:07,929 --> 00:04:12,319
+This new vertical slice would mirror
+the structure of the legacy code.
+
+81
+00:04:12,699 --> 00:04:15,479
+We would organize it exactly
+like the legacy code.
+
+82
+00:04:15,749 --> 00:04:18,659
+That way, engineers would still
+roughly know where things are.
+
+83
+00:04:19,159 --> 00:04:22,399
+This actually looks exactly
+like a microservice, but still
+
+84
+00:04:22,399 --> 00:04:24,410
+within a single compiled binary.
+
+85
+00:04:24,910 --> 00:04:28,320
+The presentation seems to land,
+and I felt confident enough
+
+86
+00:04:28,320 --> 00:04:30,010
+to try it on a real feature.
+
+87
+00:04:30,630 --> 00:04:32,780
+We have some smart engineers
+on the team, so I felt like I
+
+88
+00:04:32,780 --> 00:04:34,520
+was going down the right path.
+
+89
+00:04:35,110 --> 00:04:37,060
+I did get one question
+that I wanna mention.
+
+90
+00:04:37,560 --> 00:04:41,900
+The question was, "If the team
+structure changes, do we have to
+
+91
+00:04:41,980 --> 00:04:44,959
+redo the architecture?" Maybe.
+
+92
+00:04:45,529 --> 00:04:49,480
+The boundaries still need to make
+sense in the product and the domain,
+
+93
+00:04:50,169 --> 00:04:53,270
+but they don't need to have a
+one-to-one match with the org chart.
+
+94
+00:04:53,620 --> 00:04:57,800
+A single team can own several slices,
+and if that team later splits,
+
+95
+00:04:57,800 --> 00:04:59,809
+those splice slices can split too.
+
+96
+00:05:00,309 --> 00:05:04,099
+Shortly afterwards, we started working
+on a new feature, and this new feature
+
+97
+00:05:04,099 --> 00:05:08,069
+seemed like the ideal candidate to
+try this new modularization approach.
+
+98
+00:05:08,489 --> 00:05:11,239
+The feature was Android MDM,
+Mobile Device Management.
+
+99
+00:05:11,609 --> 00:05:17,339
+It meant a new hardware platform for us to
+support using a new, for us, Google API.
+
+100
+00:05:17,839 --> 00:05:20,039
+I created the new structure
+for the Android support.
+
+101
+00:05:20,209 --> 00:05:22,619
+I created new packages
+in a dedicated directory.
+
+102
+00:05:23,079 --> 00:05:26,399
+Most of the work was actually untangling
+some common por- parts so they
+
+103
+00:05:26,399 --> 00:05:30,429
+could be reused between the legacy
+code and this new Android feature.
+
+104
+00:05:30,929 --> 00:05:35,179
+I put up the PR, the pull
+request, and it just sat there.
+
+105
+00:05:35,599 --> 00:05:39,279
+Our guidance is to review and merge
+PRs within twenty-four hours, but
+
+106
+00:05:39,279 --> 00:05:41,169
+no one wanted to touch this one.
+
+107
+00:05:41,999 --> 00:05:45,329
+In retrospect, I should have done a
+better job communicating to the team
+
+108
+00:05:45,639 --> 00:05:49,559
+that I was actually going to do what
+I proposed in my earlier presentation.
+
+109
+00:05:50,229 --> 00:05:52,559
+Some engineers felt
+surprised by the changes.
+
+110
+00:05:52,659 --> 00:05:55,169
+They didn't feel like they
+had a voice in this approach.
+
+111
+00:05:55,659 --> 00:05:57,669
+They didn't have an
+opportunity to speak up.
+
+112
+00:05:57,929 --> 00:06:00,939
+So facing this resistance, I backtracked.
+
+113
+00:06:01,439 --> 00:06:04,219
+Let's take a look at these
+two MySQL databases down here.
+
+114
+00:06:04,669 --> 00:06:09,029
+Having two MySQL schemas made
+our migrations more complicated.
+
+115
+00:06:09,419 --> 00:06:13,159
+It also made it impossible to
+join tables across schemas.
+
+116
+00:06:13,659 --> 00:06:17,919
+Even if we put both schemas into the same
+physical database, it still would have
+
+117
+00:06:17,919 --> 00:06:19,799
+made our deployments more complicated.
+
+118
+00:06:20,299 --> 00:06:23,229
+We'll talk about this later in the
+presentation, but at this point in the
+
+119
+00:06:23,229 --> 00:06:29,549
+story, I decided to take a step back
+and unsplit, unsplit the MySQL layer.
+
+120
+00:06:29,889 --> 00:06:33,859
+So all requests would still
+go to the same MySQL schema.
+
+121
+00:06:34,359 --> 00:06:38,099
+Then I had several lengthy conversations
+with my PR reviewer regarding the
+
+122
+00:06:38,099 --> 00:06:43,719
+overall approach, and after a few more
+minor adjustments, we merged the PR.
+
+123
+00:06:44,219 --> 00:06:49,059
+A few weeks later, we also instituted an
+ADR, architecture decision record process.
+
+124
+00:06:49,649 --> 00:06:53,499
+This mens- this meant I needed to
+create ADRs and retroactively get
+
+125
+00:06:53,499 --> 00:06:56,459
+approval for these architecture changes.
+
+126
+00:06:56,959 --> 00:07:01,489
+I wrote two ADRs, one to split the API
+layer and one to split the persistence
+
+127
+00:07:01,489 --> 00:07:03,149
+layer of the Android feature.
+
+128
+00:07:03,529 --> 00:07:07,629
+The ADR to s- to split the API layer
+was approved, but the ADR to split
+
+129
+00:07:07,629 --> 00:07:10,279
+the persistence layer was rejected.
+
+130
+00:07:10,779 --> 00:07:15,189
+Engineers voiced their concerns, which
+included, " We've had this structure for
+
+131
+00:07:15,189 --> 00:07:16,999
+a while, and people know how it works.
+
+132
+00:07:17,039 --> 00:07:18,469
+Why do we need this change?
+
+133
+00:07:18,629 --> 00:07:22,519
+It might confuse and slow people down."
+" With separate persistence layers,
+
+134
+00:07:22,519 --> 00:07:27,069
+it'll be much harder to do database
+transactions across two separate modules."
+
+135
+00:07:27,569 --> 00:07:30,289
+And, "This change is just too big.
+
+136
+00:07:30,739 --> 00:07:34,609
+Let's try something incremental,
+like splitting the API layer only.
+
+137
+00:07:34,609 --> 00:07:38,099
+We can split the persistence layer
+later." Their feedback was consistent.
+
+138
+00:07:38,509 --> 00:07:42,559
+This felt risky, confusing,
+and too big to do all at once.
+
+139
+00:07:43,059 --> 00:07:45,989
+So I reverted the
+persistence layer changes.
+
+140
+00:07:46,459 --> 00:07:50,919
+The new API layer now talk to the
+same large persistence package
+
+141
+00:07:50,999 --> 00:07:52,539
+as the rest of the code base.
+
+142
+00:07:53,039 --> 00:07:55,309
+And at this point, I actually
+moved off this feature.
+
+143
+00:07:55,349 --> 00:07:56,869
+I moved to help another product team.
+
+144
+00:07:56,899 --> 00:08:01,169
+I worked on other parts of the code base,
+and other engineers continued to work on
+
+145
+00:08:01,169 --> 00:08:05,465
+this Android part of the code base We as a
+company had a lot of features promised to
+
+146
+00:08:05,465 --> 00:08:09,345
+our customers, so we were all moving very
+quickly trying to get these features out.
+
+147
+00:08:09,845 --> 00:08:11,995
+But this took a toll on our architecture.
+
+148
+00:08:12,185 --> 00:08:15,485
+Without architectural oversight,
+without a strong commitment from
+
+149
+00:08:15,485 --> 00:08:20,615
+the engineering team, this Android
+feature seeped into the legacy code.
+
+150
+00:08:21,345 --> 00:08:23,165
+So what do we have now?
+
+151
+00:08:23,665 --> 00:08:26,335
+The picture shows roughly what we have.
+
+152
+00:08:26,625 --> 00:08:30,825
+Certainly, at a high level, the code
+base doesn't appear to be very modular.
+
+153
+00:08:31,375 --> 00:08:35,075
+Arguably, it's even more complex and
+harder to maintain than it was before.
+
+154
+00:08:35,805 --> 00:08:39,905
+In practice, there's really no
+clear separation between the legacy
+
+155
+00:08:39,905 --> 00:08:41,555
+code and the Android feature.
+
+156
+00:08:42,055 --> 00:08:43,595
+But it's not all bad news.
+
+157
+00:08:43,685 --> 00:08:45,085
+Some positives do remain.
+
+158
+00:08:45,635 --> 00:08:49,935
+Most Android-specific controllers are
+in a separate package, which makes
+
+159
+00:08:49,935 --> 00:08:51,695
+it easier to change and reason about.
+
+160
+00:08:52,265 --> 00:08:55,305
+Some Android-specific code is
+now isolated, which accelerates
+
+161
+00:08:55,305 --> 00:08:59,035
+development and testing within
+that Android service package.
+
+162
+00:08:59,575 --> 00:09:04,615
+And not shown here, we did break apart
+some common code out of the legacy
+
+163
+00:09:04,615 --> 00:09:09,775
+service package, which makes it easier
+to create new API layers in the future.
+
+164
+00:09:10,275 --> 00:09:14,245
+Next, let's discuss what we've
+learned from our first attempt.
+
+165
+00:09:14,745 --> 00:09:18,025
+I keep rediscovering that
+talking to people takes time,
+
+166
+00:09:18,695 --> 00:09:19,765
+and there's no shortcut.
+
+167
+00:09:20,145 --> 00:09:20,925
+Real time.
+
+168
+00:09:21,445 --> 00:09:24,965
+Meetings, follow-ups, side
+conversations, and the bigger the
+
+169
+00:09:24,965 --> 00:09:28,075
+organization, the slower that loop gets.
+
+170
+00:09:28,875 --> 00:09:31,525
+We also can't rely on who speaks up first.
+
+171
+00:09:31,835 --> 00:09:34,685
+Early voices are often smart
+and well-intentioned, but
+
+172
+00:09:34,685 --> 00:09:36,365
+they don't represent everyone.
+
+173
+00:09:36,715 --> 00:09:41,675
+To build real consensus, we have to
+actively solicit feedback, especially
+
+174
+00:09:41,675 --> 00:09:43,605
+in one-on-ones and smaller forums.
+
+175
+00:09:44,105 --> 00:09:48,585
+To succeed, we need strong commitment,
+both from the engineers and managers,
+
+176
+00:09:49,245 --> 00:09:53,285
+to the architecture and to the
+specific boundaries we are proposing.
+
+177
+00:09:54,045 --> 00:09:58,135
+Without that commitment, engineers
+naturally revert to old patterns and
+
+178
+00:09:58,135 --> 00:10:00,725
+architectural compromises creep back in.
+
+179
+00:10:01,275 --> 00:10:04,555
+And without management support,
+short-term delivery pressure
+
+180
+00:10:04,555 --> 00:10:07,345
+wins over long-term structure.
+
+181
+00:10:07,845 --> 00:10:10,495
+Let's give a small example
+of misunderstanding.
+
+182
+00:10:11,115 --> 00:10:14,135
+In one case, people were
+confused about the words.
+
+183
+00:10:14,665 --> 00:10:16,425
+I was using the term modules.
+
+184
+00:10:16,985 --> 00:10:21,365
+I was using it in an architectural
+sense to mean a cohesive group
+
+185
+00:10:21,365 --> 00:10:23,175
+of code with a clear boundary.
+
+186
+00:10:23,875 --> 00:10:28,085
+However, some people thought I was
+talking about Go modules, which
+
+187
+00:10:28,085 --> 00:10:31,045
+is a way to distribute packages
+in the Go programming language.
+
+188
+00:10:31,545 --> 00:10:32,365
+Nobody was wrong.
+
+189
+00:10:32,395 --> 00:10:35,545
+We just weren't talking about
+the same thing, and it took a
+
+190
+00:10:35,545 --> 00:10:37,395
+face-to-face meeting to sort this out.
+
+191
+00:10:37,895 --> 00:10:39,935
+We thought the hard part
+was the architecture.
+
+192
+00:10:39,975 --> 00:10:42,545
+It turned out the hard part
+were the conversations.
+
+193
+00:10:43,045 --> 00:10:44,396
+Let's move on to the second lesson.
+
+194
+00:10:45,326 --> 00:10:47,465
+What is an architectural change anyway?
+
+195
+00:10:48,265 --> 00:10:51,245
+That sounds like a straightforward
+question, but in practice, it
+
+196
+00:10:51,245 --> 00:10:55,485
+turns out to be one of the most
+political questions in engineering.
+
+197
+00:10:55,985 --> 00:10:57,325
+Here's what we saw in reality.
+
+198
+00:10:57,895 --> 00:11:00,955
+Architectur- architectural
+changes in our code base rarely
+
+199
+00:11:00,955 --> 00:11:03,045
+showed up as architecture work.
+
+200
+00:11:03,505 --> 00:11:06,305
+Instead, they went in
+as part of feature work.
+
+201
+00:11:06,805 --> 00:11:11,476
+If you framed your change as part of
+feature work and included it in a PR with
+
+202
+00:11:11,506 --> 00:11:16,855
+other feature changes, it moved, even if
+it broke existing architectural patterns.
+
+203
+00:11:17,406 --> 00:11:20,025
+After all, we needed to get all
+the feature changes in quickly.
+
+204
+00:11:20,385 --> 00:11:22,226
+Features are what make
+money for the company.
+
+205
+00:11:22,736 --> 00:11:25,625
+But if you framed your change
+as a standalone architectural
+
+206
+00:11:25,625 --> 00:11:28,006
+improvement, it stalled.
+
+207
+00:11:28,215 --> 00:11:31,026
+It stalled because it was
+prioritized behind feature work.
+
+208
+00:11:31,206 --> 00:11:34,245
+It stalled because engineers wanted
+to have bigger discussions around it.
+
+209
+00:11:34,646 --> 00:11:38,255
+It stalled because it wasn't providing
+immediate value to the company.
+
+210
+00:11:38,755 --> 00:11:41,345
+So what's the main lesson here
+about architectural changes?
+
+211
+00:11:42,225 --> 00:11:47,315
+If you don't define how your architecture
+is allowed to change, it changes anyway,
+
+212
+00:11:47,835 --> 00:11:49,725
+and often it changes behind your back.
+
+213
+00:11:50,685 --> 00:11:51,985
+Let's move on to the third lesson.
+
+214
+00:11:52,485 --> 00:11:55,525
+One thing we were missing
+was clear ownership.
+
+215
+00:11:56,075 --> 00:11:59,505
+In a modular system, not
+every API endpoint belongs
+
+216
+00:11:59,505 --> 00:12:01,235
+cleanly to a single service.
+
+217
+00:12:01,735 --> 00:12:06,015
+Some endpoint mostly orchestrate
+work across multiple services.
+
+218
+00:12:06,395 --> 00:12:09,805
+That was true for us because this
+new Android function- functionality
+
+219
+00:12:09,805 --> 00:12:12,435
+still needed to talk to legacy code.
+
+220
+00:12:13,355 --> 00:12:16,635
+The mistake was leaving
+this orchestration unowned.
+
+221
+00:12:17,135 --> 00:12:22,215
+Every API endpoint still needs a
+clear home, a specific module, and a
+
+222
+00:12:22,215 --> 00:12:24,605
+specific team that's responsible for it.
+
+223
+00:12:25,156 --> 00:12:29,795
+Even if the endpoint is just glue,
+someone has to own that glue.
+
+224
+00:12:30,295 --> 00:12:32,056
+So where are we at this point?
+
+225
+00:12:32,816 --> 00:12:34,586
+The first attempt didn't quite succeed.
+
+226
+00:12:34,865 --> 00:12:37,966
+We still have the pain points of a
+large, tightly coupled code base.
+
+227
+00:12:38,525 --> 00:12:41,016
+But hopefully, we learned a few things.
+
+228
+00:12:41,516 --> 00:12:42,596
+We now have experience.
+
+229
+00:12:43,426 --> 00:12:45,026
+So where do we go from here?
+
+230
+00:12:45,526 --> 00:12:48,816
+At this point, I realized the
+importance of the people part in
+
+231
+00:12:48,816 --> 00:12:52,966
+architecture, and I felt like I
+couldn't convince the company on my own.
+
+232
+00:12:53,545 --> 00:12:55,706
+I still didn't feel like
+an architecture expert.
+
+233
+00:12:56,045 --> 00:12:59,806
+The first attempt was a mess, so
+why would other engineers take my
+
+234
+00:12:59,806 --> 00:13:04,336
+next proposal seriously and not
+see it as just another crazy idea?
+
+235
+00:13:04,996 --> 00:13:06,826
+I needed someone else's help.
+
+236
+00:13:07,236 --> 00:13:09,866
+I needed something like
+an appeal to authority.
+
+237
+00:13:10,276 --> 00:13:15,286
+I needed to find someone else that had
+already done this transition, and I needed
+
+238
+00:13:15,286 --> 00:13:17,056
+to analyze the way they approached it.
+
+239
+00:13:17,556 --> 00:13:22,156
+Unfortunately, I did not find any
+large open source Go projects making
+
+240
+00:13:22,156 --> 00:13:24,576
+a transition to a modular monolith.
+
+241
+00:13:25,386 --> 00:13:29,356
+As far as I know, we're the first large
+open source Go project doing this.
+
+242
+00:13:29,726 --> 00:13:30,426
+Yay us.
+
+243
+00:13:31,356 --> 00:13:33,716
+The next best reference was GitLab.
+
+244
+00:13:34,216 --> 00:13:37,286
+GitLab runs a Ruby on Rails
+monolith with over two million
+
+245
+00:13:37,286 --> 00:13:41,546
+lines of code maintained by a large
+distributed engineering organization.
+
+246
+00:13:42,176 --> 00:13:45,866
+They faced the same decision we
+were facing, whether to break
+
+247
+00:13:45,866 --> 00:13:49,156
+everything into microservices
+or find another way to scale.
+
+248
+00:13:49,696 --> 00:13:52,016
+They deliberately chose
+a modular monolith.
+
+249
+00:13:52,616 --> 00:13:56,516
+GitLab publicly documented this decision,
+and their motivation was practical.
+
+250
+00:13:56,936 --> 00:14:00,016
+They wanted to avoid the operational
+complexity of microservices,
+
+251
+00:14:00,346 --> 00:14:03,556
+and they wanted to keep the code
+base approachable for engineers.
+
+252
+00:14:04,056 --> 00:14:08,466
+And they wanted to use clear domain
+boundaries to scale development safely.
+
+253
+00:14:09,176 --> 00:14:12,786
+Their example showed that modularity
+and scale don't require microservices.
+
+254
+00:14:13,126 --> 00:14:16,426
+And to us, it showed that
+a large successful team had
+
+255
+00:14:16,426 --> 00:14:18,326
+already walked this same path.
+
+256
+00:14:18,696 --> 00:14:23,836
+And it turned my proposal from a
+crazy idea into a proven pattern.
+
+257
+00:14:24,376 --> 00:14:26,266
+We weren't trying to invent something new.
+
+258
+00:14:26,486 --> 00:14:29,836
+We were trying to follow a
+trail that was already there.
+
+259
+00:14:30,336 --> 00:14:32,326
+Internally, that changed the conversation.
+
+260
+00:14:32,746 --> 00:14:35,446
+Before that, the conversation
+kept circling about whether this
+
+261
+00:14:35,446 --> 00:14:39,856
+was too unusual, too risky, or
+too academic for our code base.
+
+262
+00:14:40,396 --> 00:14:44,256
+GitLab gave us a reference point
+that was concrete, public, and
+
+263
+00:14:44,256 --> 00:14:45,886
+large enough to be taken seriously.
+
+264
+00:14:46,556 --> 00:14:49,786
+It didn't answer all of our questions,
+but it changed the burden of proof.
+
+265
+00:14:50,556 --> 00:14:55,366
+I no longer had to argue that
+modularization was some novel idea or
+
+266
+00:14:55,366 --> 00:14:57,236
+personal preference we should gamble on.
+
+267
+00:14:57,476 --> 00:15:02,426
+I could point to a real company with a
+larger monolith than ours that had already
+
+268
+00:15:02,426 --> 00:15:05,396
+made this same bet for practical reasons.
+
+269
+00:15:05,896 --> 00:15:08,176
+Next, we had to decide where to start.
+
+270
+00:15:08,826 --> 00:15:11,926
+This time, there was no obvious
+feature to use as an anchor.
+
+271
+00:15:12,426 --> 00:15:15,766
+So we had a series of discussions
+with the engineering team.
+
+272
+00:15:16,046 --> 00:15:19,986
+We aligned on bounded context and
+domain-driven design in principle.
+
+273
+00:15:20,316 --> 00:15:23,196
+The hard part was choosing
+that first boundary.
+
+274
+00:15:23,696 --> 00:15:27,146
+I looked at our code organization
+and had a few conversations with my
+
+275
+00:15:27,146 --> 00:15:31,796
+AI agent friend and proposed several
+ways we could slice the monolith.
+
+276
+00:15:32,296 --> 00:15:36,106
+As you can imagine, this whole process
+was a lot to get your head around,
+
+277
+00:15:36,106 --> 00:15:40,176
+trying to tease apart a 10-year-old
+system into self-contained modules.
+
+278
+00:15:40,676 --> 00:15:42,956
+I felt like I was barely
+scratching the surface.
+
+279
+00:15:43,216 --> 00:15:46,516
+I felt like I was surely missing
+a lot of details and edge cases.
+
+280
+00:15:46,926 --> 00:15:48,606
+There were a lot of unknowns.
+
+281
+00:15:48,996 --> 00:15:51,486
+Starting our modularization
+effort with anything beyond
+
+282
+00:15:51,486 --> 00:15:53,336
+the bare minimum seemed risky.
+
+283
+00:15:53,956 --> 00:15:57,536
+All the engineers generally agreed that
+we wanted to do an incremental approach.
+
+284
+00:15:58,036 --> 00:16:02,206
+So we ultimately agreed on this
+activity and audit over here.
+
+285
+00:16:02,866 --> 00:16:05,996
+This content is- context is
+about recording things that
+
+286
+00:16:05,996 --> 00:16:07,336
+already happened in our system.
+
+287
+00:16:07,686 --> 00:16:11,306
+For example, recording when a new user
+was created, when a new host enrolled,
+
+288
+00:16:11,306 --> 00:16:15,386
+when a key configuration was changed,
+and a ton o- of other activities.
+
+289
+00:16:15,886 --> 00:16:19,296
+Next, I wrote up a detailed
+architectural decision record and
+
+290
+00:16:19,296 --> 00:16:20,876
+put it up for review by the team.
+
+291
+00:16:21,376 --> 00:16:24,366
+Here's the link in case someone
+can't wait to dive into the details.
+
+292
+00:16:24,886 --> 00:16:27,416
+Again, this ADR was framed as a pilot.
+
+293
+00:16:27,776 --> 00:16:31,626
+This is the first bounded context we
+were creating before a bigger rollout.
+
+294
+00:16:32,126 --> 00:16:33,966
+The ADR was up for review for a while.
+
+295
+00:16:34,466 --> 00:16:36,926
+We discussed it multiple
+times in multiple meetings.
+
+296
+00:16:37,456 --> 00:16:42,076
+For me, I just wanted to start
+coding, so I felt quite uncomfortable
+
+297
+00:16:42,076 --> 00:16:44,636
+to be stuck in that waiting limbo.
+
+298
+00:16:45,476 --> 00:16:49,286
+Instead, I got another lesson regarding
+the importance of interpersonal
+
+299
+00:16:49,286 --> 00:16:51,146
+skill in software architecture.
+
+300
+00:16:51,646 --> 00:16:53,946
+Most of the feedback I got was good.
+
+301
+00:16:54,186 --> 00:16:56,306
+We have very smart
+engineers, and that showed.
+
+302
+00:16:57,236 --> 00:17:02,526
+What made it hard wasn't bad feedback,
+it was the volume of it and the timing.
+
+303
+00:17:03,186 --> 00:17:06,456
+Sometimes feedback came faster I-
+than I could realistically absorb.
+
+304
+00:17:07,196 --> 00:17:09,506
+"Have you checked in with so and
+should we run an event storming
+
+305
+00:17:09,506 --> 00:17:14,026
+session? Can you do this other thing?"
+All reasonable suggestions, all
+
+306
+00:17:14,026 --> 00:17:15,866
+well-intentioned, but they added weight.
+
+307
+00:17:16,366 --> 00:17:19,056
+Then a few times, the
+feedback landed late.
+
+308
+00:17:19,436 --> 00:17:24,766
+Things like, "Whoa, can we step back
+and think about the bigger picture?"
+
+309
+00:17:25,266 --> 00:17:29,296
+That's an important question, it just
+would have been easier earlier in the
+
+310
+00:17:29,296 --> 00:17:33,536
+discussions before trying to slice up
+the monolith, before the ADR went up.
+
+311
+00:17:34,176 --> 00:17:38,746
+At that point, we were already six
+weeks in, momentum was building, and
+
+312
+00:17:38,816 --> 00:17:41,426
+it felt like being asked to rewind.
+
+313
+00:17:41,926 --> 00:17:45,646
+This ended up being a good exercise
+in patience, mostly for me.
+
+314
+00:17:46,486 --> 00:17:52,296
+Often, my best response was, "Okay, that's
+interesting. I'll think about it," then
+
+315
+00:17:52,296 --> 00:17:56,776
+take a break, calm down, and come back
+to the feedback in a better head space.
+
+316
+00:17:57,276 --> 00:18:00,606
+Several times, I wondered where this
+whole thing was gonna go anywhere.
+
+317
+00:18:01,076 --> 00:18:03,036
+Sometimes it felt like
+everyone was on board.
+
+318
+00:18:03,066 --> 00:18:05,946
+Other times, it felt like I
+kept running into a brick wall.
+
+319
+00:18:06,446 --> 00:18:08,936
+It felt like I kept bringing
+people along with the plan, and
+
+320
+00:18:08,936 --> 00:18:10,936
+then they slowly drifted away.
+
+321
+00:18:11,336 --> 00:18:14,116
+It felt like I kept grabbing people
+to get them on my side, and then
+
+322
+00:18:14,116 --> 00:18:15,746
+they slipped out of my hands.
+
+323
+00:18:16,246 --> 00:18:21,986
+I also felt I was deep in the weeds
+and details of this re-architecture.
+
+324
+00:18:22,016 --> 00:18:26,486
+I didn't quite see the full picture
+myself, and I had a suspicion
+
+325
+00:18:26,516 --> 00:18:28,436
+other engineers didn't either.
+
+326
+00:18:29,406 --> 00:18:35,316
+I actually needed to convince myself and
+others why we were actually doing this.
+
+327
+00:18:35,816 --> 00:18:41,576
+I needed an argument, and I needed to use
+it not just once, but every chance I got.
+
+328
+00:18:42,076 --> 00:18:45,846
+That's when I finally started to
+understand that old management maxim.
+
+329
+00:18:46,086 --> 00:18:49,896
+By the time you're tired of saying it,
+people are just starting to hear it.
+
+330
+00:18:50,396 --> 00:18:52,456
+This picture is from
+the 1970 movie Pattern.
+
+331
+00:18:53,216 --> 00:18:55,876
+So here, roughly, is my
+argument for the team.
+
+332
+00:18:56,376 --> 00:18:59,106
+Yes, this is a brief talk
+I've given to the team.
+
+333
+00:18:59,756 --> 00:19:02,136
+It's supposed to be somewhat
+motivational in nature.
+
+334
+00:19:02,636 --> 00:19:03,326
+All right, team.
+
+335
+00:19:03,816 --> 00:19:05,146
+Here's why we're doing this.
+
+336
+00:19:05,666 --> 00:19:08,046
+Our backend is around 800,000 lines of Go.
+
+337
+00:19:08,466 --> 00:19:10,166
+That number by itself is not the problem.
+
+338
+00:19:10,296 --> 00:19:13,076
+The problem is what it does
+to day-to-day engineering.
+
+339
+00:19:13,576 --> 00:19:17,406
+At this size, you stop working
+in clean, isolated areas of code.
+
+340
+00:19:17,896 --> 00:19:22,146
+More and more often, different teams end
+up in the same database tables, the same
+
+341
+00:19:22,146 --> 00:19:24,116
+service layer, the same shared logic.
+
+342
+00:19:24,846 --> 00:19:28,426
+GitLab, Shopify, and others have written
+about these scaling issues publicly.
+
+343
+00:19:29,046 --> 00:19:32,336
+We're seeing this same
+pattern in our own codebase.
+
+344
+00:19:33,326 --> 00:19:36,376
+First, teams start
+colliding with each other.
+
+345
+00:19:36,676 --> 00:19:39,946
+We've already had cases where two
+groups changed the same tables or the
+
+346
+00:19:39,946 --> 00:19:44,186
+same service code without realizing
+how tightly connected those areas were.
+
+347
+00:19:44,646 --> 00:19:46,126
+The cleanup took days.
+
+348
+00:19:46,556 --> 00:19:49,496
+Not because anyone was careless,
+because the boundaries were
+
+349
+00:19:49,496 --> 00:19:51,226
+weak, the ownership was blurry.
+
+350
+00:19:52,186 --> 00:19:55,116
+When that happens, the cost
+is not just merge conflict.
+
+351
+00:19:55,536 --> 00:19:59,926
+It is rework, regressions, and
+time spent figuring out who is
+
+352
+00:19:59,926 --> 00:20:01,496
+actually responsible for what.
+
+353
+00:20:01,996 --> 00:20:05,716
+Second, the cost of a small
+change keeps going up.
+
+354
+00:20:06,256 --> 00:20:10,116
+When packages depend on too much
+around them, even a modest change
+
+355
+00:20:10,116 --> 00:20:12,226
+pulls in unrelated context.
+
+356
+00:20:12,836 --> 00:20:16,866
+Reviews get slower, testing gets
+noisier, the chance of side effects
+
+357
+00:20:16,866 --> 00:20:19,726
+goes up, bugs become harder to isolate.
+
+358
+00:20:20,106 --> 00:20:22,346
+At some point, the system is
+no longer difficult because
+
+359
+00:20:22,346 --> 00:20:24,076
+one part is especially complex.
+
+360
+00:20:24,276 --> 00:20:27,636
+It is difficult because too many
+parts are connected to each other.
+
+361
+00:20:28,136 --> 00:20:31,046
+That is the problem
+modularization is meant to solve.
+
+362
+00:20:31,616 --> 00:20:34,906
+Not elegance, not trend
+following, containment.
+
+363
+00:20:35,376 --> 00:20:39,546
+Smaller areas of code, clear ownership,
+fewer reasons for different teams
+
+364
+00:20:39,546 --> 00:20:41,156
+to touch the same lines of code.
+
+365
+00:20:41,636 --> 00:20:45,146
+If a team can make a change without
+loading half the system into their heads,
+
+366
+00:20:45,566 --> 00:20:47,766
+they move faster and with less risk.
+
+367
+00:20:48,026 --> 00:20:49,746
+That is the outcome we want.
+
+368
+00:20:50,246 --> 00:20:52,776
+So this is not architecture
+for its own sake.
+
+369
+00:20:53,036 --> 00:20:55,836
+It is a response to cost
+we're already paying.
+
+370
+00:20:56,066 --> 00:20:59,846
+Bug escapes, long reviews, features
+taking too long to land, and
+
+371
+00:20:59,846 --> 00:21:01,726
+fixes that need follow-up fixes.
+
+372
+00:21:02,196 --> 00:21:05,446
+We can keep treating those as
+separate incidents, or we can
+
+373
+00:21:05,446 --> 00:21:08,776
+admit that the structure of the
+system is part of the problem.
+
+374
+00:21:09,166 --> 00:21:10,866
+That is why we're doing this.
+
+375
+00:21:11,741 --> 00:21:15,611
+Our code base is 10 years old, and we
+expect it to be around a lot longer.
+
+376
+00:21:16,101 --> 00:21:21,431
+This work is about making sure the code
+base helps engineers build instead of
+
+377
+00:21:21,431 --> 00:21:25,501
+getting in their way, not by rewriting
+the system, not by breaking into the
+
+378
+00:21:25,501 --> 00:21:31,151
+microservices, by introducing boundaries
+we can actually maintain as the product
+
+379
+00:21:31,151 --> 00:21:32,801
+and the company continue to grow.
+
+380
+00:21:33,301 --> 00:21:34,521
+And end scene.
+
+381
+00:21:35,021 --> 00:21:37,221
+Now, let's talk about
+the actual architecture.
+
+382
+00:21:37,721 --> 00:21:41,631
+The high-level idea is almost the same as
+where we started with the first attempt.
+
+383
+00:21:42,341 --> 00:21:45,331
+The new feature or new bounded
+context will be in its own
+
+384
+00:21:45,331 --> 00:21:48,431
+module with its own controller,
+service, and persistence layers.
+
+385
+00:21:49,191 --> 00:21:52,141
+The controllers and services will
+be able to call methods on other
+
+386
+00:21:52,141 --> 00:21:54,041
+services in other bounded contexts.
+
+387
+00:21:54,041 --> 00:21:57,731
+However, they will not be able
+to access the persistence layer
+
+388
+00:21:57,931 --> 00:21:59,151
+of another bounded context.
+
+389
+00:21:59,651 --> 00:22:04,101
+In practical terms, that means a
+bounded context can call another context
+
+390
+00:22:04,101 --> 00:22:09,271
+public service API, but it cannot
+reach into that context data store
+
+391
+00:22:09,591 --> 00:22:11,231
+just because that would be convenient.
+
+392
+00:22:11,961 --> 00:22:15,441
+Once one context starts reading
+or writing another context tables
+
+393
+00:22:15,441 --> 00:22:19,351
+through its internal persistence
+code, the boundary is mostly gone.
+
+394
+00:22:19,351 --> 00:22:22,731
+At that point, the ownership looks
+clean in the directory structure, but
+
+395
+00:22:22,731 --> 00:22:24,991
+not in the behavior of the system.
+
+396
+00:22:25,491 --> 00:22:29,601
+Here's the directory layout of the
+bounded context, and we'll bring up
+
+397
+00:22:29,601 --> 00:22:31,721
+this slide a couple times later as well.
+
+398
+00:22:31,981 --> 00:22:37,051
+So the service and MySQL
+directories over here match the
+
+399
+00:22:37,051 --> 00:22:39,901
+API layer and the persistence
+layer from the previous diagram.
+
+400
+00:22:40,641 --> 00:22:47,731
+The integration test over here should
+be able to fully test this bounded
+
+401
+00:22:47,731 --> 00:22:51,511
+context without requiring parts
+from the rest of the application.
+
+402
+00:22:52,011 --> 00:22:55,611
+Now, testing this bounded context with
+other bounded context will be done
+
+403
+00:22:55,611 --> 00:22:57,761
+at a higher-level integration test.
+
+404
+00:22:58,261 --> 00:23:02,491
+Another detail that mattered is what
+the bounded context does not own.
+
+405
+00:23:03,171 --> 00:23:06,451
+It does not own authentication
+or authorization, for example.
+
+406
+00:23:06,811 --> 00:23:08,631
+Those are injected from the outside.
+
+407
+00:23:09,211 --> 00:23:12,591
+Authentication comes in as
+middleware at the HTTP layer.
+
+408
+00:23:12,811 --> 00:23:16,251
+Authorization comes in as a
+dependency the service can call
+
+409
+00:23:16,291 --> 00:23:17,731
+but does not implement itself.
+
+410
+00:23:18,231 --> 00:23:22,751
+That separation kept the context
+focused on its own domain instead
+
+411
+00:23:22,751 --> 00:23:26,171
+of absorbing cross-cutting concerns
+just because they were already
+
+412
+00:23:26,171 --> 00:23:27,471
+present elsewhere in the monolith.
+
+413
+00:23:28,441 --> 00:23:31,771
+Now, let's talk about the decision
+not to split the database schema.
+
+414
+00:23:32,271 --> 00:23:35,501
+When people hear modular
+monolith, they often assume
+
+415
+00:23:35,501 --> 00:23:37,131
+that means multiple databases.
+
+416
+00:23:37,591 --> 00:23:39,211
+We deliberately did not do that.
+
+417
+00:23:39,261 --> 00:23:40,961
+We kept a single schema.
+
+418
+00:23:41,661 --> 00:23:45,731
+Our problems weren't database scale
+or load, they were unclear ownership,
+
+419
+00:23:45,731 --> 00:23:49,051
+broad service layers, and code
+that was too hard to reason about.
+
+420
+00:23:49,621 --> 00:23:51,831
+Splitting the database
+wouldn't have fixed that.
+
+421
+00:23:52,161 --> 00:23:56,736
+It just would have made operational
+complexity Added operation
+
+422
+00:23:56,736 --> 00:23:58,306
+complexity and new failure modes.
+
+423
+00:23:58,806 --> 00:24:02,436
+Splitting a database is also one of the
+most expensive architectural decisions
+
+424
+00:24:02,436 --> 00:24:04,896
+you can make, and it freezes boundaries.
+
+425
+00:24:05,546 --> 00:24:09,946
+We were still learning where those
+boundaries should be, so we modularized
+
+426
+00:24:09,946 --> 00:24:14,406
+the code first, preserved optionality,
+and decided we'd only split the database
+
+427
+00:24:14,406 --> 00:24:17,226
+later if scaling actually required it.
+
+428
+00:24:17,726 --> 00:24:22,836
+Now, everywhere we turned, we heard
+recommendations to use ports and adapters.
+
+429
+00:24:23,446 --> 00:24:29,086
+However, a lot of our business logic
+lives in SQL, so pretending a database is
+
+430
+00:24:29,086 --> 00:24:32,106
+just an adapter didn't make sense for us.
+
+431
+00:24:32,796 --> 00:24:36,656
+Ports and adapters doesn't work for our
+whole sys- our system as a whole, but
+
+432
+00:24:36,656 --> 00:24:39,196
+one idea from it fits extremely well.
+
+433
+00:24:39,866 --> 00:24:45,156
+That idea is that bounded contexts do
+not share the main models directly.
+
+434
+00:24:45,696 --> 00:24:50,376
+Any cross-context communication must
+go through an explicit owned contract.
+
+435
+00:24:50,876 --> 00:24:53,696
+In practice, that means
+explicit module boundaries.
+
+436
+00:24:54,566 --> 00:24:57,006
+Earlier, I talked about how we
+ended up with large packages.
+
+437
+00:24:57,506 --> 00:25:01,976
+When the shared common package is
+used for cross-context communication,
+
+438
+00:25:02,445 --> 00:25:04,136
+it creates a specific problem.
+
+439
+00:25:04,586 --> 00:25:07,386
+When two bounded contexts
+share the same common types,
+
+440
+00:25:07,746 --> 00:25:09,076
+they're no longer independent.
+
+441
+00:25:09,296 --> 00:25:12,676
+A change in one context silently
+changes the behavior of the other.
+
+442
+00:25:13,195 --> 00:25:16,816
+At that point, the boundary only
+exists in our heads, not in the code.
+
+443
+00:25:17,316 --> 00:25:20,776
+For cross-context communication,
+shared packages aren't reused.
+
+444
+00:25:20,905 --> 00:25:22,206
+Instead, they're hidden coupling.
+
+445
+00:25:22,975 --> 00:25:27,596
+That's why we require explicit owned
+contracts at context boundaries.
+
+446
+00:25:28,096 --> 00:25:32,125
+So when one bounded context
+needs something from another, it
+
+447
+00:25:32,125 --> 00:25:33,415
+doesn't reach into the internals.
+
+448
+00:25:33,415 --> 00:25:39,065
+Instead, the providing context exposes
+a small explicit interface along with
+
+449
+00:25:39,065 --> 00:25:41,855
+the types that belong to this interface.
+
+450
+00:25:42,855 --> 00:25:45,975
+Those interfaces and types
+are owned by the provider.
+
+451
+00:25:46,125 --> 00:25:49,825
+They live with the bounded context,
+and they evolve on its terms.
+
+452
+00:25:50,425 --> 00:25:54,715
+Other contexts can depend on the
+contract but not on the implementation.
+
+453
+00:25:55,545 --> 00:25:59,595
+That is what makes the boundary
+real in code, not just in our heads.
+
+454
+00:26:00,095 --> 00:26:03,645
+Now, sometimes, a new bounded
+context still needs data or
+
+455
+00:26:03,645 --> 00:26:05,515
+behavior that lives in legacy code.
+
+456
+00:26:06,015 --> 00:26:10,115
+In those cases, we don't let the
+new code talk to legacy directly.
+
+457
+00:26:10,635 --> 00:26:14,875
+Instead, we introduce an anti-corruption
+l- corruption layer, or ACL.
+
+458
+00:26:15,375 --> 00:26:19,085
+The ACL is the only place
+that understands both worlds.
+
+459
+00:26:19,705 --> 00:26:23,405
+It translates legacy concepts,
+types, and quirks into something the
+
+460
+00:26:23,405 --> 00:26:25,415
+new context can work with safely.
+
+461
+00:26:26,225 --> 00:26:31,785
+Now, notice that this ACL package is
+outside the new bounded context, so that
+
+462
+00:26:31,785 --> 00:26:35,955
+keeps the legacy semantics from leaking
+into the new code, and it gives us a
+
+463
+00:26:35,955 --> 00:26:39,585
+clear seam we can replace or delete later.
+
+464
+00:26:40,085 --> 00:26:43,315
+The goal of this ACL isn't
+elegance, it's containment.
+
+465
+00:26:44,305 --> 00:26:45,615
+Now, let's continue with the story.
+
+466
+00:26:46,115 --> 00:26:50,375
+Before we changed any code, we
+had one big concern, buy-in.
+
+467
+00:26:50,975 --> 00:26:55,215
+We didn't want this to feel like another
+harebrained idea Victor came up with
+
+468
+00:26:55,215 --> 00:26:56,975
+and everyone else has to live with.
+
+469
+00:26:57,625 --> 00:27:01,245
+If this were going to work, our
+software engineers needed to feel
+
+470
+00:27:01,405 --> 00:27:02,975
+like the end result was theirs.
+
+471
+00:27:03,515 --> 00:27:07,515
+Not something imposed, not
+something slipped in quietly,
+
+472
+00:27:07,725 --> 00:27:09,715
+something they actually owned.
+
+473
+00:27:10,215 --> 00:27:13,255
+We left this ADR open for
+discussion for about four weeks.
+
+474
+00:27:13,885 --> 00:27:16,435
+That was longer than any
+ADR we'd done before.
+
+475
+00:27:16,965 --> 00:27:19,975
+We wanted time for people to
+read it, question it, disagree
+
+476
+00:27:19,975 --> 00:27:21,565
+with it, and sit with it.
+
+477
+00:27:22,065 --> 00:27:23,585
+The goal wasn't fast approval.
+
+478
+00:27:23,805 --> 00:27:25,885
+The goal was shared understanding.
+
+479
+00:27:26,385 --> 00:27:29,065
+Next, we made a deliberate
+decision about reviews.
+
+480
+00:27:29,655 --> 00:27:33,215
+Every pull request related to this
+ADR would be reviewed by the four
+
+481
+00:27:33,215 --> 00:27:34,655
+tech leads from each product group.
+
+482
+00:27:35,275 --> 00:27:36,195
+They did two things.
+
+483
+00:27:36,505 --> 00:27:40,215
+First, it made sure they were
+generally on board, the tech leads.
+
+484
+00:27:40,535 --> 00:27:45,615
+Second, it meant their teams were
+represented, not surprised later.
+
+485
+00:27:46,005 --> 00:27:49,085
+Surprises are great for
+birthdays, not for architecture.
+
+486
+00:27:49,895 --> 00:27:53,575
+Architecture stopped being something
+decided by one person and started being
+
+487
+00:27:53,575 --> 00:27:56,295
+something carried by the organization.
+
+488
+00:27:56,795 --> 00:27:58,915
+We also didn't want the
+implementation to be rushed.
+
+489
+00:27:59,785 --> 00:28:03,705
+The stories tied to this ADR went
+through a normal design and spec process.
+
+490
+00:28:04,285 --> 00:28:07,475
+And finally, we created a single
+central page that tracked the
+
+491
+00:28:07,475 --> 00:28:09,585
+status of all of this work.
+
+492
+00:28:10,545 --> 00:28:14,725
+Anyone could see what was done, what was
+in progress, and what was coming next.
+
+493
+00:28:15,285 --> 00:28:18,815
+That visibility was important
+because it turned a potentially risky
+
+494
+00:28:18,845 --> 00:28:22,985
+architectural shift into a series
+of small, understandable steps.
+
+495
+00:28:23,485 --> 00:28:27,995
+At this point, it might seem like we
+were putting a lot of process in place.
+
+496
+00:28:28,385 --> 00:28:31,185
+Probably sounds like we were
+saying, we need to have everything
+
+497
+00:28:31,185 --> 00:28:32,885
+figured out before we even start.
+
+498
+00:28:33,795 --> 00:28:36,415
+And to be honest, that
+felt a little backwards.
+
+499
+00:28:36,875 --> 00:28:41,245
+This is the first bounded context,
+and it was supposed to be a pilot and
+
+500
+00:28:41,245 --> 00:28:43,085
+not a well-engineered masterpiece.
+
+501
+00:28:43,405 --> 00:28:47,515
+And a pilot is supposed to discover
+things, which means sometimes taking
+
+502
+00:28:47,515 --> 00:28:51,115
+a step forward only to backtrack
+when things aren't working.
+
+503
+00:28:51,885 --> 00:28:56,015
+If we already had all the answers, if
+we were able to lay out all the steps
+
+504
+00:28:56,015 --> 00:29:00,015
+in this refactoring top to bottom,
+then we wouldn't need a pilot, right?
+
+505
+00:29:00,515 --> 00:29:04,965
+This means we needed to do a POC,
+a proof of concept, to discover
+
+506
+00:29:04,965 --> 00:29:06,975
+things that we didn't know about.
+
+507
+00:29:07,475 --> 00:29:08,455
+This was great for me.
+
+508
+00:29:08,785 --> 00:29:10,875
+I love coding and I love POCs.
+
+509
+00:29:11,635 --> 00:29:15,505
+The aim of the POC was to discover
+things like which packages were
+
+510
+00:29:15,505 --> 00:29:17,655
+coupled, which patterns to use where.
+
+511
+00:29:18,395 --> 00:29:19,935
+Do we use shared objects?
+
+512
+00:29:20,005 --> 00:29:21,135
+Do we use interfaces?
+
+513
+00:29:21,245 --> 00:29:22,535
+Do we use async events?
+
+514
+00:29:23,135 --> 00:29:26,755
+How will the communication between
+bounded contexts actually look like?
+
+515
+00:29:27,515 --> 00:29:30,355
+In order to make a plan,
+we needed to know the path.
+
+516
+00:29:30,855 --> 00:29:33,105
+So I started with a proof of concept.
+
+517
+00:29:33,665 --> 00:29:36,095
+Not a full implementation,
+just a scaffold.
+
+518
+00:29:36,565 --> 00:29:37,515
+The idea was simple.
+
+519
+00:29:37,545 --> 00:29:40,185
+Create some basic shape
+of a bounded context.
+
+520
+00:29:40,575 --> 00:29:44,225
+This means using some shared
+utilities for HTTP, some middleware,
+
+521
+00:29:44,555 --> 00:29:47,575
+basic MySQL access, nothing fancy.
+
+522
+00:29:48,035 --> 00:29:50,815
+Just enough structure for
+a hello world endpoint.
+
+523
+00:29:51,315 --> 00:29:55,885
+Then I ran a dependency analysis, and
+that's where things got interesting.
+
+524
+00:29:56,385 --> 00:30:01,865
+That simple scaffold was
+pulling in half our monolith.
+
+525
+00:30:02,805 --> 00:30:05,145
+Not because this domain needed it.
+
+526
+00:30:05,365 --> 00:30:08,625
+This hello world domain of the
+scaffold didn't need anything yet.
+
+527
+00:30:09,155 --> 00:30:12,125
+But because all of these
+utility packages did.
+
+528
+00:30:12,845 --> 00:30:15,365
+The glue code was the monolith.
+
+529
+00:30:15,735 --> 00:30:17,915
+The things we thought were
+harmless helpers were actually
+
+530
+00:30:17,915 --> 00:30:19,835
+acting like dependency magnets.
+
+531
+00:30:20,825 --> 00:30:23,285
+And there's another issue
+hiding in plain sight.
+
+532
+00:30:23,785 --> 00:30:24,855
+A god package.
+
+533
+00:30:25,355 --> 00:30:29,025
+Anytime someone needed a new type and
+didn't know where it belonged, it went
+
+534
+00:30:29,025 --> 00:30:31,155
+into this fleet package at the bottom.
+
+535
+00:30:31,655 --> 00:30:36,805
+And over time, that large fleet package
+picked up its own dependencies, which
+
+536
+00:30:36,805 --> 00:30:38,275
+were not shown in the previous slide.
+
+537
+00:30:38,305 --> 00:30:40,735
+Otherwise, that slide would blow up.
+
+538
+00:30:41,055 --> 00:30:44,715
+That meant everything that
+imported it picked those up too.
+
+539
+00:30:45,455 --> 00:30:49,075
+This made circular dependencies
+incredibly easy to create and
+
+540
+00:30:49,075 --> 00:30:50,595
+incredibly hard to understand.
+
+541
+00:30:51,465 --> 00:30:54,485
+That fleet package existed
+to make things easier, but it
+
+542
+00:30:54,515 --> 00:30:56,045
+ended up doing the opposite.
+
+543
+00:30:56,545 --> 00:30:58,376
+At that point, it became clear.
+
+544
+00:30:58,825 --> 00:31:01,605
+We couldn't just extract a
+bounded context right away.
+
+545
+00:31:01,795 --> 00:31:03,056
+We were missing a layer.
+
+546
+00:31:03,666 --> 00:31:07,395
+Before we could pull anything
+out, we needed the platform layer.
+
+547
+00:31:08,315 --> 00:31:12,525
+Code that handled infrastructure
+concerns, HTTP helpers, database
+
+548
+00:31:12,525 --> 00:31:17,395
+wiring, middleware, without dragging
+domain assumptions along with it.
+
+549
+00:31:17,855 --> 00:31:20,395
+We needed to differentiate
+between two types of code.
+
+550
+00:31:21,016 --> 00:31:26,865
+We needed domain code that should express
+business rules and then platform code that
+
+551
+00:31:26,865 --> 00:31:29,405
+should make those rules possible to run.
+
+552
+00:31:29,905 --> 00:31:34,486
+So just to clarify, we do want
+modules to reuse common code.
+
+553
+00:31:34,725 --> 00:31:37,736
+We don't want every bounded
+context team reinventing HTTP
+
+554
+00:31:37,736 --> 00:31:38,975
+helpers or database plumbing.
+
+555
+00:31:39,566 --> 00:31:42,615
+But reuse without
+boundaries creates coupling.
+
+556
+00:31:42,916 --> 00:31:45,145
+And coupling was the thing
+we were trying to escape.
+
+557
+00:31:45,496 --> 00:31:49,566
+Before we could modularize the domain,
+we had to modularize the foundation.
+
+558
+00:31:50,066 --> 00:31:53,926
+Another issue we had to solve from our
+first attempt was that even with good
+
+559
+00:31:53,926 --> 00:31:59,626
+communication, even with ADRs, even with
+documentation, even with buy-in, nothing
+
+560
+00:31:59,626 --> 00:32:02,196
+stops coupling from sneaking back in.
+
+561
+00:32:02,696 --> 00:32:06,276
+Especially in a large code base, and
+especially nowadays when changes aren't
+
+562
+00:32:06,306 --> 00:32:10,556
+only written by humans, but also by AI
+coding agents that optimize for make
+
+563
+00:32:10,556 --> 00:32:13,066
+it work and not preserve architecture.
+
+564
+00:32:13,686 --> 00:32:16,736
+Architecture that lives only in
+people's heads doesn't scale,
+
+565
+00:32:16,976 --> 00:32:18,176
+and it doesn't survive time.
+
+566
+00:32:18,676 --> 00:32:23,016
+That's why we realized we needed
+architectural checks, automated checks
+
+567
+00:32:23,016 --> 00:32:27,296
+that run continuously, checks that don't
+care who wrote the code, human or AI.
+
+568
+00:32:27,856 --> 00:32:32,266
+Specifically, we needed checks to
+enforce boundaries, which packages
+
+569
+00:32:32,266 --> 00:32:36,036
+can depend on which, what the platform
+layer is allowed to know, what a bounded
+
+570
+00:32:36,036 --> 00:32:38,116
+context is not allowed to import.
+
+571
+00:32:38,556 --> 00:32:43,006
+Because once those rules are explicit,
+they stop being simply opinions.
+
+572
+00:32:43,006 --> 00:32:44,416
+They become executable.
+
+573
+00:32:44,916 --> 00:32:47,346
+I try to read a lot of books,
+and this is one of them.
+
+574
+00:32:47,926 --> 00:32:51,356
+This-- There's a term for this
+in Building Evo-Evolutionary
+
+575
+00:32:51,356 --> 00:32:53,476
+Architectures by Neal Ford and others.
+
+576
+00:32:53,976 --> 00:32:56,716
+They call these checks
+architecture fitness functions.
+
+577
+00:32:57,376 --> 00:33:01,886
+The idea is this: if an architectural
+property matters, like modularity
+
+578
+00:33:01,886 --> 00:33:05,626
+or oscillation or direction of
+dependencies, you should be able to test
+
+579
+00:33:05,626 --> 00:33:08,256
+it, not just once, but continuously.
+
+580
+00:33:08,696 --> 00:33:11,536
+If the test fails, the
+architecture failed, even if
+
+581
+00:33:11,666 --> 00:33:13,236
+all other unit tests are green.
+
+582
+00:33:13,736 --> 00:33:14,176
+All right.
+
+583
+00:33:14,456 --> 00:33:15,896
+All of this tooling is important.
+
+584
+00:33:16,295 --> 00:33:19,516
+Next, let's talk about what
+we learned from the pilot.
+
+585
+00:33:20,016 --> 00:33:20,326
+All right.
+
+586
+00:33:20,666 --> 00:33:21,926
+We completed the pilot.
+
+587
+00:33:22,536 --> 00:33:28,506
+Not a proposal, not a design, actual code
+running in production with real usage.
+
+588
+00:33:29,015 --> 00:33:34,395
+A single bounded context, activity audit,
+extracted from a ten-year monolith.
+
+589
+00:33:34,895 --> 00:33:35,346
+Great.
+
+590
+00:33:35,846 --> 00:33:38,246
+At that point, it stopped
+being a question of intent.
+
+591
+00:33:38,555 --> 00:33:40,856
+We could actually look at the results.
+
+592
+00:33:41,356 --> 00:33:42,946
+And the answer is, it worked.
+
+593
+00:33:43,366 --> 00:33:46,276
+Not in a clean, predictable
+way we imagined at the start.
+
+594
+00:33:46,776 --> 00:33:51,116
+It validated the direction, and it also
+exposed a lot of things we didn't expect.
+
+595
+00:33:51,616 --> 00:33:55,276
+Some parts become simpler, some
+parts became clearer, and some parts
+
+596
+00:33:55,276 --> 00:33:58,595
+became more complicated, which is
+exactly what you want from a pilot.
+
+597
+00:33:59,066 --> 00:34:01,026
+Not confirmation, but reality.
+
+598
+00:34:01,526 --> 00:34:04,826
+What changed most was the discussion
+stopped being theoretical.
+
+599
+00:34:05,406 --> 00:34:09,266
+We were no longer debating whether bounded
+context could exist in this code base.
+
+600
+00:34:09,646 --> 00:34:10,616
+We had one.
+
+601
+00:34:10,786 --> 00:34:14,086
+We could look at the package boundaries,
+the imports, the tests, the CI
+
+602
+00:34:14,086 --> 00:34:15,415
+workflow, the dependency wiring.
+
+603
+00:34:16,266 --> 00:34:17,696
+That shifted the conversation.
+
+604
+00:34:17,735 --> 00:34:21,005
+The problem was no longer
+is modularization possible?
+
+605
+00:34:21,376 --> 00:34:26,216
+Problem became, what patterns actually
+hold up when you do it for real?
+
+606
+00:34:26,716 --> 00:34:29,266
+One of the more interesting
+outcomes was bugs.
+
+607
+00:34:30,136 --> 00:34:36,666
+Refactoring did not just reduce risk,
+it revealed risk that we already had.
+
+608
+00:34:37,286 --> 00:34:40,876
+As we pulled the activity context
+apart from the monolith, we
+
+609
+00:34:40,876 --> 00:34:45,226
+started seeing assumptions- That
+had never been made explicit.
+
+610
+00:34:45,646 --> 00:34:50,006
+Rules that existed in our documentation,
+but not consistently in code.
+
+611
+00:34:50,376 --> 00:34:53,546
+Edge cases that had been
+hidden inside legacy flows.
+
+612
+00:34:54,126 --> 00:34:59,726
+In one case, we found we were violating
+rollback access control rules, RBAC,
+
+613
+00:35:00,186 --> 00:35:01,876
+that we had publicly documented.
+
+614
+00:35:02,376 --> 00:35:05,306
+In another, we found an edge
+case that cut against our claims
+
+615
+00:35:05,306 --> 00:35:06,636
+of visibility and transparency.
+
+616
+00:35:07,296 --> 00:35:12,436
+A canceled operation could end up
+deleting past activity record, including
+
+617
+00:35:12,436 --> 00:35:14,486
+who requested that original operation.
+
+618
+00:35:14,986 --> 00:35:17,196
+And those were not new
+bugs created by the pilot.
+
+619
+00:35:17,196 --> 00:35:22,116
+They were old bugs that became easier
+to see once the boundaries were clearer.
+
+620
+00:35:22,616 --> 00:35:26,876
+That was one of the strongest signals that
+this refactor was doing something real.
+
+621
+00:35:27,406 --> 00:35:29,226
+It was not just moving files around.
+
+622
+00:35:29,456 --> 00:35:34,836
+It was forcing the system to say more
+precisely what the behavior actually was.
+
+623
+00:35:35,336 --> 00:35:39,326
+Another strong signal that this approach
+works came from something ordinary.
+
+624
+00:35:39,826 --> 00:35:42,656
+This internal package, internal directory.
+
+625
+00:35:43,476 --> 00:35:48,386
+Code outside that bound- boundary
+simply cannot import the implementation.
+
+626
+00:35:48,886 --> 00:35:52,136
+The boundary is this whole directory,
+the se- service activity directory.
+
+627
+00:35:52,636 --> 00:35:55,696
+So in Go, internal is
+enforced by the compiler.
+
+628
+00:35:56,056 --> 00:36:01,696
+If you could put code inside
+it, nothing outside this part
+
+629
+00:36:01,696 --> 00:36:03,096
+of the code base can import it.
+
+630
+00:36:03,686 --> 00:36:06,156
+No conventions, no code review
+rules, no "Please don't do
+
+631
+00:36:06,156 --> 00:36:08,086
+this," it just fails to compile.
+
+632
+00:36:08,586 --> 00:36:11,956
+Why I bring this up is because a
+lot of architectural boundaries
+
+633
+00:36:11,956 --> 00:36:13,416
+are softer than they look.
+
+634
+00:36:13,736 --> 00:36:17,746
+They depend on engineers remembering
+the rules, reviewers noticing
+
+635
+00:36:17,746 --> 00:36:21,106
+violations, and everyone continuing
+to agree on the structure.
+
+636
+00:36:21,836 --> 00:36:24,786
+Internal removes that
+entire class of failure.
+
+637
+00:36:25,206 --> 00:36:28,856
+It means another bounded context cannot
+reach into your service implementation
+
+638
+00:36:28,856 --> 00:36:30,016
+just because it's convenient.
+
+639
+00:36:30,546 --> 00:36:33,206
+It cannot pull your MySQL layer directly.
+
+640
+00:36:33,206 --> 00:36:35,966
+It can't quietly start
+depending on internals that
+
+641
+00:36:35,966 --> 00:36:37,236
+were supposed to stay private.
+
+642
+00:36:37,736 --> 00:36:42,056
+The compiler stops it, and in a large
+code base, that's a big difference.
+
+643
+00:36:42,346 --> 00:36:45,456
+At that po- point, the boundary is
+no longer just something written
+
+644
+00:36:45,456 --> 00:36:49,736
+in an ADR or drawn on a slide,
+it is part of the program itself.
+
+645
+00:36:50,026 --> 00:36:51,756
+You can't cross it accidentally.
+
+646
+00:36:52,256 --> 00:36:56,076
+Another pattern that proved useful
+was the bootstrap layer over here.
+
+647
+00:36:56,576 --> 00:37:01,706
+Each bounded context has a single
+entry point, a bootstrap.new function.
+
+648
+00:37:02,566 --> 00:37:05,836
+That's the only place where
+dependencies are wired together.
+
+649
+00:37:06,276 --> 00:37:09,326
+From the outside, you don't see the
+internal structure, you don't know
+
+650
+00:37:09,326 --> 00:37:13,626
+about the database implementation of the
+service internals, you just get a fully
+
+651
+00:37:13,626 --> 00:37:16,641
+constructed Bounded context service.
+
+652
+00:37:17,361 --> 00:37:20,351
+That sounds small, but it
+simplifies a lot of things.
+
+653
+00:37:20,861 --> 00:37:25,311
+Testing becomes easier, integration
+becomes predictable, and r- it reinforces
+
+654
+00:37:25,311 --> 00:37:30,801
+the idea that a bounded context is a
+unit, not just a collection of packages.
+
+655
+00:37:31,301 --> 00:37:35,171
+It gives us one consistent way to
+instantiate the bounded context
+
+656
+00:37:35,351 --> 00:37:37,251
+in both production and tests.
+
+657
+00:37:37,821 --> 00:37:39,441
+That was a bigger deal than I expected.
+
+658
+00:37:39,851 --> 00:37:42,931
+Without a single composition
+root, dependency wiring tends to
+
+659
+00:37:42,931 --> 00:37:44,901
+spread across the cal- codebase.
+
+660
+00:37:45,381 --> 00:37:48,661
+Different entry points start assembling
+slightly different versions of the same
+
+661
+00:37:48,661 --> 00:37:53,071
+thing, and then it becomes harder to tell
+whe- whether different environments are
+
+662
+00:37:53,071 --> 00:37:55,221
+really exercising the same code path.
+
+663
+00:37:55,801 --> 00:37:59,131
+Keeping that wiring in one place
+removed a lot of that ambiguity.
+
+664
+00:37:59,631 --> 00:38:02,711
+We introduced an anti-corruption
+layer between the new context
+
+665
+00:38:02,771 --> 00:38:03,771
+and the legacy system.
+
+666
+00:38:04,561 --> 00:38:08,281
+Now, we covered this part earlier,
+and this was the first time we
+
+667
+00:38:08,281 --> 00:38:09,981
+applied it in this codebase.
+
+668
+00:38:10,631 --> 00:38:14,951
+With the ACL, those calls moved
+behind a single interface.
+
+669
+00:38:15,831 --> 00:38:21,641
+That interface listed exactly what the
+new bounded context depended on, right?
+
+670
+00:38:21,971 --> 00:38:27,061
+We could point to methods, not
+categories or concepts, actual functions.
+
+671
+00:38:27,691 --> 00:38:31,931
+Most of them already existed in a legacy
+system, but we also had to add a couple
+
+672
+00:38:31,931 --> 00:38:34,261
+new methods to support this interface.
+
+673
+00:38:34,761 --> 00:38:36,041
+That addition was useful.
+
+674
+00:38:36,261 --> 00:38:40,401
+It forced us to be explicit
+about a dependency that would
+
+675
+00:38:40,401 --> 00:38:42,361
+have otherwise stayed implicit.
+
+676
+00:38:43,191 --> 00:38:46,341
+At that point, the ACL became
+easier to reason about.
+
+677
+00:38:46,751 --> 00:38:50,121
+If you want to understand how this
+context interacts with the rest of the
+
+678
+00:38:50,121 --> 00:38:52,481
+system, you just read this interface.
+
+679
+00:38:53,231 --> 00:38:56,241
+And it also gives us a
+simple way to track progress.
+
+680
+00:38:56,811 --> 00:39:01,221
+Every method in this ACL is a
+dependency on the legacy system.
+
+681
+00:39:01,861 --> 00:39:03,861
+Fewer methods means less coupling.
+
+682
+00:39:04,201 --> 00:39:07,441
+More methods means the
+boundary still needs some work.
+
+683
+00:39:07,941 --> 00:39:10,941
+That interface gave us a much
+clearer definition of done.
+
+684
+00:39:11,501 --> 00:39:14,431
+The goal was not to build an
+impressive ACL, the goal was
+
+685
+00:39:14,431 --> 00:39:16,711
+keep that interface narrow.
+
+686
+00:39:17,231 --> 00:39:21,491
+If the activity context needed five
+or six methods from legacy code, fine.
+
+687
+00:39:22,051 --> 00:39:25,071
+If it kept growing, that was a signal.
+
+688
+00:39:25,421 --> 00:39:28,831
+Either the boundary was wrong or
+we were still dragging too much
+
+689
+00:39:28,831 --> 00:39:30,781
+of the monolith through that seam.
+
+690
+00:39:31,481 --> 00:39:35,151
+In that sense, the ACL was not just
+a bridge, it was a measurement point.
+
+691
+00:39:35,651 --> 00:39:39,410
+We also changed how CI, continuous
+integration, works for this code.
+
+692
+00:39:39,831 --> 00:39:43,840
+Instead of running everything on every
+change, the activity context has its
+
+693
+00:39:43,891 --> 00:39:46,541
+own workflow, its own CI workflow.
+
+694
+00:39:46,910 --> 00:39:50,090
+It only runs when files
+in that context change.
+
+695
+00:39:50,590 --> 00:39:55,171
+That had an effect on both sides
+of the system For the new bounded
+
+696
+00:39:55,171 --> 00:39:57,041
+context, the signal is clear.
+
+697
+00:39:57,261 --> 00:40:00,751
+If something fails, it is in
+the activity-bounded context.
+
+698
+00:40:01,091 --> 00:40:02,931
+There's no ambiguity about where to look.
+
+699
+00:40:03,311 --> 00:40:05,561
+For the legacy code base, it also helped.
+
+700
+00:40:06,261 --> 00:40:10,831
+We removed activity-related tests from
+the main test suite, so the remaining
+
+701
+00:40:10,831 --> 00:40:15,191
+tests run slightly faster, and there's
+less noise from unrelated failures.
+
+702
+00:40:15,691 --> 00:40:19,091
+That separation is small but
+noticeable, and more importantly,
+
+703
+00:40:19,091 --> 00:40:20,730
+it reflects the architecture.
+
+704
+00:40:21,331 --> 00:40:25,330
+The code is split, and now the
+feedback loops are split as well.
+
+705
+00:40:25,830 --> 00:40:28,250
+That sounds operational,
+but it changed behavior.
+
+706
+00:40:28,640 --> 00:40:32,880
+When the team sees a failure tied
+to its own context, ownership is
+
+707
+00:40:32,880 --> 00:40:37,040
+clear, and when unrelated failures
+stop showing up in the same workflow,
+
+708
+00:40:37,290 --> 00:40:39,620
+people spend less time triaging noise.
+
+709
+00:40:40,180 --> 00:40:43,270
+The architecture becomes visible
+not just in the code layout,
+
+710
+00:40:43,530 --> 00:40:45,540
+but in the daily developer loop.
+
+711
+00:40:46,040 --> 00:40:48,050
+We also added architecture tests.
+
+712
+00:40:48,500 --> 00:40:51,260
+They define which packages
+are allowed to import which.
+
+713
+00:40:51,760 --> 00:40:53,940
+Each bounded context has an allow list.
+
+714
+00:40:54,310 --> 00:40:57,950
+If a package pulls in something
+outside that list, the test fails.
+
+715
+00:40:58,630 --> 00:41:01,191
+That check runs in CI
+just like any other test.
+
+716
+00:41:01,521 --> 00:41:05,981
+So if someone or an AI agent
+introduces a new dependency across
+
+717
+00:41:05,981 --> 00:41:08,161
+a boundary, it shows up immediately.
+
+718
+00:41:08,711 --> 00:41:11,920
+There's no need to catch it in
+a review, and it doesn't rely
+
+719
+00:41:11,920 --> 00:41:13,871
+on people remembering the rules.
+
+720
+00:41:14,231 --> 00:41:16,211
+The constraint is in the code.
+
+721
+00:41:16,711 --> 00:41:21,641
+Taken together, internal, the ACL,
+the bootstrap layer, the dedicated
+
+722
+00:41:21,641 --> 00:41:25,331
+CI workflow, and the architecture
+tests did something important.
+
+723
+00:41:25,681 --> 00:41:30,411
+They turned the bounded context from
+simply a clean directory structure
+
+724
+00:41:30,411 --> 00:41:34,031
+into something we could enforce,
+test, and operate separately.
+
+725
+00:41:34,811 --> 00:41:39,411
+That is a much stronger result
+than, "The code looks nicer." But
+
+726
+00:41:39,451 --> 00:41:42,581
+it's important to be clear about
+what this pilot did not solve.
+
+727
+00:41:43,321 --> 00:41:45,091
+We did not modularize the system.
+
+728
+00:41:45,691 --> 00:41:47,751
+We modularized a small part of it.
+
+729
+00:41:48,251 --> 00:41:49,941
+Most of the monolith is still there.
+
+730
+00:41:50,311 --> 00:41:52,051
+Most boundaries are still undefined.
+
+731
+00:41:52,431 --> 00:41:55,601
+We still have shared concepts
+that don't map cleanly to a single
+
+732
+00:41:55,601 --> 00:42:00,451
+context, and we still have open
+questions about how these contexts
+
+733
+00:42:00,451 --> 00:42:02,611
+will interact as the system grows.
+
+734
+00:42:03,421 --> 00:42:05,101
+So this is not a finished architecture.
+
+735
+00:42:05,431 --> 00:42:07,021
+It is a validated direction.
+
+736
+00:42:07,521 --> 00:42:09,511
+Where we are now is
+somewhere in the middle.
+
+737
+00:42:10,111 --> 00:42:13,251
+We've completed one bounded
+context, and now we're figuring
+
+738
+00:42:13,251 --> 00:42:15,151
+out how to do the next ones.
+
+739
+00:42:15,891 --> 00:42:18,581
+The next likely candidates are
+user management and certificate
+
+740
+00:42:18,581 --> 00:42:20,521
+management, and those are harder.
+
+741
+00:42:20,881 --> 00:42:24,091
+Activity was a good pilot because
+it was more self-contained.
+
+742
+00:42:24,681 --> 00:42:28,671
+User management and certificate management
+sit closer to the center of the system.
+
+743
+00:42:29,121 --> 00:42:32,191
+They touch more workflows, more
+teams, and more legacy code.
+
+744
+00:42:32,781 --> 00:42:37,641
+So the next phase is not just repeating
+what we already did, it is applying
+
+745
+00:42:37,641 --> 00:42:41,021
+the same ideas in parts of the
+monolith where the boundaries are less
+
+746
+00:42:41,021 --> 00:42:43,386
+obvious and the coupling is heavier.
+
+747
+00:42:43,886 --> 00:42:45,486
+But the uncertainty is different now.
+
+748
+00:42:45,876 --> 00:42:48,266
+We're no longer asking
+whether this can work.
+
+749
+00:42:48,596 --> 00:42:49,476
+We've seen it work.
+
+750
+00:42:49,866 --> 00:42:54,546
+Now the problem is scaling it carefully
+without breaking what already exists.
+
+751
+00:42:55,046 --> 00:42:55,506
+All right.
+
+752
+00:42:56,006 --> 00:42:58,846
+Let's circle back to the core
+problem we're trying to solve.
+
+753
+00:42:59,346 --> 00:43:02,046
+Looking back, the real
+constraint wasn't Go.
+
+754
+00:43:02,546 --> 00:43:03,586
+It wasn't MySQL.
+
+755
+00:43:03,756 --> 00:43:05,116
+It wasn't even the monolith.
+
+756
+00:43:05,506 --> 00:43:07,606
+The real constraint was human attention.
+
+757
+00:43:08,166 --> 00:43:11,746
+How much of the system can
+one people hold in their head?
+
+758
+00:43:12,266 --> 00:43:14,766
+How much confidently
+can they make a change?
+
+759
+00:43:14,996 --> 00:43:18,906
+And how much unrelated context they
+have to load just to get started?
+
+760
+00:43:19,406 --> 00:43:24,115
+Once a system grows beyond that
+limit, progress slows, no matter
+
+761
+00:43:24,115 --> 00:43:25,825
+how good the engineers are.
+
+762
+00:43:26,325 --> 00:43:29,295
+We often talk about architecture
+as if it's for computers.
+
+763
+00:43:29,555 --> 00:43:32,475
+But computers don't care
+how big your code base is.
+
+764
+00:43:32,905 --> 00:43:33,615
+Humans do.
+
+765
+00:43:34,145 --> 00:43:36,745
+Architecture is really
+an interface for people.
+
+766
+00:43:36,935 --> 00:43:41,325
+It defines what you need to understand,
+what you can safely ignore, and
+
+767
+00:43:41,325 --> 00:43:42,685
+what you're allowed to change.
+
+768
+00:43:43,156 --> 00:43:47,305
+When that interface is unclear,
+every change feels risky.
+
+769
+00:43:47,605 --> 00:43:51,575
+When it's clear, people move
+faster, even in a large system.
+
+770
+00:43:52,075 --> 00:43:55,585
+The tricky part is that this
+problem shows up after success.
+
+771
+00:43:56,255 --> 00:44:00,465
+The monolith works, the product
+ships, customers are happy, and
+
+772
+00:44:00,465 --> 00:44:05,905
+slowly, almost invisibly, the
+system becomes harder to change.
+
+773
+00:44:06,725 --> 00:44:08,625
+We're not fixing a broken system.
+
+774
+00:44:08,895 --> 00:44:12,575
+We're fixing a system that
+worked until it didn't.
+
+775
+00:44:13,385 --> 00:44:16,565
+That's why these conversations are
+hard, and that's why they matter.
+
+776
+00:44:17,065 --> 00:44:18,905
+We knew our system had grown too complex.
+
+777
+00:44:19,355 --> 00:44:23,125
+Not complex in an abstract
+sense, complex in a human sense.
+
+778
+00:44:23,506 --> 00:44:26,576
+It had grown beyond what a human
+brain could comfortably hold.
+
+779
+00:44:27,105 --> 00:44:30,385
+Every small change required
+understanding too much at once.
+
+780
+00:44:31,045 --> 00:44:34,916
+At that point, adding rules or
+documentation doesn't fix the problem.
+
+781
+00:44:35,195 --> 00:44:37,475
+You have to change the
+shape of the system.
+
+782
+00:44:37,975 --> 00:44:42,815
+For a long time, I thought the hard part
+was architecture, or code, or tooling.
+
+783
+00:44:43,105 --> 00:44:43,675
+It wasn't.
+
+784
+00:44:44,165 --> 00:44:47,085
+The hardest part was
+alignment with other humans.
+
+785
+00:44:47,505 --> 00:44:50,715
+Shared language, shared
+understanding, shared ownership.
+
+786
+00:44:51,215 --> 00:44:54,025
+Code changes fast, especially
+now with AI agents.
+
+787
+00:44:54,625 --> 00:44:58,775
+Architecture survives only when
+people agree to carry it together.
+
+788
+00:44:59,275 --> 00:45:00,425
+We don't have a clean ending.
+
+789
+00:45:00,515 --> 00:45:01,805
+The work is still moving.
+
+790
+00:45:01,845 --> 00:45:03,815
+Boundaries are still being uncovered.
+
+791
+00:45:03,845 --> 00:45:05,405
+Edge cases are still surfacing.
+
+792
+00:45:05,815 --> 00:45:07,685
+But something important has shifted.
+
+793
+00:45:07,965 --> 00:45:12,455
+The system is starting to feel smaller,
+more defined, easier to follow.
+
+794
+00:45:12,945 --> 00:45:15,935
+And for the first time in a long
+time, the code base is helping us
+
+795
+00:45:15,935 --> 00:45:17,855
+think instead of getting in the way.
+
+796
+00:45:18,355 --> 00:45:20,995
+So if there's one thing I hope you
+take away from this talk, it's this.
+
+797
+00:45:21,755 --> 00:45:24,835
+Modularization isn't really about modules.
+
+798
+00:45:25,135 --> 00:45:27,895
+It's about respecting the
+limits of human attention.
+
+799
+00:45:28,375 --> 00:45:31,415
+It's about designing systems
+that people can understand,
+
+800
+00:45:31,465 --> 00:45:33,555
+trust, and change without fear.
+
+801
+00:45:34,195 --> 00:45:38,076
+Tools matter, patterns matter, but
+architecture lasts only when it's
+
+802
+00:45:38,125 --> 00:45:39,805
+owned by more than one person.
+
+803
+00:45:40,305 --> 00:45:41,345
+That's it for this talk.
+
+804
+00:45:42,205 --> 00:45:45,155
+If this resonated with you, I'd
+be interested to hear from you.
+
+805
+00:45:45,195 --> 00:45:47,715
+How are you approaching similar
+problems in your own systems?
+
+806
+00:45:48,635 --> 00:45:50,735
+Details are different, but
+the patterns usually aren't.
+
+807
+00:45:50,865 --> 00:45:53,375
+Here's a few links to Fleet, my company.
+
+808
+00:45:53,435 --> 00:45:55,025
+This QR code goes to our webpage.
+
+809
+00:45:55,745 --> 00:45:58,345
+We are hiring developers, Go developers.
+
+810
+00:45:58,515 --> 00:46:01,155
+And then you can, there's
+links, you can find me.
+
+811
+00:46:01,456 --> 00:46:03,315
+Feel free to connect with me on LinkedIn.
+
+812
+00:46:03,815 --> 00:46:04,606
+Thank you for listening.
+
