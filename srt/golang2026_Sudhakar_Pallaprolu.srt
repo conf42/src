@@ -1,0 +1,932 @@
+1
+00:00:01,069 --> 00:00:01,810
+Speaker 16: Hello, everyone.
+
+2
+00:00:02,389 --> 00:00:03,500
+Thank you for joining me.
+
+3
+00:00:03,679 --> 00:00:07,460
+My name is Sudhakar Palapralu, and
+I'm really glad to be part of Conf
+
+4
+00:00:07,460 --> 00:00:08,819
+forty-two Golic twenty twenty-six.
+
+5
+00:00:09,630 --> 00:00:12,720
+Over the next fifteen minutes, I want
+to talk about something that sits
+
+6
+00:00:12,720 --> 00:00:16,099
+right at the intersection of cloud
+operations and engineering discipline,
+
+7
+00:00:16,790 --> 00:00:20,960
+autonomous cloud infrastructure, and how
+we build self-healing systems with Go.
+
+8
+00:00:22,029 --> 00:00:24,970
+If you run anything in production
+today, you already know the truth.
+
+9
+00:00:25,120 --> 00:00:26,650
+System do not fail politely.
+
+10
+00:00:26,849 --> 00:00:30,699
+They fail three-- at 3:00 in the
+morning, they fail in cascades,
+
+11
+00:00:30,699 --> 00:00:33,469
+and they fail faster than any
+on-call engineer can respond.
+
+12
+00:00:34,129 --> 00:00:38,189
+So the question I want us to sit
+with today is a simple one: What
+
+13
+00:00:38,189 --> 00:00:42,289
+would it take for our infrastructure
+to detect, diagnose and repair
+
+14
+00:00:42,289 --> 00:00:44,399
+itself without wanting for a human?
+
+15
+00:00:45,120 --> 00:00:49,329
+To answer that, let us start with the
+problem we're actually trying to solve.
+
+16
+00:00:53,359 --> 00:00:55,229
+Unplanned downtime is expensive.
+
+17
+00:00:55,489 --> 00:00:59,559
+Every minute our infrastructure goes
+dark, you will lose revenue, customer
+
+18
+00:00:59,680 --> 00:01:05,400
+trust, and the engineering hours that
+should have gone into building things.
+
+19
+00:01:06,379 --> 00:01:11,100
+In cloud-native environments, unplanned
+downtime remains one of the most costly
+
+20
+00:01:11,139 --> 00:01:12,670
+operational failures we deal with.
+
+21
+00:01:13,570 --> 00:01:15,619
+Manual response is simply too slow.
+
+22
+00:01:16,100 --> 00:01:20,279
+With a human in the loop for every
+remediation step, we are capped by
+
+23
+00:01:20,279 --> 00:01:25,010
+human reaction time, and distributed
+systems do not wait for human
+
+24
+00:01:25,319 --> 00:01:27,960
+intervention for each remediation step.
+
+25
+00:01:28,039 --> 00:01:32,319
+So by the time someone reads
+the alert and opens Runbook,
+
+26
+00:01:32,400 --> 00:01:33,789
+the failure has already moved.
+
+27
+00:01:35,050 --> 00:01:38,550
+A modern Golang-based generally
+is not a single service.
+
+28
+00:01:38,769 --> 00:01:44,870
+It is dozens of interdependent
+microservices, and a failure on one of
+
+29
+00:01:44,870 --> 00:01:50,010
+them spreads across all of them, the
+dependency-- entire dependency graph
+
+30
+00:01:50,100 --> 00:01:52,449
+before even detection even occurs.
+
+31
+00:01:53,039 --> 00:02:01,179
+The window between an incident happening
+and it is being actually resolved, that is
+
+32
+00:02:01,179 --> 00:02:04,150
+the self-healing system tries to address.
+
+33
+00:02:04,779 --> 00:02:06,639
+So that is their goal.
+
+34
+00:02:06,950 --> 00:02:08,319
+So how do we get there?
+
+35
+00:02:08,349 --> 00:02:10,900
+Let me show you the path we will take.
+
+36
+00:02:17,110 --> 00:02:18,659
+This is what we will cover today.
+
+37
+00:02:19,479 --> 00:02:20,070
+The problem.
+
+38
+00:02:20,130 --> 00:02:24,319
+So why traditional operations model
+break under distributed and cloud-native
+
+39
+00:02:24,319 --> 00:02:31,559
+load, and how AOPs framework like the
+ML and predictive analytics automate
+
+40
+00:02:31,559 --> 00:02:33,460
+the incident lifecycle management.
+
+41
+00:02:33,939 --> 00:02:36,849
+And we will go deeper into the
+architecture layers like the
+
+42
+00:02:36,849 --> 00:02:41,820
+observability layer and the telemetry
+that feeds the observability layer
+
+43
+00:02:41,820 --> 00:02:48,169
+and the actual control plane that we
+need to build in Go to enable this.
+
+44
+00:02:48,870 --> 00:02:52,329
+And then we will go from there to
+policy-driven arc-orchestration
+
+45
+00:02:53,210 --> 00:02:56,250
+instead of from simple provisioning
+to closed-loop automation.
+
+46
+00:02:56,680 --> 00:03:01,050
+And then we will see what are all the
+tools available currently and what we need
+
+47
+00:03:01,050 --> 00:03:03,690
+to enhance from there and key takeaways.
+
+48
+00:03:07,229 --> 00:03:12,159
+AIOps adoption has accelerated,
+uh, uh, very rapidly in recent
+
+49
+00:03:12,159 --> 00:03:16,000
+times, enabling engineering teams
+to move beyond reactive operations.
+
+50
+00:03:16,029 --> 00:03:20,609
+The autonomous enterprise is defined
+by infrastructure that detects,
+
+51
+00:03:20,609 --> 00:03:25,699
+diagnoses, and repairs itself without,
+uh, waiting for human intervention.
+
+52
+00:03:26,419 --> 00:03:30,630
+So there are three key pillars
+that we need to, uh, discuss.
+
+53
+00:03:30,730 --> 00:03:35,150
+So first is detecting the, uh, issue.
+
+54
+00:03:35,330 --> 00:03:42,220
+So real-time anomaly det-detection, uh,
+requires signals that we can, uh, that
+
+55
+00:03:42,220 --> 00:03:44,620
+the system can, uh, actually look into.
+
+56
+00:03:44,760 --> 00:03:49,729
+So which are logs, metrics, and
+traces across the microservices
+
+57
+00:03:49,729 --> 00:03:52,310
+that, uh, uh, the system has.
+
+58
+00:03:53,780 --> 00:03:56,479
+The second pillar is
+diagnosing the root cause.
+
+59
+00:03:56,690 --> 00:04:02,830
+So here, uh, instead of looking
+at, uh, the logs, metrics, and
+
+60
+00:04:02,830 --> 00:04:09,870
+traces, uh, by a human at an
+individual, uh, m-microservice level.
+
+61
+00:04:10,679 --> 00:04:18,789
+So the ML-based, uh, ML-driven root cause
+analysis can look at all the data that,
+
+62
+00:04:18,970 --> 00:04:25,260
+uh, the observability layer, uh, which has
+basically the logs, metrics, and traces
+
+63
+00:04:26,080 --> 00:04:34,039
+to get to the root cause of the issue
+across all these, uh, signals that we get.
+
+64
+00:04:34,819 --> 00:04:37,929
+So this is where the main advantage lies.
+
+65
+00:04:38,029 --> 00:04:44,599
+And the remediate phase is where
+the automated but policy-gated
+
+66
+00:04:44,599 --> 00:04:49,629
+responses that restore service
+without, uh, human escalation.
+
+67
+00:04:52,219 --> 00:04:57,239
+Now, I would like to talk about,
+uh, Go's advantage in the pipeline.
+
+68
+00:04:57,420 --> 00:05:03,249
+So as you can see, the pipeline can--
+has detection, analysis, and remediation
+
+69
+00:05:03,249 --> 00:05:08,839
+phase along with the continuous loop of
+learning from past incidents resolution.
+
+70
+00:05:09,599 --> 00:05:16,280
+So here, the pipeline only works if,
+if the underlying pipeline can read
+
+71
+00:05:16,829 --> 00:05:22,409
+high volume telemetry streaming data
+and can process that information
+
+72
+00:05:22,579 --> 00:05:24,429
+very, in a very responsive manner.
+
+73
+00:05:25,330 --> 00:05:30,850
+That's where Go's concurrency model,
+uh, uh, and Go routines, channels,
+
+74
+00:05:30,850 --> 00:05:34,929
+and context propagation make it
+particularly well-suited for building
+
+75
+00:05:34,970 --> 00:05:40,229
+this pipeline, as the Go routines
+genuinely well-suited for this.
+
+76
+00:05:40,459 --> 00:05:45,179
+So because it lets you fan out across
+thousands of concurrent signals,
+
+77
+00:05:45,939 --> 00:05:50,220
+and then the channels let you pass
+the information between the phases
+
+78
+00:05:50,400 --> 00:05:56,329
+cleanly, and the context propagation,
+uh, cancel the particular Pipeline--
+
+79
+00:05:56,329 --> 00:05:58,879
+incident of the pipeline and issues.
+
+80
+00:05:58,879 --> 00:06:03,880
+That is why Go is more suited
+for low latency AIOps pipelines.
+
+81
+00:06:07,900 --> 00:06:16,489
+By saying that Go has an advantage, uh,
+but it requires the, uh, foundational data
+
+82
+00:06:16,489 --> 00:06:22,069
+with high quality so that it can process
+the information properly and identify the
+
+83
+00:06:22,069 --> 00:06:25,319
+issues and remediate, uh, the problems.
+
+84
+00:06:26,030 --> 00:06:32,430
+So the, uh, foundational data
+observ-observability layer, uh, needs
+
+85
+00:06:32,770 --> 00:06:42,110
+few, uh, high-quality data, uh, which,
+uh, you can, uh, use open telemetry with
+
+86
+00:06:42,110 --> 00:06:48,250
+Go services and, uh, have these three
+types of, uh, in-- uh, logs or metrics
+
+87
+00:06:48,250 --> 00:06:50,970
+that you can, uh, feed into that pipeline.
+
+88
+00:06:51,840 --> 00:06:55,290
+So the first is the structured logs.
+
+89
+00:06:55,419 --> 00:07:00,310
+So the logs should be machine,
+uh, parsable event streams
+
+90
+00:07:00,340 --> 00:07:02,079
+for correlation at scale.
+
+91
+00:07:02,709 --> 00:07:10,659
+So when a, uh, machine learning model,
+uh, sees the, uh, data, it needs
+
+92
+00:07:10,659 --> 00:07:14,890
+to be parsable by the, uh, system.
+
+93
+00:07:15,079 --> 00:07:21,020
+So the second is the time series
+metrics, so latency, error rates,
+
+94
+00:07:21,020 --> 00:07:22,520
+and then saturation signals.
+
+95
+00:07:22,549 --> 00:07:27,749
+So these are the ones which are driving
+the, uh, alerting, uh, thresholds,
+
+96
+00:07:28,280 --> 00:07:30,170
+and then, uh, the distributed traces.
+
+97
+00:07:30,280 --> 00:07:37,560
+So if for a particular user, if you,
+uh, see-- if, if, if you want to trace
+
+98
+00:07:37,560 --> 00:07:44,340
+a transaction of a particular user, you
+will go from a microservice, uh, to the
+
+99
+00:07:44,340 --> 00:07:48,719
+entire dependency graph, how it flows
+through, uh, where is the bottleneck.
+
+100
+00:07:49,280 --> 00:07:52,450
+All those details will be
+through these distributed traces.
+
+101
+00:07:52,509 --> 00:07:58,960
+So these three key, uh, details are
+required for the pipeline to have a
+
+102
+00:07:59,350 --> 00:08:04,520
+complete picture of, uh, what's happening
+in the system, and then the anomaly
+
+103
+00:08:04,520 --> 00:08:10,679
+detection AI engine can, uh, really
+see and, uh, do the diagnosis well.
+
+104
+00:08:12,520 --> 00:08:17,740
+Now that we have seen the, uh, the
+foundational layer, the observability
+
+105
+00:08:17,740 --> 00:08:24,880
+layer, uh, where you collect the, uh,
+traces, logs, and metrics, how to utilize
+
+106
+00:08:24,880 --> 00:08:31,600
+them and how to, uh- build a system that,
+uh, prevents failures before they happen.
+
+107
+00:08:32,350 --> 00:08:37,270
+So here, uh, rather than reacting
+to outages a-after they happen,
+
+108
+00:08:37,449 --> 00:08:41,829
+predictive models analyze leading
+indicators such as... Some examples
+
+109
+00:08:41,829 --> 00:08:46,019
+are like memory pressure, connection
+pool saturation, and disk I/O trends,
+
+110
+00:08:47,019 --> 00:08:52,029
+and, uh, trigger preventive scaling
+or restarts before, uh, any visible
+
+111
+00:08:52,029 --> 00:08:54,720
+impact happens, uh, to the system.
+
+112
+00:08:55,449 --> 00:09:01,630
+You train models, uh, the machine
+learning models on historical data
+
+113
+00:09:01,630 --> 00:09:07,849
+from Go service telemetry and use
+sliding, uh, window aggregations to
+
+114
+00:09:07,849 --> 00:09:09,820
+surface degradation trends early.
+
+115
+00:09:10,599 --> 00:09:14,270
+Just to let you know that
+these are degradation trends
+
+116
+00:09:14,419 --> 00:09:17,680
+rather than, uh, an alert.
+
+117
+00:09:18,259 --> 00:09:23,070
+So as you can see, the sliding
+window aggregation, uh, tells
+
+118
+00:09:23,070 --> 00:09:26,890
+you whether the-- there is any
+degradation from the previous window.
+
+119
+00:09:27,619 --> 00:09:31,689
+That is, uh, how you detect them early.
+
+120
+00:09:32,420 --> 00:09:36,679
+And then once you-- once there's a,
+uh, detected, you trigger preemptive
+
+121
+00:09:36,679 --> 00:09:41,999
+actions like pod restarts or, uh, shift
+the traffic from, uh, one site to other,
+
+122
+00:09:42,230 --> 00:09:47,410
+uh, one node to other node or, uh, one
+site to other site or capacity scaling.
+
+123
+00:09:48,050 --> 00:09:53,270
+And then you continuously retrain
+models as, mm, service behavior evolves.
+
+124
+00:09:53,310 --> 00:09:57,090
+So there might be some, uh,
+developments happen to the
+
+125
+00:09:57,090 --> 00:09:59,960
+microservices or, uh, uh, the trends.
+
+126
+00:10:00,509 --> 00:10:07,020
+So these kind of scenarios, uh, will
+make the predictions stagnant, uh, if you
+
+127
+00:10:07,020 --> 00:10:09,210
+don't continuously retrain the models.
+
+128
+00:10:09,740 --> 00:10:11,840
+That is why it is
+important to retrain them.
+
+129
+00:10:14,490 --> 00:10:21,020
+Now we see, uh, that the orchestration
+models have evolved from simple
+
+130
+00:10:21,020 --> 00:10:25,669
+resource provisioning to fully
+closed-loop automation, where the, uh,
+
+131
+00:10:25,669 --> 00:10:30,430
+systems self-govern based on declared
+intent rather than manual runbooks.
+
+132
+00:10:30,500 --> 00:10:36,060
+So, uh, it used to be simple
+provisioning static IaC templates and
+
+133
+00:10:36,060 --> 00:10:43,029
+manual gates which, uh, uh, evolved
+from-- to event-driven automation,
+
+134
+00:10:43,369 --> 00:10:47,449
+uh, where reactive triggers and,
+uh, alerts and threshold used
+
+135
+00:10:47,449 --> 00:10:50,699
+to, uh, uh, drive the automation.
+
+136
+00:10:51,460 --> 00:10:58,140
+Now the shift is moving to closed-loop
+orchestration, where the policy will
+
+137
+00:10:58,140 --> 00:11:08,289
+be continuously, uh, be, uh, evaluated
+against the, uh, context, the, uh,
+
+138
+00:11:08,289 --> 00:11:13,390
+running, uh, operational context
+at runtime and dispatch corrective
+
+139
+00:11:13,710 --> 00:11:17,850
+ac-actions deterministically, where
+the closed-loop orchestration is
+
+140
+00:11:17,879 --> 00:11:23,250
+governed by AI itself and, uh,
+self-correcting, uh, policy execution
+
+141
+00:11:23,250 --> 00:11:25,049
+will dispatch the corrective actions.
+
+142
+00:11:27,979 --> 00:11:32,920
+Good news is that most of the cloud--
+major cloud platforms have tools that
+
+143
+00:11:33,300 --> 00:11:37,749
+move us towards the autonomous operations.
+
+144
+00:11:38,410 --> 00:11:40,820
+For example, if you take Azure Automanage.
+
+145
+00:11:40,940 --> 00:11:46,099
+So it automates the VM best practices,
+patch management, and configuration drift
+
+146
+00:11:46,780 --> 00:11:49,669
+remediation across the Azure workloads.
+
+147
+00:11:50,239 --> 00:11:56,060
+And if you see AWS Fault Injection
+Simulator, it injects the controlled
+
+148
+00:11:56,060 --> 00:11:59,999
+failures into the production
+grade environments, which will
+
+149
+00:11:59,999 --> 00:12:04,869
+surface the hidden weaknesses in,
+in the platform or the system.
+
+150
+00:12:05,479 --> 00:12:12,139
+So-- and if you look at GCP
+Active Assist, uh, these delivers
+
+151
+00:12:12,299 --> 00:12:17,029
+ML-powered recommendations for cost
+optimization, security posture,
+
+152
+00:12:17,029 --> 00:12:18,470
+and operational efficiency.
+
+153
+00:12:19,179 --> 00:12:24,689
+So if we don't-- in other words,
+the control plane that you
+
+154
+00:12:24,799 --> 00:12:27,040
+are going to write in Golang.
+
+155
+00:12:27,040 --> 00:12:37,229
+So the-- you can use these cloud
+platforms, uh, uh, tools into the control
+
+156
+00:12:37,229 --> 00:12:41,409
+plane that you are going to write, so,
+and treat them as building blocks for
+
+157
+00:12:41,409 --> 00:12:43,259
+the system that you are going to design.
+
+158
+00:12:47,339 --> 00:12:52,729
+So IaC has transformed the operations
+by making the infrastructure
+
+159
+00:12:52,789 --> 00:12:57,860
+reproducible, but next phase moves
+beyond static templates entirely.
+
+160
+00:12:58,419 --> 00:13:01,889
+So the previous slides we have
+seen the tooling that, that is
+
+161
+00:13:01,889 --> 00:13:04,759
+available by major cloud providers.
+
+162
+00:13:05,970 --> 00:13:15,210
+And the below concepts explain how those,
+those can be utilized in the control
+
+163
+00:13:15,210 --> 00:13:17,739
+plane that you are going to architect.
+
+164
+00:13:18,530 --> 00:13:21,160
+So the context-aware configuration.
+
+165
+00:13:21,489 --> 00:13:25,329
+IaC modules consume live
+operational st- signals to modify
+
+166
+00:13:25,329 --> 00:13:27,550
+their own execution behavior.
+
+167
+00:13:28,730 --> 00:13:30,660
+Drift detection and auto- correction.
+
+168
+00:13:30,989 --> 00:13:37,169
+So continuous re-conciliation loops,
+loops written in Go enforce a declared
+
+169
+00:13:37,169 --> 00:13:39,239
+state, reverting unauthorized changes.
+
+170
+00:13:39,410 --> 00:13:43,930
+So any unauthorized changes
+will be reverted through
+
+171
+00:13:43,930 --> 00:13:45,509
+continuous reconciliation here.
+
+172
+00:13:46,379 --> 00:13:47,530
+And policy as code.
+
+173
+00:13:47,640 --> 00:13:52,700
+So the governance is embedded in
+the provisioning pipeline, so any
+
+174
+00:13:52,700 --> 00:13:57,429
+unauthorized deployments or any
+non-compliant deployments will never
+
+175
+00:13:57,429 --> 00:13:59,670
+reach production automatically.
+
+176
+00:14:05,960 --> 00:14:09,690
+As we have come to the end of the
+session, let's look at the key takeaways.
+
+177
+00:14:09,929 --> 00:14:11,960
+Um, build for observability first.
+
+178
+00:14:12,710 --> 00:14:20,419
+So for the self-healing system to work,
+it needs to have high-quality telemetry
+
+179
+00:14:20,419 --> 00:14:25,289
+data, which is complete, structured,
+and machine readable from day one Um,
+
+180
+00:14:25,539 --> 00:14:32,559
+so why it matters is if the system
+doesn't have the complete information
+
+181
+00:14:32,559 --> 00:14:39,519
+that, that it needs to diagnose the
+root cause, then no matter how fast
+
+182
+00:14:39,519 --> 00:14:41,369
+the pipeline is, it doesn't matter.
+
+183
+00:14:41,850 --> 00:14:46,190
+It needs to have high quality, complete
+structured and machine-readable data.
+
+184
+00:14:46,920 --> 00:14:48,690
+So build for observability first.
+
+185
+00:14:49,879 --> 00:14:51,160
+Close the loop with policy.
+
+186
+00:14:51,930 --> 00:14:56,150
+So move from reactive alerting
+to closed-loop orchestration,
+
+187
+00:14:56,839 --> 00:15:04,959
+and let the policy engine govern
+the remediation and, mm, that...
+
+188
+00:15:10,618 --> 00:15:12,348
+Predict, don't just react.
+
+189
+00:15:13,458 --> 00:15:17,329
+Apply ML to leading indicators
+so that infrastructure acts
+
+190
+00:15:17,378 --> 00:15:19,789
+before failures surface to users.
+
+191
+00:15:19,828 --> 00:15:25,109
+So the traditional way of doing
+it is e-even the event-driven.
+
+192
+00:15:25,309 --> 00:15:30,488
+So once the alert comes or once the
+system goes down, then it reacts.
+
+193
+00:15:30,719 --> 00:15:37,899
+So instead of that, use, uh, the AI
+and ML prediction layer to look at
+
+194
+00:15:37,899 --> 00:15:44,118
+the data and alert or identify the
+trend that is worsening over time and
+
+195
+00:15:44,118 --> 00:15:50,048
+then give you a signal before it leads
+to an incident or a major downtime.
+
+196
+00:15:51,868 --> 00:15:53,579
+Let engineers focus on innovation.
+
+197
+00:15:53,769 --> 00:15:59,259
+So these autonomous systems help you
+absorb any operational toil, freeing
+
+198
+00:15:59,259 --> 00:16:05,478
+the teams to build rather than being in
+a firefight to fix the issues once they
+
+199
+00:16:05,478 --> 00:16:06,989
+happen.
+
