@@ -1,0 +1,1707 @@
+1
+00:00:00,317 --> 00:00:03,837
+Speaker 16: Hi, welcome to Conference
+Forty Two's talk, Database DevOps:
+
+2
+00:00:04,057 --> 00:00:05,657
+CD for Stateful Applications.
+
+3
+00:00:06,157 --> 00:00:10,297
+I'm Steven Atwell, a director of product
+at Harness and the product manager
+
+4
+00:00:10,358 --> 00:00:12,237
+behind our Database DevOps product.
+
+5
+00:00:12,737 --> 00:00:15,956
+I've been giving this talk at several
+conferences recently, including
+
+6
+00:00:16,077 --> 00:00:19,376
+Postgres Conf, as well as SRE
+Day in Seattle about a month ago.
+
+7
+00:00:19,876 --> 00:00:23,817
+The team behind Conference Forty Two also
+puts on a series of global meetups called
+
+8
+00:00:23,996 --> 00:00:27,737
+SRE Day, so we're gonna go ahead and use
+the recording from that SRE Day event.
+
+9
+00:00:28,237 --> 00:00:31,298
+This will allow those of you who
+are not able to join us in person
+
+10
+00:00:31,337 --> 00:00:35,438
+in Seattle to still enjoy the
+same content and hear questions as
+
+11
+00:00:35,477 --> 00:00:36,837
+they were asked during the event.
+
+12
+00:00:37,337 --> 00:00:41,678
+If at any point after watching this you
+have questions on database DevOps, you'd
+
+13
+00:00:41,697 --> 00:00:45,598
+like to discuss your use cases, then
+please feel free to reach out to me.
+
+14
+00:00:45,757 --> 00:00:50,257
+I'm happy to dive into those
+questions and help you get answers.
+
+15
+00:00:50,667 --> 00:00:53,597
+And always happy to have a conversation
+with a practitioner in the space.
+
+16
+00:00:54,097 --> 00:00:56,077
+With that, let's go ahead
+and get started on the talk.
+
+17
+00:00:56,577 --> 00:00:56,837
+Speaker 17: Awesome.
+
+18
+00:00:56,877 --> 00:00:58,517
+So as you all heard earlier, I'm Stephen.
+
+19
+00:00:58,817 --> 00:01:00,737
+I'm a product manager at Harness.
+
+20
+00:01:00,837 --> 00:01:03,037
+I work on our database DevOps product.
+
+21
+00:01:03,077 --> 00:01:04,797
+I've been a product
+manager for about a decade.
+
+22
+00:01:04,807 --> 00:01:06,058
+Before that, I was a software engineer.
+
+23
+00:01:06,497 --> 00:01:11,257
+Go back far enough, I was in IT operations
+working as a DBA, working in server
+
+24
+00:01:11,317 --> 00:01:12,607
+support, et cetera, et cetera, et cetera.
+
+25
+00:01:13,338 --> 00:01:15,898
+So in our space, I've probably
+done it at some point.
+
+26
+00:01:16,777 --> 00:01:19,737
+I am going to chain onto
+that Gable AI talk, actually.
+
+27
+00:01:19,857 --> 00:01:23,477
+I'm gonna be talking about making
+a database schema change, and
+
+28
+00:01:23,517 --> 00:01:27,357
+we're gonna be using a real world
+app that one of my partners built.
+
+29
+00:01:27,457 --> 00:01:29,357
+And it's a barbecue app.
+
+30
+00:01:29,437 --> 00:01:31,607
+So we- they've got a
+fictional barbecue chain.
+
+31
+00:01:31,687 --> 00:01:35,577
+So it's got a JavaScript front
+end and uses Postgres on the
+
+32
+00:01:35,627 --> 00:01:37,387
+back end, runs on Kubernetes.
+
+33
+00:01:37,807 --> 00:01:42,667
+And we're gonna be going ahead and
+making a change because there've
+
+34
+00:01:42,757 --> 00:01:46,257
+been some kind of bad things in the
+scheme of this app over the years.
+
+35
+00:01:46,357 --> 00:01:47,517
+What all are we using?
+
+36
+00:01:47,577 --> 00:01:49,198
+Hey, we've got a couple Harness products.
+
+37
+00:01:49,237 --> 00:01:52,118
+We're gonna be using Harness
+CD and Harness DB DevOps and
+
+38
+00:01:52,137 --> 00:01:57,198
+Harness… I'm blanking on the name
+of our AIQA, but our AIQA thing.
+
+39
+00:01:57,257 --> 00:01:59,998
+And we're gonna be using
+GitHub for our source control.
+
+40
+00:02:00,058 --> 00:02:01,558
+We are gonna be running on Kubernetes.
+
+41
+00:02:01,657 --> 00:02:05,517
+We're using a Portworx storage
+layer, which allows you to easily
+
+42
+00:02:05,577 --> 00:02:08,337
+replicate data between environments
+without taking any downtime.
+
+43
+00:02:08,978 --> 00:02:10,777
+And we're gonna be using
+Postgres for our database.
+
+44
+00:02:11,158 --> 00:02:13,097
+We're also gonna be using
+several LLMs throughout this.
+
+45
+00:02:13,977 --> 00:02:16,877
+So specifically, we're gonna be
+using primarily Claude, but also a
+
+46
+00:02:16,917 --> 00:02:18,257
+little bit of OpenAI on the back end.
+
+47
+00:02:18,937 --> 00:02:20,757
+How do you do a database
+change with no downtime?
+
+48
+00:02:21,257 --> 00:02:25,107
+If anyone here has ever done database
+change, doing it with zero downtime and
+
+49
+00:02:25,237 --> 00:02:29,757
+zero data loss is really hard because
+let's say you have a column and you wanna
+
+50
+00:02:29,797 --> 00:02:33,817
+split it out into two new columns Version
+A of your app is running and version B
+
+51
+00:02:33,857 --> 00:02:36,658
+of the app is running at the same time,
+and they're just writing to the columns
+
+52
+00:02:36,697 --> 00:02:37,457
+they're gonna see different things.
+
+53
+00:02:38,337 --> 00:02:42,077
+So that's a problem, and it tends to
+result in people needing to take downtime.
+
+54
+00:02:42,137 --> 00:02:45,077
+A lot of companies that I talk to
+aren't using our database DevOps stuff.
+
+55
+00:02:45,168 --> 00:02:48,158
+They get to where they're able to
+do production deployments for their
+
+56
+00:02:48,208 --> 00:02:51,227
+stateless stuff many times a day, but
+they're still doing once a month, once
+
+57
+00:02:51,257 --> 00:02:54,177
+a quarter for their database stuff,
+and half the time it's entirely me.
+
+58
+00:02:54,218 --> 00:02:55,716
+There's a reason for that.
+
+59
+00:02:55,897 --> 00:03:00,317
+So what we're gonna do is we're gonna
+… For our app layer, we're gonna be doing
+
+60
+00:03:00,357 --> 00:03:01,497
+blue-green and canary deployments.
+
+61
+00:03:02,117 --> 00:03:03,837
+In our staging environment,
+we're gonna do a blue-green.
+
+62
+00:03:04,617 --> 00:03:06,357
+In our production environment,
+we're gonna do a canary.
+
+63
+00:03:07,277 --> 00:03:10,357
+Both of those deployment methods run
+the old and new version of the app in
+
+64
+00:03:10,437 --> 00:03:14,757
+parallel with some traffic going to
+each of them, and that allows us at the
+
+65
+00:03:14,837 --> 00:03:20,057
+app layer to have no downtime, but that
+forces that our database change needs
+
+66
+00:03:20,077 --> 00:03:21,487
+to be backwards compatible between them.
+
+67
+00:03:22,077 --> 00:03:24,787
+So we're gonna talk through how we
+do that safely in the database layer.
+
+68
+00:03:25,417 --> 00:03:29,877
+And again, database consistency
+is critical because if one version
+
+69
+00:03:29,897 --> 00:03:31,968
+of the app is seeing different
+data than the other version of
+
+70
+00:03:31,997 --> 00:03:33,797
+the app, this is a real problem.
+
+71
+00:03:34,477 --> 00:03:36,817
+I will move that to my left
+hand, which hopefully makes me
+
+72
+00:03:37,057 --> 00:03:38,517
+gesture less with that hand.
+
+73
+00:03:39,017 --> 00:03:41,537
+So a little bit about the
+history of this application.
+
+74
+00:03:41,677 --> 00:03:43,917
+It used to be hosted via
+using Mongo as its database.
+
+75
+00:03:44,017 --> 00:03:44,797
+It isn't anymore.
+
+76
+00:03:45,637 --> 00:03:49,997
+And real world story, last year, we got
+a version from the developer that was po-
+
+77
+00:03:50,017 --> 00:03:53,298
+ported to Postgres, and we were going,
+"Oh, okay. Cool. Let's go do an update
+
+78
+00:03:53,338 --> 00:03:55,738
+version of this talk that's on Postgres."
+
+79
+00:03:55,817 --> 00:03:57,817
+And we were gonna add a column to it.
+
+80
+00:03:57,838 --> 00:04:01,758
+We used to talk about changing a table
+and splitting a city comma state column.
+
+81
+00:04:01,798 --> 00:04:05,957
+But we looked at the schema and every
+table in the database had two columns.
+
+82
+00:04:06,498 --> 00:04:10,898
+One was named ID, the other was named doc,
+and d- doc is a serialized JSON object.
+
+83
+00:04:11,398 --> 00:04:13,638
+I don't know if any of you are
+Postgres experts, but this is
+
+84
+00:04:13,698 --> 00:04:15,298
+not how you should use Postgres.
+
+85
+00:04:15,798 --> 00:04:20,378
+So we got a little ambitious and went,
+"I don't know how to fix that with zero
+
+86
+00:04:20,438 --> 00:04:24,308
+downtime. Let's see if AI does." So
+we're gonna, we're gonna fix this schema.
+
+87
+00:04:24,808 --> 00:04:29,688
+The basic plan for today's talk, we're
+gonna take this JSON column, we're gonna
+
+88
+00:04:29,748 --> 00:04:32,257
+split it down into a separate column
+for every field with zero downtime.
+
+89
+00:04:32,757 --> 00:04:35,497
+The flow of the demo I'm gonna show
+you, we're gonna start by asking
+
+90
+00:04:35,537 --> 00:04:39,817
+an AI to fix the database, 'cause
+I don't know how to write that SQL.
+
+91
+00:04:40,237 --> 00:04:42,078
+I don't know about you, but
+I'm not that good with SQL.
+
+92
+00:04:42,677 --> 00:04:44,597
+We are then gonna go
+and validate the change.
+
+93
+00:04:44,658 --> 00:04:48,517
+The way we're gonna validate the
+change is we have a test automation
+
+94
+00:04:48,557 --> 00:04:53,397
+that is automating the application's
+UI, and it is going to log into
+
+95
+00:04:53,497 --> 00:04:54,837
+our barbecue restaurant app.
+
+96
+00:04:55,097 --> 00:04:56,077
+It's gonna place an order.
+
+97
+00:04:56,477 --> 00:04:59,198
+It's gonna go to the new version,
+make sure the order shows up, place
+
+98
+00:04:59,237 --> 00:05:01,217
+another order, go back to the old
+version, make sure it shows up.
+
+99
+00:05:01,257 --> 00:05:03,657
+So we know any edit we do
+on the new version shows up
+
+100
+00:05:03,698 --> 00:05:05,177
+on the old, and vice versa.
+
+101
+00:05:05,677 --> 00:05:08,037
+Sorry, actually, we're gonna
+do that down, down zero.
+
+102
+00:05:08,157 --> 00:05:09,918
+Here we're just gonna
+do a basic validation.
+
+103
+00:05:10,197 --> 00:05:11,438
+We're gonna commit the change to Git.
+
+104
+00:05:11,938 --> 00:05:13,278
+I mentioned Portworx earlier.
+
+105
+00:05:13,338 --> 00:05:18,278
+So this talk has its start because
+I used to work at a company where
+
+106
+00:05:18,478 --> 00:05:22,458
+90% of our bugs we only found if we
+tested with production customer data.
+
+107
+00:05:22,958 --> 00:05:26,238
+And if you go back in time six
+years, it was really hard to
+
+108
+00:05:26,277 --> 00:05:30,039
+clone all your customers and do
+customer data-specific tests.
+
+109
+00:05:30,098 --> 00:05:32,818
+So cool, we're gonna clone all
+our production data to staging.
+
+110
+00:05:32,858 --> 00:05:35,698
+We're gonna do all of our
+testing on top of that data.
+
+111
+00:05:35,738 --> 00:05:40,688
+If there is something specific to prod,
+we'll catch it in staging, and then when
+
+112
+00:05:40,709 --> 00:05:42,849
+we hit prod, we'll know everything's safe.
+
+113
+00:05:42,948 --> 00:05:46,669
+In staging, we're gonna do a blue-green
+deployment, so we're gonna spin up the old
+
+114
+00:05:46,728 --> 00:05:49,249
+and the new version of the application.
+
+115
+00:05:49,368 --> 00:05:53,268
+And the database consistency tests
+we're gonna do are gonna be comparing
+
+116
+00:05:53,308 --> 00:05:56,849
+these two versions, making sure they are
+seeing the same data while modifying the
+
+117
+00:05:57,349 --> 00:06:00,809
+So with that, I wanna
+show y'all a quick demo
+
+118
+00:06:01,309 --> 00:06:02,269
+How is the font?
+
+119
+00:06:02,369 --> 00:06:05,509
+That is, we probably wanna make
+that font a little bit bigger.
+
+120
+00:06:06,009 --> 00:06:07,529
+Can people see that all right in the back?
+
+121
+00:06:08,029 --> 00:06:08,409
+Not really.
+
+122
+00:06:09,129 --> 00:06:11,809
+Set that down because now
+I don't need those fields.
+
+123
+00:06:12,609 --> 00:06:16,929
+Just to save us a couple minutes, I typed
+this prompt in before I started, and what
+
+124
+00:06:17,009 --> 00:06:21,689
+it is doing is it's saying, "Hey, the doc
+column of our orders table is JSON text.
+
+125
+00:06:21,749 --> 00:06:22,889
+We gave it an example row.
+
+126
+00:06:23,429 --> 00:06:25,209
+Please update this table to
+have a separate column for
+
+127
+00:06:25,229 --> 00:06:26,809
+each name in the JSON string.
+
+128
+00:06:26,849 --> 00:06:29,469
+Column names should match the
+column names in the JSON string
+
+129
+00:06:29,489 --> 00:06:30,749
+exactly and be all lowercase.
+
+130
+00:06:31,209 --> 00:06:33,719
+Ensure data is kept in sync
+between the current columns and
+
+131
+00:06:33,729 --> 00:06:36,309
+the new columns, and that the
+fields are the same for every row.
+
+132
+00:06:36,669 --> 00:06:40,449
+Do not add any constraints or indexes."
+And got a couple things to make sure
+
+133
+00:06:40,469 --> 00:06:41,949
+my demo works consistently every time.
+
+134
+00:06:42,449 --> 00:06:47,838
+On the right-hand side here, we can see
+the change we generated, and this test and
+
+135
+00:06:47,869 --> 00:06:50,908
+preview button in the lower left that's
+cut off because I zoomed in too far.
+
+136
+00:06:51,589 --> 00:06:54,589
+I'm gonna click that button, and
+what that's doing is it's kicking
+
+137
+00:06:54,649 --> 00:06:57,769
+off a, an automated process
+that's validating this change.
+
+138
+00:06:57,889 --> 00:07:01,989
+Basically doing a dry run, so it's com-
+running against a real database, computing
+
+139
+00:07:02,029 --> 00:07:04,919
+the SQL this change is gonna run, pu-
+putting it through some governance
+
+140
+00:07:04,929 --> 00:07:06,169
+rules, making sure everything looks okay.
+
+141
+00:07:06,469 --> 00:07:09,529
+If it passes, it's going
+to open a PR for us.
+
+142
+00:07:10,469 --> 00:07:13,169
+While that's running, I wanna talk
+through this change and how we actually
+
+143
+00:07:13,189 --> 00:07:15,049
+do this class of database change.
+
+144
+00:07:15,229 --> 00:07:18,689
+So step one, hey, we need
+to add all those columns.
+
+145
+00:07:19,189 --> 00:07:21,339
+They come in with no data, but
+if we don't have them, we're
+
+146
+00:07:21,349 --> 00:07:22,309
+not gonna be able to do this.
+
+147
+00:07:23,189 --> 00:07:25,909
+And similarly, if for some reason we
+need to roll this back, we're gonna
+
+148
+00:07:25,949 --> 00:07:27,589
+wanna make those columns go back away.
+
+149
+00:07:27,929 --> 00:07:29,669
+So cool, step one, pretty simple.
+
+150
+00:07:30,169 --> 00:07:32,229
+Step two, things are getting
+a little bit more complicated.
+
+151
+00:07:32,589 --> 00:07:38,789
+So for step two, we are setting up a
+trigger, and this trigger is basically
+
+152
+00:07:38,909 --> 00:07:43,959
+a code that runs in the database
+any time any- anyone edits the data.
+
+153
+00:07:43,959 --> 00:07:49,139
+It is going, and if anyone edits
+that doc column, it is going and
+
+154
+00:07:49,199 --> 00:07:53,439
+updating all of those columns we
+just added so that they match.
+
+155
+00:07:53,499 --> 00:07:56,279
+That ensures data
+consistency in one direction.
+
+156
+00:07:56,359 --> 00:07:59,349
+And again, on rollback, we'll
+go ahead and remove the trigger.
+
+157
+00:07:59,849 --> 00:08:04,849
+For our next change set here, we are
+gonna go ahead and set up a trigger
+
+158
+00:08:04,869 --> 00:08:05,929
+that goes in the opposite direction.
+
+159
+00:08:06,069 --> 00:08:09,949
+So if people edit the new version, it
+also syncs back to the JSON doc column.
+
+160
+00:08:10,549 --> 00:08:15,469
+For the record, first time I ran this,
+I didn't even realize that Postgres had
+
+161
+00:08:15,489 --> 00:08:19,249
+these handy JSON functions that make
+this all fairly straightforward to do.
+
+162
+00:08:19,749 --> 00:08:24,710
+And this is all written by AI After
+we set up the triggers we've got a
+
+163
+00:08:24,749 --> 00:08:29,710
+bunch of data in these tables already
+so we need to go ahead and copy them.
+
+164
+00:08:29,789 --> 00:08:32,990
+Now, something I'll point out
+in the copy is you never know
+
+165
+00:08:33,409 --> 00:08:34,470
+how large those tables are.
+
+166
+00:08:34,729 --> 00:08:37,249
+Our barbecue restaurant
+chain, multinational,
+
+167
+00:08:37,749 --> 00:08:38,989
+billions of rows of records.
+
+168
+00:08:39,489 --> 00:08:42,930
+So cool, we don't wanna run this
+whole thing in a transaction, so we're
+
+169
+00:08:42,949 --> 00:08:47,230
+gonna go ahead and do small changes
+here, not one giant transaction
+
+170
+00:08:47,730 --> 00:08:49,770
+And that went ahead.
+
+171
+00:08:49,890 --> 00:08:53,170
+And so that's high level our change
+and those triggers are gonna make
+
+172
+00:08:53,510 --> 00:08:57,752
+sure everything continues to look
+the same in both places I'm gonna go
+
+173
+00:08:57,831 --> 00:09:01,031
+ahead and check on that validation
+pipeline we've got running really fast
+
+174
+00:09:01,531 --> 00:09:01,732
+Speaker 16: Yeah.
+
+175
+00:09:02,232 --> 00:09:02,912
+Speaker 17: Yes, definitely
+
+176
+00:09:03,412 --> 00:09:06,272
+So I'm doing this to one table in place.
+
+177
+00:09:06,612 --> 00:09:10,212
+So we are adding additional columns
+that have the new fields and there
+
+178
+00:09:10,253 --> 00:09:13,692
+are de- like, you can definitely do
+this class of thing instantiating
+
+179
+00:09:13,732 --> 00:09:16,552
+a second table, syncing the two
+tables on primary key as well.
+
+180
+00:09:17,052 --> 00:09:18,113
+Same basic approach works
+
+181
+00:09:18,613 --> 00:09:21,013
+Our validate's running a little bit slow
+at the moment, but it's almost there.
+
+182
+00:09:21,173 --> 00:09:25,174
+So we're currently, we pulled down the
+existing database definition from Git.
+
+183
+00:09:25,694 --> 00:09:26,814
+We're merging our change in.
+
+184
+00:09:27,514 --> 00:09:30,054
+We're running a validate
+and update preview.
+
+185
+00:09:30,154 --> 00:09:32,894
+So I mentioned governance checks
+earlier, so I've got a couple governance
+
+186
+00:09:32,974 --> 00:09:35,494
+checks defined in this environment.
+
+187
+00:09:36,095 --> 00:09:39,314
+So you can see right now
+I've got some policies.
+
+188
+00:09:39,354 --> 00:09:43,994
+In this case, it's literally just
+making sure we never drop table data
+
+189
+00:09:44,034 --> 00:09:48,574
+in production, and hey, we're not doing
+anything that would do that, so we passed.
+
+190
+00:09:49,394 --> 00:09:50,014
+Nice and simple.
+
+191
+00:09:50,974 --> 00:09:56,174
+When that finished, we got a link
+back to our pull request, and
+
+192
+00:09:56,294 --> 00:09:58,474
+I'm gonna go ahead and merge this
+
+193
+00:09:58,974 --> 00:10:03,474
+So with that merge, that's gonna kick
+off our CI/CD pipeline, and this CI/CD
+
+194
+00:10:03,554 --> 00:10:06,094
+pipeline is gonna run that deployment
+flow we walked through earlier.
+
+195
+00:10:06,254 --> 00:10:10,094
+Quick refresher, we are going to start
+by pulling down all the production data,
+
+196
+00:10:10,834 --> 00:10:13,455
+putting it in our staging environment so
+that we're testing with production data.
+
+197
+00:10:13,875 --> 00:10:16,634
+If you are doing this, a
+couple caveats to be aware of.
+
+198
+00:10:17,115 --> 00:10:20,214
+Some companies have different security
+rules for production versus staging.
+
+199
+00:10:21,154 --> 00:10:23,814
+If you're doing this and you're
+doing anything sensitive with your
+
+200
+00:10:23,875 --> 00:10:27,715
+product, make sure your staging
+environment has the exact same controls
+
+201
+00:10:27,754 --> 00:10:28,695
+as your production environment.
+
+202
+00:10:29,235 --> 00:10:31,555
+If it doesn't, there's also
+various anonymization layers you
+
+203
+00:10:31,594 --> 00:10:33,554
+can run on data as-- when moving.
+
+204
+00:10:33,634 --> 00:10:34,914
+I'm not doing any of that here.
+
+205
+00:10:35,715 --> 00:10:38,814
+If anyone wants to have a conversation
+about any of that, happy to dive
+
+206
+00:10:38,854 --> 00:10:40,134
+into it after the talk as well.
+
+207
+00:10:40,895 --> 00:10:45,074
+This is gonna go ahead and pull
+down that change using that Portworx
+
+208
+00:10:45,195 --> 00:10:49,695
+layer that I mentioned earlier, and
+then once it finishes, we are going
+
+209
+00:10:49,734 --> 00:10:53,574
+to stand up the database, the new
+version of the database, and then
+
+210
+00:10:53,614 --> 00:10:54,814
+the new version of the application.
+
+211
+00:10:55,314 --> 00:10:57,774
+That's gonna take about a minute
+longer, so whilst running, any-
+
+212
+00:10:57,854 --> 00:11:00,034
+anyone have any questions on
+anything I've touched on so far?
+
+213
+00:11:00,534 --> 00:11:04,274
+So Chris Crowe helped me build this
+demo, and we regularly give it together.
+
+214
+00:11:05,134 --> 00:11:10,534
+And the Frank the Pig is also the Port
+Works Barbecue Restaurant CEO, and I had
+
+215
+00:11:10,574 --> 00:11:13,974
+meant to bring him with as my co-speaker
+today, as Chris unfortunately is… While
+
+216
+00:11:14,034 --> 00:11:15,694
+he is local, is currently in Europe.
+
+217
+00:11:16,194 --> 00:11:17,054
+But yes, yeah.
+
+218
+00:11:17,134 --> 00:11:21,284
+I think the one I had the automation
+open was probably opened by me, but
+
+219
+00:11:21,314 --> 00:11:22,744
+it's entirely possible that it's
+
+220
+00:11:22,794 --> 00:11:23,374
+Speaker 16: under his username.
+
+221
+00:11:23,874 --> 00:11:26,734
+Speaker 17: So there are several
+different patterns I see for
+
+222
+00:11:26,774 --> 00:11:27,874
+testing database changes.
+
+223
+00:11:28,534 --> 00:11:32,374
+The vast majority of companies
+I've talked to do it by hand.
+
+224
+00:11:32,974 --> 00:11:33,874
+You can do better today.
+
+225
+00:11:34,314 --> 00:11:35,374
+Here I'm doing it through a UI.
+
+226
+00:11:35,774 --> 00:11:39,734
+That's pretty rare because it takes
+a lot of time to write those tests.
+
+227
+00:11:39,954 --> 00:11:44,394
+I also have a lot of customers who do
+things like, hey, packaged alongside their
+
+228
+00:11:44,434 --> 00:11:48,474
+database change, there's a SQL file that
+is a test, and they run that SQL file.
+
+229
+00:11:49,074 --> 00:11:52,254
+And for example, I've got one customer who
+has like a stored procedure in all their
+
+230
+00:11:52,294 --> 00:11:58,394
+databases that takes a SQL query and a CSV
+and runs the SQL query on both ver- run
+
+231
+00:11:58,474 --> 00:11:59,994
+SQL query, make sure it matches the CSV.
+
+232
+00:12:00,974 --> 00:12:02,634
+There's a few approaches like that.
+
+233
+00:12:03,134 --> 00:12:03,334
+Cool.
+
+234
+00:12:03,474 --> 00:12:06,894
+So we're- we've moved on to
+doing the database schema change.
+
+235
+00:12:07,394 --> 00:12:11,094
+These green rows at the top on the
+right-hand side here that barely
+
+236
+00:12:11,114 --> 00:12:14,374
+show up as green on the monitor,
+these three rows are slightly green.
+
+237
+00:12:14,414 --> 00:12:17,934
+Those are the new records
+we've a- we ha- have added.
+
+238
+00:12:18,394 --> 00:12:22,534
+We can see that I authored them a
+high-level summary of what they're doing.
+
+239
+00:12:22,954 --> 00:12:26,074
+And these database tags, these are
+rollback points to ensure we can
+
+240
+00:12:26,134 --> 00:12:27,874
+roll back any change we need to.
+
+241
+00:12:28,674 --> 00:12:32,664
+And if I click into one of these, I
+can see that full change as it exists
+
+242
+00:12:32,694 --> 00:12:38,794
+in Git or the exact SQL we actually
+compiled that to and ran against it.
+
+243
+00:12:38,874 --> 00:12:40,034
+So cool.
+
+244
+00:12:40,094 --> 00:12:41,854
+We've applied that change.
+
+245
+00:12:41,894 --> 00:12:45,394
+We touched earlier on governance, so we
+did also run that same policy here while
+
+246
+00:12:45,414 --> 00:12:46,824
+deploying to our staging environment.
+
+247
+00:12:47,324 --> 00:12:49,584
+And we were just talking about testing.
+
+248
+00:12:49,664 --> 00:12:53,404
+So the vast majority of companies
+I don't do end-to-end AI testing.
+
+249
+00:12:53,524 --> 00:13:00,064
+Here I'm gonna do an end-to-end AI test,
+and the specific test I'm gonna do was
+
+250
+00:13:00,284 --> 00:13:05,884
+also authored via AI because that's
+the new hotness these days, as I'm sure
+
+251
+00:13:05,924 --> 00:13:07,344
+I'm not the only one who's realized.
+
+252
+00:13:07,424 --> 00:13:12,044
+So over here on the right,
+we can see the test.
+
+253
+00:13:12,464 --> 00:13:14,824
+So the test is going to… Oh,
+
+254
+00:13:15,024 --> 00:13:15,844
+Speaker 16: I need to hit Play.
+
+255
+00:13:16,184 --> 00:13:19,164
+Speaker 17: The test is gonna
+go ahead and log into the new
+
+256
+00:13:19,204 --> 00:13:21,343
+version of the application.
+
+257
+00:13:21,444 --> 00:13:24,464
+And the two versions of the application,
+you'll notice as it goes through, one
+
+258
+00:13:24,504 --> 00:13:25,624
+of them has smoke in the background.
+
+259
+00:13:25,664 --> 00:13:26,324
+So cool.
+
+260
+00:13:26,364 --> 00:13:29,454
+We just placed our order on one version.
+
+261
+00:13:29,464 --> 00:13:31,914
+We're now gonna hop over to the
+other version of the application.
+
+262
+00:13:32,674 --> 00:13:33,704
+We're gonna place an order.
+
+263
+00:13:33,724 --> 00:13:35,104
+We're gonna make sure they both show up.
+
+264
+00:13:35,604 --> 00:13:36,204
+So cool.
+
+265
+00:13:36,884 --> 00:13:39,584
+Those are the orders we
+currently have on version one.
+
+266
+00:13:40,544 --> 00:13:43,224
+Hopping over to version two,
+you'll notice the smoke background,
+
+267
+00:13:43,444 --> 00:13:45,624
+so that's how you can tell the
+difference between the two versions.
+
+268
+00:13:46,124 --> 00:13:47,944
+We're gonna place a food order again
+
+269
+00:13:48,444 --> 00:13:51,444
+We've placed our order, and we're
+gonna go make sure both orders show up
+
+270
+00:13:51,944 --> 00:13:53,964
+And why do people not do
+this class of testing?
+
+271
+00:13:54,585 --> 00:13:55,984
+Because it takes time to write the test.
+
+272
+00:13:56,724 --> 00:13:58,664
+It took me about 15
+minutes to write this test.
+
+273
+00:13:59,264 --> 00:14:01,245
+It was, again, via
+English language prompt.
+
+274
+00:14:01,384 --> 00:14:06,725
+So we just placed that, that additional
+order, and we're making sure they are
+
+275
+00:14:06,744 --> 00:14:11,764
+showing up on… I feel like we looped
+back to the beginning a second ago there.
+
+276
+00:14:11,824 --> 00:14:14,164
+But This is not using
+Playwright under the covers.
+
+277
+00:14:14,284 --> 00:14:16,144
+I believe there is an
+integration to Playwright, right?
+
+278
+00:14:16,164 --> 00:14:18,404
+This is using Harness' AI
+test automation product
+
+279
+00:14:18,904 --> 00:14:21,244
+So cool, we've got both of
+those orders showing up.
+
+280
+00:14:21,664 --> 00:14:24,644
+Then we'll hop o- back over to the
+other version, make sure they're
+
+281
+00:14:24,664 --> 00:14:28,184
+there as well, and cool, they are.
+
+282
+00:14:28,524 --> 00:14:31,604
+So everything passes, and we
+can move on to production.
+
+283
+00:14:32,084 --> 00:14:35,784
+So cool, we took advantage of that
+blue-green deployment in staging so
+
+284
+00:14:35,845 --> 00:14:39,104
+that we could talk to both of those
+versions simultaneously, and then
+
+285
+00:14:39,165 --> 00:14:43,484
+that test was literally making sure
+the two apps were looking at the same
+
+286
+00:14:43,564 --> 00:14:48,404
+data, even though we were making a
+fairly large change to th- this table.
+
+287
+00:14:49,264 --> 00:14:52,404
+Going back over to the Gable AI talk,
+we might very well have other systems
+
+288
+00:14:52,444 --> 00:14:56,944
+that are talking to this beyond just
+our app, and that's okay because both
+
+289
+00:14:56,984 --> 00:14:57,924
+of these columns are still there.
+
+290
+00:14:58,005 --> 00:14:59,084
+They still have the same data.
+
+291
+00:14:59,365 --> 00:15:00,544
+So we can now go use Gable.
+
+292
+00:15:00,764 --> 00:15:01,844
+We can look at that graph.
+
+293
+00:15:01,865 --> 00:15:04,444
+We can figure out which
+services we need to update.
+
+294
+00:15:04,544 --> 00:15:07,404
+Once they're updated, then we can go make
+the old column and the triggers go away.
+
+295
+00:15:07,904 --> 00:15:09,764
+So cool, we're, we are
+fully backwards compatible.
+
+296
+00:15:10,645 --> 00:15:12,064
+We've deployed to staging.
+
+297
+00:15:12,844 --> 00:15:16,384
+We finished our blue-green
+deployment, shut down the old version,
+
+298
+00:15:16,465 --> 00:15:19,145
+and we're waiting for a manual
+approval before we go on to prod.
+
+299
+00:15:19,204 --> 00:15:22,204
+So I'm gonna go ahead and issue
+that approval, and this is gonna
+
+300
+00:15:22,245 --> 00:15:23,425
+kick off our production deployment.
+
+301
+00:15:23,745 --> 00:15:27,024
+For our production deployment, we're
+gonna do something very similar.
+
+302
+00:15:27,084 --> 00:15:29,064
+We are, instead of doing a
+blue-green, we're gonna do what's
+
+303
+00:15:29,084 --> 00:15:30,684
+called a canary deployment.
+
+304
+00:15:30,724 --> 00:15:33,304
+If anyone's not familiar with canary
+deployments, just like with the
+
+305
+00:15:33,344 --> 00:15:36,604
+blue-green, we stand up the new version
+and the old version in parallel, but
+
+306
+00:15:36,664 --> 00:15:39,313
+we slowly increase how much traffic
+we're sending to the new version.
+
+307
+00:15:39,713 --> 00:15:42,473
+Once it's all over, we shut down
+the old version, and we monitor the
+
+308
+00:15:42,533 --> 00:15:45,474
+application health metrics during
+that slow increase in traffic to
+
+309
+00:15:45,494 --> 00:15:47,514
+make sure everything stays healthy.
+
+310
+00:15:47,595 --> 00:15:51,674
+So this is gonna go ahead and run
+through that same deployment process
+
+311
+00:15:52,174 --> 00:15:52,534
+Yes
+
+312
+00:15:53,034 --> 00:15:56,034
+So specif-- most of this runs on anything.
+
+313
+00:15:56,575 --> 00:15:57,735
+The database can be on anything.
+
+314
+00:15:57,835 --> 00:16:00,054
+For this demo, I am running
+my database on Kubernetes.
+
+315
+00:16:00,994 --> 00:16:05,254
+The-- specifically, the database
+DevOps version of the delegate
+
+316
+00:16:05,315 --> 00:16:06,614
+currently is Kubernetes only.
+
+317
+00:16:06,695 --> 00:16:09,254
+There's a ECS version
+that's shipping next month.
+
+318
+00:16:09,734 --> 00:16:13,254
+So by the time you care- … there,
+there will be other options.
+
+319
+00:16:13,294 --> 00:16:17,034
+But current- currently, it is
+Kubernetes only for that one piece.
+
+320
+00:16:17,634 --> 00:16:18,954
+Every- everything else doesn't care.
+
+321
+00:16:19,454 --> 00:16:19,674
+Cool.
+
+322
+00:16:19,754 --> 00:16:21,494
+So we went through that
+same deployment check.
+
+323
+00:16:21,754 --> 00:16:23,854
+Now I'm gonna call out, we're
+doing that policy enforcement
+
+324
+00:16:23,915 --> 00:16:25,094
+in all of the environments.
+
+325
+00:16:25,494 --> 00:16:28,474
+Some companies have policies
+that only affect prod versus dev.
+
+326
+00:16:29,215 --> 00:16:32,974
+So cool, you can allow your dev-- we can
+allow our devs to have more flexibility.
+
+327
+00:16:33,415 --> 00:16:36,694
+And similarly, the more places you're
+checking things, the less likely it
+
+328
+00:16:36,754 --> 00:16:37,974
+is something slips through the cracks.
+
+329
+00:16:38,064 --> 00:16:42,564
+In this particular case, for this
+particular demo, my prod policy
+
+330
+00:16:42,604 --> 00:16:44,664
+is set to only affect prod.
+
+331
+00:16:45,564 --> 00:16:48,805
+A very common pattern I see in my
+c- in my customer base is where they
+
+332
+00:16:48,844 --> 00:16:54,265
+will have a prod policy that will
+fail in prod but will warn in dev,
+
+333
+00:16:54,804 --> 00:16:57,425
+at which point it runs through but
+finishes with warnings, and they can
+
+334
+00:16:57,505 --> 00:16:58,904
+see that, hey, they got this warning.
+
+335
+00:16:59,404 --> 00:17:00,064
+Great question.
+
+336
+00:17:00,564 --> 00:17:02,824
+So we finished our database deployment.
+
+337
+00:17:02,864 --> 00:17:05,604
+We're currently doing that canary
+deployment with p- slow traffic
+
+338
+00:17:05,664 --> 00:17:09,004
+roll-up, and in just a moment,
+that's gonna be done as well.
+
+339
+00:17:09,744 --> 00:17:13,184
+We finish sending over traffic,
+and we shut down the new version.
+
+340
+00:17:13,244 --> 00:17:13,904
+So cool.
+
+341
+00:17:14,404 --> 00:17:17,444
+We've fully deployed our
+new version of our database.
+
+342
+00:17:17,944 --> 00:17:22,054
+This w- this canary was managed entirely
+under the hood by Harness, which we can
+
+343
+00:17:22,074 --> 00:17:23,714
+do across multiple deployment techs.
+
+344
+00:17:24,174 --> 00:17:27,084
+In this case, I was going to Kubernetes
+but also we'll do it fully on all
+
+345
+00:17:27,124 --> 00:17:28,744
+of AWS, all of GCP, et cetera.
+
+346
+00:17:29,063 --> 00:17:32,143
+There's also a native Argo
+integration, so if you're using Argo
+
+347
+00:17:32,643 --> 00:17:33,203
+That's the demo.
+
+348
+00:17:33,823 --> 00:17:35,973
+Happy to go into more questions
+about databases or barbecue.
+
+349
+00:17:36,392 --> 00:17:39,233
+If you wanna play order your own
+barbecue, these are the URLs,
+
+350
+00:17:39,652 --> 00:17:45,573
+pass.pxbbq.com or pass staging or the
+new version anytime I run the demo, and
+
+351
+00:17:45,573 --> 00:17:51,132
+I'll be running it again on Thursday,
+is pass-staging-preview.pxbbq.com.
+
+352
+00:17:51,812 --> 00:17:54,292
+Feel free to place your own
+order if you are interested.
+
+353
+00:17:54,952 --> 00:17:57,673
+Otherwise any questions
+about databases or barbecue?
+
+354
+00:17:58,133 --> 00:18:03,193
+Do you get barbecue or is it like- So
+I keep telling my marketing department
+
+355
+00:18:03,313 --> 00:18:05,993
+when I give variants of this talks,
+they need to bring me barbecue.
+
+356
+00:18:06,754 --> 00:18:07,853
+It hasn't happened yet.
+
+357
+00:18:08,433 --> 00:18:14,033
+I did at a conference last year,
+get bacon candy, and today we have
+
+358
+00:18:14,074 --> 00:18:18,574
+canaries that are grill-your-own-canary
+in the back, and it…
+
+359
+00:18:18,594 --> 00:18:21,574
+They have a bit of a rubbery texture, so
+you might not wanna actually eat them, but
+
+360
+00:18:21,653 --> 00:18:23,673
+you could make barbecue canary in theory.
+
+361
+00:18:24,173 --> 00:18:24,893
+Any other questions?
+
+362
+00:18:25,393 --> 00:18:25,573
+Cool.
+
+363
+00:18:25,773 --> 00:18:26,073
+Thank you.
+
+364
+00:18:26,253 --> 00:18:29,393
+If you think of anything you'd like to
+ask later on I'll be back in that room
+
+365
+00:18:29,513 --> 00:18:33,932
+and happy to dive into your use cases or
+other conversations about this as usual.
+

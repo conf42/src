@@ -1,0 +1,1951 @@
+1
+00:00:00,402 --> 00:00:01,262
+Speaker 21: Hi, everybody.
+
+2
+00:00:01,322 --> 00:00:06,222
+My name is Amarachi Hannah Chua, and
+today I will be, presenting this topic,
+
+3
+00:00:06,322 --> 00:00:10,482
+which is, can a Kubernetes operator
+replace a database administrator?
+
+4
+00:00:10,622 --> 00:00:16,182
+And it's basically the outcomes of an
+experiment that I did, which lasted a
+
+5
+00:00:16,242 --> 00:00:19,802
+couple of days, which spanned a couple
+of days, and I'll be telling you the
+
+6
+00:00:19,822 --> 00:00:21,982
+findings of these experiments that I did.
+
+7
+00:00:22,742 --> 00:00:25,942
+So what does a database administrator do?
+
+8
+00:00:26,262 --> 00:00:29,142
+They, one, they failover
+when a primary dies.
+
+9
+00:00:29,982 --> 00:00:31,602
+Two, they monitor replication lag.
+
+10
+00:00:32,251 --> 00:00:34,001
+Three, they manage storage pressure.
+
+11
+00:00:34,682 --> 00:00:36,742
+Four, they execute versions upgrades.
+
+12
+00:00:37,282 --> 00:00:39,162
+Five, they maintain backup and recovery.
+
+13
+00:00:39,532 --> 00:00:43,122
+So this-- throughout this entire
+experiment, I'm going to be working
+
+14
+00:00:43,162 --> 00:00:46,462
+through different scenarios to figure
+out if an operator can do this.
+
+15
+00:00:46,982 --> 00:00:50,482
+And the operator we'll be using
+will be the CloudNative PG operator,
+
+16
+00:00:50,942 --> 00:00:56,082
+which would watch over our PostgreSQL
+cluster and try to keep it in the
+
+17
+00:00:56,122 --> 00:01:00,042
+state that we declared automatically
+without any human intervention,
+
+18
+00:01:00,102 --> 00:01:02,402
+without us lifting a single finger.
+
+19
+00:01:02,462 --> 00:01:06,142
+But is that actually possible, and
+what is the limit of this premise?
+
+20
+00:01:06,642 --> 00:01:09,342
+So this is the description of my setup.
+
+21
+00:01:09,482 --> 00:01:14,102
+I am going to be using Talos Linux
+operating system managed by Omni.
+
+22
+00:01:14,302 --> 00:01:18,552
+If you don't know what Talos Linux
+is an immutable operating system,
+
+23
+00:01:18,792 --> 00:01:23,532
+and by immutable, this means that
+we cannot SSH into our nodes.
+
+24
+00:01:24,172 --> 00:01:28,182
+And this is a lot of how
+production nodes are run.
+
+25
+00:01:28,722 --> 00:01:32,462
+And this is really great for this
+particular experiment because the
+
+26
+00:01:32,482 --> 00:01:38,422
+operator has to be the end all and be
+all, and we cannot at any point SSH
+
+27
+00:01:38,462 --> 00:01:41,742
+into this node to intervene humanly.
+
+28
+00:01:42,102 --> 00:01:44,862
+So hopefully, the operator
+would see this through.
+
+29
+00:01:45,622 --> 00:01:50,422
+And we'll be using Kubernetes version
+one point three five and have four
+
+30
+00:01:50,482 --> 00:01:56,052
+nodes scheduled on AWS, which actually
+was very problematic at some point
+
+31
+00:01:56,052 --> 00:01:58,142
+because I kept running into cost issues.
+
+32
+00:01:58,742 --> 00:02:02,002
+And as I see it now, I-- as I see
+this, I squint a little bit because
+
+33
+00:02:02,062 --> 00:02:06,202
+I'm like, "Oh, dang, costs." So
+I had to shorten it a little bit.
+
+34
+00:02:06,261 --> 00:02:10,482
+Instead of the original thirty, it
+ran for about sixteen to twenty days.
+
+35
+00:02:10,982 --> 00:02:13,781
+And the operator we're going to be
+using will be the CloudNative PG
+
+36
+00:02:13,881 --> 00:02:18,751
+operator, and the database will be
+Postgres sixteen, version sixteen.
+
+37
+00:02:18,911 --> 00:02:22,271
+And through the course of
+this experiment, I upgrade the
+
+38
+00:02:22,652 --> 00:02:23,971
+version to version seventeen.
+
+39
+00:02:24,471 --> 00:02:27,031
+So the experiment is
+split into six scenarios.
+
+40
+00:02:27,571 --> 00:02:32,001
+One, if we kill the primary pod,
+does the operator recognize that
+
+41
+00:02:32,051 --> 00:02:35,991
+we've killed this primary pod, and
+does it fail over automatically?
+
+42
+00:02:36,671 --> 00:02:42,231
+Two, if we drain the node that is
+running the primary, can it reschedule
+
+43
+00:02:42,311 --> 00:02:44,711
+a new replica across different nodes?
+
+44
+00:02:45,391 --> 00:02:51,271
+Three, if we fill the disk on the node
+that's probably holding the primary to
+
+45
+00:02:51,331 --> 00:02:54,911
+the breaking point, does it detect that
+this is happening, and does it give us
+
+46
+00:02:54,951 --> 00:03:00,911
+the tools to mitigate this or to reduce
+this storage pressure so that the disk
+
+47
+00:03:00,951 --> 00:03:02,731
+does not fill up to its breaking point?
+
+48
+00:03:03,331 --> 00:03:07,871
+Four, if we pause replication in
+one of the different replicas in the
+
+49
+00:03:07,911 --> 00:03:13,331
+Postgres cluster, and then the replicas
+fall behind of the primary, does the
+
+50
+00:03:13,451 --> 00:03:17,151
+operator recognize that the replicas
+are falling apart or falling behind?
+
+51
+00:03:17,631 --> 00:03:22,301
+And does it give us the tools to help
+these replicas get up to date with
+
+52
+00:03:22,761 --> 00:03:24,701
+the right updates in the primary?
+
+53
+00:03:25,321 --> 00:03:28,821
+Five, if we trigger a major
+version upgrade, does it work?
+
+54
+00:03:29,181 --> 00:03:31,241
+And how efficiently does this work?
+
+55
+00:03:32,141 --> 00:03:37,261
+Six, if we try to back up our database
+and do point-in-time recovery, can we
+
+56
+00:03:37,381 --> 00:03:41,821
+actually successfully back this data
+up, and can we restore this data?
+
+57
+00:03:42,681 --> 00:03:43,801
+So let's get right into it.
+
+58
+00:03:44,301 --> 00:03:45,301
+This is my nodes.
+
+59
+00:03:45,401 --> 00:03:48,881
+I have four nodes, one control
+plane node and three worker node.
+
+60
+00:03:49,651 --> 00:03:54,061
+And then I have my database cluster,
+which is three-- which has three
+
+61
+00:03:54,121 --> 00:03:57,561
+instances, and they're all, as
+you can see, in a healthy state.
+
+62
+00:03:58,181 --> 00:04:02,961
+And the primary in this instance
+is the experiment DB one primary.
+
+63
+00:04:03,701 --> 00:04:08,741
+And you can see all the three pods
+running, and all the three pods in the
+
+64
+00:04:08,861 --> 00:04:12,981
+database cluster are running, and they're
+healthy, and they have no restart.
+
+65
+00:04:13,061 --> 00:04:14,841
+So this is what we're working with.
+
+66
+00:04:15,561 --> 00:04:18,951
+Bear in mind that the the
+primary at this point in time is
+
+67
+00:04:18,991 --> 00:04:20,511
+the experiment DB one primary.
+
+68
+00:04:21,291 --> 00:04:22,111
+So let's get started.
+
+69
+00:04:22,191 --> 00:04:25,991
+Scenario one, kill the primary
+pod This is the first experiment.
+
+70
+00:04:26,091 --> 00:04:26,751
+So what did I do?
+
+71
+00:04:26,951 --> 00:04:31,351
+I deleted the primary, which was
+the experiment DB one, right?
+
+72
+00:04:31,411 --> 00:04:33,611
+And I deleted it using kubectl delete pod.
+
+73
+00:04:34,251 --> 00:04:38,371
+And I took… And I investigated
+and saw how long it took for
+
+74
+00:04:39,071 --> 00:04:42,351
+the operator to recognize that
+the primary has been killed.
+
+75
+00:04:42,381 --> 00:04:46,151
+And how long did it take to promote
+a replica to become the new primary.
+
+76
+00:04:46,871 --> 00:04:48,071
+So this is what happened.
+
+77
+00:04:48,131 --> 00:04:53,551
+The experiment DB one went from
+successful to-- from running to
+
+78
+00:04:53,611 --> 00:04:55,751
+terminating and to completed.
+
+79
+00:04:56,231 --> 00:05:00,731
+And experiment DB two was then
+promoted to the primary, and a fresh
+
+80
+00:05:00,791 --> 00:05:03,711
+experiment DB one pod was created.
+
+81
+00:05:04,131 --> 00:05:06,471
+And all this took about eleven seconds.
+
+82
+00:05:06,541 --> 00:05:10,671
+And at the end of this, the cluster
+was back to three over three healthy.
+
+83
+00:05:10,871 --> 00:05:13,211
+It had all three healthy instances.
+
+84
+00:05:13,631 --> 00:05:15,151
+So what did the operator do?
+
+85
+00:05:15,191 --> 00:05:19,201
+The operator detected that the primary
+pod was gone almost immediately,
+
+86
+00:05:19,671 --> 00:05:23,511
+and it promoted the most up-to-date
+replica, which is the experiment DB
+
+87
+00:05:23,571 --> 00:05:26,851
+two instance in the database cluster.
+
+88
+00:05:27,431 --> 00:05:31,991
+And he updated the internal service
+routing so that any write would go
+
+89
+00:05:32,111 --> 00:05:35,371
+to the new primary instead of the
+old primary that we just killed.
+
+90
+00:05:35,791 --> 00:05:41,211
+And it spun up a new experiment DB one
+to replace this instance that we deleted.
+
+91
+00:05:42,071 --> 00:05:45,491
+And this is very similar to what a
+database administrator would have done.
+
+92
+00:05:45,981 --> 00:05:50,451
+They would have checked the standby
+WAL, Write Ahead Login replay position,
+
+93
+00:05:50,871 --> 00:05:54,151
+and found the most up-to-date replica,
+and they would have promoted the
+
+94
+00:05:54,211 --> 00:05:58,691
+most up-to-date replica and then
+verified that the connection layer
+
+95
+00:05:58,831 --> 00:06:03,871
+routes to the new primary, which
+could be the experiment DB two, and
+
+96
+00:06:03,911 --> 00:06:06,111
+then provision a new standby replica.
+
+97
+00:06:06,751 --> 00:06:08,661
+So I guess the verdict is… Not I guess.
+
+98
+00:06:08,751 --> 00:06:13,091
+The verdict is that, yes, the operator
+did this and did it beautifully
+
+99
+00:06:13,131 --> 00:06:17,591
+in eleven seconds, and it did not
+require any human intervention.
+
+100
+00:06:18,511 --> 00:06:20,691
+But here's where it gets a little tricky.
+
+101
+00:06:21,631 --> 00:06:24,711
+But yeah, before we get there,
+we can see screenshots from this.
+
+102
+00:06:24,851 --> 00:06:29,731
+We have-- we had-- we deleted the
+experiment DB one pod, and you can
+
+103
+00:06:29,871 --> 00:06:36,531
+see in the get pods watch logs that it
+goes from terminating to initializing
+
+104
+00:06:36,551 --> 00:06:39,251
+to running in eleven seconds.
+
+105
+00:06:39,271 --> 00:06:44,601
+And you can see that it then-- the cluster
+becomes three out of three healthy, with
+
+106
+00:06:44,611 --> 00:06:46,831
+the new primary being experiment DB two.
+
+107
+00:06:47,111 --> 00:06:50,711
+As you can see, before it was experiment
+DB one that was the primary, but now
+
+108
+00:06:50,831 --> 00:06:55,711
+it's changed, and all three pods in the
+database cluster are running and running
+
+109
+00:06:55,751 --> 00:07:00,481
+well It gets a little bit tricky in the
+scenario two, which is that we drain the
+
+110
+00:07:00,541 --> 00:07:05,561
+node that is running the new primary,
+which is experiment DB two, and we see how
+
+111
+00:07:05,681 --> 00:07:09,902
+efficiently does the operator recognize
+that this is happening and fixes it.
+
+112
+00:07:10,181 --> 00:07:13,701
+If you don't know what it means
+to drain a node, to drain a
+
+113
+00:07:13,761 --> 00:07:17,741
+node, you have to first… If
+Kubernetes first cudden standard.
+
+114
+00:07:18,101 --> 00:07:21,341
+And cuddening means that you're
+not-- you cannot schedule any
+
+115
+00:07:21,401 --> 00:07:22,521
+new workload on that node.
+
+116
+00:07:22,601 --> 00:07:24,031
+So that node becomes tainted.
+
+117
+00:07:24,371 --> 00:07:29,832
+And then Kubernetes evicts any existing
+node that wa-- existing pod or existing
+
+118
+00:07:29,873 --> 00:07:31,513
+workload that was working on that node.
+
+119
+00:07:32,412 --> 00:07:37,854
+So what I did was I first did a
+kubectl get pod wide to see which
+
+120
+00:07:38,013 --> 00:07:41,873
+node that our experiment DB two,
+which is the primary, was running on.
+
+121
+00:07:42,213 --> 00:07:45,473
+And if you can see in the previous
+slide, you can see that experiment
+
+122
+00:07:45,734 --> 00:07:54,774
+DB two is running on this IP
+172.31.40.42 node And then I drained
+
+123
+00:07:54,784 --> 00:07:57,174
+that node, and this is what happened.
+
+124
+00:07:57,454 --> 00:08:00,794
+Yes, the primary got evicted,
+but the operator recognized
+
+125
+00:08:00,814 --> 00:08:04,274
+that the primary was evicted and
+immediately promoted experiment
+
+126
+00:08:04,334 --> 00:08:07,014
+DB 1 to become the primary again.
+
+127
+00:08:07,514 --> 00:08:12,834
+The problem, however, is that experiment
+DB 2 was stuck at pending for about
+
+128
+00:08:12,994 --> 00:08:18,074
+26 minutes, and this was because of
+the PVC node affinity conflict, right?
+
+129
+00:08:18,574 --> 00:08:22,864
+The the experiment DB 2 was writing
+to a storage, a piece of storage
+
+130
+00:08:22,884 --> 00:08:27,104
+that was present on the node that we
+just tainted and said that we cannot
+
+131
+00:08:27,184 --> 00:08:28,883
+schedule any more workloads on it.
+
+132
+00:08:29,383 --> 00:08:34,503
+So as, and as, because of the PVC was
+already bound to that volume, it could
+
+133
+00:08:34,513 --> 00:08:40,223
+not be scheduled on another node because a
+different node would not have that storage
+
+134
+00:08:40,263 --> 00:08:42,283
+that was present on the previous node.
+
+135
+00:08:42,824 --> 00:08:43,483
+So this is what happened.
+
+136
+00:08:43,523 --> 00:08:47,303
+The operator recognized that the
+primary was evicted and immediately it
+
+137
+00:08:47,344 --> 00:08:51,904
+failed over to experiment DB 1 and the
+cluster stayed available throughout.
+
+138
+00:08:52,404 --> 00:08:55,824
+E-even though that the cluster
+was only available two instance
+
+139
+00:08:55,944 --> 00:08:58,904
+out of three instead of a regular
+three instance out of three.
+
+140
+00:08:59,384 --> 00:09:03,834
+And it did attempt to reschedule
+experiment DB 2 on another node, but
+
+141
+00:09:03,864 --> 00:09:08,144
+it failed because it could not resolve
+this PVC node affinity constraint.
+
+142
+00:09:09,004 --> 00:09:10,964
+So what would the
+database administrator do?
+
+143
+00:09:11,044 --> 00:09:15,674
+They would have understood the storage
+topology before draining any node and
+
+144
+00:09:15,704 --> 00:09:20,113
+they would have verified that, okay
+these PV-PVCs are not bound to any
+
+145
+00:09:20,133 --> 00:09:21,893
+local storage that we are going to miss.
+
+146
+00:09:22,733 --> 00:09:27,273
+Maybe they could choose like a cloud
+storage or whatever storage that could--
+
+147
+00:09:28,214 --> 00:09:29,954
+that would be better in this scenario.
+
+148
+00:09:30,324 --> 00:09:33,473
+And they would have planned the
+switchover first, promote a replica
+
+149
+00:09:33,633 --> 00:09:37,893
+explicitly, then drain the former
+primary without any or jetting.
+
+150
+00:09:38,353 --> 00:09:42,363
+And if we required a local storage,
+they would have planned for that
+
+151
+00:09:42,434 --> 00:09:44,593
+data to be receded after that drain.
+
+152
+00:09:45,233 --> 00:09:50,714
+So maybe I shouldn't be so hard on the
+operator for not recognizing this and
+
+153
+00:09:50,733 --> 00:09:53,593
+probably used a different sort of storage.
+
+154
+00:09:53,694 --> 00:09:56,013
+But I would say the result,
+I would say it was partial.
+
+155
+00:09:56,464 --> 00:09:59,593
+The failover was automatic, but
+the self-healing was blocked
+
+156
+00:10:00,013 --> 00:10:01,973
+by local storage node affinity.
+
+157
+00:10:02,434 --> 00:10:03,434
+And you can see it here.
+
+158
+00:10:03,593 --> 00:10:06,074
+You can see that, yes, all three…
+
+159
+00:10:06,253 --> 00:10:08,394
+By the way, these are two
+different terminals opened.
+
+160
+00:10:08,873 --> 00:10:13,933
+One terminal was watching over what was
+happening, over the events of the po--
+
+161
+00:10:14,093 --> 00:10:15,954
+the cluster and seeing what was happening.
+
+162
+00:10:16,434 --> 00:10:22,514
+So when I drained, you can see I drained
+this node here using kubectl drain.
+
+163
+00:10:22,574 --> 00:10:27,154
+The node was first cordoned,
+and it then evicted every single
+
+164
+00:10:27,234 --> 00:10:31,534
+existing pod or workload on that
+node, and then drained that node.
+
+165
+00:10:32,054 --> 00:10:38,114
+But you can see that it was stuck
+at pending for a while Because-- and
+
+166
+00:10:38,134 --> 00:10:42,235
+when we tried to get this experiment
+DB cluster, you can see that it only
+
+167
+00:10:42,314 --> 00:10:45,754
+had three-- it had-- even though
+it had three instances up, only
+
+168
+00:10:45,794 --> 00:10:50,174
+two were ready, and it kept waiting
+for the instances to become active.
+
+169
+00:10:50,214 --> 00:10:53,653
+But the good news was that the
+operator failed over the new
+
+170
+00:10:53,773 --> 00:10:55,933
+old primary to experiment DB 1.
+
+171
+00:10:56,453 --> 00:11:00,233
+So experiment DB 1 took over from
+experiment DB 2 as the new primary,
+
+172
+00:11:00,813 --> 00:11:03,393
+but experiment DB 2 never got up.
+
+173
+00:11:03,653 --> 00:11:04,353
+You can see it here.
+
+174
+00:11:04,393 --> 00:11:06,193
+It was stuck at pending for a while.
+
+175
+00:11:06,653 --> 00:11:09,993
+And if you check the events, you
+can see that It could-- there was no
+
+176
+00:11:10,033 --> 00:11:14,573
+available nodes for these pods to get
+scheduled on because out of the four
+
+177
+00:11:14,633 --> 00:11:19,753
+nodes we had, one had an untolerated
+taint, which is our control plane node.
+
+178
+00:11:20,473 --> 00:11:25,573
+One re- was unschedulable, and that
+was the node that we just evicted
+
+179
+00:11:25,633 --> 00:11:27,733
+and we just drained and cordoned.
+
+180
+00:11:27,793 --> 00:11:32,303
+And by cordoning, we instructed
+Kubernetes to not schedule any
+
+181
+00:11:32,343 --> 00:11:34,623
+more workload on that n-node.
+
+182
+00:11:34,703 --> 00:11:36,583
+So that node was unschedulable.
+
+183
+00:11:37,123 --> 00:11:42,373
+The two had the two did not match the
+persistent volumes node affinity and as
+
+184
+00:11:42,413 --> 00:11:44,133
+thus could not receive this workload.
+
+185
+00:11:44,613 --> 00:11:46,213
+And so you can see it here.
+
+186
+00:11:46,633 --> 00:11:50,253
+It got stuck at pending
+here for about 26 minutes.
+
+187
+00:11:51,113 --> 00:11:54,733
+But then what I had to do was I
+had to uncordon the node and say,
+
+188
+00:11:54,773 --> 00:11:59,253
+"Okay, it's fine. You can schedule
+more workloads on that node." And
+
+189
+00:11:59,333 --> 00:12:04,313
+immediately the pod came back and
+began to… and was running in the same
+
+190
+00:12:04,573 --> 00:12:06,513
+minute and the cluster became healthy.
+
+191
+00:12:07,133 --> 00:12:07,413
+Great.
+
+192
+00:12:07,913 --> 00:12:09,693
+So now we have scenario three.
+
+193
+00:12:10,293 --> 00:12:14,313
+If we fill the disk of the
+node that is holding the pod
+
+194
+00:12:14,693 --> 00:12:16,253
+until it breaks, what happens?
+
+195
+00:12:16,333 --> 00:12:18,913
+What would the operator
+do in that scenario?
+
+196
+00:12:18,953 --> 00:12:22,633
+So what I did was that I exec into
+the experiment DB1, which is now at
+
+197
+00:12:22,713 --> 00:12:28,263
+this point the primary, and I wrote
+about 8.4 gig of da- junk data, and
+
+198
+00:12:28,313 --> 00:12:31,393
+this was about 64% disk utilization.
+
+199
+00:12:31,693 --> 00:12:36,313
+Then I wrote another four gigabyte
+of junk data to push the disks
+
+200
+00:12:36,373 --> 00:12:41,093
+towards 90% utilization, and I
+watched the status throughout.
+
+201
+00:12:41,573 --> 00:12:42,853
+And this is what happened.
+
+202
+00:12:42,873 --> 00:12:46,573
+At 64%, the operator reported
+that the cluster was in a healthy
+
+203
+00:12:46,613 --> 00:12:50,973
+state, so there were no alerts
+or no, no change in its events.
+
+204
+00:12:51,473 --> 00:12:55,823
+At 90%, the pod, the primary pod
+crashed and the operator recognized
+
+205
+00:12:55,853 --> 00:12:58,693
+that the pod had crashed and
+triggered an automatic failover.
+
+206
+00:12:59,573 --> 00:13:05,283
+But Kubernetes had to had to intervene
+and it tainted that node with a taint
+
+207
+00:13:05,423 --> 00:13:09,983
+of disk pressure NoSchedule, meaning
+that you cannot schedule any more
+
+208
+00:13:10,043 --> 00:13:14,713
+workloads on this node because it's
+done, it's filled, it's okay, it's fine.
+
+209
+00:13:14,773 --> 00:13:15,592
+Leave that node alone.
+
+210
+00:13:16,513 --> 00:13:21,953
+And then as thus, because of the
+PVC issues and everything, the node,
+
+211
+00:13:22,143 --> 00:13:27,893
+the pod, a new pod was not created
+to replace this pod that crashed.
+
+212
+00:13:28,373 --> 00:13:34,413
+The pod gets, kept getting stuck
+at pending and kubectl… And we
+
+213
+00:13:34,473 --> 00:13:39,173
+could not, of course, we could
+not SSH into the node and try to
+
+214
+00:13:39,253 --> 00:13:41,153
+manually delete data or anything.
+
+215
+00:13:41,533 --> 00:13:42,673
+So what did the operator do?
+
+216
+00:13:42,873 --> 00:13:48,353
+The operator stayed completely
+silent through 64% to 90%.
+
+217
+00:13:48,373 --> 00:13:54,101
+There was no warning, no changes in events
+or anything, but it did detect that the
+
+218
+00:13:54,141 --> 00:13:58,421
+primary had crashed and triggered an
+automatic failover to experimentdb2.
+
+219
+00:13:59,241 --> 00:14:03,841
+But because we could not clean
+this data up, the pod kept getting
+
+220
+00:14:03,921 --> 00:14:06,081
+stuck at pending for a while.
+
+221
+00:14:06,481 --> 00:14:09,181
+So what will a database
+administrator do in this scenario?
+
+222
+00:14:09,601 --> 00:14:16,051
+Database administrator would have set
+up discrete usage alerts at 70%, 80% and
+
+223
+00:14:16,241 --> 00:14:18,921
+90% thresholds on every database nodes.
+
+224
+00:14:19,441 --> 00:14:23,041
+And when you start getting the alerts,
+you would have investigated, okay,
+
+225
+00:14:23,121 --> 00:14:30,001
+what is causing this usage, this
+spike in disk usage and proactively
+
+226
+00:14:30,281 --> 00:14:36,161
+cleaned or cleaned up space before
+hitting a crash or stop whatever is
+
+227
+00:14:36,201 --> 00:14:38,681
+causing this spike in disk usage.
+
+228
+00:14:39,461 --> 00:14:43,821
+You could-- And addi-additionally, a
+database administrator would have had
+
+229
+00:14:43,871 --> 00:14:48,011
+a documented runbook for disk full
+scenarios in case they happened in
+
+230
+00:14:48,111 --> 00:14:53,581
+prod and would have a sort of foolproof
+way of fixing this or dealing with
+
+231
+00:14:53,611 --> 00:14:55,191
+this whenever they encounter this.
+
+232
+00:14:55,731 --> 00:14:56,511
+What was the result?
+
+233
+00:14:56,611 --> 00:15:01,351
+There was no warnings, no nothing,
+no change in events, and recovery
+
+234
+00:15:01,431 --> 00:15:05,651
+needed human intervention because
+the operator could not provide it
+
+235
+00:15:05,671 --> 00:15:12,511
+could not provide what you need to
+recover from disk breaking, from over,
+
+236
+00:15:12,551 --> 00:15:14,551
+from overutilization of your disk.
+
+237
+00:15:15,331 --> 00:15:16,731
+You can see it here.
+
+238
+00:15:16,771 --> 00:15:22,061
+We had all three database instances
+running and the cluster, the database
+
+239
+00:15:22,121 --> 00:15:25,601
+cluster was in a healthy state with
+the primary being experimentdb1.
+
+240
+00:15:26,481 --> 00:15:33,181
+And I wrote about 8.4 gig data into
+this disk and filled it up to about 64%.
+
+241
+00:15:33,961 --> 00:15:40,201
+And yeah, once I filled it up again an
+additional nine-- to around 90%, you
+
+242
+00:15:40,241 --> 00:15:45,341
+can see that one of the pods crashed and
+we only have two pods or two instances
+
+243
+00:15:45,961 --> 00:15:47,641
+ready out of the three instances.
+
+244
+00:15:48,141 --> 00:15:49,781
+But we had a new primary now.
+
+245
+00:15:49,861 --> 00:15:51,561
+The new primary is experimentdb2.
+
+246
+00:15:52,061 --> 00:15:57,601
+So yeah, it got stuck at pending for
+a while and this is because of, if you
+
+247
+00:15:57,681 --> 00:16:01,261
+check the events of why this pod was
+not getting scheduled, you can see that
+
+248
+00:16:01,361 --> 00:16:03,161
+zero over four nodes were available.
+
+249
+00:16:03,701 --> 00:16:06,641
+Two nodes did not match the
+persistent volume node affinity.
+
+250
+00:16:07,041 --> 00:16:11,441
+Two nodes had untolerated taints, and
+those two nodes were the cl-- control
+
+251
+00:16:11,541 --> 00:16:18,091
+plane and the node that Kubernetes
+had tainted because of disk pressure.
+
+252
+00:16:18,191 --> 00:16:21,251
+And you can see it here,
+taint DiskPressure.
+
+253
+00:16:22,231 --> 00:16:26,531
+And you can see the time it was
+added So I would give this to the
+
+254
+00:16:26,631 --> 00:16:28,831
+database administrator, of course.
+
+255
+00:16:29,011 --> 00:16:33,821
+I don't think that the operator
+could have handled it as well as a
+
+256
+00:16:33,831 --> 00:16:35,171
+database administrator would have.
+
+257
+00:16:35,751 --> 00:16:39,430
+Scenario four is if we pause
+replication and create lag.
+
+258
+00:16:39,891 --> 00:16:45,351
+Basically, if we pause one of the
+replicas and st- and it became--
+
+259
+00:16:45,711 --> 00:16:48,671
+it started lagging behind with
+the information in the primary.
+
+260
+00:16:48,951 --> 00:16:52,331
+Basically, it wasn't up to date
+with the information in the primary.
+
+261
+00:16:52,651 --> 00:16:55,631
+Is the operator going to see into
+this event that was happening?
+
+262
+00:16:55,731 --> 00:16:59,931
+And is the operator going to give you
+the tools to remedy this scenario?
+
+263
+00:17:00,191 --> 00:17:02,631
+So what I did was that I picked a replica.
+
+264
+00:17:02,671 --> 00:17:06,571
+I exec into experiment DB three
+replica, and I stopped it from
+
+265
+00:17:06,631 --> 00:17:09,091
+receiving any write-ahead logging.
+
+266
+00:17:09,211 --> 00:17:13,351
+So I did wal replay pause, and I muted
+the replica, and I stopped it from
+
+267
+00:17:13,371 --> 00:17:15,191
+receiving any write-ahead logging.
+
+268
+00:17:15,451 --> 00:17:19,450
+And I wrote about one million
+rows of data to the primary.
+
+269
+00:17:20,111 --> 00:17:24,791
+And I checked to see, and I
+ensured, and I checked to see if
+
+270
+00:17:24,851 --> 00:17:27,011
+this replica was really behind.
+
+271
+00:17:27,311 --> 00:17:30,211
+So what would happened was that
+experiment DB three, which is the
+
+272
+00:17:30,271 --> 00:17:35,471
+replica that I just paused wal replay
+on, it fell behind about a hundred and
+
+273
+00:17:35,491 --> 00:17:38,411
+two MB, behind the primary that is.
+
+274
+00:17:38,791 --> 00:17:42,991
+But if you checked the cluster sta-
+cluster status or cluster event, the
+
+275
+00:17:43,011 --> 00:17:45,191
+cluster was still in a very healthy state.
+
+276
+00:17:45,571 --> 00:17:49,931
+There was zero reaction from the operator,
+and you could not sync to any event.
+
+277
+00:17:50,391 --> 00:17:54,191
+But if you try to see the replication
+lag, you can see that we had
+
+278
+00:17:54,211 --> 00:17:58,731
+almost one million… Basically,
+the replica was very behind.
+
+279
+00:17:59,491 --> 00:18:02,831
+And once I resumed the wal
+replay, the replica caught up
+
+280
+00:18:03,411 --> 00:18:05,291
+to zero lag almost instantly.
+
+281
+00:18:05,711 --> 00:18:08,291
+So what the operator did
+not detect the lag at all.
+
+282
+00:18:08,331 --> 00:18:13,231
+There were no alerts, no events, no
+status change, and continued reporting
+
+283
+00:18:13,241 --> 00:18:15,411
+the cluster as healthy throughout.
+
+284
+00:18:15,451 --> 00:18:19,071
+It has no built-in mechanism to
+monitor or alert replication lag.
+
+285
+00:18:19,791 --> 00:18:25,191
+So the operator is really good at
+seeing pod health, but not necessarily
+
+286
+00:18:25,231 --> 00:18:27,351
+Postgres level replication state.
+
+287
+00:18:28,131 --> 00:18:32,051
+What would a DB, a database administrator
+do differently in this case?
+
+288
+00:18:32,511 --> 00:18:37,051
+The database administrator would
+probably have set alerts over different
+
+289
+00:18:37,091 --> 00:18:41,651
+thresholds and figure out if your
+replicas are lagging significantly
+
+290
+00:18:41,671 --> 00:18:43,731
+behind and to investigate the cause.
+
+291
+00:18:43,811 --> 00:18:44,961
+What is causing this lag?
+
+292
+00:18:45,091 --> 00:18:46,731
+Is it a network issue?
+
+293
+00:18:46,771 --> 00:18:48,571
+Is it a pod resource pressure?
+
+294
+00:18:48,591 --> 00:18:49,851
+Is it an intentional pause?
+
+295
+00:18:50,491 --> 00:18:54,292
+If the lag is too large A database
+administrator might give up on that
+
+296
+00:18:54,351 --> 00:19:00,092
+replica and create a new replica from the
+primary instead of letting it catch up.
+
+297
+00:19:00,411 --> 00:19:05,891
+And yeah, so Operator is-- the verdict
+is Operator is blind to replication
+
+298
+00:19:05,971 --> 00:19:10,871
+lag, and there might be a gap
+that exists at a PostgreSQL layer.
+
+299
+00:19:11,351 --> 00:19:12,351
+And you can see it here.
+
+300
+00:19:13,091 --> 00:19:14,931
+We have the pods all running.
+
+301
+00:19:15,531 --> 00:19:20,511
+And once I exec into the primary
+into the replica, the experiment DB
+
+302
+00:19:20,611 --> 00:19:26,271
+three replica, and I paused the WAL
+replay, I can see that… And I wrote
+
+303
+00:19:26,311 --> 00:19:30,791
+a bunch, I wrote a, about a million
+rows of data into the primary, and
+
+304
+00:19:30,871 --> 00:19:33,131
+nothing is still running perfectly.
+
+305
+00:19:33,172 --> 00:19:35,951
+There are no-- everything, the
+cluster is still in a healthy state.
+
+306
+00:19:35,971 --> 00:19:40,332
+There is no, there's not any information
+that would signify that maybe you
+
+307
+00:19:40,391 --> 00:19:44,931
+would want to look into that the,
+that there might be any-- there
+
+308
+00:19:44,972 --> 00:19:47,091
+might be something afoot, right?
+
+309
+00:19:47,132 --> 00:19:50,071
+And you can see that when we do check
+out the lag, you can see that there's a
+
+310
+00:19:50,152 --> 00:19:53,271
+byte lag of this ma- of this much data.
+
+311
+00:19:53,771 --> 00:20:00,471
+So I had to exec back into the pod
+and replay and resume the WAL replay,
+
+312
+00:20:00,551 --> 00:20:02,792
+and the byte lag was zero zero.
+
+313
+00:20:02,811 --> 00:20:07,562
+There was no lag once I resumed
+once I resumed the write-ahead
+
+314
+00:20:07,602 --> 00:20:12,822
+logging replay on the e- replica
+The fifth scenario is can we do a
+
+315
+00:20:12,882 --> 00:20:18,282
+major version upgrade from Postgres
+version 16 to Postgres version 17?
+
+316
+00:20:18,382 --> 00:20:22,102
+So what I did was that you have
+to first confirm that, okay, we
+
+317
+00:20:22,122 --> 00:20:23,652
+are indeed running Postgres 16.
+
+318
+00:20:24,202 --> 00:20:26,142
+We're running Postgres 16.13.
+
+319
+00:20:26,502 --> 00:20:30,622
+And I patched to change-- I did
+keepcity up patch to change the
+
+320
+00:20:30,662 --> 00:20:37,602
+image name from Postgres 16.13 to
+Postgres 17.6, and I just watched the
+
+321
+00:20:37,642 --> 00:20:39,762
+entire event and the cluster status.
+
+322
+00:20:40,222 --> 00:20:44,742
+So what happened was that all three pods
+were terminated simultaneously, and a
+
+323
+00:20:44,802 --> 00:20:50,082
+major upgrade job was spun up, and a
+primary started on-- And the primary
+
+324
+00:20:50,182 --> 00:20:56,202
+restarted on Postgres 17 in about 47
+seconds, but a new two fresh replicas
+
+325
+00:20:56,262 --> 00:21:01,542
+were created from the primary, which was
+experiment DB five and experiment DB six.
+
+326
+00:21:02,042 --> 00:21:05,402
+And yeah, it was indeed Postgres 17.6.
+
+327
+00:21:05,882 --> 00:21:06,862
+So what did the operator do?
+
+328
+00:21:06,922 --> 00:21:12,072
+The operator terminated all instances
+in a controlled, coordinated shutdown,
+
+329
+00:21:12,722 --> 00:21:17,692
+and it restarted a primary, the primary
+on the new Postgres 17 image and
+
+330
+00:21:17,722 --> 00:21:22,622
+discarded the old replicas and cloned
+fresh ones from the upgraded primary.
+
+331
+00:21:23,342 --> 00:21:24,382
+What would a DBA do?
+
+332
+00:21:24,822 --> 00:21:29,032
+A DBA would have planned a
+maintenance window a week in advance.
+
+333
+00:21:29,432 --> 00:21:33,372
+It will test the upgrade on a
+staging cluster first to ensure
+
+334
+00:21:33,412 --> 00:21:37,472
+that, okay, we're not running into
+some sort of compatibility issues
+
+335
+00:21:37,552 --> 00:21:42,652
+or anything, or having bugs that
+are detrimental to our cluster.
+
+336
+00:21:43,042 --> 00:21:47,351
+And it will take a full backup before
+even starting this upgrade, just in
+
+337
+00:21:47,412 --> 00:21:50,851
+case something goes wrong mid-upgrade.
+
+338
+00:21:51,532 --> 00:21:55,891
+And then it will validate the
+upgrades check and then cut over
+
+339
+00:21:55,951 --> 00:22:00,211
+traffic to a new instance, to
+the upgraded version instance.
+
+340
+00:22:00,651 --> 00:22:03,482
+So I guess if you want to
+look at it a little bit, the
+
+341
+00:22:03,512 --> 00:22:05,012
+operator did do really well.
+
+342
+00:22:05,611 --> 00:22:11,371
+It it upgraded the cluster in about
+47 seconds, but a DBA, a database
+
+343
+00:22:11,391 --> 00:22:15,671
+administrator would have been more
+meticulous with this version upgrade just
+
+344
+00:22:15,711 --> 00:22:17,651
+to make sure that nothing went wr-wrong.
+
+345
+00:22:18,591 --> 00:22:24,072
+So you can see I was indeed running
+Postgres 16.13, and I did patch it.
+
+346
+00:22:24,911 --> 00:22:26,651
+And you can see the events.
+
+347
+00:22:26,792 --> 00:22:30,772
+The cluster went from upgrading
+to a Postgres major version,
+
+348
+00:22:30,871 --> 00:22:31,752
+which was the primary.
+
+349
+00:22:31,792 --> 00:22:34,052
+The primary was getting upgraded.
+
+350
+00:22:34,792 --> 00:22:40,111
+And then when-- Once the primary was
+running The cluster the operator created
+
+351
+00:22:40,532 --> 00:22:47,392
+new replicas from cloning the primary and
+the cluster became in a healthy state.
+
+352
+00:22:47,892 --> 00:22:52,352
+So the last scenario is the backup
+plus point-in-time recovery, which I
+
+353
+00:22:52,392 --> 00:22:58,172
+think is the most important scenario
+or which is a very important scenario.
+
+354
+00:22:58,212 --> 00:23:02,932
+So what I did was that I patched the
+cluster with the S3 backup config
+
+355
+00:23:02,972 --> 00:23:04,472
+using the Barman object store.
+
+356
+00:23:04,692 --> 00:23:08,932
+If you don't know what Barman is a
+backup management tool that CloudNativePG
+
+357
+00:23:09,012 --> 00:23:15,552
+uses under the hood to manage
+backups and archiving and whatnot.
+
+358
+00:23:16,192 --> 00:23:23,512
+So I did create a sort of backup and I
+backed up my data to an AWS S3 bucket and
+
+359
+00:23:23,692 --> 00:23:32,412
+I watched it get-- I watched the data in
+my database get backed up and I deleted
+
+360
+00:23:32,432 --> 00:23:38,072
+the data from my cluster and I tried to
+create a new cluster with the data that I
+
+361
+00:23:38,152 --> 00:23:40,252
+backed up, basically a recovery cluster.
+
+362
+00:23:40,612 --> 00:23:41,352
+And this is what happened.
+
+363
+00:23:41,392 --> 00:23:46,292
+The backup did complete in eight
+seconds and uploaded this data to S3.
+
+364
+00:23:46,712 --> 00:23:49,812
+There was a little bit of issues
+that, that I ran into and I
+
+365
+00:23:49,832 --> 00:23:51,492
+will explain a little bit later.
+
+366
+00:23:52,052 --> 00:23:57,472
+And the recovery cluster did spin up, but
+the point-in-time recovery failed because
+
+367
+00:23:57,552 --> 00:24:03,512
+of the WAL segment was not found in S3
+and the operator kept restarting in a
+
+368
+00:24:03,552 --> 00:24:06,072
+recovery pod in a loop for about one hour.
+
+369
+00:24:06,462 --> 00:24:11,932
+And the reason why is that this operator
+did not there was no-- WAL archiving was
+
+370
+00:24:11,972 --> 00:24:16,972
+not configured at cluster creation time
+and it wasn't something that was enforced.
+
+371
+00:24:17,652 --> 00:24:22,392
+So it did trigger the backup, base backup
+data and uploaded it to S3 automatically.
+
+372
+00:24:22,992 --> 00:24:28,432
+But WAL, because WAL archiving was
+not backed up at the exact same
+
+373
+00:24:28,532 --> 00:24:33,042
+time that we were backing up the
+the data You could, we could not
+
+374
+00:24:33,102 --> 00:24:36,384
+replay this data that we backed up.
+
+375
+00:24:37,103 --> 00:24:42,963
+But— and so it was a continuous
+failure that went on for about an hour.
+
+376
+00:24:43,523 --> 00:24:46,183
+So what would the
+database administrator do?
+
+377
+00:24:46,382 --> 00:24:50,062
+The database administrator would have
+configured Write Ahead Logging, WAL or
+
+378
+00:24:50,382 --> 00:24:52,422
+WAL, however you like to pronounce it.
+
+379
+00:24:52,462 --> 00:24:54,102
+I feel awkward with
+the way I pronounce it.
+
+380
+00:24:54,502 --> 00:24:57,202
+Archiving from day one and
+not as an afterthought.
+
+381
+00:24:57,542 --> 00:25:01,742
+And they would have first verified
+that recovery was working before
+
+382
+00:25:02,062 --> 00:25:03,982
+before testing it in production.
+
+383
+00:25:04,402 --> 00:25:07,703
+And they would have monitored
+backup age and WAL archive lag
+
+384
+00:25:07,883 --> 00:25:09,822
+as part of the normal operations.
+
+385
+00:25:09,843 --> 00:25:14,383
+And they would have maintained
+a documented RTPO or RTO or RPO
+
+386
+00:25:14,523 --> 00:25:16,202
+and test against it regularly.
+
+387
+00:25:16,962 --> 00:25:22,961
+So base backup did not work base backup
+worked, but point-in-time recovery failed,
+
+388
+00:25:23,081 --> 00:25:27,542
+and because of the WAL archiving, which
+must be enabled at cluster creation,
+
+389
+00:25:27,601 --> 00:25:30,681
+but it's not enforced and, yeah.
+
+390
+00:25:31,181 --> 00:25:33,262
+So you have this data.
+
+391
+00:25:33,982 --> 00:25:38,582
+So I did try to back it up, and as you
+can see, this is like a test data that I
+
+392
+00:25:38,601 --> 00:25:41,303
+was using to try out backup and recovery.
+
+393
+00:25:42,123 --> 00:25:46,242
+And you can see the error that came up
+when I was trying to create a recovery
+
+394
+00:25:46,303 --> 00:25:48,562
+cluster from the data I backed up.
+
+395
+00:25:48,602 --> 00:25:54,744
+And this was as a result of WAL
+archiving that did not work So yeah,
+
+396
+00:25:54,903 --> 00:25:56,403
+that was heartbreaking a little bit.
+
+397
+00:25:56,903 --> 00:26:01,644
+But yeah, this is the very first,
+this is the beta of my experiment.
+
+398
+00:26:01,743 --> 00:26:06,123
+I might do a lot more about-- Yeah,
+I might do a lot more in seeing
+
+399
+00:26:06,223 --> 00:26:10,423
+how much we can self-automate
+without human intervention.
+
+400
+00:26:10,843 --> 00:26:11,824
+So what is the verdict?
+
+401
+00:26:12,063 --> 00:26:16,924
+The verdict as… The simp- the simplified
+version of the verdict is that the
+
+402
+00:26:16,963 --> 00:26:21,204
+operator does not replace a database
+administrator, but it does replace routine
+
+403
+00:26:21,283 --> 00:26:27,633
+execution of database administrating work,
+and it does a very manual, repetitive,
+
+404
+00:26:27,692 --> 00:26:33,773
+reproducible work like pod failover, major
+versions upgrade, replica provisioning and
+
+405
+00:26:33,832 --> 00:26:36,292
+cloning, self-healing after pod failures.
+
+406
+00:26:36,613 --> 00:26:41,083
+But human is still crucially important
+in scenarios like storage topology
+
+407
+00:26:41,143 --> 00:26:47,123
+decisions, replication lag and monitoring
+and alerting, disk full recovery
+
+408
+00:26:47,263 --> 00:26:50,933
+on any immutable OS and like that.
+
+409
+00:26:50,993 --> 00:26:54,993
+So work i-- while archiving and
+backup architecture planning.
+
+410
+00:26:55,473 --> 00:26:56,894
+So that is it for me.
+
+411
+00:26:57,173 --> 00:26:59,353
+Thank you so much for having me.
+
+412
+00:26:59,413 --> 00:27:04,113
+And if you'd like to connect, here
+are my socials @ thisamarachihanacho
+
+413
+00:27:04,233 --> 00:27:06,613
+on LinkedIn, Instagram, TikTok.
+
+414
+00:27:06,674 --> 00:27:09,794
+And if you have any questions if there,
+if this is going through, I will be
+
+415
+00:27:09,875 --> 00:27:12,894
+in the comment section or anything.
+
+416
+00:27:12,934 --> 00:27:14,614
+But thank you so much for having me.
+
+417
+00:27:15,074 --> 00:27:16,235
+This has been an honor.
+
+418
+00:27:16,274 --> 00:27:16,654
+Thank you.
+

@@ -1,0 +1,564 @@
+1
+00:00:00,500 --> 00:00:02,920
+Speaker 13: Hey everyone,
+and welcome to CON42.
+
+2
+00:00:03,279 --> 00:00:07,000
+I'm Muthumalliyappan Ramanathan,
+senior software developer at DoorDash.
+
+3
+00:00:07,760 --> 00:00:10,819
+Today we are going to explore a
+critical architectural frontier
+
+4
+00:00:10,881 --> 00:00:15,421
+in modern data engineering:
+operationalizing semantic consistency.
+
+5
+00:00:16,060 --> 00:00:21,360
+We will look at how we can apply a
+robust DevOps framework to achieve
+
+6
+00:00:21,441 --> 00:00:23,939
+truly reliable cross-engine analytics.
+
+7
+00:00:24,660 --> 00:00:27,121
+Let's dive in The multi-engine reality.
+
+8
+00:00:27,621 --> 00:00:32,221
+The reality of modern landscape is that we
+no longer live in a single engine world.
+
+9
+00:00:32,821 --> 00:00:38,781
+To satisfy strict latency SLAs,
+massive data volumes, and high diverse
+
+10
+00:00:38,900 --> 00:00:44,521
+workloads, organizations run multiple
+distributed compute runtimes in parallel,
+
+11
+00:00:44,900 --> 00:00:47,281
+such as Spark, Trino, and Snowflake.
+
+12
+00:00:47,781 --> 00:00:52,601
+We choose these because different
+engines excel at different query shapes.
+
+13
+00:00:53,061 --> 00:00:57,481
+For example, ETL pipelines, ad hoc
+exploration, and real-time dashboards
+
+14
+00:00:58,061 --> 00:00:59,791
+all favor distinct runtimes.
+
+15
+00:01:00,481 --> 00:01:04,761
+But this architectural flexibility
+introduces a massive hidden challenge.
+
+16
+00:01:05,261 --> 00:01:09,641
+SQL compatibility is not always
+similar to semantic consistency.
+
+17
+00:01:10,141 --> 00:01:11,740
+Here is the core problem we face.
+
+18
+00:01:12,641 --> 00:01:16,181
+SQL compatibility does not
+equal semantic consistency.
+
+19
+00:01:16,701 --> 00:01:21,441
+Just because a query successfully
+compiles and executes across every engine
+
+20
+00:01:21,481 --> 00:01:26,621
+in your stack does not mean it returns
+the exact same answer on every engine.
+
+21
+00:01:27,460 --> 00:01:32,081
+This is a silent risk that fundamentally
+threatens data reliability.
+
+22
+00:01:32,581 --> 00:01:34,281
+So where does this divergence hides?
+
+23
+00:01:34,781 --> 00:01:39,781
+It hides in the subtle intentional
+design choices of the engines themselves.
+
+24
+00:01:40,481 --> 00:01:41,601
+Let's look at what are those.
+
+25
+00:01:42,321 --> 00:01:43,561
+First, type handling.
+
+26
+00:01:44,341 --> 00:01:50,481
+Implicit casts, numeric precision, and
+integer overflows differ across engines.
+
+27
+00:01:51,221 --> 00:01:52,581
+Second, null semantics.
+
+28
+00:01:53,241 --> 00:01:58,521
+How null values propagate through joins
+and aggregations varies drastically.
+
+29
+00:01:59,000 --> 00:02:00,861
+Third, aggregation behavior.
+
+30
+00:02:01,701 --> 00:02:06,440
+Simple things like floating point
+summation, order or distinct, count
+
+31
+00:02:06,500 --> 00:02:09,661
+edges c- count edge cases diverge.
+
+32
+00:02:10,541 --> 00:02:12,701
+And finally, optimizer decisions.
+
+33
+00:02:13,701 --> 00:02:18,881
+Query rewrites can silently alter
+row inclusion or result ordering.
+
+34
+00:02:19,521 --> 00:02:24,021
+Over time, these compound into
+massive analytical drift The
+
+35
+00:02:24,061 --> 00:02:25,561
+same query, three answers.
+
+36
+00:02:26,441 --> 00:02:30,761
+Imagine feeding this exact same SQL
+string into Spark, Trino, and Snowflake.
+
+37
+00:02:31,521 --> 00:02:35,421
+Because of the discrepancies we
+just discussed, you can easily end
+
+38
+00:02:35,481 --> 00:02:37,441
+up with three different answers.
+
+39
+00:02:38,121 --> 00:02:41,021
+This creates silent data
+reliability failures.
+
+40
+00:02:41,581 --> 00:02:45,821
+The worst part, standard SQL
+linting and basic schema tests
+
+41
+00:02:46,282 --> 00:02:50,640
+will completely miss it So what's
+the core concept of the framework?
+
+42
+00:02:50,981 --> 00:02:52,500
+It's the analytical intent.
+
+43
+00:02:53,400 --> 00:02:57,360
+To solve this, we need an innovative
+shift in how we build data pipelines.
+
+44
+00:02:57,960 --> 00:03:01,780
+We must introduce analytical intent
+as a first-class abstraction.
+
+45
+00:03:02,380 --> 00:03:07,560
+Instead of writing engine-specific SQL
+syntax, we define what the query is
+
+46
+00:03:07,640 --> 00:03:11,640
+supposed to mean entirely independent
+of the underlying execution layer.
+
+47
+00:03:12,140 --> 00:03:13,820
+This relies on three pillars.
+
+48
+00:03:14,320 --> 00:03:20,621
+First, intent definition, where we declare
+logical meaning in engine-agnostic terms.
+
+49
+00:03:21,320 --> 00:03:26,860
+Second, a semantic layer that translates
+the intent using deterministic rules.
+
+50
+00:03:27,480 --> 00:03:33,240
+And third, validated execution to
+guarantee semantic equivalence on whatever
+
+51
+00:03:33,300 --> 00:03:37,141
+target engine we choose Let's discuss
+about the canonical semantic layer.
+
+52
+00:03:37,641 --> 00:03:39,722
+This brings us to the
+heart of the framework.
+
+53
+00:03:40,642 --> 00:03:43,781
+Here, logic is defined exactly once.
+
+54
+00:03:44,541 --> 00:03:48,201
+Engine-specific dialects are
+deterministically generated from
+
+55
+00:03:48,241 --> 00:03:53,201
+this layer, meaning humans never
+author dialect-specific SQL directly.
+
+56
+00:03:53,941 --> 00:03:58,461
+This completely eliminates
+handcrafted query drift and preserves
+
+57
+00:03:58,541 --> 00:04:00,502
+a single source of logical truth
+
+58
+00:04:01,002 --> 00:04:03,103
+CI/CD integrated validation workflows.
+
+59
+00:04:03,423 --> 00:04:05,363
+This is the crucial part of the framework.
+
+60
+00:04:06,122 --> 00:04:08,262
+A semantic layer alone is not enough.
+
+61
+00:04:09,122 --> 00:04:10,722
+We have to operationalize it.
+
+62
+00:04:11,322 --> 00:04:17,002
+Semantic guarantees must be rigorously
+enforced at commit time rather than
+
+63
+00:04:17,082 --> 00:04:19,642
+discovered late on a production dashboard.
+
+64
+00:04:20,343 --> 00:04:24,162
+Let's look at how we build this
+into a modern DevOps pipeline.
+
+65
+00:04:24,662 --> 00:04:26,342
+Embedding validation in the pipeline.
+
+66
+00:04:27,182 --> 00:04:32,422
+By shifting left, every single code
+commit or schema change triggers
+
+67
+00:04:32,563 --> 00:04:35,502
+an automated validation workflow.
+
+68
+00:04:36,002 --> 00:04:40,142
+The pipelines runs a semantic diff
+and executes a cross-engine dry run.
+
+69
+00:04:41,002 --> 00:04:46,662
+An equivalence assertion test guarantees
+the outputs match before allowing a merge.
+
+70
+00:04:47,463 --> 00:04:53,422
+This ensures semantic drift is caught
+as a PR blocker, not a production data
+
+71
+00:04:53,463 --> 00:04:55,962
+incident Semantic testing strategies.
+
+72
+00:04:56,962 --> 00:05:01,002
+Let's discuss the four quest--
+four core testing strategies.
+
+73
+00:05:01,982 --> 00:05:07,002
+Traditional data testing validates
+data shape and freshness, but semantic
+
+74
+00:05:07,102 --> 00:05:09,302
+testing validates actual meaning.
+
+75
+00:05:10,082 --> 00:05:12,002
+We implement four primary strategies.
+
+76
+00:05:12,502 --> 00:05:16,642
+Equivalence tests to assert
+identical results across engine
+
+77
+00:05:16,742 --> 00:05:19,362
+pairs using a reference dataset.
+
+78
+00:05:19,862 --> 00:05:24,182
+Null boundary tests to
+evaluate statistically rare but
+
+79
+00:05:24,242 --> 00:05:26,342
+semantically critical null paths.
+
+80
+00:05:26,842 --> 00:05:32,303
+Precision regression tests to keep
+floating point aggregations within a
+
+81
+00:05:32,362 --> 00:05:34,502
+strict tolerance using engine upgrades.
+
+82
+00:05:35,463 --> 00:05:40,522
+And translation snapshot tests
+to pin generated SQL and detect
+
+83
+00:05:40,643 --> 00:05:42,462
+unintended compiler changes.
+
+84
+00:05:42,962 --> 00:05:46,682
+Now let's see some of the observability
+patterns for semantic drift.
+
+85
+00:05:47,182 --> 00:05:51,942
+Of course, data production, data
+protection shouldn't stop at merge time.
+
+86
+00:05:52,502 --> 00:05:58,143
+Production pipelines require continuous
+runtime observability to catch drift
+
+87
+00:05:58,202 --> 00:06:00,162
+before it corrupts downstream metrics.
+
+88
+00:06:01,022 --> 00:06:04,802
+We do this by simultaneously
+executing queries across engine
+
+89
+00:06:04,862 --> 00:06:10,682
+pairs, comparing result fingerprints,
+alerting on metric divergence, and
+
+90
+00:06:10,802 --> 00:06:15,302
+using lineage-aware attribution to
+instantly isolate the root cause.
+
+91
+00:06:15,802 --> 00:06:17,501
+Trust as an operational property.
+
+92
+00:06:18,181 --> 00:06:22,521
+Ultimately, data reproducibility
+and trust are not operational
+
+93
+00:06:22,582 --> 00:06:24,941
+features you simply tra-track on.
+
+94
+00:06:25,441 --> 00:06:30,981
+They are core operational properties that
+you must actively enforce through robust
+
+95
+00:06:31,061 --> 00:06:36,042
+process engineering, automated tooling,
+and a cultural commitment to semantic
+
+96
+00:06:36,101 --> 00:06:39,062
+rigor Operational resilience outcomes.
+
+97
+00:06:40,062 --> 00:06:44,302
+When data team adopt this framework,
+the outcomes are highly measurable.
+
+98
+00:06:45,081 --> 00:06:50,601
+We achieve absolute reproducibility,
+meaning queries yield identical answers
+
+99
+00:06:50,842 --> 00:06:52,601
+regardless of the execution runtime.
+
+100
+00:06:53,342 --> 00:06:58,281
+We see early detection, blocking
+semantic drift in CI, and saving
+
+101
+00:06:58,342 --> 00:07:00,881
+hundreds of hours on incident response.
+
+102
+00:07:01,381 --> 00:07:06,060
+And finally, we establish pristine
+governance with an auditable
+
+103
+00:07:06,140 --> 00:07:09,440
+version-controlled repository
+of our core business logic.
+
+104
+00:07:09,940 --> 00:07:11,319
+Let's see the framework in summary.
+
+105
+00:07:11,920 --> 00:07:17,899
+To summarize the framework, we decouple
+logic via a canonical semantic layer,
+
+106
+00:07:18,739 --> 00:07:23,799
+enforce equivalence through CI/CD
+validation, and continuously monitor
+
+107
+00:07:23,920 --> 00:07:25,919
+runtime drift with observability.
+
+108
+00:07:26,419 --> 00:07:31,680
+This enables data organizations
+to confidently adopt heterogeneous
+
+109
+00:07:31,739 --> 00:07:37,099
+engines, treat semantic guarantees
+as code artifacts, and execute
+
+110
+00:07:37,180 --> 00:07:40,699
+seamless engine migrations
+without sacrificing correctness.
+
+111
+00:07:41,199 --> 00:07:42,519
+So what are the key takeaways?
+
+112
+00:07:43,019 --> 00:07:46,479
+As we wrap up, I leave you
+with three key takeaways.
+
+113
+00:07:47,339 --> 00:07:51,458
+SQL compatibility is
+necessary but not sufficient.
+
+114
+00:07:51,558 --> 00:07:54,198
+Engine design details cause silent drift.
+
+115
+00:07:54,698 --> 00:07:59,138
+Treat analytical intent as a
+first-class abstraction by separating
+
+116
+00:07:59,178 --> 00:08:00,939
+your logic from your dialect.
+
+117
+00:08:01,439 --> 00:08:06,218
+Move your semantic guarantees directly
+into your CI/CD pipeline Thank
+
+118
+00:08:06,238 --> 00:08:07,378
+you so much for your time today.
+
+119
+00:08:08,118 --> 00:08:13,138
+This framework has fundamentally shifted
+how we look at multi-engine reliability,
+
+120
+00:08:13,778 --> 00:08:17,818
+and I would love to open the floor to hear
+your thoughts and answer any questions.
+
+121
+00:08:18,398 --> 00:08:19,078
+Let's discuss.
+
+122
+00:08:19,858 --> 00:08:20,258
+Thank you.
+
