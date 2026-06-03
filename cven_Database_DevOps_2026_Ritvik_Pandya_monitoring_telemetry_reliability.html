@@ -441,6 +441,8 @@
 
             <script>
               
+              var transcript = [{"text": "Speaker 8: Hi, everyone.", "timestamp": "00:00:00,500", "timestamp_s": 0.0}, {"text": "I\u0027m Ritwik Pandya.", "timestamp": "00:00:01,180", "timestamp_s": 1.0}, {"text": "I manage engineering teams focused on large-scale payment platform at", "timestamp": "00:00:02,280", "timestamp_s": 2.0}, {"text": "the leading financial institution.", "timestamp": "00:00:06,120", "timestamp_s": 6.0}, {"text": "Today, I want to talk about the problem many of us have", "timestamp": "00:00:08,380", "timestamp_s": 8.0}, {"text": "seen in the production systems.", "timestamp": "00:00:10,740", "timestamp_s": 10.0}, {"text": "There is sudden p99 latency spike during the peak hours, where the", "timestamp": "00:00:12,740", "timestamp_s": 12.0}, {"text": "response times jumps nearly four-fold.", "timestamp": "00:00:16,799", "timestamp_s": 16.0}, {"text": "I\u0027ll walk you through a single architectural shift around the", "timestamp": "00:00:19,100", "timestamp_s": 19.0}, {"text": "deterministic routing and the data locality, which significantly can improve", "timestamp": "00:00:21,980", "timestamp_s": 21.0}, {"text": "the system behavior, delivering higher throughput and reducing the tail latency", "timestamp": "00:00:26,660", "timestamp_s": 26.0}, {"text": "by, say, fourteen-- fifty-nine percent, which we saw, all on the same hardware", "timestamp": "00:00:31,299", "timestamp_s": 31.0}, {"text": "and the same database infrastructure.", "timestamp": "00:00:36,100", "timestamp_s": 36.0}, {"text": "So here\u0027s the story.", "timestamp": "00:00:38,790", "timestamp_s": 38.0}, {"text": "Our base p99 latency was around twelve milliseconds, and during the", "timestamp": "00:00:40,650", "timestamp_s": 40.0}, {"text": "peak hours, it jumped to forty-seven milliseconds, nearly four times slower.", "timestamp": "00:00:44,550", "timestamp_s": 44.0}, {"text": "Transactions started timing out, clients retried automatically.", "timestamp": "00:00:49,230", "timestamp_s": 49.0}, {"text": "Retry piled up on top of the existing load, and very quickly, we", "timestamp": "00:00:52,879", "timestamp_s": 52.0}, {"text": "were dealing with the retry storm.", "timestamp": "00:00:57,019", "timestamp_s": 57.0}, {"text": "The SLA alert fired, pagers went off.", "timestamp": "00:00:59,180", "timestamp_s": 59.0}, {"text": "At first, it was obvious answer to be that, \"Hey, add more nodes.\" So we did.", "timestamp": "00:01:02,739", "timestamp_s": 62.0}, {"text": "But latency didn\u0027t improve.", "timestamp": "00:01:09,079", "timestamp_s": 69.0}, {"text": "In fact, it got slightly worse.", "timestamp": "00:01:10,859", "timestamp_s": 70.0}, {"text": "That was the key insight.", "timestamp": "00:01:13,259", "timestamp_s": 73.0}, {"text": "The problem wasn\u0027t the capacity, the problem was the coordination", "timestamp": "00:01:14,499", "timestamp_s": 74.0}, {"text": "overhead caused by the randomness.", "timestamp": "00:01:18,119", "timestamp_s": 78.0}, {"text": "Every request was l-landing on the random node, while the actual", "timestamp": "00:01:20,259", "timestamp_s": 80.0}, {"text": "data often lived somewhere else.", "timestamp": "00:01:25,219", "timestamp_s": 85.0}, {"text": "So each transaction triggered the extra coordination, cross-node", "timestamp": "00:01:27,879", "timestamp_s": 87.0}, {"text": "lookups, replication waits, log checks, cache misses.", "timestamp": "00:01:32,199", "timestamp_s": 92.0}, {"text": "The system was spending more time cor- coordinating the work", "timestamp": "00:01:37,399", "timestamp_s": 97.0}, {"text": "than actually doing the work.", "timestamp": "00:01:41,959", "timestamp_s": 101.0}, {"text": "Think of it like a hospital where every patient is assigned to", "timestamp": "00:01:44,019", "timestamp_s": 104.0}, {"text": "the random doctor on each visit.", "timestamp": "00:01:47,239", "timestamp_s": 107.0}, {"text": "The doctor doesn\u0027t have your record locally, so they first fetch the", "timestamp": "00:01:51,039", "timestamp_s": 111.0}, {"text": "files, call the departments, verify the context, and then begin the treatment.", "timestamp": "00:01:55,699", "timestamp_s": 115.0}, {"text": "That\u0027s effectively what our database was doing under the load.", "timestamp": "00:02:01,079", "timestamp_s": 121.0}, {"text": "So we ask a simple question: What if every transaction could land to", "timestamp": "00:02:05,600", "timestamp_s": 125.0}, {"text": "the node that already has its data?", "timestamp": "00:02:10,679", "timestamp_s": 130.0}, {"text": "So before getting in the solution, it\u0027s worth grounding this why", "timestamp": "00:02:14,660", "timestamp_s": 134.0}, {"text": "the latency actually matters.", "timestamp": "00:02:18,760", "timestamp_s": 138.0}, {"text": "In transactional systems, latency isn\u0027t the performance metrics.", "timestamp": "00:02:21,380", "timestamp_s": 141.0}, {"text": "It\u0027s directly translate into the business impact.", "timestamp": "00:02:25,881", "timestamp_s": 145.0}, {"text": "There was a well-known pattern across the industry, and Amazon reported that", "timestamp": "00:02:29,899", "timestamp_s": 149.0}, {"text": "every additional hundred millisecond of the latency impacted revenue.", "timestamp": "00:02:33,799", "timestamp_s": 153.0}, {"text": "Google observed measurable query drop-offs with the few hundred millisecond delay.", "timestamp": "00:02:38,859", "timestamp_s": 158.0}, {"text": "Same goes with other top industry vendors.", "timestamp": "00:02:45,060", "timestamp_s": 165.0}, {"text": "We saw the same effect operationally.", "timestamp": "00:02:49,960", "timestamp_s": 169.0}, {"text": "When our P99 climbed up from twelve millisecond to forty-seven", "timestamp": "00:02:52,362", "timestamp_s": 172.0}, {"text": "millisecond under the peak load, about three point two requests,", "timestamp": "00:02:56,780", "timestamp_s": 176.0}, {"text": "percent requests began timing out.", "timestamp": "00:03:02,841", "timestamp_s": 182.0}, {"text": "And every failed transaction had a real downstream cost: retries, operational", "timestamp": "00:03:05,421", "timestamp_s": 185.0}, {"text": "overhead, customer friction, SLA exposure.", "timestamp": "00:03:12,241", "timestamp_s": 192.0}, {"text": "At our scale, even the few percentage points become", "timestamp": "00:03:16,261", "timestamp_s": 196.0}, {"text": "materially expensive very quickly.", "timestamp": "00:03:19,561", "timestamp_s": 199.0}, {"text": "At same time, the business was focusing nearly twice transaction growth over", "timestamp": "00:03:23,400", "timestamp_s": 203.0}, {"text": "the next year, but the infrastructure budget wasn\u0027t doubling with it.", "timestamp": "00:03:29,700", "timestamp_s": 209.0}, {"text": "So simply scaling horizon- horizontally by adding more nodes", "timestamp": "00:03:33,740", "timestamp_s": 213.0}, {"text": "wasn\u0027t a sustainable answer.", "timestamp": "00:03:38,160", "timestamp_s": 218.0}, {"text": "That constraint focused us to rethink architecture itself,", "timestamp": "00:03:40,200", "timestamp_s": 220.0}, {"text": "not just add more hardware.", "timestamp": "00:03:44,460", "timestamp_s": 224.0}, {"text": "So this was our baseline architecture where we started.", "timestamp": "00:03:46,861", "timestamp_s": 226.0}, {"text": "A client request hits to load balancer, and the load balancer", "timestamp": "00:03:50,680", "timestamp_s": 230.0}, {"text": "selects an application node randomly.", "timestamp": "00:03:54,480", "timestamp_s": 234.0}, {"text": "Let\u0027s say node one.", "timestamp": "00:03:57,360", "timestamp_s": 237.0}, {"text": "But the data for the transaction may actually owned by node three.", "timestamp": "00:03:59,600", "timestamp_s": 239.0}, {"text": "So node one now has locate the correct range of leaseholder, coordinate", "timestamp": "00:04:03,801", "timestamp_s": 243.0}, {"text": "across the nodes, wait for replication acknowledgment, acquire locks, and only", "timestamp": "00:04:09,001", "timestamp_s": 249.0}, {"text": "then execute the transac-transaction.", "timestamp": "00:04:14,881", "timestamp_s": 254.0}, {"text": "Every additional network hop adds latency.", "timestamp": "00:04:17,941", "timestamp_s": 257.0}, {"text": "Every coordination boundary introduce the queu-queuing and contention.", "timestamp": "00:04:22,000", "timestamp_s": 262.0}, {"text": "Over the time, four major problem become obvious.", "timestamp": "00:04:28,601", "timestamp_s": 268.0}, {"text": "First, every request effectively rediscover data locally from the scratch.", "timestamp": "00:04:32,101", "timestamp_s": 272.0}, {"text": "The request path had no awareness where data already lived.", "timestamp": "00:04:37,541", "timestamp_s": 277.0}, {"text": "Second, writes triggered synchronously, cross-node coordination happens.", "timestamp": "00:04:42,561", "timestamp_s": 282.0}, {"text": "Transactions spend significant time waiting for-- waiting on replication", "timestamp": "00:04:49,360", "timestamp_s": 289.0}, {"text": "and consensus na- overhead rather than doing the useful work.", "timestamp": "00:04:53,940", "timestamp_s": 293.0}, {"text": "Third, utilization become uneven.", "timestamp": "00:04:58,600", "timestamp_s": 298.0}, {"text": "Some nodes saturated while other remained underutilized.", "timestamp": "00:05:01,280", "timestamp_s": 301.0}, {"text": "We were paying for the cluster capacity we couldn\u0027t ef- efficiently consume.", "timestamp": "00:05:06,661", "timestamp_s": 306.0}, {"text": "And the fourth one, under the peak concurrency, lock contention", "timestamp": "00:05:11,441", "timestamp_s": 311.0}, {"text": "become increasingly visible.", "timestamp": "00:05:16,701", "timestamp_s": 316.0}, {"text": "The queue depth grew, retries increased, and the tail latency amplified rapidly.", "timestamp": "00:05:19,121", "timestamp_s": 319.0}, {"text": "This is actually a default behavior of many distribus- distributed", "timestamp": "00:05:25,561", "timestamp_s": 325.0}, {"text": "systems under the random routing.", "timestamp": "00:05:29,181", "timestamp_s": 329.0}, {"text": "A moderated load, it works reasonably well, but as concurrency increases,", "timestamp": "00:05:31,661", "timestamp_s": 331.0}, {"text": "the coordination overhead starts dominating the request path", "timestamp": "00:05:38,641", "timestamp_s": 338.0}, {"text": "We tried to instrumentate the entire request path under-- and to", "timestamp": "00:05:42,821", "timestamp_s": 342.0}, {"text": "understand where those forty-seven milliseconds were actually going.", "timestamp": "00:05:46,881", "timestamp_s": 346.0}, {"text": "And the result were honestly surprising.", "timestamp": "00:05:52,141", "timestamp_s": 352.0}, {"text": "Around twelve milliseconds were spent just re-resolving metadata", "timestamp": "00:05:54,651", "timestamp_s": 354.0}, {"text": "and determining where data lived.", "timestamp": "00:05:59,191", "timestamp_s": 359.0}, {"text": "Another eighteen millisecond went into cross-node coordination,", "timestamp": "00:06:01,491", "timestamp_s": 361.0}, {"text": "replication, acknowledgments, et cetera.", "timestamp": "00:06:06,091", "timestamp_s": 366.0}, {"text": "Lock contention contributed roughly eight millisecond under concurrency.", "timestamp": "00:06:08,451", "timestamp_s": 368.0}, {"text": "Connection management and network overhead added ano-", "timestamp": "00:06:14,071", "timestamp_s": 374.0}, {"text": "other another four milliseconds.", "timestamp": "00:06:18,331", "timestamp_s": 378.0}, {"text": "So when we added everything up the real insight became o- obvious.", "timestamp": "00:06:20,621", "timestamp_s": 380.0}, {"text": "The most of the latency wasn\u0027t the computation, it was coordination.", "timestamp": "00:06:26,261", "timestamp_s": 386.0}, {"text": "The system was spending majority of its time locating the data, synchronizing", "timestamp": "00:06:30,561", "timestamp_s": 390.0}, {"text": "the state, waiting for locks, and coordinating across the nodes.", "timestamp": "00:06:37,101", "timestamp_s": 397.0}, {"text": "Only small fraction of the request path was actual transaction execution.", "timestamp": "00:06:41,341", "timestamp_s": 401.0}, {"text": "A useful analogy is say, a restaurant where the kitchen spend nearly all", "timestamp": "00:06:47,451", "timestamp_s": 407.0}, {"text": "of its time coordinating the orders, locating in-ingredients, and handling", "timestamp": "00:06:52,221", "timestamp_s": 412.0}, {"text": "work between the stations, and only tiny portion of actual-- actually cooking food.", "timestamp": "00:06:57,561", "timestamp_s": 417.0}, {"text": "At some point, adding more cooks doesn\u0027t help.", "timestamp": "00:07:04,821", "timestamp_s": 424.0}, {"text": "The operational overhead itself becomes the bottleneck, and that was", "timestamp": "00:07:08,061", "timestamp_s": 428.0}, {"text": "the architectural realization for us.", "timestamp": "00:07:13,221", "timestamp_s": 433.0}, {"text": "We didn\u0027t need bigger system.", "timestamp": "00:07:15,721", "timestamp_s": 435.0}, {"text": "We needed system to coordinate less.", "timestamp": "00:07:17,901", "timestamp_s": 437.0}, {"text": "And just to be precise, these numbers are the representative", "timestamp": "00:07:21,041", "timestamp_s": 441.0}, {"text": "attribution from the distributed tracing and span-level analysis.", "timestamp": "00:07:25,841", "timestamp_s": 445.0}, {"text": "Percentage decomposition is never the mathematically perfect in the practice,", "timestamp": "00:07:31,601", "timestamp_s": 451.0}, {"text": "but the proposition were consistent and reproducible across the runs.", "timestamp": "00:07:37,160", "timestamp_s": 457.0}, {"text": "That become the turning point of discussions with the leadership", "timestamp": "00:07:42,880", "timestamp_s": 462.0}, {"text": "because the optimization opportunity was suddenly very visible", "timestamp": "00:07:47,160", "timestamp_s": 467.0}, {"text": "Now, one architectural decision changed everything for us.", "timestamp": "00:07:52,020", "timestamp_s": 472.0}, {"text": "Instead of routing transaction randomly, we started routing each transaction to the", "timestamp": "00:07:56,560", "timestamp_s": 476.0}, {"text": "node most likely to already own its data.", "timestamp": "00:08:02,660", "timestamp_s": 482.0}, {"text": "Routing decision were deterministic based on the key hashing, and the", "timestamp": "00:08:07,180", "timestamp_s": 487.0}, {"text": "execution was in parallel with isolated worker pools to avoid shared contention.", "timestamp": "00:08:11,160", "timestamp_s": 491.0}, {"text": "That becomes core architecture principle behind the entire system, and now", "timestamp": "00:08:19,460", "timestamp_s": 499.0}, {"text": "underlying idea itself isn\u0027t new.", "timestamp": "00:08:23,300", "timestamp_s": 503.0}, {"text": "The system like Dynamo introduced the partition-aware routing years ago,", "timestamp": "00:08:27,650", "timestamp_s": 507.0}, {"text": "and later research such as Calvin explored deterministic transaction", "timestamp": "00:08:32,909", "timestamp_s": 512.0}, {"text": "scheduling at the database layer.", "timestamp": "00:08:37,669", "timestamp_s": 517.0}, {"text": "What we found interestingly was applying the same locality principle earlier in", "timestamp": "00:08:39,889", "timestamp_s": 519.0}, {"text": "request path and applic-- and at the application and routing layer itself.", "timestamp": "00:08:46,449", "timestamp_s": 526.0}, {"text": "Because once the request arrives near the correct data from the beginning,", "timestamp": "00:08:52,130", "timestamp_s": 532.0}, {"text": "an entire category of coordination overhead start disappearing.", "timestamp": "00:08:58,270", "timestamp_s": 538.0}, {"text": "There will be a fewer metadata lookups, fewer cross-node hops, better cache", "timestamp": "00:09:03,640", "timestamp_s": 543.0}, {"text": "locality, lower lock, lock contention.", "timestamp": "00:09:09,080", "timestamp_s": 549.0}, {"text": "So the real gain real gain wasn\u0027t about inventing faster algorithm, it was about", "timestamp": "00:09:13,240", "timestamp_s": 553.0}, {"text": "eliminating unnecessary movement of data and coordinating that never needed to", "timestamp": "00:09:20,280", "timestamp_s": 560.0}, {"text": "be happen in the first place itself.", "timestamp": "00:09:26,260", "timestamp_s": 566.0}, {"text": "A few quick words on why this approach works particularly well in the", "timestamp": "00:09:28,400", "timestamp_s": 568.0}, {"text": "modern distributed data-databases.", "timestamp": "00:09:35,540", "timestamp_s": 575.0}, {"text": "Most distributed databases today already optimize around the locality internally.", "timestamp": "00:09:37,880", "timestamp_s": 577.0}, {"text": "They partition data into ranges and shards replicate those ranges across the nodes,", "timestamp": "00:09:44,960", "timestamp_s": 584.0}, {"text": "and use consensus protocol like Raft to coordinate ownership and consistency.", "timestamp": "00:09:50,940", "timestamp_s": 590.0}, {"text": "The important realization for us was, if the database is already locality-aware", "timestamp": "00:09:57,560", "timestamp_s": 597.0}, {"text": "internally, the application layer should stop behaving randomly.", "timestamp": "00:10:04,750", "timestamp_s": 604.0}, {"text": "Under traditional random routing, request lands on any random nodes,", "timestamp": "00:10:09,530", "timestamp_s": 609.0}, {"text": "and the database spends additional time forwarding the request,", "timestamp": "00:10:15,629", "timestamp_s": 615.0}, {"text": "resolving the ownership, coordinating replicas, and managing cross-node", "timestamp": "00:10:20,489", "timestamp_s": 620.0}, {"text": "communication Solution is deterministic routing that changes everything.", "timestamp": "00:10:25,089", "timestamp_s": 625.0}, {"text": "By routing the request based on the same partition key used by the", "timestamp": "00:10:31,389", "timestamp_s": 631.0}, {"text": "database and application increase the probability that request arrives near", "timestamp": "00:10:35,468", "timestamp_s": 635.0}, {"text": "the node already coordinating that data.", "timestamp": "00:10:40,648", "timestamp_s": 640.0}, {"text": "That redu-reduces unnecessary hops, improves cache locality, lower", "timestamp": "00:10:44,009", "timestamp_s": 644.0}, {"text": "coordination overhead, and shorten the critical transaction path.", "timestamp": "00:10:49,988", "timestamp_s": 649.0}, {"text": "The database still hurdles correctness, replication, failover,", "timestamp": "00:10:54,129", "timestamp_s": 654.0}, {"text": "rebalancing, and consensus underneath.", "timestamp": "00:10:59,469", "timestamp_s": 659.0}, {"text": "We are not replacing the distributed coordination here.", "timestamp": "00:11:02,390", "timestamp_s": 662.0}, {"text": "We are reducing how often the system needs expensive coordination on the hot path.", "timestamp": "00:11:05,031", "timestamp_s": 665.0}, {"text": "This broader principle shows across many distributed systems, from the Dynamo-style", "timestamp": "00:11:12,609", "timestamp_s": 672.0}, {"text": "partitioning to locality-aware databases like Spanner, CockroachDB,", "timestamp": "00:11:18,490", "timestamp_s": 678.0}, {"text": "You have ByteDB, TiDB, and others.", "timestamp": "00:11:23,611", "timestamp_s": 683.0}, {"text": "So how could we actually implement this?", "timestamp": "00:11:27,031", "timestamp_s": 687.0}, {"text": "At the conceptual level, the routing logic is sup-surprisingly", "timestamp": "00:11:30,351", "timestamp_s": 690.0}, {"text": "simple and very bookish in a way.", "timestamp": "00:11:34,471", "timestamp_s": 694.0}, {"text": "That take your transactions primary key, hash it, and map that hash", "timestamp": "00:11:37,211", "timestamp_s": 697.0}, {"text": "to one of the node in the cluster.", "timestamp": "00:11:43,210", "timestamp_s": 703.0}, {"text": "Simple.", "timestamp": "00:11:46,330", "timestamp_s": 706.0}, {"text": "And that hash tells the application which node should handle the request.", "timestamp": "00:11:47,170", "timestamp_s": 707.0}, {"text": "So in that way, there is no random load balancing, no request path", "timestamp": "00:11:52,910", "timestamp_s": 712.0}, {"text": "metadata lookup will be there, no guessing where the data might live.", "timestamp": "00:11:58,250", "timestamp_s": 718.0}, {"text": "And because the routing is deterministic, the same key", "timestamp": "00:12:03,750", "timestamp_s": 723.0}, {"text": "consistently lands on the same node.", "timestamp": "00:12:07,650", "timestamp_s": 727.0}, {"text": "That consistency is what creates locality.", "timestamp": "00:12:11,050", "timestamp_s": 731.0}, {"text": "Now, in production, we don\u0027t actually use naive modulo hashing.", "timestamp": "00:12:14,870", "timestamp_s": 734.0}, {"text": "Modulo works fine in examples, but behaves badly when the cluster membership changes.", "timestamp": "00:12:18,630", "timestamp_s": 738.0}, {"text": "For example, if you add or remove a node and suddenly the most of the keyspace", "timestamp": "00:12:24,610", "timestamp_s": 744.0}, {"text": "gets remapped, that creates massive cache churn and unnecessary redistribution.", "timestamp": "00:12:28,910", "timestamp_s": 748.0}, {"text": "So instead, we use consistent hashing with virtual nodes.", "timestamp": "00:12:34,970", "timestamp_s": 754.0}, {"text": "With consistent hashing, when the node is added or removed, only a", "timestamp": "00:12:39,370", "timestamp_s": 759.0}, {"text": "small portion of the keyspace moves.", "timestamp": "00:12:44,950", "timestamp_s": 764.0}, {"text": "This is the same foundation idea used in Akamai, Cloudflare, Dynamo-style", "timestamp": "00:12:47,470", "timestamp_s": 767.0}, {"text": "partitioning, and large-scale distribus-- distributed caches.", "timestamp": "00:12:52,650", "timestamp_s": 772.0}, {"text": "Once we introduced the deterministic routing, the several benefits", "timestamp": "00:12:56,449", "timestamp_s": 776.0}, {"text": "started compounding naturally.", "timestamp": "00:12:59,890", "timestamp_s": 779.0}, {"text": "Request bitten-- requests become predictable, metadata resolution", "timestamp": "00:13:02,390", "timestamp_s": 782.0}, {"text": "disappeared from the hot path, cache locality improves because same key", "timestamp": "00:13:06,890", "timestamp_s": 786.0}, {"text": "repeatedly hit the same execution path, and load distribution stayed relatively", "timestamp": "00:13:12,910", "timestamp_s": 792.0}, {"text": "balanced because the hashing spread keys uniformly across the cluster.", "timestamp": "00:13:17,970", "timestamp_s": 797.0}, {"text": "One important caveat here the choice of key matters.", "timestamp": "00:13:22,469", "timestamp_s": 802.0}, {"text": "The routing key needs to be stable, high car-- high cardinality is needed, and", "timestamp": "00:13:26,389", "timestamp_s": 806.0}, {"text": "closely aligned with your access pattern.", "timestamp": "00:13:33,888", "timestamp_s": 813.0}, {"text": "You don\u0027t want to hash on something mutable, and you definitely", "timestamp": "00:13:37,628", "timestamp_s": 817.0}, {"text": "don\u0027t want keyspaces with only handful of possible values.", "timestamp": "00:13:43,809", "timestamp_s": 823.0}, {"text": "Otherwise, you simply move the bottleneck instead of eliminating it so now routing", "timestamp": "00:13:48,468", "timestamp_s": 828.0}, {"text": "solved only one part of the problem but execution was the other half, right?", "timestamp": "00:13:53,929", "timestamp_s": 833.0}, {"text": "Because deterministic routing alone improves the locality, but it-- if", "timestamp": "00:13:59,719", "timestamp_s": 839.0}, {"text": "all requests still execute through the shared execution path, connection simply", "timestamp": "00:14:04,929", "timestamp_s": 844.0}, {"text": "moves somewhere else in the system.", "timestamp": "00:14:10,769", "timestamp_s": 850.0}, {"text": "So we paired deterministic routing with thread-to-node affinity.", "timestamp": "00:14:14,289", "timestamp_s": 854.0}, {"text": "So this is second fold of the solution here.", "timestamp": "00:14:19,489", "timestamp_s": 859.0}, {"text": "Say thread zero primarily handled work for node zero, thread", "timestamp": "00:14:23,269", "timestamp_s": 863.0}, {"text": "one for node one, and so on.", "timestamp": "00:14:28,509", "timestamp_s": 868.0}, {"text": "Each worker thread own its own dedicated connection pool", "timestamp": "00:14:31,169", "timestamp_s": 871.0}, {"text": "to its assigned node group.", "timestamp": "00:14:34,949", "timestamp_s": 874.0}, {"text": "No shared pools, no cross-threaded coordination during the connection", "timestamp": "00:14:37,349", "timestamp_s": 877.0}, {"text": "ac-acquisition, no l-lock contention around the pooled resources, and this part", "timestamp": "00:14:42,369", "timestamp_s": 882.0}, {"text": "mattered more than we initially expected.", "timestamp": "00:14:49,929", "timestamp_s": 889.0}, {"text": "Our first implementation actually used shared connection pool across threads.", "timestamp": "00:14:53,749", "timestamp_s": 893.0}, {"text": "Under load, we performed terribly.", "timestamp": "00:14:59,459", "timestamp_s": 899.0}, {"text": "Thread spend surprisingly amount of time containing the pooled connection,", "timestamp": "00:15:02,779", "timestamp_s": 902.0}, {"text": "waiting for the synchronization and fighting each other internally.", "timestamp": "00:15:10,779", "timestamp_s": 910.0}, {"text": "In some scenarios, contention become worse than the original", "timestamp": "00:15:15,719", "timestamp_s": 915.0}, {"text": "single-threaded baseline.", "timestamp": "00:15:20,019", "timestamp_s": 920.0}, {"text": "Again, the restaurant analogy here.", "timestamp": "00:15:21,699", "timestamp_s": 921.0}, {"text": "If every waiter can serve every table, they constant-- constantly", "timestamp": "00:15:23,838", "timestamp_s": 923.0}, {"text": "cross paths, interrupts each other, and compete for the same space.", "timestamp": "00:15:29,438", "timestamp_s": 929.0}, {"text": "But if each waiter owns a dedicated section, movement become predictable", "timestamp": "00:15:35,838", "timestamp_s": 935.0}, {"text": "and collisions largely disappear.", "timestamp": "00:15:42,478", "timestamp_s": 942.0}, {"text": "That\u0027s effectively what thread affinity gives us.", "timestamp": "00:15:46,308", "timestamp_s": 946.0}, {"text": "The round-robin scheduling kept work even evenly distributed across the workers.", "timestamp": "00:15:49,948", "timestamp_s": 949.0}, {"text": "Asynchronous input/output prevented threads from the", "timestamp": "00:15:56,648", "timestamp_s": 956.0}, {"text": "blocking on the network wa-waits.", "timestamp": "00:16:00,409", "timestamp_s": 960.0}, {"text": "Persistent connection eliminated the repeated setup and teardown cos-cost.", "timestamp": "00:16:03,488", "timestamp_s": 963.0}, {"text": "So now let\u0027s talk about the operational side of this Because we are not optimizing", "timestamp": "00:16:09,768", "timestamp_s": 969.0}, {"text": "the algorithm here, we are, and in such systems, we run them on Kubernetes.", "timestamp": "00:16:14,569", "timestamp_s": 974.0}, {"text": "In our case, we realized this thing very rapidly or very quickly that", "timestamp": "00:16:21,249", "timestamp_s": 981.0}, {"text": "default Kub- Kubernetes behavior is often optimized for general availability", "timestamp": "00:16:26,309", "timestamp_s": 986.0}, {"text": "and not for the tail latency.", "timestamp": "00:16:32,609", "timestamp_s": 992.0}, {"text": "And that\u0027s where we tried to-- we took s- say four configuration decisions here.", "timestamp": "00:16:35,879", "timestamp_s": 995.0}, {"text": "One is stateful sets of database layer.", "timestamp": "00:16:43,339", "timestamp_s": 1003.0}, {"text": "Distributed database rel-rely heavily on stable network identity", "timestamp": "00:16:46,489", "timestamp_s": 1006.0}, {"text": "and persistent storage, and that\u0027s where stateful sets help us.", "timestamp": "00:16:51,649", "timestamp_s": 1011.0}, {"text": "It gives us predictable predictable pod identities, durable volumes,", "timestamp": "00:16:57,069", "timestamp_s": 1017.0}, {"text": "and safer rolling updates during the quorum-sensitive operations.", "timestamp": "00:17:02,949", "timestamp_s": 1022.0}, {"text": "The second one is node affinity.", "timestamp": "00:17:07,229", "timestamp_s": 1027.0}, {"text": "So we try to co-locate the application workloads a- as close", "timestamp": "00:17:09,848", "timestamp_s": 1029.0}, {"text": "as the database nodes, and in some cases, you can say that it\u0027s the", "timestamp": "00:17:15,109", "timestamp_s": 1035.0}, {"text": "same zone, same rack, and same NUMA.", "timestamp": "00:17:19,649", "timestamp_s": 1039.0}, {"text": "And that less network distance shaved a few millisecond off in the request", "timestamp": "00:17:22,009", "timestamp_s": 1042.0}, {"text": "path which kind of helped us out a lot with P99 and P nin- 95 latency.", "timestamp": "00:17:29,169", "timestamp_s": 1049.0}, {"text": "The third one is autoscaling based on the latency-aware signal instead of CPU.", "timestamp": "00:17:36,689", "timestamp_s": 1056.0}, {"text": "Y- because default HPA policy typically reacts to the CPU", "timestamp": "00:17:41,349", "timestamp_s": 1061.0}, {"text": "utilization, but in general, CPU is often lacking the indicator for", "timestamp": "00:17:45,769", "timestamp_s": 1065.0}, {"text": "transactional latency problems.", "timestamp": "00:17:51,249", "timestamp_s": 1071.0}, {"text": "So he- this is where the latency-aware signals helped us a lot.", "timestamp": "00:17:53,449", "timestamp_s": 1073.0}, {"text": "And the finally th- the next configuration what we try to do is guaranteed QoS.", "timestamp": "00:17:59,789", "timestamp_s": 1079.0}, {"text": "So we set CPU request equal to the limit of the latency-sensitive workloads and", "timestamp": "00:18:06,509", "timestamp_s": 1086.0}, {"text": "that that configuration helped us a lot.", "timestamp": "00:18:11,829", "timestamp_s": 1091.0}, {"text": "So after moving the critical workload into guaranteed QoS or,", "timestamp": "00:18:14,049", "timestamp_s": 1094.0}, {"text": "quality of service, latency various dropped notice significantly and the", "timestamp": "00:18:18,609", "timestamp_s": 1098.0}, {"text": "tail behavior becomes more stable", "timestamp": "00:18:25,049", "timestamp_s": 1105.0}, {"text": "Now here are a few results which I would like to mention here.", "timestamp": "00:18:28,249", "timestamp_s": 1108.0}, {"text": "S- P50 latency dropped around eighteen milliseconds to eight", "timestamp": "00:18:33,269", "timestamp_s": 1113.0}, {"text": "milliseconds, so it\u0027s about fifty-six percent of reduction, right?", "timestamp": "00:18:38,129", "timestamp_s": 1118.0}, {"text": "P95 went from thirty-four millisecond to fourteen.", "timestamp": "00:18:42,649", "timestamp_s": 1122.0}, {"text": "P99, which was the metric hurting us operationally the most, dropped from", "timestamp": "00:18:46,409", "timestamp_s": 1126.0}, {"text": "forty-seven millisecond to nineteen millisecond which is our primary", "timestamp": "00:18:51,829", "timestamp_s": 1131.0}, {"text": "example where we started all this story.", "timestamp": "00:18:55,789", "timestamp_s": 1135.0}, {"text": "So roughly fifty-nine percent improvement here.", "timestamp": "00:18:58,249", "timestamp_s": 1138.0}, {"text": "And throughput improved even more dramatically.", "timestamp": "00:19:01,309", "timestamp_s": 1141.0}, {"text": "So overall, with all this configurations decisions we saw a significant", "timestamp": "00:19:04,769", "timestamp_s": 1144.0}, {"text": "improvement in our application.", "timestamp": "00:19:11,629", "timestamp_s": 1151.0}, {"text": "Few of the concepts here might be very specific to, CockroachDB side of things,", "timestamp": "00:19:13,809", "timestamp_s": 1153.0}, {"text": "but the same principle is applied to any of the modern distributed data store.", "timestamp": "00:19:18,309", "timestamp_s": 1158.0}, {"text": "So systems like Amazon DynamoDB, the partition data by the stable", "timestamp": "00:19:25,229", "timestamp_s": 1165.0}, {"text": "partition key is already there.", "timestamp": "00:19:30,669", "timestamp_s": 1170.0}, {"text": "The distributed SQL systems like TiDB, YugaDB, or other distributed", "timestamp": "00:19:32,649", "timestamp_s": 1172.0}, {"text": "ranges, tablets, or region across the nodes using similar", "timestamp": "00:19:38,589", "timestamp_s": 1178.0}, {"text": "locality-aware concepts internally.", "timestamp": "00:19:42,429", "timestamp_s": 1182.0}, {"text": "The implementation details might vary that some use Raft groups, some use", "timestamp": "00:19:44,669", "timestamp_s": 1184.0}, {"text": "placement rules some use partition map or tablet leaders, but the", "timestamp": "00:19:51,009", "timestamp_s": 1191.0}, {"text": "architectural data or architectural idea is consistent across all of them, that", "timestamp": "00:19:56,749", "timestamp_s": 1196.0}, {"text": "data already has the placement strategy.", "timestamp": "00:20:01,349", "timestamp_s": 1201.0}, {"text": "The closer your application routing aligns with the placement strategy,", "timestamp": "00:20:04,579", "timestamp_s": 1204.0}, {"text": "the less coordination of the s- system performs on the hot path.", "timestamp": "00:20:10,579", "timestamp_s": 1210.0}, {"text": "It give, it will give you the advantage in terms of there will be a fewer", "timestamp": "00:20:14,908", "timestamp_s": 1214.0}, {"text": "cross-node hops there will be a better cache locality there will be a", "timestamp": "00:20:19,548", "timestamp_s": 1219.0}, {"text": "lower coordination overhead, and more predictable tail latency will be there.", "timestamp": "00:20:24,647", "timestamp_s": 1224.0}, {"text": "Overall, it will benefit the system.", "timestamp": "00:20:29,867", "timestamp_s": 1229.0}, {"text": "Now In, in my experience there were three major lessons I can talk about.", "timestamp": "00:20:32,447", "timestamp_s": 1232.0}, {"text": "Fun-- first one is the deterministic routing without the resiliency is fragile.", "timestamp": "00:20:40,347", "timestamp_s": 1240.0}, {"text": "Our initial implementation was extremely straightforward, say, which I also", "timestamp": "00:20:46,268", "timestamp_s": 1246.0}, {"text": "talked about, that hash the key, route to the target node, execute the request.", "timestamp": "00:20:52,028", "timestamp_s": 1252.0}, {"text": "And operationally, it worked great until the node failed, right?", "timestamp": "00:20:57,288", "timestamp_s": 1257.0}, {"text": "So at that point, every request mapped to the to that node immediately", "timestamp": "00:21:01,469", "timestamp_s": 1261.0}, {"text": "start failing, and customer impact was visible within seconds.", "timestamp": "00:21:06,608", "timestamp_s": 1266.0}, {"text": "So we evolved the routing layer to become a replication-aware.", "timestamp": "00:21:10,868", "timestamp_s": 1270.0}, {"text": "If preferred target was unavailable, the request could fail over", "timestamp": "00:21:15,729", "timestamp_s": 1275.0}, {"text": "to the another replica already hosting the same key range.", "timestamp": "00:21:20,868", "timestamp_s": 1280.0}, {"text": "We introduced s- a small temporary queues for in-flight requests", "timestamp": "00:21:25,389", "timestamp_s": 1285.0}, {"text": "during the failover windows.", "timestamp": "00:21:30,368", "timestamp_s": 1290.0}, {"text": "And the key lesson key thing here was the predictability is valuable,", "timestamp": "00:21:32,308", "timestamp_s": 1292.0}, {"text": "but predictability without graceful degradation becomes a liability.", "timestamp": "00:21:39,138", "timestamp_s": 1299.0}, {"text": "The second learning here is The parallelism without isolation can", "timestamp": "00:21:45,516", "timestamp_s": 1305.0}, {"text": "actually reduce the throughput, right?", "timestamp": "00:21:53,116", "timestamp_s": 1313.0}, {"text": "Our first multithreaded implementation used shared connection pool because it", "timestamp": "00:21:55,416", "timestamp_s": 1315.0}, {"text": "looked more resource efficient on paper.", "timestamp": "00:22:01,896", "timestamp_s": 1321.0}, {"text": "In reality, threads spend huge amount of time contending for the pooled connection", "timestamp": "00:22:05,456", "timestamp_s": 1325.0}, {"text": "and synchronize the resources internally.", "timestamp": "00:22:13,156", "timestamp_s": 1333.0}, {"text": "And under the load throughput actually dr-dropped below the", "timestamp": "00:22:16,776", "timestamp_s": 1336.0}, {"text": "single-threaded baseline, as I mentioned in my previous slide also.", "timestamp": "00:22:21,376", "timestamp_s": 1341.0}, {"text": "The fix here was isolating the execution path, dedicated connection", "timestamp": "00:22:25,416", "timestamp_s": 1345.0}, {"text": "pool per workers thr- worker thread and per-node affinity group.", "timestamp": "00:22:29,436", "timestamp_s": 1349.0}, {"text": "That changed the system behavior completely.", "timestamp": "00:22:34,356", "timestamp_s": 1354.0}, {"text": "The third one is default Kubernetes behavior, often", "timestamp": "00:22:37,207", "timestamp_s": 1357.0}, {"text": "hostile to low tail latency.", "timestamp": "00:22:39,987", "timestamp_s": 1359.0}, {"text": "Our staging benchmark looked ex-excellent, but the production latency consistently", "timestamp": "00:22:42,867", "timestamp_s": 1362.0}, {"text": "ran about fifteen milliseconds slower under the comparable traffic.", "timestamp": "00:22:48,527", "timestamp_s": 1368.0}, {"text": "We spent weeks investigating network paths, databa- database tuning, garbage", "timestamp": "00:22:54,087", "timestamp_s": 1374.0}, {"text": "collection, even tracing overl- overhead.", "timestamp": "00:22:59,747", "timestamp_s": 1379.0}, {"text": "The real culprit turned out to be a CPU throttling from the Linux scheduler.", "timestamp": "00:23:03,287", "timestamp_s": 1383.0}, {"text": "Because our workloads were running in burstable QOS, the kernel", "timestamp": "00:23:10,787", "timestamp_s": 1390.0}, {"text": "was throttling container once they exceeded the quota windows.", "timestamp": "00:23:17,787", "timestamp_s": 1397.0}, {"text": "That scheduling jitter was the leaking directly into our P99 latency.", "timestamp": "00:23:23,937", "timestamp_s": 1403.0}, {"text": "Once we moved the latency-sensitive services to the guaranteed QOS by setting", "timestamp": "00:23:29,737", "timestamp_s": 1409.0}, {"text": "the request equals to limits, the tail latency stabilized drama- dramatically.", "timestamp": "00:23:35,877", "timestamp_s": 1415.0}, {"text": "So this, these were few of our learning and, few of the things which we improvised", "timestamp": "00:23:42,807", "timestamp_s": 1422.0}, {"text": "later I also want to very clear about the limitation of this approach.", "timestamp": "00:23:49,117", "timestamp_s": 1429.0}, {"text": "The deterministic routing is powerful, but it\u0027s not a silver bullet.", "timestamp": "00:23:53,997", "timestamp_s": 1433.0}, {"text": "There are several scenarios where the model starts breaking down or", "timestamp": "00:23:58,837", "timestamp_s": 1438.0}, {"text": "requires additional operation handling.", "timestamp": "00:24:03,197", "timestamp_s": 1443.0}, {"text": "First, say, hot partition.", "timestamp": "00:24:06,277", "timestamp_s": 1446.0}, {"text": "It\u0027s a well-known DB problem.", "timestamp": "00:24:08,597", "timestamp_s": 1448.0}, {"text": "If one tenant, one merchant or customer suddenly generates where, heavy", "timestamp": "00:24:11,517", "timestamp_s": 1451.0}, {"text": "amount of traffic, all that traffic still hashes the same execution path.", "timestamp": "00:24:16,696", "timestamp_s": 1456.0}, {"text": "And deterministic routing improves locality, but it cannot automatically in", "timestamp": "00:24:22,266", "timestamp_s": 1462.0}, {"text": "parallel put the single hotkey, right?", "timestamp": "00:24:27,406", "timestamp_s": 1467.0}, {"text": "At that point, we need additional strategy splitting the partition,", "timestamp": "00:24:30,866", "timestamp_s": 1470.0}, {"text": "introducing sub-sharding or isolating hot tenants onto dedicated capacity.", "timestamp": "00:24:35,786", "timestamp_s": 1475.0}, {"text": "Second, leaseholder movement and the corresponding kind of rebalancing.", "timestamp": "00:24:42,106", "timestamp_s": 1482.0}, {"text": "So in distributed databases, ownership of the ranges or partitions is not static.", "timestamp": "00:24:47,586", "timestamp_s": 1487.0}, {"text": "The leaseholder move during the failover, balancing, and topology changes.", "timestamp": "00:24:54,036", "timestamp_s": 1494.0}, {"text": "That means the routing layer is operating on the probability and not the certainty.", "timestamp": "00:24:59,676", "timestamp_s": 1499.0}, {"text": "Sometimes the request lands exactly where you want it.", "timestamp": "00:25:04,736", "timestamp_s": 1504.0}, {"text": "Sometimes it lands near the right replica and requires", "timestamp": "00:25:08,956", "timestamp_s": 1508.0}, {"text": "the additional hop internally.", "timestamp": "00:25:12,816", "timestamp_s": 1512.0}, {"text": "So the routing layer has to be-- has to tolerate the misses gracefully, right?", "timestamp": "00:25:15,216", "timestamp_s": 1515.0}, {"text": "In our case, we added retry-aware routing and the fallback path for", "timestamp": "00:25:22,136", "timestamp_s": 1522.0}, {"text": "scale lo- locality assumptions.", "timestamp": "00:25:27,836", "timestamp_s": 1527.0}, {"text": "The third third one is multi-key and distributed transactions.", "timestamp": "00:25:30,376", "timestamp_s": 1530.0}, {"text": "Our biggest gain come from the common case where the requests", "timestamp": "00:25:33,956", "timestamp_s": 1533.0}, {"text": "primarily operate on a single partition key or a localized dataset.", "timestamp": "00:25:38,396", "timestamp_s": 1538.0}, {"text": "If transactions regularly spans more shards, ranges, or tenants, then", "timestamp": "00:25:44,416", "timestamp_s": 1544.0}, {"text": "coordination overhead still exists and relative improvement becomes smaller.", "timestamp": "00:25:50,296", "timestamp_s": 1550.0}, {"text": "The fourth one is topology and rebalancing complexity.", "timestamp": "00:25:56,736", "timestamp_s": 1556.0}, {"text": "So As the cluster scale node changes, range range change rebalance happens.", "timestamp": "00:26:00,776", "timestamp_s": 1560.0}, {"text": "The traffic distribution evolves over the time.", "timestamp": "00:26:07,737", "timestamp_s": 1567.0}, {"text": "Maintaining the locality awareness at the application layer introduces operational", "timestamp": "00:26:11,416", "timestamp_s": 1571.0}, {"text": "complexity around the observability partition movement, and adaptive balance.", "timestamp": "00:26:16,816", "timestamp_s": 1576.0}, {"text": "So we need visibility into where the data actually lives and how that", "timestamp": "00:26:22,896", "timestamp_s": 1582.0}, {"text": "placement changes over the time.", "timestamp": "00:26:27,896", "timestamp_s": 1587.0}, {"text": "So we need to monitor it very closely.", "timestamp": "00:26:29,556", "timestamp_s": 1589.0}, {"text": "S- so the important takeaway is deterministic routing is the", "timestamp": "00:26:32,366", "timestamp_s": 1592.0}, {"text": "optimization for the common path.", "timestamp": "00:26:36,226", "timestamp_s": 1596.0}, {"text": "It improves locality, reduces a- avoidable coordination and makes the system more", "timestamp": "00:26:39,186", "timestamp_s": 1599.0}, {"text": "efficient under the normal high volume tr- traffic patterns But it does not replace", "timestamp": "00:26:45,967", "timestamp_s": 1605.0}, {"text": "failover handling distributed transaction coordination hotspot management or", "timestamp": "00:26:53,007", "timestamp_s": 1613.0}, {"text": "capacity planning under squid workloads.", "timestamp": "00:26:58,689", "timestamp_s": 1618.0}, {"text": "So", "timestamp": "00:27:03,148", "timestamp_s": 1623.0}, {"text": "So where are the opportunities to for improvement, right?", "timestamp": "00:27:03,848", "timestamp_s": 1623.0}, {"text": "So first is adaptive rebalancing.", "timestamp": "00:27:07,748", "timestamp_s": 1627.0}, {"text": "So traffic patterns are never static.", "timestamp": "00:27:10,488", "timestamp_s": 1630.0}, {"text": "Over the time, some tenant becomes significantly hotter than", "timestamp": "00:27:13,808", "timestamp_s": 1633.0}, {"text": "others, and static partitioning eventually creates imbalance.", "timestamp": "00:27:18,548", "timestamp_s": 1638.0}, {"text": "So one area we are exploring is dynamic rebalancing, automatic how", "timestamp": "00:27:22,068", "timestamp_s": 1642.0}, {"text": "we can make it more auto in nature.", "timestamp": "00:27:27,768", "timestamp_s": 1647.0}, {"text": "So automatic redistribution, heavily accessed of heavily accessed key ranges", "timestamp": "00:27:31,228", "timestamp_s": 1651.0}, {"text": "without interrupting the live traffic.", "timestamp": "00:27:36,728", "timestamp_s": 1656.0}, {"text": "In some cases, that may even isolating the extremely hot", "timestamp": "00:27:40,148", "timestamp_s": 1660.0}, {"text": "partition onto dedicated capacity that could be one of the solution.", "timestamp": "00:27:44,888", "timestamp_s": 1664.0}, {"text": "The second is multi-region deterministic routing.", "timestamp": "00:27:49,448", "timestamp_s": 1669.0}, {"text": "So today, locality mostly exists within the cluster or regional boundary.", "timestamp": "00:27:52,188", "timestamp_s": 1672.0}, {"text": "The next step is extending that routing awareness across the region.", "timestamp": "00:27:58,148", "timestamp_s": 1678.0}, {"text": "Instead of routing requests to any healthy node globally, the system can we can", "timestamp": "00:28:02,928", "timestamp_s": 1682.0}, {"text": "prioritize to the nearest region, right?", "timestamp": "00:28:09,488", "timestamp_s": 1689.0}, {"text": "So the most likely to already host the relevant data or leaseholder.", "timestamp": "00:28:13,048", "timestamp_s": 1693.0}, {"text": "The third one is routing-aware failover.", "timestamp": "00:28:18,898", "timestamp_s": 1698.0}, {"text": "So traditional failover mechanism typically redirect traffic towards", "timestamp": "00:28:21,818", "timestamp_s": 1701.0}, {"text": "any available healthy node.", "timestamp": "00:28:29,198", "timestamp_s": 1709.0}, {"text": "But in distributed system, not all healthy nodes are equally optimal, right?", "timestamp": "00:28:31,598", "timestamp_s": 1711.0}, {"text": "So we can-- We are continuing to evolve the routing layers, so failover decision", "timestamp": "00:28:36,778", "timestamp_s": 1716.0}, {"text": "remain locality-aware redirecting requests towards the replica already close to the", "timestamp": "00:28:44,418", "timestamp_s": 1724.0}, {"text": "affected key ranges instead of introducing unnecessary coordination after the failure", "timestamp": "00:28:51,518", "timestamp_s": 1731.0}, {"text": "event wherever problem started, right?", "timestamp": "00:28:56,708", "timestamp_s": 1736.0}, {"text": "Yeah that\u0027s still, one version is still there.", "timestamp": "00:28:58,618", "timestamp_s": 1738.0}, {"text": "The fourth one is deeper observation integration.", "timestamp": "00:29:02,006", "timestamp_s": 1742.0}, {"text": "That\u0027s one of the biggest opportunity here.", "timestamp": "00:29:05,597", "timestamp_s": 1745.0}, {"text": "Which keys are becoming hot?", "timestamp": "00:29:08,237", "timestamp_s": 1748.0}, {"text": "Which ranges are producing elevated tail latency?", "timestamp": "00:29:11,677", "timestamp_s": 1751.0}, {"text": "Which nodes are consistently becoming coordination bottlenecks?", "timestamp": "00:29:16,257", "timestamp_s": 1756.0}, {"text": "The earlier system", "timestamp": "00:29:22,937", "timestamp_s": 1762.0}, {"text": "The earlier system can detect locality imbalance sooner it can respond before", "timestamp": "00:29:24,277", "timestamp_s": 1764.0}, {"text": "user visibility degradation occurs, right?", "timestamp": "00:29:32,678", "timestamp_s": 1772.0}, {"text": "But across all this enhancement, the underlying principle remains unchanged,", "timestamp": "00:29:36,178", "timestamp_s": 1776.0}, {"text": "that computation becomes more efficient when the request execute clo- as close", "timestamp": "00:29:42,237", "timestamp_s": 1782.0}, {"text": "as possible to the data they need.", "timestamp": "00:29:48,317", "timestamp_s": 1788.0}, {"text": "Everything else is essential refinement around the core idea.", "timestamp": "00:29:52,197", "timestamp_s": 1792.0}, {"text": "Now what you as an audience can do here, right?", "timestamp": "00:29:56,957", "timestamp_s": 1796.0}, {"text": "So check your database\u0027s partition strategy.", "timestamp": "00:30:01,407", "timestamp_s": 1801.0}, {"text": "Check the keys and try to get the sample data how many transactions or how many", "timestamp": "00:30:05,787", "timestamp_s": 1805.0}, {"text": "hits you get on the node for those keys.", "timestamp": "00:30:14,146", "timestamp_s": 1814.0}, {"text": "Set Kubernetes resources request limit to your latency-critical pods.", "timestamp": "00:30:19,407", "timestamp_s": 1819.0}, {"text": "Try to come up or, measure the P95 and P99 compare before and after and see", "timestamp": "00:30:25,718", "timestamp_s": 1825.0}, {"text": "how much impro- improvement is there.", "timestamp": "00:30:35,498", "timestamp_s": 1835.0}, {"text": "And, Instrument the node hit ratio track the percentage of request", "timestamp": "00:30:39,497", "timestamp_s": 1839.0}, {"text": "landing on the correct node and try to optimize those numbers there.", "timestamp": "00:30:45,246", "timestamp_s": 1845.0}, {"text": "So that, that could be a good start.", "timestamp": "00:30:50,845", "timestamp_s": 1850.0}, {"text": "And then based on that, I think and few of the approaches which I just talked", "timestamp": "00:30:53,966", "timestamp_s": 1853.0}, {"text": "about some configuration decision could be taken and definitely there,", "timestamp": "00:31:00,227", "timestamp_s": 1860.0}, {"text": "there will be a hu-huge improvement could be seen after implementing that.", "timestamp": "00:31:04,237", "timestamp_s": 1864.0}, {"text": "So yeah thanks.", "timestamp": "00:31:10,228", "timestamp_s": 1870.0}, {"text": "Thanks, everyone.", "timestamp": "00:31:11,318", "timestamp_s": 1871.0}, {"text": "Thanks once again.", "timestamp": "00:31:12,178", "timestamp_s": 1872.0}, {"text": "Myself, Ritwik, and yeah, I would like to connect you on LinkedIn.", "timestamp": "00:31:13,208", "timestamp_s": 1873.0}, {"text": "Here is my LinkedIn URL.", "timestamp": "00:31:18,997", "timestamp_s": 1878.0}, {"text": "So definitely looking forward and thanks once again, CON42,", "timestamp": "00:31:22,066", "timestamp_s": 1882.0}, {"text": "for giving me this opportunity.", "timestamp": "00:31:26,846", "timestamp_s": 1886.0}, {"text": "Thank", "timestamp": "00:31:28,826", "timestamp_s": 1888.0}, {"text": "you.", "timestamp": "00:31:29,006", "timestamp_s": 1889.0}];
+              
 
               var tag = document.createElement('script');
 
@@ -549,6 +551,1692 @@
           </div>
 
           
+          
+
+          <div class="col-12 mb-5">
+            <h3>
+              Summary
+            </h3>
+            <ul>
+              
+            </ul>
+          </div>
+
+          <div class="col-12 mb-5">
+            <h3>
+              Transcript
+            </h3>
+            <span class="text-muted">
+              This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/./srt/dbd2026_Ritvik_Pandya.srt" target="_blank">submit a PR</a>.
+            </span>
+            <div>
+            
+            <span id="chunk-0" class="transcript-chunks" onclick="console.log('00:00:00,500'); seek(0.0)">
+              Speaker 8: Hi, everyone.
+            </span>
+            
+            <span id="chunk-1" class="transcript-chunks" onclick="console.log('00:00:01,180'); seek(1.0)">
+              I'm Ritwik Pandya.
+            </span>
+            
+            <span id="chunk-2" class="transcript-chunks" onclick="console.log('00:00:02,280'); seek(2.0)">
+              I manage engineering teams focused on large-scale payment platform at
+            </span>
+            
+            <span id="chunk-3" class="transcript-chunks" onclick="console.log('00:00:06,120'); seek(6.0)">
+              the leading financial institution.
+            </span>
+            
+            <span id="chunk-4" class="transcript-chunks" onclick="console.log('00:00:08,380'); seek(8.0)">
+              Today, I want to talk about the problem many of us have
+            </span>
+            
+            <span id="chunk-5" class="transcript-chunks" onclick="console.log('00:00:10,740'); seek(10.0)">
+              seen in the production systems.
+            </span>
+            
+            <span id="chunk-6" class="transcript-chunks" onclick="console.log('00:00:12,740'); seek(12.0)">
+              There is sudden p99 latency spike during the peak hours, where the
+            </span>
+            
+            <span id="chunk-7" class="transcript-chunks" onclick="console.log('00:00:16,799'); seek(16.0)">
+              response times jumps nearly four-fold.
+            </span>
+            
+            <span id="chunk-8" class="transcript-chunks" onclick="console.log('00:00:19,100'); seek(19.0)">
+              I'll walk you through a single architectural shift around the
+            </span>
+            
+            <span id="chunk-9" class="transcript-chunks" onclick="console.log('00:00:21,980'); seek(21.0)">
+              deterministic routing and the data locality, which significantly can improve
+            </span>
+            
+            <span id="chunk-10" class="transcript-chunks" onclick="console.log('00:00:26,660'); seek(26.0)">
+              the system behavior, delivering higher throughput and reducing the tail latency
+            </span>
+            
+            <span id="chunk-11" class="transcript-chunks" onclick="console.log('00:00:31,299'); seek(31.0)">
+              by, say, fourteen-- fifty-nine percent, which we saw, all on the same hardware
+            </span>
+            
+            <span id="chunk-12" class="transcript-chunks" onclick="console.log('00:00:36,100'); seek(36.0)">
+              and the same database infrastructure.
+            </span>
+            
+            <span id="chunk-13" class="transcript-chunks" onclick="console.log('00:00:38,790'); seek(38.0)">
+              So here's the story.
+            </span>
+            
+            <span id="chunk-14" class="transcript-chunks" onclick="console.log('00:00:40,650'); seek(40.0)">
+              Our base p99 latency was around twelve milliseconds, and during the
+            </span>
+            
+            <span id="chunk-15" class="transcript-chunks" onclick="console.log('00:00:44,550'); seek(44.0)">
+              peak hours, it jumped to forty-seven milliseconds, nearly four times slower.
+            </span>
+            
+            <span id="chunk-16" class="transcript-chunks" onclick="console.log('00:00:49,230'); seek(49.0)">
+              Transactions started timing out, clients retried automatically.
+            </span>
+            
+            <span id="chunk-17" class="transcript-chunks" onclick="console.log('00:00:52,879'); seek(52.0)">
+              Retry piled up on top of the existing load, and very quickly, we
+            </span>
+            
+            <span id="chunk-18" class="transcript-chunks" onclick="console.log('00:00:57,019'); seek(57.0)">
+              were dealing with the retry storm.
+            </span>
+            
+            <span id="chunk-19" class="transcript-chunks" onclick="console.log('00:00:59,180'); seek(59.0)">
+              The SLA alert fired, pagers went off.
+            </span>
+            
+            <span id="chunk-20" class="transcript-chunks" onclick="console.log('00:01:02,739'); seek(62.0)">
+              At first, it was obvious answer to be that, "Hey, add more nodes." So we did.
+            </span>
+            
+            <span id="chunk-21" class="transcript-chunks" onclick="console.log('00:01:09,079'); seek(69.0)">
+              But latency didn't improve.
+            </span>
+            
+            <span id="chunk-22" class="transcript-chunks" onclick="console.log('00:01:10,859'); seek(70.0)">
+              In fact, it got slightly worse.
+            </span>
+            
+            <span id="chunk-23" class="transcript-chunks" onclick="console.log('00:01:13,259'); seek(73.0)">
+              That was the key insight.
+            </span>
+            
+            <span id="chunk-24" class="transcript-chunks" onclick="console.log('00:01:14,499'); seek(74.0)">
+              The problem wasn't the capacity, the problem was the coordination
+            </span>
+            
+            <span id="chunk-25" class="transcript-chunks" onclick="console.log('00:01:18,119'); seek(78.0)">
+              overhead caused by the randomness.
+            </span>
+            
+            <span id="chunk-26" class="transcript-chunks" onclick="console.log('00:01:20,259'); seek(80.0)">
+              Every request was l-landing on the random node, while the actual
+            </span>
+            
+            <span id="chunk-27" class="transcript-chunks" onclick="console.log('00:01:25,219'); seek(85.0)">
+              data often lived somewhere else.
+            </span>
+            
+            <span id="chunk-28" class="transcript-chunks" onclick="console.log('00:01:27,879'); seek(87.0)">
+              So each transaction triggered the extra coordination, cross-node
+            </span>
+            
+            <span id="chunk-29" class="transcript-chunks" onclick="console.log('00:01:32,199'); seek(92.0)">
+              lookups, replication waits, log checks, cache misses.
+            </span>
+            
+            <span id="chunk-30" class="transcript-chunks" onclick="console.log('00:01:37,399'); seek(97.0)">
+              The system was spending more time cor- coordinating the work
+            </span>
+            
+            <span id="chunk-31" class="transcript-chunks" onclick="console.log('00:01:41,959'); seek(101.0)">
+              than actually doing the work.
+            </span>
+            
+            <span id="chunk-32" class="transcript-chunks" onclick="console.log('00:01:44,019'); seek(104.0)">
+              Think of it like a hospital where every patient is assigned to
+            </span>
+            
+            <span id="chunk-33" class="transcript-chunks" onclick="console.log('00:01:47,239'); seek(107.0)">
+              the random doctor on each visit.
+            </span>
+            
+            <span id="chunk-34" class="transcript-chunks" onclick="console.log('00:01:51,039'); seek(111.0)">
+              The doctor doesn't have your record locally, so they first fetch the
+            </span>
+            
+            <span id="chunk-35" class="transcript-chunks" onclick="console.log('00:01:55,699'); seek(115.0)">
+              files, call the departments, verify the context, and then begin the treatment.
+            </span>
+            
+            <span id="chunk-36" class="transcript-chunks" onclick="console.log('00:02:01,079'); seek(121.0)">
+              That's effectively what our database was doing under the load.
+            </span>
+            
+            <span id="chunk-37" class="transcript-chunks" onclick="console.log('00:02:05,600'); seek(125.0)">
+              So we ask a simple question: What if every transaction could land to
+            </span>
+            
+            <span id="chunk-38" class="transcript-chunks" onclick="console.log('00:02:10,679'); seek(130.0)">
+              the node that already has its data?
+            </span>
+            
+            <span id="chunk-39" class="transcript-chunks" onclick="console.log('00:02:14,660'); seek(134.0)">
+              So before getting in the solution, it's worth grounding this why
+            </span>
+            
+            <span id="chunk-40" class="transcript-chunks" onclick="console.log('00:02:18,760'); seek(138.0)">
+              the latency actually matters.
+            </span>
+            
+            <span id="chunk-41" class="transcript-chunks" onclick="console.log('00:02:21,380'); seek(141.0)">
+              In transactional systems, latency isn't the performance metrics.
+            </span>
+            
+            <span id="chunk-42" class="transcript-chunks" onclick="console.log('00:02:25,881'); seek(145.0)">
+              It's directly translate into the business impact.
+            </span>
+            
+            <span id="chunk-43" class="transcript-chunks" onclick="console.log('00:02:29,899'); seek(149.0)">
+              There was a well-known pattern across the industry, and Amazon reported that
+            </span>
+            
+            <span id="chunk-44" class="transcript-chunks" onclick="console.log('00:02:33,799'); seek(153.0)">
+              every additional hundred millisecond of the latency impacted revenue.
+            </span>
+            
+            <span id="chunk-45" class="transcript-chunks" onclick="console.log('00:02:38,859'); seek(158.0)">
+              Google observed measurable query drop-offs with the few hundred millisecond delay.
+            </span>
+            
+            <span id="chunk-46" class="transcript-chunks" onclick="console.log('00:02:45,060'); seek(165.0)">
+              Same goes with other top industry vendors.
+            </span>
+            
+            <span id="chunk-47" class="transcript-chunks" onclick="console.log('00:02:49,960'); seek(169.0)">
+              We saw the same effect operationally.
+            </span>
+            
+            <span id="chunk-48" class="transcript-chunks" onclick="console.log('00:02:52,362'); seek(172.0)">
+              When our P99 climbed up from twelve millisecond to forty-seven
+            </span>
+            
+            <span id="chunk-49" class="transcript-chunks" onclick="console.log('00:02:56,780'); seek(176.0)">
+              millisecond under the peak load, about three point two requests,
+            </span>
+            
+            <span id="chunk-50" class="transcript-chunks" onclick="console.log('00:03:02,841'); seek(182.0)">
+              percent requests began timing out.
+            </span>
+            
+            <span id="chunk-51" class="transcript-chunks" onclick="console.log('00:03:05,421'); seek(185.0)">
+              And every failed transaction had a real downstream cost: retries, operational
+            </span>
+            
+            <span id="chunk-52" class="transcript-chunks" onclick="console.log('00:03:12,241'); seek(192.0)">
+              overhead, customer friction, SLA exposure.
+            </span>
+            
+            <span id="chunk-53" class="transcript-chunks" onclick="console.log('00:03:16,261'); seek(196.0)">
+              At our scale, even the few percentage points become
+            </span>
+            
+            <span id="chunk-54" class="transcript-chunks" onclick="console.log('00:03:19,561'); seek(199.0)">
+              materially expensive very quickly.
+            </span>
+            
+            <span id="chunk-55" class="transcript-chunks" onclick="console.log('00:03:23,400'); seek(203.0)">
+              At same time, the business was focusing nearly twice transaction growth over
+            </span>
+            
+            <span id="chunk-56" class="transcript-chunks" onclick="console.log('00:03:29,700'); seek(209.0)">
+              the next year, but the infrastructure budget wasn't doubling with it.
+            </span>
+            
+            <span id="chunk-57" class="transcript-chunks" onclick="console.log('00:03:33,740'); seek(213.0)">
+              So simply scaling horizon- horizontally by adding more nodes
+            </span>
+            
+            <span id="chunk-58" class="transcript-chunks" onclick="console.log('00:03:38,160'); seek(218.0)">
+              wasn't a sustainable answer.
+            </span>
+            
+            <span id="chunk-59" class="transcript-chunks" onclick="console.log('00:03:40,200'); seek(220.0)">
+              That constraint focused us to rethink architecture itself,
+            </span>
+            
+            <span id="chunk-60" class="transcript-chunks" onclick="console.log('00:03:44,460'); seek(224.0)">
+              not just add more hardware.
+            </span>
+            
+            <span id="chunk-61" class="transcript-chunks" onclick="console.log('00:03:46,861'); seek(226.0)">
+              So this was our baseline architecture where we started.
+            </span>
+            
+            <span id="chunk-62" class="transcript-chunks" onclick="console.log('00:03:50,680'); seek(230.0)">
+              A client request hits to load balancer, and the load balancer
+            </span>
+            
+            <span id="chunk-63" class="transcript-chunks" onclick="console.log('00:03:54,480'); seek(234.0)">
+              selects an application node randomly.
+            </span>
+            
+            <span id="chunk-64" class="transcript-chunks" onclick="console.log('00:03:57,360'); seek(237.0)">
+              Let's say node one.
+            </span>
+            
+            <span id="chunk-65" class="transcript-chunks" onclick="console.log('00:03:59,600'); seek(239.0)">
+              But the data for the transaction may actually owned by node three.
+            </span>
+            
+            <span id="chunk-66" class="transcript-chunks" onclick="console.log('00:04:03,801'); seek(243.0)">
+              So node one now has locate the correct range of leaseholder, coordinate
+            </span>
+            
+            <span id="chunk-67" class="transcript-chunks" onclick="console.log('00:04:09,001'); seek(249.0)">
+              across the nodes, wait for replication acknowledgment, acquire locks, and only
+            </span>
+            
+            <span id="chunk-68" class="transcript-chunks" onclick="console.log('00:04:14,881'); seek(254.0)">
+              then execute the transac-transaction.
+            </span>
+            
+            <span id="chunk-69" class="transcript-chunks" onclick="console.log('00:04:17,941'); seek(257.0)">
+              Every additional network hop adds latency.
+            </span>
+            
+            <span id="chunk-70" class="transcript-chunks" onclick="console.log('00:04:22,000'); seek(262.0)">
+              Every coordination boundary introduce the queu-queuing and contention.
+            </span>
+            
+            <span id="chunk-71" class="transcript-chunks" onclick="console.log('00:04:28,601'); seek(268.0)">
+              Over the time, four major problem become obvious.
+            </span>
+            
+            <span id="chunk-72" class="transcript-chunks" onclick="console.log('00:04:32,101'); seek(272.0)">
+              First, every request effectively rediscover data locally from the scratch.
+            </span>
+            
+            <span id="chunk-73" class="transcript-chunks" onclick="console.log('00:04:37,541'); seek(277.0)">
+              The request path had no awareness where data already lived.
+            </span>
+            
+            <span id="chunk-74" class="transcript-chunks" onclick="console.log('00:04:42,561'); seek(282.0)">
+              Second, writes triggered synchronously, cross-node coordination happens.
+            </span>
+            
+            <span id="chunk-75" class="transcript-chunks" onclick="console.log('00:04:49,360'); seek(289.0)">
+              Transactions spend significant time waiting for-- waiting on replication
+            </span>
+            
+            <span id="chunk-76" class="transcript-chunks" onclick="console.log('00:04:53,940'); seek(293.0)">
+              and consensus na- overhead rather than doing the useful work.
+            </span>
+            
+            <span id="chunk-77" class="transcript-chunks" onclick="console.log('00:04:58,600'); seek(298.0)">
+              Third, utilization become uneven.
+            </span>
+            
+            <span id="chunk-78" class="transcript-chunks" onclick="console.log('00:05:01,280'); seek(301.0)">
+              Some nodes saturated while other remained underutilized.
+            </span>
+            
+            <span id="chunk-79" class="transcript-chunks" onclick="console.log('00:05:06,661'); seek(306.0)">
+              We were paying for the cluster capacity we couldn't ef- efficiently consume.
+            </span>
+            
+            <span id="chunk-80" class="transcript-chunks" onclick="console.log('00:05:11,441'); seek(311.0)">
+              And the fourth one, under the peak concurrency, lock contention
+            </span>
+            
+            <span id="chunk-81" class="transcript-chunks" onclick="console.log('00:05:16,701'); seek(316.0)">
+              become increasingly visible.
+            </span>
+            
+            <span id="chunk-82" class="transcript-chunks" onclick="console.log('00:05:19,121'); seek(319.0)">
+              The queue depth grew, retries increased, and the tail latency amplified rapidly.
+            </span>
+            
+            <span id="chunk-83" class="transcript-chunks" onclick="console.log('00:05:25,561'); seek(325.0)">
+              This is actually a default behavior of many distribus- distributed
+            </span>
+            
+            <span id="chunk-84" class="transcript-chunks" onclick="console.log('00:05:29,181'); seek(329.0)">
+              systems under the random routing.
+            </span>
+            
+            <span id="chunk-85" class="transcript-chunks" onclick="console.log('00:05:31,661'); seek(331.0)">
+              A moderated load, it works reasonably well, but as concurrency increases,
+            </span>
+            
+            <span id="chunk-86" class="transcript-chunks" onclick="console.log('00:05:38,641'); seek(338.0)">
+              the coordination overhead starts dominating the request path
+            </span>
+            
+            <span id="chunk-87" class="transcript-chunks" onclick="console.log('00:05:42,821'); seek(342.0)">
+              We tried to instrumentate the entire request path under-- and to
+            </span>
+            
+            <span id="chunk-88" class="transcript-chunks" onclick="console.log('00:05:46,881'); seek(346.0)">
+              understand where those forty-seven milliseconds were actually going.
+            </span>
+            
+            <span id="chunk-89" class="transcript-chunks" onclick="console.log('00:05:52,141'); seek(352.0)">
+              And the result were honestly surprising.
+            </span>
+            
+            <span id="chunk-90" class="transcript-chunks" onclick="console.log('00:05:54,651'); seek(354.0)">
+              Around twelve milliseconds were spent just re-resolving metadata
+            </span>
+            
+            <span id="chunk-91" class="transcript-chunks" onclick="console.log('00:05:59,191'); seek(359.0)">
+              and determining where data lived.
+            </span>
+            
+            <span id="chunk-92" class="transcript-chunks" onclick="console.log('00:06:01,491'); seek(361.0)">
+              Another eighteen millisecond went into cross-node coordination,
+            </span>
+            
+            <span id="chunk-93" class="transcript-chunks" onclick="console.log('00:06:06,091'); seek(366.0)">
+              replication, acknowledgments, et cetera.
+            </span>
+            
+            <span id="chunk-94" class="transcript-chunks" onclick="console.log('00:06:08,451'); seek(368.0)">
+              Lock contention contributed roughly eight millisecond under concurrency.
+            </span>
+            
+            <span id="chunk-95" class="transcript-chunks" onclick="console.log('00:06:14,071'); seek(374.0)">
+              Connection management and network overhead added ano-
+            </span>
+            
+            <span id="chunk-96" class="transcript-chunks" onclick="console.log('00:06:18,331'); seek(378.0)">
+              other another four milliseconds.
+            </span>
+            
+            <span id="chunk-97" class="transcript-chunks" onclick="console.log('00:06:20,621'); seek(380.0)">
+              So when we added everything up the real insight became o- obvious.
+            </span>
+            
+            <span id="chunk-98" class="transcript-chunks" onclick="console.log('00:06:26,261'); seek(386.0)">
+              The most of the latency wasn't the computation, it was coordination.
+            </span>
+            
+            <span id="chunk-99" class="transcript-chunks" onclick="console.log('00:06:30,561'); seek(390.0)">
+              The system was spending majority of its time locating the data, synchronizing
+            </span>
+            
+            <span id="chunk-100" class="transcript-chunks" onclick="console.log('00:06:37,101'); seek(397.0)">
+              the state, waiting for locks, and coordinating across the nodes.
+            </span>
+            
+            <span id="chunk-101" class="transcript-chunks" onclick="console.log('00:06:41,341'); seek(401.0)">
+              Only small fraction of the request path was actual transaction execution.
+            </span>
+            
+            <span id="chunk-102" class="transcript-chunks" onclick="console.log('00:06:47,451'); seek(407.0)">
+              A useful analogy is say, a restaurant where the kitchen spend nearly all
+            </span>
+            
+            <span id="chunk-103" class="transcript-chunks" onclick="console.log('00:06:52,221'); seek(412.0)">
+              of its time coordinating the orders, locating in-ingredients, and handling
+            </span>
+            
+            <span id="chunk-104" class="transcript-chunks" onclick="console.log('00:06:57,561'); seek(417.0)">
+              work between the stations, and only tiny portion of actual-- actually cooking food.
+            </span>
+            
+            <span id="chunk-105" class="transcript-chunks" onclick="console.log('00:07:04,821'); seek(424.0)">
+              At some point, adding more cooks doesn't help.
+            </span>
+            
+            <span id="chunk-106" class="transcript-chunks" onclick="console.log('00:07:08,061'); seek(428.0)">
+              The operational overhead itself becomes the bottleneck, and that was
+            </span>
+            
+            <span id="chunk-107" class="transcript-chunks" onclick="console.log('00:07:13,221'); seek(433.0)">
+              the architectural realization for us.
+            </span>
+            
+            <span id="chunk-108" class="transcript-chunks" onclick="console.log('00:07:15,721'); seek(435.0)">
+              We didn't need bigger system.
+            </span>
+            
+            <span id="chunk-109" class="transcript-chunks" onclick="console.log('00:07:17,901'); seek(437.0)">
+              We needed system to coordinate less.
+            </span>
+            
+            <span id="chunk-110" class="transcript-chunks" onclick="console.log('00:07:21,041'); seek(441.0)">
+              And just to be precise, these numbers are the representative
+            </span>
+            
+            <span id="chunk-111" class="transcript-chunks" onclick="console.log('00:07:25,841'); seek(445.0)">
+              attribution from the distributed tracing and span-level analysis.
+            </span>
+            
+            <span id="chunk-112" class="transcript-chunks" onclick="console.log('00:07:31,601'); seek(451.0)">
+              Percentage decomposition is never the mathematically perfect in the practice,
+            </span>
+            
+            <span id="chunk-113" class="transcript-chunks" onclick="console.log('00:07:37,160'); seek(457.0)">
+              but the proposition were consistent and reproducible across the runs.
+            </span>
+            
+            <span id="chunk-114" class="transcript-chunks" onclick="console.log('00:07:42,880'); seek(462.0)">
+              That become the turning point of discussions with the leadership
+            </span>
+            
+            <span id="chunk-115" class="transcript-chunks" onclick="console.log('00:07:47,160'); seek(467.0)">
+              because the optimization opportunity was suddenly very visible
+            </span>
+            
+            <span id="chunk-116" class="transcript-chunks" onclick="console.log('00:07:52,020'); seek(472.0)">
+              Now, one architectural decision changed everything for us.
+            </span>
+            
+            <span id="chunk-117" class="transcript-chunks" onclick="console.log('00:07:56,560'); seek(476.0)">
+              Instead of routing transaction randomly, we started routing each transaction to the
+            </span>
+            
+            <span id="chunk-118" class="transcript-chunks" onclick="console.log('00:08:02,660'); seek(482.0)">
+              node most likely to already own its data.
+            </span>
+            
+            <span id="chunk-119" class="transcript-chunks" onclick="console.log('00:08:07,180'); seek(487.0)">
+              Routing decision were deterministic based on the key hashing, and the
+            </span>
+            
+            <span id="chunk-120" class="transcript-chunks" onclick="console.log('00:08:11,160'); seek(491.0)">
+              execution was in parallel with isolated worker pools to avoid shared contention.
+            </span>
+            
+            <span id="chunk-121" class="transcript-chunks" onclick="console.log('00:08:19,460'); seek(499.0)">
+              That becomes core architecture principle behind the entire system, and now
+            </span>
+            
+            <span id="chunk-122" class="transcript-chunks" onclick="console.log('00:08:23,300'); seek(503.0)">
+              underlying idea itself isn't new.
+            </span>
+            
+            <span id="chunk-123" class="transcript-chunks" onclick="console.log('00:08:27,650'); seek(507.0)">
+              The system like Dynamo introduced the partition-aware routing years ago,
+            </span>
+            
+            <span id="chunk-124" class="transcript-chunks" onclick="console.log('00:08:32,909'); seek(512.0)">
+              and later research such as Calvin explored deterministic transaction
+            </span>
+            
+            <span id="chunk-125" class="transcript-chunks" onclick="console.log('00:08:37,669'); seek(517.0)">
+              scheduling at the database layer.
+            </span>
+            
+            <span id="chunk-126" class="transcript-chunks" onclick="console.log('00:08:39,889'); seek(519.0)">
+              What we found interestingly was applying the same locality principle earlier in
+            </span>
+            
+            <span id="chunk-127" class="transcript-chunks" onclick="console.log('00:08:46,449'); seek(526.0)">
+              request path and applic-- and at the application and routing layer itself.
+            </span>
+            
+            <span id="chunk-128" class="transcript-chunks" onclick="console.log('00:08:52,130'); seek(532.0)">
+              Because once the request arrives near the correct data from the beginning,
+            </span>
+            
+            <span id="chunk-129" class="transcript-chunks" onclick="console.log('00:08:58,270'); seek(538.0)">
+              an entire category of coordination overhead start disappearing.
+            </span>
+            
+            <span id="chunk-130" class="transcript-chunks" onclick="console.log('00:09:03,640'); seek(543.0)">
+              There will be a fewer metadata lookups, fewer cross-node hops, better cache
+            </span>
+            
+            <span id="chunk-131" class="transcript-chunks" onclick="console.log('00:09:09,080'); seek(549.0)">
+              locality, lower lock, lock contention.
+            </span>
+            
+            <span id="chunk-132" class="transcript-chunks" onclick="console.log('00:09:13,240'); seek(553.0)">
+              So the real gain real gain wasn't about inventing faster algorithm, it was about
+            </span>
+            
+            <span id="chunk-133" class="transcript-chunks" onclick="console.log('00:09:20,280'); seek(560.0)">
+              eliminating unnecessary movement of data and coordinating that never needed to
+            </span>
+            
+            <span id="chunk-134" class="transcript-chunks" onclick="console.log('00:09:26,260'); seek(566.0)">
+              be happen in the first place itself.
+            </span>
+            
+            <span id="chunk-135" class="transcript-chunks" onclick="console.log('00:09:28,400'); seek(568.0)">
+              A few quick words on why this approach works particularly well in the
+            </span>
+            
+            <span id="chunk-136" class="transcript-chunks" onclick="console.log('00:09:35,540'); seek(575.0)">
+              modern distributed data-databases.
+            </span>
+            
+            <span id="chunk-137" class="transcript-chunks" onclick="console.log('00:09:37,880'); seek(577.0)">
+              Most distributed databases today already optimize around the locality internally.
+            </span>
+            
+            <span id="chunk-138" class="transcript-chunks" onclick="console.log('00:09:44,960'); seek(584.0)">
+              They partition data into ranges and shards replicate those ranges across the nodes,
+            </span>
+            
+            <span id="chunk-139" class="transcript-chunks" onclick="console.log('00:09:50,940'); seek(590.0)">
+              and use consensus protocol like Raft to coordinate ownership and consistency.
+            </span>
+            
+            <span id="chunk-140" class="transcript-chunks" onclick="console.log('00:09:57,560'); seek(597.0)">
+              The important realization for us was, if the database is already locality-aware
+            </span>
+            
+            <span id="chunk-141" class="transcript-chunks" onclick="console.log('00:10:04,750'); seek(604.0)">
+              internally, the application layer should stop behaving randomly.
+            </span>
+            
+            <span id="chunk-142" class="transcript-chunks" onclick="console.log('00:10:09,530'); seek(609.0)">
+              Under traditional random routing, request lands on any random nodes,
+            </span>
+            
+            <span id="chunk-143" class="transcript-chunks" onclick="console.log('00:10:15,629'); seek(615.0)">
+              and the database spends additional time forwarding the request,
+            </span>
+            
+            <span id="chunk-144" class="transcript-chunks" onclick="console.log('00:10:20,489'); seek(620.0)">
+              resolving the ownership, coordinating replicas, and managing cross-node
+            </span>
+            
+            <span id="chunk-145" class="transcript-chunks" onclick="console.log('00:10:25,089'); seek(625.0)">
+              communication Solution is deterministic routing that changes everything.
+            </span>
+            
+            <span id="chunk-146" class="transcript-chunks" onclick="console.log('00:10:31,389'); seek(631.0)">
+              By routing the request based on the same partition key used by the
+            </span>
+            
+            <span id="chunk-147" class="transcript-chunks" onclick="console.log('00:10:35,468'); seek(635.0)">
+              database and application increase the probability that request arrives near
+            </span>
+            
+            <span id="chunk-148" class="transcript-chunks" onclick="console.log('00:10:40,648'); seek(640.0)">
+              the node already coordinating that data.
+            </span>
+            
+            <span id="chunk-149" class="transcript-chunks" onclick="console.log('00:10:44,009'); seek(644.0)">
+              That redu-reduces unnecessary hops, improves cache locality, lower
+            </span>
+            
+            <span id="chunk-150" class="transcript-chunks" onclick="console.log('00:10:49,988'); seek(649.0)">
+              coordination overhead, and shorten the critical transaction path.
+            </span>
+            
+            <span id="chunk-151" class="transcript-chunks" onclick="console.log('00:10:54,129'); seek(654.0)">
+              The database still hurdles correctness, replication, failover,
+            </span>
+            
+            <span id="chunk-152" class="transcript-chunks" onclick="console.log('00:10:59,469'); seek(659.0)">
+              rebalancing, and consensus underneath.
+            </span>
+            
+            <span id="chunk-153" class="transcript-chunks" onclick="console.log('00:11:02,390'); seek(662.0)">
+              We are not replacing the distributed coordination here.
+            </span>
+            
+            <span id="chunk-154" class="transcript-chunks" onclick="console.log('00:11:05,031'); seek(665.0)">
+              We are reducing how often the system needs expensive coordination on the hot path.
+            </span>
+            
+            <span id="chunk-155" class="transcript-chunks" onclick="console.log('00:11:12,609'); seek(672.0)">
+              This broader principle shows across many distributed systems, from the Dynamo-style
+            </span>
+            
+            <span id="chunk-156" class="transcript-chunks" onclick="console.log('00:11:18,490'); seek(678.0)">
+              partitioning to locality-aware databases like Spanner, CockroachDB,
+            </span>
+            
+            <span id="chunk-157" class="transcript-chunks" onclick="console.log('00:11:23,611'); seek(683.0)">
+              You have ByteDB, TiDB, and others.
+            </span>
+            
+            <span id="chunk-158" class="transcript-chunks" onclick="console.log('00:11:27,031'); seek(687.0)">
+              So how could we actually implement this?
+            </span>
+            
+            <span id="chunk-159" class="transcript-chunks" onclick="console.log('00:11:30,351'); seek(690.0)">
+              At the conceptual level, the routing logic is sup-surprisingly
+            </span>
+            
+            <span id="chunk-160" class="transcript-chunks" onclick="console.log('00:11:34,471'); seek(694.0)">
+              simple and very bookish in a way.
+            </span>
+            
+            <span id="chunk-161" class="transcript-chunks" onclick="console.log('00:11:37,211'); seek(697.0)">
+              That take your transactions primary key, hash it, and map that hash
+            </span>
+            
+            <span id="chunk-162" class="transcript-chunks" onclick="console.log('00:11:43,210'); seek(703.0)">
+              to one of the node in the cluster.
+            </span>
+            
+            <span id="chunk-163" class="transcript-chunks" onclick="console.log('00:11:46,330'); seek(706.0)">
+              Simple.
+            </span>
+            
+            <span id="chunk-164" class="transcript-chunks" onclick="console.log('00:11:47,170'); seek(707.0)">
+              And that hash tells the application which node should handle the request.
+            </span>
+            
+            <span id="chunk-165" class="transcript-chunks" onclick="console.log('00:11:52,910'); seek(712.0)">
+              So in that way, there is no random load balancing, no request path
+            </span>
+            
+            <span id="chunk-166" class="transcript-chunks" onclick="console.log('00:11:58,250'); seek(718.0)">
+              metadata lookup will be there, no guessing where the data might live.
+            </span>
+            
+            <span id="chunk-167" class="transcript-chunks" onclick="console.log('00:12:03,750'); seek(723.0)">
+              And because the routing is deterministic, the same key
+            </span>
+            
+            <span id="chunk-168" class="transcript-chunks" onclick="console.log('00:12:07,650'); seek(727.0)">
+              consistently lands on the same node.
+            </span>
+            
+            <span id="chunk-169" class="transcript-chunks" onclick="console.log('00:12:11,050'); seek(731.0)">
+              That consistency is what creates locality.
+            </span>
+            
+            <span id="chunk-170" class="transcript-chunks" onclick="console.log('00:12:14,870'); seek(734.0)">
+              Now, in production, we don't actually use naive modulo hashing.
+            </span>
+            
+            <span id="chunk-171" class="transcript-chunks" onclick="console.log('00:12:18,630'); seek(738.0)">
+              Modulo works fine in examples, but behaves badly when the cluster membership changes.
+            </span>
+            
+            <span id="chunk-172" class="transcript-chunks" onclick="console.log('00:12:24,610'); seek(744.0)">
+              For example, if you add or remove a node and suddenly the most of the keyspace
+            </span>
+            
+            <span id="chunk-173" class="transcript-chunks" onclick="console.log('00:12:28,910'); seek(748.0)">
+              gets remapped, that creates massive cache churn and unnecessary redistribution.
+            </span>
+            
+            <span id="chunk-174" class="transcript-chunks" onclick="console.log('00:12:34,970'); seek(754.0)">
+              So instead, we use consistent hashing with virtual nodes.
+            </span>
+            
+            <span id="chunk-175" class="transcript-chunks" onclick="console.log('00:12:39,370'); seek(759.0)">
+              With consistent hashing, when the node is added or removed, only a
+            </span>
+            
+            <span id="chunk-176" class="transcript-chunks" onclick="console.log('00:12:44,950'); seek(764.0)">
+              small portion of the keyspace moves.
+            </span>
+            
+            <span id="chunk-177" class="transcript-chunks" onclick="console.log('00:12:47,470'); seek(767.0)">
+              This is the same foundation idea used in Akamai, Cloudflare, Dynamo-style
+            </span>
+            
+            <span id="chunk-178" class="transcript-chunks" onclick="console.log('00:12:52,650'); seek(772.0)">
+              partitioning, and large-scale distribus-- distributed caches.
+            </span>
+            
+            <span id="chunk-179" class="transcript-chunks" onclick="console.log('00:12:56,449'); seek(776.0)">
+              Once we introduced the deterministic routing, the several benefits
+            </span>
+            
+            <span id="chunk-180" class="transcript-chunks" onclick="console.log('00:12:59,890'); seek(779.0)">
+              started compounding naturally.
+            </span>
+            
+            <span id="chunk-181" class="transcript-chunks" onclick="console.log('00:13:02,390'); seek(782.0)">
+              Request bitten-- requests become predictable, metadata resolution
+            </span>
+            
+            <span id="chunk-182" class="transcript-chunks" onclick="console.log('00:13:06,890'); seek(786.0)">
+              disappeared from the hot path, cache locality improves because same key
+            </span>
+            
+            <span id="chunk-183" class="transcript-chunks" onclick="console.log('00:13:12,910'); seek(792.0)">
+              repeatedly hit the same execution path, and load distribution stayed relatively
+            </span>
+            
+            <span id="chunk-184" class="transcript-chunks" onclick="console.log('00:13:17,970'); seek(797.0)">
+              balanced because the hashing spread keys uniformly across the cluster.
+            </span>
+            
+            <span id="chunk-185" class="transcript-chunks" onclick="console.log('00:13:22,469'); seek(802.0)">
+              One important caveat here the choice of key matters.
+            </span>
+            
+            <span id="chunk-186" class="transcript-chunks" onclick="console.log('00:13:26,389'); seek(806.0)">
+              The routing key needs to be stable, high car-- high cardinality is needed, and
+            </span>
+            
+            <span id="chunk-187" class="transcript-chunks" onclick="console.log('00:13:33,888'); seek(813.0)">
+              closely aligned with your access pattern.
+            </span>
+            
+            <span id="chunk-188" class="transcript-chunks" onclick="console.log('00:13:37,628'); seek(817.0)">
+              You don't want to hash on something mutable, and you definitely
+            </span>
+            
+            <span id="chunk-189" class="transcript-chunks" onclick="console.log('00:13:43,809'); seek(823.0)">
+              don't want keyspaces with only handful of possible values.
+            </span>
+            
+            <span id="chunk-190" class="transcript-chunks" onclick="console.log('00:13:48,468'); seek(828.0)">
+              Otherwise, you simply move the bottleneck instead of eliminating it so now routing
+            </span>
+            
+            <span id="chunk-191" class="transcript-chunks" onclick="console.log('00:13:53,929'); seek(833.0)">
+              solved only one part of the problem but execution was the other half, right?
+            </span>
+            
+            <span id="chunk-192" class="transcript-chunks" onclick="console.log('00:13:59,719'); seek(839.0)">
+              Because deterministic routing alone improves the locality, but it-- if
+            </span>
+            
+            <span id="chunk-193" class="transcript-chunks" onclick="console.log('00:14:04,929'); seek(844.0)">
+              all requests still execute through the shared execution path, connection simply
+            </span>
+            
+            <span id="chunk-194" class="transcript-chunks" onclick="console.log('00:14:10,769'); seek(850.0)">
+              moves somewhere else in the system.
+            </span>
+            
+            <span id="chunk-195" class="transcript-chunks" onclick="console.log('00:14:14,289'); seek(854.0)">
+              So we paired deterministic routing with thread-to-node affinity.
+            </span>
+            
+            <span id="chunk-196" class="transcript-chunks" onclick="console.log('00:14:19,489'); seek(859.0)">
+              So this is second fold of the solution here.
+            </span>
+            
+            <span id="chunk-197" class="transcript-chunks" onclick="console.log('00:14:23,269'); seek(863.0)">
+              Say thread zero primarily handled work for node zero, thread
+            </span>
+            
+            <span id="chunk-198" class="transcript-chunks" onclick="console.log('00:14:28,509'); seek(868.0)">
+              one for node one, and so on.
+            </span>
+            
+            <span id="chunk-199" class="transcript-chunks" onclick="console.log('00:14:31,169'); seek(871.0)">
+              Each worker thread own its own dedicated connection pool
+            </span>
+            
+            <span id="chunk-200" class="transcript-chunks" onclick="console.log('00:14:34,949'); seek(874.0)">
+              to its assigned node group.
+            </span>
+            
+            <span id="chunk-201" class="transcript-chunks" onclick="console.log('00:14:37,349'); seek(877.0)">
+              No shared pools, no cross-threaded coordination during the connection
+            </span>
+            
+            <span id="chunk-202" class="transcript-chunks" onclick="console.log('00:14:42,369'); seek(882.0)">
+              ac-acquisition, no l-lock contention around the pooled resources, and this part
+            </span>
+            
+            <span id="chunk-203" class="transcript-chunks" onclick="console.log('00:14:49,929'); seek(889.0)">
+              mattered more than we initially expected.
+            </span>
+            
+            <span id="chunk-204" class="transcript-chunks" onclick="console.log('00:14:53,749'); seek(893.0)">
+              Our first implementation actually used shared connection pool across threads.
+            </span>
+            
+            <span id="chunk-205" class="transcript-chunks" onclick="console.log('00:14:59,459'); seek(899.0)">
+              Under load, we performed terribly.
+            </span>
+            
+            <span id="chunk-206" class="transcript-chunks" onclick="console.log('00:15:02,779'); seek(902.0)">
+              Thread spend surprisingly amount of time containing the pooled connection,
+            </span>
+            
+            <span id="chunk-207" class="transcript-chunks" onclick="console.log('00:15:10,779'); seek(910.0)">
+              waiting for the synchronization and fighting each other internally.
+            </span>
+            
+            <span id="chunk-208" class="transcript-chunks" onclick="console.log('00:15:15,719'); seek(915.0)">
+              In some scenarios, contention become worse than the original
+            </span>
+            
+            <span id="chunk-209" class="transcript-chunks" onclick="console.log('00:15:20,019'); seek(920.0)">
+              single-threaded baseline.
+            </span>
+            
+            <span id="chunk-210" class="transcript-chunks" onclick="console.log('00:15:21,699'); seek(921.0)">
+              Again, the restaurant analogy here.
+            </span>
+            
+            <span id="chunk-211" class="transcript-chunks" onclick="console.log('00:15:23,838'); seek(923.0)">
+              If every waiter can serve every table, they constant-- constantly
+            </span>
+            
+            <span id="chunk-212" class="transcript-chunks" onclick="console.log('00:15:29,438'); seek(929.0)">
+              cross paths, interrupts each other, and compete for the same space.
+            </span>
+            
+            <span id="chunk-213" class="transcript-chunks" onclick="console.log('00:15:35,838'); seek(935.0)">
+              But if each waiter owns a dedicated section, movement become predictable
+            </span>
+            
+            <span id="chunk-214" class="transcript-chunks" onclick="console.log('00:15:42,478'); seek(942.0)">
+              and collisions largely disappear.
+            </span>
+            
+            <span id="chunk-215" class="transcript-chunks" onclick="console.log('00:15:46,308'); seek(946.0)">
+              That's effectively what thread affinity gives us.
+            </span>
+            
+            <span id="chunk-216" class="transcript-chunks" onclick="console.log('00:15:49,948'); seek(949.0)">
+              The round-robin scheduling kept work even evenly distributed across the workers.
+            </span>
+            
+            <span id="chunk-217" class="transcript-chunks" onclick="console.log('00:15:56,648'); seek(956.0)">
+              Asynchronous input/output prevented threads from the
+            </span>
+            
+            <span id="chunk-218" class="transcript-chunks" onclick="console.log('00:16:00,409'); seek(960.0)">
+              blocking on the network wa-waits.
+            </span>
+            
+            <span id="chunk-219" class="transcript-chunks" onclick="console.log('00:16:03,488'); seek(963.0)">
+              Persistent connection eliminated the repeated setup and teardown cos-cost.
+            </span>
+            
+            <span id="chunk-220" class="transcript-chunks" onclick="console.log('00:16:09,768'); seek(969.0)">
+              So now let's talk about the operational side of this Because we are not optimizing
+            </span>
+            
+            <span id="chunk-221" class="transcript-chunks" onclick="console.log('00:16:14,569'); seek(974.0)">
+              the algorithm here, we are, and in such systems, we run them on Kubernetes.
+            </span>
+            
+            <span id="chunk-222" class="transcript-chunks" onclick="console.log('00:16:21,249'); seek(981.0)">
+              In our case, we realized this thing very rapidly or very quickly that
+            </span>
+            
+            <span id="chunk-223" class="transcript-chunks" onclick="console.log('00:16:26,309'); seek(986.0)">
+              default Kub- Kubernetes behavior is often optimized for general availability
+            </span>
+            
+            <span id="chunk-224" class="transcript-chunks" onclick="console.log('00:16:32,609'); seek(992.0)">
+              and not for the tail latency.
+            </span>
+            
+            <span id="chunk-225" class="transcript-chunks" onclick="console.log('00:16:35,879'); seek(995.0)">
+              And that's where we tried to-- we took s- say four configuration decisions here.
+            </span>
+            
+            <span id="chunk-226" class="transcript-chunks" onclick="console.log('00:16:43,339'); seek(1003.0)">
+              One is stateful sets of database layer.
+            </span>
+            
+            <span id="chunk-227" class="transcript-chunks" onclick="console.log('00:16:46,489'); seek(1006.0)">
+              Distributed database rel-rely heavily on stable network identity
+            </span>
+            
+            <span id="chunk-228" class="transcript-chunks" onclick="console.log('00:16:51,649'); seek(1011.0)">
+              and persistent storage, and that's where stateful sets help us.
+            </span>
+            
+            <span id="chunk-229" class="transcript-chunks" onclick="console.log('00:16:57,069'); seek(1017.0)">
+              It gives us predictable predictable pod identities, durable volumes,
+            </span>
+            
+            <span id="chunk-230" class="transcript-chunks" onclick="console.log('00:17:02,949'); seek(1022.0)">
+              and safer rolling updates during the quorum-sensitive operations.
+            </span>
+            
+            <span id="chunk-231" class="transcript-chunks" onclick="console.log('00:17:07,229'); seek(1027.0)">
+              The second one is node affinity.
+            </span>
+            
+            <span id="chunk-232" class="transcript-chunks" onclick="console.log('00:17:09,848'); seek(1029.0)">
+              So we try to co-locate the application workloads a- as close
+            </span>
+            
+            <span id="chunk-233" class="transcript-chunks" onclick="console.log('00:17:15,109'); seek(1035.0)">
+              as the database nodes, and in some cases, you can say that it's the
+            </span>
+            
+            <span id="chunk-234" class="transcript-chunks" onclick="console.log('00:17:19,649'); seek(1039.0)">
+              same zone, same rack, and same NUMA.
+            </span>
+            
+            <span id="chunk-235" class="transcript-chunks" onclick="console.log('00:17:22,009'); seek(1042.0)">
+              And that less network distance shaved a few millisecond off in the request
+            </span>
+            
+            <span id="chunk-236" class="transcript-chunks" onclick="console.log('00:17:29,169'); seek(1049.0)">
+              path which kind of helped us out a lot with P99 and P nin- 95 latency.
+            </span>
+            
+            <span id="chunk-237" class="transcript-chunks" onclick="console.log('00:17:36,689'); seek(1056.0)">
+              The third one is autoscaling based on the latency-aware signal instead of CPU.
+            </span>
+            
+            <span id="chunk-238" class="transcript-chunks" onclick="console.log('00:17:41,349'); seek(1061.0)">
+              Y- because default HPA policy typically reacts to the CPU
+            </span>
+            
+            <span id="chunk-239" class="transcript-chunks" onclick="console.log('00:17:45,769'); seek(1065.0)">
+              utilization, but in general, CPU is often lacking the indicator for
+            </span>
+            
+            <span id="chunk-240" class="transcript-chunks" onclick="console.log('00:17:51,249'); seek(1071.0)">
+              transactional latency problems.
+            </span>
+            
+            <span id="chunk-241" class="transcript-chunks" onclick="console.log('00:17:53,449'); seek(1073.0)">
+              So he- this is where the latency-aware signals helped us a lot.
+            </span>
+            
+            <span id="chunk-242" class="transcript-chunks" onclick="console.log('00:17:59,789'); seek(1079.0)">
+              And the finally th- the next configuration what we try to do is guaranteed QoS.
+            </span>
+            
+            <span id="chunk-243" class="transcript-chunks" onclick="console.log('00:18:06,509'); seek(1086.0)">
+              So we set CPU request equal to the limit of the latency-sensitive workloads and
+            </span>
+            
+            <span id="chunk-244" class="transcript-chunks" onclick="console.log('00:18:11,829'); seek(1091.0)">
+              that that configuration helped us a lot.
+            </span>
+            
+            <span id="chunk-245" class="transcript-chunks" onclick="console.log('00:18:14,049'); seek(1094.0)">
+              So after moving the critical workload into guaranteed QoS or,
+            </span>
+            
+            <span id="chunk-246" class="transcript-chunks" onclick="console.log('00:18:18,609'); seek(1098.0)">
+              quality of service, latency various dropped notice significantly and the
+            </span>
+            
+            <span id="chunk-247" class="transcript-chunks" onclick="console.log('00:18:25,049'); seek(1105.0)">
+              tail behavior becomes more stable
+            </span>
+            
+            <span id="chunk-248" class="transcript-chunks" onclick="console.log('00:18:28,249'); seek(1108.0)">
+              Now here are a few results which I would like to mention here.
+            </span>
+            
+            <span id="chunk-249" class="transcript-chunks" onclick="console.log('00:18:33,269'); seek(1113.0)">
+              S- P50 latency dropped around eighteen milliseconds to eight
+            </span>
+            
+            <span id="chunk-250" class="transcript-chunks" onclick="console.log('00:18:38,129'); seek(1118.0)">
+              milliseconds, so it's about fifty-six percent of reduction, right?
+            </span>
+            
+            <span id="chunk-251" class="transcript-chunks" onclick="console.log('00:18:42,649'); seek(1122.0)">
+              P95 went from thirty-four millisecond to fourteen.
+            </span>
+            
+            <span id="chunk-252" class="transcript-chunks" onclick="console.log('00:18:46,409'); seek(1126.0)">
+              P99, which was the metric hurting us operationally the most, dropped from
+            </span>
+            
+            <span id="chunk-253" class="transcript-chunks" onclick="console.log('00:18:51,829'); seek(1131.0)">
+              forty-seven millisecond to nineteen millisecond which is our primary
+            </span>
+            
+            <span id="chunk-254" class="transcript-chunks" onclick="console.log('00:18:55,789'); seek(1135.0)">
+              example where we started all this story.
+            </span>
+            
+            <span id="chunk-255" class="transcript-chunks" onclick="console.log('00:18:58,249'); seek(1138.0)">
+              So roughly fifty-nine percent improvement here.
+            </span>
+            
+            <span id="chunk-256" class="transcript-chunks" onclick="console.log('00:19:01,309'); seek(1141.0)">
+              And throughput improved even more dramatically.
+            </span>
+            
+            <span id="chunk-257" class="transcript-chunks" onclick="console.log('00:19:04,769'); seek(1144.0)">
+              So overall, with all this configurations decisions we saw a significant
+            </span>
+            
+            <span id="chunk-258" class="transcript-chunks" onclick="console.log('00:19:11,629'); seek(1151.0)">
+              improvement in our application.
+            </span>
+            
+            <span id="chunk-259" class="transcript-chunks" onclick="console.log('00:19:13,809'); seek(1153.0)">
+              Few of the concepts here might be very specific to, CockroachDB side of things,
+            </span>
+            
+            <span id="chunk-260" class="transcript-chunks" onclick="console.log('00:19:18,309'); seek(1158.0)">
+              but the same principle is applied to any of the modern distributed data store.
+            </span>
+            
+            <span id="chunk-261" class="transcript-chunks" onclick="console.log('00:19:25,229'); seek(1165.0)">
+              So systems like Amazon DynamoDB, the partition data by the stable
+            </span>
+            
+            <span id="chunk-262" class="transcript-chunks" onclick="console.log('00:19:30,669'); seek(1170.0)">
+              partition key is already there.
+            </span>
+            
+            <span id="chunk-263" class="transcript-chunks" onclick="console.log('00:19:32,649'); seek(1172.0)">
+              The distributed SQL systems like TiDB, YugaDB, or other distributed
+            </span>
+            
+            <span id="chunk-264" class="transcript-chunks" onclick="console.log('00:19:38,589'); seek(1178.0)">
+              ranges, tablets, or region across the nodes using similar
+            </span>
+            
+            <span id="chunk-265" class="transcript-chunks" onclick="console.log('00:19:42,429'); seek(1182.0)">
+              locality-aware concepts internally.
+            </span>
+            
+            <span id="chunk-266" class="transcript-chunks" onclick="console.log('00:19:44,669'); seek(1184.0)">
+              The implementation details might vary that some use Raft groups, some use
+            </span>
+            
+            <span id="chunk-267" class="transcript-chunks" onclick="console.log('00:19:51,009'); seek(1191.0)">
+              placement rules some use partition map or tablet leaders, but the
+            </span>
+            
+            <span id="chunk-268" class="transcript-chunks" onclick="console.log('00:19:56,749'); seek(1196.0)">
+              architectural data or architectural idea is consistent across all of them, that
+            </span>
+            
+            <span id="chunk-269" class="transcript-chunks" onclick="console.log('00:20:01,349'); seek(1201.0)">
+              data already has the placement strategy.
+            </span>
+            
+            <span id="chunk-270" class="transcript-chunks" onclick="console.log('00:20:04,579'); seek(1204.0)">
+              The closer your application routing aligns with the placement strategy,
+            </span>
+            
+            <span id="chunk-271" class="transcript-chunks" onclick="console.log('00:20:10,579'); seek(1210.0)">
+              the less coordination of the s- system performs on the hot path.
+            </span>
+            
+            <span id="chunk-272" class="transcript-chunks" onclick="console.log('00:20:14,908'); seek(1214.0)">
+              It give, it will give you the advantage in terms of there will be a fewer
+            </span>
+            
+            <span id="chunk-273" class="transcript-chunks" onclick="console.log('00:20:19,548'); seek(1219.0)">
+              cross-node hops there will be a better cache locality there will be a
+            </span>
+            
+            <span id="chunk-274" class="transcript-chunks" onclick="console.log('00:20:24,647'); seek(1224.0)">
+              lower coordination overhead, and more predictable tail latency will be there.
+            </span>
+            
+            <span id="chunk-275" class="transcript-chunks" onclick="console.log('00:20:29,867'); seek(1229.0)">
+              Overall, it will benefit the system.
+            </span>
+            
+            <span id="chunk-276" class="transcript-chunks" onclick="console.log('00:20:32,447'); seek(1232.0)">
+              Now In, in my experience there were three major lessons I can talk about.
+            </span>
+            
+            <span id="chunk-277" class="transcript-chunks" onclick="console.log('00:20:40,347'); seek(1240.0)">
+              Fun-- first one is the deterministic routing without the resiliency is fragile.
+            </span>
+            
+            <span id="chunk-278" class="transcript-chunks" onclick="console.log('00:20:46,268'); seek(1246.0)">
+              Our initial implementation was extremely straightforward, say, which I also
+            </span>
+            
+            <span id="chunk-279" class="transcript-chunks" onclick="console.log('00:20:52,028'); seek(1252.0)">
+              talked about, that hash the key, route to the target node, execute the request.
+            </span>
+            
+            <span id="chunk-280" class="transcript-chunks" onclick="console.log('00:20:57,288'); seek(1257.0)">
+              And operationally, it worked great until the node failed, right?
+            </span>
+            
+            <span id="chunk-281" class="transcript-chunks" onclick="console.log('00:21:01,469'); seek(1261.0)">
+              So at that point, every request mapped to the to that node immediately
+            </span>
+            
+            <span id="chunk-282" class="transcript-chunks" onclick="console.log('00:21:06,608'); seek(1266.0)">
+              start failing, and customer impact was visible within seconds.
+            </span>
+            
+            <span id="chunk-283" class="transcript-chunks" onclick="console.log('00:21:10,868'); seek(1270.0)">
+              So we evolved the routing layer to become a replication-aware.
+            </span>
+            
+            <span id="chunk-284" class="transcript-chunks" onclick="console.log('00:21:15,729'); seek(1275.0)">
+              If preferred target was unavailable, the request could fail over
+            </span>
+            
+            <span id="chunk-285" class="transcript-chunks" onclick="console.log('00:21:20,868'); seek(1280.0)">
+              to the another replica already hosting the same key range.
+            </span>
+            
+            <span id="chunk-286" class="transcript-chunks" onclick="console.log('00:21:25,389'); seek(1285.0)">
+              We introduced s- a small temporary queues for in-flight requests
+            </span>
+            
+            <span id="chunk-287" class="transcript-chunks" onclick="console.log('00:21:30,368'); seek(1290.0)">
+              during the failover windows.
+            </span>
+            
+            <span id="chunk-288" class="transcript-chunks" onclick="console.log('00:21:32,308'); seek(1292.0)">
+              And the key lesson key thing here was the predictability is valuable,
+            </span>
+            
+            <span id="chunk-289" class="transcript-chunks" onclick="console.log('00:21:39,138'); seek(1299.0)">
+              but predictability without graceful degradation becomes a liability.
+            </span>
+            
+            <span id="chunk-290" class="transcript-chunks" onclick="console.log('00:21:45,516'); seek(1305.0)">
+              The second learning here is The parallelism without isolation can
+            </span>
+            
+            <span id="chunk-291" class="transcript-chunks" onclick="console.log('00:21:53,116'); seek(1313.0)">
+              actually reduce the throughput, right?
+            </span>
+            
+            <span id="chunk-292" class="transcript-chunks" onclick="console.log('00:21:55,416'); seek(1315.0)">
+              Our first multithreaded implementation used shared connection pool because it
+            </span>
+            
+            <span id="chunk-293" class="transcript-chunks" onclick="console.log('00:22:01,896'); seek(1321.0)">
+              looked more resource efficient on paper.
+            </span>
+            
+            <span id="chunk-294" class="transcript-chunks" onclick="console.log('00:22:05,456'); seek(1325.0)">
+              In reality, threads spend huge amount of time contending for the pooled connection
+            </span>
+            
+            <span id="chunk-295" class="transcript-chunks" onclick="console.log('00:22:13,156'); seek(1333.0)">
+              and synchronize the resources internally.
+            </span>
+            
+            <span id="chunk-296" class="transcript-chunks" onclick="console.log('00:22:16,776'); seek(1336.0)">
+              And under the load throughput actually dr-dropped below the
+            </span>
+            
+            <span id="chunk-297" class="transcript-chunks" onclick="console.log('00:22:21,376'); seek(1341.0)">
+              single-threaded baseline, as I mentioned in my previous slide also.
+            </span>
+            
+            <span id="chunk-298" class="transcript-chunks" onclick="console.log('00:22:25,416'); seek(1345.0)">
+              The fix here was isolating the execution path, dedicated connection
+            </span>
+            
+            <span id="chunk-299" class="transcript-chunks" onclick="console.log('00:22:29,436'); seek(1349.0)">
+              pool per workers thr- worker thread and per-node affinity group.
+            </span>
+            
+            <span id="chunk-300" class="transcript-chunks" onclick="console.log('00:22:34,356'); seek(1354.0)">
+              That changed the system behavior completely.
+            </span>
+            
+            <span id="chunk-301" class="transcript-chunks" onclick="console.log('00:22:37,207'); seek(1357.0)">
+              The third one is default Kubernetes behavior, often
+            </span>
+            
+            <span id="chunk-302" class="transcript-chunks" onclick="console.log('00:22:39,987'); seek(1359.0)">
+              hostile to low tail latency.
+            </span>
+            
+            <span id="chunk-303" class="transcript-chunks" onclick="console.log('00:22:42,867'); seek(1362.0)">
+              Our staging benchmark looked ex-excellent, but the production latency consistently
+            </span>
+            
+            <span id="chunk-304" class="transcript-chunks" onclick="console.log('00:22:48,527'); seek(1368.0)">
+              ran about fifteen milliseconds slower under the comparable traffic.
+            </span>
+            
+            <span id="chunk-305" class="transcript-chunks" onclick="console.log('00:22:54,087'); seek(1374.0)">
+              We spent weeks investigating network paths, databa- database tuning, garbage
+            </span>
+            
+            <span id="chunk-306" class="transcript-chunks" onclick="console.log('00:22:59,747'); seek(1379.0)">
+              collection, even tracing overl- overhead.
+            </span>
+            
+            <span id="chunk-307" class="transcript-chunks" onclick="console.log('00:23:03,287'); seek(1383.0)">
+              The real culprit turned out to be a CPU throttling from the Linux scheduler.
+            </span>
+            
+            <span id="chunk-308" class="transcript-chunks" onclick="console.log('00:23:10,787'); seek(1390.0)">
+              Because our workloads were running in burstable QOS, the kernel
+            </span>
+            
+            <span id="chunk-309" class="transcript-chunks" onclick="console.log('00:23:17,787'); seek(1397.0)">
+              was throttling container once they exceeded the quota windows.
+            </span>
+            
+            <span id="chunk-310" class="transcript-chunks" onclick="console.log('00:23:23,937'); seek(1403.0)">
+              That scheduling jitter was the leaking directly into our P99 latency.
+            </span>
+            
+            <span id="chunk-311" class="transcript-chunks" onclick="console.log('00:23:29,737'); seek(1409.0)">
+              Once we moved the latency-sensitive services to the guaranteed QOS by setting
+            </span>
+            
+            <span id="chunk-312" class="transcript-chunks" onclick="console.log('00:23:35,877'); seek(1415.0)">
+              the request equals to limits, the tail latency stabilized drama- dramatically.
+            </span>
+            
+            <span id="chunk-313" class="transcript-chunks" onclick="console.log('00:23:42,807'); seek(1422.0)">
+              So this, these were few of our learning and, few of the things which we improvised
+            </span>
+            
+            <span id="chunk-314" class="transcript-chunks" onclick="console.log('00:23:49,117'); seek(1429.0)">
+              later I also want to very clear about the limitation of this approach.
+            </span>
+            
+            <span id="chunk-315" class="transcript-chunks" onclick="console.log('00:23:53,997'); seek(1433.0)">
+              The deterministic routing is powerful, but it's not a silver bullet.
+            </span>
+            
+            <span id="chunk-316" class="transcript-chunks" onclick="console.log('00:23:58,837'); seek(1438.0)">
+              There are several scenarios where the model starts breaking down or
+            </span>
+            
+            <span id="chunk-317" class="transcript-chunks" onclick="console.log('00:24:03,197'); seek(1443.0)">
+              requires additional operation handling.
+            </span>
+            
+            <span id="chunk-318" class="transcript-chunks" onclick="console.log('00:24:06,277'); seek(1446.0)">
+              First, say, hot partition.
+            </span>
+            
+            <span id="chunk-319" class="transcript-chunks" onclick="console.log('00:24:08,597'); seek(1448.0)">
+              It's a well-known DB problem.
+            </span>
+            
+            <span id="chunk-320" class="transcript-chunks" onclick="console.log('00:24:11,517'); seek(1451.0)">
+              If one tenant, one merchant or customer suddenly generates where, heavy
+            </span>
+            
+            <span id="chunk-321" class="transcript-chunks" onclick="console.log('00:24:16,696'); seek(1456.0)">
+              amount of traffic, all that traffic still hashes the same execution path.
+            </span>
+            
+            <span id="chunk-322" class="transcript-chunks" onclick="console.log('00:24:22,266'); seek(1462.0)">
+              And deterministic routing improves locality, but it cannot automatically in
+            </span>
+            
+            <span id="chunk-323" class="transcript-chunks" onclick="console.log('00:24:27,406'); seek(1467.0)">
+              parallel put the single hotkey, right?
+            </span>
+            
+            <span id="chunk-324" class="transcript-chunks" onclick="console.log('00:24:30,866'); seek(1470.0)">
+              At that point, we need additional strategy splitting the partition,
+            </span>
+            
+            <span id="chunk-325" class="transcript-chunks" onclick="console.log('00:24:35,786'); seek(1475.0)">
+              introducing sub-sharding or isolating hot tenants onto dedicated capacity.
+            </span>
+            
+            <span id="chunk-326" class="transcript-chunks" onclick="console.log('00:24:42,106'); seek(1482.0)">
+              Second, leaseholder movement and the corresponding kind of rebalancing.
+            </span>
+            
+            <span id="chunk-327" class="transcript-chunks" onclick="console.log('00:24:47,586'); seek(1487.0)">
+              So in distributed databases, ownership of the ranges or partitions is not static.
+            </span>
+            
+            <span id="chunk-328" class="transcript-chunks" onclick="console.log('00:24:54,036'); seek(1494.0)">
+              The leaseholder move during the failover, balancing, and topology changes.
+            </span>
+            
+            <span id="chunk-329" class="transcript-chunks" onclick="console.log('00:24:59,676'); seek(1499.0)">
+              That means the routing layer is operating on the probability and not the certainty.
+            </span>
+            
+            <span id="chunk-330" class="transcript-chunks" onclick="console.log('00:25:04,736'); seek(1504.0)">
+              Sometimes the request lands exactly where you want it.
+            </span>
+            
+            <span id="chunk-331" class="transcript-chunks" onclick="console.log('00:25:08,956'); seek(1508.0)">
+              Sometimes it lands near the right replica and requires
+            </span>
+            
+            <span id="chunk-332" class="transcript-chunks" onclick="console.log('00:25:12,816'); seek(1512.0)">
+              the additional hop internally.
+            </span>
+            
+            <span id="chunk-333" class="transcript-chunks" onclick="console.log('00:25:15,216'); seek(1515.0)">
+              So the routing layer has to be-- has to tolerate the misses gracefully, right?
+            </span>
+            
+            <span id="chunk-334" class="transcript-chunks" onclick="console.log('00:25:22,136'); seek(1522.0)">
+              In our case, we added retry-aware routing and the fallback path for
+            </span>
+            
+            <span id="chunk-335" class="transcript-chunks" onclick="console.log('00:25:27,836'); seek(1527.0)">
+              scale lo- locality assumptions.
+            </span>
+            
+            <span id="chunk-336" class="transcript-chunks" onclick="console.log('00:25:30,376'); seek(1530.0)">
+              The third third one is multi-key and distributed transactions.
+            </span>
+            
+            <span id="chunk-337" class="transcript-chunks" onclick="console.log('00:25:33,956'); seek(1533.0)">
+              Our biggest gain come from the common case where the requests
+            </span>
+            
+            <span id="chunk-338" class="transcript-chunks" onclick="console.log('00:25:38,396'); seek(1538.0)">
+              primarily operate on a single partition key or a localized dataset.
+            </span>
+            
+            <span id="chunk-339" class="transcript-chunks" onclick="console.log('00:25:44,416'); seek(1544.0)">
+              If transactions regularly spans more shards, ranges, or tenants, then
+            </span>
+            
+            <span id="chunk-340" class="transcript-chunks" onclick="console.log('00:25:50,296'); seek(1550.0)">
+              coordination overhead still exists and relative improvement becomes smaller.
+            </span>
+            
+            <span id="chunk-341" class="transcript-chunks" onclick="console.log('00:25:56,736'); seek(1556.0)">
+              The fourth one is topology and rebalancing complexity.
+            </span>
+            
+            <span id="chunk-342" class="transcript-chunks" onclick="console.log('00:26:00,776'); seek(1560.0)">
+              So As the cluster scale node changes, range range change rebalance happens.
+            </span>
+            
+            <span id="chunk-343" class="transcript-chunks" onclick="console.log('00:26:07,737'); seek(1567.0)">
+              The traffic distribution evolves over the time.
+            </span>
+            
+            <span id="chunk-344" class="transcript-chunks" onclick="console.log('00:26:11,416'); seek(1571.0)">
+              Maintaining the locality awareness at the application layer introduces operational
+            </span>
+            
+            <span id="chunk-345" class="transcript-chunks" onclick="console.log('00:26:16,816'); seek(1576.0)">
+              complexity around the observability partition movement, and adaptive balance.
+            </span>
+            
+            <span id="chunk-346" class="transcript-chunks" onclick="console.log('00:26:22,896'); seek(1582.0)">
+              So we need visibility into where the data actually lives and how that
+            </span>
+            
+            <span id="chunk-347" class="transcript-chunks" onclick="console.log('00:26:27,896'); seek(1587.0)">
+              placement changes over the time.
+            </span>
+            
+            <span id="chunk-348" class="transcript-chunks" onclick="console.log('00:26:29,556'); seek(1589.0)">
+              So we need to monitor it very closely.
+            </span>
+            
+            <span id="chunk-349" class="transcript-chunks" onclick="console.log('00:26:32,366'); seek(1592.0)">
+              S- so the important takeaway is deterministic routing is the
+            </span>
+            
+            <span id="chunk-350" class="transcript-chunks" onclick="console.log('00:26:36,226'); seek(1596.0)">
+              optimization for the common path.
+            </span>
+            
+            <span id="chunk-351" class="transcript-chunks" onclick="console.log('00:26:39,186'); seek(1599.0)">
+              It improves locality, reduces a- avoidable coordination and makes the system more
+            </span>
+            
+            <span id="chunk-352" class="transcript-chunks" onclick="console.log('00:26:45,967'); seek(1605.0)">
+              efficient under the normal high volume tr- traffic patterns But it does not replace
+            </span>
+            
+            <span id="chunk-353" class="transcript-chunks" onclick="console.log('00:26:53,007'); seek(1613.0)">
+              failover handling distributed transaction coordination hotspot management or
+            </span>
+            
+            <span id="chunk-354" class="transcript-chunks" onclick="console.log('00:26:58,689'); seek(1618.0)">
+              capacity planning under squid workloads.
+            </span>
+            
+            <span id="chunk-355" class="transcript-chunks" onclick="console.log('00:27:03,148'); seek(1623.0)">
+              So
+            </span>
+            
+            <span id="chunk-356" class="transcript-chunks" onclick="console.log('00:27:03,848'); seek(1623.0)">
+              So where are the opportunities to for improvement, right?
+            </span>
+            
+            <span id="chunk-357" class="transcript-chunks" onclick="console.log('00:27:07,748'); seek(1627.0)">
+              So first is adaptive rebalancing.
+            </span>
+            
+            <span id="chunk-358" class="transcript-chunks" onclick="console.log('00:27:10,488'); seek(1630.0)">
+              So traffic patterns are never static.
+            </span>
+            
+            <span id="chunk-359" class="transcript-chunks" onclick="console.log('00:27:13,808'); seek(1633.0)">
+              Over the time, some tenant becomes significantly hotter than
+            </span>
+            
+            <span id="chunk-360" class="transcript-chunks" onclick="console.log('00:27:18,548'); seek(1638.0)">
+              others, and static partitioning eventually creates imbalance.
+            </span>
+            
+            <span id="chunk-361" class="transcript-chunks" onclick="console.log('00:27:22,068'); seek(1642.0)">
+              So one area we are exploring is dynamic rebalancing, automatic how
+            </span>
+            
+            <span id="chunk-362" class="transcript-chunks" onclick="console.log('00:27:27,768'); seek(1647.0)">
+              we can make it more auto in nature.
+            </span>
+            
+            <span id="chunk-363" class="transcript-chunks" onclick="console.log('00:27:31,228'); seek(1651.0)">
+              So automatic redistribution, heavily accessed of heavily accessed key ranges
+            </span>
+            
+            <span id="chunk-364" class="transcript-chunks" onclick="console.log('00:27:36,728'); seek(1656.0)">
+              without interrupting the live traffic.
+            </span>
+            
+            <span id="chunk-365" class="transcript-chunks" onclick="console.log('00:27:40,148'); seek(1660.0)">
+              In some cases, that may even isolating the extremely hot
+            </span>
+            
+            <span id="chunk-366" class="transcript-chunks" onclick="console.log('00:27:44,888'); seek(1664.0)">
+              partition onto dedicated capacity that could be one of the solution.
+            </span>
+            
+            <span id="chunk-367" class="transcript-chunks" onclick="console.log('00:27:49,448'); seek(1669.0)">
+              The second is multi-region deterministic routing.
+            </span>
+            
+            <span id="chunk-368" class="transcript-chunks" onclick="console.log('00:27:52,188'); seek(1672.0)">
+              So today, locality mostly exists within the cluster or regional boundary.
+            </span>
+            
+            <span id="chunk-369" class="transcript-chunks" onclick="console.log('00:27:58,148'); seek(1678.0)">
+              The next step is extending that routing awareness across the region.
+            </span>
+            
+            <span id="chunk-370" class="transcript-chunks" onclick="console.log('00:28:02,928'); seek(1682.0)">
+              Instead of routing requests to any healthy node globally, the system can we can
+            </span>
+            
+            <span id="chunk-371" class="transcript-chunks" onclick="console.log('00:28:09,488'); seek(1689.0)">
+              prioritize to the nearest region, right?
+            </span>
+            
+            <span id="chunk-372" class="transcript-chunks" onclick="console.log('00:28:13,048'); seek(1693.0)">
+              So the most likely to already host the relevant data or leaseholder.
+            </span>
+            
+            <span id="chunk-373" class="transcript-chunks" onclick="console.log('00:28:18,898'); seek(1698.0)">
+              The third one is routing-aware failover.
+            </span>
+            
+            <span id="chunk-374" class="transcript-chunks" onclick="console.log('00:28:21,818'); seek(1701.0)">
+              So traditional failover mechanism typically redirect traffic towards
+            </span>
+            
+            <span id="chunk-375" class="transcript-chunks" onclick="console.log('00:28:29,198'); seek(1709.0)">
+              any available healthy node.
+            </span>
+            
+            <span id="chunk-376" class="transcript-chunks" onclick="console.log('00:28:31,598'); seek(1711.0)">
+              But in distributed system, not all healthy nodes are equally optimal, right?
+            </span>
+            
+            <span id="chunk-377" class="transcript-chunks" onclick="console.log('00:28:36,778'); seek(1716.0)">
+              So we can-- We are continuing to evolve the routing layers, so failover decision
+            </span>
+            
+            <span id="chunk-378" class="transcript-chunks" onclick="console.log('00:28:44,418'); seek(1724.0)">
+              remain locality-aware redirecting requests towards the replica already close to the
+            </span>
+            
+            <span id="chunk-379" class="transcript-chunks" onclick="console.log('00:28:51,518'); seek(1731.0)">
+              affected key ranges instead of introducing unnecessary coordination after the failure
+            </span>
+            
+            <span id="chunk-380" class="transcript-chunks" onclick="console.log('00:28:56,708'); seek(1736.0)">
+              event wherever problem started, right?
+            </span>
+            
+            <span id="chunk-381" class="transcript-chunks" onclick="console.log('00:28:58,618'); seek(1738.0)">
+              Yeah that's still, one version is still there.
+            </span>
+            
+            <span id="chunk-382" class="transcript-chunks" onclick="console.log('00:29:02,006'); seek(1742.0)">
+              The fourth one is deeper observation integration.
+            </span>
+            
+            <span id="chunk-383" class="transcript-chunks" onclick="console.log('00:29:05,597'); seek(1745.0)">
+              That's one of the biggest opportunity here.
+            </span>
+            
+            <span id="chunk-384" class="transcript-chunks" onclick="console.log('00:29:08,237'); seek(1748.0)">
+              Which keys are becoming hot?
+            </span>
+            
+            <span id="chunk-385" class="transcript-chunks" onclick="console.log('00:29:11,677'); seek(1751.0)">
+              Which ranges are producing elevated tail latency?
+            </span>
+            
+            <span id="chunk-386" class="transcript-chunks" onclick="console.log('00:29:16,257'); seek(1756.0)">
+              Which nodes are consistently becoming coordination bottlenecks?
+            </span>
+            
+            <span id="chunk-387" class="transcript-chunks" onclick="console.log('00:29:22,937'); seek(1762.0)">
+              The earlier system
+            </span>
+            
+            <span id="chunk-388" class="transcript-chunks" onclick="console.log('00:29:24,277'); seek(1764.0)">
+              The earlier system can detect locality imbalance sooner it can respond before
+            </span>
+            
+            <span id="chunk-389" class="transcript-chunks" onclick="console.log('00:29:32,678'); seek(1772.0)">
+              user visibility degradation occurs, right?
+            </span>
+            
+            <span id="chunk-390" class="transcript-chunks" onclick="console.log('00:29:36,178'); seek(1776.0)">
+              But across all this enhancement, the underlying principle remains unchanged,
+            </span>
+            
+            <span id="chunk-391" class="transcript-chunks" onclick="console.log('00:29:42,237'); seek(1782.0)">
+              that computation becomes more efficient when the request execute clo- as close
+            </span>
+            
+            <span id="chunk-392" class="transcript-chunks" onclick="console.log('00:29:48,317'); seek(1788.0)">
+              as possible to the data they need.
+            </span>
+            
+            <span id="chunk-393" class="transcript-chunks" onclick="console.log('00:29:52,197'); seek(1792.0)">
+              Everything else is essential refinement around the core idea.
+            </span>
+            
+            <span id="chunk-394" class="transcript-chunks" onclick="console.log('00:29:56,957'); seek(1796.0)">
+              Now what you as an audience can do here, right?
+            </span>
+            
+            <span id="chunk-395" class="transcript-chunks" onclick="console.log('00:30:01,407'); seek(1801.0)">
+              So check your database's partition strategy.
+            </span>
+            
+            <span id="chunk-396" class="transcript-chunks" onclick="console.log('00:30:05,787'); seek(1805.0)">
+              Check the keys and try to get the sample data how many transactions or how many
+            </span>
+            
+            <span id="chunk-397" class="transcript-chunks" onclick="console.log('00:30:14,146'); seek(1814.0)">
+              hits you get on the node for those keys.
+            </span>
+            
+            <span id="chunk-398" class="transcript-chunks" onclick="console.log('00:30:19,407'); seek(1819.0)">
+              Set Kubernetes resources request limit to your latency-critical pods.
+            </span>
+            
+            <span id="chunk-399" class="transcript-chunks" onclick="console.log('00:30:25,718'); seek(1825.0)">
+              Try to come up or, measure the P95 and P99 compare before and after and see
+            </span>
+            
+            <span id="chunk-400" class="transcript-chunks" onclick="console.log('00:30:35,498'); seek(1835.0)">
+              how much impro- improvement is there.
+            </span>
+            
+            <span id="chunk-401" class="transcript-chunks" onclick="console.log('00:30:39,497'); seek(1839.0)">
+              And, Instrument the node hit ratio track the percentage of request
+            </span>
+            
+            <span id="chunk-402" class="transcript-chunks" onclick="console.log('00:30:45,246'); seek(1845.0)">
+              landing on the correct node and try to optimize those numbers there.
+            </span>
+            
+            <span id="chunk-403" class="transcript-chunks" onclick="console.log('00:30:50,845'); seek(1850.0)">
+              So that, that could be a good start.
+            </span>
+            
+            <span id="chunk-404" class="transcript-chunks" onclick="console.log('00:30:53,966'); seek(1853.0)">
+              And then based on that, I think and few of the approaches which I just talked
+            </span>
+            
+            <span id="chunk-405" class="transcript-chunks" onclick="console.log('00:31:00,227'); seek(1860.0)">
+              about some configuration decision could be taken and definitely there,
+            </span>
+            
+            <span id="chunk-406" class="transcript-chunks" onclick="console.log('00:31:04,237'); seek(1864.0)">
+              there will be a hu-huge improvement could be seen after implementing that.
+            </span>
+            
+            <span id="chunk-407" class="transcript-chunks" onclick="console.log('00:31:10,228'); seek(1870.0)">
+              So yeah thanks.
+            </span>
+            
+            <span id="chunk-408" class="transcript-chunks" onclick="console.log('00:31:11,318'); seek(1871.0)">
+              Thanks, everyone.
+            </span>
+            
+            <span id="chunk-409" class="transcript-chunks" onclick="console.log('00:31:12,178'); seek(1872.0)">
+              Thanks once again.
+            </span>
+            
+            <span id="chunk-410" class="transcript-chunks" onclick="console.log('00:31:13,208'); seek(1873.0)">
+              Myself, Ritwik, and yeah, I would like to connect you on LinkedIn.
+            </span>
+            
+            <span id="chunk-411" class="transcript-chunks" onclick="console.log('00:31:18,997'); seek(1878.0)">
+              Here is my LinkedIn URL.
+            </span>
+            
+            <span id="chunk-412" class="transcript-chunks" onclick="console.log('00:31:22,066'); seek(1882.0)">
+              So definitely looking forward and thanks once again, CON42,
+            </span>
+            
+            <span id="chunk-413" class="transcript-chunks" onclick="console.log('00:31:26,846'); seek(1886.0)">
+              for giving me this opportunity.
+            </span>
+            
+            <span id="chunk-414" class="transcript-chunks" onclick="console.log('00:31:28,826'); seek(1888.0)">
+              Thank
+            </span>
+            
+            <span id="chunk-415" class="transcript-chunks" onclick="console.log('00:31:29,006'); seek(1889.0)">
+              you.
+            </span>
+            
+            </div>
+          </div>
           
           
 
