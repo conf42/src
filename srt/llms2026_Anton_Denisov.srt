@@ -1,0 +1,1156 @@
+1
+00:00:00,500 --> 00:00:02,240
+Hi, I'm Anton Denisov.
+
+2
+00:00:02,450 --> 00:00:03,890
+I work at the Dwelli.
+
+3
+00:00:03,999 --> 00:00:09,780
+It's a tech native real estate operator in
+the UK where I lead the revenue function
+
+4
+00:00:09,819 --> 00:00:12,990
+and built our product and data systems.
+
+5
+00:00:13,020 --> 00:00:16,680
+Today, I'm talking about a
+sentiment analysis system that
+
+6
+00:00:16,680 --> 00:00:18,250
+we build and run in production.
+
+7
+00:00:19,009 --> 00:00:24,290
+It reads landlord emails and phone calls
+and flags the ones where the customer is
+
+8
+00:00:24,290 --> 00:00:27,130
+unhappy, so we can act before they leave.
+
+9
+00:00:27,630 --> 00:00:30,770
+I'll cover how we built it, the
+data, the model, and what we found
+
+10
+00:00:31,270 --> 00:00:34,210
+Dwell is a tech native real
+estate operator in the UK.
+
+11
+00:00:34,220 --> 00:00:39,220
+In plain terms, we manage rental
+properties end to end on behalf of
+
+12
+00:00:39,230 --> 00:00:43,960
+the landlords thousands of them on
+our own software stack rather than
+
+13
+00:00:43,960 --> 00:00:45,270
+a traditional high street agency.
+
+14
+00:00:45,770 --> 00:00:49,190
+This talk is about a system we
+built and run in production.
+
+15
+00:00:49,760 --> 00:00:53,980
+It reads our landlord communications,
+emails, and phone calls, and flags the
+
+16
+00:00:53,980 --> 00:00:58,170
+ones where the landlord is unhappy,
+so we can step in before they leave.
+
+17
+00:00:59,010 --> 00:01:02,930
+I'll walk through how we built it, the
+data, the model, the prompt engineering,
+
+18
+00:01:03,439 --> 00:01:08,370
+which took most of the time and work
+we learned running it on real messy
+
+19
+00:01:08,370 --> 00:01:14,040
+conversations The title promises British
+sarcasms, and that's a real problem.
+
+20
+00:01:14,130 --> 00:01:14,970
+I'll get to it.
+
+21
+00:01:15,520 --> 00:01:19,150
+The harder question sitting
+underneath is the engineering.
+
+22
+00:01:19,920 --> 00:01:24,500
+How do you build a sentiment system
+that actually works when your customers
+
+23
+00:01:24,500 --> 00:01:29,200
+are real people on the phone who
+don't always say what they mean?
+
+24
+00:01:30,010 --> 00:01:32,720
+Here is a core problem
+in a single message.
+
+25
+00:01:33,430 --> 00:01:36,390
+Our landlord wrote to
+us, "No problem at all.
+
+26
+00:01:36,860 --> 00:01:38,730
+I completely understand your visit.
+
+27
+00:01:39,340 --> 00:01:42,360
+Whenever you get a chance to look
+in the boiler, that would be great.
+
+28
+00:01:42,890 --> 00:01:47,480
+Thank you so much for all your help."
+Run through most of the off-the-shelf
+
+29
+00:01:47,480 --> 00:01:53,050
+sentiment models, and it scores positive;
+no problem, great, thank you so much.
+
+30
+00:01:53,550 --> 00:01:56,320
+However, i- and it looks
+like a happy customer.
+
+31
+00:01:56,820 --> 00:02:00,720
+That landlord moved their
+property to a competitor about two
+
+32
+00:02:00,720 --> 00:02:02,360
+weeks later after this message.
+
+33
+00:02:03,010 --> 00:02:06,370
+A generic model would
+never have flagged it.
+
+34
+00:02:07,120 --> 00:02:11,040
+Building something that does
+is the subject of this talk.
+
+35
+00:02:11,540 --> 00:02:12,750
+A bit of context first.
+
+36
+00:02:13,570 --> 00:02:16,500
+Retention drives the
+economics of this business.
+
+37
+00:02:16,939 --> 00:02:21,250
+A managed property is a multi-year
+recurring relationship, and
+
+38
+00:02:21,250 --> 00:02:25,349
+replacing a lo-lost landlord
+costs far more than keeping one.
+
+39
+00:02:26,030 --> 00:02:29,610
+You are paying acquisition
+costs again just to stand still.
+
+40
+00:02:30,110 --> 00:02:32,610
+One thing surprised us
+when we looked closely.
+
+41
+00:02:33,090 --> 00:02:37,380
+A big part of churn is
+unpreventable, though not most of it.
+
+42
+00:02:38,000 --> 00:02:42,810
+Landlords sell the flat or they
+move back in themselves, and for
+
+43
+00:02:42,810 --> 00:02:46,530
+a real share of cases, nothing we
+did would have changed the outcome.
+
+44
+00:02:47,030 --> 00:02:52,210
+If you're ever handed a reduced churn
+target, that's w- worth knowing upfront.
+
+45
+00:02:52,500 --> 00:02:54,400
+It stop you chasing the wrong number.
+
+46
+00:02:54,900 --> 00:03:00,090
+But the rest of it, landlords switching
+to competitor or deciding to manage
+
+47
+00:03:00,090 --> 00:03:04,860
+properties themselves, it's service
+driven and therefore preventable.
+
+48
+00:03:05,790 --> 00:03:07,610
+It's also the expensive kind.
+
+49
+00:03:07,620 --> 00:03:12,599
+It reflects disfact-- dissatisfaction
+rather than a live rent.
+
+50
+00:03:13,250 --> 00:03:15,960
+Those are the people you
+actually have a chance to keep.
+
+51
+00:03:16,460 --> 00:03:19,889
+So the problem wasn't
+really measure sentiment.
+
+52
+00:03:20,309 --> 00:03:21,330
+It was narrower.
+
+53
+00:03:21,889 --> 00:03:26,320
+Can we detect the preventable
+churn early enough to act on it
+
+54
+00:03:26,919 --> 00:03:32,600
+inside tens of thousands of mostly
+ordinary, mostly polite interactions?
+
+55
+00:03:33,100 --> 00:03:37,030
+The signals we needed were
+rare, and they were easy to miss
+
+56
+00:03:37,530 --> 00:03:42,270
+Standard sentiment analysis,
+lexicon scoring, classic fine-tuning
+
+57
+00:03:42,270 --> 00:03:47,640
+classifiers, NPS surveys, all
+rest on the same assumption, that
+
+58
+00:03:47,640 --> 00:03:52,300
+the strength of the emotion words
+track the strength of the feeling.
+
+59
+00:03:53,060 --> 00:03:57,420
+More terrible, more furious,
+more explanation marks, the
+
+60
+00:03:57,420 --> 00:03:59,220
+more negatives in messages.
+
+61
+00:04:00,170 --> 00:04:03,410
+British professional communication
+doesn't follow that rule.
+
+62
+00:04:04,110 --> 00:04:07,700
+A lot of complaint here is
+expressed by removing the
+
+63
+00:04:07,700 --> 00:04:09,640
+emotional signal, not adding it.
+
+64
+00:04:10,140 --> 00:04:14,350
+A few real examples: " I'd have thought
+someone would have called me back by
+
+65
+00:04:14,350 --> 00:04:19,330
+now." That's a complaint. " A little
+disappointed with how this was handled."
+
+66
+00:04:19,900 --> 00:04:21,610
+A little usually means quite a lot.
+
+67
+00:04:22,530 --> 00:04:27,250
+"When you get a chance" often means
+this is urgent and already overdue.
+
+68
+00:04:27,750 --> 00:04:31,370
+The dissatisfaction is fully
+present in all the three.
+
+69
+00:04:32,160 --> 00:04:37,220
+It just been toned down because
+saying it directly would feel rude.
+
+70
+00:04:37,720 --> 00:04:42,720
+And the keyword model reads every
+one of them as neutral or positive.
+
+71
+00:04:43,190 --> 00:04:45,330
+There is no angry words to catch.
+
+72
+00:04:45,840 --> 00:04:48,570
+NPS makes it worse, not better.
+
+73
+00:04:49,160 --> 00:04:53,320
+The people most likely to quietly
+leave are exactly the ones who are
+
+74
+00:04:53,370 --> 00:04:55,270
+too polite to give you a low score.
+
+75
+00:04:55,920 --> 00:04:58,720
+They give you seven, and
+they then don't renew.
+
+76
+00:04:59,220 --> 00:05:04,380
+There is a second half to this that's easy
+to overlook, and it matters just as much.
+
+77
+00:05:05,050 --> 00:05:09,270
+A large share of the dissatisfaction
+wasn't caused by something we did.
+
+78
+00:05:09,630 --> 00:05:11,950
+It was caused by something we didn't do.
+
+79
+00:05:12,870 --> 00:05:17,300
+Silence on our side, and landlord
+emails that no one replies.
+
+80
+00:05:17,810 --> 00:05:20,600
+They leave a voicemail, no one calls back.
+
+81
+00:05:21,100 --> 00:05:24,270
+They chase, and the chase goes unanswered.
+
+82
+00:05:24,770 --> 00:05:29,040
+From the model's point of view,
+that's a hard case because the
+
+83
+00:05:29,100 --> 00:05:31,660
+triggering event is an absence.
+
+84
+00:05:32,090 --> 00:05:37,140
+There is no angry message to classify,
+just a follow-up that is slightly shorter
+
+85
+00:05:37,390 --> 00:05:39,169
+or slightly cooler than the last one.
+
+86
+00:05:39,920 --> 00:05:42,819
+But it was one of the biggest
+drivers of churn we had.
+
+87
+00:05:43,629 --> 00:05:47,220
+People often don't leave because
+they got something wrong.
+
+88
+00:05:47,930 --> 00:05:49,920
+People leave because we went quiet.
+
+89
+00:05:50,590 --> 00:05:53,290
+So the task was never detect anger.
+
+90
+00:05:53,910 --> 00:05:55,340
+Anger is the easy case.
+
+91
+00:05:55,370 --> 00:05:56,880
+It announces itself.
+
+92
+00:05:57,310 --> 00:06:01,280
+The real task was to detect
+dissatisfaction that has been deliberately
+
+93
+00:06:01,340 --> 00:06:07,819
+understated, and in some cases to
+infer it from what wasn't said or what
+
+94
+00:06:07,820 --> 00:06:12,040
+wasn't done Let me walk you through
+the dataset, because this is where
+
+95
+00:06:12,040 --> 00:06:14,250
+the introduction starts to matter.
+
+96
+00:06:15,050 --> 00:06:20,370
+We pulled together around eleven
+thousand landlord interactions over
+
+97
+00:06:20,370 --> 00:06:24,260
+about a seven-week window, roughly
+two thousand unique landlords.
+
+98
+00:06:24,540 --> 00:06:28,370
+It spanned four channels, and
+the channel mattered a lot, so
+
+99
+00:06:28,370 --> 00:06:29,760
+these are worth holding onto.
+
+100
+00:06:30,260 --> 00:06:33,520
+Email through our CRM,
+structured and logged.
+
+101
+00:06:34,480 --> 00:06:38,870
+Email outside the CRM, and landlord
+just emails the person directly.
+
+102
+00:06:39,560 --> 00:06:43,820
+Calls through the CRM, usually
+our team calling the landlord.
+
+103
+00:06:44,350 --> 00:06:48,400
+And an inbound calls outside
+the CRM, where the landlord pick
+
+104
+00:06:48,400 --> 00:06:50,669
+ups up the phone and rings us.
+
+105
+00:06:51,549 --> 00:06:55,640
+The calls were the most valuable
+and the hardest to work with.
+
+106
+00:06:56,280 --> 00:06:59,550
+About eleven hundred of them
+transcribed with Voximplant.
+
+107
+00:07:00,380 --> 00:07:04,600
+People are more candid on the phone
+than in writing, though that's where
+
+108
+00:07:04,640 --> 00:07:06,640
+a lot of the real signal lived.
+
+109
+00:07:07,460 --> 00:07:13,040
+But the transcripts are messy:
+overlapping speakers, tangents, speech
+
+110
+00:07:13,040 --> 00:07:14,930
+recognition error, no structure.
+
+111
+00:07:15,360 --> 00:07:17,690
+If you work with the call
+data, you know it's a different
+
+112
+00:07:17,690 --> 00:07:19,209
+problem from a clean text.
+
+113
+00:07:20,070 --> 00:07:25,099
+Then labeling, which I which I would
+encourage any team to overinvest in.
+
+114
+00:07:25,729 --> 00:07:28,279
+We did not start by prompting the model.
+
+115
+00:07:28,419 --> 00:07:29,819
+We started by reading.
+
+116
+00:07:30,239 --> 00:07:33,839
+We hand-labeled around two hundred
+borderline negative cases from the
+
+117
+00:07:33,839 --> 00:07:38,160
+actual transcripts, and we wrote
+label definitions as explicit
+
+118
+00:07:38,169 --> 00:07:40,539
+decision rules, not judgment calls.
+
+119
+00:07:41,320 --> 00:07:46,609
+The schema had three axes: severity,
+four levels, green, amber, orange,
+
+120
+00:07:46,619 --> 00:07:50,810
+red; topic, maintenance, payments,
+move-out, compliance, seven find
+
+121
+00:07:50,810 --> 00:07:55,330
+or other; and intent, about ten
+categories, and this is where most
+
+122
+00:07:55,330 --> 00:07:59,189
+of the value was: communication,
+failure, self-management, signal,
+
+123
+00:07:59,199 --> 00:08:01,679
+decision, dispute, et cetera, et cetera.
+
+124
+00:08:02,179 --> 00:08:05,010
+The severity rules were
+deliberately mechanical.
+
+125
+00:08:05,749 --> 00:08:07,799
+Amber need an explicit signal.
+
+126
+00:08:08,390 --> 00:08:10,750
+Orange need two independent strong signal.
+
+127
+00:08:11,140 --> 00:08:14,060
+Red needs literal termination language.
+
+128
+00:08:14,820 --> 00:08:18,620
+We wrote them that a way for a
+reason-- that way for a reason.
+
+129
+00:08:19,050 --> 00:08:23,819
+So two different people would land on
+the same label and saw the model would
+
+130
+00:08:23,820 --> 00:08:26,320
+match the humans rather than drift.
+
+131
+00:08:27,150 --> 00:08:29,930
+That hand label set did double duty.
+
+132
+00:08:30,300 --> 00:08:35,600
+It was both our evaluation benchmark
+and our source of few short examples
+
+133
+00:08:36,100 --> 00:08:40,230
+We used this language model, a large
+language model, Cloth Sonnet, and the most
+
+134
+00:08:40,230 --> 00:08:45,620
+important design decision was to make it
+as two-step pipeline rather than one shot.
+
+135
+00:08:46,280 --> 00:08:47,630
+Step one is narrow.
+
+136
+00:08:48,330 --> 00:08:50,160
+Is this message negative at all?
+
+137
+00:08:50,970 --> 00:08:55,030
+A three-way call: positive,
+neutral, negative, nothing else.
+
+138
+00:08:55,590 --> 00:08:59,940
+Step two runs only on the message
+that come back negative, about
+
+139
+00:08:59,940 --> 00:09:01,990
+six or seven percent of the total.
+
+140
+00:09:02,640 --> 00:09:07,360
+On those and only on those, we extract
+the full structure, severity topic
+
+141
+00:09:07,370 --> 00:09:08,970
+intent, and the routing decision.
+
+142
+00:09:09,730 --> 00:09:11,880
+There are two reason to this matters.
+
+143
+00:09:12,360 --> 00:09:14,630
+The first is the cost and latency.
+
+144
+00:09:15,010 --> 00:09:18,940
+Step two is expensive reasoning,
+and you run on seven percent of
+
+145
+00:09:18,940 --> 00:09:20,530
+the volume instead of all of it.
+
+146
+00:09:21,080 --> 00:09:25,500
+The whole pipeline came in
+around a third cent per message.
+
+147
+00:09:26,460 --> 00:09:28,930
+The re- the second
+reason is more important.
+
+148
+00:09:29,280 --> 00:09:34,190
+Splitting the steps let us tune
+recall on direction separately
+
+149
+00:09:34,490 --> 00:09:36,430
+from precision of classification.
+
+150
+00:09:37,380 --> 00:09:39,010
+Those are different objectives.
+
+151
+00:09:39,390 --> 00:09:42,980
+Trying to hit both in a
+single prompt made both worse.
+
+152
+00:09:43,860 --> 00:09:47,710
+Once they were separate, we could make
+the detector deliberately sensitive
+
+153
+00:09:48,170 --> 00:09:52,810
+by store catching the quiet, polite
+cases, while keeping the severity
+
+154
+00:09:52,810 --> 00:09:59,869
+classifier conservative, so it doesn't
+turn every mild grumble into the red
+
+155
+00:09:59,940 --> 00:10:04,400
+alert Then the prompt engineering,
+where the real interaction went.
+
+156
+00:10:04,870 --> 00:10:08,880
+Three problems worth naming
+because I suspect they generalize.
+
+157
+00:10:09,800 --> 00:10:12,840
+One, the model rewi-rewarded politeness.
+
+158
+00:10:13,480 --> 00:10:16,630
+Out of the box, it did exactly
+what the keyword models do.
+
+159
+00:10:16,880 --> 00:10:21,270
+They saw lovely, thank you so
+much, and scored it positive.
+
+160
+00:10:21,830 --> 00:10:24,600
+The fix was to tell it to treat
+the courtesy as a wrapping and
+
+161
+00:10:24,600 --> 00:10:26,500
+classify on the substance underneath.
+
+162
+00:10:27,140 --> 00:10:29,110
+What is this person actually asking for?
+
+163
+00:10:29,390 --> 00:10:31,500
+How many times have
+they had to ask for it?
+
+164
+00:10:31,910 --> 00:10:34,180
+Is the politeness covering frustration?
+
+165
+00:10:34,840 --> 00:10:38,540
+Then we fed in the hand-labeled
+polite but negative case a few
+
+166
+00:10:38,540 --> 00:10:43,219
+short anchors, concrete examples
+of sounds nice is not nice.
+
+167
+00:10:43,719 --> 00:10:47,120
+That only… That one change moved the
+results from anything else we did…
+
+168
+00:10:47,160 --> 00:10:48,269
+more than anything else we did.
+
+169
+00:10:48,769 --> 00:10:51,679
+Two, problem number
+two, it over-escalated.
+
+170
+00:10:52,639 --> 00:10:57,229
+A sensitive detector wants to label
+everything orange, so it pushed the
+
+171
+00:10:57,229 --> 00:10:59,099
+strict rules straight into the prompt.
+
+172
+00:10:59,539 --> 00:11:01,709
+Orange requires two strong signals.
+
+173
+00:11:01,739 --> 00:11:05,769
+Red requires explicit language
+and nothing else, nothing less.
+
+174
+00:11:06,499 --> 00:11:10,679
+Severity became a checklist,
+not a feeling, and the
+
+175
+00:11:10,679 --> 00:11:12,939
+false red largely went away.
+
+176
+00:11:13,439 --> 00:11:16,389
+Three, telling went in apart from blame.
+
+177
+00:11:16,889 --> 00:11:22,369
+Landlords would call up annoyed about a
+tenant or a contractor or some external
+
+178
+00:11:22,369 --> 00:11:25,709
+mess and explicitly not blame us.
+
+179
+00:11:26,039 --> 00:11:27,229
+I know it's not your fault.
+
+180
+00:11:27,909 --> 00:11:32,369
+A naive classifier reads a negative
+tone and routes it to a ser-service
+
+181
+00:11:32,369 --> 00:11:36,469
+failure, and a manager spends
+their afternoon apologizing for
+
+182
+00:11:36,469 --> 00:11:38,309
+something they did not cause.
+
+183
+00:11:38,749 --> 00:11:43,659
+So external issue became its own
+intent, and the prompt had to separate
+
+184
+00:11:43,669 --> 00:11:48,499
+two things that look identical to
+a keyword model, the tone of the
+
+185
+00:11:48,499 --> 00:11:50,459
+message and who it's aimed it at.
+
+186
+00:11:51,289 --> 00:11:54,669
+Negative but not at us is a
+completely different action.
+
+187
+00:11:55,169 --> 00:12:00,079
+On the production side, none of
+these were one-off batch job.
+
+188
+00:12:00,609 --> 00:12:05,820
+Emails streamed in from BigQuery, calls
+came through Voximplant translation,
+
+189
+00:12:05,830 --> 00:12:09,670
+the models scored continuously, and
+the scores were written back into the
+
+190
+00:12:09,670 --> 00:12:13,489
+warehouse for the rest of the business
+to use So what were the key findings?
+
+191
+00:12:13,799 --> 00:12:18,719
+First, people are more guarded in
+writing and more direct on the phone.
+
+192
+00:12:19,359 --> 00:12:24,909
+Calls ran meaningfully more negative
+than email in order of 50% more.
+
+193
+00:12:25,769 --> 00:12:31,879
+Second, and no survey tool can do this,
+switching channels is a leading indicator.
+
+194
+00:12:32,629 --> 00:12:36,049
+When a landlord who'd been emailing
+us suddenly starts phoning,
+
+195
+00:12:36,139 --> 00:12:37,819
+escalation usually follows.
+
+196
+00:12:38,269 --> 00:12:40,429
+The switch itself is a signal.
+
+197
+00:12:40,929 --> 00:12:45,989
+Third, communication failure was
+the single largest category, about
+
+198
+00:12:45,999 --> 00:12:48,799
+36% of all negative interactions.
+
+199
+00:12:49,089 --> 00:12:52,929
+Not maintenance, not money, not
+being able to reach a human.
+
+200
+00:12:53,559 --> 00:12:57,899
+More than a third of neg- every negative
+case reduced to, "I tried to contact
+
+201
+00:12:57,899 --> 00:13:04,699
+you, nothing happened." Fourth, the
+polite customer point, now with numbers.
+
+202
+00:13:05,169 --> 00:13:08,809
+We match the sentiment data against
+the landlords who actually left.
+
+203
+00:13:09,369 --> 00:13:13,469
+The ones who left to sell
+ran around 4% negativity.
+
+204
+00:13:14,169 --> 00:13:18,749
+The ones who switched to a competitor,
+the preventable, expensive chore, ran
+
+205
+00:13:18,789 --> 00:13:24,129
+several times higher But here's what
+matters for how you build the model.
+
+206
+00:13:24,489 --> 00:13:26,269
+They didn't express it by shouting.
+
+207
+00:13:26,329 --> 00:13:30,239
+They expressed it by in measured,
+polite, slightly formal language.
+
+208
+00:13:30,739 --> 00:13:35,369
+And the fifth, the more data
+sources mean b- better output.
+
+209
+00:13:35,979 --> 00:13:40,839
+One agency looked like the top
+performer, very low negativity, about 4%.
+
+210
+00:13:41,729 --> 00:13:42,999
+Then we checked the pipeline.
+
+211
+00:13:43,249 --> 00:13:46,089
+We were only capturing a small
+fraction of that agency calls.
+
+212
+00:13:46,109 --> 00:13:49,359
+Most of its phone conversation
+were not reaching the model at all.
+
+213
+00:13:50,219 --> 00:13:53,269
+Once the call feed was complete,
+the number fell right in
+
+214
+00:13:53,269 --> 00:13:54,579
+line with everyone else's.
+
+215
+00:13:54,919 --> 00:13:56,189
+So the point is simple.
+
+216
+00:13:56,439 --> 00:13:59,929
+The quality of the output is
+bounded by the coverage of the input
+
+217
+00:14:00,429 --> 00:14:02,999
+Detection on its own doesn't do much.
+
+218
+00:14:03,909 --> 00:14:07,819
+A classifier that produces a
+dashboard nobody acts is just
+
+219
+00:14:07,819 --> 00:14:09,309
+a report with extra steps.
+
+220
+00:14:10,049 --> 00:14:13,619
+So each intent mapped it to a
+defined action, what an owner and
+
+221
+00:14:13,619 --> 00:14:16,439
+response time agreed in advance
+with the people who'd carry it out.
+
+222
+00:14:16,969 --> 00:14:20,909
+Communication failure, a manager
+calls within twenty-four hours.
+
+223
+00:14:20,999 --> 00:14:25,199
+A self-management signal, a personal
+call, a conversation about the value, not
+
+224
+00:14:25,199 --> 00:14:27,759
+specific repair, et cetera, et cetera.
+
+225
+00:14:28,669 --> 00:14:33,819
+The cleanest example of the loop closing,
+once we quantified that communication
+
+226
+00:14:33,849 --> 00:14:38,089
+fai-failure was the single biggest
+driver, chasing landlords one by
+
+227
+00:14:38,089 --> 00:14:40,609
+one was obviously treating symptoms.
+
+228
+00:14:41,109 --> 00:14:42,539
+The cause was structural.
+
+229
+00:14:42,969 --> 00:14:45,329
+We were not answering
+the call, phone reliably.
+
+230
+00:14:45,719 --> 00:14:50,019
+So the finding led directly to a second
+build, an agentic voice assistant
+
+231
+00:14:50,029 --> 00:14:52,059
+to handle inbound landlord calls.
+
+232
+00:14:52,839 --> 00:14:56,689
+The detection system didn't just flag
+the problems, it told us what to build
+
+233
+00:14:56,769 --> 00:15:02,669
+next with the volume data to justify
+let me pull together the lessons.
+
+234
+00:15:02,729 --> 00:15:05,059
+I think generalize whatever
+you're classifying.
+
+235
+00:15:05,359 --> 00:15:08,679
+One don't reach out for
+off-the-shelf sentiment.
+
+236
+00:15:08,949 --> 00:15:10,829
+Two, split the problem.
+
+237
+00:15:10,939 --> 00:15:14,929
+Achieve sensitive detector first,
+expensive structured classification
+
+238
+00:15:15,319 --> 00:15:17,259
+only when, what it, on what it flags.
+
+239
+00:15:17,859 --> 00:15:21,709
+Three, put your effort into
+labeling at prompts, not the model.
+
+240
+00:15:21,959 --> 00:15:24,949
+Four, detection is
+worthless without action.
+
+241
+00:15:25,399 --> 00:15:27,859
+Map every category to an
+owner and the response time.
+
+242
+00:15:28,499 --> 00:15:31,229
+Five, coverage bounds quality.
+
+243
+00:15:31,679 --> 00:15:35,889
+Feed feed it every channel you
+have or your confident-looking
+
+244
+00:15:35,899 --> 00:15:37,089
+output is quietly wrong.
+
+245
+00:15:37,589 --> 00:15:41,999
+Do those five things, and the British
+sarcasm problem is a little title stop
+
+246
+00:15:41,999 --> 00:15:46,279
+speed courtesy, and it becomes something
+you can actually catch in production
+
+247
+00:15:46,949 --> 00:15:48,779
+early enough to keep the customer.
+
+248
+00:15:49,249 --> 00:15:49,669
+Thank you.
+
