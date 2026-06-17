@@ -1,0 +1,1951 @@
+1
+00:00:00,500 --> 00:00:00,799
+Speaker 28: Yep.
+
+2
+00:00:00,830 --> 00:00:01,730
+Hi, everyone.
+
+3
+00:00:02,000 --> 00:00:07,070
+So my name is Yaroslav, and so a
+bit of context before we start Yep.
+
+4
+00:00:07,460 --> 00:00:12,490
+So for the last two years, I worked with
+LLMs in production across three companies.
+
+5
+00:00:12,750 --> 00:00:17,409
+So it was Thread, which builds ad
+infrastructure inside conversational AI.
+
+6
+00:00:18,080 --> 00:00:19,479
+It was Cesar Labs in San Francisco.
+
+7
+00:00:19,770 --> 00:00:22,810
+It is large OpenAI-backed
+multi-agent neo lab.
+
+8
+00:00:23,119 --> 00:00:27,860
+And now I'm in early stage multi-agentic
+startup where I'm a founding engineer.
+
+9
+00:00:28,489 --> 00:00:32,229
+So alongside that, I'm studying at
+King's College London, doing mathematics
+
+10
+00:00:32,229 --> 00:00:38,799
+with finance, and also I do executive
+education in data science at Imperial.
+
+11
+00:00:39,520 --> 00:00:42,390
+So I'm not here to talk
+about building agents.
+
+12
+00:00:42,930 --> 00:00:47,920
+There are plenty of talks about that, and
+I think you heard a lot about them today.
+
+13
+00:00:48,280 --> 00:00:54,059
+So I want to talk about the part almost
+nobody designs on purpose, the part
+
+14
+00:00:54,080 --> 00:01:01,140
+that gets bolted on at the end, treated
+as plumbing and then quietly decides
+
+15
+00:01:01,180 --> 00:01:03,930
+whether your entire system can be trusted.
+
+16
+00:01:04,460 --> 00:01:08,560
+And yeah, this is verifier, the judge,
+the thing that decides whether the agent's
+
+17
+00:01:08,590 --> 00:01:13,389
+output was any good And the uncomfortable
+thesis I want to defend today is that
+
+18
+00:01:14,119 --> 00:01:18,559
+the judge is the hardest component
+in a genetic system, not the easiest.
+
+19
+00:01:18,629 --> 00:01:19,019
+Yeah.
+
+20
+00:01:19,389 --> 00:01:24,999
+What we have built our intuition about
+it backwards, and so that almost every
+
+21
+00:01:24,999 --> 00:01:30,419
+production verify I've seen is in a
+precise sense, it's rotten, degrading
+
+22
+00:01:30,479 --> 00:01:37,039
+in a way that pr- produces no error,
+no alert, no signal until one day
+
+23
+00:01:37,039 --> 00:01:40,939
+you realize the number it's been
+emitting for months meant nothing.
+
+24
+00:01:41,469 --> 00:01:47,389
+And let me try to earn that
+claim So yeah start with what
+
+25
+00:01:47,399 --> 00:01:48,909
+actually happens on a team.
+
+26
+00:01:49,069 --> 00:01:51,869
+You build an agent, it
+worked on in the demo.
+
+27
+00:01:52,279 --> 00:01:58,079
+Someone, usually, like someone
+sensible and kinda precise ask how
+
+28
+00:01:58,079 --> 00:01:59,639
+you know the output is correct.
+
+29
+00:02:00,079 --> 00:02:02,829
+And yeah, of course, you
+will add the verifier.
+
+30
+00:02:03,039 --> 00:02:07,819
+In practice, this means a second model
+call with a prompt that say something
+
+31
+00:02:07,829 --> 00:02:13,789
+like, "Rate the quality of answer," or,
+"Is it following the same like guardrails?
+
+32
+00:02:13,789 --> 00:02:14,999
+Explain your reasoning.
+
+33
+00:02:15,409 --> 00:02:17,309
+Check the reasoning," and stuff like that.
+
+34
+00:02:17,309 --> 00:02:23,369
+So you wire it up, you set a threshold,
+you call it quality control, and you ship.
+
+35
+00:02:24,039 --> 00:02:29,099
+For a while it seems fine, and
+here is the first subtle thing.
+
+36
+00:02:29,709 --> 00:02:32,999
+It seems fine precisely because
+in the early days you're still
+
+37
+00:02:32,999 --> 00:02:34,599
+reading the outputs yourself.
+
+38
+00:02:34,959 --> 00:02:39,339
+The judge and your own eyes agree, so you
+trust the judge, and you stop reading.
+
+39
+00:02:39,869 --> 00:02:45,009
+That is the exact moment the rot begins,
+not when the judge gets worse, but
+
+40
+00:02:45,049 --> 00:02:49,899
+when you stop being able to see whether
+it was never as good as you thought.
+
+41
+00:02:50,649 --> 00:02:54,369
+Because a broken judge and a working
+judge produce the same artifact,
+
+42
+00:02:54,449 --> 00:02:58,319
+a number, a verdict, looked good,
+like 8 out of 10, 10 out of 10.
+
+43
+00:02:58,319 --> 00:03:01,649
+There is no exception thrown when
+a judge approves a bad answer.
+
+44
+00:03:02,259 --> 00:03:05,709
+There is no stack trace
+when it rejects a good one.
+
+45
+00:03:06,009 --> 00:03:11,720
+The failure mode of a verifier is
+like really the silence, and silence
+
+46
+00:03:11,750 --> 00:03:16,670
+is the one failure mode our entire
+engineer culture is bad at detecting.
+
+47
+00:03:16,979 --> 00:03:21,349
+Because every tool we have, logs,
+alerts, dashboards, is built to
+
+48
+00:03:21,360 --> 00:03:25,700
+surface events, and a silently
+wrong verdict is not an event.
+
+49
+00:03:25,820 --> 00:03:29,160
+It's absess of, absence of one.
+
+50
+00:03:29,799 --> 00:03:35,589
+So the first idea I want to plant in
+this, the ver- the verifier is the
+
+51
+00:03:35,610 --> 00:03:39,719
+only component in your system whose
+failures are invisible by construction.
+
+52
+00:03:40,350 --> 00:03:45,090
+The agent fails loudly, wrong
+output, angry user, broken test.
+
+53
+00:03:45,420 --> 00:03:46,609
+The judge fails silently.
+
+54
+00:03:46,700 --> 00:03:49,779
+It just keeps agreeing with
+things it shouldn't, and the
+
+55
+00:03:49,780 --> 00:03:54,069
+cost lands later somewhere else
+where you can't trace it back
+
+56
+00:03:54,569 --> 00:03:58,439
+And yeah, let me get specific about
+why this happens, because we judge is
+
+57
+00:03:58,579 --> 00:04:01,859
+unreliable, is too vague to act on.
+
+58
+00:04:02,529 --> 00:04:04,269
+There are concrete measured reasons.
+
+59
+00:04:04,589 --> 00:04:09,559
+When you ask an LLM to judge, you
+imagine it evaluating quality.
+
+60
+00:04:09,959 --> 00:04:12,839
+It isn't, or at least not only.
+
+61
+00:04:13,419 --> 00:04:17,119
+It's evaluating a blend of quality and
+a set of biases that have nothing to
+
+62
+00:04:17,119 --> 00:04:19,379
+do with whether the answer is correct.
+
+63
+00:04:20,009 --> 00:04:20,149
+These are not res-speculative, I will say.
+
+64
+00:04:20,149 --> 00:04:20,813
+There are some of
+
+65
+00:04:21,313 --> 00:04:24,223
+the most reproduced
+fi-findings in this field.
+
+66
+00:04:25,093 --> 00:04:26,033
+Position bias.
+
+67
+00:04:26,303 --> 00:04:29,803
+Show a judge two answers, and it
+tends to prefer whichever came
+
+68
+00:04:30,053 --> 00:04:31,943
+first independent of content.
+
+69
+00:04:32,683 --> 00:04:34,363
+Second one is verbosity bias.
+
+70
+00:04:34,733 --> 00:04:39,223
+It tends to prefer the longer answer,
+even when the extra length is padding.
+
+71
+00:04:39,223 --> 00:04:43,353
+These were in the original LLM as a judge
+paper from Zhen and colleagues back in two
+
+72
+00:04:43,353 --> 00:04:47,913
+thousand and twenty-three, and they have
+survived every model generation since.
+
+73
+00:04:48,723 --> 00:04:53,993
+But the one that should generally
+unsettle you in a self-pre-- preference,
+
+74
+00:04:54,243 --> 00:04:58,903
+a judge systema-systematically favors
+text that looks like its own output.
+
+75
+00:04:59,403 --> 00:05:02,983
+Watilola and colleagues measured
+this carefully and found something
+
+76
+00:05:03,033 --> 00:05:04,803
+revealing about this mechanism.
+
+77
+00:05:05,263 --> 00:05:06,953
+The effect tracks perplexity.
+
+78
+00:05:06,953 --> 00:05:11,653
+The judge prefers text it finds
+easy to predict, text in its own
+
+79
+00:05:11,653 --> 00:05:17,503
+style, its own rhythms, its own
+habits of phrasing and the structure
+
+80
+00:05:17,503 --> 00:05:19,143
+of sentencing and stuff like that.
+
+81
+00:05:19,563 --> 00:05:21,253
+Not text that is correct.
+
+82
+00:05:21,423 --> 00:05:23,243
+Text that is familiar.
+
+83
+00:05:23,353 --> 00:05:27,663
+The judge is, in a sense, grading
+on how much the answer sounds
+
+84
+00:05:27,663 --> 00:05:29,193
+like something it would have said
+
+85
+00:05:29,693 --> 00:05:29,812
+And yeah, how big is this?
+
+86
+00:05:29,812 --> 00:05:30,079
+On one public benchmark, Arena Hard, maybe
+some of you heard about that, it's kinda
+
+87
+00:05:30,079 --> 00:05:30,315
+popular right now, the self-preference
+effect across different judges ranged from
+
+88
+00:05:30,815 --> 00:05:33,285
+- 38% to +90%.
+
+89
+00:05:33,285 --> 00:05:33,655
+Sit with that range for a second.
+
+90
+00:05:33,655 --> 00:05:35,815
+That is not a small bias around the truth.
+
+91
+00:05:36,605 --> 00:05:40,965
+That is a verdict that can move by
+more than 100 points depending solely
+
+92
+00:05:40,995 --> 00:05:42,945
+on who wrote the answer being judged.
+
+93
+00:05:43,405 --> 00:05:47,635
+If you if your agent and your judge
+come from the same model family,
+
+94
+00:05:47,785 --> 00:05:49,395
+you are not getting verification.
+
+95
+00:05:49,525 --> 00:05:54,755
+You're getting a model nodding
+as its own reflection Yep, and
+
+96
+00:05:54,895 --> 00:05:58,335
+there's a human version of this, and
+close of the obvious escape route.
+
+97
+00:05:58,745 --> 00:06:03,125
+The obvious fix when I don't trust the
+judge is to put a person on top of it.
+
+98
+00:06:03,275 --> 00:06:07,505
+It's like the human loop, have a
+human review the judge's verdicts.
+
+99
+00:06:07,505 --> 00:06:11,495
+But Dietz and colleagues documented
+what they called the rubber sum effect.
+
+100
+00:06:12,065 --> 00:06:15,315
+When you ask a person to
+verify an LLM's judgment, they
+
+101
+00:06:15,315 --> 00:06:19,495
+disproportionately just agree with
+it, even when it demonstrably wrong.
+
+102
+00:06:19,895 --> 00:06:23,825
+It's the Asch conformity
+experiment run with a model as
+
+103
+00:06:23,875 --> 00:06:25,485
+the confident voice in the room.
+
+104
+00:06:25,745 --> 00:06:31,925
+So the human safety net has the same
+hole as the judge it's meant to catch.
+
+105
+00:06:32,725 --> 00:06:36,915
+You've stacked two correlated verifiers
+and called it defense in depth.
+
+106
+00:06:37,555 --> 00:06:41,155
+Now, none of these biases
+show up in your demo.
+
+107
+00:06:41,445 --> 00:06:42,635
+That's the cruel part.
+
+108
+00:06:42,725 --> 00:06:46,095
+In the demo, you have 10 examples,
+and you read all of them.
+
+109
+00:06:46,505 --> 00:06:48,395
+The biases are statistical.
+
+110
+00:06:48,505 --> 00:06:53,065
+They emerge at scale, in
+aggregate, exactly in the regime
+
+111
+00:06:53,095 --> 00:06:54,795
+where you've stopped looking.
+
+112
+00:06:55,505 --> 00:06:58,775
+The judge doesn't rot
+because the model degrades.
+
+113
+00:06:59,015 --> 00:07:05,595
+It rots because the condition that masked
+its biases, your attention maybe, or
+
+114
+00:07:05,645 --> 00:07:13,315
+your temporarily, and the biases were,
+like, for all time And yeah here's
+
+115
+00:07:13,325 --> 00:07:18,385
+where I want to push against a piece of
+received wisdom, because I think it's
+
+116
+00:07:18,425 --> 00:07:21,135
+not just wrong, but precisely inverted.
+
+117
+00:07:21,935 --> 00:07:25,145
+Most teams use a weaker,
+cheaper model as the judge.
+
+118
+00:07:25,155 --> 00:07:27,985
+The reasoning feels, like, all right.
+
+119
+00:07:28,065 --> 00:07:30,315
+Judging is easier than doing.
+
+120
+00:07:30,635 --> 00:07:32,185
+Checking an answer is
+simpler than producing it.
+
+121
+00:07:32,415 --> 00:07:36,965
+So spend your expensive tokens on
+generation and economize on verification.
+
+122
+00:07:37,435 --> 00:07:41,355
+Put the big model on the agent
+and a small o- model on the judge.
+
+123
+00:07:41,415 --> 00:07:47,635
+So I want to argue that backwards, but I
+have to be careful here because there is
+
+124
+00:07:47,675 --> 00:07:52,245
+a real result that seems to support the
+conventional view, and the interesting
+
+125
+00:07:52,265 --> 00:07:54,395
+part is exac- is exactly where it breaks.
+
+126
+00:07:54,415 --> 00:07:58,065
+The supporting result is
+verification asymmetry.
+
+127
+00:07:58,065 --> 00:08:03,125
+There is a genuine deep fact, or maybe
+Jason Wei wrote about it recently,
+
+128
+00:08:03,325 --> 00:08:07,585
+and it shows up across mathema-
+mathematics that verifying a solution
+
+129
+00:08:07,605 --> 00:08:09,305
+is often easier than producing one.
+
+130
+00:08:10,085 --> 00:08:12,905
+Okay, let's think about
+the prime factorization.
+
+131
+00:08:13,285 --> 00:08:17,375
+Finding the factors of a large
+number is brutally hard but checking
+
+132
+00:08:17,675 --> 00:08:21,475
+whether two proposed factors
+multiply back is trivial, right?
+
+133
+00:08:22,115 --> 00:08:26,995
+In convex optimization, a dual certificate
+lets you validate that a solution is
+
+134
+00:08:26,995 --> 00:08:29,495
+optimal far more cheaply than finding it.
+
+135
+00:08:29,845 --> 00:08:34,905
+So in these domains, yes, a weaker ver-
+verifier can check a stronger generator
+
+136
+00:08:35,235 --> 00:08:40,025
+because the verification problem is
+generally a smaller problem But here's
+
+137
+00:08:40,025 --> 00:08:42,465
+the catch, and it's the whole game.
+
+138
+00:08:42,555 --> 00:08:45,585
+But the symmetry only holds when
+verification has a cheap certificate,
+
+139
+00:08:46,085 --> 00:08:50,565
+when there is a shortcut to checking that
+doesn't require redoing the work, right?
+
+140
+00:08:51,055 --> 00:08:54,555
+Or factorization has one, multiply, right?
+
+141
+00:08:54,755 --> 00:08:57,215
+Optimization has one, like we do.
+
+142
+00:08:57,705 --> 00:09:01,725
+Code has one, sometimes run
+it, and yeah, that's it.
+
+143
+00:09:02,335 --> 00:09:07,265
+So but most agentic task has,
+have no certificate, right?
+
+144
+00:09:07,765 --> 00:09:11,135
+Was this l-legal summary
+faithful to the contract?
+
+145
+00:09:11,245 --> 00:09:14,925
+Did this research synthesis
+represent the sources honestly?
+
+146
+00:09:15,225 --> 00:09:18,945
+Is this multi-step plan actually
+going to achieve the goal?
+
+147
+00:09:19,435 --> 00:09:21,275
+There is no cheap check to this.
+
+148
+00:09:21,875 --> 00:09:25,165
+To verify the answer, the judge
+has to do essentially the same
+
+149
+00:09:25,165 --> 00:09:27,165
+reasoning the generator did.
+
+150
+00:09:27,415 --> 00:09:32,615
+Reconstruct the argument, find the
+load-bearing step, and know what correct
+
+151
+00:09:32,685 --> 00:09:35,825
+answer often without an answer key at all.
+
+152
+00:09:36,505 --> 00:09:41,005
+So yeah, when there is no
+certificate, the asymmetry collapses.
+
+153
+00:09:41,495 --> 00:09:46,385
+Verification becomes as hard as
+generation, and I will think I think that
+
+154
+00:09:46,695 --> 00:09:51,725
+sometimes even harder because spotting
+the one subtle flaw in a plausible-looking
+
+155
+00:09:51,725 --> 00:09:55,025
+proof is harder than producing a
+plausible-looking f-proof, right?
+
+156
+00:09:55,455 --> 00:09:59,165
+So and there is a measured
+failure mode behind this.
+
+157
+00:09:59,635 --> 00:10:05,325
+Sometimes called limited reasoning bias,
+a judge cannot reliably catch a mistake on
+
+158
+00:10:05,325 --> 00:10:07,915
+a problem it could not have solved itself.
+
+159
+00:10:08,605 --> 00:10:13,695
+If your agent is operating at the
+frontier o-of what the strongest model
+
+160
+00:10:13,695 --> 00:10:16,105
+can do, a weaker judge isn't checking it.
+
+161
+00:10:16,365 --> 00:10:20,355
+It's rubber-stamping it with
+extra steps and confident tone.
+
+162
+00:10:20,555 --> 00:10:21,005
+That's it.
+
+163
+00:10:21,655 --> 00:10:25,795
+So the principle I would offer
+is conditional, and the condition
+
+164
+00:10:25,795 --> 00:10:27,125
+is the interesting part.
+
+165
+00:10:27,875 --> 00:10:31,585
+Ask does this task have a
+cheap verification certificate?
+
+166
+00:10:31,585 --> 00:10:35,945
+If yes, if you can run the code,
+check the tool, execute the query,
+
+167
+00:10:36,425 --> 00:10:41,345
+so yeah, when a cheaper judge plus
+that tool can absolutely verify a
+
+168
+00:10:41,345 --> 00:10:43,345
+strong, a stronger generator, right?
+
+169
+00:10:43,695 --> 00:10:47,305
+And you should lean on the tool hard.
+
+170
+00:10:48,135 --> 00:10:53,405
+If no, if verif-- if verification requires
+the same reasoning as a generator when
+
+171
+00:10:53,415 --> 00:10:58,285
+your judge must be at least as strong as
+your agent, and probably even stronger,
+
+172
+00:10:58,745 --> 00:11:00,715
+and the place you cut cost is not here.
+
+173
+00:11:01,305 --> 00:11:03,665
+The mistake isn't using a weak judge.
+
+174
+00:11:04,415 --> 00:11:09,285
+The mistake is using a weak judge on a
+task with no certificate, which is, I'll
+
+175
+00:11:09,285 --> 00:11:14,955
+say, most of them And now I want to go
+one level deeper into a finding where
+
+176
+00:11:14,955 --> 00:11:19,505
+it generally surprised me and that I
+think very few teams have internalized.
+
+177
+00:11:20,405 --> 00:11:25,645
+You might assume that as the models
+get more capable, more high in
+
+178
+00:11:25,645 --> 00:11:31,265
+quality, or they get better at judging,
+including at judging themselves, more
+
+179
+00:11:31,265 --> 00:11:33,335
+intelligence, like better verdicts.
+
+180
+00:11:33,635 --> 00:11:38,055
+It turns out this is not what happens,
+and the gap is like structural.
+
+181
+00:11:38,475 --> 00:11:42,375
+There is recent work, a paper on
+self-verification dynamics from earlier
+
+182
+00:11:42,535 --> 00:11:46,645
+this year in the clearest, like showing
+a persistent asymmetry between a
+
+183
+00:11:47,115 --> 00:11:51,185
+model's ability to generate and its
+ability to verify its own generations.
+
+184
+00:11:51,975 --> 00:11:55,195
+And the striking part is
+the direction of the arrows.
+
+185
+00:11:55,635 --> 00:11:59,035
+Training a model to generate
+better, does not improve in
+
+186
+00:11:59,055 --> 00:12:02,025
+self self-verification, right?
+
+187
+00:12:02,635 --> 00:12:04,975
+The two capabilities
+doesn't move together.
+
+188
+00:12:05,315 --> 00:12:09,925
+You can scale generation all you,
+like all you want, and the model's
+
+189
+00:12:09,965 --> 00:12:13,555
+ability to check its own work
+doesn't come along for this ride.
+
+190
+00:12:14,415 --> 00:12:19,725
+Verification is a distant capability,
+not like byproduct of being smart.
+
+191
+00:12:20,505 --> 00:12:25,265
+Worse, when researchers looked
+closely at what models do when they
+
+192
+00:12:25,295 --> 00:12:31,665
+appear to self-verifi-ver-verify,
+they found a lot of it is what they
+
+193
+00:12:31,665 --> 00:12:33,585
+bluntly called fake verification.
+
+194
+00:12:34,085 --> 00:12:36,785
+The model emits the words of checking
+like, "Let me verify this step,"
+
+195
+00:12:37,245 --> 00:12:41,455
+but verification step has almost no
+causal effect on the final answer.
+
+196
+00:12:41,845 --> 00:12:45,985
+It's performing the ritual of
+checking without doing the work.
+
+197
+00:12:46,605 --> 00:12:50,025
+From the outside, in your,
+like in your logs this looks
+
+198
+00:12:50,025 --> 00:12:51,735
+identical to real verification.
+
+199
+00:12:52,015 --> 00:12:55,155
+Model says it's checked, the
+trace contains a checking step,
+
+200
+00:12:55,315 --> 00:12:56,835
+but nothing was actually tested.
+
+201
+00:12:57,465 --> 00:13:00,945
+So this connects to an older
+finding from the critic work.
+
+202
+00:13:01,135 --> 00:13:03,615
+Without external feedback,
+a LLM self-correction can
+
+203
+00:13:03,715 --> 00:13:05,225
+actively make things worse.
+
+204
+00:13:05,595 --> 00:13:09,705
+The model asks to reject its own
+answer with no outside signal.
+
+205
+00:13:10,105 --> 00:13:15,335
+Will sometimes talk itself out of
+correct answer into a wrong one.
+
+206
+00:13:16,095 --> 00:13:20,435
+The summary line from that research has
+stuck with me: Language models don't
+
+207
+00:13:20,455 --> 00:13:25,275
+reliably know what they know, and if
+a model doesn't reliably know what
+
+208
+00:13:25,275 --> 00:13:29,895
+it knows, when asking that-- the same
+model to be the judge of its own work
+
+209
+00:13:30,025 --> 00:13:35,085
+is asking the blind spot to inspect
+itself And yeah, here's why this matters
+
+210
+00:13:35,245 --> 00:13:36,505
+for architecture like concretely.
+
+211
+00:13:36,915 --> 00:13:40,875
+It means you cannot get verification
+for free by adding a now check your
+
+212
+00:13:40,875 --> 00:13:43,265
+work step to your agent's own prompt.
+
+213
+00:13:43,905 --> 00:13:46,285
+That's the cheapest and
+more tempting design.
+
+214
+00:13:46,375 --> 00:13:51,555
+Same model, one more turn, self-critique,
+and research says it's largely a feature.
+
+215
+00:13:52,295 --> 00:13:55,405
+Real verification has to come
+from somewhere the generation
+
+216
+00:13:55,415 --> 00:13:59,405
+didn't: a different model, an
+external tool, a ground truth
+
+217
+00:13:59,415 --> 00:14:01,575
+signal or something like that.
+
+218
+00:14:02,065 --> 00:14:06,395
+So verification you can trust is
+verification that has independent
+
+219
+00:14:06,445 --> 00:14:07,695
+purchase on the problem.
+
+220
+00:14:08,165 --> 00:14:13,185
+Self-verification di- done by the same
+model is the same context, mostly tells
+
+221
+00:14:13,185 --> 00:14:15,505
+you what the model already believed.
+
+222
+00:14:16,065 --> 00:14:22,145
+So the deeper principle is this,
+verification is not a weaker form
+
+223
+00:14:22,185 --> 00:14:24,075
+of generation that you can bolt on.
+
+224
+00:14:24,415 --> 00:14:28,555
+It is an orthogonal capability
+that has to be sourced completely
+
+225
+00:14:28,565 --> 00:14:33,345
+independently from a different model,
+like a tool or a measured outcome.
+
+226
+00:14:33,855 --> 00:14:37,475
+So the moment your verif- your verifier
+shares the generator's mind, it
+
+227
+00:14:38,185 --> 00:14:41,915
+shares the generator's blind spots,
+and it will constantly miss exactly
+
+228
+00:14:41,995 --> 00:14:46,005
+the errors the generator was prone
+to make And yeah, if one judge can't
+
+229
+00:14:46,005 --> 00:14:51,415
+be trusted, we-- easy to-- instinct
+is to use several and vote, right?
+
+230
+00:14:52,405 --> 00:14:56,555
+This is right in spirit and
+usually wrong in execution, and
+
+231
+00:14:56,595 --> 00:14:58,465
+the reason is worth dwelling on.
+
+232
+00:14:59,035 --> 00:15:03,635
+So if you take three judges from the
+same model family and average them,
+
+233
+00:15:03,825 --> 00:15:06,415
+you have not built a robust verifier.
+
+234
+00:15:06,955 --> 00:15:11,175
+You've built three correlated copies
+of the same biases and averaged
+
+235
+00:15:11,175 --> 00:15:14,905
+them which sharpens your confidence
+without improving your accuracy.
+
+236
+00:15:15,525 --> 00:15:20,035
+So they share self pre- preference
+they share position bias, they
+
+237
+00:15:20,035 --> 00:15:23,655
+share the same holes because
+they share the same training.
+
+238
+00:15:24,145 --> 00:15:26,725
+Averaging correlated
+errors doesn't cancel them.
+
+239
+00:15:26,955 --> 00:15:32,455
+It launders them into a number that looks
+more trustworthy, and yeah, it isn't.
+
+240
+00:15:32,855 --> 00:15:37,775
+We think what actually helps
+is we think teams instinctively
+
+241
+00:15:37,795 --> 00:15:40,015
+try to suppress disagreement.
+
+242
+00:15:40,055 --> 00:15:43,675
+So when judges from generally
+different families, imagine like
+
+243
+00:15:43,675 --> 00:15:47,705
+Claude, GPT, Gemini, or maybe some
+Chinese models, disagree about
+
+244
+00:15:47,715 --> 00:15:51,695
+an output, that disagreement is
+not noise to be smoothed away.
+
+245
+00:15:52,265 --> 00:15:54,885
+It's the most informative
+signal in the whole system.
+
+246
+00:15:55,205 --> 00:15:59,565
+The cases where all three agree are
+almost by definition the easy cases.
+
+247
+00:16:00,225 --> 00:16:06,385
+The cases where they split and we are
+one sitting on the real boundary, like
+
+248
+00:16:06,545 --> 00:16:12,155
+general ambiguity or a place where
+one judge specific bias is very hard.
+
+249
+00:16:12,195 --> 00:16:17,245
+So those split cases are where
+the entire question of trust
+
+250
+00:16:17,245 --> 00:16:21,305
+lies, and the disagreement is
+not random, it's systematic,
+
+251
+00:16:21,415 --> 00:16:24,075
+and that's what makes it usable.
+
+252
+00:16:24,495 --> 00:16:28,355
+A Gemini judge leans toward
+Gemini-flavored answers.
+
+253
+00:16:28,575 --> 00:16:31,515
+A GIN model has a characteristic
+verbosity profile.
+
+254
+00:16:32,125 --> 00:16:37,475
+These are stable, measured tendencies
+which means you can do something most
+
+255
+00:16:37,475 --> 00:16:43,655
+teams never attempt, m- like model
+each judge's bias explicitly as a known
+
+256
+00:16:43,865 --> 00:16:48,645
+quantity and correct for it, rather than
+pretending the judge is like a neutral
+
+257
+00:16:48,645 --> 00:16:50,795
+instrument and being silently wrong.
+
+258
+00:16:51,625 --> 00:16:55,695
+And the cleanest practical rule
+that falls out of the literature
+
+259
+00:16:55,735 --> 00:16:59,285
+is almost embarrassingly simple,
+and almost nobody follows it.
+
+260
+00:16:59,895 --> 00:17:03,585
+Never let a model be the
+sole judge or… of itself.
+
+261
+00:17:03,755 --> 00:17:08,155
+If your agent runs on GPT, GPT should
+not be the only thing grading GPT.
+
+262
+00:17:08,655 --> 00:17:12,705
+Pair it with judges that doesn't
+share training and treat the places
+
+263
+00:17:12,705 --> 00:17:16,095
+where you disagree as a live map
+of where your system risk actually
+
+264
+00:17:16,095 --> 00:17:19,515
+is, and the disagreement isn't a
+problem with your verification.
+
+265
+00:17:19,915 --> 00:17:24,125
+It is your verification So the
+unit of replication isn't a judge.
+
+266
+00:17:24,175 --> 00:17:28,385
+It's a panel of deliberately different
+judges plus a model of how each one is
+
+267
+00:17:28,385 --> 00:17:32,525
+wrong, which raises the question that
+actually has to be solved in production.
+
+268
+00:17:32,755 --> 00:17:36,095
+Which judge do you call on
+which task at what cost?
+
+269
+00:17:36,635 --> 00:17:41,095
+You can't run, you can't run a full
+panel of frontier models on every
+
+270
+00:17:41,095 --> 00:17:43,095
+single output and survive a bill.
+
+271
+00:17:43,465 --> 00:17:47,695
+Calling everyone every time is
+the static answer, and it's both
+
+272
+00:17:47,695 --> 00:17:50,075
+wasteful of I don't know, and naive.
+
+273
+00:17:50,425 --> 00:17:53,805
+It spends your most expensive
+judge on the easiest cases
+
+274
+00:17:53,845 --> 00:17:55,415
+and learns nothing over time.
+
+275
+00:17:55,905 --> 00:18:02,015
+The better frame is the one I want to
+leave you with technically is to treat
+
+276
+00:18:02,025 --> 00:18:05,905
+judge selection as a multi-armed bandit.
+
+277
+00:18:06,405 --> 00:18:09,645
+This setup maps almost too cleanly.
+
+278
+00:18:10,035 --> 00:18:13,605
+Each judge or each combination
+of judges is an arm.
+
+279
+00:18:14,045 --> 00:18:19,085
+When you route a task to an arm and
+gets a verdict, you eventually learn
+
+280
+00:18:19,525 --> 00:18:20,875
+whether that verdict was right.
+
+281
+00:18:20,965 --> 00:18:26,655
+A human spot checks it, and downstream
+test passes or fails, a customer
+
+282
+00:18:26,655 --> 00:18:34,025
+escalated or doesn't So a better outcome
+is a reward, and now you're in classic
+
+283
+00:18:34,025 --> 00:18:36,235
+exploration/exploitation problem.
+
+284
+00:18:36,455 --> 00:18:40,495
+Explore enough to learn which judge
+is reliable for which kind of task.
+
+285
+00:18:41,205 --> 00:18:46,275
+Then exploits that knowledge throughout
+each task to the judge that has earned
+
+286
+00:18:46,275 --> 00:18:50,615
+it And yeah, the tool I would reach
+for is basically Thompson sampling.
+
+287
+00:18:51,005 --> 00:18:55,725
+It dates to 1933 and has aged better
+than almost anything in this field.
+
+288
+00:18:56,365 --> 00:19:00,625
+The idea is to pick each arm in proportion
+to its probability of being the best
+
+289
+00:19:00,625 --> 00:19:02,555
+one, given everything you've seen so far.
+
+290
+00:19:03,115 --> 00:19:07,325
+And yeah, early on, when you know
+little, it naturally explo-explores.
+
+291
+00:19:07,515 --> 00:19:10,285
+It tries different judges
+and watches the outcomes.
+
+292
+00:19:10,785 --> 00:19:15,095
+As evidence accumulates, it naturally
+concentrates on the judges that
+
+293
+00:19:15,125 --> 00:19:17,095
+keep being right for each task type.
+
+294
+00:19:17,935 --> 00:19:22,685
+Agrawal and Goyal proved it achieves
+logarithmic regret, as I remember,
+
+295
+00:19:23,095 --> 00:19:27,525
+which in plain terms means the cost
+of learning is small and bounded.
+
+296
+00:19:27,835 --> 00:19:31,545
+You stop wasting calls on bad
+judges quickly, yeah, not slowly.
+
+297
+00:19:32,205 --> 00:19:34,945
+This isn't exotic.
+
+298
+00:19:35,175 --> 00:19:38,945
+There is a solid body of recent work
+using exactly this machinery for model
+
+299
+00:19:38,955 --> 00:19:44,475
+routing, framing which model do I call as
+a bandit balancing cost against accuracy.
+
+300
+00:19:44,475 --> 00:19:48,725
+The same machinery transfers
+directly to which judge do I call.
+
+301
+00:19:49,145 --> 00:19:54,765
+And for this, an even more pointed
+prece-precedent, a variant called
+
+302
+00:19:55,265 --> 00:19:59,565
+QOC-aware Thompson sampling was built
+specifically for runtime verification
+
+303
+00:19:59,935 --> 00:20:03,845
+for the case where you don't merely
+want the best arm on average, you
+
+304
+00:20:03,845 --> 00:20:07,725
+want to guarantee a quality threshold
+is met with high confidence.
+
+305
+00:20:08,215 --> 00:20:11,925
+That is the verification problem
+stated in the language of bandits.
+
+306
+00:20:12,565 --> 00:20:14,535
+Someone already wrote down the algorithm.
+
+307
+00:20:14,575 --> 00:20:17,555
+It just wasn't pointed at the judges yet.
+
+308
+00:20:18,055 --> 00:20:21,625
+But the reason I care about the
+bandit framing isn't the algorithm.
+
+309
+00:20:21,795 --> 00:20:23,655
+It's the stance it forces.
+
+310
+00:20:24,055 --> 00:20:28,905
+A static Ansible encodes an
+assumption that you already know
+
+311
+00:20:29,085 --> 00:20:32,425
+how to verify, and you're frozen
+that knowledge into a config.
+
+312
+00:20:33,115 --> 00:20:37,465
+A bandit routes encodes the
+opposite, more honest assumption,
+
+313
+00:20:38,045 --> 00:20:42,045
+that you are still learning how
+to verify on live traffic forever.
+
+314
+00:20:42,355 --> 00:20:46,155
+Because the agent changes, the
+model ver-version changed underneath
+
+315
+00:20:46,405 --> 00:20:50,495
+you, the task distribution drifts,
+and the judge that was perfectly
+
+316
+00:20:50,725 --> 00:20:54,865
+calibrated last month is already
+subtly miscalibrated this month.
+
+317
+00:20:54,915 --> 00:21:00,435
+So routing is what keeps verification
+honest, and the ground moves.
+
+318
+00:21:00,695 --> 00:21:03,775
+The config-frozen version isn't simpler.
+
+319
+00:21:04,265 --> 00:21:09,835
+It's just wrong more slowly and silently,
+which is the exact failure we started
+
+320
+00:21:09,835 --> 00:21:13,495
+with And yeah, let me be honest about
+the economics because everything I've
+
+321
+00:21:13,495 --> 00:21:16,965
+said point toward an expensive answer,
+and pretending otherwise would be
+
+322
+00:21:16,975 --> 00:21:18,615
+the same dishonesty I'm criticizing.
+
+323
+00:21:19,285 --> 00:21:24,095
+If your judge is as strong as your
+agent, which I argued it must be, or
+
+324
+00:21:24,115 --> 00:21:28,035
+any task without a cheap certificate
+when verification roughly doubles your
+
+325
+00:21:28,035 --> 00:21:30,335
+per task inference cost at, as a floor.
+
+326
+00:21:30,965 --> 00:21:35,485
+Run a panel of three strong judges
+and you've triple or quadruple it.
+
+327
+00:21:35,975 --> 00:21:41,975
+So verification done seriously is not a
+rounding error on the top of generation.
+
+328
+00:21:42,295 --> 00:21:45,815
+At full strength, it can be the single
+largest line in your inference bill.
+
+329
+00:21:46,785 --> 00:21:50,215
+This is the real unspoken reason
+teams switch for a weak judge.
+
+330
+00:21:50,725 --> 00:21:54,755
+Not because they believe it worked
+better, but because the honest version
+
+331
+00:21:54,755 --> 00:21:57,315
+looks alarming on a spreadsheet, right?
+
+332
+00:21:57,325 --> 00:22:02,345
+And its failures are invisible until
+much later and some-somewhere else.
+
+333
+00:22:03,025 --> 00:22:07,215
+This is exactly the problem the
+banding dissolves, and it's why the
+
+334
+00:22:07,215 --> 00:22:09,735
+routing isn't a nice to have thing.
+
+335
+00:22:10,165 --> 00:22:13,175
+It's what makes the honest
+version economically survivable.
+
+336
+00:22:13,615 --> 00:22:16,405
+You don't run the full
+panel on every task.
+
+337
+00:22:16,735 --> 00:22:19,415
+You run it on the task that need it.
+
+338
+00:22:20,205 --> 00:22:24,275
+The ones near a decision boundary,
+the ones where the judges have
+
+339
+00:22:24,275 --> 00:22:28,005
+historically disagreed, the ones
+where a wrong verdict is expensive.
+
+340
+00:22:28,595 --> 00:22:34,875
+On the high agreement, like low stakes
+cases, one cheap judge suffice, and
+
+341
+00:22:35,245 --> 00:22:37,825
+the router learns to recognize them.
+
+342
+00:22:38,175 --> 00:22:42,135
+So the true cost of verification
+isn't like the strongest judge
+
+343
+00:22:42,945 --> 00:22:44,945
+time every ti-- times every task.
+
+344
+00:22:45,415 --> 00:22:49,765
+It's the strongest judge times the
+fraction of tasks that generally need one.
+
+345
+00:22:50,135 --> 00:22:53,875
+And discovering that fraction per
+task type is precisely the thing
+
+346
+00:22:53,955 --> 00:22:55,715
+that banding is built to Yeah.
+
+347
+00:22:56,355 --> 00:23:00,245
+And there is a cost of the other side
+of the ledger that's easy to leave
+
+348
+00:23:00,245 --> 00:23:02,235
+out of the spreadsheet entirely.
+
+349
+00:23:02,675 --> 00:23:06,015
+The most expensive verification
+failure is never the compute.
+
+350
+00:23:06,185 --> 00:23:08,025
+It's the wrong verdict that ships.
+
+351
+00:23:08,355 --> 00:23:12,155
+The bad output your judge made
+through, the bad reach to customer,
+
+352
+00:23:12,635 --> 00:23:16,635
+like that someone has to discover,
+explain, and unwind usually after
+
+353
+00:23:16,635 --> 00:23:18,715
+it's caused the damage real damage.
+
+354
+00:23:19,155 --> 00:23:23,645
+So measured against that,
+paying for a strong judge on the
+
+355
+00:23:23,655 --> 00:23:25,695
+generally hard cases is not a cost.
+
+356
+00:23:25,895 --> 00:23:29,535
+It's insurance against being
+silently, expensively wrong at scale.
+
+357
+00:23:30,105 --> 00:23:33,389
+You're not spending on verification you're
+buying down the probability that your
+
+358
+00:23:33,389 --> 00:23:33,535
+whole system is confidently lying to you
+
+359
+00:23:34,035 --> 00:23:38,235
+And yeah, let me compress all of this
+into the things I would generally hold
+
+360
+00:23:38,245 --> 00:23:40,675
+to building one of these systems today.
+
+361
+00:23:41,045 --> 00:23:44,695
+I would design the verifier
+be-before the agent, not like after.
+
+362
+00:23:45,145 --> 00:23:49,565
+If I can't articulate how I will know the
+agent is right, I don't have a system yet.
+
+363
+00:23:49,575 --> 00:23:51,705
+I have a demo with good lightning.
+
+364
+00:23:52,705 --> 00:23:55,355
+The verification strategy
+is the architecture, not
+
+365
+00:23:55,365 --> 00:23:57,025
+like a layer on top of it.
+
+366
+00:23:57,535 --> 00:24:02,055
+I would ask for every task type whether
+it has a cheap verification certificate.
+
+367
+00:24:02,075 --> 00:24:05,875
+If it does, code I can run, like
+a query I can check, a tool I can
+
+368
+00:24:06,015 --> 00:24:10,515
+compute, I would lean on the tool hard
+and let the cheaper judge wield it.
+
+369
+00:24:11,095 --> 00:24:15,515
+If it doesn't, I would make the judge
+at least as strong as the agent and
+
+370
+00:24:15,515 --> 00:24:22,345
+accept the cost because a weak judge,
+a certificate-free task is just hope
+
+371
+00:24:22,585 --> 00:24:24,105
+with a confidence score attached.
+
+372
+00:24:24,885 --> 00:24:28,355
+So I would source verification
+independently of generation.
+
+373
+00:24:28,905 --> 00:24:32,425
+None of the same model checking
+its own work in its own context.
+
+374
+00:24:32,735 --> 00:24:37,725
+That's mostly fatal, if the research
+is clear, but can make things worse.
+
+375
+00:24:38,285 --> 00:24:42,565
+Verification has to have independent
+purchase, a different model, an external
+
+376
+00:24:42,565 --> 00:24:44,995
+tool, or like a real-world outcome.
+
+377
+00:24:45,495 --> 00:24:48,885
+And yeah, I would build the judge as
+a panel of generally different model
+
+378
+00:24:48,895 --> 00:24:52,985
+families, and I would treat their
+disagreement as the primary signal rather
+
+379
+00:24:52,985 --> 00:24:55,155
+than inconvenience to average away.
+
+380
+00:24:55,945 --> 00:24:59,165
+The split cases are the
+map of where my risk lives.
+
+381
+00:24:59,835 --> 00:25:01,745
+I would route, not vote.
+
+382
+00:25:01,985 --> 00:25:04,525
+Treat judge selection as a bandit.
+
+383
+00:25:05,025 --> 00:25:08,825
+Learn from life outcomes which
+judge to trust for which task and
+
+384
+00:25:08,825 --> 00:25:12,765
+let the system keep relearning as
+everything underneath it drifts.
+
+385
+00:25:13,485 --> 00:25:17,835
+And above all, I would measure the judge
+continuously, forever, like against
+
+386
+00:25:17,835 --> 00:25:23,035
+ground truth, human review, downstream
+tests, real outcomes on a sampled schedule
+
+387
+00:25:23,035 --> 00:25:27,895
+that never stops because the judge is
+the component, like one component whose
+
+388
+00:25:27,895 --> 00:25:32,125
+decay is invisible and the verifier you
+are not verifying is already rotten.
+
+389
+00:25:32,295 --> 00:25:37,145
+So you simply can't see it yet And
+yeah, I want to end on the asymmetry
+
+390
+00:25:37,145 --> 00:25:41,485
+that I think justifies all of this
+because it's the thing I would
+
+391
+00:25:41,795 --> 00:25:44,125
+want you to carry on of this room.
+
+392
+00:25:44,895 --> 00:25:49,235
+So when you, your agent
+is wrong, you lose a task.
+
+393
+00:25:49,905 --> 00:25:53,025
+When your judge is wrong, you
+lose the ability to know that
+
+394
+00:25:53,075 --> 00:25:54,415
+anything is wrong at all.
+
+395
+00:25:54,845 --> 00:25:58,125
+So one failure is local and loud,
+the other is global and silent.
+
+396
+00:25:58,575 --> 00:26:02,485
+And we have spent the last two years
+pouring our attention into making
+
+397
+00:26:02,485 --> 00:26:06,035
+agents more capable while leaving
+the component that decides whether we
+
+398
+00:26:06,035 --> 00:26:08,635
+can trust any of it as afterthought.
+
+399
+00:26:09,145 --> 00:26:13,963
+A cheap model, a quick prompt,
+and no- b- nobody audits at all.
+
+400
+00:26:13,963 --> 00:26:20,165
+The teams whose systems still mean
+something in a year will be the ones
+
+401
+00:26:20,165 --> 00:26:24,985
+who inverted that who treats the
+judge as the hardest problem, not the
+
+402
+00:26:24,985 --> 00:26:29,645
+easiest, who made it strong, made it
+independent, made it plural, made it
+
+403
+00:26:29,705 --> 00:26:32,025
+adaptive, and never stopped watching it.
+
+404
+00:26:32,715 --> 00:26:33,625
+So who understand that
+
+405
+00:26:34,125 --> 00:26:35,315
+it's the part of the stack that
+decides whether you can believe your
+
+406
+00:26:35,315 --> 00:26:41,155
+own outputs or you do not get to be
+cheap, and you do not get to look away.
+
+407
+00:26:41,655 --> 00:26:44,965
+So stop bolting verifiers
+onto finished agents.
+
+408
+00:26:45,075 --> 00:26:46,185
+Build the judge first.
+
+409
+00:26:46,395 --> 00:26:50,365
+Build it stronger when we
+think it does, and never, ever
+
+410
+00:26:50,365 --> 00:26:51,395
+stop verifying the verifier.
+
+411
+00:26:51,895 --> 00:26:56,925
+So yeah, this is some results
+read in full, so if you need
+
+412
+00:26:56,995 --> 00:26:57,965
+that, you can screenshot.
+
+413
+00:26:58,815 --> 00:26:59,955
+Pretty useful things to read.
+
+414
+00:27:00,455 --> 00:27:01,785
+And yeah, thank you.
+

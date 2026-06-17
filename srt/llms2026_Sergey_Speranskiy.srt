@@ -1,0 +1,727 @@
+1
+00:00:00,374 --> 00:00:01,754
+Speaker 20: Hi, my name is Sergey.
+
+2
+00:00:02,704 --> 00:00:07,023
+I'm a senior infrastructure platform
+engineer at the Social Discovery Group.
+
+3
+00:00:07,774 --> 00:00:12,764
+In this talk, I want to look at LLM
+workloads from the infrastructure side.
+
+4
+00:00:13,264 --> 00:00:17,294
+When teams move from experiments
+to production, reliability is
+
+5
+00:00:17,294 --> 00:00:19,644
+no longer only about the model.
+
+6
+00:00:20,124 --> 00:00:23,144
+It also depends on the
+Kubernetes platform.
+
+7
+00:00:23,644 --> 00:00:29,154
+It depends on how workloads are scheduled,
+how traffic moves through the network,
+
+8
+00:00:29,484 --> 00:00:35,034
+how failure works, and how quickly we
+can understand problems under load.
+
+9
+00:00:35,534 --> 00:00:41,474
+My main point is simple: LLM services
+become reliable only when the
+
+10
+00:00:41,644 --> 00:00:44,114
+platform under them is reliable.
+
+11
+00:00:44,614 --> 00:00:48,094
+LLM workloads make platform
+weaknesses visible faster.
+
+12
+00:00:49,024 --> 00:00:51,994
+They are different from
+typical web services.
+
+13
+00:00:52,494 --> 00:00:55,443
+A traditional web service
+is usually CPU-based.
+
+14
+00:00:55,963 --> 00:01:00,133
+Requests are short, and it's
+often possible to scale the
+
+15
+00:01:00,143 --> 00:01:02,274
+service by adding more replicas.
+
+16
+00:01:02,774 --> 00:01:06,754
+LLM service depends on
+expensive GPU capacity.
+
+17
+00:01:07,454 --> 00:01:13,664
+They need a lot of memory, and requests
+can run much longer Latency depends
+
+18
+00:01:13,694 --> 00:01:16,954
+not only on the network or CPU.
+
+19
+00:01:17,414 --> 00:01:22,174
+It also depends on model size,
+prompt length, generated tokens,
+
+20
+00:01:22,234 --> 00:01:24,354
+batching, and queue time.
+
+21
+00:01:24,854 --> 00:01:31,634
+So infrastructure mistakes become
+more visible, bad scheduling, unstable
+
+22
+00:01:31,634 --> 00:01:38,204
+networking, or unexpected restarts can
+quickly become user visible problems.
+
+23
+00:01:39,014 --> 00:01:41,784
+Many LLM projects start as experiment.
+
+24
+00:01:42,044 --> 00:01:47,184
+At that stage, it is normal to run
+everything on one node, deploy manually,
+
+25
+00:01:47,883 --> 00:01:50,684
+and debug problems directly on the server.
+
+26
+00:01:51,543 --> 00:01:54,134
+But production changes the requirements.
+
+27
+00:01:54,834 --> 00:01:56,774
+One node is no longer enough.
+
+28
+00:01:57,224 --> 00:01:59,714
+One network path is no longer enough.
+
+29
+00:02:00,564 --> 00:02:02,904
+Unexpected restarts become expensive.
+
+30
+00:02:03,404 --> 00:02:07,944
+Default networking may work,
+but when something breaks, it
+
+31
+00:02:07,944 --> 00:02:11,934
+can be hard to understand where
+the traffic actually goes.
+
+32
+00:02:12,434 --> 00:02:17,114
+The problem is not that Kubernetes
+cannot run LLM workloads.
+
+33
+00:02:17,614 --> 00:02:23,124
+The problem is that production expose
+weak assumption in the platform design.
+
+34
+00:02:23,824 --> 00:02:28,854
+So before looking at the separate
+components, let's start this
+
+35
+00:02:28,993 --> 00:02:31,204
+simple reference arch-architecture.
+
+36
+00:02:32,033 --> 00:02:35,083
+This is a simplified view of the platform.
+
+37
+00:02:35,974 --> 00:02:39,573
+A user request enters through gateway API.
+
+38
+00:02:40,383 --> 00:02:45,483
+Th-then it goes to an LLM
+service running on GPU nodes.
+
+39
+00:02:46,203 --> 00:02:49,734
+The service depends on model
+storage or model cache.
+
+40
+00:02:50,724 --> 00:02:59,193
+The whole path also depends on platform
+services, monitoring, CI/CD, networking,
+
+41
+00:02:59,293 --> 00:03:01,353
+and the Kubernetes control plane.
+
+42
+00:03:01,853 --> 00:03:07,923
+The important point is that reliability
+is not owned by one component.
+
+43
+00:03:08,673 --> 00:03:16,193
+If gateway API, GPU scheduling, storage,
+networking, or secrets are unstable,
+
+44
+00:03:16,573 --> 00:03:23,334
+the LLM service become unstable too A
+reliable LLM workloads need capacity and
+
+45
+00:03:23,354 --> 00:03:25,744
+redundancy in different failure domains.
+
+46
+00:03:26,524 --> 00:03:30,774
+Now we move from application
+architecture to cluster architecture.
+
+47
+00:03:31,654 --> 00:03:35,694
+For LLM workloads, failure
+domains are very important.
+
+48
+00:03:36,384 --> 00:03:39,714
+GPU nodes are expensive
+and usually limited.
+
+49
+00:03:40,554 --> 00:03:46,124
+If we lose one node, one switch,
+or one rack, we can lose a large
+
+50
+00:03:46,154 --> 00:03:49,204
+part of available GPU capacity.
+
+51
+00:03:50,164 --> 00:03:53,334
+The control plane should
+be also protected.
+
+52
+00:03:54,234 --> 00:03:59,544
+etcd needs quorum, so control
+plane nodes should be placed in
+
+53
+00:03:59,553 --> 00:04:02,154
+separate physical failure domains.
+
+54
+00:04:02,934 --> 00:04:08,603
+For GPU nodes, the goal is to
+continue running or rescheduling
+
+55
+00:04:08,724 --> 00:04:11,014
+workloads with predictable capacity.
+
+56
+00:04:11,914 --> 00:04:17,584
+This means spreading replicas, avoiding
+single network path, and keeping
+
+57
+00:04:17,584 --> 00:04:19,853
+some spare capacity for failover.
+
+58
+00:04:20,334 --> 00:04:25,974
+If the control plane is unstable, the
+whole platform becomes harder to operate.
+
+59
+00:04:26,523 --> 00:04:30,933
+The control plane is not used
+for every user request, but it's
+
+60
+00:04:30,933 --> 00:04:33,144
+critical for operating the platform.
+
+61
+00:04:33,644 --> 00:04:41,354
+If the API server or etcd has problems,
+scheduling, reload, and auto-scaling
+
+62
+00:04:41,474 --> 00:04:48,064
+become unreliable this is especially
+important for LLM workloads because
+
+63
+00:04:48,414 --> 00:04:51,704
+GPU capacity is limited and expensive.
+
+64
+00:04:52,204 --> 00:04:58,614
+In my preferred design, the Kubernetes
+API endpoint uses a virtual IP.
+
+65
+00:04:59,294 --> 00:05:04,964
+This virtual IP is announced
+by BGP Anycast from all
+
+66
+00:05:04,974 --> 00:05:06,604
+healthy control plane nodes.
+
+67
+00:05:07,104 --> 00:05:12,873
+It's each node check its local API server.
+
+68
+00:05:13,373 --> 00:05:19,744
+If the API server is healthy, the
+node advertises the virtual IP.
+
+69
+00:05:20,513 --> 00:05:24,804
+If it's not healthy, the
+node removes the route.
+
+70
+00:05:25,674 --> 00:05:30,594
+So the network sends API
+traffic only to healthy nodes.
+
+71
+00:05:31,274 --> 00:05:39,324
+This gives us active access to Kubernetes
+API and simple network level failover.
+
+72
+00:05:39,824 --> 00:05:46,064
+I also prefer BGP routing to run
+on the host, not inside Kubernetes.
+
+73
+00:05:46,564 --> 00:05:47,694
+The reason is simple.
+
+74
+00:05:48,044 --> 00:05:53,844
+Kubernetes needs networking to start
+pods, so basic networking should
+
+75
+00:05:53,854 --> 00:05:56,093
+not depends on Kubernetes pods.
+
+76
+00:05:56,683 --> 00:06:01,834
+For production, the network path
+should be visible and predictable.
+
+77
+00:06:02,564 --> 00:06:08,104
+In many default Kubernetes network
+designs, the data path is hidden
+
+78
+00:06:08,104 --> 00:06:10,973
+behind NAT or overlay encapsulation.
+
+79
+00:06:11,473 --> 00:06:16,314
+This works, but during incidents it
+can make troubleshooting much harder.
+
+80
+00:06:16,814 --> 00:06:22,664
+We may see node IPs, translated
+addresses or encapsulated traffic
+
+81
+00:06:22,684 --> 00:06:30,024
+instead of the real pod-to-pod flow
+In a routable design, pod CIDRs are
+
+82
+00:06:30,044 --> 00:06:32,424
+known by the data center network.
+
+83
+00:06:33,234 --> 00:06:36,054
+Traffic flows normal layer 3 routing.
+
+84
+00:06:36,554 --> 00:06:41,754
+This makes the path easier to
+understand with standard tools like
+
+85
+00:06:41,834 --> 00:06:44,924
+iproute, traceroute, and tcpdump.
+
+86
+00:06:45,894 --> 00:06:53,264
+For LLM services, this matters because
+latency, packet loss, and network
+
+87
+00:06:53,314 --> 00:06:56,924
+instability can directly affect users.
+
+88
+00:06:57,234 --> 00:07:02,524
+In this network design, each
+Kubernetes node peers with two
+
+89
+00:07:02,674 --> 00:07:05,224
+top-of-rack switches using BGP.
+
+90
+00:07:05,724 --> 00:07:10,914
+The node advertises its pod CIDR
+into the data center fabric.
+
+91
+00:07:11,474 --> 00:07:18,293
+Because of this, pod can be routed
+dir- directly without overlay or NAT.
+
+92
+00:07:18,793 --> 00:07:23,744
+ECMP allows both uplinks can
+be used at the same time.
+
+93
+00:07:24,244 --> 00:07:29,693
+This gives us not only redundancy, but
+also active-active network capacity.
+
+94
+00:07:30,193 --> 00:07:32,743
+BFD improves failure detection.
+
+95
+00:07:33,633 --> 00:07:41,783
+If one link or one switch fails, BFD
+helps BGP remove the failed path quickly
+
+96
+00:07:41,913 --> 00:07:44,783
+instead of waiting for long BGP timers.
+
+97
+00:07:45,673 --> 00:07:51,573
+I prefer running Bird on the host,
+not as a Kubernetes pod, because
+
+98
+00:07:51,633 --> 00:07:55,293
+routing is part of node bootstrap.
+
+99
+00:07:55,793 --> 00:07:59,194
+It should not depend on
+Kubernetes already being healthy.
+
+100
+00:08:00,034 --> 00:08:04,123
+GPU nodes should be managed
+as a platform infrastructure.
+
+101
+00:08:04,694 --> 00:08:10,744
+Before we schedule LLM workloads GPU
+nodes must be prepared correctly.
+
+102
+00:08:11,674 --> 00:08:17,103
+It needs the correct NVIDIA driver
+container runtime integration
+
+103
+00:08:17,463 --> 00:08:24,153
+Kubernetes device plugin, node label,
+monitoring, and a safe upgrade process.
+
+104
+00:08:25,023 --> 00:08:33,313
+Kubernetes use device plugins to expose
+special hardware like GPUs to the kubelet.
+
+105
+00:08:34,143 --> 00:08:40,373
+After that, the cluster can expose
+GPU resources In practice, many
+
+106
+00:08:40,413 --> 00:08:44,733
+teams use the GPU NVIDIA operator.
+
+107
+00:08:45,553 --> 00:08:49,993
+It can manage drivers, the
+device plugin, container toolkit,
+
+108
+00:08:50,493 --> 00:08:52,713
+node labeling, and monitoring.
+
+109
+00:08:53,213 --> 00:08:58,513
+Kubernetes schedules GPU workloads
+only when GPU resources are
+
+110
+00:08:58,543 --> 00:09:00,853
+explicitly exposed and requested.
+
+111
+00:09:01,353 --> 00:09:06,453
+Kubernetes doesn't schedule a
+pod to a GPU au-automatically.
+
+112
+00:09:07,443 --> 00:09:14,253
+The GPU must be exposed to Kubernetes,
+usually by a device plug, plugin, and
+
+113
+00:09:14,273 --> 00:09:16,893
+the pod must explicitly request it.
+
+114
+00:09:17,393 --> 00:09:21,503
+For a simple service, a normal
+deployment can be enough.
+
+115
+00:09:22,333 --> 00:09:28,713
+Each replica request one GPU, and
+Kubernetes schedules replicas only
+
+116
+00:09:28,753 --> 00:09:31,743
+on nodes with available GPU capacity.
+
+117
+00:09:32,243 --> 00:09:37,673
+For training, fine-tuning, or
+batch workloads, a deployment is
+
+118
+00:09:37,863 --> 00:09:40,183
+usually not the best abstraction.
+
+119
+00:09:41,153 --> 00:09:48,263
+Jobs or queues are often a better
+fit because these workloads
+
+120
+00:09:48,413 --> 00:09:54,123
+are finite, expensive, and
+need controlled concurrency.
+
+121
+00:09:54,623 --> 00:09:57,673
+The operational point is simple.
+
+122
+00:09:58,483 --> 00:10:03,183
+GPU capacity should be planned
+and scheduled explicitly.
+
+123
+00:10:03,483 --> 00:10:08,913
+Scheduling policy decides whether
+GPU capacity is reliable or fragile.
+
+124
+00:10:09,413 --> 00:10:14,473
+For GPU workloads, scheduling is
+not only about finding any free node
+
+125
+00:10:15,213 --> 00:10:23,483
+requests, tell Kubernetes how much CPU,
+memory, and GPU capacity the pod needs.
+
+126
+00:10:23,983 --> 00:10:32,073
+Node selectors or affinity help place for
+LLM workloads on the correct node pool.
+
+127
+00:10:32,573 --> 00:10:38,663
+Anti-affinity and topology spread
+help avoid putting all replicas
+
+128
+00:10:38,703 --> 00:10:40,433
+in the same failure domain.
+
+129
+00:10:40,933 --> 00:10:45,493
+Taint and tolerations are
+especially useful for GPU nodes.
+
+130
+00:10:45,993 --> 00:10:51,653
+They prevent normal workload
+from consuming resources
+
+131
+00:10:51,763 --> 00:10:53,873
+on expensive GPU servers.
+
+132
+00:10:54,744 --> 00:11:00,773
+At the same time, they allows
+approved LLM workloads to run there.
+
+133
+00:11:01,273 --> 00:11:05,563
+The goal is simple, use GPU
+capacity efficiently, but
+
+134
+00:11:05,663 --> 00:11:08,503
+not create fragile placement.
+
+135
+00:11:09,003 --> 00:11:15,353
+One node, one rack, or one switch failure
+should not take down the whole service.
+
+136
+00:11:16,033 --> 00:11:19,813
+Reliable reload is part of
+reliable infrastructure.
+
+137
+00:11:20,613 --> 00:11:24,503
+For LLM services, reload
+strategy is very important.
+
+138
+00:11:25,203 --> 00:11:30,973
+A new model version, prompt template,
+runtime image, or configuration can
+
+139
+00:11:30,973 --> 00:11:34,703
+change latency, cost, and error rate.
+
+140
+00:11:35,203 --> 00:11:39,493
+Gateway API gives us a clean
+way to manage external traffic.
+
+141
+00:11:40,213 --> 00:11:46,593
+With HTTP route, we can split traffic
+between two versions of the service.
+
+142
+00:11:47,093 --> 00:11:54,343
+For example ninety percent of traffic
+can stay on stable version, and ten
+
+143
+00:11:54,343 --> 00:11:56,733
+percent can go to the new version.
+
+144
+00:11:57,173 --> 00:12:00,433
+If metrics looks good, we
+increase the percentage.
+
+145
+00:12:00,953 --> 00:12:06,313
+If something goes wrong, rollback
+can be done by shifting traffic back.
+
+146
+00:12:07,293 --> 00:12:09,163
+The last point is observability.
+
+147
+00:12:09,663 --> 00:12:14,553
+For LLM services, it's not enough
+to measure only application errors.
+
+148
+00:12:15,243 --> 00:12:21,613
+We also need to see GPU utilization,
+GPU memory, pod scheduling problems,
+
+149
+00:12:21,743 --> 00:12:28,663
+network behavior, GPU state, API
+server latency, and etcd health.
+
+150
+00:12:29,163 --> 00:12:31,113
+The final checklist is simple.
+
+151
+00:12:31,713 --> 00:12:39,093
+Make the network path visible, keep
+the control plane stable, plan GPU
+
+152
+00:12:39,093 --> 00:12:46,583
+scheduling, use a safe reload strategy,
+and collect metrics before production.
+
+153
+00:12:47,083 --> 00:12:51,003
+The model is important, but
+the platform decides how the
+
+154
+00:12:51,003 --> 00:12:53,413
+model behaves under failure.
+
+155
+00:12:53,913 --> 00:12:54,983
+That's it for today.
+
+156
+00:12:55,283 --> 00:12:56,523
+Thank you for listening.
+
