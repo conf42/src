@@ -2938,6 +2938,19 @@ function suggestDialCode() {
     }
 }
 
+// Before the EmailOctopus embed posts the form: drop a phone value that is still just the
+// prefilled "+NN" prefix (nobody typed a number) and trim whitespace, so no junk phone is stored.
+function cleanDialPrefix(form) {
+    var phone = form.querySelector('#field_3');
+    if (!phone) return;
+    var v = phone.value.trim();
+    if (/^\+\d{1,4}$/.test(v)) v = "";
+    phone.value = v;
+}
+Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form'), function (form) {
+    form.addEventListener('submit', function () { cleanDialPrefix(form); }, true);
+});
+
 function updateCountry() {
     const destination = document.querySelector('#country-destination');
     const source = document.querySelector('#country-source');
