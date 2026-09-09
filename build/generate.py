@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 import datetime
+import os
+import subprocess
 import sys
+import time
 import urllib.parse
 import markdown
 
@@ -25,6 +28,20 @@ from .events import get_enriched_metadata
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
+
+def get_asset_version():
+    """
+        Short token appended to local CSS/JS URLs (?v=...) so that every deploy
+        busts the CDN/browser cache. GitHub Actions exposes the commit sha;
+        locally fall back to git, then to the current time.
+    """
+    sha = os.environ.get("GITHUB_SHA", "")
+    if sha:
+        return sha[:10]
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short=10", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return str(int(time.time()))
 SITEMAP_URLS = []
 
 # store urls for the sitemap.xml
@@ -34,6 +51,8 @@ def register_url(url):
 print(DIVIDER)
 print("Loading the context")
 context = get_enriched_metadata(BASE_FOLDER)
+context["asset_version"] = get_asset_version()
+print("Asset version:", context["asset_version"])
 
 # init the jinja stuff
 file_loader = FileSystemLoader("_templates")
@@ -167,7 +186,8 @@ context["speakers"] = speakers
 for event in context.get("events"):
     for talk in event.get("talks_raw", []):
         for field in ["Name1", "Name2"]:
-            speaker = talk.get(field)
+            # strip: a whitespace-only Name2 in a CSV used to create a blank "speaker__" profile
+            speaker = (talk.get(field) or "").strip()
             if speaker:
                 speakers[speaker].append(dict(
                     date=event.get("date"),
@@ -378,12 +398,12 @@ for post in posts:
 # MAIN PAGES
 print(DIVIDER)
 print("Generating main pages")
-for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html"]:
+for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html", "404.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)
         f.write(template.render(page=page, canonical=get_canonical_url(page), **context))
-        if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html"]:
+        if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html", "404.html"]:
             register_url(page.replace(".html",""))
 
 # SITEMAP
