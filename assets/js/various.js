@@ -3102,7 +3102,7 @@ function settleAnchor(hash) {
 }
 document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
-    if (!a) return;
+    if (!a || a.hasAttribute('data-bs-toggle')) return;      // Bootstrap tabs/collapses handle their own hash hrefs
     var href = a.getAttribute('href');
     if (href.length < 2 || !document.getElementById(href.slice(1))) return;
     e.preventDefault();
