@@ -2954,6 +2954,83 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
     form.addEventListener('submit', function () { cleanDialPrefix(form); }, true);
 });
 
+// ---- Newsletter form: form-only bot defence ----------------------------------------------
+// The static HTML carries no posting URL. It is assembled here and attached to the form only
+// after a trusted interaction, and a capture-phase submit check (runs before the EmailOctopus
+// embed's own handler) blocks decoy-filled / never-touched submissions and paces instant ones.
+function eoEndpoint() {
+    var id = ["a3ba0cb5", "7524", "11eb", "a3d0", "06b4694bee2a"].join("-");
+    return "https://emailoctopus.com/lists/" + id + "/members/embedded/1.3/add";
+}
+Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form'), function (form) {
+    var loadedAt = Date.now();
+    var MIN_MS = 3000;          // a real person needs longer than this to fill seven fields
+    var interacted = false;
+
+    function arm(e) {
+        if (e && e.isTrusted === false) return;
+        interacted = true;
+        if (!form.getAttribute('action')) form.setAttribute('action', eoEndpoint());
+    }
+    ['pointerdown', 'keydown'].forEach(function (type) { form.addEventListener(type, arm); });   // focusin left out: element.focus() also yields trusted events
+
+    function showError(msg) {
+        var box = (form.parentNode && form.parentNode.querySelector('.emailoctopus-error-message')) ||
+                  document.querySelector('.emailoctopus-error-message');
+        if (box) box.textContent = msg;
+    }
+
+    form.addEventListener('submit', function (e) {
+        var decoy = form.querySelector('#nf-website');
+        if ((decoy && decoy.value) || !interacted) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showError("Something looks off. Please reload the page and try again.");
+            return;
+        }
+        var wait = MIN_MS - (Date.now() - loadedAt);
+        if (wait > 0) {
+            // too fast to be a person typing - not rejected, just paced
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            var btn = form.querySelector('button[type=submit]');
+            if (btn) btn.disabled = true;
+            setTimeout(function () {
+                if (btn) btn.disabled = false;
+                loadedAt = 0;
+                if (form.requestSubmit) form.requestSubmit(); else form.submit();
+            }, wait);
+            return;
+        }
+        if (!form.getAttribute('action')) form.setAttribute('action', eoEndpoint());
+    }, true);
+});
+
+// ---- Keep same-page anchor jumps on target while lazy images load ---------------------------
+// Cards above the target grow as their lazy images arrive during the scroll, so the browser's
+// landing spot drifts. Re-align for a short while after any in-page anchor navigation.
+function settleAnchor(hash) {
+    if (!hash || hash.length < 2) return;
+    var target;
+    try { target = document.getElementById(decodeURIComponent(hash.slice(1))); } catch (e) { return; }
+    if (!target) return;
+    var margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+    var start = Date.now();
+    setTimeout(function tick() {
+        var top = target.getBoundingClientRect().top;
+        if (Math.abs(top - margin) > 2) target.scrollIntoView({ behavior: 'instant', block: 'start' });
+        if (Date.now() - start < 2500) setTimeout(tick, 100);
+    }, 600);
+}
+document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (href.length > 1 && document.getElementById(href.slice(1))) settleAnchor(href);
+});
+window.addEventListener('hashchange', function () { settleAnchor(location.hash); });
+if (location.hash) settleAnchor(location.hash);
+
 function updateCountry() {
     const destination = document.querySelector('#country-destination');
     const source = document.querySelector('#country-source');
