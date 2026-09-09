@@ -265,17 +265,21 @@ for event in context.get("events"):
     print(f"Templating out {event.get('name')} {event.get('year')}")
 
     # template each talk page for the event
-    for talk in event.get("talks_raw"):
+    talks_raw = event.get("talks_raw")
+    for i, talk in enumerate(talks_raw):
+        # neighbours for the previous / next talk links (CSV order)
+        prev_talk = talks_raw[i - 1] if i > 0 else None
+        next_talk = talks_raw[i + 1] if i + 1 < len(talks_raw) else None
         # template the talk subpage
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
-            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, **context))
+            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, prev_talk=prev_talk, next_talk=next_talk, **context))
             register_url(talk.get("short_url").replace(".html",""))
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
                 template = env.get_template("talk.html")
-                f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, secret_mode=True, **context))
+                f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, prev_talk=prev_talk, next_talk=next_talk, secret_mode=True, **context))
 
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
