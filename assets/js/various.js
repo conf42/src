@@ -2921,7 +2921,7 @@ function countryCodeForName(name) {
 // Only touches an empty field or one that still holds just a "+NN" prefix, so people can edit or
 // delete it freely.
 function suggestDialCode() {
-    var phone = document.querySelector('#field_3');
+    var phone = document.querySelector('#phone-code');
     if (!phone) return;
     var select = document.querySelector('#country-source');
     var code = null;
@@ -2936,22 +2936,26 @@ function suggestDialCode() {
     // anything a person typed (even a bare prefix) is left alone.
     var current = phone.value;
     if (current.trim() === "" || current === phone.dataset.prefilled) {
-        phone.value = dial + " ";
+        phone.value = dial;
         phone.dataset.prefilled = phone.value;
     }
 }
 
-// Before the EmailOctopus embed posts the form: if the phone field still holds only the
-// untouched prefill (nobody typed a number), send it empty so no junk phone is stored.
-function cleanDialPrefix(form) {
-    var phone = form.querySelector('#field_3');
-    if (!phone) return;
-    if (phone.dataset.prefilled !== undefined && phone.value === phone.dataset.prefilled) {
-        phone.value = "";
-    }
+// Phone is two visible boxes (#phone-code, #phone-number, both unnamed). Merge them into the
+// hidden field_3 the embed posts: "+44 7700 900123". No number typed -> nothing is sent (the
+// dial code alone is not a phone). A number typed with its own "+" prefix is sent as-is.
+function mergePhone(form) {
+    var hidden = form.querySelector('#field_3');
+    if (!hidden) return;
+    var code = form.querySelector('#phone-code'), num = form.querySelector('#phone-number');
+    var n = (num ? num.value : "").trim();
+    var c = (code ? code.value : "").trim();
+    if (!n) { hidden.value = ""; return; }
+    hidden.value = (n.charAt(0) === "+" || !c) ? n : (c + " " + n);
 }
 Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form'), function (form) {
-    form.addEventListener('submit', function () { cleanDialPrefix(form); }, true);
+    form.addEventListener('submit', function () { mergePhone(form); }, true);
+    form.addEventListener('input', function () { mergePhone(form); });
 });
 
 // ---- Newsletter form: obvious-junk checks on name / job title / company -------------------
@@ -2964,8 +2968,12 @@ function junkReason(value, kind) {
     var letters = (v.match(_letterRe) || []).length;
     var cjk = /[぀-ヿ㐀-鿿가-힯]/.test(v);      // one CJK character is a complete name/word
     var alnum = kind !== "name" && /\d/.test(v) && letters >= 1 && v.length >= 2;   // "3M", "K2"
-    if (!cjk && !alnum && (v.length < 2 || letters < 2)) return "short";   // "T", "-", "42"
-    if (cjk && letters < 1) return "short";
+    if (kind === "name") {
+        if (letters < 1) return "short";                                    // single-letter names are common in India
+    } else {
+        if (!cjk && !alnum && (v.length < 2 || letters < 2)) return "short";   // "T", "-", "42"
+        if (cjk && letters < 1) return "short";
+    }
     if (/(.)\1{3,}/.test(v)) return "repeat";                               // "aaaa", "----"
     if (/https?:|www\.|\.(com|net|org|io|ru|xyz)\b/i.test(v)) return "url";
     if (/[<>{}\[\]\\|^~`]/.test(v)) return "symbols";                       // markup / shell junk
@@ -3068,17 +3076,21 @@ function settleAnchor(hash) {
     if (!target) return;
     var margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
     var start = Date.now();
-    setTimeout(function tick() {
+    (function tick() {
         var top = target.getBoundingClientRect().top;
         if (Math.abs(top - margin) > 2) target.scrollIntoView({ behavior: 'instant', block: 'start' });
         if (Date.now() - start < 2500) setTimeout(tick, 100);
-    }, 600);
+    })();
 }
 document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
     if (!a) return;
     var href = a.getAttribute('href');
-    if (href.length > 1 && document.getElementById(href.slice(1))) settleAnchor(href);
+    if (href.length < 2 || !document.getElementById(href.slice(1))) return;
+    // jump instantly ourselves: a smooth scroll can be cut short by images loading on the way
+    e.preventDefault();
+    if (history.pushState) history.pushState(null, '', href); else location.hash = href;
+    settleAnchor(href);
 });
 window.addEventListener('hashchange', function () { settleAnchor(location.hash); });
 if (location.hash) settleAnchor(location.hash);
