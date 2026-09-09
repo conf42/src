@@ -3066,28 +3066,45 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
     }, true);
 });
 
-// ---- Keep same-page anchor jumps on target while lazy images load ---------------------------
-// Cards above the target grow as their lazy images arrive during the scroll, so the browser's
-// landing spot drifts. Re-align for a short while after any in-page anchor navigation.
+// ---- Same-page anchor jumps: smooth animation, accurate landing, never fights the user -----
+// Cards above the target can grow while their lazy images arrive, so the browser's landing spot
+// drifts. After the smooth scroll finishes we re-align once, and check again briefly for late
+// image loads. Any wheel / touch / key / pointer input from the visitor cancels all of it.
 function settleAnchor(hash) {
     if (!hash || hash.length < 2) return;
     var target;
     try { target = document.getElementById(decodeURIComponent(hash.slice(1))); } catch (e) { return; }
     if (!target) return;
     var margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
-    var start = Date.now();
-    (function tick() {
-        var top = target.getBoundingClientRect().top;
-        if (Math.abs(top - margin) > 2) target.scrollIntoView({ behavior: 'instant', block: 'start' });
-        if (Date.now() - start < 2500) setTimeout(tick, 100);
-    })();
+    var cancelled = false, corrections = 0, finished = false;
+    var inputTypes = ['wheel', 'touchmove', 'pointerdown', 'keydown'];
+    function cancel() { cancelled = true; cleanup(); }
+    function cleanup() { inputTypes.forEach(function (t) { window.removeEventListener(t, cancel); }); }
+    inputTypes.forEach(function (t) { window.addEventListener(t, cancel, { passive: true }); });
+
+    function correct() {
+        if (cancelled || corrections >= 3) return;
+        if (Math.abs(target.getBoundingClientRect().top - margin) > 2) {
+            corrections++;
+            target.scrollIntoView({ behavior: 'instant', block: 'start' });
+        }
+    }
+    function onScrollEnd() {
+        if (finished || cancelled) return;
+        finished = true;
+        correct();                                   // right after the animation
+        setTimeout(correct, 700);                    // late image loads
+        setTimeout(function () { correct(); cleanup(); }, 1500);
+    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
+    setTimeout(onScrollEnd, 1200);                   // fallback (no scrollend support, or nothing to scroll)
 }
 document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
     if (!a) return;
     var href = a.getAttribute('href');
     if (href.length < 2 || !document.getElementById(href.slice(1))) return;
-    // jump instantly ourselves: a smooth scroll can be cut short by images loading on the way
     e.preventDefault();
     if (history.pushState) history.pushState(null, '', href); else location.hash = href;
     settleAnchor(href);
