@@ -2954,6 +2954,45 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
     form.addEventListener('submit', function () { cleanDialPrefix(form); }, true);
 });
 
+// ---- Newsletter form: obvious-junk checks on name / job title / company -------------------
+// Runs only on submit (never while typing), never clears a value, allows any script (Unicode
+// letters), and explains exactly which field to fix. Aimed at "T", "asdfgh", "<script>", URLs.
+var _letterRe;
+try { _letterRe = new RegExp("\\p{L}", "gu"); } catch (e) { _letterRe = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ֐-ۿऀ-ॿ぀-ヿ一-鿿가-힯]/g; }
+function junkReason(value, kind) {
+    var v = (value || "").trim();
+    var letters = (v.match(_letterRe) || []).length;
+    var cjk = /[぀-ヿ㐀-鿿가-힯]/.test(v);      // one CJK character is a complete name/word
+    var alnum = kind !== "name" && /\d/.test(v) && letters >= 1 && v.length >= 2;   // "3M", "K2"
+    if (!cjk && !alnum && (v.length < 2 || letters < 2)) return "short";   // "T", "-", "42"
+    if (cjk && letters < 1) return "short";
+    if (/(.)\1{3,}/.test(v)) return "repeat";                               // "aaaa", "----"
+    if (/https?:|www\.|\.(com|net|org|io|ru|xyz)\b/i.test(v)) return "url";
+    if (/[<>{}\[\]\\|^~`]/.test(v)) return "symbols";                       // markup / shell junk
+    if (kind === "name" && /\d/.test(v)) return "digits";                   // digits are fine in companies ("3M", "Web3")
+    if (/^[\x00-\x7F]+$/.test(v) && v.length >= 7 && !/[aeiouy]/i.test(v)) return "mash";  // "sdfghjk"; ASCII-only rule so other scripts are untouched
+    return null;
+}
+var junkMessages = {
+    field_1: "Please enter your first name.",
+    field_2: "Please enter your last name.",
+    field_5: "Please enter your job title, e.g. Software Engineer.",
+    field_4: "Please enter your company or university name."
+};
+function validateHumanFields(form) {
+    var checks = [["field_1", "name"], ["field_2", "name"], ["field_5", "text"], ["field_4", "text"]];
+    for (var i = 0; i < checks.length; i++) {
+        var el = form.querySelector("#" + checks[i][0]);
+        if (el && junkReason(el.value, checks[i][1])) return { field: el, message: junkMessages[checks[i][0]] };
+    }
+    var f = form.querySelector("#field_1"), l = form.querySelector("#field_2"), c = form.querySelector("#field_4");
+    if (f && l && c) {
+        var a = f.value.trim().toLowerCase(), b = l.value.trim().toLowerCase(), d = c.value.trim().toLowerCase();
+        if (a && a === b && b === d) return { field: c, message: "Please check your name and company, they look identical." };
+    }
+    return null;
+}
+
 // ---- Newsletter form: form-only bot defence ----------------------------------------------
 // The static HTML carries no posting URL. It is assembled here and attached to the form only
 // after a trusted interaction, and a capture-phase submit check (runs before the EmailOctopus
@@ -2972,7 +3011,10 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
         interacted = true;
         if (!form.getAttribute('action')) form.setAttribute('action', eoEndpoint());
     }
-    ['pointerdown', 'keydown'].forEach(function (type) { form.addEventListener(type, arm); });   // focusin left out: element.focus() also yields trusted events
+    ['pointerdown', 'keydown'].forEach(function (type) { form.addEventListener(type, arm); });
+    form.addEventListener('input', function (e) {                 // clear a flagged field once it is edited
+        if (e.target && e.target.classList) { e.target.classList.remove('is-invalid'); e.target.removeAttribute('aria-invalid'); }
+    });   // focusin left out: element.focus() also yields trusted events
 
     function showError(msg) {
         var box = (form.parentNode && form.parentNode.querySelector('.emailoctopus-error-message')) ||
@@ -2986,6 +3028,16 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
             e.preventDefault();
             e.stopImmediatePropagation();
             showError("Something looks off. Please reload the page and try again.");
+            return;
+        }
+        var junk = validateHumanFields(form);
+        if (junk) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showError(junk.message);
+            junk.field.classList.add("is-invalid");
+            junk.field.setAttribute("aria-invalid", "true");
+            junk.field.focus({ preventScroll: false });
             return;
         }
         var wait = MIN_MS - (Date.now() - loadedAt);
