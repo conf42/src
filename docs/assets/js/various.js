@@ -2932,20 +2932,23 @@ function suggestDialCode() {
     }
     var dial = code && dialCodes[code];
     if (!dial) return;
-    var current = phone.value.trim();
-    if (current === "" || /^\+\d{1,4}$/.test(current)) {
+    // Only touch the field while it is empty or still exactly what this script prefilled;
+    // anything a person typed (even a bare prefix) is left alone.
+    var current = phone.value;
+    if (current.trim() === "" || current === phone.dataset.prefilled) {
         phone.value = dial + " ";
+        phone.dataset.prefilled = phone.value;
     }
 }
 
-// Before the EmailOctopus embed posts the form: drop a phone value that is still just the
-// prefilled "+NN" prefix (nobody typed a number) and trim whitespace, so no junk phone is stored.
+// Before the EmailOctopus embed posts the form: if the phone field still holds only the
+// untouched prefill (nobody typed a number), send it empty so no junk phone is stored.
 function cleanDialPrefix(form) {
     var phone = form.querySelector('#field_3');
     if (!phone) return;
-    var v = phone.value.trim();
-    if (/^\+\d{1,4}$/.test(v)) v = "";
-    phone.value = v;
+    if (phone.dataset.prefilled !== undefined && phone.value === phone.dataset.prefilled) {
+        phone.value = "";
+    }
 }
 Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form'), function (form) {
     form.addEventListener('submit', function () { cleanDialPrefix(form); }, true);
