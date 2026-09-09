@@ -61,6 +61,9 @@ def get_enriched_metadata(base_folder):
         vrd = event.get("videos_reveal_date")
         if vrd is not None and datetime.date.today() >= vrd:
             event["reveal_videos"] = True
+        # the event day itself is over (videos may be revealed earlier than that, so this is
+        # deliberately separate from reveal_videos)
+        event["is_past"] = event.get("date") is not None and event.get("date") < datetime.date.today()
     context["years"] = years
     context["years_sorted"] = sorted(years.keys(), reverse=True)
     context["future_events"] = future_events
