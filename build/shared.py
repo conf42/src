@@ -24,6 +24,10 @@ def read_talk_csv(path):
     """ Read the pre-process the CSV """
     items = read_csv(path)
     for item in items:
+        # whitespace-only cells (e.g. Company " ") must behave as empty in the templates
+        for key, value in list(item.items()):
+            if isinstance(value, str):
+                item[key] = value.strip()
         if "Abstract" in item:
             item["Abstract_s"] = textwrap.shorten(item.get("Abstract",""), 200-len(item.get("title","")), placeholder="...")
             item["Abstract_m"] = textwrap.shorten(item.get("Abstract",""), 400-len(item.get("title","")), placeholder="...")
