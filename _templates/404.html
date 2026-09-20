@@ -1,84 +1,105 @@
-{% extends "base.html" %}
+{# ── GitHub Pages serves docs/404.html for any missing URL. Same system as the sreday / llmday / platformday 404s
+     (mascot, one-line headline, ONE "Did you mean" link, back button), adapted to conf42's FLAT urls:
+     (1) harmless slips (letter case, trailing slash, .html, spaces or hyphens for underscores, a nested path whose
+         last part is a real page) redirect to the page that exists,
+     (2) anything else shows this page with the single closest match from /404-index.json
+         (written by build/generate.py: events + every page in the sitemap).
+     A different year (obs2028 -> obs2027) is only ever SUGGESTED, never redirected (Marek's rule on the sister sites).
+     All URLs are root-absolute because the page is served at any depth. Standalone on purpose (no base.html). ── #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Conf42 - page not found</title>
+  <link rel="shortcut icon" href="/assets/favicon/favicon.ico" type="image/x-icon"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --accent: #335eea; --navy: #1b2a4e; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; align-items: center; justify-content: center; background: #f4f4f6; color: #111; font-family: 'Plus Jakarta Sans', Arial, sans-serif; }
+    main { width: 100%; max-width: 900px; padding: 40px 20px 60px; text-align: center; box-sizing: border-box; }
+    .mascot { display: block; width: min(260px, 60vw); height: auto; margin: 0 auto 38px; animation: lost 3.2s ease-in-out infinite; transform-origin: 50% 90%; }
+    @keyframes lost { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) translateY(-6px); } }
+    @media (prefers-reduced-motion: reduce) { .mascot { animation: none; } }
+    h1 { font-weight: 800; font-size: clamp(.75rem, 3.6vw, 2rem); line-height: 1.2; white-space: nowrap; color: var(--navy); margin: 0 0 18px; }   /* always ONE line: the size follows the viewport instead of wrapping */
+    h1 b { color: var(--accent); }
+    .hint { display: none; margin: 0 0 26px; color: #666; font-size: 1.08rem; line-height: 1.7; overflow-wrap: anywhere; }
+    .hint.on { display: block; }
+    .hint a { color: var(--accent); font-weight: 800; text-decoration: none; transition: opacity .15s; }
+    .hint a:hover { opacity: .65; }
+    .back { display: inline-block; margin-top: 8px; padding: 13px 30px; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 800; font-size: 1rem; text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,.18); transition: transform .15s, box-shadow .15s; }
+    .back:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.24); }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="mascot" src="/assets/conf42/404_corgi.png" alt="" width="260" height="400">
+    <h1><b>404</b> - We couldn't fetch that page.</h1>
+    <p class="hint" id="hint"></p>
+    <a class="back" href="/">Back to main page</a>
+  </main>
+  <script>
+  (function () {
+    if (!window.fetch) return;
+    function lev(a, b, max) {                          // Levenshtein distance, two rows; gives up early past max
+      if (a === b) return 0; if (!a.length) return b.length; if (!b.length) return a.length;
+      if (Math.abs(a.length - b.length) > max) return max + 1;
+      var prev = [], cur = [], i, j, rowMin;
+      for (j = 0; j <= b.length; j++) prev[j] = j;
+      for (i = 1; i <= a.length; i++) {
+        cur = [i]; rowMin = i;
+        for (j = 1; j <= b.length; j++) {
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+          if (cur[j] < rowMin) rowMin = cur[j];
+        }
+        if (rowMin > max) return max + 1;
+        prev = cur;
+      }
+      return prev[b.length];
+    }
+    // one spelling for comparisons: lower case, no .html, spaces / hyphens / %20 -> underscores
+    function norm(s) { try { s = decodeURIComponent(s); } catch (e) {} return s.toLowerCase().replace(/\.html?$/, '').replace(/[\s\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); }
 
-{# GitHub Pages serves docs/404.html for every missing URL, at any depth, so make the
-   relative ./assets and ./page links resolve from the site root. #}
-{% block head %}
-    <base href="/">
-    <meta name="robots" content="noindex">
-{% endblock %}
+    fetch('/404-index.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (idx) {
+      if (!idx) return;
+      var events = idx.events || [], pages = idx.pages || [];
+      var segs = location.pathname.split('/').filter(function (s) { return s && !/^index\.html?$/i.test(s); });
+      if (!segs.length) return;
+      var typedRaw = segs[segs.length - 1], typed = norm(typedRaw), k;
+      if (!typed) return;
 
-{% block content %}
+      // (1) harmless slips: the same page once case / slash / .html / separators are tidied -> go there
+      var all = pages.concat(events.map(function (ev) { return ev.slug; }));
+      for (k = 0; k < all.length; k++) {
+        if (norm(all[k]) === typed) {
+          if ('/' + all[k] !== location.pathname) location.replace('/' + all[k] + location.search + location.hash);
+          return;
+        }
+      }
 
-    <!-- WELCOME -->
-    <section class="py-5 py-md-10 bg-dark">
-
-      <!-- Shape -->
-      <div class="shape shape-blur-3 svg-shim text-white">
-        <svg viewBox="0 0 1738 487" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0h1420.92s713.43 457.505 0 485.868C707.502 514.231 0 0 0 0z" fill="url(#paint0_linear)"/><defs><linearGradient id="paint0_linear" x1="0" y1="0" x2="1049.98" y2="912.68" gradientUnits="userSpaceOnUse"><stop stop-color="currentColor" stop-opacity=".075"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs></svg>
-      </div>
-
-      <div class="container">
-        <div class="row justify-content-center">
-          <div class="col-12 col-md-10 col-lg-8 text-center" data-aos="fade-up">
-
-            <!-- Heading -->
-            <h1 class="display-1 fw-bold text-white mb-2">
-              404
-            </h1>
-            <h2 class="text-white">
-              This page has left orbit
-            </h2>
-            <p class="lead text-white-75 mb-6">
-              The link may be outdated, or the talk you are after has moved. Try one of these instead.
-            </p>
-
-            <!-- Buttons -->
-            <a href="./" class="btn btn-primary shadow lift me-1 mb-3">
-              <i class="fe fe-home me-2"></i>
-              Home
-            </a>
-            <a href="./hall-of-fame" class="btn btn-white shadow lift me-1 mb-3">
-              <i class="fe fe-award me-2"></i>
-              Top talks
-            </a>
-            <a href="./speakers" class="btn btn-white shadow lift mb-3">
-              <i class="fe fe-users me-2"></i>
-              Speakers
-            </a>
-
-          </div>
-        </div> <!-- / .row -->
-      </div> <!-- / .container -->
-    </section>
-
-    <!-- SHAPE -->
-    <div class="position-relative">
-      <div class="shape shape-bottom shape-fluid-x svg-shim text-light">
-        <svg viewBox="0 0 2880 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 48h2880V0h-720C1442.5 52 720 0 720 0H0v48z" fill="currentColor"/></svg>
-      </div>
-    </div>
-
-    {% if future_events %}
-    <!-- NEXT EVENTS -->
-    <section class="pt-6 pb-8">
-      <div class="container">
-        <div class="row justify-content-center">
-          <div class="col-12 col-md-10 col-lg-8">
-            <h3 class="mb-4">Coming up next</h3>
-            <ul class="list-unstyled mb-0">
-              {% for evt in future_events[:3] %}
-              <li class="mb-3">
-                <a href="{{ evt.url }}" class="fs-lg">
-                  <i class="fe fe-chevron-right me-2"></i>{{ evt.name }} {{ evt.year }}
-                </a>
-                <span class="text-muted ms-2">{{ evt.date.strftime('%B %d %Y') }}</span>
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-    {% endif %}
-
-{% endblock %}
+      // (2) the single closest match: events first (upcoming, then newest), then every other page
+      var best = null;
+      function offer(slug, d, rank) { if (!best || d < best.d || (d === best.d && rank < best.rank)) best = { slug: slug, d: d, rank: rank }; }
+      for (k = 0; k < events.length; k++) {
+        var e = norm(events[k].slug), de = lev(typed, e, 2);
+        var stem = typed.replace(/\d+$/, ''), estem = e.replace(/\d+$/, '');           // "obs2031" -> the newest "obs" edition
+        if (de <= 2) offer(events[k].slug, de, (events[k].upcoming ? 0 : 1000) + k);
+        else if (stem.length >= 2 && stem === estem) offer(events[k].slug, 2, (events[k].upcoming ? 0 : 1000) + k);
+      }
+      for (k = 0; k < pages.length; k++) {
+        var p = norm(pages[k]), max = Math.max(3, Math.round(p.length * 0.15));
+        var cut = typed.length >= 8 && (p.indexOf(typed) === 0 || typed.indexOf(p) === 0);   // a cut-off or over-long address
+        var dp = cut ? Math.min(2, Math.abs(p.length - typed.length)) : lev(typed, p, max);
+        if (cut || dp <= max) offer(pages[k], dp + 0.5, 5000 + k);                          // +0.5: an equally close event wins
+      }
+      if (!best) return;
+      var url = '/' + best.slug, full = location.origin + url, hint = document.getElementById('hint');
+      hint.innerHTML = 'Did you mean: <a href="' + url.replace(/"/g, '%22') + '">' + full.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</a> ?';
+      hint.className = 'hint on';
+    }).catch(function () {});
+  })();
+  </script>
+</body>
+</html>
