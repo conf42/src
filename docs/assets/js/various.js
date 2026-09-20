@@ -1,6 +1,6 @@
 // NAV DROPDOWNS: keep a panel on screen. Panels are centred under their tab (CSS); when that would push one past
 // the viewport edge (the wide Events panel on 992-1300px windows) it is shifted back via --nav-shift, and the CSS
-// moves the arrow notch the other way so it still points at the tab. Kept at the TOP of this file on purpose:
+// keeps the pop-in origin under the tab. It also measures --nav-top. Kept at the TOP of this file on purpose:
 // the video code further down throws on pages without a player, which stops everything after it.
 (function () {
   function place(li) {
@@ -13,6 +13,9 @@
     if (centre - w / 2 < margin) shift = margin - (centre - w / 2);
     else if (centre + w / 2 > vw - margin) shift = (vw - margin) - (centre + w / 2);
     p.style.setProperty('--nav-shift', Math.round(shift) + 'px');
+    // the panel opens right under the navbar's bottom edge: --nav-top = gap between the tab and that edge
+    var nav = li.closest('.navbar');
+    if (nav) p.style.setProperty('--nav-top', Math.max(0, Math.round(nav.getBoundingClientRect().bottom - box.bottom)) + 'px');
   }
   function init() {
     document.querySelectorAll('.navbar-nav .dropdown').forEach(function (li) {
