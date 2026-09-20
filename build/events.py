@@ -18,6 +18,43 @@ from .srt import (
 )
 english_dict = get_dict()
 
+_CFP_NINJA_CACHE = {}
+
+
+def cfp_ninja_is_open(url):
+    """Build-time look at cfp.ninja: False when the CFP is closed / reviewing / complete or cfp_close_at has passed.
+    Anything uncertain (other host, network error, unknown slug, SKIP_CFP_CHECK=1) keeps the CFP button."""
+    import json, os, urllib.request
+    m = re.match(r"^https?://(www[.])?cfp[.]ninja/e/([^/?#]+)", str(url or "").strip())
+    if not m or os.environ.get("SKIP_CFP_CHECK"):
+        return True
+    slug = m.group(2)
+    if slug in _CFP_NINJA_CACHE:
+        return _CFP_NINJA_CACHE[slug]
+    is_open = True
+    try:
+        req = urllib.request.Request("https://cfp.ninja/api/v0/e/%s" % slug, headers={"User-Agent": "Mozilla/5.0"})
+        data = json.loads(urllib.request.urlopen(req, timeout=5).read().decode("utf-8", "ignore"))
+        ev = data.get("data", data) if isinstance(data, dict) else {}
+        ev = ev if isinstance(ev, dict) else {}
+        status = str(ev.get("cfp_status") or "").lower()
+        close_at = str(ev.get("cfp_close_at") or "")
+        is_open = status not in ("closed", "reviewing", "complete")
+        if is_open and close_at:
+            try:
+                close_dt = datetime.datetime.fromisoformat(close_at.replace("Z", "+00:00"))
+                if close_dt.tzinfo is None:
+                    close_dt = close_dt.replace(tzinfo=datetime.timezone.utc)
+                is_open = datetime.datetime.now(datetime.timezone.utc) < close_dt
+            except ValueError:
+                pass
+        print("  CFP %s: %s (status=%s, closes %s)" % (slug, "open" if is_open else "closed", status or "?", close_at or "?"))
+    except Exception as e:
+        print("  WARN: could not check cfp.ninja for %s (%s); keeping the CFP button" % (slug, e))
+    _CFP_NINJA_CACHE[slug] = is_open
+    return is_open
+
+
 
 def get_metadata():
     context = dict()
@@ -131,6 +168,13 @@ def get_enriched_metadata(base_folder):
             talk for talk in talks
             if talk.get("Featured","").lower() != "yes" and talk.get("Panel","").lower() != "yes"
         ]
+
+        # CFP buttons (home card badge + "CFP is open!" in the event hero) - ONE rule for both, Marek 2026-09-20:
+        # shown only while the CFP is really open. Hidden when the event has no cfp_url, is (nearly) over, when
+        # cfp.ninja says the CFP is closed / its close date has passed, AND as soon as the line-up is published,
+        # i.e. the event's CSV (db_path) has been uploaded and holds talks.
+        event["lineup_published"] = bool(talks)
+        event["cfp_open"] = bool(event.get("cfp_url")) and not event.get("cfp_closed") and not event["lineup_published"]             and cfp_ninja_is_open(event.get("cfp_url"))
 
         #counts
         print("%s %s /%s (%d talks, %d keynotes, %d panels)" % (event.get("date"), event.get("name"), event.get("short_url"), len(event["talks"]), len(event["talks_featured"]), len(event["talks_panel"])))
