@@ -1,253 +1,153 @@
-<section class="pt-3">
+{# Schedule, reworked 2026-09-20 in the style of the event hero: a timeline of cards instead of a table. Same functions
+   as before - kick-off call (live link / ended / subscribe fallback), keynotes, panels, one tab per track, LinkedIn
+   links, watch / subscribe-to-watch, secret pages (prefix + secret_mode), times in the visitor's clock. What changed for
+   the reader: the time zone is said ONCE in the header ("your time (BST)", no place name) instead of on every row, times
+   have no seconds, speakers have faces, and tracks are a pill switcher with talk counts. The event colour is the accent. #}
+
+{% macro sch_person(name, link, job, company) %}
+  {% if name %}
+  <span class="sch-person">{% if link %}<a href="{{ link }}" target="_blank" rel="noopener">{{ name }}</a>{% else %}<b>{{ name }}</b>{% endif %}{% if job or company %} <span class="sch-role">{{ job }}{% if job and company %} at {% endif %}{{ company }}</span>{% endif %}</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro sch_item(talk, kind, url_prefix, can_watch, show_time=true) %}
+  <article class="sch-item{% if kind %} sch-item-{{ kind }}{% endif %}{% if not show_time %} sch-item-notime{% endif %}">
+    {% if show_time %}<div class="sch-time"><span class="scheduletime" data-time-offset-minutes={{ talk.offset }}>{{ talk.start_time }}</span></div>{% endif %}
+    {% if talk.Name1 and talk.Picture %}
+    <img class="sch-avatar" src="{{ talk.Picture }}" alt="" width="60" height="60" loading="lazy">
+    {% else %}
+    <span class="sch-avatar sch-avatar-icon"><i class="fe fe-{{ 'users' if kind == 'panel' else 'mic' }}"></i></span>
+    {% endif %}
+    <div class="sch-body">
+      {% if kind == 'keynote' %}<span class="sch-tag">Keynote</span>{% elif kind == 'panel' %}<span class="sch-tag">Panel</span>{% endif %}
+      <h3 class="sch-title"><a href="{{ url_prefix }}{{ talk.short_url }}">{{ talk.Title }}</a></h3>
+      <p class="sch-people">
+        {{ sch_person(talk.Name1, talk.LinkedIn1, talk.JobTitle1, talk.Company1) }}
+        {{ sch_person(talk.Name2, talk.LinkedIn2, talk.JobTitle2, talk.Company2) }}
+      </p>
+    </div>
+    <div class="sch-action">
+      {% if kind == 'keynote' %}
+      <a target="_blank" rel="noopener" href="{{ talk.YouTube }}" class="sch-btn sch-btn-watch watch-btn" title="Watch the keynote on YouTube"><i class="fe fe-play"></i>Watch the keynote</a>
+      {% elif kind == 'panel' or can_watch %}
+      <a target="_blank" rel="noopener" href="{{ talk.YouTube }}" class="sch-btn sch-btn-watch watch-btn" title="Watch on YouTube"><i class="fe fe-play"></i>Watch</a>
+      {% else %}
+      <a href="#register" class="sch-btn sch-btn-sub"><i class="fe fe-user-check"></i>Subscribe to watch</a>
+      {% endif %}
+    </div>
+  </article>
+{% endmacro %}
+
+{% set can_watch = (secret_mode is defined or event.reveal_videos) %}
+{% set url_prefix = prefix | default('') %}
+{# _schedule_v4.html includes this file with sch_track_times = false: those events never gave the track talks a time slot #}
+{% set track_times = sch_track_times | default(true) %}
+
+<section class="sch pt-3" style="--ev: {{ event.color or '#335eea' }};">
     <div class="container">
 
-      <div class="row">
-        <div class="col-12">
-          <!-- Heading -->
-          <h2 class="mb-0">
-            Schedule
-          </h2>
-          <!-- Text -->
-          <p class="mb-5 text-muted">
-            {{ event.talks|length}} talks in {{ event.tracks.keys()|length}} tracks
-          </p>
+      <header class="sch-head">
+        <h2 class="sch-heading">Schedule</h2>
+        <div class="sch-meta">
+          <span class="sch-chip"><i class="fe fe-mic"></i>{{ event.talks|length }} talks</span>
+          <span class="sch-chip"><i class="fe fe-layers"></i>{{ event.tracks.keys()|length }} tracks</span>
+          <span class="sch-chip sch-chip-tz"><i class="fe fe-watch"></i>Times in <span id="scheduletimezone">GMT</span></span>
         </div>
-      </div> <!-- / .row -->
+      </header>
 
-      <div class="row">
+      <!-- Opening: kick-off call, keynotes, panels -->
+      <div class="sch-list">
 
-        <!-- Table -->
-        <div class="table-responsive">
-          <table class="table table-align-middle schedule-table">
-            <tbody>
-              <tr>
-                {# Rule: past event -> greyed-out "Meeting has ended"; current or upcoming event with a
-                   kickoff_url -> live link; no kickoff_url -> subscribe fallback #}
-                <td>
-                  <p class="mb-1">
-                    {% if event.kickoff_url and event.is_past %}
-                    Kick-off (live, online)
-                    {% elif event.kickoff_url %}
-                    <a target="_blank" rel="noopener" href="{{ event.kickoff_url }}">
-                      Kick-off (live, online)
-                    </a>
-                    {% else %}
-                    <a href="#register">
-                      Kick-off (live, online)
-                    </a>
-                    {% endif %}
-                  </p>
-                  <p class="fs-sm text-muted mb-0">
-                    Attendees, speakers & organisers are all invited to a video call. Come to meet others, ask questions and hang out.
-                    We'll explain how the conference works and give you a tour of the talks.
-                    {% if not event.kickoff_url and secret_mode is not defined %}
-                      <b><a href="#register">Subscribe</a> for FREE to get access</b>
-                    {% endif %}
-                  </p>
-                </td>
+        {# Rule: past event -> "Meeting has ended"; current or upcoming event with a kickoff_url -> live link;
+           no kickoff_url -> subscribe fallback #}
+        <article class="sch-item sch-item-kickoff">
+          <div class="sch-time"><span class="scheduletime" data-time-offset-minutes=0></span></div>
+          <span class="sch-avatar sch-avatar-icon"><i class="fe fe-video"></i></span>
+          <div class="sch-body">
+            <span class="sch-tag">{% if not event.is_past %}<span class="ev-dot"></span>{% endif %}Live call</span>
+            <h3 class="sch-title">
+              {% if event.kickoff_url and event.is_past %}
+              Kick-off (live, online)
+              {% elif event.kickoff_url %}
+              <a target="_blank" rel="noopener" href="{{ event.kickoff_url }}">Kick-off (live, online)</a>
+              {% else %}
+              <a href="#register">Kick-off (live, online)</a>
+              {% endif %}
+            </h3>
+            <p class="sch-people">
+              Attendees, speakers &amp; organisers are all invited to a video call. Come to meet others, ask questions and hang out.
+              We'll explain how the conference works and give you a tour of the talks.
+              {% if not event.kickoff_url and secret_mode is not defined %}
+                <b><a href="#register">Subscribe</a> for FREE to get access</b>
+              {% endif %}
+            </p>
+          </div>
+          <div class="sch-action">
+            {% if event.kickoff_url and event.is_past %}
+            <span class="sch-btn sch-btn-off kickoff-ended" aria-disabled="true"><i class="fe fe-video-off"></i>Meeting has ended</span>
+            {% elif event.kickoff_url %}
+            <a class="sch-btn sch-btn-live kickoff-link" target="_blank" rel="noopener" href="{{ event.kickoff_url }}" title="Join the kick-off call"><i class="fe fe-video"></i>Join kick-off meeting</a>
+            {% else %}
+            <a href="#register" class="sch-btn sch-btn-live"><i class="fe fe-user-check"></i>Subscribe to join for FREE</a>
+            {% endif %}
+          </div>
+        </article>
 
-                <td>
-                  <p class="fs-sm mb-0">
-                    <span class="scheduletime" data-time-offset-minutes=0></span>
-                  </p>
-                </td>
+        {% for talk in event.talks_featured %}
+          {{ sch_item(talk, 'keynote', url_prefix, can_watch) }}
+        {% endfor %}
 
-                <td>
-                  <p class="fs-sm mb-0">
-                    {% if event.kickoff_url and event.is_past %}
-                    {# past event: the call is over #}
-                    <span class="btn btn-secondary btn-sm disabled kickoff-ended" aria-disabled="true">
-                      <i class="fe fe-video-off me-2"></i>Meeting has ended
-                    </span>
-                    {% elif event.kickoff_url %}
-                    <a class="btn btn-success btn-sm shadow lift kickoff-link" target="_blank" rel="noopener" href="{{ event.kickoff_url }}" title="Join the kick-off call">
-                      <i class="fe fe-video me-1"></i>Join kick-off meeting
-                    </a>
-                    {% else %}
-                    <a href="#register" class="btn btn-success btn-sm shadow lift">
-                      subscribe to join for FREE
-                    </a>
-                    {% endif %}
-                  </p>
-                </td>
-              </tr>
-
-              {% for talk in event.talks_featured %}
-              <tr>
-                <td>
-                  <p class="mb-1">
-                    <a href="{{ prefix | default('') }}{{ talk.short_url }}">
-                      Keynote: {{ talk.Title }}
-                    </a>
-                  </p>
-                  <p class="fs-sm text-muted mb-0">
-                    {% if talk.LinkedIn1 %}
-                    <a href="{{ talk.LinkedIn1 }}" target="_blank">
-                      {{ talk.Name1 }}
-                    </a>
-                    {% else %}
-                      {{ talk.Name1 }} 
-                    {% endif %}
-                    {{ talk.JobTitle1 }}{% if talk.JobTitle1 and talk.Company1 %} at {% endif %}{{ talk.Company1 }}
-                  </p>
-                  {% if talk.Name2 %}
-                  <p class="fs-sm text-muted mb-0">
-                    {% if talk.LinkedIn2 %}
-                    <a href="{{ talk.LinkedIn2 }}" target="_blank">
-                      {{ talk.Name2 }}
-                    </a>
-                    {% else %}
-                      {{ talk.Name2 }} 
-                    {% endif %}
-                    {{ talk.JobTitle2 }}{% if talk.JobTitle2 and talk.Company2 %} at {% endif %}{{ talk.Company2 }}
-                  </p>
-                  {% endif %}
-                </td>
-
-                <td>
-                  <p class="fs-sm mb-0">
-                    <span class="scheduletime" data-time-offset-minutes={{ talk.offset }}>{{ talk.start_time }}</span>
-                  </p>
-                </td>
-
-                <td>
-                  <p class="fs-sm mb-0">
-                    <a target="_blank" rel="noopener" href="{{ talk.YouTube }}" class="btn btn-sm shadow lift watch-btn watch-btn-keynote" title="Watch the keynote on YouTube">Watch the Keynote</a>
-                  </p>
-                </td>
-              </tr>
-            {% endfor %}
-              
-            {% for talk in event.talks_panel %}
-            <tr>
-              <td>
-                <p class="mb-1">
-                  <a href="{{ prefix | default('') }}{{ talk.short_url }}">
-                    Panel: {{ talk.Title }}
-                  </a>
-                </p>
-              </td>
-
-              <td>
-                <p class="fs-sm mb-0">
-                  <span class="scheduletime" data-time-offset-minutes={{ talk.offset }}>{{ talk.start_time }}</span>
-                </p>
-              </td>
-
-              <td>
-                <p class="fs-sm mb-0">
-                  <a target="_blank" rel="noopener" href="{{ talk.YouTube }}" class="btn btn-danger btn-xs shadow lift watch-btn" title="Watch on YouTube">Watch</a>
-                </p>
-              </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-    </div> <!-- / .row -->
-
-    <div class="row">
-    <!-- Nav tabs -->
-    <ul class="schedule-nav nav nav-tabs" id="myTab" role="tablist">
-      {% for track in event.tracks.keys() %}
-            <li class="nav-item me-2">
-              <a class="nav-link {% if loop.index==1 %}active{% endif %}" id="tab-{{ loop.index }}" data-bs-toggle="tab" href="#tab-{{ loop.index }}-content" role="tab" aria-controls="tab-{{ loop.index }}-content"
-                aria-selected={% if loop.index==1 %}"true"{% else %}"false"{% endif %}
-              >
-                <span class="heading">{{ track }}</span>
-              </a>
-            </li>
-      {% endfor %}
-          </ul>
-          
-          <!-- Tab panes -->
-          <div class="schedule-tab-content tab-content">
-      
-      {% for track in event.tracks.keys() %}
-            <div class="tab-pane {% if loop.index==1 %}active{% endif %}" id="tab-{{ loop.index }}-content" role="tabpanel" aria-labelledby="tab-{{ loop.index }}">
-      
-              <table class="table table-align-middle schedule-table">
-                <tbody>
-
-      {% for talk in event.tracks[track] %}
-                  <tr>
-                    <td>
-                      <p class="mb-1">
-                        <a href="{{ prefix | default('') }}{{ talk.short_url }}">
-                          {{ talk.Title }}
-                        </a>
-                      </p>
-                      <p class="fs-sm text-muted mb-0">
-                        {% if talk.LinkedIn1 %}
-                        <a href="{{ talk.LinkedIn1 }}" target="_blank">
-                          {{ talk.Name1 }}
-                        </a>
-                        {% else %}
-                          {{ talk.Name1 }} 
-                        {% endif %}
-                        {{ talk.JobTitle1 }}{% if talk.JobTitle1 and talk.Company1 %} at {% endif %}{{ talk.Company1 }}
-                      </p>
-                      {% if talk.Name2 %}
-                      <p class="fs-sm text-muted mb-0">
-                        {% if talk.LinkedIn2 %}
-                        <a href="{{ talk.LinkedIn2 }}" target="_blank">
-                          {{ talk.Name2 }}
-                        </a>
-                        {% else %}
-                          {{ talk.Name2 }} 
-                        {% endif %}
-                        {{ talk.JobTitle2 }}{% if talk.JobTitle2 and talk.Company2 %} at {% endif %}{{ talk.Company2 }}
-                      </p>
-                      {% endif %}
-                    </td>
-
-                    <td>
-                      <p class="fs-sm mb-0">
-                        <span class="scheduletime" data-time-offset-minutes={{ talk.offset }}>{{ talk.start_time }}</span>
-                      </p>
-                    </td>
-
-                    <td>
-                      <p class="fs-sm mb-0">
-                        {% if (secret_mode is defined or event.reveal_videos) %}
-                        <a target="_blank" rel="noopener" href="{{ talk.YouTube }}" class="btn btn-danger btn-xs shadow lift watch-btn" title="Watch on YouTube">Watch</a>
-                        {% else %}
-                        <a href="#register" class="btn btn-primary btn-xs shadow lift">
-                          subscribe to watch
-                        </a>
-                        {% endif %}
-                      </p>
-                    </td>
-                  </tr>
-      {% endfor %}
-
-                </tbody>
-              </table>
-      
-            </div><!--//tab-{{ loop.index }}-content-->
-      
-      {% endfor %}
-          </div><!--//schedule-tab-content-->
-
-
-          <script>
-            function updateTimestamps() {
-              const local_timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-              var elem = document.getElementById("scheduletimezone")
-              if (elem){
-                elem.innerHTML =  " (" + local_timezone + ")";
-              }
-
-              var x, i;
-              x = document.querySelectorAll(".scheduletime");
-              for (i = 0; i < x.length; i++) {
-                const event_date = new Date("{{ event.date }}T17:00:00.000+00:00");
-                event_date.setMinutes(event_date.getMinutes() + Number(x[i].dataset.timeOffsetMinutes))
-                x[i].innerHTML = event_date.toLocaleTimeString() + " (" + local_timezone + ")";
-              }
-            }
-            updateTimestamps();
-          </script>
-
+        {% for talk in event.talks_panel %}
+          {{ sch_item(talk, 'panel', url_prefix, can_watch) }}
+        {% endfor %}
       </div>
+
+      <!-- Tracks -->
+      <ul class="sch-tabs schedule-nav nav" id="myTab" role="tablist">
+        {% for track in event.tracks.keys() %}
+        <li class="nav-item" role="presentation">
+          <a class="nav-link {% if loop.index==1 %}active{% endif %}" id="tab-{{ loop.index }}" data-bs-toggle="tab" href="#tab-{{ loop.index }}-content" role="tab" aria-controls="tab-{{ loop.index }}-content"
+            aria-selected={% if loop.index==1 %}"true"{% else %}"false"{% endif %}
+          >
+            <span class="heading">{{ track|upper if track|length <= 3 else track|capitalize }}</span><span class="sch-count">{{ event.tracks[track]|length }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+
+      <div class="schedule-tab-content tab-content">
+        {% for track in event.tracks.keys() %}
+        <div class="tab-pane {% if loop.index==1 %}active{% endif %}" id="tab-{{ loop.index }}-content" role="tabpanel" aria-labelledby="tab-{{ loop.index }}">
+          <div class="sch-list">
+            {% for talk in event.tracks[track] %}
+              {{ sch_item(talk, '', url_prefix, can_watch, track_times) }}
+            {% endfor %}
+          </div>
+        </div><!--//tab-{{ loop.index }}-content-->
+        {% endfor %}
+      </div><!--//schedule-tab-content-->
+
+      <script>
+        // every .scheduletime becomes HH:MM in the visitor's clock; the zone is named once, in the header chip, as an
+        // abbreviation / offset ("BST", "GMT+2") rather than a place name that reads like a venue
+        function updateTimestamps() {
+          var start = new Date("{{ event.date }}T17:00:00.000+00:00");
+          var zoneEl = document.getElementById("scheduletimezone");
+          if (zoneEl) {
+            try {
+              var part = new Intl.DateTimeFormat("en-GB", {timeZoneName: "short"}).formatToParts(start).filter(function(p){ return p.type === "timeZoneName"; })[0];
+              zoneEl.textContent = "your time" + (part ? " (" + part.value + ")" : "");
+            } catch (e) { zoneEl.textContent = "your time"; }
+          }
+          var fmt = new Intl.DateTimeFormat(undefined, {hour: "2-digit", minute: "2-digit"});
+          var x = document.querySelectorAll(".scheduletime");
+          for (var i = 0; i < x.length; i++) {
+            var t = new Date(start.getTime() + Number(x[i].dataset.timeOffsetMinutes) * 60000);
+            x[i].textContent = fmt.format(t);
+          }
+        }
+        updateTimestamps();
+      </script>
+
     </div> <!-- / .container -->
   </section>
