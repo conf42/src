@@ -406,6 +406,23 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
         if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html", "404.html"]:
             register_url(page.replace(".html",""))
 
+# 404 INDEX
+# /404-index.json feeds docs/404.html (see _templates/404.html): slip redirects + the single "Did you mean" link.
+# events = own event pages, newest first, with an upcoming flag (they win ties and catch "obs2031" -> newest obs);
+# pages = every url registered for the sitemap, so nothing that is not already public ends up in here.
+print(DIVIDER)
+import json
+_idx_future = {id(e) for e in (context.get("future_events") or [])}
+_idx_events = [e for e in (context.get("events") or []) if "external_url" not in e and e.get("short_url")]
+_idx_events.sort(key=lambda e: e.get("date"), reverse=True)
+_idx = {
+    "events": [{"slug": e.get("short_url").replace(".html", ""), "upcoming": id(e) in _idx_future} for e in _idx_events],
+    "pages": sorted(set(u for u in SITEMAP_URLS if u)),
+}
+with open(BASE_FOLDER + "/404-index.json", "w", encoding="utf-8") as f:
+    json.dump(_idx, f, ensure_ascii=False, separators=(",", ":"))
+print("Writing out 404-index.json (%d events, %d pages)" % (len(_idx["events"]), len(_idx["pages"])))
+
 # SITEMAP
 print(DIVIDER)
 print("Generating sitemap.xml with %d items" % len(SITEMAP_URLS))
