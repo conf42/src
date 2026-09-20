@@ -66,6 +66,12 @@ def get_enriched_metadata(base_folder):
         event["is_past"] = event.get("date") is not None and event.get("date") < datetime.date.today()
     context["years"] = years
     context["years_sorted"] = sorted(years.keys(), reverse=True)
+    # nav "Events" dropdown lists ONLY the current year (2027 events used to show above 2026 as soon as they were
+    # added). The template renders the current year plus any future years and shows nav_year; a tiny script in
+    # base.html then switches to the visitor's calendar year, so it rolls over on Jan 1 00:00 without a rebuild.
+    this_year = str(datetime.date.today().year)
+    context["nav_years"] = [y for y in context["years_sorted"] if y >= this_year] or context["years_sorted"][:1]
+    context["nav_year"] = this_year if this_year in years else context["nav_years"][-1]
     context["future_events"] = future_events
     context["current_event"] = past_events[-1]
     context["past_events"] = past_events[:-1]
