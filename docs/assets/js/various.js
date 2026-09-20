@@ -1,3 +1,27 @@
+// NAV DROPDOWNS: keep a panel on screen. Panels are centred under their tab (CSS); when that would push one past
+// the viewport edge (the wide Events panel on 992-1300px windows) it is shifted back via --nav-shift, and the CSS
+// moves the arrow notch the other way so it still points at the tab. Kept at the TOP of this file on purpose:
+// the video code further down throws on pages without a player, which stops everything after it.
+(function () {
+  function place(li) {
+    var p = li.querySelector('.nav-panel');
+    if (!p || window.innerWidth < 992) return;
+    var w = p.offsetWidth;
+    if (!w) { requestAnimationFrame(function () { if (p.offsetWidth) place(li); }); return; }
+    var box = li.getBoundingClientRect(), centre = box.left + box.width / 2, margin = 16;
+    var vw = document.documentElement.clientWidth, shift = 0;
+    if (centre - w / 2 < margin) shift = margin - (centre - w / 2);
+    else if (centre + w / 2 > vw - margin) shift = (vw - margin) - (centre + w / 2);
+    p.style.setProperty('--nav-shift', Math.round(shift) + 'px');
+  }
+  function init() {
+    document.querySelectorAll('.navbar-nav .dropdown').forEach(function (li) {
+      ['mouseenter', 'focusin', 'click'].forEach(function (ev) { li.addEventListener(ev, function () { place(li); }); });
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
 function getCountry() {
 	var countries = {
 		AD: "Andorra",
