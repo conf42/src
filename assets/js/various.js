@@ -19,6 +19,8 @@
 			if (x !== target) raf = window.requestAnimationFrame(frame);
 		}
 		bar.addEventListener('mousemove', function (e) {
+			// no glow while the pointer is on a dropdown tab (Events, Community) or inside its open panel (Marek 2026-09-20)
+			if (e.target && e.target.closest && e.target.closest('.dropdown')) { wrap.classList.remove('on'); return; }
 			target = e.clientX - bar.getBoundingClientRect().left;
 			if (x === null || still) x = target;
 			wrap.classList.add('on');
