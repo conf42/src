@@ -398,7 +398,7 @@ for post in posts:
 # MAIN PAGES
 print(DIVIDER)
 print("Generating main pages")
-for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html", "404.html"]:
+for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html", "panels.html", "404.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)

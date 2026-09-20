@@ -122,7 +122,11 @@ def get_enriched_metadata(base_folder):
         # split into featured and not
         event["talks_featured"] = [talk for talk in talks if talk.get("Featured","").lower() == "yes"]
         event["talks_panel"] = [talk for talk in talks if talk.get("Panel","").lower() == "yes"]
-        context["panels"] = context.get("panels", []) + event["talks_panel"]
+        # panels feed the home page ("Latest panels", newest two) and /panels (all of them); each one remembers
+        # its event for the label on /panels. Events are walked oldest first, so newer panels go in front.
+        for talk in event["talks_panel"]:
+            talk["panel_event"] = {"name": event.get("name"), "year": event.get("year"), "date": event.get("date"), "short_url": event.get("short_url")}
+        context["panels"] = event["talks_panel"] + context.get("panels", [])
         event["talks"] = [
             talk for talk in talks
             if talk.get("Featured","").lower() != "yes" and talk.get("Panel","").lower() != "yes"
