@@ -3155,9 +3155,10 @@ function settleAnchor(hash) {
         setTimeout(correct, 700);                    // late image loads
         setTimeout(function () { correct(); cleanup(); }, 1500);
     }
-    // Sponsor buttons teleport (Marek 2026-09-21: the glide "sometimes gets stuck mid way"): no animation, then the
-    // same re-align checks as below. Every other anchor keeps the smooth scroll.
-    if (target.id === 'sponsors' || target.id === 'sponsor') {
+    // Sponsor buttons and "Join the community!" / Subscribe (#register) teleport (Marek 2026-09-21: the glide
+    // "sometimes gets stuck mid way"): no animation, then the same re-align checks as below. Every other anchor
+    // keeps the smooth scroll.
+    if (target.id === 'sponsors' || target.id === 'sponsor' || target.id === 'register') {
         target.scrollIntoView({ behavior: 'instant', block: 'start' });
         onScrollEnd();
         return;
