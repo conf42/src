@@ -93,19 +93,22 @@
       </div>
     </div>
 
-    {% if (secret_mode is defined or event.reveal_videos) and talk.YouTube %}
-    <!-- VIDEO -->
-    <section class="pt-2 sticky">
+    {% set can_video = (secret_mode is defined or event.reveal_videos) and talk.YouTube %}
+    {% set n_talks = (event.talks | length) + (event.talks_featured | length) %}
+    {% set link_prefix = (event.secret_url ~ '_') if secret_mode is defined else '' %}
+    <!-- TALK BODY (2026-09-21): watch row = 16:9 player card + action bar + chapters, transcript beside it (proposals 1 + 2) -->
+    <section class="tk-body pt-3 pt-md-4 pb-6" style="--ev: {{ event.color }}; --event-color: {{ event.color }};">
       <div class="container">
-        <div class="row justify-content-center">
 
-          <div id="video-container" class="col-9 col-lg-12 mb-5">
-
-          <!-- Video -->
-
-            <!-- 1. The <iframe> (and video player) will replace this <div> tag. -->
-            <div id="player" class="sticky"></div>
-
+        {% if can_video %}
+        <div class="tk-watch{% if not (talk.YouTubeId and talk.transcript) %} tk-watch-solo{% endif %}">
+          <div class="tk-watch-main">
+            <!-- 1. The <iframe> (and video player) will replace the #player <div>. 16:9 card; pinned on phones only -->
+            <div class="tk-player-card sticky">
+              <div id="video-container">
+                <div id="player"></div>
+              </div>
+            </div>
             <script>
               {% if talk.transcript %}
               var transcript = {{ talk.transcript.chunks|tojson }};
@@ -186,27 +189,16 @@
               }
               time_update_interval = setInterval(highlightParagraph, 1000);
             </script>
-          </div>
-        </div> <!-- / .row -->
-      </div> <!-- / .container -->
-    </section>
-    {% endif %}
-
-    <!-- CONTENT -->
-    <section class="pt-2">
-      <div class="container">
-        <div class="row justify-content-center">
-
-          <div class="col-12 mb-5">
-            {# title + duration moved into the hero (proposal A) #}
-            {% if (secret_mode is defined or event.reveal_videos) and talk.YouTube %}
-            <h3 class="bg-white">
-              Video size:
-              <a href="javascript:void(0);" onclick="resizeVideo(25)"><i class="fe fe-zoom-out me-2"></i></a>
-              <a href="javascript:void(0);" onclick="resizeVideo(50)"><i class="fe fe-zoom-in me-2"></i></a>
-              <a href="javascript:void(0);" onclick="copyLinkAtTime()" title="Copy a link to this talk at the current time"><i class="fe fe-link me-2"></i></a>
-              <span id="copy-link-feedback" class="small-text text-muted fw-normal"></span>
-            </h3>
+            <div class="tk-bar">
+              <button type="button" class="tk-chip-btn" onclick="copyLinkAtTime()" title="Copy a link to this talk at the current time"><i class="fe fe-clock me-2"></i>Link at current time</button>
+              <span id="copy-link-feedback" class="small-text text-muted"></span>
+              <span class="tk-bar-spacer"></span>
+              <span class="tk-share-label">Share</span>
+              <a class="tk-icon-btn" href="javascript:void(0);" onclick="navigator.clipboard && navigator.clipboard.writeText('{{ canonical }}'); this.classList.add('done');" title="Copy link"><i class="fe fe-link"></i></a>
+              <a class="tk-icon-btn" href="https://www.linkedin.com/sharing/share-offsite/?url={{ canonical | urlencode }}" target="_blank" rel="noopener" title="Share on LinkedIn"><i class="fe fe-linkedin"></i></a>
+              <a class="tk-icon-btn" href="https://twitter.com/intent/tweet?url={{ canonical | urlencode }}&amp;text={{ ('Check out this talk by ' ~ talk.Name1) | urlencode }}" target="_blank" rel="noopener" title="Share on X"><i class="fe fe-twitter"></i></a>
+              {% if talk.Slides %}<a class="tk-chip-btn" href="#slides"><i class="fe fe-paperclip me-2"></i>Slides</a>{% endif %}
+            </div>
             <script>
               // copy "<talk url>#<seconds>" - the existing deep link format handled by onPlayerReady()
               function copyLinkAtTime() {
@@ -230,49 +222,30 @@
                 }
               }
             </script>
+            {% if talk.YouTubeId and talk.transcript and talk.transcript.chunks %}
+            {# Chapters: a jump point roughly every 1/7th of the talk, at a paragraph start. Labels are the first
+               words spoken there - proper chapter titles would need one summarising pass per talk at build time. #}
+            {% set ch = namespace(last=-99999, n=0) %}
+            {% set ch_gap = [talk.transcript.chunks[-1].timestamp_s / 7, 90] | max %}
+            <div class="tk-chapters" aria-label="Jump to a part of the talk">
+              {% for c in talk.transcript.chunks %}
+              {% if (c.para_break or loop.first) and (c.timestamp_s - ch.last) >= ch_gap and ch.n < 7 %}
+              {% set stamp = c.timestamp.split(',')[0] %}
+              <button type="button" class="tk-chapter" onclick="seek({{ c.timestamp_s }})"><b>{{ stamp[3:] if stamp.startswith('00:') else stamp }}</b>{{ c.text.split()[:6] | join(' ') }}&hellip;</button>
+              {% set ch.last = c.timestamp_s %}{% set ch.n = ch.n + 1 %}
+              {% endif %}
+              {% endfor %}
+            </div>
             {% endif %}
           </div>
 
-          <div class="col-12 mb-5">
-            <h3>
-              Abstract
-            </h3>
-<!-- Text -->
-{% markdown %}
-{{ talk.Abstract }}
-{% endmarkdown %}
-<!-- End Text -->
-          </div>
-
-          {% if (secret_mode is defined or event.reveal_videos) and talk.YouTubeId %}
-          {% if talk.transcript %}
-
-          {% if talk.transcript.summary %}
-          <div class="col-12 mb-5">
-            <h3>
-              Summary
-            </h3>
-            <ul>
-              {% for elem in talk.transcript.summary %}
-              <li>
-                {{ elem }}
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
-          {% endif %}
-
-          <div class="col-12 mb-5" style="--event-color: {{ event.color }};">
-            <h3>
-              Transcript
-              <a href="javascript:void(0);" id="transcript-toggle" class="ms-2 small-text fw-normal" onclick="toggleTranscript()">
-                <i class="fe fe-eye-off me-1"></i><span>Hide</span>
-              </a>
-            </h3>
-            <span class="text-muted">
-              This transcript was autogenerated. To make changes, <a href="https://github.com/conf42/src/edit/main/{{ talk.transcript.path }}" target="_blank">submit a PR</a>.
-            </span>
-
+          {% if talk.YouTubeId and talk.transcript %}
+          <aside class="tk-transcript">
+            <div class="tk-transcript-inner">
+              <div class="tk-transcript-head">
+                <h3>Transcript</h3>
+                <a href="javascript:void(0);" id="transcript-toggle" class="small-text" onclick="toggleTranscript()"><i class="fe fe-eye-off me-1"></i><span>Hide</span></a>
+              </div>
             <!-- Transcript search (full width of the panel) -->
             <div class="mt-3 mb-2" id="transcript-toolbar">
               <input type="search" class="form-control form-control-sm" id="transcript-search" placeholder="Search the transcript..." autocomplete="off" aria-label="Search the transcript">
@@ -304,8 +277,12 @@
             {% endfor %}
               </p>
             </div>
-          </div>
-
+              <span class="tk-transcript-note">Autogenerated. <a href="https://github.com/conf42/src/edit/main/{{ talk.transcript.path }}" target="_blank">Fix a typo with a PR</a>.</span>
+            </div>
+          </aside>
+          {% endif %}
+        </div>
+        {% if talk.YouTubeId and talk.transcript %}
           <script>
             // Transcript panel: show/hide, follow playback, keyword search.
             // Relies on the globals defined by the video script above:
@@ -453,11 +430,41 @@
               if (load(FOLLOW_KEY) === "1") setFollow(true);
             })();
           </script>
+        {% endif %}
+        {% endif %}
+
+        <div class="row justify-content-center mt-4">
+
+          <div class="col-12 mb-5">
+            <h3>
+              Abstract
+            </h3>
+<!-- Text -->
+{% markdown %}
+{{ talk.Abstract }}
+{% endmarkdown %}
+<!-- End Text -->
+          </div>
+
+          {% if can_video and talk.YouTubeId and talk.transcript %}
+          {% if talk.transcript.summary %}
+          <div class="col-12 mb-5">
+            <h3>
+              Summary
+            </h3>
+            <ul>
+              {% for elem in talk.transcript.summary %}
+              <li>
+                {{ elem }}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
           {% endif %}
           {% endif %}
 
           {% if (secret_mode is defined or event.reveal_videos) and talk.Slides %}
-          <div class="col-12 mb-5">
+          <div class="col-12 mb-5" id="slides">
             <h3>
               Slides
             </h3>
@@ -480,7 +487,6 @@
         </div> <!-- / .row -->
       </div> <!-- / .container -->
     </section>
-
     <!-- PHOTO -->
     <section class="pt-8 pb-6">
       <div class="container">
