@@ -3155,6 +3155,13 @@ function settleAnchor(hash) {
         setTimeout(correct, 700);                    // late image loads
         setTimeout(function () { correct(); cleanup(); }, 1500);
     }
+    // Sponsor buttons teleport (Marek 2026-09-21: the glide "sometimes gets stuck mid way"): no animation, then the
+    // same re-align checks as below. Every other anchor keeps the smooth scroll.
+    if (target.id === 'sponsors' || target.id === 'sponsor') {
+        target.scrollIntoView({ behavior: 'instant', block: 'start' });
+        onScrollEnd();
+        return;
+    }
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if ('onscrollend' in window) window.addEventListener('scrollend', onScrollEnd, { once: true });
     setTimeout(onScrollEnd, 1200);                   // fallback (no scrollend support, or nothing to scroll)
