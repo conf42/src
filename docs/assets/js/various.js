@@ -3134,31 +3134,44 @@ function settleAnchor(hash) {
     var target;
     try { target = document.getElementById(decodeURIComponent(hash.slice(1))); } catch (e) { return; }
     if (!target) return;
+    var instant = target.id === 'sponsors' || target.id === 'sponsor' || target.id === 'register';
+    // "Join the community!" lands on its heading, not on the top of the tall coloured band, so the whole form
+    // fits on the screen (Marek's screenshot 2026-09-21). The heading's scroll-margin-top is set in various.css.
+    if (target.id === 'register') target = target.querySelector('h1, h2') || target;
     var margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
     var cancelled = false, corrections = 0, finished = false;
     var inputTypes = ['wheel', 'touchmove', 'pointerdown', 'keydown'];
     function cancel() { cancelled = true; cleanup(); }
-    function cleanup() { inputTypes.forEach(function (t) { window.removeEventListener(t, cancel); }); }
+    function cleanup() {
+        inputTypes.forEach(function (t) { window.removeEventListener(t, cancel); });
+        document.removeEventListener('load', onImageLoad, true);
+    }
     inputTypes.forEach(function (t) { window.addEventListener(t, cancel, { passive: true }); });
 
     function correct() {
-        if (cancelled || corrections >= 3) return;
+        if (cancelled || corrections >= 40) return;
         if (Math.abs(target.getBoundingClientRect().top - margin) > 2) {
             corrections++;
             target.scrollIntoView({ behavior: 'instant', block: 'start' });
         }
     }
+    // The jump itself brings lazy images above the target close to the screen; they keep arriving for seconds and
+    // push the page down (measured 2026-09-21: the heading drifted 1400px after the 1.5 s checks had ended). So
+    // every image load re-aligns, for 8 s or until the visitor touches the page - whichever comes first.
+    function onImageLoad(e) { if (e.target && e.target.tagName === 'IMG') correct(); }
     function onScrollEnd() {
         if (finished || cancelled) return;
         finished = true;
         correct();                                   // right after the animation
-        setTimeout(correct, 700);                    // late image loads
-        setTimeout(function () { correct(); cleanup(); }, 1500);
+        document.addEventListener('load', onImageLoad, true);
+        setTimeout(correct, 700);
+        setTimeout(correct, 1500);
+        setTimeout(function () { correct(); cleanup(); }, 8000);
     }
     // Sponsor buttons and "Join the community!" / Subscribe (#register) teleport (Marek 2026-09-21: the glide
     // "sometimes gets stuck mid way"): no animation, then the same re-align checks as below. Every other anchor
     // keeps the smooth scroll.
-    if (target.id === 'sponsors' || target.id === 'sponsor' || target.id === 'register') {
+    if (instant) {
         target.scrollIntoView({ behavior: 'instant', block: 'start' });
         onScrollEnd();
         return;
