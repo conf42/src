@@ -16,6 +16,10 @@ from .assemblyai import (
 from .srt import (
     read_srt_transcript,
 )
+from .about import (
+    load_about_config,
+    build_about,
+)
 english_dict = get_dict()
 
 _CFP_NINJA_CACHE = {}
@@ -138,6 +142,7 @@ def get_enriched_metadata(base_folder):
         others.sort(key=lambda x: x.get("year"))
 
     # read in the talks database
+    about_config = load_about_config()
     for event in events:
         # for external URLs, just use that as url
         if "external_url" in event:
@@ -232,7 +237,10 @@ def get_enriched_metadata(base_folder):
             transcript = read_srt_transcript(talk["Name1"], event["short_url"])
             if transcript:
                 talk["transcript"] = transcript
-            
+
+        # "About the conference" panel (companies + topics), needs talk["short_url"] from the loop above
+        build_about(event, about_config)
+
     return context
 
 def extract_keywords(talk):
