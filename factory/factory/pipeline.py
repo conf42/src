@@ -265,6 +265,7 @@ class Run:
                 t["finished"] = now()
                 self.save()
             self.note("done: %s" % key)
+            self.publish()
         except Exception as ex:
             with self.lock:
                 t["error"] = "%s: %s" % (t.get("current") or "?", ex)
@@ -275,12 +276,26 @@ class Run:
             self.note("FAILED %s at %s: %s" % (key, t.get("current"), ex))
             traceback.print_exc()
 
+    def publish(self, force=False):
+        """Push the progress to the unlisted page conf42.com/factory, at most every status_publish_minutes."""
+        every = float(self.cfg.get("status_publish_minutes", 20)) * 60
+        last = getattr(self, "_last_publish", 0)
+        if not force and (every <= 0 or datetime.datetime.now().timestamp() - last < every):
+            return
+        self._last_publish = datetime.datetime.now().timestamp()
+        try:
+            from . import app
+            self.note("status page: %s" % app.publish_status())
+        except Exception as ex:
+            self.note("status page not updated: %s" % ex)
+
     def run(self, only=None):
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
         self.note("processing %d talk(s), %d at a time" % (len(keys), self.cfg["parallel_talks"]))
         with ThreadPoolExecutor(max_workers=max(1, int(self.cfg["parallel_talks"]))) as pool:
             list(pool.map(self.process, keys))
         self.note("run finished")
+        self.publish(force=True)
 
 
 def summary(state):
