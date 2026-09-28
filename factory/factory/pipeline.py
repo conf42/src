@@ -8,6 +8,7 @@ Steps per talk: match -> probe -> upload -> edit -> publish -> download -> srt -
 import datetime
 import glob
 import json
+import re
 import os
 import shutil
 import threading
@@ -276,7 +277,14 @@ class Run:
                 self.record_edit(cid, key, credits)
                 self.set(key, "edit", "done", report=j["result"].get("agent_response", ""), credits=credits, job_id=j.get("job_id"))
                 cap = float(cfg.get("max_edit_credits") or 0)
-                if cap and credits > cap:                   # e.g. the AI editor worked on the whole project
+                report = str(j["result"].get("agent_response") or "")
+                others = [k for k in self.state["talks"] if k != key and k in report]
+                if re.search(r"\ball \d+ (clips|compositions)\b", report, re.I) or others:   # it strayed into other talks
+                    with self.lock:
+                        self.state["edits_paused"] = "%s's edit report mentions %s - the AI editor may have edited other talks; check it in Descript, then clear edits_paused in state.json" % (
+                            key, ", ".join(others) or "all clips")
+                    self.note("EDITS PAUSED: " + self.state["edits_paused"])
+                elif cap and credits > cap:                 # an unusually expensive edit
                     with self.lock:
                         self.state["edits_paused"] = "%s's edit cost %.1f AI credits (limit %g) - check it in Descript, then clear edits_paused in state.json" % (key, credits, cap)
                     self.note("EDITS PAUSED: " + self.state["edits_paused"])
