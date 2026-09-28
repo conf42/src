@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
+import json
 import os
 import subprocess
 import sys
@@ -405,6 +406,19 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
         f.write(template.render(page=page, canonical=get_canonical_url(page), **context))
         if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html", "404.html"]:
             register_url(page.replace(".html",""))
+
+# FACTORY (conf42.com/factory - unlisted: noindex, never passed to register_url, so not in the sitemap or
+# 404-index.json). Progress of the factory runs (factory/, the local Descript video pipeline), from _db/factory.json
+# which the factory app writes and pushes ("Publish status").
+try:
+    with open("./_db/factory.json", encoding="utf-8") as f:
+        video_factory = json.load(f)
+except (OSError, ValueError):
+    video_factory = {"updated": "", "events": []}
+with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
+    print("Writing out factory.html (unlisted)")
+    f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory,
+                                                           steps=["upload", "edit", "publish", "download", "srt", "loudness", "qa"]))
 
 # 404 INDEX
 # /404-index.json feeds docs/404.html (see _templates/404.html): slip redirects + the single "Did you mean" link.
