@@ -237,7 +237,7 @@ PAGE_FILE = os.path.join(os.path.dirname(__file__), "dashboard.html")
 # Expected seconds per step = a + b * video minutes + c * MB, then scaled by how long finished steps really took
 # (median ratio, so the bars learn this PC's upload speed and Descript's pace). Seeds from 2026-09-28 Descript jobs.
 DEFAULT_SECS = {"render": (5, 4, 0), "upload": (70, 0, 0.25), "edit": (75, 0, 0), "publish": (40, 14, 0),
-                "download": (10, 0, 0.05), "srt": (8, 0, 0), "loudness": (5, 2.5, 0), "qa": (3, 1.2, 0)}
+                "download": (10, 0, 0.05), "srt": (8, 0, 0), "chapters": (60, 0, 0), "loudness": (5, 2.5, 0), "qa": (3, 1.2, 0)}
 
 
 def expectations(st):
