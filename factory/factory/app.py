@@ -247,6 +247,7 @@ class Handler(BaseHTTPRequestHandler):
             queue = sorted(({"talk": k, "mb": t.get("size_mb"), "n": t["queued"]} for k, t in st.get("talks", {}).items()
                             if t.get("queued")), key=lambda x: x["n"])
             return self.send(200, {"queue": queue, "usage": cached("usage", 60, usage_month),
+                                   "gpu": cached("gpu", 3, pipeline.media.gpu_status),
                                    "runners": cached("run:" + e, 10, lambda: runners(e)),
                                    "heartbeat": (st.get("runner") or {}).get("at") or st.get("updated"),
                                    "descript": cached("d:" + e, 20, lambda: descript_now(e)),

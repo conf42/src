@@ -67,6 +67,32 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None):
     return dst
 
 
+def gpu_status():
+    """NVIDIA GPU load for the render scheduler and the dashboard; None without nvidia-smi."""
+    exe = shutil.which("nvidia-smi") or r"C:\Windows\System32\nvidia-smi.exe"
+    try:
+        r = subprocess.run([exe, "--query-gpu=name,utilization.gpu,utilization.encoder,utilization.decoder,memory.used,"
+                            "memory.total,temperature.gpu,power.draw,encoder.stats.sessionCount,encoder.stats.averageFps",
+                            "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
+        v = [x.strip() for x in r.stdout.strip().splitlines()[0].split(",")]
+    except Exception:
+        return None
+    num = lambda x: float(x) if x.replace(".", "", 1).isdigit() else None
+    return {"name": v[0], "gpu": num(v[1]), "encoder": num(v[2]), "decoder": num(v[3]), "vram_used": num(v[4]),
+            "vram_total": num(v[5]), "temp": num(v[6]), "power": num(v[7]), "sessions": num(v[8]), "fps": num(v[9])}
+
+
+def render_slots(setting):
+    """How many renders may run at once: a number from settings, or 'auto' = go all out on an RTX 5090 (8 NVENC
+    sessions, Marek 2026-09-28), 3 on another NVIDIA card, 2 on the CPU."""
+    if str(setting).strip().isdigit():
+        return max(1, int(setting))
+    g = gpu_status()
+    if not g:
+        return 2
+    return 8 if "5090" in g["name"] else 3
+
+
 def _ffmpeg_progress(args, duration, cb):
     """Run ffmpeg with -progress pipe:1 and report the percentage done every couple of seconds."""
     import time
