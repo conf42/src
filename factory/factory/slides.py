@@ -19,7 +19,6 @@ import subprocess
 from . import events
 
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
-SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe"
 logging.getLogger("pypdf").setLevel(logging.ERROR)     # "Ignoring wrong pointing object" noise
 STEPS = ((75, 1800), (65, 1600), (55, 1400), (45, 1200), (35, 1000))
 
@@ -34,9 +33,11 @@ def _done_name(name, title):
 
 
 def convert(src, out_dir):
-    if not os.path.exists(SOFFICE):
-        raise RuntimeError("LibreOffice not found at %s (winget install TheDocumentFoundation.LibreOffice)" % SOFFICE)
-    r = subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", out_dir, src],
+    from . import machine
+    so = machine.soffice()
+    if not so:
+        raise RuntimeError("LibreOffice not found (%s)" % machine.install_hint("libreoffice"))
+    r = subprocess.run([so, "--headless", "--convert-to", "pdf", "--outdir", out_dir, src],
                        capture_output=True, text=True, cwd=out_dir, timeout=600)
     pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".pdf")
     if not os.path.exists(pdf):

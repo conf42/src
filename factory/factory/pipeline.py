@@ -19,7 +19,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import requests
 import yaml
 
-from . import events, media
+from . import events, machine, media
 from . import slides as slides_mod
 from .descript import Descript
 
@@ -31,12 +31,18 @@ MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, 
 
 
 def settings():
+    """settings.yml (shared, in git) overlaid with settings.local.yml (this machine only, git-ignored)."""
     with open(os.path.join(HERE, "settings.yml"), encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f) or {}
+    local = os.path.join(HERE, "settings.local.yml")
+    if os.path.exists(local):
+        with open(local, encoding="utf-8") as f:
+            cfg.update(yaml.safe_load(f) or {})
+    return cfg
 
 
 def desktop():
-    return os.path.join(os.path.expanduser("~"), "Desktop")
+    return machine.desktop()
 
 
 def now():
@@ -47,7 +53,7 @@ class Run:
     def __init__(self, short_url):
         self.cfg = settings()
         self.ev = events.event(short_url)
-        self.dir = os.path.join(desktop(), self.cfg["work_folder"], short_url)
+        self.dir = os.path.join(machine.work_root(self.cfg), short_url)
         self.inp, self.out, self.srt_dir, self.slides_dir = (os.path.join(self.dir, d) for d in ("in", "out", "srt", "slides"))
         for d in (self.inp, self.out, self.srt_dir, self.slides_dir):
             os.makedirs(d, exist_ok=True)
@@ -67,7 +73,8 @@ class Run:
     def save(self):
         with self.lock:
             self.state["updated"] = now()
-            self.state["runner"] = {"pid": os.getpid(), "at": now()}      # heartbeat: the app shows whether a run is alive
+            self.state["runner"] = {"pid": os.getpid(), "at": now(),     # heartbeat: the app shows whether a run is alive
+                                    "machine": machine.machine_id(), "name": machine.machine_name(self.cfg)}
             tmp = self.state_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.state, f, indent=1, ensure_ascii=False)
@@ -428,7 +435,18 @@ class Run:
         except Exception as ex:
             self.note("status page not updated: %s" % ex)
 
-    def run(self, only=None):
+    def run(self, only=None, force=False):
+        # machine lock: one computer per event (two would cancel each other's Descript uploads)
+        from . import app
+        holder = app.lock_holder(self.ev["short_url"])
+        if holder and not force:
+            msg = ("%s is already being processed on %s (last seen %s). Stop it there first, or start this one with "
+                   "--force if that machine is off." % (self.ev["title"], holder.get("name") or "another machine", holder.get("at")))
+            self.note("NOT STARTED: " + msg)
+            raise SystemExit(msg)
+        self.state["run_started"] = now()
+        self.save()
+        self.publish(force=True)                     # claims the lock (and updates conf42.com/factory)
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
         def size(k):                                 # smallest video first: quick uploads finish early and
             try:                                     # never queue behind a 1 GB file (one Descript job per project)

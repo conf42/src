@@ -48,10 +48,10 @@ textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
 .jobs td{padding:6px 8px;font-size:12.5px}
 </style></head><body><div class="wrap">
 <div class="top"><div><h1>Conf42 factory</h1><div class="sub">Drive download &rarr; mp4 render &rarr; Descript &rarr; finished MP4 + SRT on the Desktop</div></div>
-<div class="bar"><select id="ev"></select><button class="go" onclick="post('start')">Start / resume</button>
+<div class="bar"><select id="ev"></select><button class="go" onclick="post('start',event.shiftKey)" title="Shift+click: take over an event another machine holds">Start / resume</button>
 <button onclick="post('open')">Open output folder</button><button onclick="post('publish')">Publish to conf42.com/factory</button>
 <button onclick="toggleSet()">Settings</button><span class="live"><span id="ldot" class="dot"></span><span id="lupd">connecting...</span></span></div></div>
-<div id="msg" class="mut"></div>
+<div id="doc"></div><div id="msg" class="mut"></div>
 <div class="card hero"><div id="overall"></div><div id="nowbox" class="now"></div></div>
 <div class="card" style="overflow-x:auto"><table><thead><tr><th>Talk</th><th>Pipeline</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="card"><details><summary>Descript job history</summary><div id="jobs"></div></details>
@@ -112,7 +112,7 @@ function render(){
   // ---- right now
   const busy=descriptBusy(), q=talks.filter(([k,t])=>t.queued).sort((a,b)=>a[1].queued-b[1].queued);
   const working=talks.filter(([k,t])=>!t.finished&&t.current&&!t.queued);
-  const run=alive?`<span class="dot on"></span> <b>Running</b> <span class=mut>since ${clock(N.runners[0].since)}</span>`:`<span class=dot></span> <b>Not running</b>`+(fin<total?' <span class=mut>- press Start / resume</span>':'');
+  const run=alive?`<span class="dot on"></span> <b>Running</b> <span class=mut>since ${clock(N.runners[0].since)} on ${esc(N.runners[0].machine||'this machine')}</span>`:`<span class=dot></span> <b>Not running</b>`+(fin<total?' <span class=mut>- press Start / resume</span>':'');
   $('nowbox').innerHTML=`<div class=row><span class=k>Factory</span><span>${run}</span></div>
    <div class=row><span class=k>Descript</span><span>${busy?`<span class="pill p-run">${esc(busy.job)}</span> ${esc(busy.talk||'')} <span class=mut>${busy.percent!=null?busy.percent+'% &middot; ':''}${esc(busy.note||'')}</span>`:'<span class=mut>idle - no job running this moment</span>'}${N&&N.descript&&N.descript.project_url?` &middot; <a href="${N.descript.project_url}" target=_blank>open project</a>`:''}</span></div>
    <div class=row><span class=k>Working on</span><span>${working.length?working.map(([k,t])=>{const x=t.steps[t.current]||{};return `<b>${esc(k)}</b> <span class=mut>(${x.status==='waiting'?'waiting in line for Descript':NAMES[t.current]})</span>`}).join(', '):'<span class=mut>-</span>'}</span></div>
@@ -151,9 +151,12 @@ function tick(){const a=(Date.now()-lastOk)/1000;$('ldot').className='dot'+(a<5?
 async function load(){const es=await j('/api/events');$('ev').innerHTML=es.map(e=>`<option value="${e.short_url}">${e.title} (${e.date})${e.started?' - started':''}</option>`).join('');
  $('ev').onchange=()=>{S=null;N=null;loadState();loadNow()};await loadState();loadNow();
  setInterval(loadState,1500);setInterval(loadNow,10000);setInterval(tick,1000)}
-async function post(a){const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({e:$('ev').value})});$('msg').textContent=r.msg||'';setTimeout(loadNow,1500)}
+async function post(a,force){const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({e:$('ev').value,force:!!force})});$('msg').textContent=r.msg||'';setTimeout(loadNow,1500)}
+async function loadDoctor(){try{const d=await j('/api/doctor');const bad=d.checks.filter(c=>!c.ok&&c.required),opt=d.checks.filter(c=>!c.ok&&!c.required);
+ $('doc').innerHTML=bad.length||opt.length?`<div class=card style="border-left:4px solid ${bad.length?'#c0392b':'#c98a00'};padding:10px 16px"><b>${bad.length?'This machine needs attention':'Heads up'}</b> <span class=mut>(${esc(d.machine)})</span>`+
+  [...bad,...opt].map(c=>`<div style="font-size:13px;margin-top:4px">${c.required?'<span class=warn>&#9679;</span>':'<span style="color:#c98a00">&#9679;</span>'} <b>${esc(c.name)}</b>: ${esc(c.detail)}${c.fix?` <span class=mut>- ${esc(c.fix)}</span>`:''}</div>`).join('')+'</div>':''}catch(e){}}
 async function retry(k){const r=await j('/api/retry',{method:'POST',body:JSON.stringify({e:$('ev').value,speakers:k})});$('msg').textContent=r.msg}
 async function toggleSet(){const b=$('setbox');b.open=!b.open;if(b.open){$('yml').value=(await j('/api/settings')).yaml;b.scrollIntoView({behavior:'smooth'})}}
 async function saveSet(){const r=await j('/api/settings',{method:'POST',body:JSON.stringify({yaml:$('yml').value})});$('msg').textContent=r.msg}
-load();
+load();loadDoctor();setInterval(loadDoctor,300000);
 </script></body></html>

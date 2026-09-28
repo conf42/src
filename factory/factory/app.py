@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
-from . import events, pipeline
+from . import events, machine, pipeline
 from .descript import Descript
 
 PORT = 8042
@@ -28,7 +28,7 @@ HERE = pipeline.HERE
 
 
 def work_root():
-    return os.path.join(pipeline.desktop(), pipeline.settings()["work_folder"])
+    return machine.work_root(pipeline.settings())
 
 
 def state_of(short_url):
@@ -70,6 +70,19 @@ def cached(key, seconds, fn):
 
 
 def runners(short_url):
+    """Is a factory run alive for this event? The run saves a heartbeat every 30 s (state.json runner)."""
+    st = state_of(short_url) or {}
+    r = st.get("runner") or {}
+    try:
+        age = (datetime.datetime.now() - datetime.datetime.fromisoformat(r.get("at"))).total_seconds()
+    except (TypeError, ValueError):
+        return []
+    if not r.get("pid") or age > 120:
+        return []
+    return [{"pid": r["pid"], "since": st.get("run_started") or r.get("at"), "machine": r.get("name") or "this machine"}]
+
+
+def _runners_windows_scan(short_url):
     """Background factory processes for this event (python -m factory run|retry <short_url>), found by command line."""
     if os.name != "nt":
         return []
@@ -146,18 +159,66 @@ def usage_month():
 
 def spawn(args, short_url):
     log = open(os.path.join(work_root(), short_url, "run.log"), "a", encoding="utf-8")
-    flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0          # DETACHED_PROCESS | NEW_PROCESS_GROUP
+    extra = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {"start_new_session": True}
     subprocess.Popen([PY, "-m", "factory"] + args, cwd=HERE, stdout=log, stderr=subprocess.STDOUT,
-                     creationflags=flags, env={**os.environ, "PYTHONUTF8": "1"})
+                     env={**os.environ, "PYTHONUTF8": "1"}, **extra)
+
+
+LOCK_MINUTES = 45      # a lock older than this (no status publish from its machine) is considered abandoned
+
+
+def _git():
+    exe = shutil.which("git") or r"C:\Program Files\Git\cmd\git.exe"   # detached runs may have no git on PATH
+    return lambda *a: subprocess.run([exe, "-C", events.REPO] + list(a), capture_output=True, text=True, timeout=120)
+
+
+def _published():
+    try:
+        with open(os.path.join(events.REPO, "_db", "factory.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"events": []}
+
+
+def lock_holder(short_url):
+    """Another machine running this event right now? Pulls the repo, reads its runner entry in _db/factory.json."""
+    try:
+        _git()("pull", "--rebase", "--autostash", "-q")
+    except Exception:
+        pass                                          # offline: best effort, the local state still guards this machine
+    for e in _published().get("events", []):
+        r = e.get("runner") or {}
+        if e.get("short_url") != short_url or not r.get("active") or r.get("machine") == machine.machine_id():
+            continue
+        try:
+            age = (datetime.datetime.now() - datetime.datetime.fromisoformat(r["at"])).total_seconds() / 60
+        except (KeyError, ValueError):
+            continue
+        if age < LOCK_MINUTES:
+            return r
+    return None
 
 
 def publish_status():
-    """Write src/_db/factory.json (no links, no tokens) for the unlisted conf42.com/factory page and push it."""
+    """Write src/_db/factory.json (no links, no tokens) for the unlisted conf42.com/factory page and push it.
+    Events this machine knows replace their entries; other machines' events (and their live locks) are kept."""
+    try:
+        _git()("pull", "--rebase", "--autostash", "-q")
+    except Exception:
+        pass
+    old = {e.get("short_url"): e for e in _published().get("events", [])}
     data = {"updated": datetime.datetime.now().isoformat(timespec="seconds"), "events": []}
+    mine = set()
     for e in event_list():
         st = state_of(e["short_url"])
         if not st:
             continue
+        r = st.get("runner") or {}
+        alive = bool(runners(e["short_url"]))
+        prev = (old.get(e["short_url"]) or {}).get("runner") or {}
+        if not alive and prev.get("active") and prev.get("machine") != machine.machine_id():
+            continue                                  # another machine is running it: its entry wins
+        mine.add(e["short_url"])
         talks = []
         for k, t in sorted(st["talks"].items()):
             qa = (t["steps"].get("qa") or {})
@@ -167,13 +228,14 @@ def publish_status():
                           "minutes": qa.get("minutes_after"), "cut_percent": qa.get("cut_percent"),
                           "lufs": qa.get("lufs"), "flags": qa.get("flags", [])})
         data["events"].append({"short_url": e["short_url"], "title": e["title"], "talks": talks,
-                               "missing_videos": pipeline.summary(st)["missing_videos"]})
-    repo = events.REPO
-    path = os.path.join(repo, "_db", "factory.json")
+                               "missing_videos": pipeline.summary(st)["missing_videos"],
+                               "runner": {"machine": machine.machine_id(), "name": r.get("name") or "",
+                                          "at": r.get("at"), "active": alive}})
+    data["events"] += [e for k, e in old.items() if k not in mine]
+    path = os.path.join(events.REPO, "_db", "factory.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=1, ensure_ascii=False)
-    git_exe = shutil.which("git") or r"C:\Program Files\Git\cmd\git.exe"   # detached runs have no git on PATH
-    git = lambda *a: subprocess.run([git_exe, "-C", repo] + list(a), capture_output=True, text=True)
+    git = _git()
     git("add", "_db/factory.json")
     if git("diff", "--cached", "--quiet").returncode == 0:
         return "nothing changed"
@@ -234,6 +296,9 @@ class Handler(BaseHTTPRequestHandler):
             ev = next((x for x in event_list() if x["short_url"] == st["event"]["short_url"]), {})
             return self.send(200, {"state": st, "summary": pipeline.summary(st), "expect": expectations(st),
                                    "title": ev.get("title", ""), "parallel": pipeline.settings().get("parallel_talks", 2)})
+        if u.path == "/api/doctor":
+            return self.send(200, cached("doctor", 300, lambda: {"machine": machine.machine_name(pipeline.settings()),
+                                                                  "checks": machine.doctor(pipeline.settings(), events.REPO)}))
         if u.path == "/api/now":
             e = (q.get("e") or [""])[0]
             st = state_of(e) or {}
@@ -265,8 +330,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/start":
                 os.makedirs(os.path.join(work_root(), e), exist_ok=True)
-                spawn(["run", e], e)
-                return self.send(200, {"msg": "started - progress below updates every 5 s"})
+                holder = lock_holder(e)
+                if holder and not body.get("force"):
+                    return self.send(200, {"msg": "Not started: this event is running on %s (last seen %s). Stop it "
+                                                  "there, or Shift+click Start to take over if that machine is off." % (
+                                                      holder.get("name") or "another machine", holder.get("at"))})
+                spawn(["run", e] + (["--force"] if body.get("force") else []), e)
+                return self.send(200, {"msg": "started"})
             if self.path == "/api/retry":
                 spawn(["retry", e, body["speakers"]], e)
                 return self.send(200, {"msg": "retrying " + body["speakers"]})

@@ -15,13 +15,10 @@ LIVE_UPLOADS = set()     # import jobs this process is uploading to right now; a
 
 
 def token():
-    t = os.environ.get("DESCRIPT_API_TOKEN", "")
-    if not t and os.name == "nt":   # a fresh `setx` is not visible to already-open shells: read the registry value
-        t = subprocess.run(["powershell", "-NoProfile", "-Command",
-                            "[Environment]::GetEnvironmentVariable('DESCRIPT_API_TOKEN','User')"],
-                           capture_output=True, text=True).stdout.strip()
+    from .machine import read_token
+    t = read_token()
     if not t:
-        raise RuntimeError("DESCRIPT_API_TOKEN is not set (Descript > Settings > API tokens)")
+        raise RuntimeError("no Descript API token on this machine - run: python -m factory setup")
     return t
 
 
