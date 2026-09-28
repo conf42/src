@@ -120,19 +120,21 @@ class Descript:
     def project(self, project_id):
         return self.json("GET", "/projects/" + project_id)
 
-    def import_file(self, path, key, project_id=None, project_name=None, on_progress=None):
-        """Upload one local video as its own composition; returns (project_id, composition_id, job)."""
+    def import_file(self, path, key, project_id=None, project_name=None, on_progress=None, media_name=None):
+        """Upload one local video as its own composition named `key`; returns (project_id, composition_id, job).
+        media_name defaults to key; a re-upload uses a fresh one so it never collides with a broken earlier file."""
         size = os.path.getsize(path)
         ctype = "video/quicktime" if path.lower().endswith(".mov") else "video/mp4"
-        body = {"add_media": {key: {"content_type": ctype, "file_size": size}},
-                "add_compositions": [{"name": key, "clips": [{"media": key}]}]}
+        media = media_name or key
+        body = {"add_media": {media: {"content_type": ctype, "file_size": size}},
+                "add_compositions": [{"name": key, "clips": [{"media": media}]}]}
         if project_id:
             body["project_id"] = project_id
         else:
             body["project_name"] = project_name
         self.on_wait = on_progress
         j = self.json("POST", "/jobs/import/project_media", json=body)
-        url = j["upload_urls"][key]["upload_url"]
+        url = j["upload_urls"][media]["upload_url"]
         LIVE_UPLOADS.add(j["job_id"])
         try:
             with open(path, "rb") as f:
