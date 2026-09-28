@@ -58,8 +58,9 @@ def soffice():
 
 
 def open_folder(path):
-    """Show a folder in Explorer / Finder / the Linux file manager."""
-    os.makedirs(path, exist_ok=True)
+    """Show a folder (or open a file) in Explorer / Finder / the Linux desktop."""
+    if not os.path.isfile(path):
+        os.makedirs(path, exist_ok=True)
     if os.name == "nt":
         os.startfile(path)
     else:

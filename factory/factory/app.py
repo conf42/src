@@ -327,6 +327,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/retry":
                 spawn(["retry", e, body["speakers"]], e)
                 return self.send(200, {"msg": "retrying " + body["speakers"]})
+            if self.path == "/api/openchapters":
+                path = os.path.join(work_root(), e, "chapters.txt")
+                if not os.path.exists(path):
+                    return self.send(200, {"msg": "no chapters yet"})
+                machine.open_folder(path)
+                return self.send(200, {"msg": ""})
             if self.path == "/api/open":
                 machine.open_folder(os.path.join(work_root(), e))
                 return self.send(200, {"msg": ""})
