@@ -8,6 +8,7 @@ import datetime
 import html
 import json
 import os
+import shutil
 import subprocess
 import sys
 import webbrowser
@@ -75,7 +76,8 @@ def publish_status():
     path = os.path.join(repo, "_db", "factory.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=1, ensure_ascii=False)
-    git = lambda *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True)
+    git_exe = shutil.which("git") or r"C:\Program Files\Git\cmd\git.exe"   # detached runs have no git on PATH
+    git = lambda *a: subprocess.run([git_exe, "-C", repo] + list(a), capture_output=True, text=True)
     git("add", "_db/factory.json")
     if git("diff", "--cached", "--quiet").returncode == 0:
         return "nothing changed"
