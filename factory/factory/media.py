@@ -32,6 +32,39 @@ def probe(path):
             "duration": float((d.get("format") or {}).get("duration") or 0)}
 
 
+def render(src, dst, max_short_side=1080, cq=21):
+    """Re-encode a source video to a lean H.264/AAC MP4 before the upload (camera .mov files are huge for no gain):
+    GPU (NVENC) when there is one, else libx264; short side capped at max_short_side, audio kept at 48 kHz 192k so
+    Studio Sound still gets a clean signal. Returns dst, or src when the render would not be smaller."""
+    info = probe(src)
+    w, h = info["width"], info["height"]
+    big = w and h and min(w, h) > max_short_side
+    size = ("-2:%d" % max_short_side) if h <= w else ("%d:-2" % max_short_side)
+    audio = ["-map", "0:v:0", "-map", "0:a:0?", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
+    nvenc = ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", str(cq), "-b:v", "0"]
+    head = ["-hide_banner", "-loglevel", "error", "-y"]
+    attempts = [   # 1. all on the GPU (NVDEC decode + NVENC encode), 2. CPU decode + NVENC, 3. CPU only
+        head + ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", src]
+        + (["-vf", "scale_cuda=%s" % size.replace(":", ":h=").replace("-2:h=", "w=-2:h=") if False else "scale_cuda=" + size] if big else [])
+        + nvenc + audio,
+        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p"] + nvenc + audio,
+        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(cq - 1)] + audio]
+    err = ""
+    for args in attempts:
+        r = run([tool("ffmpeg")] + args + [dst + ".part.mp4"])
+        if r.returncode == 0:
+            break
+        err = r.stderr[-300:]
+    else:
+        raise RuntimeError("render to mp4 failed: " + err)
+    if os.path.getsize(dst + ".part.mp4") >= os.path.getsize(src):
+        os.remove(dst + ".part.mp4")
+        return src
+    os.replace(dst + ".part.mp4", dst)
+    return dst
+
+
 def pick_resolution(width, height, cap):
     """Largest Descript export size not above the source (short side) and not above the cap."""
     short = min(width, height) if width and height else 1080

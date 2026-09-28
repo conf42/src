@@ -5,11 +5,13 @@ written anywhere by the factory. Every call returns parsed JSON; jobs are polled
 """
 import os
 import subprocess
+import datetime
 import time
 
 import requests
 
 BASE = "https://descriptapi.com/v1"
+LIVE_UPLOADS = set()     # import jobs this process is uploading to right now; any other waiting import is an orphan
 
 
 def token():
@@ -56,6 +58,14 @@ class Descript:
                     print("Descript 429 on %s %s: %s" % (method, path, r.text[:200]), flush=True)
                 if self.on_wait:
                     self.on_wait("Descript is busy (too many jobs at once), waiting in line - %d min so far" % (waited // 60))
+                pid = (kw.get("json") or {}).get("project_id")
+                if pid and waited and waited % 120 < pause:     # every ~2 min in line: is the line blocked by an orphan?
+                    try:
+                        gone = self.cancel_orphan_uploads(pid)
+                        if gone:
+                            print("cancelled %d orphan Descript upload(s) blocking the project" % len(gone), flush=True)
+                    except Exception as ex:
+                        print("orphan check failed: %s" % ex, flush=True)
                 time.sleep(pause)
                 waited += pause
                 continue
@@ -92,12 +102,16 @@ class Descript:
         return None
 
     def cancel_orphan_uploads(self, project_id):
-        """Descript runs ONE job per project at a time. An import whose upload died with a stopped run waits for its
-        file forever and blocks every later job (429 "A job is already running for this project") - cancel those.
-        Only call this when no other factory process is uploading to the project."""
-        gone = []
+        """Descript runs ONE job per project at a time. An import whose file never arrives (its run was stopped, or
+        Descript created the job but answered with an error so the file was never sent) waits forever and blocks
+        every later job (429 "A job is already running for this project") - cancel those. Imports this process is
+        uploading to (LIVE_UPLOADS) and ones younger than 2 minutes are left alone."""
+        gone, now = [], datetime.datetime.now(datetime.timezone.utc)
         for j in self.json("GET", "/jobs", params={"project_id": project_id, "limit": 50}).get("data", []):
-            if j.get("job_state") == "running" and (j.get("progress") or {}).get("waiting_for_uploads"):
+            created = j.get("created_at") or ""
+            age = (now - datetime.datetime.fromisoformat(created.replace("Z", "+00:00"))).total_seconds() if created else 1e9
+            if (j.get("job_state") == "running" and (j.get("progress") or {}).get("waiting_for_uploads")
+                    and j["job_id"] not in LIVE_UPLOADS and age > 120):
                 self.call("DELETE", "/jobs/" + j["job_id"])
                 gone.append(j["job_id"])
         return gone
@@ -118,11 +132,15 @@ class Descript:
         self.on_wait = on_progress
         j = self.json("POST", "/jobs/import/project_media", json=body)
         url = j["upload_urls"][key]["upload_url"]
-        with open(path, "rb") as f:
-            r = requests.put(url, data=_Progress(f, size, on_progress), headers={"Content-Type": "application/octet-stream"},
-                             timeout=6 * 3600)
-        if r.status_code >= 300:
-            raise RuntimeError("upload of %s failed: %s %s" % (key, r.status_code, r.text[:200]))
+        LIVE_UPLOADS.add(j["job_id"])
+        try:
+            with open(path, "rb") as f:
+                r = requests.put(url, data=_Progress(f, size, on_progress),
+                                 headers={"Content-Type": "application/octet-stream"}, timeout=6 * 3600)
+            if r.status_code >= 300:
+                raise RuntimeError("upload of %s failed: %s %s" % (key, r.status_code, r.text[:200]))
+        finally:
+            LIVE_UPLOADS.discard(j["job_id"])
         done = self.wait(j["job_id"], 10, on_progress)
         comps = done["result"].get("created_compositions") or []
         return done["project_id"], comps[0]["id"], done
