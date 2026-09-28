@@ -147,7 +147,11 @@ def doctor(cfg, repo, check_descript=True):
             enc = "Apple VideoToolbox"
     add("Video encoder", True, enc, required=False)
     so = soffice()
-    add("LibreOffice (PPTX decks only)", so, so or "not found", install_hint("libreoffice"), required=False)
+    pptx = so and (os.name != "nt" or os.path.exists(os.path.join(os.path.dirname(so), "ooxlo.dll")))
+    add("LibreOffice (PPTX decks only)", pptx,
+        so if pptx else ("installed without its PowerPoint import filter (ooxlo.dll) - PPTX decks fail" if so else "not found"),
+        ("reinstall the full package: winget uninstall TheDocumentFoundation.LibreOffice, then "
+         "winget install TheDocumentFoundation.LibreOffice") if so else install_hint("libreoffice"), required=False)
     root = work_root(cfg)
     try:
         os.makedirs(root, exist_ok=True)
