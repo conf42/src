@@ -133,10 +133,11 @@ class Descript:
         try:
             j = self.json("POST", "/jobs/import/project_media", json=body)
         except RuntimeError as ex:
-            if " 409 " not in str(ex) or "already exists" not in str(ex) or media_name:
+            if " 409 " not in str(ex) or "already exists" not in str(ex):
                 raise
+            old = media
             media = "%s (%s)" % (key, time.strftime("%H%M%S"))      # the earlier, failed upload keeps the old name
-            body["add_media"] = {media: body["add_media"].pop(key)}
+            body["add_media"] = {media: body["add_media"].pop(old)}
             body["add_compositions"][0]["clips"][0]["media"] = media
             j = self.json("POST", "/jobs/import/project_media", json=body)
         url = j["upload_urls"][media]["upload_url"]
