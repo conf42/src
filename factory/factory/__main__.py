@@ -38,13 +38,17 @@ def setup():
     here = pipeline.HERE
     local = os.path.join(here, "settings.local.yml")
     if not os.path.exists(local):
-        name = input("Name for this machine [%s]: " % socket.gethostname()).strip() or socket.gethostname()
+        try:
+            name = input("Name for this machine [%s]: " % socket.gethostname()).strip() if sys.stdin.isatty() else ""
+        except EOFError:
+            name = ""
+        name = name or socket.gethostname()
         with open(local, "w", encoding="utf-8") as f:
             f.write("# this machine only (git-ignored). Anything from settings.yml can be overridden here.\n"
                     "machine_name: %s\n# work_root: D:/talk-factory    # default: <Desktop>/talk-factory\n"
                     "render_parallel: auto\n" % name)
         print("wrote " + local)
-    if not machine.read_token():
+    if not machine.read_token() and sys.stdin.isatty():
         print("\nDescript API token (Descript > Settings > API tokens). It is stored on this machine only, never in git.")
         tok = getpass.getpass("token (hidden): ").strip()
         if tok:

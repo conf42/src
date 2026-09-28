@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import subprocess
 
 RESOLUTIONS = [(480, "480p"), (720, "720p"), (1080, "1080p"), (1440, "1440p"), (2160, "4K")]
@@ -41,19 +42,20 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None):
     audio = ["-map", "0:v:0", "-map", "0:a:0?", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart"]
     nvenc = ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", str(cq), "-b:v", "0"]
     head = ["-hide_banner", "-loglevel", "error", "-y"]
-    attempts = [   # 1. all on the GPU (NVDEC decode + NVENC encode), 2. CPU decode + NVENC, 3. CPU only
-        head + ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", src]
-        + (["-vf", "scale_cuda=" + size] if big else [])
-        + nvenc + audio,
-        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p"] + nvenc + audio,
-        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",      # Apple Silicon
-                "-c:v", "h264_videotoolbox", "-q:v", "62"] + audio,
-        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(cq - 1)] + audio]
+    scale = ["-vf", "scale=" + size] if big else []
+    attempts = []   # (label, args) in the order this machine can use them; the CPU always last
+    if gpu_status():                                  # NVIDIA: all on the GPU (NVDEC + NVENC), then CPU decode + NVENC
+        attempts += [("GPU", head + ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", src]
+                      + (["-vf", "scale_cuda=" + size] if big else []) + nvenc + audio),
+                     ("GPU encoder", head + ["-i", src] + scale + ["-pix_fmt", "yuv420p"] + nvenc + audio)]
+    if sys.platform == "darwin":                      # Apple: the media engine decodes and encodes
+        attempts += [("Mac media engine", head + ["-hwaccel", "videotoolbox", "-i", src] + scale +
+                      ["-pix_fmt", "yuv420p", "-c:v", "h264_videotoolbox", "-q:v", "62", "-allow_sw", "1"] + audio)]
+    attempts += [("CPU", head + ["-i", src] + scale + ["-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "veryfast",
+                                                      "-crf", str(cq - 1)] + audio)]
     part = "%s.%d.part.mp4" % (dst, os.getpid())     # per process: a leftover ffmpeg can never write into it
     err = ""
-    for n, args in enumerate(attempts):
-        how = ("GPU", "GPU encode", "Mac media engine", "CPU")[n]
+    for how, args in attempts:
         rc, err = _ffmpeg_progress([tool("ffmpeg")] + args + ["-progress", "pipe:1", "-nostats", part],
                                    info["duration"], lambda pct: on_progress and on_progress(
                                        "rendering to mp4 on the %s - %d%%" % (how, pct), pct))
