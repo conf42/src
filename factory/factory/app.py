@@ -82,19 +82,6 @@ def runners(short_url):
     return [{"pid": r["pid"], "since": st.get("run_started") or r.get("at"), "machine": r.get("name") or "this machine"}]
 
 
-def _runners_windows_scan(short_url):
-    """Background factory processes for this event (python -m factory run|retry <short_url>), found by command line."""
-    if os.name != "nt":
-        return []
-    ps = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-          "Where-Object { $_.CommandLine -match '-m factory (run|retry) %s' } | "
-          "ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.ParentProcessId, $_.CreationDate.ToString('s') }" % short_url)
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout
-    rows = [l.split("|") for l in out.split() if l.count("|") == 2]
-    pids = {r[0] for r in rows}
-    return [{"pid": int(r[0]), "since": r[2]} for r in rows if r[1] not in pids]   # the venv launcher's child is the same run
-
-
 def descript_now(short_url):
     """What Descript is doing for this event's project right now: the job list, mapped to talk names."""
     st = state_of(short_url) or {}
@@ -341,7 +328,7 @@ class Handler(BaseHTTPRequestHandler):
                 spawn(["retry", e, body["speakers"]], e)
                 return self.send(200, {"msg": "retrying " + body["speakers"]})
             if self.path == "/api/open":
-                os.startfile(os.path.join(work_root(), e))
+                machine.open_folder(os.path.join(work_root(), e))
                 return self.send(200, {"msg": ""})
             if self.path == "/api/publish":
                 return self.send(200, {"msg": publish_status()})

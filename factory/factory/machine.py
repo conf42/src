@@ -57,6 +57,15 @@ def soffice():
     return None
 
 
+def open_folder(path):
+    """Show a folder in Explorer / Finder / the Linux file manager."""
+    os.makedirs(path, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(path)
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
+
+
 def find_tool(name):
     """ffmpeg / ffprobe: PATH, then winget's and Homebrew's usual folders."""
     found = shutil.which(name)

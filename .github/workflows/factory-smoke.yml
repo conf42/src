@@ -1,0 +1,57 @@
+# Conf42 factory smoke test: the one-time setup + an offline run of everything the factory does on a machine
+# (render on the machine's encoder, damaged-file check, loudness, slides, matching, dashboard) on macOS, Windows and
+# Linux. No Descript calls and no secrets. Runs when factory/ changes, or by hand from the Actions tab.
+name: factory smoke test
+on:
+  push:
+    paths: ["factory/**", ".github/workflows/factory-smoke.yml"]
+  workflow_dispatch:
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, name: "macOS (Apple Silicon)"}
+          - {os: macos-latest, name: "macOS, Python 3.9", python: "3.9"}
+          - {os: windows-latest, name: "Windows"}
+          - {os: ubuntu-latest, name: "Linux"}
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      FACTORY_NO_LAUNCH: "1"
+      FACTORY_SKIP_OPTIONAL: "1"
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            factory
+            _db
+      - uses: actions/setup-python@v5
+        if: matrix.python
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Setup (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update -qq; fi
+          if [ -n "${{ matrix.python }}" ]; then export FACTORY_PYTHON=python${{ matrix.python }}; fi
+          bash factory/setup.sh || echo "setup reported items to fix (expected without a Descript token)"
+      - name: Setup (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          choco install ffmpeg -y --no-progress
+          call factory\setup.cmd
+          exit /b 0
+      - name: Smoke test (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: env/bin/python factory/tests/smoke.py
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          env\Scripts\python.exe factory\tests\smoke.py

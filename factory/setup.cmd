@@ -30,10 +30,12 @@ env\Scripts\python.exe -c "import sys;sys.path.insert(0,'factory');from factory 
   echo Installing ffmpeg ...
   winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements
 )
+if defined FACTORY_SKIP_OPTIONAL goto :optdone
 env\Scripts\python.exe -c "import sys;sys.path.insert(0,'factory');from factory import machine;sys.exit(0 if machine.soffice() else 1)" || (
   echo Installing LibreOffice - converts PPTX decks to PDF ...
   winget install -e --id TheDocumentFoundation.LibreOffice --accept-source-agreements --accept-package-agreements
 )
+:optdone
 
 cd factory
 ..\env\Scripts\python.exe -m factory setup
@@ -43,6 +45,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+if defined FACTORY_NO_LAUNCH exit /b 0
 echo.
 echo All set. Opening the dashboard ...
 start "" "%~dp0run.cmd"
