@@ -11,6 +11,8 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -18,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from . import events, pipeline
+from .descript import Descript
 
 PORT = 8042
 PY = sys.executable
@@ -46,6 +49,75 @@ def event_list():
             out.append({"short_url": e["short_url"], "title": "Conf42 %s %s" % (e["name"], date[:4]), "date": date,
                         "started": started})
     return sorted(out, key=lambda x: (not x["started"], x["date"] < today, x["date"]))
+
+
+_cache, _cache_lock = {}, threading.Lock()
+
+
+def cached(key, seconds, fn):
+    """Descript is asked at most every `seconds` however many browser tabs poll (it rate-limits with 429)."""
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit and time.time() - hit[0] < seconds:
+            return hit[1]
+    try:
+        val = fn()
+    except Exception as ex:
+        val = {"error": str(ex)[:300]}
+    with _cache_lock:
+        _cache[key] = (time.time(), val)
+    return val
+
+
+def runners(short_url):
+    """Background factory processes for this event (python -m factory run|retry <short_url>), found by command line."""
+    if os.name != "nt":
+        return []
+    ps = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
+          "Where-Object { $_.CommandLine -match '-m factory (run|retry) %s' } | "
+          "ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.ParentProcessId, $_.CreationDate.ToString('s') }" % short_url)
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout
+    rows = [l.split("|") for l in out.split() if l.count("|") == 2]
+    pids = {r[0] for r in rows}
+    return [{"pid": int(r[0]), "since": r[2]} for r in rows if r[1] not in pids]   # the venv launcher's child is the same run
+
+
+def descript_now(short_url):
+    """What Descript is doing for this event's project right now: the job list, mapped to talk names."""
+    st = state_of(short_url) or {}
+    pid = st.get("project_id")
+    if not pid:
+        return {"jobs": [], "note": "no Descript project yet"}
+    talks = st.get("talks", {})
+    names = {t.get("composition_id"): k for k, t in talks.items() if t.get("composition_id")}
+    by_job = {(t["steps"].get(s) or {}).get("job_id"): k for k, t in talks.items() for s in ("edit", "publish")}
+    active = lambda step: [k for k, t in talks.items() if t.get("current") == step and not t.get("error")
+                           and (t["steps"].get(step) or {}).get("status") == "running"
+                           and not str((t["steps"].get(step) or {}).get("label", "")).startswith("Descript is busy")]
+    uploading = active("upload")
+    d = Descript()
+    jobs = []
+    for j in d.json("GET", "/jobs", params={"project_id": pid, "limit": 30}).get("data", []):
+        pr, res = j.get("progress") or {}, j.get("result") or {}
+        cid = pr.get("composition_id") or res.get("composition_id") or j.get("composition_id")
+        kind = {"import/project_media": "upload", "agent": "edit", "publish": "publish"}.get(j.get("job_type"), j.get("job_type"))
+        created = j.get("created_at", "")
+        age_min = ((datetime.datetime.now(datetime.timezone.utc) -
+                    datetime.datetime.fromisoformat(created.replace("Z", "+00:00"))).total_seconds() / 60) if created else 0
+        state = j.get("job_state")
+        note = pr.get("label", "") if state == "running" else res.get("status", "")
+        if state == "running" and pr.get("waiting_for_uploads") and age_min > 60:
+            state, note = "stale", "upload never arrived (left over from a stopped run); it blocks the project until the next run cancels it"
+        talk = names.get(cid) or by_job.get(j.get("job_id")) or ""
+        if not talk and kind == "upload":                                # finished imports name their composition
+            talk = ", ".join(c.get("name", "") for c in res.get("created_compositions") or [])
+        if not talk and state == "running" and kind in ("upload", "edit"):  # one job per project: it's the active talk
+            talk = " / ".join(uploading if kind == "upload" else active("edit"))
+        jobs.append({"talk": talk, "job": kind, "state": state, "note": note,
+                     "percent": pr.get("percent"), "minutes": round(age_min)})
+    comps = d.project(pid).get("compositions", [])
+    return {"jobs": jobs, "project_url": "https://web.descript.com/" + pid, "compositions": len(comps),
+            "uploading_now": uploading}
 
 
 def spawn(args, short_url):
@@ -100,6 +172,12 @@ th{background:#f0edfb;font-weight:600} .s{display:inline-block;min-width:74px;pa
 .box{background:#fff;border-radius:10px;padding:12px 16px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.06)} .warn{color:#a4231c}
 pre{white-space:pre-wrap;font-size:12px;max-height:220px;overflow:auto;background:#fafafa;padding:8px;border-radius:6px}
 textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
+.mut{color:#888} .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.on{background:#22a355;box-shadow:0 0 0 4px rgba(34,163,85,.18);animation:pulse 1.6s infinite} .off{background:#bbb}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(34,163,85,.05)}}
+.pbar{height:8px;background:#eee;border-radius:9px;overflow:hidden;min-width:120px;margin-bottom:2px} .pbar i{display:block;height:100%;background:#6b40d8}
+.lbl{display:block;font-size:11px;color:#8a6100;margin-top:3px;max-width:150px} .stale{background:#eee;color:#888}
+#now table{box-shadow:none;margin-top:8px} #now td,#now th{font-size:13px;padding:6px 8px}
 </style></head><body>
 <h1>Conf42 factory</h1><div class="sub">Conf42 talk videos: Drive download &rarr; Descript &rarr; finished MP4 + SRT on the Desktop</div>
 <div class="bar"><select id="ev"></select>
@@ -107,6 +185,7 @@ textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
 <button onclick="post('open')">Open output folder</button>
 <button onclick="post('publish')">Publish status to conf42.com/factory</button>
 <button onclick="toggle('set')">Settings</button><span id="msg"></span></div>
+<div id="now" class="box"><b>Right now</b> <small class="mut">checking...</small></div>
 <div id="sum" class="box"></div>
 <table><thead><tr><th>Talk</th><th>Upload</th><th>Edit</th><th>Publish</th><th>Download</th><th>SRT</th><th>Loudness</th><th>QA</th><th></th></tr></thead><tbody id="rows"></tbody></table>
 <div id="set" class="box" style="display:none"><b>settings.yml</b><textarea id="yml"></textarea><br><button class="go" onclick="saveSet()">Save settings</button></div>
@@ -114,7 +193,7 @@ textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
 <script>
 const $=id=>document.getElementById(id), steps=__STEPS__;
 async function j(u,o){const r=await fetch(u,o);return r.json()}
-async function load(){const es=await j('/api/events');$('ev').innerHTML=es.map(e=>`<option value="${e.short_url}">${e.title} (${e.date})${e.started?' - started':''}</option>`).join('');$('ev').onchange=refresh;refresh()}
+async function load(){const es=await j('/api/events');$('ev').innerHTML=es.map(e=>`<option value="${e.short_url}">${e.title} (${e.date})${e.started?' - started':''}</option>`).join('');$('ev').onchange=()=>{refresh();now()};refresh()}
 async function refresh(){const d=await j('/api/state?e='+$('ev').value);
  if(!d.state){$('sum').innerHTML='Not started. Put the Drive zips on the Desktop (or ask Claude), then press Start.';$('rows').innerHTML='';$('log').textContent='';return}
  const s=d.summary;$('sum').innerHTML=`<b>${s.finished.length}</b> of <b>${s.matched}</b> videos finished &middot; ${s.in_csv} talks in the CSV`+
@@ -122,14 +201,31 @@ async function refresh(){const d=await j('/api/state?e='+$('ev').value);
  (s.missing_videos.length?`<div>No video yet: ${s.missing_videos.join(', ')}</div>`:'')+
  (Object.keys(s.flagged).length?`<div class=warn>QA flags: ${Object.entries(s.flagged).map(([k,v])=>k+': '+v.join(', ')).join('; ')}</div>`:'');
  $('rows').innerHTML=Object.entries(d.state.talks).sort().map(([k,t])=>'<tr><td><b>'+k+'</b><br><small>'+(t.title||'')+'</small>'+(t.error?'<div class=warn><small>'+t.error+'</small></div>':'')+'</td>'+
-  steps.map(st=>{const x=t.steps[st]||{};const c=x.status||'todo';return '<td><span class="s '+c+'" title="'+(x.label||x.error||'')+'">'+(c=='todo'?'-':c)+'</span></td>'}).join('')+
+  steps.map(st=>{const x=t.steps[st]||{};const c=x.status||'todo';return '<td><span class="s '+c+'" title="'+(x.label||x.error||'')+'">'+(c=='todo'?'-':c)+'</span>'+(c=='running'&&x.label?'<span class=lbl>'+x.label+'</span>':'')+'</td>'}).join('')+
   '<td>'+(t.error?`<button onclick="retry('${k.replace(/'/g,"\\\\'")}')">Retry</button>`:'')+'</td></tr>').join('');
  $('log').textContent=(d.state.log||[]).slice(-40).reverse().join('\\n')}
 async function post(a){const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({e:$('ev').value})});$('msg').textContent=r.msg||'';setTimeout(refresh,1500)}
 async function retry(k){const r=await j('/api/retry',{method:'POST',body:JSON.stringify({e:$('ev').value,speakers:k})});$('msg').textContent=r.msg}
 async function toggle(id){const b=$(id);b.style.display=b.style.display=='none'?'block':'none';if(id=='set')$('yml').value=(await j('/api/settings')).yaml}
 async function saveSet(){const r=await j('/api/settings',{method:'POST',body:JSON.stringify({yaml:$('yml').value})});$('msg').textContent=r.msg}
-load();setInterval(refresh,5000);
+function ago(iso){if(!iso)return '';const s=(Date.now()-new Date(iso))/1000;return s<90?Math.round(s)+' s ago':Math.round(s/60)+' min ago'}
+function when(m){return m<90?m+' min ago':Math.round(m/60)+' h ago'}
+function jrow(x,up){const cls=x.state=='running'?'running':x.state=='stale'?'stale':x.note=='success'?'done':'failed';
+ const word=x.state=='stopped'?(x.note=='success'?'done':(x.note||'stopped')):x.state;
+ const who=x.talk||'<span class=mut>-</span>';
+ const prog=(x.state=='running'&&x.percent!=null?'<div class=pbar><i style="width:'+x.percent+'%"></i></div>'+x.percent+'% ':'')+(x.state=='running'||x.state=='stale'?x.note:'');
+ return `<tr><td>${who}</td><td>${x.job}</td><td><span class="s ${cls}">${word}</span></td><td><small>${prog}</small></td><td><small>${when(x.minutes)}</small></td></tr>`}
+async function now(){const e=$('ev').value;if(!e)return;const n=await j('/api/now?e='+e),d=n.descript||{},up=d.uploading_now||[];
+ const run=n.runners&&n.runners.length?`<span class="dot on"></span><b>Factory is running</b> <span class=mut>(process ${n.runners.map(r=>r.pid).join(', ')}, started ${n.runners[0].since.replace('T',' ')}, last activity ${ago(n.heartbeat)})</span>`
+  :`<span class="dot off"></span><b>Factory is not running</b> <span class=mut>(last activity ${ago(n.heartbeat)||'never'})</span>`;
+ const jobs=d.jobs||[],running=jobs.filter(x=>x.state=='running'),rest=jobs.filter(x=>x.state!='running').slice(0,8);
+ $('now').innerHTML=`<b>Right now</b><div style="margin:6px 0">${run}</div>`+(d.error?`<div class=warn>Descript did not answer: ${d.error}</div>`:
+  `<div><b>Descript</b> <span class=mut>&middot; ${d.compositions||0} talks in the project &middot; ${n.edits} edits paid, about ${n.credits} AI credits</span>${d.project_url?` &middot; <a href="${d.project_url}" target=_blank>open the project in Descript</a>`:''}</div>`+
+  (running.length?'':'<div class=mut style="margin-top:6px">No Descript job running at this moment (the factory may be uploading, downloading or measuring loudness).</div>')+
+  '<div class=mut style="margin-top:4px"><small>Descript runs one job per project at a time, so talks take turns: a talk showing "Descript is busy" is waiting in line, not stuck.</small></div>'+
+  `<table><thead><tr><th>Talk</th><th>Job</th><th>State</th><th>Progress</th><th>Started</th></tr></thead><tbody>${running.map(x=>jrow(x,up)).join('')}`+
+  (rest.length?'<tr><td colspan=5 class=mut>recently finished</td></tr>'+rest.map(x=>jrow(x,[])).join(''):'')+'</tbody></table>')}
+load().then(()=>{now();setInterval(now,20000)});setInterval(refresh,5000);
 </script></body></html>"""
 
 
@@ -155,6 +251,21 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/state":
             st = state_of((q.get("e") or [""])[0])
             return self.send(200, {"state": st, "summary": pipeline.summary(st) if st else None})
+        if u.path == "/api/now":
+            e = (q.get("e") or [""])[0]
+            st = state_of(e) or {}
+            ledger = {}
+            try:
+                with open(os.path.join(work_root(), "ledger.json"), encoding="utf-8") as f:
+                    ledger = json.load(f)
+            except (OSError, ValueError):
+                pass
+            mine = [v for v in ledger.values() if v.get("event") == e]
+            return self.send(200, {"runners": cached("run:" + e, 10, lambda: runners(e)),
+                                   "heartbeat": (st.get("runner") or {}).get("at") or st.get("updated"),
+                                   "descript": cached("d:" + e, 20, lambda: descript_now(e)),
+                                   "edits": len(mine),
+                                   "credits": round(sum(float(v.get("credits") or 0) for v in mine), 1)})
         if u.path == "/api/settings":
             with open(os.path.join(HERE, "settings.yml"), encoding="utf-8") as f:
                 return self.send(200, {"yaml": f.read()})
@@ -188,8 +299,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve():
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = "http://localhost:%d" % PORT
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    except OSError:                                  # already running (another run.cmd): just show it
+        webbrowser.open(url)
+        return
     print("factory app on " + url)
     webbrowser.open(url)
     srv.serve_forever()

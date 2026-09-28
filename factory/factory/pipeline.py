@@ -64,6 +64,7 @@ class Run:
     def save(self):
         with self.lock:
             self.state["updated"] = now()
+            self.state["runner"] = {"pid": os.getpid(), "at": now()}      # heartbeat: the app shows whether a run is alive
             tmp = self.state_path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(self.state, f, indent=1, ensure_ascii=False)
@@ -218,14 +219,22 @@ class Run:
                 if paid:
                     self.set(key, "edit", "done", note="already edited in Descript, skipped (%s)" % (paid.get("note") or paid.get("at")))
             if not done("edit"):
+                if self.state.get("edits_paused"):          # an earlier edit cost too much: no more paid edits this run
+                    raise RuntimeError("edits paused: " + self.state["edits_paused"])
                 self.set(key, "edit", "running")
-                j = d.edit(pid, cid, cfg["edit_prompt"].format(**cfg), on_progress=progress("edit"))
-                self.record_edit(cid, key, j["result"].get("ai_credits_used"))
-                self.set(key, "edit", "done", report=j["result"].get("agent_response", ""), credits=j["result"].get("ai_credits_used"))
+                j = d.edit(pid, cid, cfg["edit_prompt"].format(composition=key, **cfg), on_progress=progress("edit"))
+                credits = float(j["result"].get("ai_credits_used") or 0)
+                self.record_edit(cid, key, credits)
+                self.set(key, "edit", "done", report=j["result"].get("agent_response", ""), credits=credits, job_id=j.get("job_id"))
+                cap = float(cfg.get("max_edit_credits") or 0)
+                if cap and credits > cap:                   # e.g. the AI editor worked on the whole project
+                    with self.lock:
+                        self.state["edits_paused"] = "%s's edit cost %.1f AI credits (limit %g) - check it in Descript, then clear edits_paused in state.json" % (key, credits, cap)
+                    self.note("EDITS PAUSED: " + self.state["edits_paused"])
             if not done("publish"):
                 self.set(key, "publish", "running")
                 j = d.publish(pid, cid, t["resolution"], cfg["publish_access"], on_progress=progress("publish"))
-                self.set(key, "publish", "done", share_url=j["result"].get("share_url"),
+                self.set(key, "publish", "done", job_id=j.get("job_id"), share_url=j["result"].get("share_url"),
                          download_url=j["result"].get("download_url"), expires=j["result"].get("download_url_expires_at"))
             if not done("download"):
                 self.set(key, "download", "running")
@@ -292,9 +301,28 @@ class Run:
     def run(self, only=None):
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
         self.note("processing %d talk(s), %d at a time" % (len(keys), self.cfg["parallel_talks"]))
+        if self.state.get("project_id"):             # uploads left hanging by a stopped run block the whole project
+            try:
+                gone = Descript().cancel_orphan_uploads(self.state["project_id"])
+                if gone:
+                    self.note("cancelled %d Descript upload(s) left over from a stopped run" % len(gone))
+            except Exception as ex:
+                self.note("could not check for leftover Descript uploads: %s" % ex)
+        stop = threading.Event()
+        def beat():                                  # keep the heartbeat fresh while Descript jobs are quiet
+            while not stop.wait(30):
+                self.save()
+        threading.Thread(target=beat, daemon=True).start()
         with ThreadPoolExecutor(max_workers=max(1, int(self.cfg["parallel_talks"]))) as pool:
             list(pool.map(self.process, keys))
+        stop.set()
         self.note("run finished")
+        with self.lock:
+            self.state["runner"] = {"pid": None, "at": now(), "finished": True}
+            tmp = self.state_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.state, f, indent=1, ensure_ascii=False)
+            os.replace(tmp, self.state_path)
         self.publish(force=True)
 
 

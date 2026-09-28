@@ -23,10 +23,28 @@ def token():
     return t
 
 
+class _Progress:
+    """File wrapper for the upload PUT: reports 'uploading 45% of 1.2 GB' every few seconds."""
+    def __init__(self, f, size, on_progress):
+        self.f, self.size, self.cb, self.sent, self.last = f, size, on_progress, 0, 0
+
+    def __len__(self):
+        return self.size
+
+    def read(self, n=-1):
+        chunk = self.f.read(n if n and n > 0 else 1024 * 1024)
+        self.sent += len(chunk)
+        if self.cb and (time.time() - self.last > 5 or self.sent >= self.size):
+            self.last = time.time()
+            self.cb("uploading %d%% of %.1f GB" % (100 * self.sent // max(self.size, 1), self.size / 1e9))
+        return chunk
+
+
 class Descript:
     def __init__(self):
         self.s = requests.Session()
         self.s.headers["Authorization"] = "Bearer " + token()
+        self.on_wait = None                          # set per request: shows "Descript busy" waits in the app
 
     def call(self, method, path, **kw):
         waited = 0
@@ -34,6 +52,10 @@ class Descript:
             r = self.s.request(method, BASE + path, timeout=120, **kw)
             if r.status_code == 429 and waited < 3600:                   # too many jobs at once: queue politely
                 pause = max(int(float(r.headers.get("Retry-After", 0) or 0)), 30)
+                if waited == 0:
+                    print("Descript 429 on %s %s: %s" % (method, path, r.text[:200]), flush=True)
+                if self.on_wait:
+                    self.on_wait("Descript is busy (too many jobs at once), waiting in line - %d min so far" % (waited // 60))
                 time.sleep(pause)
                 waited += pause
                 continue
@@ -69,6 +91,17 @@ class Descript:
                 return p["id"]
         return None
 
+    def cancel_orphan_uploads(self, project_id):
+        """Descript runs ONE job per project at a time. An import whose upload died with a stopped run waits for its
+        file forever and blocks every later job (429 "A job is already running for this project") - cancel those.
+        Only call this when no other factory process is uploading to the project."""
+        gone = []
+        for j in self.json("GET", "/jobs", params={"project_id": project_id, "limit": 50}).get("data", []):
+            if j.get("job_state") == "running" and (j.get("progress") or {}).get("waiting_for_uploads"):
+                self.call("DELETE", "/jobs/" + j["job_id"])
+                gone.append(j["job_id"])
+        return gone
+
     def project(self, project_id):
         return self.json("GET", "/projects/" + project_id)
 
@@ -82,10 +115,12 @@ class Descript:
             body["project_id"] = project_id
         else:
             body["project_name"] = project_name
+        self.on_wait = on_progress
         j = self.json("POST", "/jobs/import/project_media", json=body)
         url = j["upload_urls"][key]["upload_url"]
         with open(path, "rb") as f:
-            r = requests.put(url, data=f, headers={"Content-Type": "application/octet-stream"}, timeout=6 * 3600)
+            r = requests.put(url, data=_Progress(f, size, on_progress), headers={"Content-Type": "application/octet-stream"},
+                             timeout=6 * 3600)
         if r.status_code >= 300:
             raise RuntimeError("upload of %s failed: %s %s" % (key, r.status_code, r.text[:200]))
         done = self.wait(j["job_id"], 10, on_progress)
@@ -93,10 +128,12 @@ class Descript:
         return done["project_id"], comps[0]["id"], done
 
     def edit(self, project_id, composition_id, prompt, on_progress=None):
+        self.on_wait = on_progress
         j = self.json("POST", "/jobs/agent", json={"project_id": project_id, "composition_id": composition_id, "prompt": prompt})
         return self.wait(j["job_id"], 20, on_progress)
 
     def publish(self, project_id, composition_id, resolution, access, on_progress=None):
+        self.on_wait = on_progress
         j = self.json("POST", "/jobs/publish", json={"project_id": project_id, "composition_id": composition_id,
                                                       "media_type": "Video", "resolution": resolution, "access_level": access})
         return self.wait(j["job_id"], 20, on_progress)
