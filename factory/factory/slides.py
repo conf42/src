@@ -33,16 +33,24 @@ def _done_name(name, title):
 
 
 def convert(src, out_dir):
+    """PPTX/KEY/ODP -> PDF with the first converter this machine has that works: LibreOffice (own throw-away
+    profile, so an open LibreOffice window or a locked profile cannot break it), Microsoft PowerPoint (Windows),
+    Keynote (macOS). Returns (pdf path, converter name)."""
     from . import machine
-    so = machine.soffice()
-    if not so:
-        raise RuntimeError("LibreOffice not found (%s)" % machine.install_hint("libreoffice"))
-    r = subprocess.run([so, "--headless", "--convert-to", "pdf", "--outdir", out_dir, src],
-                       capture_output=True, text=True, cwd=out_dir, timeout=600)
     pdf = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".pdf")
-    if not os.path.exists(pdf):
-        raise RuntimeError("LibreOffice could not convert %s: %s" % (os.path.basename(src), (r.stderr or r.stdout)[-300:]))
-    return pdf
+    errors = []
+    for name, fn in machine.pptx_converters():
+        try:
+            if os.path.exists(pdf):
+                os.remove(pdf)
+            fn(os.path.abspath(src), os.path.abspath(pdf))
+            if os.path.exists(pdf) and os.path.getsize(pdf) > 0:
+                return pdf, name
+            errors.append("%s: no PDF came out" % name)
+        except Exception as ex:
+            errors.append("%s: %s" % (name, str(ex)[-160:]))
+    raise RuntimeError("could not convert %s to PDF (%s)" % (os.path.basename(src), "; ".join(errors) or
+                       "no converter on this machine - install LibreOffice"))
 
 
 def _shrink(path, quality, max_px):
@@ -133,7 +141,7 @@ def prepare(slides_dir, ev, talk_list, max_mb=5):
             continue
         try:
             if not keep.lower().endswith(".pdf"):
-                pdf = convert(keep, slides_dir)
+                pdf, how = convert(keep, slides_dir)
                 os.makedirs(originals, exist_ok=True)
                 shutil.move(keep, os.path.join(originals, os.path.basename(keep)))
                 report["converted"].append(os.path.basename(keep))

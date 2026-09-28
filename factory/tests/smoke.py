@@ -102,6 +102,13 @@ def main():
     except Exception as ex:
         check("slides compressed, pages kept", False, ex)
 
+    # 6b. PPTX -> PDF with whatever converter this machine has (LibreOffice / PowerPoint / Keynote)
+    if machine.pptx_converters():
+        ok, detail = machine.pptx_test()
+        check("pptx deck -> pdf", ok, detail)
+    else:
+        print("SKIP pptx deck -> pdf (no converter installed here)")
+
     # 7. speaker matching against a real event CSV
     try:
         ev = next(e for e in events.all_events() if (e.get("db_path") or "").strip()
