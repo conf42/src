@@ -51,7 +51,7 @@ textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
 </style></head><body><div class="wrap">
 <div class="top"><div><h1>Conf42 factory</h1><div class="sub">Drive download &rarr; mp4 render &rarr; Descript &rarr; finished MP4 + SRT on the Desktop</div></div>
 <div class="bar"><select id="ev"></select><button class="go" onclick="post('start',event.shiftKey)" title="Shift+click: take over an event another machine holds">Start / resume</button>
-<button onclick="post('open')">Open output folder</button><button onclick="post('publish')">Publish to conf42.com/factory</button>
+<button onclick="post('open')">Open output folder</button><button id="chbtn" style="display:none" onclick="post('openchapters')">Chapters file</button><button onclick="post('publish')">Publish to conf42.com/factory</button>
 <button onclick="toggleSet()">Settings</button><span class="live"><span id="ldot" class="dot"></span><span id="lupd">connecting...</span></span></div></div>
 <div id="doc"></div><div id="msg" class="mut"></div>
 <div class="card hero"><div id="overall"></div><div id="nowbox" class="now"></div></div>
@@ -79,8 +79,11 @@ function stepPct(t,k,st){  // live percent for a running step: real percent when
     pct=Math.min(99,real+secs(x.at)*rate); left=Math.max(3,(100-pct)/rate)}
   return {pct:Math.max(2,pct),left,el,exp}
 }
+function chLeft(k,t){  // a finished talk still waiting for its YouTube chapters
+  const x=t.steps.chapters||{};if(x.status==='done')return 0;const e=(S.expect[k]||{}).chapters||60;
+  return x.status==='running'?Math.max(5,e-secs(x.started||x.at)):e}
 function talkLeft(k,t){  // seconds of work still ahead of this talk
-  if(t.finished)return 0;let s=0;
+  if(t.finished)return chLeft(k,t);let s=0;
   for(const st of STEPS){const x=t.steps[st]||{};if(x.status==='done')continue;
     const e=(S.expect[k]||{})[st]||60; s+= x.status==='running'?Math.max(10,e-secs(x.started||x.at)):e}
   return s}
@@ -101,28 +104,37 @@ function render(){
   let doneSteps=0; talks.forEach(([k,t])=>STEPS.forEach(st=>{const x=t.steps[st]||{};if(x.status==='done')doneSteps+=1;else if(x.status==='running')doneSteps+=stepPct(t,k,st).pct/100}));
   const pct=total?doneSteps/(total*STEPS.length)*100:0;
   const par=Math.max(1,(S.parallel||2)), leftAll=talks.reduce((a,[k,t])=>a+talkLeft(k,t),0)/par;
-  const eta=new Date(Date.now()+leftAll*1000);
+  const eta=new Date(Date.now()+leftAll*1000), busyAll=leftAll>1;
+  const chT=talks.filter(([k,t])=>t.finished), chDone=chT.filter(([k,t])=>(t.steps.chapters||{}).status==='done').length;
+  const chRun=chT.find(([k,t])=>['running','waiting'].includes((t.steps.chapters||{}).status));
+  let chPct=chT.length?chDone/chT.length*100:0;
+  if(chRun){const x=chRun[1].steps.chapters;chPct+=(x.status==='running'?stepPct(chRun[1],chRun[0],'chapters').pct:0)/chT.length}
+  const chLeftAll=chT.reduce((a,[k,t])=>a+chLeft(k,t),0);
+  const chBlock=chT.length&&chDone<chT.length?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><b>YouTube chapters</b><span class=mut>${chDone} of ${chT.length} talks${chRun?` &middot; now: <b style="color:var(--ink)">${esc(chRun[0])}</b> ${chRun[1].steps.chapters.status==='waiting'?'(waiting in line for Descript)':Math.round(stepPct(chRun[1],chRun[0],'chapters').pct)+'%'}`:alive?' &middot; starting':' &middot; press Start / resume'} &middot; ~${dur(chLeftAll)} left</span></div>
+    <div class=track><div class=fill style="width:${chPct.toFixed(1)}%;background:linear-gradient(90deg,#c98a00,#f0b93a)"></div></div></div>`:'';
   $('overall').innerHTML=`<div class=mut style="font-size:13px">${esc(S.title||'')}</div><div class=big>${fin} of ${total} talks finished</div>
    <div class=track><div class="fill ${fin===total?'g':''}" style="width:${pct.toFixed(1)}%"></div></div>
-   <div class=kpi><div>overall<b>${pct.toFixed(0)}%</b></div><div>time left (estimate)<b>${fin===total?'-':'~'+dur(leftAll)}</b></div>
-   <div>ready around<b>${fin===total?'done':eta.toTimeString().slice(0,5)}</b></div><div>no video yet<b>${sm.missing_videos.length}</b></div>
+   <div class=kpi><div>overall<b>${pct.toFixed(0)}%</b></div><div>time left (estimate)<b>${busyAll?'~'+dur(leftAll):'-'}</b></div>
+   <div>ready around<b>${busyAll?eta.toTimeString().slice(0,5):'done'}</b></div><div>no video yet<b>${sm.missing_videos.length}</b></div>
    <div>AI credits paid<b>${N?('~'+N.credits):'...'}</b></div></div>
    ${N&&N.usage&&!N.usage.error?`<div class=kpi style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
     <div>Descript this month: AI credits<b>${N.usage.credits_left!=null?N.usage.credits_left+' left':N.usage.credits+' used'}</b>${N.usage.credits_left!=null?N.usage.credits+' used':'<span title="set plan_ai_credits_month in Settings">plan not set</span>'}</div>
     <div>media minutes<b>${N.usage.media_left!=null?N.usage.media_left+' left':N.usage.media_min+' used'}</b>${N.usage.media_left!=null?N.usage.media_min+' used':'<span title="set plan_media_minutes_month in Settings">plan not set</span>'}</div>
-    <div class=mut style="align-self:end;font-size:11.5px;max-width:260px">API use only, this calendar month - Descript has no balance endpoint</div></div>`:''}`;
+    <div class=mut style="align-self:end;font-size:11.5px;max-width:260px">API use only, this calendar month - Descript has no balance endpoint</div></div>`:''}${chBlock}`;
   // ---- right now
   const busy=descriptBusy(), q=talks.filter(([k,t])=>t.queued).sort((a,b)=>a[1].queued-b[1].queued);
-  const working=talks.filter(([k,t])=>!t.finished&&t.current&&!t.queued);
+  const working=talks.filter(([k,t])=>(!t.finished&&t.current&&!t.queued)||(t.finished&&['running','waiting'].includes((t.steps.chapters||{}).status)));
   const run=alive?`<span class="dot on"></span> <b>Running</b> <span class=mut>since ${clock(N.runners[0].since)} on ${esc(N.runners[0].machine||'this machine')}</span>`:`<span class=dot></span> <b>Not running</b>`+(fin<total?' <span class=mut>- press Start / resume</span>':'');
   $('nowbox').innerHTML=`<div class=row><span class=k>Factory</span><span>${run}</span></div>
    <div class=row><span class=k>Descript</span><span>${busy?`<span class="pill p-run">${esc(busy.job)}</span> ${esc(busy.talk||'')} <span class=mut>${busy.percent!=null?busy.percent+'% &middot; ':''}${esc(busy.note||'')}</span>`:'<span class=mut>idle - no job running this moment</span>'}${N&&N.descript&&N.descript.project_url?` &middot; <a href="${N.descript.project_url}" target=_blank>open project</a>`:''}</span></div>
-   <div class=row><span class=k>Working on</span><span>${working.length?working.map(([k,t])=>{const x=t.steps[t.current]||{};return `<b>${esc(k)}</b> <span class=mut>(${x.status==='waiting'?'waiting in line for Descript':NAMES[t.current]})</span>`}).join(', '):'<span class=mut>-</span>'}</span></div>
+   <div class=row><span class=k>Working on</span><span>${working.length?working.map(([k,t])=>{const x=t.steps[t.current]||{};return t.finished?`<b>${esc(k)}</b> <span class=mut>(YouTube chapters)</span>`:`<b>${esc(k)}</b> <span class=mut>(${x.status==='waiting'?'waiting in line for Descript':NAMES[t.current]})</span>`}).join(', '):'<span class=mut>-</span>'}</span></div>
    ${gpuRow()}
    <div class=row><span class=k>Queue</span><span>${q.length?'<span class=queue>'+q.map(([k,t])=>`<span class=chip><b>#${t.queued}</b> ${esc(k)} &middot; ${t.size_mb||'?'} MB</span>`).join('')+'</span>':'<span class=mut>empty</span>'}</span></div>
    <div class="mut" style="font-size:12px;margin-top:6px">Descript runs one job per project at a time, so the talks take turns there. Rendering, downloading and loudness run on this PC in parallel.</div>`;
   // ---- rows: working first, then queue order, then failed, then finished
-  const rank=t=>t.finished?4:(t.error&&!t.retry)?3:t.queued?2:1;
+  const chActive=t=>t.finished&&['running','waiting'].includes((t.steps.chapters||{}).status);
+  const rank=t=>chActive(t)?1:t.finished?4:(t.error&&!t.retry)?3:t.queued?2:1;
   talks.sort((a,b)=>rank(a[1])-rank(b[1])||(a[1].queued||0)-(b[1].queued||0)||a[0].localeCompare(b[0]));
   $('rows').innerHTML=talks.map(([k,t])=>{
     const segs=STEPS.map(st=>{const x=t.steps[st]||{};let c='',w=0,lab=NAMES[st];
@@ -135,7 +147,9 @@ function render(){
       else if(t.finished&&st==='chapters'){c='later';lab+=' &middot; '+(alive?'at the end of the run':'to do')}
       return `<div class="seg ${c}" title="${esc(x.label||x.note||x.error||NAMES[st])}"><div class=t><div class=f style="width:${c==='run'?w.toFixed(1):c==='done'?100:0}%"></div></div><div class=l>${lab}</div></div>`}).join('');
     let status='',cls='';
-    if(t.finished){const qa=(t.steps.qa||{});status=`<span class="pill p-done">Finished ${clock(t.finished)}</span><span class=m>${qa.minutes_after?qa.minutes_after+' min':''}${qa.cut_percent!=null?', '+qa.cut_percent+'% cut':''}${qa.lufs!=null?', '+qa.lufs+' LUFS':''}${(qa.flags||[]).length?' &middot; <span class=warn>'+esc(qa.flags.join(', '))+'</span>':''}</span>`;cls='fin'}
+    if(chActive(t)){const x=t.steps.chapters,p=stepPct(t,k,'chapters');cls='act';
+      status=`<span class="pill p-done">Finished ${clock(t.finished)}</span> <span class="pill p-run">${x.status==='waiting'?'chapters: in line':'writing chapters '+Math.round(p.pct)+'%'}</span><span class=m>Descript's AI editor is writing the YouTube chapters &middot; ~${dur(chLeft(k,t))} left</span>`}
+    else if(t.finished){const qa=(t.steps.qa||{});status=`<span class="pill p-done">Finished ${clock(t.finished)}</span><span class=m>${qa.minutes_after?qa.minutes_after+' min':''}${qa.cut_percent!=null?', '+qa.cut_percent+'% cut':''}${qa.lufs!=null?', '+qa.lufs+' LUFS':''}${(qa.flags||[]).length?' &middot; <span class=warn>'+esc(qa.flags.join(', '))+'</span>':''}</span>`;cls='fin'}
     else if(t.retry){status=`<span class="pill p-wait">Retrying automatically</span><span class=m>${esc(t.retry)}</span>`;cls='act'}
     else if(t.error){status=`<span class="pill p-fail">Failed</span><span class=m>${esc(t.error.slice(0,160))}</span>`}
     else if(t.queued){const ahead=q.filter(([kk,tt])=>tt.queued<t.queued).length;status=`<span class="pill p-q">Queued #${t.queued}</span><span class=m>${ahead?ahead+' talk'+(ahead>1?'s':'')+' ahead':'next up'} &middot; ${t.size_mb||'?'} MB &middot; ~${dur(talkLeft(k,t))} of work</span>`}
@@ -145,6 +159,7 @@ function render(){
     else{status=`<span class="pill p-idle">Not started</span><span class=m>${alive?'':'press Start / resume'}</span>`}
     const btn=t.error&&!t.retry&&!alive?`<button data-k="${encodeURIComponent(k)}" onclick="retry(decodeURIComponent(this.dataset.k))">Retry</button>`:'';
     return `<tr class="${cls}"><td class=who><b>${esc(k)}</b><small>${esc(t.title||'')}</small><small>${t.minutes?t.minutes+' min video &middot; ':''}${t.size_mb?t.size_mb+' MB':''}</small></td><td><div class=pipe>${segs}</div></td><td class=stat>${status}</td><td>${btn}</td></tr>`}).join('');
+  $('chbtn').style.display=talks.some(([k,t])=>(t.steps.chapters||{}).status==='done')?'':'none';
   $('log').textContent=(S.state.log||[]).slice(-60).reverse().join('\n');
   const jobs=(N&&N.descript&&N.descript.jobs)||[];
   $('jobs').innerHTML='<table class=jobs><tr><th>Talk</th><th>Job</th><th>State</th><th>Started</th></tr>'+jobs.map(x=>`<tr><td>${esc(x.talk||'(not matched)')}</td><td>${esc(x.job)}</td><td>${esc(x.state==='stopped'?(x.note==='success'?'done':x.note):x.state)}${x.state==='running'&&x.percent!=null?' '+x.percent+'%':''}</td><td>${x.minutes<90?x.minutes+' min ago':Math.round(x.minutes/60)+' h ago'}</td></tr>`).join('')+'</table>';
