@@ -66,6 +66,78 @@ def open_folder(path):
         subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
 
 
+def _libreoffice(src, pdf):
+    import tempfile, pathlib
+    profile = tempfile.mkdtemp(prefix="lo-profile-")
+    try:
+        r = subprocess.run([soffice(), "-env:UserInstallation=" + pathlib.Path(profile).as_uri(), "--headless",
+                            "--norestore", "--convert-to", "pdf", "--outdir", os.path.dirname(pdf), src],
+                           capture_output=True, text=True, timeout=600)
+        made = os.path.join(os.path.dirname(pdf), os.path.splitext(os.path.basename(src))[0] + ".pdf")
+        if made != pdf and os.path.exists(made):
+            os.replace(made, pdf)
+        if not os.path.exists(pdf):
+            raise RuntimeError((r.stderr or r.stdout).strip()[-200:] or "failed")
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
+
+
+def _powerpoint_windows(src, pdf):
+    ps = ("$p = New-Object -ComObject PowerPoint.Application; "
+          "$d = $p.Presentations.Open('%s', $true, $false, $false); $d.SaveAs('%s', 32); $d.Close(); $p.Quit()"
+          % (src.replace("'", "''"), pdf.replace("'", "''")))
+    r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip()[-200:])
+
+
+def _keynote(src, pdf):
+    script = ('tell application "Keynote"\n set d to open POSIX file "%s"\n export d to POSIX file "%s" as PDF\n'
+              ' close d saving no\nend tell' % (src, pdf))
+    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=600)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip()[-200:])
+
+
+def pptx_converters():
+    """(name, function) for every PPTX -> PDF converter this machine has, best first."""
+    out = []
+    if soffice():
+        out.append(("LibreOffice", _libreoffice))
+    if os.name == "nt":
+        try:
+            import winreg
+            winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\POWERPNT.EXE").Close()
+            out.append(("PowerPoint", _powerpoint_windows))
+        except OSError:
+            pass
+    if sys.platform == "darwin" and os.path.exists("/Applications/Keynote.app"):
+        out.append(("Keynote", _keynote))
+    return out
+
+
+def pptx_test():
+    """Convert the bundled one-slide sample for real. Returns (ok, detail)."""
+    import tempfile
+    sample = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tests", "fixtures", "sample.pptx")
+    convs = pptx_converters()
+    if not convs:
+        return False, "no converter (LibreOffice, PowerPoint or Keynote) - PPTX decks stay as they are"
+    if not os.path.exists(sample):
+        return True, "found: " + ", ".join(n for n, _ in convs) + " (not tested: sample missing)"
+    tmp = tempfile.mkdtemp(prefix="pptx-test-")
+    try:
+        from .slides import convert
+        src = os.path.join(tmp, "sample.pptx")
+        shutil.copy(sample, src)
+        pdf, how = convert(src, tmp)
+        return True, "works - tested with %s" % how
+    except Exception as ex:
+        return False, str(ex)[-220:]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def find_tool(name):
     """ffmpeg / ffprobe: PATH, then winget's and Homebrew's usual folders."""
     found = shutil.which(name)
@@ -155,12 +227,11 @@ def doctor(cfg, repo, check_descript=True):
         elif "h264_videotoolbox" in encs and sys.platform == "darwin":
             enc = "Apple VideoToolbox"
     add("Video encoder", True, enc, required=False)
-    so = soffice()
-    pptx = so and (os.name != "nt" or os.path.exists(os.path.join(os.path.dirname(so), "ooxlo.dll")))
-    add("LibreOffice (PPTX decks only)", pptx,
-        so if pptx else ("installed without its PowerPoint import filter (ooxlo.dll) - PPTX decks fail" if so else "not found"),
-        ("reinstall the full package: winget uninstall TheDocumentFoundation.LibreOffice, then "
-         "winget install TheDocumentFoundation.LibreOffice") if so else install_hint("libreoffice"), required=False)
+    ok, detail = pptx_test()
+    fix = install_hint("libreoffice") if not soffice() else (
+        "reinstall LibreOffice: winget install --force TheDocumentFoundation.LibreOffice" if os.name == "nt" else
+        "brew reinstall --cask libreoffice" if sys.platform == "darwin" else "reinstall libreoffice")
+    add("PPTX decks -> PDF", ok, detail, fix, required=False)
     root = work_root(cfg)
     try:
         os.makedirs(root, exist_ok=True)
