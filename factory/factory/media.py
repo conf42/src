@@ -10,13 +10,11 @@ RESOLUTIONS = [(480, "480p"), (720, "720p"), (1080, "1080p"), (1440, "1440p"), (
 
 
 def tool(name):
-    found = shutil.which(name)
+    from . import machine
+    found = machine.find_tool(name)
     if found:
         return found
-    hits = glob.glob(os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\*FFmpeg*\*\bin\%s.exe" % name))
-    if hits:
-        return hits[0]
-    raise RuntimeError("%s not found - install it with: winget install Gyan.FFmpeg" % name)
+    raise RuntimeError("%s not found - install it with: %s" % (name, machine.install_hint("ffmpeg")))
 
 
 def run(args):
@@ -48,11 +46,13 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None):
         + (["-vf", "scale_cuda=" + size] if big else [])
         + nvenc + audio,
         head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p"] + nvenc + audio,
+        head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",      # Apple Silicon
+                "-c:v", "h264_videotoolbox", "-q:v", "62"] + audio,
         head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", str(cq - 1)] + audio]
     err = ""
     for n, args in enumerate(attempts):
-        how = ("GPU", "GPU encode", "CPU")[n]
+        how = ("GPU", "GPU encode", "Mac media engine", "CPU")[n]
         rc, err = _ffmpeg_progress([tool("ffmpeg")] + args + ["-progress", "pipe:1", "-nostats", dst + ".part.mp4"],
                                    info["duration"], lambda pct: on_progress and on_progress(
                                        "rendering to mp4 on the %s - %d%%" % (how, pct), pct))

@@ -63,9 +63,33 @@ Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again
 - an edit is skipped when the ledger of paid edits (`Desktop\talk-factory\ledger.json`) lists it, or when the composition is already shorter than its media
 
-## Setup
+## Setup (any machine: Windows, macOS, Linux)
 
-- **Descript:** a paid plan and an API token (Descript > Settings > API tokens), stored as the Windows user environment variable `DESCRIPT_API_TOKEN`. Never put the token in a file here: this repo is public.
-- **Credits and minutes:** imports use media minutes and each AI edit uses about 10 AI credits per talk. Descript answers 402 when the plan runs out.
-- **Tools:** ffmpeg/ffprobe (`winget install Gyan.FFmpeg`) and the site venv (`make env deps`, plus `pyyaml requests`).
-- **Settings:** everything adjustable lives in `settings.yml` (also editable in the app).
+1. `git clone https://github.com/conf42/src` (and `conf42/static` next to it if you ship slides from this machine).
+2. Run the one-time setup:
+   - **Windows:** double-click `factory\setup.cmd`
+   - **macOS / Linux:** `bash factory/setup.sh`
+
+   It creates the Python environment, installs what is missing (ffmpeg, LibreOffice), asks for a name for this machine
+   and for the Descript API token (Descript > Settings > API tokens), puts a **Conf42 factory** launcher on the Desktop,
+   runs the health check and opens the dashboard.
+3. Later: double-click the launcher (or `run.cmd` / `run.sh`). `python -m factory doctor` re-runs the health check;
+   the dashboard shows a banner when something is off.
+
+Where things live:
+- **Descript token:** never in git (this repo is public). Windows: the user environment variable `DESCRIPT_API_TOKEN`;
+  macOS/Linux: `~/.conf42-factory/descript_token` (readable by you only). An environment variable always wins.
+- **Per-machine settings:** `factory/settings.local.yml` (git-ignored) overrides `settings.yml`: `machine_name`,
+  `work_root` (default `<Desktop>/talk-factory`, OneDrive Desktops included), `render_parallel` (`auto` = up to 8 renders
+  on an RTX 5090, 3 on other NVIDIA cards, Apple's media engine on Macs, 2 on CPU).
+- **Work files** (videos, state, ledger of paid edits) stay on the machine that runs the event.
+
+**One machine per event.** Descript runs one job per project and the factory cancels uploads it does not own, so two
+machines on the same event would fight. Every run claims the event through `_db/factory.json` (pushed with the
+status page) and a second machine refuses to start it while the first one is alive. If that machine is off, take over
+with Shift+click on Start (or `python -m factory run <event> --force`); a lock nobody refreshed for 45 minutes expires.
+Moving an event mid-way is safe for credits: talks already in Descript are reused, edited ones are not edited again.
+
+**Credits and minutes:** imports use media minutes and each AI edit about 8-12 AI credits per talk; Descript answers
+402 when the plan runs out. The dashboard shows this month's API usage (set `plan_ai_credits_month` /
+`plan_media_minutes_month` to see what is left - Descript has no balance endpoint).
