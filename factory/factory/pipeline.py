@@ -300,6 +300,12 @@ class Run:
 
     def run(self, only=None):
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
+        def size(k):                                 # smallest video first: quick uploads finish early and
+            try:                                     # never queue behind a 1 GB file (one Descript job per project)
+                return os.path.getsize(os.path.join(self.inp, self.state["talks"][k]["source"]))
+            except (OSError, KeyError):
+                return 0
+        keys.sort(key=size)
         self.note("processing %d talk(s), %d at a time" % (len(keys), self.cfg["parallel_talks"]))
         if self.state.get("project_id"):             # uploads left hanging by a stopped run block the whole project
             try:
