@@ -4,6 +4,7 @@
   python -m factory run    <short_url> [zip/folder ...]   the whole pipeline (resumes where it stopped)
   python -m factory slides <short_url> [zip/folder ...]   decks only: unzip, match, PDF, rename, compress < 5 MB
   python -m factory status <short_url>                    progress summary
+  python -m factory chapters <short_url>                  YouTube chapters for finished talks -> <event>/chapters.txt
   python -m factory retry  <short_url> "<speaker(s)>"     retry one talk from its failed step
   python -m factory serve                                 the local app on http://localhost:8042
   python -m factory doctor                                check this machine (tools, GPU, token, git, disk)
@@ -108,6 +109,13 @@ def main(argv):
         if cmd == "run":
             run.run(force=force)
             print(json.dumps(pipeline.summary(run.state), indent=1))
+    elif cmd == "chapters":
+        from . import app
+        if app.runners(argv[1]):
+            print("a run is going on this event - its chapters are made at the end of the run")
+            return
+        run.chapters_pass()
+        print(open(os.path.join(run.dir, "chapters.txt"), encoding="utf-8").read())
     elif cmd == "status":
         print(json.dumps(pipeline.summary(run.state), indent=1))
     elif cmd == "retry":

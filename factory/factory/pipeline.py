@@ -27,7 +27,7 @@ from .descript import Descript
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
-STEPS = ["render", "upload", "edit", "publish", "download", "srt", "loudness", "qa"]
+STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
 MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, not a talk
 
 
@@ -308,6 +308,8 @@ class Run:
                 with open(srt_path, "wb") as f:
                     f.write(d.srt(pid, cid))
                 self.set(key, "srt", "done", file=os.path.basename(srt_path))
+            if not done("chapters"):
+                self.chapters_step(key, d)
             if not done("loudness"):
                 self.set(key, "loudness", "running", label="ffmpeg to %s LUFS" % cfg["loudness_lufs"])
                 media.normalize(raw, final, cfg["loudness_lufs"], cfg["true_peak_db"])
@@ -343,6 +345,54 @@ class Run:
                 self.save()
             self.note("FAILED %s at %s: %s" % (key, t.get("current"), ex))
             traceback.print_exc()
+
+    def chapters_step(self, key, d=None):
+        """YouTube chapters from Descript's AI editor (read-only prompt, about 6 AI credits), cleaned to YouTube's
+        rules and collected in <event>/chapters.txt. A reply that cannot be used is flagged, never fatal."""
+        t, d = self.talk(key), d or Descript()
+        self.set(key, "chapters", "running", label="Descript is writing chapters")
+        text, res = d.chapters(self.state["project_id"], t["composition_id"], key,
+                               on_progress=lambda label, percent=None: self.set(key, "chapters", "running",
+                                                                                label=label, percent=percent))
+        if res.get("project_changed"):
+            self.note("%s: the chapters job reported a change to the project - check it in Descript" % key)
+        length = (((t["steps"].get("qa") or {}).get("minutes_after") or 0) * 60) or None
+        chapters, problem = youtube_chapters(text, length)
+        self.set(key, "chapters", "done", chapters=chapters, credits=res.get("ai_credits_used"),
+                 note=problem or "%d chapters" % len(chapters), raw=None if chapters else text[:500])
+        self.write_chapters()
+
+    def chapters_pass(self):
+        """Chapters for finished talks that do not have them yet (talks processed before the step existed)."""
+        todo = [k for k, t in self.state["talks"].items()
+                if t.get("finished") and t.get("composition_id") and (t["steps"].get("chapters") or {}).get("status") != "done"]
+        if todo:
+            self.note("chapters for %d finished talk(s)" % len(todo))
+        for k in todo:
+            try:
+                self.chapters_step(k)
+            except Exception as ex:
+                self.set(k, "chapters", "failed", error=str(ex)[:300])
+                self.note("chapters failed for %s: %s" % (k, ex))
+        self.write_chapters()
+
+    def write_chapters(self):
+        """<event>/chapters.txt: every talk in the order of the event CSV, ready to paste into YouTube."""
+        rows = []
+        for tk in events.talks(self.ev):
+            t = self.state["talks"].get(tk["speakers"])
+            ch = ((t or {}).get("steps", {}).get("chapters") or {}).get("chapters") if t else None
+            if ch:
+                rows.append((tk["speakers"], tk["title"], ch))
+        lines = ["%s - YouTube chapters" % self.ev["title"],
+                 "Paste each block into the video description (YouTube needs the 0:00 line first).", ""]
+        for speakers, title, ch in rows:
+            lines += ["=" * 70, "%s - %s" % (speakers, title), "=" * 70] + ["%s %s" % (c["at"], c["title"]) for c in ch] + [""]
+        missing = [tk["speakers"] for tk in events.talks(self.ev) if tk["speakers"] not in {r[0] for r in rows}]
+        if missing:
+            lines += ["(no chapters yet: %s)" % ", ".join(missing)]
+        with open(os.path.join(self.dir, "chapters.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
 
     def forget_composition(self, key, cid):
         """A composition without real video (cut-off upload): mark it broken, redo render/upload/edit/publish."""
@@ -530,6 +580,10 @@ class Run:
             list(pool.map(self.process_with_retries, keys))
         stop.set()
         render_pool.shutdown(wait=True)
+        try:
+            self.chapters_pass()
+        except Exception as ex:
+            self.note("chapters pass failed: %s" % ex)
         self.note("run finished")
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}
@@ -538,6 +592,38 @@ class Run:
                 json.dump(self.state, f, indent=1, ensure_ascii=False)
             os.replace(tmp, self.state_path)
         self.publish(force=True)
+
+
+def _secs(stamp):
+    parts = [int(x) for x in stamp.split(":")]
+    return parts[0] * 3600 + parts[1] * 60 + parts[2] if len(parts) == 3 else parts[0] * 60 + parts[1]
+
+
+def _stamp(sec):
+    return "%d:%02d:%02d" % (sec // 3600, sec % 3600 // 60, sec % 60) if sec >= 3600 else "%d:%02d" % (sec // 60, sec % 60)
+
+
+def youtube_chapters(text, length=None):
+    """Chapter lines -> [{"at", "title"}] that YouTube accepts: first at 0:00, ascending, >= 10 s apart, inside the
+    video, at least 3. Returns (chapters, problem or None)."""
+    found = []
+    for line in (text or "").splitlines():
+        m = re.match(r"^[-*\s]*\(?(\d{1,2}(?::\d{2}){1,2})\)?[\s:\-]*(.+)$", line.strip())
+        if m and m.group(2).strip():
+            found.append((_secs(m.group(1)), m.group(2).strip().strip("-").strip()))
+    found.sort()
+    out = []
+    for sec, title in found:
+        if length and sec >= length - 5:
+            continue
+        if out and sec - out[-1][0] < 10:
+            continue
+        out.append((sec, title))
+    if out and out[0][0] != 0:
+        out[0] = (0, out[0][1])
+    if len(out) < 3:
+        return [], "Descript gave %d usable chapter(s) - YouTube needs 3+" % len(out)
+    return [{"at": _stamp(s), "title": t} for s, t in out], None
 
 
 def summary(state):

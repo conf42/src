@@ -164,6 +164,19 @@ class Descript:
                                                       "media_type": "Video", "resolution": resolution, "access_level": access})
         return self.wait(j["job_id"], 20, on_progress)
 
+    def chapters(self, project_id, composition_id, name, on_progress=None):
+        """YouTube chapters from Descript's AI editor, without touching the composition. Returns (text, job result)."""
+        prompt = ('Generate YouTube chapters for the composition "%s" only. Do NOT change the composition, its script, '
+                  'media or any setting, and do not touch any other composition. Reply with ONLY the chapter list, one '
+                  'chapter per line, formatted as M:SS Title (H:MM:SS past one hour), timed to this composition as it '
+                  'plays now. The first chapter starts at 0:00, chapters are at least 10 seconds apart, 4 to 10 '
+                  'chapters, short descriptive titles, no numbering, no extra text.' % name)
+        self.on_wait = on_progress
+        j = self.json("POST", "/jobs/agent", json={"project_id": project_id, "composition_id": composition_id,
+                                                     "prompt": prompt})
+        res = self.wait(j["job_id"], 10, on_progress)["result"]
+        return str(res.get("agent_response") or ""), res
+
     def srt(self, project_id, composition_id):
         return self.call("POST", "/export/transcript", json={"project_id": project_id, "composition_id": composition_id,
                                                              "format": "srt", "include_speaker_labels": "off"}).content
