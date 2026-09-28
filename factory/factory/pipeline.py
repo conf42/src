@@ -14,7 +14,7 @@ import threading
 import time
 import traceback
 import zipfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 
 import requests
 import yaml
@@ -351,6 +351,41 @@ class Run:
             self.set(key, "render", "done", file=os.path.basename(used),
                      note="%.0f MB -> %.0f MB" % (os.path.getsize(src) / 1e6, os.path.getsize(used) / 1e6))
 
+    def render_scheduler(self, need, slots, pool):
+        """Start renders smallest first, up to `slots` at once. Three always run on the 5090 (two elsewhere) unless it
+        runs hot; more start only while the GPU has headroom (encoder < 95 %, below 83 C, 2 GB VRAM free). Measured
+        2026-09-28: the 5090's NVENC tops out near 940 fps in total, so extra sessions share it rather than add speed.
+        The load is kept in state for the dashboard."""
+        running = []
+        def run_one(k):
+            try:
+                self.render_step(k)
+                self.render_futures[k].set_result(True)
+            except Exception as ex:
+                self.render_futures[k].set_exception(ex)
+        for k in need:
+            while True:
+                running = [f for f in running if not f.done()]
+                g = media.gpu_status()
+                with self.lock:
+                    self.state["gpu"] = dict(g or {}, renders=len(running), slots=slots, at=now())
+                roomy = g and (g["encoder"] or 0) < 95 and (g["temp"] or 0) < 83 and \
+                    ((g["vram_total"] or 0) - (g["vram_used"] or 0)) > 2048
+                base = min(3 if g and "5090" in g["name"] else 2, slots)   # the 5090's NVENC is saturated by ~3
+                cool = not g or (g["temp"] or 0) < 83
+                if (len(running) < base and cool) or (len(running) < slots and (roomy or not g)):
+                    break
+                time.sleep(5)
+            running.append(pool.submit(run_one, k))
+            time.sleep(3)                                 # let the new session show up in the encoder load
+        while any(not f.done() for f in running):         # keep the GPU numbers fresh until the last render ends
+            g = media.gpu_status()
+            with self.lock:
+                self.state["gpu"] = dict(g or {}, renders=sum(not f.done() for f in running), slots=slots, at=now())
+            time.sleep(5)
+        with self.lock:
+            self.state["gpu"] = dict(media.gpu_status() or {}, renders=0, slots=slots, at=now())
+
     def check_compositions(self, keys):
         """Before a run: any talk whose Descript composition holds no real video gets a fresh upload."""
         if not self.state.get("project_id"):
@@ -424,10 +459,12 @@ class Run:
             self.note("could not check the Descript compositions: %s" % ex)
         need = [k for k in keys if (self.talk(k)["steps"].get("render") or {}).get("status") != "done"
                 and (self.talk(k)["steps"].get("upload") or {}).get("status") != "done"]
-        render_pool = ThreadPoolExecutor(max_workers=max(1, int(self.cfg.get("render_parallel", 4))))
-        self.render_futures = {k: render_pool.submit(self.render_step, k) for k in need}
+        slots = media.render_slots(self.cfg.get("render_parallel", "auto"))
+        render_pool = ThreadPoolExecutor(max_workers=slots)
+        self.render_futures = {k: Future() for k in need}
         if need:
-            self.note("rendering %d talk(s) to mp4, %d at a time on the GPU" % (len(need), int(self.cfg.get("render_parallel", 4))))
+            self.note("rendering %d talk(s) to mp4, up to %d at a time (GPU-watched)" % (len(need), slots))
+            threading.Thread(target=self.render_scheduler, args=(need, slots, render_pool), daemon=True).start()
         stop = threading.Event()
         def beat():                                  # keep the heartbeat fresh while Descript jobs are quiet
             while not stop.wait(30):
