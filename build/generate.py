@@ -396,10 +396,16 @@ for post in posts:
         f.write(template.render(post=post, canonical=get_canonical_url(post.get("ShortURL")),  **context))
         register_url(post.get("ShortURL").replace(".html",""))
 
+# BRANDS (conf42.com/brands, Marek 2026-09-28): brands.yaml + live numbers from the sister sites (build/brands.py)
+print(DIVIDER)
+print("Loading the brands page data")
+from .brands import brands_context
+context["brands"] = brands_context("./brands.yaml", context.get("events") or [])
+
 # MAIN PAGES
 print(DIVIDER)
 print("Generating main pages")
-for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html", "panels.html", "404.html"]:
+for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "code-of-conduct.html", "blog.html", "seradio.html", "hall-of-fame.html", "speakers.html", "stats.html", "testimonials.html", "support.html", "about.html", "panels.html", "brands.html", "404.html"]:
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)
@@ -418,7 +424,7 @@ except (OSError, ValueError):
 with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     print("Writing out factory.html (unlisted)")
     f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory,
-                                                           steps=["upload", "edit", "publish", "download", "srt", "loudness", "qa"]))
+                                                           steps=["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 
 # 404 INDEX
 # /404-index.json feeds docs/404.html (see _templates/404.html): slip redirects + the single "Did you mean" link.
