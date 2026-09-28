@@ -120,6 +120,30 @@ def descript_now(short_url):
             "uploading_now": uploading}
 
 
+def usage_month():
+    """AI credits + media minutes used through the API this calendar month (all projects). Descript has no endpoint
+    for the remaining balance, so 'left' needs the plan's monthly allowance from settings.yml (Descript > Settings >
+    Billing shows it); usage made by hand in the Descript app is not included."""
+    d, cur, credits, media = Descript(), None, 0.0, 0.0
+    month = datetime.date.today().strftime("%Y-%m")
+    while True:
+        params = {"limit": 100, **({"cursor": cur} if cur else {})}
+        r = d.json("GET", "/jobs", params=params)
+        for x in r.get("data", []):
+            if x.get("created_at", "")[:7] == month:
+                res = x.get("result") or {}
+                credits += float(res.get("ai_credits_used") or 0)
+                media += float(res.get("media_seconds_used") or 0) / 60
+        cur = (r.get("pagination") or {}).get("next_cursor")
+        if not cur or not r.get("data"):
+            break
+    cfg = pipeline.settings()
+    plan_c, plan_m = cfg.get("plan_ai_credits_month"), cfg.get("plan_media_minutes_month")
+    return {"credits": round(credits, 1), "media_min": round(media),
+            "credits_left": round(float(plan_c) - credits) if plan_c else None,
+            "media_left": round(float(plan_m) - media) if plan_m else None}
+
+
 def spawn(args, short_url):
     log = open(os.path.join(work_root(), short_url, "run.log"), "a", encoding="utf-8")
     flags = 0x00000008 | 0x00000200 if os.name == "nt" else 0          # DETACHED_PROCESS | NEW_PROCESS_GROUP
@@ -222,7 +246,8 @@ class Handler(BaseHTTPRequestHandler):
             mine = [v for v in ledger.values() if v.get("event") == e]
             queue = sorted(({"talk": k, "mb": t.get("size_mb"), "n": t["queued"]} for k, t in st.get("talks", {}).items()
                             if t.get("queued")), key=lambda x: x["n"])
-            return self.send(200, {"queue": queue, "runners": cached("run:" + e, 10, lambda: runners(e)),
+            return self.send(200, {"queue": queue, "usage": cached("usage", 60, usage_month),
+                                   "runners": cached("run:" + e, 10, lambda: runners(e)),
                                    "heartbeat": (st.get("runner") or {}).get("at") or st.get("updated"),
                                    "descript": cached("d:" + e, 20, lambda: descript_now(e)),
                                    "edits": len(mine),
