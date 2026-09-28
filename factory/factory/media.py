@@ -32,7 +32,7 @@ def probe(path):
             "duration": float((d.get("format") or {}).get("duration") or 0)}
 
 
-def render(src, dst, max_short_side=1080, cq=21):
+def render(src, dst, max_short_side=1080, cq=21, on_progress=None):
     """Re-encode a source video to a lean H.264/AAC MP4 before the upload (camera .mov files are huge for no gain):
     GPU (NVENC) when there is one, else libx264; short side capped at max_short_side, audio kept at 48 kHz 192k so
     Studio Sound still gets a clean signal. Returns dst, or src when the render would not be smaller."""
@@ -45,24 +45,44 @@ def render(src, dst, max_short_side=1080, cq=21):
     head = ["-hide_banner", "-loglevel", "error", "-y"]
     attempts = [   # 1. all on the GPU (NVDEC decode + NVENC encode), 2. CPU decode + NVENC, 3. CPU only
         head + ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", src]
-        + (["-vf", "scale_cuda=%s" % size.replace(":", ":h=").replace("-2:h=", "w=-2:h=") if False else "scale_cuda=" + size] if big else [])
+        + (["-vf", "scale_cuda=" + size] if big else [])
         + nvenc + audio,
         head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p"] + nvenc + audio,
         head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", str(cq - 1)] + audio]
     err = ""
-    for args in attempts:
-        r = run([tool("ffmpeg")] + args + [dst + ".part.mp4"])
-        if r.returncode == 0:
+    for n, args in enumerate(attempts):
+        how = ("GPU", "GPU encode", "CPU")[n]
+        rc, err = _ffmpeg_progress([tool("ffmpeg")] + args + ["-progress", "pipe:1", "-nostats", dst + ".part.mp4"],
+                                   info["duration"], lambda pct: on_progress and on_progress(
+                                       "rendering to mp4 on the %s - %d%%" % (how, pct), pct))
+        if rc == 0:
             break
-        err = r.stderr[-300:]
     else:
-        raise RuntimeError("render to mp4 failed: " + err)
+        raise RuntimeError("render to mp4 failed: " + err[-300:])
     if os.path.getsize(dst + ".part.mp4") >= os.path.getsize(src):
         os.remove(dst + ".part.mp4")
         return src
     os.replace(dst + ".part.mp4", dst)
     return dst
+
+
+def _ffmpeg_progress(args, duration, cb):
+    """Run ffmpeg with -progress pipe:1 and report the percentage done every couple of seconds."""
+    import time
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    last = 0
+    for line in p.stdout:
+        if line.startswith("out_time_us=") and duration:
+            try:
+                pct = min(99, int(int(line.split("=")[1]) / 1e6 / duration * 100))
+            except ValueError:
+                continue
+            if time.time() - last > 2:
+                last = time.time()
+                cb(pct)
+    err = p.stderr.read()
+    return p.wait(), err
 
 
 def pick_resolution(width, height, cap):

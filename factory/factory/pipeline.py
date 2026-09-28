@@ -26,7 +26,7 @@ from .descript import Descript
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
-STEPS = ["upload", "edit", "publish", "download", "srt", "loudness", "qa"]
+STEPS = ["render", "upload", "edit", "publish", "download", "srt", "loudness", "qa"]
 
 
 def settings():
@@ -81,10 +81,22 @@ class Run:
         return self.state["talks"][key]
 
     def set(self, key, step, status, **extra):
+        """Step states for the dashboard: running (with started + percent), waiting (in Descript's one-job line,
+        with since), done (with took = seconds of real work), failed."""
         with self.lock:
             t = self.talk(key)
-            t["steps"][step] = {"status": status, "at": now(), **extra}
-            t["current"] = step if status == "running" else t.get("current")
+            prev = t["steps"].get(step) or {}
+            if status == "running" and str(extra.get("label") or "").startswith("Descript is busy"):
+                status = "waiting"
+            e = {"status": status, "at": now(), **{k: v for k, v in extra.items() if v is not None}}
+            if status == "running":
+                e["started"] = prev.get("started") if prev.get("status") == "running" and prev.get("started") else now()
+            if status == "waiting":
+                e["since"] = prev.get("since") if prev.get("status") == "waiting" and prev.get("since") else now()
+            if status == "done" and prev.get("started"):
+                e["took"] = round((datetime.datetime.now() - datetime.datetime.fromisoformat(prev["started"])).total_seconds())
+            t["steps"][step] = e
+            t["current"] = step if status in ("running", "waiting") else t.get("current")
             self.save()
 
     # ---- the ledger of paid Descript edits, shared by all events (Desktop/<work_folder>/ledger.json) ----------
@@ -169,7 +181,7 @@ class Run:
         final = os.path.join(self.out, "%s - %s.mp4" % (key, self.ev["title"]))
         raw = os.path.join(self.out, "_descript", key + ".mp4")
         srt_path = os.path.join(self.srt_dir, ("%s_%s.srt" % (self.ev["short_url"], t["name1"])).replace(" ", "_"))
-        progress = lambda step: (lambda label: self.set(key, step, "running", label=label))
+        progress = lambda step: (lambda label, percent=None: self.set(key, step, "running", label=label, percent=percent))
         try:
             with self.lock:
                 t["error"] = None
@@ -187,13 +199,26 @@ class Run:
                 if key in existing:
                     t["composition_id"] = existing[key]["id"]
                     self.set(key, "upload", "done", note="already in Descript, reused")
+            # render: a lean H.264/AAC mp4 (GPU) instead of the camera file - smaller, faster upload (Marek 2026-09-28)
+            if done("upload") and not done("render"):
+                self.set(key, "render", "done", note="not needed, already uploaded")
+            if not done("render"):
+                self.set(key, "render", "running", label="rendering to mp4", percent=0)
+                lean = os.path.join(self.dir, "mp4", key + ".mp4")
+                os.makedirs(os.path.dirname(lean), exist_ok=True)
+                used = media.render(src, lean, on_progress=progress("render"))
+                self.set(key, "render", "done", file=os.path.basename(used),
+                         note="%.0f MB -> %.0f MB" % (os.path.getsize(src) / 1e6, os.path.getsize(used) / 1e6))
+            up = os.path.join(self.dir, "mp4", key + ".mp4")
+            if not os.path.exists(up) or (t["steps"].get("render") or {}).get("file") != key + ".mp4":
+                up = src
             if not done("upload"):
-                self.set(key, "upload", "running", label="uploading %.0f MB" % (os.path.getsize(src) / 1e6))
+                self.set(key, "upload", "running", label="uploading %.0f MB" % (os.path.getsize(up) / 1e6), percent=0)
                 with self.plock:                                 # the first upload creates (or finds) the project
                     if not self.state["project_id"]:
                         self.state["project_id"] = d.find_project(cfg["project_name"].format(**self.ev))
                     if not self.state["project_id"]:
-                        pid, cid, _ = d.import_file(src, key, project_name=cfg["project_name"].format(**self.ev),
+                        pid, cid, _ = d.import_file(up, key, project_name=cfg["project_name"].format(**self.ev),
                                                     on_progress=progress("upload"))
                         self.state["project_id"] = pid
                         self.save()
@@ -203,7 +228,7 @@ class Run:
                 if created:
                     pass
                 else:
-                    pid, cid, _ = d.import_file(src, key, project_id=self.state["project_id"], on_progress=progress("upload"))
+                    pid, cid, _ = d.import_file(up, key, project_id=self.state["project_id"], on_progress=progress("upload"))
                 t["composition_id"] = cid
                 self.set(key, "upload", "done")
             pid, cid = self.state["project_id"], t["composition_id"]
@@ -332,7 +357,8 @@ class Run:
                 for step in list(t["steps"]):
                     if (t["steps"][step] or {}).get("status") in ("running", "failed"):
                         del t["steps"][step]
-                t.update(current=None, error=None, retry=None, queued=i + 1, size_mb=round(size(k) / 1e6))
+                t.update(current=None, error=None, retry=None, queued=i + 1, size_mb=round(size(k) / 1e6),
+                         minutes=round((t.get("probe") or {}).get("duration", 0) / 60, 1) or None)
             self.save()
         self.note("processing %d talk(s), %d at a time" % (len(keys), self.cfg["parallel_talks"]))
         if self.state.get("project_id"):             # uploads left hanging by a stopped run block the whole project
