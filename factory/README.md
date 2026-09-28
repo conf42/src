@@ -58,7 +58,7 @@ Descript answers 429 when too many jobs run at once. The client waits and retrie
 
 Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again
-- an edit is skipped when the ledger of paid edits (`Desktop	alk-factory\ledger.json`) lists it, or when the composition is already shorter than its media
+- an edit is skipped when the ledger of paid edits (`Desktop\talk-factory\ledger.json`) lists it, or when the composition is already shorter than its media
 
 ## Setup
 
