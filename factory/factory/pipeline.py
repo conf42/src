@@ -20,7 +20,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import requests
 import yaml
 
-from . import events, machine, media
+from . import events, machine, media, youtube
 from . import slides as slides_mod
 from .descript import Descript
 
@@ -351,9 +351,16 @@ class Run:
         rules and collected in <event>/chapters.txt. A reply that cannot be used is flagged, never fatal."""
         t, d = self.talk(key), d or Descript()
         self.set(key, "chapters", "running", label="Descript is writing chapters")
+        row = next((r for r in youtube.talk_rows(self.ev) if r["speakers"] == key), None)
+        room = youtube.budget(self.ev, self.cfg, key) if row else None
         text, res = d.chapters(self.state["project_id"], t["composition_id"], key,
                                on_progress=lambda label, percent=None: self.set(key, "chapters", "running",
-                                                                                label=label, percent=percent))
+                                                                                label=label, percent=percent),
+                               title=row["title"] if row and len(row["title"]) > (room or 0) else None, title_room=room)
+        m = re.search(r"^\s*TITLE:\s*(.+?)\s*$", text, re.M | re.I)
+        if m and not t.get("yt_title"):
+            with self.lock:
+                t["yt_title"] = m.group(1).strip().strip('"')
         if res.get("project_changed"):
             self.note("%s: the chapters job reported a change to the project - check it in Descript" % key)
         length = (((t["steps"].get("qa") or {}).get("minutes_after") or 0) * 60) or None
@@ -377,22 +384,31 @@ class Run:
         self.write_chapters()
 
     def write_chapters(self):
-        """<event>/chapters.txt: every talk in the order of the event CSV, ready to paste into YouTube."""
-        rows = []
-        for tk in events.talks(self.ev):
-            t = self.state["talks"].get(tk["speakers"])
+        """<event>/YouTube items.txt: per talk, in the order of the event CSV, the YouTube title (<= 100 characters)
+        and the description (abstract / event / CFP / Discord links + chapters), ready to paste."""
+        rows_yt, out = youtube.talk_rows(self.ev), ["%s - YouTube items" % self.ev["title"],
+                                                   "Per talk: the TITLE line goes in the YouTube title, everything under "
+                                                   "DESCRIPTION into the description.", ""]
+        ready, missing = 0, []
+        for r in rows_yt:
+            t = self.state["talks"].get(r["speakers"])
             ch = ((t or {}).get("steps", {}).get("chapters") or {}).get("chapters") if t else None
-            if ch:
-                rows.append((tk["speakers"], tk["title"], ch))
-        lines = ["%s - YouTube chapters" % self.ev["title"],
-                 "Paste each block into the video description (YouTube needs the 0:00 line first).", ""]
-        for speakers, title, ch in rows:
-            lines += ["=" * 70, "%s - %s" % (speakers, title), "=" * 70] + ["%s %s" % (c["at"], c["title"]) for c in ch] + [""]
-        missing = [tk["speakers"] for tk in events.talks(self.ev) if tk["speakers"] not in {r[0] for r in rows}]
+            if not ch:
+                missing.append(r["speakers"])
+                continue
+            title, lines = youtube.block(self.ev, self.cfg, r, ch, t.get("yt_title"))
+            ready += 1
+            out += ["=" * 78, "%s - %s" % (r["speakers"], r["title"]), "=" * 78,
+                    "TITLE (%d of %d characters)" % (len(title), int((self.cfg.get("youtube") or {}).get("title_max") or 100)),
+                    lines[0], "", "DESCRIPTION"] + lines[2:] + ["", ""]
         if missing:
-            lines += ["(no chapters yet: %s)" % ", ".join(missing)]
-        with open(os.path.join(self.dir, "chapters.txt"), "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+            out += ["(not ready yet - no video or chapters: %s)" % ", ".join(missing)]
+        with open(os.path.join(self.dir, "YouTube items.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(out) + "\n")
+        old = os.path.join(self.dir, "chapters.txt")
+        if os.path.exists(old):
+            os.remove(old)
+        return ready
 
     def forget_composition(self, key, cid):
         """A composition without real video (cut-off upload): mark it broken, redo render/upload/edit/publish."""
