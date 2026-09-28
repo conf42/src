@@ -40,6 +40,7 @@ A run can be stopped and started again at any time. Finished steps are skipped, 
   ..\env\Scripts\python -m factory retry  devsecops2026 "Emmy Eide"
   ```
 
+- **Watching it:** the app's "Right now" box shows whether a factory run is alive (process + last activity), every Descript job of the event's project with its progress bar (upload, edit, publish, mapped to talk names), the AI credits paid so far, and a link to the project in Descript. Running steps show their live label in the talk table ("uploading 45% of 1.2 GB", "Descript is busy ..."). Running `run.cmd` again when the app is already up just opens the page. conf42.com/factory shows the same table, updated every `status_publish_minutes`.
 - **With Claude:** say "here are the drive videos for Conf42 DevSecOps", or share the Drive folder link, and it runs the whole loop, slides included.
 
 ## Slides
@@ -54,7 +55,9 @@ Decks from the Drive download are matched to talks like the videos, then:
 
 ## Rate limits and credits
 
-Descript answers 429 when too many jobs run at once. The client waits and retries for up to an hour.
+Descript runs ONE job per project at a time; anything else gets 429 "A job is already running for this project". The client waits and retries for up to an hour, so talks simply take turns. An upload that died with a stopped run keeps its import job waiting forever and blocks the project: every run starts by cancelling those (`DELETE /jobs/<id>`).
+
+The edit prompt names the talk's composition (`{composition}`). Without that, "apply to all clips" made the AI editor re-edit every talk in the project (48 credits instead of ~8). As a safety net, an edit costing more than `max_edit_credits` pauses all further edits (`edits_paused` in state.json).
 
 Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again
