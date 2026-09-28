@@ -1,0 +1,2029 @@
+1
+00:00:01,050 --> 00:00:01,703
+Hi, everyone.
+
+2
+00:00:02,211 --> 00:00:03,134
+I'm Sonu Kumar.
+
+3
+00:00:03,852 --> 00:00:07,186
+I work in platform and infrastructure
+engineering at Peoplefluent.
+
+4
+00:00:07,608 --> 00:00:12,238
+I have been doing this kind of work for
+about 18 years, build system, deployment
+
+5
+00:00:12,243 --> 00:00:14,173
+pipeline, Kubernetes, observability.
+
+6
+00:00:14,933 --> 00:00:18,269
+And for the last few years, more
+and more of it has been about the
+
+7
+00:00:18,269 --> 00:00:20,119
+infrastructure AI workload run on.
+
+8
+00:00:21,060 --> 00:00:23,919
+I want to talk today about
+something a lot of platform team
+
+9
+00:00:23,922 --> 00:00:25,933
+are quietly struggling with.
+
+10
+00:00:26,800 --> 00:00:28,840
+Everyone wants AI in the platform.
+
+11
+00:00:30,051 --> 00:00:34,575
+Everyone also wants the platform to
+stay reliable, secure, and auditable.
+
+12
+00:00:35,572 --> 00:00:37,535
+Those two goals don't always get along.
+
+13
+00:00:37,682 --> 00:00:41,762
+So in the next half hour, I'll walk you
+through a reference architecture for what
+
+14
+00:00:41,776 --> 00:00:43,955
+I call a governed AI native platform.
+
+15
+00:00:44,541 --> 00:00:45,574
+It is not a product.
+
+16
+00:00:46,458 --> 00:00:50,821
+It is a way of thinking about the
+layers, the controls, and the signals.
+
+17
+00:00:51,160 --> 00:00:54,871
+Near the end, I'll walk through
+a production scenario because
+
+18
+00:00:54,879 --> 00:00:59,563
+that's where the idea either holds
+up or fall apart The challenges.
+
+19
+00:01:00,936 --> 00:01:04,840
+Let me start with the tension because
+it explains most of what follows.
+
+20
+00:01:05,471 --> 00:01:09,424
+Platform team today have two jobs
+that pull in opposite directions.
+
+21
+00:01:10,602 --> 00:01:12,201
+The first one is building for AI.
+
+22
+00:01:13,140 --> 00:01:18,377
+Someone of the product side want a RAG
+pipeline so the p- support assistant
+
+23
+00:01:18,470 --> 00:01:20,406
+can answer from internal document.
+
+24
+00:01:21,417 --> 00:01:24,747
+Someone else want to host
+a model for inference.
+
+25
+00:01:25,725 --> 00:01:30,195
+Then a third team wants an agent
+then-- that can actually take
+
+26
+00:01:30,216 --> 00:01:32,815
+actions, not just answer questions.
+
+27
+00:01:33,369 --> 00:01:37,482
+All of that needs infrastructure,
+GPU capacity, vector storage,
+
+28
+00:01:37,572 --> 00:01:42,508
+model registries, and it need
+to be secure because these
+
+29
+00:01:42,519 --> 00:01:44,704
+workload touch real customer data.
+
+30
+00:01:45,910 --> 00:01:48,007
+The second job is building with AI.
+
+31
+00:01:49,128 --> 00:01:54,681
+That is using AI inside our own DevSecOps
+workflow, validating deployment,
+
+32
+00:01:54,696 --> 00:01:59,770
+triaging incident, catching security
+drift be-before a human would notice it.
+
+33
+00:02:00,946 --> 00:02:02,742
+Here is the pattern I keep seeing.
+
+34
+00:02:02,976 --> 00:02:05,392
+Most teams are doing one
+of these reasonably well.
+
+35
+00:02:06,169 --> 00:02:10,298
+Very few are doing both on the same
+platform with the same controls.
+
+36
+00:02:10,907 --> 00:02:16,055
+What usually happens is you end up
+with an AI platform in one corner,
+
+37
+00:02:16,114 --> 00:02:20,767
+often built fast by a small team,
+and the real platform elsewhere
+
+38
+00:02:21,767 --> 00:02:26,177
+Two set of rules, two set of
+dashboards, and two on-call stories.
+
+39
+00:02:27,144 --> 00:02:30,594
+And the risk lives in the gap between them
+
+40
+00:02:31,594 --> 00:02:37,158
+So the idea behind this architecture
+is easy to say and harder to do.
+
+41
+00:02:38,487 --> 00:02:41,858
+One platform, one control plane.
+
+42
+00:02:43,053 --> 00:02:47,932
+AI workload and your regular
+cloud-native services are governed
+
+43
+00:02:48,881 --> 00:02:52,813
+the same way, observed the same
+way, and audited the same way.
+
+44
+00:02:53,440 --> 00:02:58,102
+When I say control plane, I don't
+only mean Kubernetes API server,
+
+45
+00:02:58,149 --> 00:03:02,207
+I mean the whole set of things
+that decide what is allowed to
+
+46
+00:03:02,208 --> 00:03:04,769
+run and what it is allowed to do.
+
+47
+00:03:06,358 --> 00:03:10,766
+Admission policies, identity, the
+registry, the GitOps controller.
+
+48
+00:03:11,652 --> 00:03:15,466
+If an inference service and a payroll
+service go through different control
+
+49
+00:03:15,469 --> 00:03:17,969
+plane, you don't have one platform.
+
+50
+00:03:18,548 --> 00:03:21,981
+You have two platforms that, that
+happen to share same hardware.
+
+51
+00:03:23,400 --> 00:03:29,328
+Policy automation and auditability
+aren't a layer you add at the end.
+
+52
+00:03:29,438 --> 00:03:31,106
+They run through every layer.
+
+53
+00:03:31,524 --> 00:03:38,887
+So let's take a look at what those layers
+are Five layers of governed AI platform I
+
+54
+00:03:38,887 --> 00:03:41,693
+think about this platform as five layer.
+
+55
+00:03:41,713 --> 00:03:44,820
+Let me go from the bottom up.
+
+56
+00:03:46,418 --> 00:03:49,187
+Layer one is the
+infrastructure foundation.
+
+57
+00:03:50,045 --> 00:03:55,112
+Compute, GPU pools, storage,
+networking, and Kubernetes itself.
+
+58
+00:03:55,871 --> 00:04:00,622
+Nobody talks about this layer until it
+breaks, and then it is the only thing
+
+59
+00:04:00,665 --> 00:04:03,687
+everyone and anyone wants to talk about.
+
+60
+00:04:04,673 --> 00:04:08,560
+The thing that changes with AI is GPUs.
+
+61
+00:04:08,893 --> 00:04:14,191
+They are expensive, they are scare--
+scarce, and they don't behave like CPU.
+
+62
+00:04:15,404 --> 00:04:19,053
+You can't slice them the
+way you slice CPU milicores.
+
+63
+00:04:19,399 --> 00:04:25,390
+So you end up doing things like dedicated
+GPU node pools with taints, so only
+
+64
+00:04:25,404 --> 00:04:29,723
+workload that asks for GPU and land there.
+
+65
+00:04:31,292 --> 00:04:34,197
+And on the network side, if you are
+running something like Kiln Yam network
+
+66
+00:04:34,202 --> 00:04:40,158
+policy between namespaces give you a
+real boundary between, say, a RAG service
+
+67
+00:04:41,167 --> 00:04:42,781
+and the vector database it talk to.
+
+68
+00:04:44,439 --> 00:04:46,376
+Layer two is platform service.
+
+69
+00:04:47,604 --> 00:04:54,169
+Identity, secrets, your artifacts, model
+registry, service mesh, the CIAT plumbing.
+
+70
+00:04:55,129 --> 00:04:58,920
+The important idea here is that
+a model is just another artifact.
+
+71
+00:04:59,654 --> 00:05:04,032
+If your container images live in a
+registry like Harbor with signing
+
+72
+00:05:04,033 --> 00:05:07,959
+and scanning, your model should get
+the same treatment, same registry
+
+73
+00:05:07,960 --> 00:05:09,929
+pattern, same promotion rules.
+
+74
+00:05:11,149 --> 00:05:16,735
+Layer three is the AI workload layer,
+RAG, inference, agents, the stuff
+
+75
+00:05:16,739 --> 00:05:18,276
+people actually come-- came for.
+
+76
+00:05:19,359 --> 00:05:21,182
+I'll go deeper on this on the next slide.
+
+77
+00:05:22,667 --> 00:05:27,738
+Layer four is the DevSecOps automation,
+CI/CD, supply chain security, GitOps
+
+78
+00:05:27,739 --> 00:05:29,870
+delivery with something like Argo CD.
+
+79
+00:05:30,387 --> 00:05:34,552
+And this is also where governed
+agent live, the AI that
+
+80
+00:05:34,562 --> 00:05:36,003
+helps operate the platform.
+
+81
+00:05:36,898 --> 00:05:40,728
+And the layer five wraps around
+everything, governance and observability
+
+82
+00:05:41,728 --> 00:05:44,967
+The last one is the
+point I would underline.
+
+83
+00:05:46,396 --> 00:05:49,985
+In a lot of platform I have seen
+governance lives at the edges.
+
+84
+00:05:50,659 --> 00:05:54,840
+A check at the ingress, a scan in
+the pipeline, and that's about it.
+
+85
+00:05:55,802 --> 00:05:59,886
+That was the mostly fine when every
+change came in through a pipeline.
+
+86
+00:06:00,340 --> 00:06:01,561
+It isn't fine anymore.
+
+87
+00:06:01,609 --> 00:06:05,505
+An agent running inside the
+cluster can take actions that
+
+88
+00:06:05,505 --> 00:06:06,808
+never pass through the edge.
+
+89
+00:06:07,366 --> 00:06:09,743
+It can call the Kubernetes API directly.
+
+90
+00:06:10,126 --> 00:06:15,258
+The governance and observability have
+to wrap every layer, not the guard doors
+
+91
+00:06:16,258 --> 00:06:21,667
+Each layer can be run and upgraded on its
+own, but they all follow the same rule
+
+92
+00:06:22,667 --> 00:06:27,803
+So in AI workload support, so what does
+the platform actually have to serve?
+
+93
+00:06:28,084 --> 00:06:35,044
+Four things: RAG, vector stores,
+chunking pipelines, embedding services.
+
+94
+00:06:35,664 --> 00:06:39,258
+The part people forget is data
+lineage and access control.
+
+95
+00:06:40,180 --> 00:06:43,404
+When the assistants answer a
+question using a document, you need
+
+96
+00:06:43,445 --> 00:06:48,979
+to be able to say which documents,
+which version, and what the person
+
+97
+00:06:49,008 --> 00:06:50,614
+asking was allowed to see it.
+
+98
+00:06:51,703 --> 00:06:54,075
+The last one catches people out.
+
+99
+00:06:54,772 --> 00:06:58,631
+If your vector index does not carry
+the document's access permission,
+
+100
+00:06:59,223 --> 00:07:02,792
+your RAG pipeline can leak data across
+tenants without anyone noticing.
+
+101
+00:07:03,906 --> 00:07:07,272
+So permission filtering has to
+happen at retrieval time, not
+
+102
+00:07:07,305 --> 00:07:09,205
+only when document was ingested.
+
+103
+00:07:10,709 --> 00:07:15,037
+One more technical point on RAG,
+changing your embedding model isn't
+
+104
+00:07:15,044 --> 00:07:16,700
+like changing a normal dependency.
+
+105
+00:07:17,472 --> 00:07:21,542
+The vector from the old model and the
+new model live in different spaces.
+
+106
+00:07:21,548 --> 00:07:22,518
+You can't mix them.
+
+107
+00:07:24,462 --> 00:07:30,421
+So an embedding upgrade means re-embedding
+the whole corpus, usually into second
+
+108
+00:07:30,424 --> 00:07:35,118
+index, and then cutting over basically
+a blue-green deployment for your index.
+
+109
+00:07:35,842 --> 00:07:39,292
+Your platform should ma-make
+that a standard pattern, not
+
+110
+00:07:39,315 --> 00:07:41,818
+a weekend project Inference.
+
+111
+00:07:42,700 --> 00:07:49,462
+A model serving the-- that auto scales
+with latency, SLOs, and cost guardrails.
+
+112
+00:07:50,253 --> 00:07:55,734
+GPU time isn't cheap, and a runway
+workload will show up on the bill
+
+113
+00:07:55,755 --> 00:07:57,787
+before it shows up on a dashboard.
+
+114
+00:07:58,683 --> 00:08:00,554
+Auto-scaling here is also different.
+
+115
+00:08:01,614 --> 00:08:04,676
+GPU utilization is a poor
+signal for an inference server.
+
+116
+00:08:05,277 --> 00:08:10,138
+Queue depth or token in flight
+tell you much more about whether
+
+117
+00:08:10,138 --> 00:08:11,469
+you need another replica.
+
+118
+00:08:13,132 --> 00:08:13,533
+Agents
+
+119
+00:08:14,533 --> 00:08:15,416
+This is the new one.
+
+120
+00:08:15,546 --> 00:08:20,234
+An agent is basically a service
+account that makes its own decision.
+
+121
+00:08:20,496 --> 00:08:24,899
+So it needs defined tool permissions,
+approval gates, and an audit
+
+122
+00:08:24,914 --> 00:08:26,700
+trail of what it actually did.
+
+123
+00:08:27,348 --> 00:08:32,873
+We should treat it at least as
+carefully as we treat a service account.
+
+124
+00:08:33,088 --> 00:08:34,254
+Honestly, more carefully.
+
+125
+00:08:36,012 --> 00:08:40,107
+And model lifecycle, registry,
+versioning, provenance, and an automated
+
+126
+00:08:40,128 --> 00:08:42,498
+path from experiment to production.
+
+127
+00:08:44,068 --> 00:08:47,420
+I'll come back to this because
+I think it is where platform
+
+128
+00:08:47,483 --> 00:08:50,089
+team most need to s-step up
+
+129
+00:08:51,089 --> 00:08:54,010
+Security foundation The rule is simple.
+
+130
+00:08:54,145 --> 00:08:59,035
+Every workload, AI or not, runs
+under the same zero trust posture.
+
+131
+00:08:59,972 --> 00:09:04,831
+No implicit trust, every request is
+verified, authorized, and logged.
+
+132
+00:09:05,250 --> 00:09:08,347
+Being inside the cluster
+does not make you trusted.
+
+133
+00:09:09,817 --> 00:09:11,307
+Three things make that real.
+
+134
+00:09:12,468 --> 00:09:14,694
+First, policy as code.
+
+135
+00:09:16,181 --> 00:09:20,961
+We use OPA and its policy language,
+Rego, to enforce admission
+
+136
+00:09:20,968 --> 00:09:23,324
+runtime and data access policies.
+
+137
+00:09:23,535 --> 00:09:27,461
+In Kubernetes, that usually
+means OPA Gatekeeper sitting
+
+138
+00:09:27,462 --> 00:09:29,256
+on the admission webhook.
+
+139
+00:09:30,366 --> 00:09:35,083
+Kyverno is a good option too if y- if
+your team would rather write policies in
+
+140
+00:09:35,613 --> 00:09:39,672
+YAML The important bit isn't the tool.
+
+141
+00:09:40,574 --> 00:09:43,651
+It is that these policies live
+and get next to the application
+
+142
+00:09:43,684 --> 00:09:47,473
+code, and they go through pull
+requests like everything else.
+
+143
+00:09:49,032 --> 00:09:52,050
+So when someone asks, "Why
+was my deployment blocked?"
+
+144
+00:09:52,371 --> 00:09:57,734
+The answer is a commit with a reviewer
+and a reason, not some- somebody's memory.
+
+145
+00:09:58,913 --> 00:09:59,842
+A practical tip here.
+
+146
+00:09:59,859 --> 00:10:03,759
+Don't run on a new policy
+in enforce mode on day one.
+
+147
+00:10:04,083 --> 00:10:05,614
+Run in audit mode first.
+
+148
+00:10:05,623 --> 00:10:08,401
+Gatekeeper and Kyverno both supports that.
+
+149
+00:10:09,152 --> 00:10:15,355
+Let it tell you what you would have
+been blocked for a week or two.
+
+150
+00:10:16,232 --> 00:10:20,857
+You will always find a legitimate
+workload you would have forgotten about.
+
+151
+00:10:22,292 --> 00:10:23,781
+Second, model provenance.
+
+152
+00:10:24,624 --> 00:10:30,161
+Model artifacts get signed, and
+they carry a bill of material,
+
+153
+00:10:31,593 --> 00:10:32,882
+just like a container image.
+
+154
+00:10:33,540 --> 00:10:38,694
+Tools like Sigstore Cosign work for
+an OCI artifact, not only images.
+
+155
+00:10:39,162 --> 00:10:41,497
+So you can sign a model the same way.
+
+156
+00:10:43,326 --> 00:10:48,286
+Then the same admission policy checks
+the signature before run-- anything runs.
+
+157
+00:10:48,823 --> 00:10:51,858
+We learned this lesson the
+hard way with software supply
+
+158
+00:10:51,864 --> 00:10:53,297
+chain over the last few years.
+
+159
+00:10:53,778 --> 00:10:55,628
+Models are the next supply chain.
+
+160
+00:10:55,646 --> 00:10:58,255
+We don't need to learn it twice.
+
+161
+00:11:00,017 --> 00:11:05,107
+Third one is RBAC at every layer Who
+can deploy a model, who can invoke it,
+
+162
+00:11:05,122 --> 00:11:07,242
+who can retain it, who can override it.
+
+163
+00:11:07,463 --> 00:11:11,442
+These are four different permission,
+and they should be four different roles.
+
+164
+00:11:11,461 --> 00:11:15,271
+In practice, le- le- lot of
+team give one broad service
+
+165
+00:11:15,273 --> 00:11:16,941
+account to the whole ML pipeline.
+
+166
+00:11:17,435 --> 00:11:19,207
+That is the first thing I would split up
+
+167
+00:11:20,207 --> 00:11:22,671
+Observability is not optional.
+
+168
+00:11:23,671 --> 00:11:28,291
+And I mean something a bit wider
+than what most of us grew up with.
+
+169
+00:11:28,884 --> 00:11:33,343
+Latency and error rate still matter,
+but in an AI platform, some of the
+
+170
+00:11:33,343 --> 00:11:35,766
+most important signals are new ones.
+
+171
+00:11:36,026 --> 00:11:40,720
+Model drift, token cost, the path
+an agent took to reach a decision,
+
+172
+00:11:40,816 --> 00:11:42,452
+how often a policy says no.
+
+173
+00:11:43,156 --> 00:11:45,344
+Those are nice to, nice to have dashboard.
+
+174
+00:11:45,987 --> 00:11:48,173
+They are inputs to the control plane.
+
+175
+00:11:48,631 --> 00:11:51,796
+If you can't see it, you can't govern it
+
+176
+00:11:52,796 --> 00:11:53,910
+Continuous observability.
+
+177
+00:11:55,601 --> 00:12:00,124
+I group what we measure into four
+buckets Infrastructure signals.
+
+178
+00:12:01,573 --> 00:12:06,839
+CPU, GPU utilization, pod health,
+queue depth, network throughput.
+
+179
+00:12:07,649 --> 00:12:08,395
+Familiar stuff.
+
+180
+00:12:08,493 --> 00:12:14,824
+But now it covers GPU too, and they behave
+differently for the NVIDIA hardware.
+
+181
+00:12:15,375 --> 00:12:19,511
+D-D-DGCM exporter gives you
+GPU utilization and memory
+
+182
+00:12:19,513 --> 00:12:21,660
+info into the Prometheus.
+
+183
+00:12:22,655 --> 00:12:24,413
+GPU memory is one to watch.
+
+184
+00:12:25,012 --> 00:12:28,821
+A GPU can show forty percent
+utilization and still be one request
+
+185
+00:12:28,843 --> 00:12:30,519
+away from running out of memory.
+
+186
+00:12:32,080 --> 00:12:33,506
+AI-specific metrics.
+
+187
+00:12:34,652 --> 00:12:40,909
+Inference latency, token consumption,
+embedding quality, drift scores, and
+
+188
+00:12:40,909 --> 00:12:42,786
+some proxy for hallucination rate.
+
+189
+00:12:43,792 --> 00:12:45,184
+I say proxy on purpose.
+
+190
+00:12:45,248 --> 00:12:47,693
+Nobody has a perfect
+hallucination metrics.
+
+191
+00:12:48,401 --> 00:12:52,766
+But you can track things like how often
+retrieval found a relevant document and
+
+192
+00:12:52,768 --> 00:12:54,806
+how often user corrected the answer.
+
+193
+00:12:55,571 --> 00:12:59,966
+A trend is still useful when,
+when the absolute number isn't.
+
+194
+00:13:01,146 --> 00:13:05,774
+One warning from my experience: be
+careful with labels on these metrics.
+
+195
+00:13:06,219 --> 00:13:09,707
+It's tempting to label token usage
+by user, by prompt, by session.
+
+196
+00:13:10,503 --> 00:13:14,457
+In Prometheus, that's a cardinal-
+cardinality explosion waiting to happen.
+
+197
+00:13:15,476 --> 00:13:21,837
+Keep the high detail data in
+traces or logs, and keep metrics
+
+198
+00:13:22,194 --> 00:13:27,483
+to things like model version and
+tenant Third is security telemetry.
+
+199
+00:13:28,391 --> 00:13:31,854
+Policy violation, unusual RBAC
+access pattern, and an audit
+
+200
+00:13:31,854 --> 00:13:34,000
+log for every privileged action.
+
+201
+00:13:34,464 --> 00:13:36,643
+The Kubernetes audit log is gold here.
+
+202
+00:13:36,699 --> 00:13:40,424
+If you actually ship it somewhere
+searchable like open source,
+
+203
+00:13:41,223 --> 00:13:42,270
+it's very, very helpful.
+
+204
+00:13:44,024 --> 00:13:45,750
+Fourth one, agent traces.
+
+205
+00:13:46,294 --> 00:13:48,606
+This is the one I would push hardest on.
+
+206
+00:13:49,229 --> 00:13:53,775
+For every agent workflow, you want
+the full traces, which tool it called,
+
+207
+00:13:54,631 --> 00:13:59,083
+with what, inputs and what came
+back, and where a human stepped in.
+
+208
+00:13:59,443 --> 00:14:03,916
+OpenTelemetry now has semantics
+conventions for generative AI, so you
+
+209
+00:14:03,916 --> 00:14:05,804
+don't have to invent your own format.
+
+210
+00:14:06,453 --> 00:14:11,831
+When an agent does something surprising
+at 2:00 in the morning, that trace
+
+211
+00:14:11,855 --> 00:14:15,484
+is the difference between a 10-minute
+review and a two-day investigation
+
+212
+00:14:16,484 --> 00:14:20,652
+So let's talk about agent doing
+actual DevSec, DevSecOps work.
+
+213
+00:14:21,908 --> 00:14:24,067
+There are four places
+where I see real value.
+
+214
+00:14:24,707 --> 00:14:26,225
+Imple- deployment validation.
+
+215
+00:14:27,672 --> 00:14:32,219
+The agent checks rollout health
+against your SLOs before cut over.
+
+216
+00:14:33,002 --> 00:14:35,152
+That is more than are the parts running.
+
+217
+00:14:37,089 --> 00:14:42,830
+It is P99 latency still inside
+budget, and is the error flat rate
+
+218
+00:14:42,837 --> 00:14:44,137
+compared to the stable version?
+
+219
+00:14:45,808 --> 00:14:46,638
+Incident triage.
+
+220
+00:14:46,706 --> 00:14:49,747
+It pulls the metrics, the logs,
+the recent change history, and
+
+221
+00:14:49,748 --> 00:14:51,847
+it scopes the likely cause.
+
+222
+00:14:52,536 --> 00:14:54,461
+And this is key.
+
+223
+00:14:54,513 --> 00:14:57,683
+It escalates when its confidence
+is low instead of guessing.
+
+224
+00:14:58,072 --> 00:15:02,016
+An agent that says, "I'm not sure, here
+is what I found," is far more useful
+
+225
+00:15:02,016 --> 00:15:03,652
+than one that is confidently wrong.
+
+226
+00:15:04,947 --> 00:15:05,574
+Self-healing.
+
+227
+00:15:06,539 --> 00:15:08,897
+Remediation, but only
+inside approved playbooks.
+
+228
+00:15:08,907 --> 00:15:12,172
+Restart this, roll back that,
+nothing outside the list.
+
+229
+00:15:12,725 --> 00:15:16,823
+Compliance checks, continuous drift
+detection, someone change a setting by
+
+230
+00:15:16,828 --> 00:15:20,678
+hand in a production, and then agent
+notices no longer matches the Git.
+
+231
+00:15:21,967 --> 00:15:24,194
+It has gated authority to put it back.
+
+232
+00:15:25,277 --> 00:15:28,119
+Now look at the flow at the
+bottom s- bottom of the slide.
+
+233
+00:15:29,453 --> 00:15:34,332
+Trigger, evaluate, context, policy,
+check, execute, audit Notice
+
+234
+00:15:34,342 --> 00:15:35,710
+where the policy check sits.
+
+235
+00:15:35,930 --> 00:15:40,603
+It is because before
+the action, not after.
+
+236
+00:15:42,387 --> 00:15:44,148
+That ordering is the whole point.
+
+237
+00:15:44,166 --> 00:15:47,880
+The agent does not act
+and then get reviewed.
+
+238
+00:15:48,334 --> 00:15:51,372
+It gets checked, then it act,
+then everything is recorded.
+
+239
+00:15:52,489 --> 00:15:54,135
+How do you actually build that?
+
+240
+00:15:54,196 --> 00:15:56,939
+Mechanically, it is less
+exotic than it sounds.
+
+241
+00:15:56,977 --> 00:16:01,081
+The agent run with his own Kubernetes
+service account with narrow RBAC.
+
+242
+00:16:01,827 --> 00:16:05,252
+It can patch a rollout in the
+one namespace, not delete nodes.
+
+243
+00:16:05,947 --> 00:16:09,443
+Every tool the agent can call
+goes through a thin gateway.
+
+244
+00:16:09,472 --> 00:16:11,717
+The gateway asks the policy
+engine, "Is this allowed?"
+
+245
+00:16:11,783 --> 00:16:16,074
+Before passing the call on, and the
+gateway rewrites the audit record.
+
+246
+00:16:16,774 --> 00:16:19,942
+The model itself never
+hold broad credential.
+
+247
+00:16:20,324 --> 00:16:22,635
+That is the single most
+important design choice.
+
+248
+00:16:23,466 --> 00:16:26,854
+If the model's reasoning goes
+wrong, the permission still holds
+
+249
+00:16:27,854 --> 00:16:30,219
+Approval gateway are
+architecture, not bureaucracy.
+
+250
+00:16:30,911 --> 00:16:32,701
+Which brings me to the approval gate.
+
+251
+00:16:33,063 --> 00:16:38,980
+I know approval gate sounds like
+the thing that slows everyone down.
+
+252
+00:16:39,337 --> 00:16:40,676
+I would argue the opposite.
+
+253
+00:16:41,069 --> 00:16:45,601
+When system can redeploy or change
+infrastructure on their own, you
+
+254
+00:16:45,603 --> 00:16:47,155
+n- you need defined boundaries.
+
+255
+00:16:47,638 --> 00:16:51,525
+The only question is whether those
+boundaries are written down and enforced
+
+256
+00:16:51,708 --> 00:16:53,351
+or whether they live in somebody's head.
+
+257
+00:16:54,076 --> 00:16:55,475
+We do it in three steps.
+
+258
+00:16:57,093 --> 00:17:02,118
+One, define au- autonomy
+tiers by blast radius.
+
+259
+00:17:03,140 --> 00:17:04,430
+Tier one is auto-approved.
+
+260
+00:17:05,062 --> 00:17:11,048
+Restarting a pod or roll back
+a canary that only gets 10% of
+
+261
+00:17:11,078 --> 00:17:14,086
+traffic, small scoped reversible.
+
+262
+00:17:15,516 --> 00:17:18,757
+Tier two runs, but a human is notified.
+
+263
+00:17:19,470 --> 00:17:23,190
+Tier three needs a human to
+say yes before it happens.
+
+264
+00:17:24,005 --> 00:17:27,709
+Anything touching shared infrastructure,
+production data, or another team workload.
+
+265
+00:17:28,543 --> 00:17:33,081
+The question I use to chart
+action is simple: If this goes
+
+266
+00:17:33,107 --> 00:17:34,900
+wrong, how many people find out?
+
+267
+00:17:35,409 --> 00:17:37,256
+And can we undo it in five minutes?
+
+268
+00:17:38,531 --> 00:17:41,001
+Two, encode that as policy.
+
+269
+00:17:41,813 --> 00:17:44,321
+The gate condition lives
+in version control files.
+
+270
+00:17:45,249 --> 00:17:49,534
+A rule might read in plain English,
+"An agent may abort a rollou-
+
+271
+00:17:49,622 --> 00:17:52,442
+rollout in its own namespace.
+
+272
+00:17:52,475 --> 00:17:54,034
+An agent may not drain a node.
+
+273
+00:17:54,682 --> 00:17:58,505
+Anything labeled as holding
+customer data need human approval."
+
+274
+00:17:59,161 --> 00:18:02,150
+And that is reviewed in a
+pull request, same as code.
+
+275
+00:18:03,902 --> 00:18:06,492
+Three, log every decision.
+
+276
+00:18:07,360 --> 00:18:12,624
+Approved or blocked, every agent action
+writes an immutable audit record.
+
+277
+00:18:13,777 --> 00:18:19,430
+What it tried, why, what evidence it
+had, and on whose authority Once you
+
+278
+00:18:19,435 --> 00:18:21,060
+have that, something nice happens.
+
+279
+00:18:21,079 --> 00:18:24,711
+You can widen the agent's autonomy
+gradually based on evidence.
+
+280
+00:18:24,867 --> 00:18:30,279
+If an action has been proposed 100 times
+and a human approved it 100 times, that
+
+281
+00:18:30,280 --> 00:18:33,236
+is a good case for moving it down a tier.
+
+282
+00:18:33,752 --> 00:18:37,031
+It is a data conversation,
+not an argument in a meeting
+
+283
+00:18:38,031 --> 00:18:38,965
+model life cycle.
+
+284
+00:18:39,301 --> 00:18:42,712
+It is often treated a- as a data
+science problem, and I think it
+
+285
+00:18:42,712 --> 00:18:44,524
+is really a platform problem.
+
+286
+00:18:44,931 --> 00:18:49,041
+Three patterns Registered
+registry first promotion.
+
+287
+00:18:49,297 --> 00:18:53,595
+No model gets to staging or production
+without a signed validated registry entry.
+
+288
+00:18:54,796 --> 00:18:59,903
+Exactly how we treat container
+images and the registry entry should
+
+289
+00:18:59,906 --> 00:19:01,513
+carry more than a version number.
+
+290
+00:19:02,270 --> 00:19:07,408
+It should say what data the model
+was trained on, what approved-- who
+
+291
+00:19:07,408 --> 00:19:11,669
+approved it, and what it need to run,
+how much GPU memory, which accelerator.
+
+292
+00:19:12,162 --> 00:19:13,822
+Keep that last part in mind.
+
+293
+00:19:13,862 --> 00:19:15,403
+It comes back in the case study
+
+294
+00:19:16,403 --> 00:19:17,709
+Henry and shadow serving.
+
+295
+00:19:17,955 --> 00:19:22,559
+Shift traffic gradually with a
+automatic rollback tied to latency,
+
+296
+00:19:22,582 --> 00:19:24,203
+accuracy, and business KPIs.
+
+297
+00:19:24,867 --> 00:19:29,855
+Tool like Argo Rollout, lay-- rollouts
+or K serve handle the traffic split.
+
+298
+00:19:30,173 --> 00:19:33,307
+Shadow mode is especially
+useful for models.
+
+299
+00:19:33,344 --> 00:19:37,360
+The new version sees real
+production traffic, but it answers--
+
+300
+00:19:37,847 --> 00:19:39,227
+its answer don't go to user.
+
+301
+00:19:39,320 --> 00:19:40,609
+You compare them offline.
+
+302
+00:19:41,202 --> 00:19:45,170
+It is the safest way I know to find
+out how a model behaves on real
+
+303
+00:19:45,171 --> 00:19:48,371
+inputs Drift triggered retraining.
+
+304
+00:19:49,191 --> 00:19:52,993
+The observability signals we talked about
+feedback into the retaining pipelines.
+
+305
+00:19:53,414 --> 00:19:54,855
+That is the loop closing.
+
+306
+00:19:55,620 --> 00:20:00,502
+But retraining is itself a change, so the
+new model goes through the same registry,
+
+307
+00:20:00,812 --> 00:20:04,465
+same model signing, and the same cannery.
+
+308
+00:20:05,163 --> 00:20:07,192
+No shortcut because it is just a retrain
+
+309
+00:20:08,192 --> 00:20:11,615
+Okay, let me step away from
+architecture for a minute and share
+
+310
+00:20:11,624 --> 00:20:13,257
+what production has actually taught me.
+
+311
+00:20:13,296 --> 00:20:13,892
+Three things.
+
+312
+00:20:14,530 --> 00:20:17,104
+Governance debt compound fast.
+
+313
+00:20:18,724 --> 00:20:20,684
+It is technical debt, but worst.
+
+314
+00:20:21,152 --> 00:20:25,764
+Every AI component that goes into
+production without governance add audit
+
+315
+00:20:25,768 --> 00:20:31,990
+surface and widens the blad- blast radius
+of the next incident, and it is much
+
+316
+00:20:31,990 --> 00:20:37,188
+harder to add control to something that is
+already live and that people depends on.
+
+317
+00:20:37,675 --> 00:20:41,007
+Nobody wants to be the person who
+breaks the demo the CEO loves.
+
+318
+00:20:42,193 --> 00:20:44,226
+Platform abs- abstraction save teams.
+
+319
+00:20:45,132 --> 00:20:49,079
+When we give team golden path standard
+template policy already attached,
+
+320
+00:20:49,116 --> 00:20:54,544
+observability already wired in, onboarding
+a new AI workload goes from week to days.
+
+321
+00:20:55,515 --> 00:20:59,192
+People don't want to become
+expert in Rego or OpenTelemetry.
+
+322
+00:20:59,910 --> 00:21:01,656
+They want to ship their feature.
+
+323
+00:21:02,901 --> 00:21:04,980
+So make the safe path the easy path.
+
+324
+00:21:05,940 --> 00:21:08,950
+The governed way is also the fastest way.
+
+325
+00:21:08,960 --> 00:21:13,479
+You barely have to enforce anything
+Shared ownership is non-negotiable.
+
+326
+00:21:14,019 --> 00:21:17,742
+Security platform and ML engineering
+have to write the standard together.
+
+327
+00:21:17,903 --> 00:21:23,954
+When each team group writes its own,
+the gap sit exactly between them,
+
+328
+00:21:24,387 --> 00:21:25,839
+and that is where incident come from
+
+329
+00:21:26,839 --> 00:21:30,706
+I'll walk through a scenario that is very
+close to the kind of thing we deal with.
+
+330
+00:21:30,804 --> 00:21:33,824
+It shows every piece of this
+architecture working to-together,
+
+331
+00:21:33,934 --> 00:21:35,288
+and one piece saving us.
+
+332
+00:21:36,360 --> 00:21:41,553
+Picture a RAG-based support assistant
+running on a GPU node pool in Kubernetes.
+
+333
+00:21:41,870 --> 00:21:44,658
+It is about nine forty
+on a weekday evening.
+
+334
+00:21:45,582 --> 00:21:49,942
+A team ships a new version of generation
+model, the model that writes the answer.
+
+335
+00:21:50,794 --> 00:21:57,662
+It goes out through GitOps as a canary, so
+only ten percent of traffic sees it About
+
+336
+00:21:57,663 --> 00:22:00,126
+six minutes in, the signal starts firing.
+
+337
+00:22:01,264 --> 00:22:06,719
+P99 latency on the canary goes from around
+380 millisecond to over two seconds.
+
+338
+00:22:07,186 --> 00:22:15,994
+GPU memory on those nodes is at 96%, and
+two of the inference pod get OOM Killed.
+
+339
+00:22:17,338 --> 00:22:18,599
+Killed for running out of memory.
+
+340
+00:22:20,103 --> 00:22:22,444
+At eight minute, theRIAZ
+agent picks it up.
+
+341
+00:22:23,271 --> 00:22:28,641
+It pulls the Prometheus metrics, the pod
+lo-logs, and the rollout history from the
+
+342
+00:22:28,650 --> 00:22:32,470
+GitOps controller, and it lines then up.
+
+343
+00:22:32,860 --> 00:22:35,863
+The latency spike start exactly
+when the canary started.
+
+344
+00:22:35,874 --> 00:22:39,469
+The OOM are only on canary pods.
+
+345
+00:22:40,469 --> 00:22:41,780
+The stable version is fine.
+
+346
+00:22:42,222 --> 00:22:45,849
+So its conclusion with high confidence
+is the new model version is the cause.
+
+347
+00:22:46,949 --> 00:22:51,004
+Proposes action one, abort
+the canary and roll back.
+
+348
+00:22:51,560 --> 00:22:53,118
+Now, that is a tier one action.
+
+349
+00:22:53,331 --> 00:22:56,882
+It is scoped to one
+rollout in one namespace.
+
+350
+00:22:57,086 --> 00:23:01,188
+It is reversible, and it is
+in the approved playbook.
+
+351
+00:23:01,641 --> 00:23:04,352
+So the policy engine
+says yes, and it runs.
+
+352
+00:23:05,116 --> 00:23:09,571
+At nine minutes, the canary go-- canary
+is gone and the latency is back to normal.
+
+353
+00:23:09,597 --> 00:23:12,072
+No user outside the
+10% ever saw a problem.
+
+354
+00:23:12,970 --> 00:23:14,837
+So far, the agent was right, right?
+
+355
+00:23:15,862 --> 00:23:17,542
+But then it proposes action two.
+
+356
+00:23:17,807 --> 00:23:21,668
+It notices, notices that three GPU
+nodes are still showing memory pressure.
+
+357
+00:23:22,199 --> 00:23:28,063
+So it suggests gardening and draining
+those three nodes to clear the bad state.
+
+358
+00:23:28,080 --> 00:23:29,388
+That sound reasonable, right?
+
+359
+00:23:31,293 --> 00:23:35,050
+Those nodes are a shared GPU pool,
+another team's production model.
+
+360
+00:23:35,837 --> 00:23:38,495
+A completely different service
+is running on the same node.
+
+361
+00:23:39,701 --> 00:23:44,179
+Draining them would have evicted that
+team's workaround in the middle of
+
+362
+00:23:44,450 --> 00:23:48,394
+everything, and the memory pressure
+was clearing on its own anyway
+
+363
+00:23:48,431 --> 00:23:50,023
+because the canary pods are gone.
+
+364
+00:23:50,170 --> 00:23:54,240
+The agent did not know any
+of that, but the policy did.
+
+365
+00:23:54,248 --> 00:23:57,368
+Draining a node is a tier three action.
+
+366
+00:23:57,993 --> 00:24:00,842
+It touches shared infrastructure,
+so the policy engine denied it,
+
+367
+00:24:01,316 --> 00:24:04,784
+and the on-call engineer was faced
+with the full evidence bundle, the
+
+368
+00:24:04,784 --> 00:24:08,092
+metrics, the reasoning, what the agent
+wanted to do, and why it blocked.
+
+369
+00:24:08,113 --> 00:24:10,515
+The engineer looked at it for
+two minutes and said, "No."
+
+370
+00:24:12,437 --> 00:24:15,848
+So nine minutes from the first signal
+to roll back, zero error outside the
+
+371
+00:24:15,850 --> 00:24:21,468
+canary, and one unsafe action blocked
+by policy before it even ran The agent
+
+372
+00:24:21,480 --> 00:24:26,781
+was right about the cause, and the gate
+was right to stop the second action.
+
+373
+00:24:26,828 --> 00:24:29,585
+I think that's what good looks like.
+
+374
+00:24:29,800 --> 00:24:31,728
+You don't need the agent to be perfect.
+
+375
+00:24:31,728 --> 00:24:36,026
+You need the system around it to
+be designed for when it isn't.
+
+376
+00:24:36,827 --> 00:24:41,635
+And there is one more part, which I
+actually think is the most valuable part.
+
+377
+00:24:42,169 --> 00:24:44,969
+When we looked at why this
+happened, the new model version
+
+378
+00:24:44,976 --> 00:24:50,433
+simply needed more GPU memory than
+the old one, but the deployment
+
+379
+00:24:50,442 --> 00:24:52,237
+resource request hadn't changed.
+
+380
+00:24:52,792 --> 00:24:56,118
+Nobody had updated them, so the
+fix was a new admission policies.
+
+381
+00:24:56,133 --> 00:24:59,903
+Now every new model registry entry
+declares the memory it needs.
+
+382
+00:25:00,292 --> 00:25:04,395
+If the deployment asks for less
+than that, admission rejects it
+
+383
+00:25:05,062 --> 00:25:06,634
+before it ever reaches a GPU.
+
+384
+00:25:07,874 --> 00:25:09,673
+That is the loop closing.
+
+385
+00:25:11,125 --> 00:25:12,949
+An incident becomes a policy.
+
+386
+00:25:13,081 --> 00:25:17,370
+The policy live in Git, and the next team
+cannot make the same mistake, even if
+
+387
+00:25:17,381 --> 00:25:19,313
+they have never heard about this incident
+
+388
+00:25:20,313 --> 00:25:24,098
+So the big question, does
+all of this slow you down?
+
+389
+00:25:24,133 --> 00:25:24,979
+I don't think so.
+
+390
+00:25:25,015 --> 00:25:28,046
+The tension between moving fast
+and staying safe is real, but
+
+391
+00:25:28,133 --> 00:25:32,675
+it is an engineering problem,
+not a culture war Think about
+
+392
+00:25:32,696 --> 00:25:34,294
+the case we just walked through.
+
+393
+00:25:35,663 --> 00:25:39,064
+Without the gate, you'd have
+either stopped the agent from doing
+
+394
+00:25:39,078 --> 00:25:43,036
+anything useful, or you let it
+drain node on a Tuesday evening.
+
+395
+00:25:43,037 --> 00:25:48,554
+The get-- The gate is what lets you
+say yes to the rollback with no human
+
+396
+00:25:48,559 --> 00:25:53,321
+in the loop because you know that
+the dangerous action is covered.
+
+397
+00:25:54,222 --> 00:25:56,418
+Good governments take away ambiguity.
+
+398
+00:25:56,746 --> 00:25:58,737
+Team know what is allowed.
+
+399
+00:25:59,209 --> 00:26:02,105
+Compliance checks run automatically
+instead of in a reviewing
+
+400
+00:26:02,106 --> 00:26:03,144
+meeting two weeks later.
+
+401
+00:26:04,064 --> 00:26:07,270
+And there are pre-approved
+patterns to build on.
+
+402
+00:26:07,334 --> 00:26:11,551
+In my experience, team with mature
+policy as code ship AI feature
+
+403
+00:26:11,553 --> 00:26:16,371
+faster, mostly because they spend far
+less time recovering from incident
+
+404
+00:26:16,390 --> 00:26:18,246
+and cleaning up after audits.
+
+405
+00:26:19,326 --> 00:26:21,409
+The goal was never to slow AI down.
+
+406
+00:26:21,723 --> 00:26:23,779
+It is to make the speed sustainable
+
+407
+00:26:24,779 --> 00:26:25,999
+The path forward.
+
+408
+00:26:26,665 --> 00:26:31,089
+If you look at the steps on this slide,
+that is roughly how I see this journey.
+
+409
+00:26:31,091 --> 00:26:34,539
+We started with manual DevSecOps.
+
+410
+00:26:34,837 --> 00:26:37,184
+Most of us moved to automated pipeline.
+
+411
+00:26:37,244 --> 00:26:41,759
+A lot of teams are now in the AI-augmented
+operation, AI-suggested human acts.
+
+412
+00:26:42,154 --> 00:26:46,132
+And the next step is governed automan-
+autonomous delivery, where AI act
+
+413
+00:26:46,132 --> 00:26:47,797
+inside the boundaries we have defined.
+
+414
+00:26:48,973 --> 00:26:51,497
+The word I would focus on is governed.
+
+415
+00:26:52,300 --> 00:26:55,686
+Autonomy without governance
+is just uncontrolled risk.
+
+416
+00:26:55,977 --> 00:27:00,085
+So my advice, start building the
+governance foundation now, before
+
+417
+00:27:00,088 --> 00:27:01,976
+the agent shows up at scale.
+
+418
+00:27:02,675 --> 00:27:06,738
+Start small, pick one agent, use
+case like rollout validation.
+
+419
+00:27:07,357 --> 00:27:10,424
+Give its own identity, put
+a policy gateway in front of
+
+420
+00:27:10,428 --> 00:27:12,427
+its tools, and log everything.
+
+421
+00:27:13,637 --> 00:27:18,750
+You will learn more from what-- one
+real deployment than from any amount
+
+422
+00:27:18,752 --> 00:27:24,506
+of planning, planning Any retrofitting
+governance later is much, much harder
+
+423
+00:27:25,232 --> 00:27:27,230
+and even harder in the live production
+
+424
+00:27:28,230 --> 00:27:30,168
+So the takeaway, like four things.
+
+425
+00:27:30,259 --> 00:27:31,470
+unify both mandates.
+
+426
+00:27:31,485 --> 00:27:36,449
+Build for AI with AI on one governmental
+platform, not two separate efforts.
+
+427
+00:27:37,704 --> 00:27:39,474
+Policy as code is the foundation.
+
+428
+00:27:39,482 --> 00:27:44,874
+Zero trust, RBAC, provenance,
+and audit need to be designed in,
+
+429
+00:27:45,087 --> 00:27:49,038
+not bolted on after going live.
+
+430
+00:27:50,867 --> 00:27:55,023
+Observability spans every layer,
+from the GPU all the way to the
+
+431
+00:27:55,030 --> 00:27:56,730
+model drift and agent traces.
+
+432
+00:27:56,759 --> 00:28:01,006
+If you can't measure it, you
+can't govern it Four, approval
+
+433
+00:28:01,019 --> 00:28:02,863
+gates enable, they don't block.
+
+434
+00:28:03,355 --> 00:28:08,792
+Including human oversight as policy gives
+agent a clear operating envelope, and it
+
+435
+00:28:08,809 --> 00:28:13,385
+gives your organization the confidence
+to widen that envelope over time
+
+436
+00:28:14,385 --> 00:28:14,741
+Thank you.
+
+437
+00:28:15,278 --> 00:28:16,143
+That's it from me.
+
+438
+00:28:16,188 --> 00:28:17,477
+Thanks for spending the time.
+
+439
+00:28:17,985 --> 00:28:22,910
+If you are working through any of these
+in your platform, I would really like
+
+440
+00:28:22,910 --> 00:28:26,780
+to hear how you are approaching it
+and especially where it went wrong.
+
+441
+00:28:27,792 --> 00:28:30,109
+Those are always the best conversation.
+
+442
+00:28:30,176 --> 00:28:31,388
+You can find me on LinkedIn.
+
+443
+00:28:31,439 --> 00:28:32,049
+Thanks again
+

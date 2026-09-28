@@ -1,0 +1,1442 @@
+1
+00:00:01,000 --> 00:00:04,896
+Your alerting is working
+perfectly, and that is the problem.
+
+2
+00:00:05,254 --> 00:00:09,803
+There are probably three to six
+actions your AI agent can take
+
+3
+00:00:09,812 --> 00:00:12,300
+right now that you cannot take back.
+
+4
+00:00:12,625 --> 00:00:15,331
+Most teams have never
+written that list down.
+
+5
+00:00:15,763 --> 00:00:20,125
+By the end of the next half hour, you
+will have written it for your own system.
+
+6
+00:00:20,510 --> 00:00:25,190
+I'm going to tell you which ones I block,
+which ones I deliberately let fail and
+
+7
+00:00:25,191 --> 00:00:30,564
+revert, and what blocking them actually
+costs me in latency and shipping speed,
+
+8
+00:00:30,905 --> 00:00:32,891
+including the one I got wrong, of course.
+
+9
+00:00:33,061 --> 00:00:33,811
+Hi, everyone.
+
+10
+00:00:33,816 --> 00:00:35,362
+My name is Artemis Leonarou.
+
+11
+00:00:35,576 --> 00:00:40,360
+I'm a founding engineer at NoFire AI, the
+context and control model for production.
+
+12
+00:00:40,637 --> 00:00:44,898
+And in this session, we're going to look
+at what it actually means to check an
+
+13
+00:00:44,898 --> 00:00:49,672
+agent's action before it runs instead
+of after, where that check goes in a
+
+14
+00:00:49,675 --> 00:00:53,830
+pipeline you already have, and which
+actions are worth checking at all.
+
+15
+00:00:54,071 --> 00:00:55,627
+Here is the shape of the thing.
+
+16
+00:00:55,955 --> 00:00:59,690
+Almost all of the safety tooling
+we have built around AI agents is
+
+17
+00:00:59,699 --> 00:01:01,266
+built to tell you what happened.
+
+18
+00:01:01,510 --> 00:01:04,607
+The alert fires, the log line
+lands, somebody reads it,
+
+19
+00:01:04,632 --> 00:01:06,038
+and somebody investigates.
+
+20
+00:01:06,360 --> 00:01:09,173
+That ordering is not an
+accident, and it is not stupid.
+
+21
+00:01:09,673 --> 00:01:12,999
+It works, and it has worked for
+twenty years because for twenty
+
+22
+00:01:12,999 --> 00:01:17,829
+years, the thing taking the action
+was a human, and humans hesitate.
+
+23
+00:01:18,095 --> 00:01:22,573
+A person about to do something
+ir-irreversible pauses half a second, and
+
+24
+00:01:22,573 --> 00:01:25,276
+in that half second they sometimes stop.
+
+25
+00:01:25,758 --> 00:01:29,291
+Every incident review you have
+ever read has a moment in it where
+
+26
+00:01:29,294 --> 00:01:32,433
+someone says, "I was about to
+run it and something felt wrong."
+
+27
+00:01:33,157 --> 00:01:35,085
+Agents do not hesitate.
+
+28
+00:01:35,205 --> 00:01:36,797
+There is no half second.
+
+29
+00:01:37,176 --> 00:01:42,048
+The action and the decision to take the
+action happen in the same instant, and
+
+30
+00:01:42,048 --> 00:01:44,051
+your alert arrives after both of them.
+
+31
+00:01:44,589 --> 00:01:46,083
+That is not a monitoring gap.
+
+32
+00:01:46,184 --> 00:01:47,890
+Your monitoring is fine.
+
+33
+00:01:48,298 --> 00:01:51,955
+It is an ordering problem, and
+you cannot fix an ordering problem
+
+34
+00:01:51,994 --> 00:01:53,696
+by buying better monitoring.
+
+35
+00:01:54,086 --> 00:01:57,274
+And, and really quickly, so
+you know who is telling you
+
+36
+00:01:57,276 --> 00:01:58,883
+this, I am twenty years old.
+
+37
+00:01:58,892 --> 00:02:03,486
+I have been shipping code to production
+since I was fourteen, and for about
+
+38
+00:02:03,502 --> 00:02:07,208
+the last three years, I have not
+been the one writing most of it.
+
+39
+00:02:07,517 --> 00:02:12,940
+So I am not warning you about the future,
+I am describing my normal working day.
+
+40
+00:02:13,256 --> 00:02:16,941
+I learned this e-expensively, and
+I will keep it short because the
+
+41
+00:02:16,942 --> 00:02:18,839
+lesson is worth more than the story.
+
+42
+00:02:19,182 --> 00:02:20,711
+An agent wrote a change.
+
+43
+00:02:20,745 --> 00:02:24,625
+That change went through human code
+review, and the person approved it.
+
+44
+00:02:24,832 --> 00:02:27,233
+It went through CI, and CI passed.
+
+45
+00:02:27,474 --> 00:02:30,831
+Then it ran, and it did something
+that could not be taken back.
+
+46
+00:02:31,172 --> 00:02:33,660
+My alerting worked exactly as designed.
+
+47
+00:02:33,850 --> 00:02:37,794
+It was accurate, fast, and it
+was useless because what it told
+
+48
+00:02:37,794 --> 00:02:39,683
+me about had already happened.
+
+49
+00:02:39,954 --> 00:02:43,730
+It had already been done, and it had
+already been seen by other people.
+
+50
+00:02:44,116 --> 00:02:47,433
+I spent a while afterwards looking
+for the control that failed,
+
+51
+00:02:47,838 --> 00:02:49,654
+and that was the wrong search.
+
+52
+00:02:49,933 --> 00:02:50,788
+Nothing failed.
+
+53
+00:02:50,819 --> 00:02:54,434
+Every control I owned did
+precisely what it was built to do.
+
+54
+00:02:55,322 --> 00:03:00,238
+So I did not have a detection
+problem, I had an ordering problem,
+
+55
+00:03:00,620 --> 00:03:01,971
+and that's the whole story.
+
+56
+00:03:01,974 --> 00:03:06,423
+The rest of the talk is what I did
+about it and what you can all do about
+
+57
+00:03:06,426 --> 00:03:11,489
+it without the incident, hopefully
+Before I take anything apart, I want to
+
+58
+00:03:11,493 --> 00:03:15,150
+be fair to the thing you already have
+because I think a lot of talks in this
+
+59
+00:03:15,150 --> 00:03:17,828
+slot are quietly dishonest about this.
+
+60
+00:03:18,171 --> 00:03:20,146
+Code review is good.
+
+61
+00:03:20,527 --> 00:03:25,400
+A human reading a diff catches things
+that, automated checks might not
+
+62
+00:03:25,428 --> 00:03:30,681
+catch, especially intent, especially,
+"Why is this thing here at all?"
+
+63
+00:03:31,151 --> 00:03:32,592
+So CI is good.
+
+64
+00:03:32,603 --> 00:03:34,038
+It catches regressions.
+
+65
+00:03:34,046 --> 00:03:35,770
+It catches the thing you forgot.
+
+66
+00:03:35,793 --> 00:03:38,017
+It runs every time, and
+it never gets tired.
+
+67
+00:03:38,403 --> 00:03:40,836
+Monitoring and alerting are good.
+
+68
+00:03:41,171 --> 00:03:44,538
+They are how you find out about
+the entire enormous category of
+
+69
+00:03:44,539 --> 00:03:46,256
+failures that nobody predicted.
+
+70
+00:03:46,636 --> 00:03:50,045
+And of course, I'm not here to tell
+you that all of these are theater.
+
+71
+00:03:50,066 --> 00:03:50,690
+They are not.
+
+72
+00:03:51,052 --> 00:03:54,250
+I still run all, all of them, and
+I would not remove any of them.
+
+73
+00:03:54,554 --> 00:03:57,486
+What I want you to notice
+is narrower than that.
+
+74
+00:03:57,991 --> 00:04:01,887
+Every single one of these
+controls produces a report.
+
+75
+00:04:02,339 --> 00:04:05,304
+Review produces an
+opinion before the merge.
+
+76
+00:04:05,645 --> 00:04:07,881
+CI produces a result.
+
+77
+00:04:08,197 --> 00:04:10,289
+Alerting produces a notification.
+
+78
+00:04:10,602 --> 00:04:14,536
+And for a very large fraction of
+what your system does, a report
+
+79
+00:04:14,568 --> 00:04:18,519
+is exactly right because if the
+thing turns out to be wrong, you
+
+80
+00:04:18,529 --> 00:04:20,262
+read the report and you undo it.
+
+81
+00:04:20,668 --> 00:04:25,323
+The question this talk is about is what
+happens you-- when you cannot undo it
+
+82
+00:04:25,716 --> 00:04:28,321
+because then the report is not a control.
+
+83
+00:04:28,598 --> 00:04:29,463
+It is a receipt.
+
+84
+00:04:30,202 --> 00:04:34,709
+So here is a reframe, and it is the
+single most useful thing I have got.
+
+85
+00:04:35,226 --> 00:04:39,680
+When people think about this, they
+usually ask, "Is this action risky?"
+
+86
+00:04:40,031 --> 00:04:43,506
+And risk is a genuinely
+hard thing to reason about.
+
+87
+00:04:43,866 --> 00:04:45,316
+You need a probability.
+
+88
+00:04:45,474 --> 00:04:46,544
+You need an impact.
+
+89
+00:04:46,552 --> 00:04:50,766
+You need to argue with people about
+both, and you end up with a spreadsheet
+
+90
+00:04:50,803 --> 00:04:52,828
+that nobody believes in reality.
+
+91
+00:04:53,495 --> 00:04:58,530
+So you can replace it with a much
+easier question: Can I take this back?
+
+92
+00:04:58,590 --> 00:05:01,425
+And if yes, how fast can I take this back?
+
+93
+00:05:02,052 --> 00:05:06,425
+That question has the enormous
+advantage of having an actual answer.
+
+94
+00:05:06,765 --> 00:05:10,784
+You do not need the probability, and
+you don't need to predict anything.
+
+95
+00:05:11,022 --> 00:05:15,278
+You look at the action, and you ask what
+it would take to reverse the action.
+
+96
+00:05:15,702 --> 00:05:17,497
+That is a fact about your system.
+
+97
+00:05:17,520 --> 00:05:21,716
+It is not a forecast, and usually,
+the person who owns the system can
+
+98
+00:05:21,725 --> 00:05:23,564
+answer it in about four seconds.
+
+99
+00:05:24,078 --> 00:05:27,788
+And once you ask it that way,
+everything your agent can
+
+100
+00:05:27,788 --> 00:05:30,173
+do falls into three buckets.
+
+101
+00:05:30,486 --> 00:05:33,100
+The first bucket is freely reversible.
+
+102
+00:05:33,443 --> 00:05:37,932
+You can undo it in seconds by
+yourself without asking anyone.
+
+103
+00:05:38,270 --> 00:05:43,253
+Most of what your agent does lives
+here, writing to a scratchpad, producing
+
+104
+00:05:43,256 --> 00:05:44,998
+a draft, reading anything at all.
+
+105
+00:05:45,377 --> 00:05:48,434
+Second, this bucket should not be gated.
+
+106
+00:05:48,473 --> 00:05:51,630
+I want to be really clear
+because this is where people go
+
+107
+00:05:51,630 --> 00:05:53,314
+wrong in the other direction.
+
+108
+00:05:53,800 --> 00:05:59,473
+A gate on a freely reversible action buys
+you nothing, and it costs you shipping
+
+109
+00:05:59,785 --> 00:06:02,295
+speed- On every single execution.
+
+110
+00:06:02,536 --> 00:06:04,560
+It is pure tax on your side.
+
+111
+00:06:04,972 --> 00:06:08,006
+The second bucket is
+reversible with effort.
+
+112
+00:06:08,285 --> 00:06:11,574
+You can undo it, but it takes
+a while, or it needs someone
+
+113
+00:06:11,577 --> 00:06:13,517
+else, or it needs a deployment.
+
+114
+00:06:13,825 --> 00:06:15,689
+do not gate this either, I would say.
+
+115
+00:06:15,967 --> 00:06:19,017
+Instead, just make some
+boundaries for them.
+
+116
+00:06:19,374 --> 00:06:23,754
+Make the change small enough that
+undoing it is cheap, and make
+
+117
+00:06:23,754 --> 00:06:25,676
+sure the undo path is one step.
+
+118
+00:06:26,061 --> 00:06:28,343
+The work here is not adding a check.
+
+119
+00:06:28,397 --> 00:06:34,172
+It is reducing the cost of the reversal
+until bucket two behaves like bucket one.
+
+120
+00:06:34,570 --> 00:06:38,071
+And then bucket three is the
+changes that are not reversible.
+
+121
+00:06:38,267 --> 00:06:41,321
+Once it has run, it has
+run, and there is no undo.
+
+122
+00:06:41,768 --> 00:06:46,253
+There may be a follow-up action that
+partially compensates, an apology, a
+
+123
+00:06:46,253 --> 00:06:50,867
+correction, a refund, but the original
+thing has happened and it stays happened.
+
+124
+00:06:51,221 --> 00:06:54,643
+This should be gated before
+execution every time.
+
+125
+00:06:55,483 --> 00:06:59,223
+So let's see what is
+actually in bucket three.
+
+126
+00:06:59,249 --> 00:07:03,443
+This is the part I would like you
+to steal directly because I think
+
+127
+00:07:03,479 --> 00:07:07,891
+most teams have simply never sat
+down and enumerated it like that.
+
+128
+00:07:08,172 --> 00:07:13,900
+Here is my list of things an agent can
+do that you cannot take back It sends
+
+129
+00:07:13,901 --> 00:07:18,458
+a message to a person or to a channel
+or to a customer, email, Slack, a
+
+130
+00:07:18,458 --> 00:07:20,995
+notification, a comment on someone PRs.
+
+131
+00:07:21,674 --> 00:07:24,163
+Once a human has read
+it, you cannot unread it.
+
+132
+00:07:24,414 --> 00:07:28,037
+Deleting the message doesn't help
+because the person already knows.
+
+133
+00:07:28,356 --> 00:07:33,402
+It publishes something externally
+visible, a release, a post, a status page
+
+134
+00:07:33,418 --> 00:07:38,721
+update, a package to a, to a registry,
+a DNS change, and the internet saw it.
+
+135
+00:07:38,968 --> 00:07:43,268
+It moves money, pays refunds,
+charges, and transfers.
+
+136
+00:07:43,560 --> 00:07:46,366
+It deletes or overwrites
+something without a snapshot.
+
+137
+00:07:46,941 --> 00:07:48,594
+And note the second half of that.
+
+138
+00:07:48,911 --> 00:07:51,858
+Deleting with a snapshot
+is bucket two problem.
+
+139
+00:07:52,202 --> 00:07:56,629
+Deleting without, without a snapshot
+is bucket three, and whether
+
+140
+00:07:56,631 --> 00:08:00,158
+you are in bucket two or three
+depends entirely on a detail most
+
+141
+00:08:00,158 --> 00:08:01,697
+people have not checked recently.
+
+142
+00:08:01,976 --> 00:08:07,035
+It grants or escalates access because
+the moment a credential exists in
+
+143
+00:08:07,037 --> 00:08:11,422
+someone's hands, revoking it later does
+not un-grant the window that they had.
+
+144
+00:08:12,095 --> 00:08:14,945
+It rotates or revokes a
+credential, which is the same
+
+145
+00:08:14,945 --> 00:08:16,898
+problem pointing the other way.
+
+146
+00:08:17,201 --> 00:08:19,271
+It merges to a branch that deploys.
+
+147
+00:08:19,501 --> 00:08:22,916
+If merging to main puts
+something in production, then
+
+148
+00:08:22,930 --> 00:08:24,585
+merging is not a code action.
+
+149
+00:08:24,599 --> 00:08:27,191
+It is a deployment action,
+and it belongs here.
+
+150
+00:08:27,480 --> 00:08:30,658
+It calls a third-party
+API with a side effect.
+
+151
+00:08:31,086 --> 00:08:35,463
+Anything where the state you changed
+is not in a database you control.
+
+152
+00:08:36,464 --> 00:08:38,085
+That is eight categories.
+
+153
+00:08:38,400 --> 00:08:42,106
+When I do this exercise with a real
+system, the actual number of distinct
+
+154
+00:08:42,122 --> 00:08:46,945
+irreversible actions usually comes
+out somewhere between three and six,
+
+155
+00:08:47,022 --> 00:08:48,934
+and not thirty, not three hundred.
+
+156
+00:08:49,339 --> 00:08:54,019
+And that is genuinely the encouraging part
+of this talk, so I want to say it plainly.
+
+157
+00:08:54,475 --> 00:08:57,657
+The set of things that you
+need t-to gate is small.
+
+158
+00:08:58,137 --> 00:09:02,084
+The reason this feels overwhelming is
+not that there are too many of them.
+
+159
+00:09:02,426 --> 00:09:06,376
+It is that nobody has written
+them down, so every action gets
+
+160
+00:09:06,378 --> 00:09:08,907
+treated as if it might be one.
+
+161
+00:09:09,348 --> 00:09:12,333
+Now we are going to go
+into something concrete.
+
+162
+00:09:12,829 --> 00:09:16,723
+If you do nothing else from this
+talk, if you do this, it takes about
+
+163
+00:09:16,723 --> 00:09:22,072
+an hour Step one, list every action
+your agent is permitted to take.
+
+164
+00:09:22,429 --> 00:09:25,518
+And I want to be precise
+about that word, permitted.
+
+165
+00:09:25,775 --> 00:09:29,467
+Not what it usually does, not
+what you designed it to do,
+
+166
+00:09:29,726 --> 00:09:31,810
+but what it is allowed to do.
+
+167
+00:09:32,050 --> 00:09:33,366
+What tools does it have?
+
+168
+00:09:33,388 --> 00:09:35,098
+What credentials does it hold?
+
+169
+00:09:35,377 --> 00:09:38,189
+And what does its token
+actually authorize?
+
+170
+00:09:38,655 --> 00:09:41,480
+This step is uncomfortable,
+and that is the point.
+
+171
+00:09:41,781 --> 00:09:45,545
+Most people find at least one thing
+on the list they had forgotten about.
+
+172
+00:09:45,803 --> 00:09:46,526
+I sure did.
+
+173
+00:09:46,872 --> 00:09:50,305
+Step two, for each one,
+answer two questions.
+
+174
+00:09:50,649 --> 00:09:52,291
+How long would it take to undo?
+
+175
+00:09:52,774 --> 00:09:54,397
+And who has to be awake?
+
+176
+00:09:54,665 --> 00:09:57,646
+The second half matters
+more than people expect.
+
+177
+00:09:58,060 --> 00:10:02,103
+An action you can technically reverse
+in ten minutes, but only if a specific
+
+178
+00:10:02,111 --> 00:10:06,752
+person with a specific permission
+is conscious and at a laptop, is not
+
+179
+00:10:06,766 --> 00:10:08,512
+in reality a ten-minute reversal.
+
+180
+00:10:08,848 --> 00:10:13,876
+At 3:00 in the morning, it is a two-hours
+reversal, so write down the real number.
+
+181
+00:10:14,205 --> 00:10:17,117
+Answers come out as
+minutes, hours, or never.
+
+182
+00:10:17,449 --> 00:10:21,060
+Step three is gate only the never row.
+
+183
+00:10:21,606 --> 00:10:22,851
+Bound the hours row.
+
+184
+00:10:23,111 --> 00:10:25,131
+Leave the minutes completely alone.
+
+185
+00:10:25,692 --> 00:10:26,532
+So that's it.
+
+186
+00:10:26,558 --> 00:10:27,653
+That's the whole procedure.
+
+187
+00:10:27,669 --> 00:10:31,558
+Now you have a list of three to
+six things and a reason for every
+
+188
+00:10:31,559 --> 00:10:35,646
+gate you add, which means you can
+defend each one to the person who
+
+189
+00:10:35,652 --> 00:10:38,122
+asks why their deploy got slower.
+
+190
+00:10:38,476 --> 00:10:40,779
+Now, where does the check live?
+
+191
+00:10:40,839 --> 00:10:45,007
+And I want to head something off
+because whenever anyone talks
+
+192
+00:10:45,010 --> 00:10:49,303
+about policy and gating, half the
+room starts imagining a platform.
+
+193
+00:10:49,609 --> 00:10:51,141
+You do not need a new service.
+
+194
+00:10:51,142 --> 00:10:52,625
+You do not need a redesign.
+
+195
+00:10:52,853 --> 00:10:54,343
+You don't need a control plane.
+
+196
+00:10:54,579 --> 00:10:59,240
+Every placement I am about to describe
+goes in a pipeline that you already have.
+
+197
+00:10:59,843 --> 00:11:04,117
+There are four places, and I will
+go through them in order of how late
+
+198
+00:11:04,153 --> 00:11:06,947
+they fire, because later is worse.
+
+199
+00:11:07,274 --> 00:11:12,550
+One is at the call site, a wrapper around
+the function that actually performs the
+
+200
+00:11:12,550 --> 00:11:16,630
+irreversible action, the send function,
+the delete function, and the payment
+
+201
+00:11:16,632 --> 00:11:21,565
+call This is the cheapest to build
+and the most precise, and it has one
+
+202
+00:11:21,566 --> 00:11:23,660
+property that none of the others have.
+
+203
+00:11:24,160 --> 00:11:28,853
+It is the only placement that catches
+an action taken outside your pipeline.
+
+204
+00:11:29,200 --> 00:11:32,515
+If your agent can be triggered from
+somewhere and you did not think
+
+205
+00:11:32,525 --> 00:11:37,560
+about, a CI check will never see
+it, and the call site will see it.
+
+206
+00:11:38,020 --> 00:11:40,193
+So if you only do one, do this one.
+
+207
+00:11:40,662 --> 00:11:45,286
+Second is pre-merge, a required
+check on the branch that deploys.
+
+208
+00:11:45,664 --> 00:11:50,289
+It is good when the irreversible
+thing is the deployment itself.
+
+209
+00:11:50,647 --> 00:11:54,905
+And the third is the CI, a
+job that inspects the output.
+
+210
+00:11:55,206 --> 00:11:59,680
+And I want to stress the output
+and not the prompt or the diff.
+
+211
+00:11:59,855 --> 00:12:02,430
+Checking the prompt tells
+you what you asked for.
+
+212
+00:12:02,758 --> 00:12:06,959
+Checking the diff tells you what changed,
+but neither of them tells you what the
+
+213
+00:12:06,959 --> 00:12:09,268
+thing actually produced when it ran.
+
+214
+00:12:09,569 --> 00:12:12,853
+And in my case, the prompt was
+fine, and the diff was fine.
+
+215
+00:12:13,686 --> 00:12:18,289
+And the fourth is at the boundary, a
+policy check sitting between the agent
+
+216
+00:12:18,302 --> 00:12:20,358
+and the external system it is calling.
+
+217
+00:12:20,868 --> 00:12:25,185
+Most general, latest to fire, and
+the one most likely to turn into
+
+218
+00:12:25,185 --> 00:12:26,858
+a platform project if you let it.
+
+219
+00:12:27,069 --> 00:12:29,470
+For what it's worth, I use
+the first and the third.
+
+220
+00:12:29,511 --> 00:12:34,055
+I skipped the fourth entirely because in
+a system my size, it would have been a lot
+
+221
+00:12:34,055 --> 00:12:38,014
+of architecture protecting a small number
+of calls that I had already wrapped.
+
+222
+00:12:38,854 --> 00:12:41,922
+And now let's get into what it all costs.
+
+223
+00:12:42,353 --> 00:12:46,847
+I promised at the start that I would be
+honest about what this costs, and I want
+
+224
+00:12:46,849 --> 00:12:52,033
+to do that properly because I think this
+is where talks like this usually go quiet.
+
+225
+00:12:52,251 --> 00:12:54,877
+So of course, it adds latency.
+
+226
+00:12:55,371 --> 00:13:00,114
+Every gated action now has a check
+in front of it, and that check sits
+
+227
+00:13:00,117 --> 00:13:02,209
+on a path where somebody is waiting.
+
+228
+00:13:02,569 --> 00:13:05,037
+It is not free, and you
+cannot pretend it is free.
+
+229
+00:13:05,363 --> 00:13:07,089
+It blocks legitimate work.
+
+230
+00:13:07,552 --> 00:13:10,417
+This is the real cost, and
+it is not a rounding error.
+
+231
+00:13:10,738 --> 00:13:14,237
+A gate that has never produced
+a false positive is a gate
+
+232
+00:13:14,237 --> 00:13:15,435
+that is not doing anything.
+
+233
+00:13:16,077 --> 00:13:20,614
+Mine stop things that are-- turn
+out to be perfectly fine, and every
+
+234
+00:13:20,628 --> 00:13:23,850
+time that happens, somebody's work
+is interrupted, and they have to
+
+235
+00:13:23,853 --> 00:13:25,708
+decide whether to override or not.
+
+236
+00:13:26,040 --> 00:13:31,122
+Also, a badly scoped gate is worse
+than no gate at all, and I want
+
+237
+00:13:31,127 --> 00:13:33,094
+to be empathic about this one.
+
+238
+00:13:33,575 --> 00:13:38,035
+If your gate fires too often or
+fires on things people know are
+
+239
+00:13:38,035 --> 00:13:40,447
+safe, they will route around it.
+
+240
+00:13:40,691 --> 00:13:45,791
+They will find a path that doesn't have
+the check, and then you have lost twice.
+
+241
+00:13:46,122 --> 00:13:50,523
+You don't have the gate, and you also
+don't have an honest picture of not having
+
+242
+00:13:50,523 --> 00:13:53,328
+it because on paper, the gate exists.
+
+243
+00:13:53,551 --> 00:13:57,959
+And Gating everything is its own failure.
+
+244
+00:13:58,410 --> 00:14:01,267
+It is the most common
+way this can go wrong.
+
+245
+00:14:01,646 --> 00:14:05,747
+Somebody reads a talk like this
+one, decides that safety is good
+
+246
+00:14:05,747 --> 00:14:10,697
+and more safety is better, and they
+put a check in front of all actions.
+
+247
+00:14:10,997 --> 00:14:13,613
+Six weeks later, nobody can ship anything.
+
+248
+00:14:13,801 --> 00:14:18,444
+The team has built three separate
+bypasses, and the checks are now
+
+249
+00:14:18,531 --> 00:14:22,638
+actively making the system less safe
+than it was because all the real work is
+
+250
+00:14:22,652 --> 00:14:28,402
+happening on the unmonitored path Which
+brings me to the one that I got wrong.
+
+251
+00:14:28,869 --> 00:14:31,566
+When I first did this,
+I gated the wrong layer.
+
+252
+00:14:31,720 --> 00:14:34,902
+I put a check in front of the
+agent's ability to write files
+
+253
+00:14:35,204 --> 00:14:39,262
+because writing files felt dangerous,
+and it was easy to intercept.
+
+254
+00:14:39,891 --> 00:14:41,901
+It was the wrong gate for two reason.
+
+255
+00:14:42,270 --> 00:14:44,098
+Writing a file was bucket one.
+
+256
+00:14:44,393 --> 00:14:49,271
+It was freely reversible, I could undo
+it in seconds, and I had just made every
+
+257
+00:14:49,271 --> 00:14:52,440
+single one of those slower for no benefit.
+
+258
+00:14:52,694 --> 00:14:57,465
+And the thing that I actually cared
+about, the message going out to people,
+
+259
+00:14:57,809 --> 00:15:03,983
+was three steps further down and sailed
+straight past it because by the time the
+
+260
+00:15:03,992 --> 00:15:08,569
+file was written, the decision to send
+had already been made somewhere else.
+
+261
+00:15:09,277 --> 00:15:13,622
+So I had a gate that was
+expensive, visible, annoying,
+
+262
+00:15:14,007 --> 00:15:15,560
+and pointed at the wrong thing.
+
+263
+00:15:15,979 --> 00:15:17,079
+It caught nothing.
+
+264
+00:15:17,172 --> 00:15:21,083
+It cost me real time every day,
+and because it existed, it made
+
+265
+00:15:21,084 --> 00:15:24,006
+me feel covered, which is the
+worst outcome of the three.
+
+266
+00:15:24,323 --> 00:15:29,290
+The lesson I took and the reason the
+reversibility question is at the center
+
+267
+00:15:29,290 --> 00:15:34,213
+of this talk is gate the action and not
+the thing that is easy to intercept.
+
+268
+00:15:34,514 --> 00:15:38,617
+These are very rarely the same
+layer, and the easy one is a trap
+
+269
+00:15:38,636 --> 00:15:40,177
+precisely because it is easy.
+
+270
+00:15:41,306 --> 00:15:46,475
+So specifically, what I gate, anything
+that sends something to a human,
+
+271
+00:15:46,819 --> 00:15:51,218
+anything that deletes without a snapshot,
+and anything that grants access.
+
+272
+00:15:51,617 --> 00:15:53,946
+this is my whole list
+for my specific project.
+
+273
+00:15:54,170 --> 00:15:59,267
+What I deliberately do not gate, and
+these are real decisions, is that I do
+
+274
+00:15:59,267 --> 00:16:04,041
+not gate rights to branches, I do not gate
+anything that is read-only, obviously.
+
+275
+00:16:04,440 --> 00:16:08,469
+I do not gate the agent's ability
+to open a pull request because a
+
+276
+00:16:08,470 --> 00:16:11,853
+pull request is a proposal, and a
+proposal is reversible by definition.
+
+277
+00:16:12,444 --> 00:16:17,009
+And I don't gate deploys to anything
+that is not production because the
+
+278
+00:16:17,009 --> 00:16:20,915
+entire point of a non-production
+environment is that breaking it is cheap.
+
+279
+00:16:21,176 --> 00:16:25,749
+Every one of those is a place where
+I decided that the check would cost
+
+280
+00:16:25,749 --> 00:16:29,857
+more than it would save, and I would
+rather say that out loud, than pretend
+
+281
+00:16:29,858 --> 00:16:31,465
+that I have full coverage everywhere.
+
+282
+00:16:31,842 --> 00:16:35,838
+Now, getting to the end, we are going
+to talk about two limits, honestly.
+
+283
+00:16:36,394 --> 00:16:38,761
+A gate doesn't make the agent correct.
+
+284
+00:16:39,218 --> 00:16:42,709
+Nothing in this talk improves the
+quality of what your agent produces.
+
+285
+00:16:43,212 --> 00:16:48,275
+It bounds what an incorrect agent can
+reach, and those are different problems,
+
+286
+00:16:48,305 --> 00:16:50,114
+and this is only the second one.
+
+287
+00:16:50,459 --> 00:16:52,781
+And the system in my story was small.
+
+288
+00:16:53,157 --> 00:16:57,427
+I'm not going to stand here and imply
+I have run this at scale most of you
+
+289
+00:16:57,429 --> 00:17:02,874
+work at What I would say is that the
+thing that transfers is not the scale.
+
+290
+00:17:03,351 --> 00:17:04,508
+It is the change path.
+
+291
+00:17:04,854 --> 00:17:10,156
+The sequence, decide, then execute,
+then report is the same sequence in
+
+292
+00:17:10,156 --> 00:17:14,995
+a system with 18 users and a system
+with 18 million users, and the fix is
+
+293
+00:17:15,010 --> 00:17:17,003
+in the ordering and not in the size.
+
+294
+00:17:17,348 --> 00:17:23,313
+So one thing to take away is go and
+find the three actions in your system
+
+295
+00:17:23,579 --> 00:17:26,070
+that you genuinely cannot take back.
+
+296
+00:17:26,462 --> 00:17:29,420
+Gate those and leave
+everything else alone.
+
+297
+00:17:29,802 --> 00:17:31,677
+There is no need to do more than that.
+
+298
+00:17:32,074 --> 00:17:37,274
+The instinct after a talk like this is to
+go out and add checks everywhere, and I
+
+299
+00:17:37,290 --> 00:17:41,907
+have just spent five minutes telling you
+that it is the most common way this fails.
+
+300
+00:17:42,412 --> 00:17:45,032
+Three to six thing, and you're done.
+
+301
+00:17:45,595 --> 00:17:46,714
+That is everything.
+
+302
+00:17:46,748 --> 00:17:50,370
+Thank you a lot for watching this
+session, and thank you also to
+
+303
+00:17:50,373 --> 00:17:52,885
+Conforty too for having me here.
+
+304
+00:17:53,231 --> 00:17:54,373
+I'm Artemis Leonardo.
+
+305
+00:17:54,376 --> 00:17:58,889
+I'm a founding engineer at NoFire
+AI, where we build software for SREs
+
+306
+00:17:58,923 --> 00:18:00,647
+and people who run infrastructure.
+
+307
+00:18:00,928 --> 00:18:04,105
+If that is your world or if you
+just want to argue with any of
+
+308
+00:18:04,105 --> 00:18:05,894
+this, you can find me on LinkedIn.
+
+309
+00:18:06,104 --> 00:18:10,796
+I would genuinely like to hear which
+actions you ended up gating and especially
+
+310
+00:18:10,810 --> 00:18:12,598
+if you find a category I missed.
+
+311
+00:18:12,849 --> 00:18:15,105
+So thank you and see
+you all in the next one.
+
+312
+00:18:15,174 --> 00:18:15,623
+Bye.
+
