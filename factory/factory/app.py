@@ -159,80 +159,28 @@ def publish_status():
     return "pushed" if r.returncode == 0 else "commit made, push failed: " + r.stderr[-200:]
 
 
-PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>Conf42 factory</title>
-<style>
-body{font-family:Segoe UI,Arial,sans-serif;margin:24px;color:#1a1a2e;background:#f6f7fb}
-h1{margin:0 0 4px;font-size:22px} .sub{color:#666;margin-bottom:18px}
-select,button,textarea,input{font:inherit} button{padding:7px 14px;border-radius:8px;border:1px solid #bbb;background:#fff;cursor:pointer}
-button.go{background:#6b40d8;color:#fff;border-color:#6b40d8} .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0 18px}
-table{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left;font-size:14px;vertical-align:top}
-th{background:#f0edfb;font-weight:600} .s{display:inline-block;min-width:74px;padding:2px 8px;border-radius:999px;font-size:12px;text-align:center}
-.done{background:#dff5e6;color:#17693a}.running{background:#fff3cd;color:#8a6100}.failed{background:#fde2e1;color:#a4231c}.todo{background:#eee;color:#888}
-.box{background:#fff;border-radius:10px;padding:12px 16px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.06)} .warn{color:#a4231c}
-pre{white-space:pre-wrap;font-size:12px;max-height:220px;overflow:auto;background:#fafafa;padding:8px;border-radius:6px}
-textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
-.mut{color:#888} .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
-.on{background:#22a355;box-shadow:0 0 0 4px rgba(34,163,85,.18);animation:pulse 1.6s infinite} .off{background:#bbb}
-@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(34,163,85,.05)}}
-.pbar{height:8px;background:#eee;border-radius:9px;overflow:hidden;min-width:120px;margin-bottom:2px} .pbar i{display:block;height:100%;background:#6b40d8}
-.lbl{display:block;font-size:11px;color:#8a6100;margin-top:3px;max-width:150px} .stale{background:#eee;color:#888}
-#now table{box-shadow:none;margin-top:8px} #now td,#now th{font-size:13px;padding:6px 8px}
-</style></head><body>
-<h1>Conf42 factory</h1><div class="sub">Conf42 talk videos: Drive download &rarr; Descript &rarr; finished MP4 + SRT on the Desktop</div>
-<div class="bar"><select id="ev"></select>
-<button class="go" onclick="post('start')">Start / resume</button>
-<button onclick="post('open')">Open output folder</button>
-<button onclick="post('publish')">Publish status to conf42.com/factory</button>
-<button onclick="toggle('set')">Settings</button><span id="msg"></span></div>
-<div id="now" class="box"><b>Right now</b> <small class="mut">checking...</small></div>
-<div id="sum" class="box"></div>
-<table><thead><tr><th>Talk</th><th>Upload</th><th>Edit</th><th>Publish</th><th>Download</th><th>SRT</th><th>Loudness</th><th>QA</th><th></th></tr></thead><tbody id="rows"></tbody></table>
-<div id="set" class="box" style="display:none"><b>settings.yml</b><textarea id="yml"></textarea><br><button class="go" onclick="saveSet()">Save settings</button></div>
-<div class="box"><b>Log</b><pre id="log"></pre></div>
-<script>
-const $=id=>document.getElementById(id), steps=__STEPS__;
-async function j(u,o){const r=await fetch(u,o);return r.json()}
-async function load(){const es=await j('/api/events');$('ev').innerHTML=es.map(e=>`<option value="${e.short_url}">${e.title} (${e.date})${e.started?' - started':''}</option>`).join('');$('ev').onchange=()=>{refresh();now()};refresh()}
-let alive=false;
-async function refresh(){const d=await j('/api/state?e='+$('ev').value);
- if(!d.state){$('sum').innerHTML='Not started. Put the Drive zips on the Desktop (or ask Claude), then press Start.';$('rows').innerHTML='';$('log').textContent='';return}
- const s=d.summary;$('sum').innerHTML=`<b>${s.finished.length}</b> of <b>${s.matched}</b> videos finished &middot; ${s.in_csv} talks in the CSV`+
- (s.unmatched.length?`<div class=warn>Not matched: ${s.unmatched.map(u=>u.file+' ('+u.why+')').join('; ')}</div>`:'')+
- (s.missing_videos.length?`<div>No video yet: ${s.missing_videos.join(', ')}</div>`:'')+
- (Object.keys(s.flagged).length?`<div class=warn>QA flags: ${Object.entries(s.flagged).map(([k,v])=>k+': '+v.join(', ')).join('; ')}</div>`:'');
- const rank=t=>t.finished?4:t.error&&!t.retry?3:t.queued?2:1;
- const rowsIn=Object.entries(d.state.talks).sort((a,b)=>rank(a[1])-rank(b[1])||(a[1].queued||0)-(b[1].queued||0)||a[0].localeCompare(b[0]));
- $('rows').innerHTML=rowsIn.map(([k,t])=>'<tr><td><b>'+k+'</b><br><small>'+(t.title||'')+'</small>'+(t.retry?'<div class=lbl style="max-width:none">'+t.retry+'</div>':t.error?'<div class=warn><small>'+t.error+'</small></div>':'')+
-  (t.queued?'<div><span class="s todo" style="background:#e9e4fb;color:#5a37b8">queued #'+t.queued+'</span> <small class=mut>'+(t.size_mb||'?')+' MB, waits for a free slot</small></div>':'')+'</td>'+
-  steps.map(st=>{const x=t.steps[st]||{};const c=x.status||'todo';return '<td><span class="s '+c+'" title="'+(x.label||x.error||'')+'">'+(c=='todo'?'-':c)+'</span>'+(c=='running'&&x.label?'<span class=lbl>'+x.label+'</span>':'')+'</td>'}).join('')+
-  '<td>'+(t.error&&!t.retry&&!alive?`<button onclick="retry('${k.replace(/'/g,"\\\\'")}')">Retry</button>`:'')+'</td></tr>').join('');
- $('log').textContent=(d.state.log||[]).slice(-40).reverse().join('\\n')}
-async function post(a){const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({e:$('ev').value})});$('msg').textContent=r.msg||'';setTimeout(refresh,1500)}
-async function retry(k){const r=await j('/api/retry',{method:'POST',body:JSON.stringify({e:$('ev').value,speakers:k})});$('msg').textContent=r.msg}
-async function toggle(id){const b=$(id);b.style.display=b.style.display=='none'?'block':'none';if(id=='set')$('yml').value=(await j('/api/settings')).yaml}
-async function saveSet(){const r=await j('/api/settings',{method:'POST',body:JSON.stringify({yaml:$('yml').value})});$('msg').textContent=r.msg}
-function ago(iso){if(!iso)return '';const s=(Date.now()-new Date(iso))/1000;return s<90?Math.round(s)+' s ago':Math.round(s/60)+' min ago'}
-function when(m){return m<90?m+' min ago':Math.round(m/60)+' h ago'}
-function jrow(x,up){const cls=x.state=='running'?'running':x.state=='stale'?'stale':x.note=='success'?'done':'failed';
- const word=x.state=='stopped'?(x.note=='success'?'done':(x.note||'stopped')):x.state;
- const who=x.talk||'<span class=mut>-</span>';
- const prog=(x.state=='running'&&x.percent!=null?'<div class=pbar><i style="width:'+x.percent+'%"></i></div>'+x.percent+'% ':'')+(x.state=='running'||x.state=='stale'?x.note:'');
- return `<tr><td>${who}</td><td>${x.job}</td><td><span class="s ${cls}">${word}</span></td><td><small>${prog}</small></td><td><small>${when(x.minutes)}</small></td></tr>`}
-async function now(){const e=$('ev').value;if(!e)return;const n=await j('/api/now?e='+e),d=n.descript||{},up=d.uploading_now||[];
- alive=!!(n.runners&&n.runners.length);const q=n.queue||[];
- const run=n.runners&&n.runners.length?`<span class="dot on"></span><b>Factory is running</b> <span class=mut>(process ${n.runners.map(r=>r.pid).join(', ')}, started ${n.runners[0].since.replace('T',' ')}, last activity ${ago(n.heartbeat)})</span>`
-  :`<span class="dot off"></span><b>Factory is not running</b> <span class=mut>(last activity ${ago(n.heartbeat)||'never'})</span>`;
- const jobs=d.jobs||[],running=jobs.filter(x=>x.state=='running'),rest=jobs.filter(x=>x.state!='running').slice(0,8);
- $('now').innerHTML=`<b>Right now</b><div style="margin:6px 0">${run}</div>`+
-  (q.length?`<div style="margin:0 0 8px"><b>Queue</b> <span class=mut>(smallest first)</span>: ${q.map((x,i)=>(i+1)+'. '+x.talk+' <span class=mut>('+x.mb+' MB)</span>').join(' &middot; ')}</div>`:'')+(d.error?`<div class=warn>Descript did not answer: ${d.error}</div>`:
-  `<div><b>Descript</b> <span class=mut>&middot; ${d.compositions||0} talks in the project &middot; ${n.edits} edits paid, about ${n.credits} AI credits</span>${d.project_url?` &middot; <a href="${d.project_url}" target=_blank>open the project in Descript</a>`:''}</div>`+
-  (running.length?'':'<div class=mut style="margin-top:6px">No Descript job running at this moment (the factory may be uploading, downloading or measuring loudness).</div>')+
-  '<div class=mut style="margin-top:4px"><small>Descript runs one job per project at a time, so talks take turns: a talk showing "Descript is busy" is waiting in line, not stuck.</small></div>'+
-  `<table><thead><tr><th>Talk</th><th>Job</th><th>State</th><th>Progress</th><th>Started</th></tr></thead><tbody>${running.map(x=>jrow(x,up)).join('')}`+
-  (rest.length?'<tr><td colspan=5 class=mut>recently finished</td></tr>'+rest.map(x=>jrow(x,[])).join(''):'')+'</tbody></table>')}
-load().then(()=>{now();setInterval(now,20000)});setInterval(refresh,5000);
-</script></body></html>"""
+PAGE_FILE = os.path.join(os.path.dirname(__file__), "dashboard.html")
+
+# Expected seconds per step = a + b * video minutes + c * MB, then scaled by how long finished steps really took
+# (median ratio, so the bars learn this PC's upload speed and Descript's pace). Seeds from 2026-09-28 Descript jobs.
+DEFAULT_SECS = {"render": (5, 4, 0), "upload": (70, 0, 0.25), "edit": (75, 0, 0), "publish": (40, 14, 0),
+                "download": (10, 0, 0.05), "srt": (8, 0, 0), "loudness": (5, 2.5, 0), "qa": (3, 1.2, 0)}
+
+
+def expectations(st):
+    talks = st.get("talks", {})
+    def base(step, t):
+        a, b, c = DEFAULT_SECS.get(step, (60, 0, 0))
+        minutes = ((t.get("probe") or {}).get("duration") or 0) / 60 or 20
+        return a + b * minutes + c * (t.get("size_mb") or 500)
+    out = {}
+    for step in pipeline.STEPS:
+        ratios = sorted((t["steps"][step]["took"] / base(step, t)) for t in talks.values()
+                        if (t["steps"].get(step) or {}).get("took"))
+        f = min(6, max(0.25, ratios[len(ratios) // 2])) if ratios else 1
+        for k, t in talks.items():
+            out.setdefault(k, {})[step] = round(base(step, t) * f)
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -251,12 +199,17 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         q = parse_qs(u.query)
         if u.path == "/":
-            return self.send(200, PAGE.replace("__STEPS__", json.dumps(pipeline.STEPS)), "text/html")
+            with open(PAGE_FILE, encoding="utf-8") as f:
+                return self.send(200, f.read().replace("__STEPS__", json.dumps(pipeline.STEPS)), "text/html")
         if u.path == "/api/events":
             return self.send(200, event_list())
         if u.path == "/api/state":
             st = state_of((q.get("e") or [""])[0])
-            return self.send(200, {"state": st, "summary": pipeline.summary(st) if st else None})
+            if not st:
+                return self.send(200, {"state": None})
+            ev = next((x for x in event_list() if x["short_url"] == st["event"]["short_url"]), {})
+            return self.send(200, {"state": st, "summary": pipeline.summary(st), "expect": expectations(st),
+                                   "title": ev.get("title", ""), "parallel": pipeline.settings().get("parallel_talks", 2)})
         if u.path == "/api/now":
             e = (q.get("e") or [""])[0]
             st = state_of(e) or {}

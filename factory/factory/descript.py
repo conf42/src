@@ -38,7 +38,8 @@ class _Progress:
         self.sent += len(chunk)
         if self.cb and (time.time() - self.last > 5 or self.sent >= self.size):
             self.last = time.time()
-            self.cb("uploading %d%% of %.1f GB" % (100 * self.sent // max(self.size, 1), self.size / 1e9))
+            pct = 100 * self.sent // max(self.size, 1)
+            self.cb("uploading %d%% of %.0f MB" % (pct, self.size / 1e6), pct)
         return chunk
 
 
@@ -91,7 +92,7 @@ class Descript:
                     raise RuntimeError("Descript job %s failed: %s" % (job_id, str(res)[:400]))
                 return j
             if on_progress and j.get("progress"):
-                on_progress(j["progress"].get("label", ""))
+                on_progress(j["progress"].get("label", ""), j["progress"].get("percent"))
             time.sleep(every)
 
     # ---- the calls the factory uses -------------------------------------------------------
