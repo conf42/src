@@ -1,0 +1,1528 @@
+1
+00:00:01,238 --> 00:00:01,948
+Hello, everyone.
+
+2
+00:00:02,218 --> 00:00:03,328
+I'm Mridula Chilukuri.
+
+3
+00:00:03,838 --> 00:00:07,108
+I'm a product manager, building
+microservices-based platforms.
+
+4
+00:00:07,468 --> 00:00:10,818
+I've spent more than a decade,
+in, enterprise infrastructure.
+
+5
+00:00:11,218 --> 00:00:15,438
+early years of my career, I have been on
+hands-on roles in data center operations.
+
+6
+00:00:15,897 --> 00:00:20,107
+and this talk comes out of
+the diagnostic problems I've
+
+7
+00:00:20,107 --> 00:00:21,887
+watched teams hitting, regularly.
+
+8
+00:00:22,397 --> 00:00:24,417
+So let me start with a question.
+
+9
+00:00:24,887 --> 00:00:27,737
+When a request fails in a
+distributed Kubernetes platform,
+
+10
+00:00:28,027 --> 00:00:30,047
+why is the debugging so unreliable?
+
+11
+00:00:30,437 --> 00:00:31,828
+So what do I mean, by it?
+
+12
+00:00:32,308 --> 00:00:37,998
+So whenever, an issue occurs, engineer
+A comes with, root cause X, and
+
+13
+00:00:38,028 --> 00:00:40,018
+engineer B comes with a root cause Y.
+
+14
+00:00:40,568 --> 00:00:43,688
+They're looking at the same
+incidents, but they are coming
+
+15
+00:00:43,688 --> 00:00:45,368
+to two different conclusions.
+
+16
+00:00:46,238 --> 00:00:50,008
+So over the next, few minutes,
+I want to show you how to make
+
+17
+00:00:50,048 --> 00:00:54,748
+diagnostics deterministic, secure,
+and something you can actually
+
+18
+00:00:54,798 --> 00:00:56,558
+depend on when the pager goes off.
+
+19
+00:00:56,978 --> 00:01:01,948
+So this is built for DevSecOps engineers,
+the persona who owns reliability
+
+20
+00:01:01,968 --> 00:01:03,718
+and security at the same time.
+
+21
+00:01:05,028 --> 00:01:07,968
+For example, look at this
+request in the image, right?
+
+22
+00:01:08,348 --> 00:01:11,428
+take an example of an application,
+like, that's comprised of
+
+23
+00:01:11,488 --> 00:01:12,978
+multiple microservices.
+
+24
+00:01:13,428 --> 00:01:17,568
+So in this example, the application
+consists of authentication
+
+25
+00:01:17,568 --> 00:01:21,358
+service, cart service, payment
+service, and inventory service.
+
+26
+00:01:22,198 --> 00:01:26,397
+A user request, it can touch all
+the services in an application or
+
+27
+00:01:26,418 --> 00:01:28,358
+only few services in an application.
+
+28
+00:01:28,857 --> 00:01:33,137
+So when the application is being
+built, each service, is usually
+
+29
+00:01:33,177 --> 00:01:34,458
+owned by, like, different teams.
+
+30
+00:01:34,487 --> 00:01:38,457
+Like, each, team deploys, the
+service on their own schedule.
+
+31
+00:01:38,927 --> 00:01:42,967
+And, our telemetry is usually
+fragmented across all of it.
+
+32
+00:01:43,218 --> 00:01:48,227
+Like, logs live in one system, metrics
+in another system, traces are partial
+
+33
+00:01:48,227 --> 00:01:49,678
+or, or they are totally missing.
+
+34
+00:01:50,197 --> 00:01:52,737
+So debugging becomes non-deterministic.
+
+35
+00:01:53,737 --> 00:01:58,267
+So the answer you get depends on
+which engineer is looking and which
+
+36
+00:01:58,267 --> 00:02:00,167
+system they happen to check first.
+
+37
+00:02:00,947 --> 00:02:01,937
+So look at the trace.
+
+38
+00:02:02,007 --> 00:02:06,047
+Like, the request came in through
+the gateway, and then it moved
+
+39
+00:02:06,048 --> 00:02:09,077
+through authentication service,
+and then to the cart service.
+
+40
+00:02:09,658 --> 00:02:11,327
+And right there, there's a gap.
+
+41
+00:02:11,597 --> 00:02:12,517
+And payment service.
+
+42
+00:02:12,557 --> 00:02:13,308
+Where is the span?
+
+43
+00:02:13,317 --> 00:02:14,977
+Like, the span is missing entirely.
+
+44
+00:02:15,397 --> 00:02:21,147
+So one engineer starting at the cart
+service data concludes one thing, and
+
+45
+00:02:21,147 --> 00:02:24,617
+then another looking at what little
+payment data exists, they conclude
+
+46
+00:02:24,718 --> 00:02:26,588
+something completely differently.
+
+47
+00:02:27,328 --> 00:02:30,498
+and the same failure event,
+but different root causes.
+
+48
+00:02:31,007 --> 00:02:35,008
+So when, when engineers are trying to
+find, the root cause, I've seen, like,
+
+49
+00:02:35,008 --> 00:02:37,357
+they dig into logs of each service.
+
+50
+00:02:37,728 --> 00:02:41,808
+an enterprise application, it's usually
+built of hundreds of microservices.
+
+51
+00:02:42,820 --> 00:02:47,110
+So think about, what that does
+to your mean time resolution.
+
+52
+00:02:47,620 --> 00:02:50,120
+It's not just slow, it's a coin flip.
+
+53
+00:02:50,590 --> 00:02:51,240
+So…
+
+54
+00:02:52,190 --> 00:02:57,160
+And every incident review, like after
+the fact, it turns into an argument
+
+55
+00:02:57,160 --> 00:03:01,440
+about what actually happened, because
+nobody has the full picture of it.
+
+56
+00:03:01,980 --> 00:03:05,800
+And here I want to be clear,
+this isn't a convenience problem.
+
+57
+00:03:06,080 --> 00:03:12,520
+So when you are under like SOC 2 or HIPAA
+or PCI or in just a live incident review
+
+58
+00:03:12,520 --> 00:03:17,840
+with your VP on the call, not being able
+to reconstruct what happened, it's a
+
+59
+00:03:17,840 --> 00:03:20,060
+compliance and incident response risk.
+
+60
+00:03:20,530 --> 00:03:23,670
+So if you can't like paint the
+full picture, you cannot defend
+
+61
+00:03:23,670 --> 00:03:28,710
+it to an auditor, and you cannot
+prove that it won't happen again So
+
+62
+00:03:28,710 --> 00:03:32,670
+here's a map of, what I'll be going
+through in terms of the solution.
+
+63
+00:03:33,200 --> 00:03:33,910
+Four things.
+
+64
+00:03:34,510 --> 00:03:38,140
+the architecture, the design
+decisions that make tracing
+
+65
+00:03:38,160 --> 00:03:40,660
+deterministic, and then security.
+
+66
+00:03:41,030 --> 00:03:46,320
+how we keep trace metadata
+compliant, with an allowlist model.
+
+67
+00:03:46,320 --> 00:03:47,460
+Then resilience.
+
+68
+00:03:48,000 --> 00:03:50,710
+The telemetry failing should
+never touch a user request.
+
+69
+00:03:51,420 --> 00:03:52,670
+and verification.
+
+70
+00:03:53,040 --> 00:03:55,570
+seven capabilities like
+you can actually test.
+
+71
+00:03:55,940 --> 00:04:00,989
+everything I claim today is something
+you could check, in your pipelines Now,
+
+72
+00:04:01,089 --> 00:04:05,569
+let me talk a little bit about, why,
+standard observability cannot solve this.
+
+73
+00:04:05,989 --> 00:04:09,879
+like a lot of teams, they think they
+have solved observability because they
+
+74
+00:04:09,889 --> 00:04:12,129
+have dashboards, like lots of dashboards.
+
+75
+00:04:12,669 --> 00:04:18,919
+But conventional observability, it
+treats logs, metrics, and traces as
+
+76
+00:04:19,039 --> 00:04:24,109
+three separate domains, like three
+silos collected independently with
+
+77
+00:04:24,109 --> 00:04:26,099
+no shared identity linking them.
+
+78
+00:04:26,689 --> 00:04:31,929
+So you can have like a world-class
+dashboards for each pillar and still not
+
+79
+00:04:31,949 --> 00:04:34,180
+be able to follow one request across them.
+
+80
+00:04:34,769 --> 00:04:39,619
+So what that means, no-- that
+means there is no common trace
+
+81
+00:04:39,730 --> 00:04:41,829
+identifier across service ops.
+
+82
+00:04:42,399 --> 00:04:45,429
+So you are grepping the
+timestamps and hopping.
+
+83
+00:04:46,269 --> 00:04:52,369
+so here a manual log correlation
+that's, that's what is slowing it down
+
+84
+00:04:52,439 --> 00:04:54,920
+and making the diagnostics unreliable.
+
+85
+00:04:55,559 --> 00:05:01,509
+and inconsistent sampling also, it drops
+the exact failure you needed to see.
+
+86
+00:05:01,890 --> 00:05:05,189
+So because sampling decisions were made
+per service, not per trace, these gaps,
+
+87
+00:05:06,189 --> 00:05:09,229
+they quietly lead you
+to the wrong root cause.
+
+88
+00:05:10,129 --> 00:05:12,669
+The fix here isn't,
+like a fourth dashboard.
+
+89
+00:05:13,029 --> 00:05:18,129
+we want a shared identity that flows
+across every service, so the three
+
+90
+00:05:18,180 --> 00:05:23,319
+pillars finally point at the same thing
+And here we are following, the shared
+
+91
+00:05:23,349 --> 00:05:26,839
+identity, which is, a W3C trace context.
+
+92
+00:05:27,399 --> 00:05:29,419
+this, is a web standard.
+
+93
+00:05:29,489 --> 00:05:31,639
+It's not a vendor feature.
+
+94
+00:05:32,099 --> 00:05:38,169
+it gives, it gives software systems like
+a single universal way to pass tracking
+
+95
+00:05:38,169 --> 00:05:39,869
+information between the services.
+
+96
+00:05:40,419 --> 00:05:46,029
+Which means it's vendor-agnostic,
+and it propagates a trace ID,
+
+97
+00:05:46,339 --> 00:05:50,549
+and a span ID across, HTTP
+calls, in a vendor-neutral way.
+
+98
+00:05:51,599 --> 00:05:54,579
+This, header that you are
+seeing is a trace parent.
+
+99
+00:05:54,969 --> 00:05:56,459
+It carries four things.
+
+100
+00:05:56,929 --> 00:06:01,889
+One is the version, and then the second
+is a globally unique trace ID that
+
+101
+00:06:01,909 --> 00:06:04,599
+stays constant across the whole request.
+
+102
+00:06:05,059 --> 00:06:08,689
+And then there is a span ID,
+like for the current hop.
+
+103
+00:06:09,019 --> 00:06:15,379
+It's, specific to the service and specific
+to that particular request, and flags.
+
+104
+00:06:16,109 --> 00:06:20,449
+So every service reads it, and they
+pass it on to the next service.
+
+105
+00:06:21,199 --> 00:06:22,619
+If you see, the flow is simple.
+
+106
+00:06:22,729 --> 00:06:26,339
+the ingress generates the identity,
+every service propagates it
+
+107
+00:06:26,339 --> 00:06:30,629
+unchanged, and the collector
+assembles a full trace at the end.
+
+108
+00:06:31,009 --> 00:06:36,039
+and here now the question is why
+build on, a standard instead of
+
+109
+00:06:36,039 --> 00:06:37,979
+rolling your own correlation ID?
+
+110
+00:06:39,409 --> 00:06:45,039
+So the reason is that you are not
+logged into any one vendor's SDK.
+
+111
+00:06:45,609 --> 00:06:51,029
+You can run one service instrumented with
+the OpenTelemetry SDK, another like behind
+
+112
+00:06:51,029 --> 00:06:57,099
+a service mesh, or a third with a vendor
+agent, and they all speak the same header.
+
+113
+00:06:58,029 --> 00:07:05,599
+So here, the identity survi-survives
+every single hop across every language
+
+114
+00:07:06,249 --> 00:07:08,369
+and, framework in your stack as well.
+
+115
+00:07:08,939 --> 00:07:14,669
+So this is the foundation everything
+else sits on Here I have mapped,
+
+116
+00:07:14,779 --> 00:07:19,389
+like three decisions that turn a
+standard into something reliable.
+
+117
+00:07:20,059 --> 00:07:23,699
+The first one is trace identity
+that is being generated at the
+
+118
+00:07:24,029 --> 00:07:29,099
+ingress gateway, and every inbound
+request carries a globally unique ID
+
+119
+00:07:29,139 --> 00:07:30,799
+before it touches a single service.
+
+120
+00:07:31,669 --> 00:07:34,869
+and no request, it
+starts, life untraceable.
+
+121
+00:07:35,959 --> 00:07:41,489
+The second one, this is the one I'll
+defend the hardest, context propagation.
+
+122
+00:07:41,799 --> 00:07:42,819
+This is mandatory.
+
+123
+00:07:43,129 --> 00:07:47,289
+Like, if the, if the propagation
+is optional, you get diagnostic
+
+124
+00:07:47,299 --> 00:07:51,619
+gaps, and a gap is exactly
+where your worst incidents hide.
+
+125
+00:07:52,119 --> 00:07:56,909
+So teams that treat it as a
+nice to have, discover the hole
+
+126
+00:07:56,909 --> 00:07:58,519
+at the worst possible moment.
+
+127
+00:07:59,029 --> 00:08:02,869
+And the third one is sampling,
+which is the export targets,
+
+128
+00:08:02,919 --> 00:08:06,069
+verbosity, all config-driven.
+
+129
+00:08:06,069 --> 00:08:07,059
+They are not hard-coded.
+
+130
+00:08:07,599 --> 00:08:11,079
+That means you can tune telemetry
+in production without a redeploy.
+
+131
+00:08:11,609 --> 00:08:16,389
+So during an incident, that's the
+difference between minutes and hours
+
+132
+00:08:18,287 --> 00:08:20,237
+Now, let me show you the whole path.
+
+133
+00:08:20,727 --> 00:08:26,467
+So a request comes in, ingress injects
+a trace parent, and then the same trace
+
+134
+00:08:26,467 --> 00:08:30,117
+ID propagates through authentication
+service, cart service, payment
+
+135
+00:08:30,117 --> 00:08:36,797
+service unchanged, till the end, and
+along the, synchronous request path.
+
+136
+00:08:37,297 --> 00:08:42,847
+So that's the top row, like you-- like
+where you are seeing there are hard lines.
+
+137
+00:08:43,447 --> 00:08:48,947
+Now, there-- here is a detail that
+matters most for this audience, and
+
+138
+00:08:49,037 --> 00:08:52,597
+it's a difference between a design that
+helps you and the one that hurts you.
+
+139
+00:08:53,037 --> 00:08:58,087
+So each service, it exports
+its spans asynchronously of the
+
+140
+00:08:58,097 --> 00:09:02,187
+request path, and, they send it
+to the, open telemetry collector.
+
+141
+00:09:03,437 --> 00:09:08,067
+So l-like these other arrows,
+like, which you see, the dotted
+
+142
+00:09:08,067 --> 00:09:11,177
+ones, these, are the span exports.
+
+143
+00:09:11,177 --> 00:09:15,757
+Go-- Th-these are going, these are
+going down, the, the other span
+
+144
+00:09:15,757 --> 00:09:19,367
+exports, and they're completely
+decoupled from that request.
+
+145
+00:09:19,987 --> 00:09:24,597
+And the solid arrows across the top,
+they are the actual user request.
+
+146
+00:09:24,927 --> 00:09:26,157
+They're moving from one service
+
+147
+00:09:27,157 --> 00:09:27,227
+to another.
+
+148
+00:09:27,227 --> 00:09:32,297
+And here, a service, it records its
+span and hands it to, a local buffer.
+
+149
+00:09:32,897 --> 00:09:37,047
+Then the request moves on immediately
+without waiting for anything to
+
+150
+00:09:37,047 --> 00:09:40,907
+be written or without waiting
+for it to be shipped anywhere.
+
+151
+00:09:42,047 --> 00:09:47,007
+The collector then assembles the
+trace, and it ships it to the back end.
+
+152
+00:09:47,017 --> 00:09:50,717
+Here, the back end can be any
+observability tools where you,
+
+153
+00:09:50,797 --> 00:09:52,367
+can query by the trace ID.
+
+154
+00:09:53,107 --> 00:09:58,497
+And because that export is off the
+request path, like if the collector
+
+155
+00:09:58,557 --> 00:10:02,807
+goes down or the back end is slow
+or the network to your observability
+
+156
+00:10:02,807 --> 00:10:08,767
+vendor is having a bad day or, like,
+you, you drop spans, but still, like,
+
+157
+00:10:08,767 --> 00:10:10,717
+your, your request still succeeds.
+
+158
+00:10:11,267 --> 00:10:16,527
+So your monitoring can be completely on
+fire, and your users never notice it.
+
+159
+00:10:17,077 --> 00:10:22,887
+That dashed line in your zero request
+impact, the, the dash-dashed line here,
+
+160
+00:10:23,427 --> 00:10:25,937
+it's your zero request impact guarantee.
+
+161
+00:10:26,407 --> 00:10:30,847
+And, we will, we'll come back to it,
+when I'm talking about the resilience.
+
+162
+00:10:31,257 --> 00:10:34,338
+let's just move on to,
+the security, bucket.
+
+163
+00:10:34,358 --> 00:10:41,440
+Like, here Now, like, the rich
+trace, metadata, it is useful.
+
+164
+00:10:42,220 --> 00:10:48,110
+But, uns-unrestricted metadata
+propagation is how you leak PR two
+
+165
+00:10:48,110 --> 00:10:52,640
+credentials or internal topology
+straight into your telemetry pipeline.
+
+166
+00:10:53,140 --> 00:10:56,040
+So we invert the default.
+
+167
+00:10:56,180 --> 00:10:59,910
+Instead of blocking bad fields,
+we allow only the vetted ones.
+
+168
+00:11:00,520 --> 00:11:01,830
+Here, the default is deny.
+
+169
+00:11:02,900 --> 00:11:05,680
+Think about how metadata usually grows.
+
+170
+00:11:06,420 --> 00:11:10,950
+An engineer is debugging something
+that adds a span attribute to help.
+
+171
+00:11:11,440 --> 00:11:16,740
+Maybe the full request body or
+maybe a user object, or it can be an
+
+172
+00:11:16,950 --> 00:11:21,910
+authentication, or, or authentication
+header, and they ship it and they move on.
+
+173
+00:11:22,970 --> 00:11:24,310
+It works, so it stays.
+
+174
+00:11:24,890 --> 00:11:31,260
+So multiply that across dozens of teams,
+like, over the couple of years, and
+
+175
+00:11:31,260 --> 00:11:36,040
+your trace store quietly becomes a copy
+of your most sensitive data sitting in
+
+176
+00:11:36,180 --> 00:11:38,680
+your system your whole org can query.
+
+177
+00:11:39,050 --> 00:11:39,800
+That's the leak.
+
+178
+00:11:39,900 --> 00:11:42,350
+Like, nobody, like, decided to do it.
+
+179
+00:11:42,890 --> 00:11:44,896
+so we invert the default.
+
+180
+00:11:44,896 --> 00:11:46,387
+Here are the nine, like,
+approved, operational fields.
+
+181
+00:11:46,387 --> 00:11:46,527
+the
+
+182
+00:11:47,527 --> 00:11:51,587
+trace ID, span ID, parent span
+ID, and then the service name,
+
+183
+00:11:52,657 --> 00:11:57,787
+operation name, timestamps, duration,
+status, and HTTP response code.
+
+184
+00:11:58,257 --> 00:12:02,347
+So every one of them went through
+an explicit approval gate.
+
+185
+00:12:02,957 --> 00:12:04,397
+Notice what's on this list.
+
+186
+00:12:04,437 --> 00:12:05,627
+It's all, like, structured.
+
+187
+00:12:05,887 --> 00:12:11,537
+Like, it tells you what happened and
+how long it took, and nothing about
+
+188
+00:12:11,597 --> 00:12:14,277
+who the user was or what they sent.
+
+189
+00:12:14,637 --> 00:12:18,557
+And everything else, like the
+payloads, headers, user data, they
+
+190
+00:12:18,557 --> 00:12:20,387
+never enter the, pipeline at all.
+
+191
+00:12:21,107 --> 00:12:25,357
+You get diagnostic richness without
+turning your trace store into a compliance
+
+192
+00:12:25,407 --> 00:12:29,937
+liability and without depending on
+every engineer to remember the rules
+
+193
+00:12:31,931 --> 00:12:34,391
+Next, I'll talk about, the resilience.
+
+194
+00:12:35,331 --> 00:12:41,291
+I-- Here I treat like the collectors,
+exporters, and the backends, as
+
+195
+00:12:41,301 --> 00:12:43,661
+non-critical path dependencies.
+
+196
+00:12:44,481 --> 00:12:45,831
+So look at the two states.
+
+197
+00:12:46,411 --> 00:12:50,441
+On the left side, the telemetry is
+healthy, like the request returns
+
+198
+00:12:50,451 --> 00:12:53,081
+two hundred, and spans are captured.
+
+199
+00:12:53,671 --> 00:12:54,901
+Full trace is available.
+
+200
+00:12:55,321 --> 00:13:00,331
+On the right, the collector is down, and
+the request still returns two hundred.
+
+201
+00:13:00,791 --> 00:13:03,861
+spans are dropped, the request
+is completely unaffected.
+
+202
+00:13:04,251 --> 00:13:08,391
+So you lose observability data,
+but you do not lose user traffic.
+
+203
+00:13:08,891 --> 00:13:11,621
+And this has to be enforced
+in the architecture.
+
+204
+00:13:11,991 --> 00:13:16,731
+it should not be left to a, like
+a well-behaved SDK or a hopeful
+
+205
+00:13:16,891 --> 00:13:21,781
+timeout config because, here the
+failure mode where your monitoring
+
+206
+00:13:21,781 --> 00:13:25,601
+takes down your product is one of the
+most embarrassing outages there is.
+
+207
+00:13:26,101 --> 00:13:28,701
+So we have all seen it or
+heard the story, right?
+
+208
+00:13:28,701 --> 00:13:28,831
+Right.
+
+209
+00:13:29,681 --> 00:13:33,421
+so here the collector gets
+overwhelmed, export calls start
+
+210
+00:13:33,441 --> 00:13:37,441
+blo-blocking, and then the threads
+pile up waiting for the telemetry.
+
+211
+00:13:37,501 --> 00:13:42,181
+And suddenly, the thing that you added
+to understand outages is causing one.
+
+212
+00:13:43,111 --> 00:13:45,441
+So it can be, like, entirely avoidable.
+
+213
+00:13:45,931 --> 00:13:50,461
+And the way you avoid it is to make
+telemetry structural-- structurally
+
+214
+00:13:50,471 --> 00:13:52,251
+incapable of blocking a request.
+
+215
+00:13:53,611 --> 00:13:58,411
+then the next slide moving on to,
+like, in this slide, I'm talking
+
+216
+00:13:58,411 --> 00:14:03,251
+about, like, the three design, three,
+compliance frameworks, which follow--
+
+217
+00:14:03,281 --> 00:14:05,031
+which can follow one single design.
+
+218
+00:14:05,081 --> 00:14:09,841
+because, the, because, the identity,
+is consistent and the metadata is
+
+219
+00:14:09,841 --> 00:14:14,541
+controlled, one design can map cleanly
+onto three compliance frameworks,
+
+220
+00:14:14,561 --> 00:14:20,821
+like the SOC 2, which, deterministic
+traces give auditors a reproducible,
+
+221
+00:14:21,101 --> 00:14:22,841
+replayable record of what happened.
+
+222
+00:14:23,301 --> 00:14:27,951
+And then HIPAA, the allow list
+excludes payloads and user data,
+
+223
+00:14:28,281 --> 00:14:32,091
+so protected health information
+never reaches a trace store.
+
+224
+00:14:32,701 --> 00:14:34,121
+Then PCI DSS.
+
+225
+00:14:34,751 --> 00:14:38,831
+Deny by default means, like, card
+numbers and credentials can't
+
+226
+00:14:38,841 --> 00:14:40,431
+ride along in span attributes.
+
+227
+00:14:41,301 --> 00:14:45,991
+And here's why this matters, like, and why
+you have to, like, spend your time here.
+
+228
+00:14:46,951 --> 00:14:51,831
+Normally, each of these frameworks
+pulls a separate audit, a separate
+
+229
+00:14:51,871 --> 00:14:53,271
+control, a separate scramble.
+
+230
+00:14:54,111 --> 00:14:58,291
+When the control is structural
+and when the architecture itself
+
+231
+00:14:58,441 --> 00:15:02,461
+makes the bad outcome impossible,
+you answer the auditor's question
+
+232
+00:15:02,471 --> 00:15:04,691
+once, and it holds across all three.
+
+233
+00:15:05,091 --> 00:15:08,481
+So you're not building here, like,
+three separate compliance stories.
+
+234
+00:15:08,721 --> 00:15:10,101
+It's the same architecture.
+
+235
+00:15:10,241 --> 00:15:11,621
+It answers all three.
+
+236
+00:15:12,841 --> 00:15:18,391
+So for a, for a DevSecOps team, that's
+the difference between, security being a
+
+237
+00:15:18,391 --> 00:15:24,551
+tax on every release and security being
+something the platform just does Then, the
+
+238
+00:15:24,551 --> 00:15:27,731
+seven capabilities, the system guarantees.
+
+239
+00:15:27,911 --> 00:15:30,091
+So here's where, I make
+the claims testable.
+
+240
+00:15:31,201 --> 00:15:34,631
+seven capabilities, the system
+guarantees, like each one
+
+241
+00:15:34,701 --> 00:15:36,781
+independently, can be verifiable.
+
+242
+00:15:37,301 --> 00:15:40,541
+the first four are, like,
+h-about, reliable tracing.
+
+243
+00:15:41,221 --> 00:15:45,711
+one is every request, it gets a
+globally unique trace ID at ingress,
+
+244
+00:15:46,211 --> 00:15:48,221
+and, existing IDs are preserved.
+
+245
+00:15:48,661 --> 00:15:55,541
+Two, each request creates its own span
+with correct parent-child lineage, and
+
+246
+00:15:55,541 --> 00:15:57,851
+retries, keep the original trace ID.
+
+247
+00:15:59,301 --> 00:16:05,151
+Third, full trace-level data capture
+that, that includes, like IDs, names,
+
+248
+00:16:05,721 --> 00:16:08,231
+timings, status, and HTTP code.
+
+249
+00:16:08,551 --> 00:16:13,401
+And the fourth one, you can query
+any trace, by its ID, and see
+
+250
+00:16:13,401 --> 00:16:15,011
+the complete end-to-end path.
+
+251
+00:16:16,821 --> 00:16:21,671
+Then, the f-- last three, like, they're
+about, being operable and secure.
+
+252
+00:16:22,371 --> 00:16:25,341
+the fifth one here is config-only export.
+
+253
+00:16:25,861 --> 00:16:29,191
+Destination set via a Kubernetes config.
+
+254
+00:16:29,811 --> 00:16:34,811
+and there would be no code changes, with
+multiple backend and tenant routing.
+
+255
+00:16:35,241 --> 00:16:37,661
+And the sixth one, rich, visualization.
+
+256
+00:16:37,701 --> 00:16:41,481
+Like, you can see the end-to-end
+trace views, dependency graphs,
+
+257
+00:16:41,561 --> 00:16:44,271
+and per-span latency breakdowns.
+
+258
+00:16:44,681 --> 00:16:47,341
+The seventh one is
+non-disruptive and secure.
+
+259
+00:16:47,941 --> 00:16:52,611
+Tracing never blocks requests when the
+backend is down, and trace data excludes
+
+260
+00:16:52,611 --> 00:16:53,881
+payloads, credentials, and PII by design.
+
+261
+00:16:54,641 --> 00:16:58,831
+And because each of these, is
+independently testable, they
+
+262
+00:16:58,831 --> 00:17:01,011
+are automatable in CI/CD.
+
+263
+00:17:02,101 --> 00:17:04,261
+it's not about like, are we tracing ready?
+
+264
+00:17:04,321 --> 00:17:08,741
+Like, it's, it stops, being a
+judgment call, and it becomes
+
+265
+00:17:08,741 --> 00:17:10,301
+a checklist i-you, you run.
+
+266
+00:17:10,851 --> 00:17:14,361
+let's, let me make this like
+a concrete with the scenario.
+
+267
+00:17:14,461 --> 00:17:18,181
+so it's the exact pattern
+this architecture eliminates.
+
+268
+00:17:18,261 --> 00:17:23,051
+So, checkout, like, let's say like the
+checkout starts failing intermittently.
+
+269
+00:17:23,711 --> 00:17:27,341
+Roughly one in twenty request
+returns a five hundred.
+
+270
+00:17:27,981 --> 00:17:32,621
+No pattern in the dashboards, and
+it only reproduces under load.
+
+271
+00:17:32,621 --> 00:17:34,741
+So here now the hunt begins.
+
+272
+00:17:34,821 --> 00:17:39,821
+Like, Engineer A opens the cart
+service logs, sees the database
+
+273
+00:17:39,831 --> 00:17:41,951
+timeouts and blames the database.
+
+274
+00:17:42,011 --> 00:17:45,251
+And then Engineer B looks at
+the payment service metrics.
+
+275
+00:17:45,591 --> 00:17:50,301
+They see elevated, latency
+and blames a downstream API.
+
+276
+00:17:51,191 --> 00:17:51,971
+So here's the thing.
+
+277
+00:17:52,451 --> 00:17:57,871
+They are both looking at real signals,
+but from this s- same failure, and they
+
+278
+00:17:57,951 --> 00:18:00,801
+reach, they reach opposite conclusions.
+
+279
+00:18:00,901 --> 00:18:05,791
+So, that takes, like, hours of two
+people chasing two wrong answers.
+
+280
+00:18:06,281 --> 00:18:12,681
+Now, here again, the deterministic version
+is pull one failing trace by its ID.
+
+281
+00:18:13,241 --> 00:18:15,451
+The waterfall shows the truth immediately.
+
+282
+00:18:15,451 --> 00:18:19,601
+Like, authentication service is
+exhausting its connection pool under load.
+
+283
+00:18:20,091 --> 00:18:23,551
+like it, it, it is delaying
+every downstream hop.
+
+284
+00:18:23,901 --> 00:18:27,891
+Then the database timeout and the
+payment latency were both symptoms.
+
+285
+00:18:28,381 --> 00:18:30,291
+They are not the actual root cause.
+
+286
+00:18:30,541 --> 00:18:37,071
+So one trace, one answer, and then d- the
+diagnostic shifted from hours to minutes
+
+287
+00:18:38,071 --> 00:18:42,221
+So, a, a few honest lessons, I learned
+from running this in production.
+
+288
+00:18:42,751 --> 00:18:48,951
+First, the constraints shape the
+design, and the mandatory propagation
+
+289
+00:18:48,981 --> 00:18:52,771
+and ingress level identity weren't
+the elegant academic choice.
+
+290
+00:18:53,011 --> 00:18:57,621
+They were the choice that survived
+real services owned by the teams.
+
+291
+00:18:58,131 --> 00:19:02,761
+and the second is, you have to design
+failure handling in from day one.
+
+292
+00:19:03,281 --> 00:19:06,831
+So non-disruptive telemetry
+failure cannot be retrofitted.
+
+293
+00:19:07,711 --> 00:19:12,431
+If export sits on the request path
+even once, you will find out during
+
+294
+00:19:12,441 --> 00:19:15,021
+your worst outage and not before.
+
+295
+00:19:15,731 --> 00:19:19,301
+And the third is, like, security
+is cheaper when it's structural.
+
+296
+00:19:20,121 --> 00:19:23,441
+Like, bolting metadata
+controls on after launch means
+
+297
+00:19:23,561 --> 00:19:26,021
+auditing every existing field.
+
+298
+00:19:26,611 --> 00:19:29,011
+So you deny by default from the start.
+
+299
+00:19:29,361 --> 00:19:30,861
+It's, it's the one-time game.
+
+300
+00:19:31,251 --> 00:19:33,691
+Not-- It's not a, a perpetual cleanup
+
+301
+00:19:34,691 --> 00:19:37,371
+So let me boil it down to four numbers.
+
+302
+00:19:38,181 --> 00:19:42,951
+so far, like we have covered the seven
+capabilities which are all automatable
+
+303
+00:19:42,951 --> 00:19:48,911
+in CI/CD, and nine allowlist metadata
+fields for compliance safe richness,
+
+304
+00:19:49,291 --> 00:19:53,841
+and then three compliance frameworks,
+covered by one design, and zero
+
+305
+00:19:53,841 --> 00:19:55,711
+request impact on telemetry failure.
+
+306
+00:19:56,191 --> 00:20:01,351
+So that last hero, like it's
+non-negotiable, is a whole resilience
+
+307
+00:20:01,371 --> 00:20:03,271
+contract in, in a single digit
+
+308
+00:20:04,271 --> 00:20:09,091
+If you, if you take one thing home, it's
+that the combination is what matters.
+
+309
+00:20:09,481 --> 00:20:14,381
+So ingress-level identity plus
+mandatory propagation, plus, allowlisted
+
+310
+00:20:14,421 --> 00:20:20,031
+metadata, plus config-driven controls,
+plus non-disruptive failure handling.
+
+311
+00:20:20,491 --> 00:20:24,621
+Any one of these alone is a,
+a nice-to-have, but you-- when
+
+312
+00:20:24,621 --> 00:20:28,631
+you put, all of them together,
+that's what makes the diagnostics
+
+313
+00:20:28,661 --> 00:20:31,201
+deterministic, secure, and resilient.
+
+314
+00:20:32,501 --> 00:20:33,761
+And here are my key takeaways.
+
+315
+00:20:34,001 --> 00:20:39,331
+Like, one is, like, determinism is an
+architectural, architecture problem.
+
+316
+00:20:39,801 --> 00:20:41,381
+it's not a tooling problem.
+
+317
+00:20:41,741 --> 00:20:45,821
+mandatory propagation and ingress
+identity are what separate, sep…
+
+318
+00:20:46,401 --> 00:20:50,871
+These are the ones that separate reliable
+tracing from aspirational instrumentation.
+
+319
+00:20:51,241 --> 00:20:54,271
+And the second one is security
+is structural, it's not additive.
+
+320
+00:20:54,781 --> 00:20:57,971
+and the allowlist is part of the
+design, and it's not a filter
+
+321
+00:20:58,281 --> 00:20:59,811
+you bolt on after the leak.
+
+322
+00:21:00,101 --> 00:21:03,831
+And the three-- third one is resilience
+is a contract, it's not a goal.
+
+323
+00:21:04,451 --> 00:21:09,391
+Zero request impact, it has to be
+enforced and, verified, and not assumed.
+
+324
+00:21:11,051 --> 00:21:11,551
+that's it.
+
+325
+00:21:11,851 --> 00:21:13,031
+thank you, thank you.
+
+326
+00:21:13,121 --> 00:21:14,941
+and, I'm happy to take any questions.
+
+327
+00:21:15,261 --> 00:21:19,061
+if you want to go deeper on the
+seven capabilities or allowlists,
+
+328
+00:21:19,111 --> 00:21:22,951
+fields, you can, find me on
+LinkedIn, and you can reach out to
+
+329
+00:21:22,951 --> 00:21:24,701
+me, for any further discussions.
+
+330
+00:21:25,151 --> 00:21:25,601
+Thank you.
+
