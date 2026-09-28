@@ -220,6 +220,14 @@ class Run:
                 else:
                     self.render_step(key)
             up = os.path.join(self.dir, "mp4", key + ".mp4")
+            if not done("upload") and (t["steps"].get("render") or {}).get("file") == key + ".mp4":
+                bad = media.verify(up, (t.get("probe") or {}).get("duration"))
+                if bad:                                     # e.g. written into by a leftover ffmpeg: render it again
+                    self.note("%s: rendered mp4 is damaged (%s) - rendering again" % (key, bad))
+                    if os.path.exists(up):
+                        os.remove(up)
+                    t["steps"].pop("render", None)
+                    self.render_step(key)
             if not os.path.exists(up) or (t["steps"].get("render") or {}).get("file") != key + ".mp4":
                 up = src
             if not done("upload"):
@@ -393,6 +401,27 @@ class Run:
         with self.lock:
             self.state["gpu"] = dict(media.gpu_status() or {}, renders=0, slots=slots, at=now())
 
+    def kill_orphan_ffmpeg(self):
+        """ffmpeg keeps running when its factory process is killed; left alone it keeps writing into this event's
+        files. Close every ffmpeg working in this event's folder whose parent process is gone."""
+        try:
+            import psutil
+        except ImportError:
+            return
+        mine = os.path.normcase(self.dir)
+        for p in psutil.process_iter(["name", "cmdline", "ppid"]):
+            try:
+                if "ffmpeg" not in (p.info["name"] or "").lower():
+                    continue
+                if not any(mine in os.path.normcase(a) for a in (p.info["cmdline"] or [])):
+                    continue
+                if p.info["ppid"] and psutil.pid_exists(p.info["ppid"]):
+                    continue
+                p.kill()
+                self.note("closed a leftover ffmpeg (pid %d) from a stopped run" % p.pid)
+            except Exception:
+                continue
+
     def check_compositions(self, keys):
         """Before a run: any talk whose Descript composition holds no real video gets a fresh upload."""
         if not self.state.get("project_id"):
@@ -471,6 +500,7 @@ class Run:
                     self.note("cancelled %d Descript upload(s) left over from a stopped run" % len(gone))
             except Exception as ex:
                 self.note("could not check for leftover Descript uploads: %s" % ex)
+        self.kill_orphan_ffmpeg()
         try:
             self.check_compositions(keys)
         except Exception as ex:

@@ -130,7 +130,15 @@ class Descript:
         else:
             body["project_name"] = project_name
         self.on_wait = on_progress
-        j = self.json("POST", "/jobs/import/project_media", json=body)
+        try:
+            j = self.json("POST", "/jobs/import/project_media", json=body)
+        except RuntimeError as ex:
+            if " 409 " not in str(ex) or "already exists" not in str(ex) or media_name:
+                raise
+            media = "%s (%s)" % (key, time.strftime("%H%M%S"))      # the earlier, failed upload keeps the old name
+            body["add_media"] = {media: body["add_media"].pop(key)}
+            body["add_compositions"][0]["clips"][0]["media"] = media
+            j = self.json("POST", "/jobs/import/project_media", json=body)
         url = j["upload_urls"][media]["upload_url"]
         LIVE_UPLOADS.add(j["job_id"])
         try:

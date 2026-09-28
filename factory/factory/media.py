@@ -50,21 +50,42 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None):
                 "-c:v", "h264_videotoolbox", "-q:v", "62"] + audio,
         head + ["-i", src] + (["-vf", "scale=" + size] if big else []) + ["-pix_fmt", "yuv420p",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", str(cq - 1)] + audio]
+    part = "%s.%d.part.mp4" % (dst, os.getpid())     # per process: a leftover ffmpeg can never write into it
     err = ""
     for n, args in enumerate(attempts):
         how = ("GPU", "GPU encode", "Mac media engine", "CPU")[n]
-        rc, err = _ffmpeg_progress([tool("ffmpeg")] + args + ["-progress", "pipe:1", "-nostats", dst + ".part.mp4"],
+        rc, err = _ffmpeg_progress([tool("ffmpeg")] + args + ["-progress", "pipe:1", "-nostats", part],
                                    info["duration"], lambda pct: on_progress and on_progress(
                                        "rendering to mp4 on the %s - %d%%" % (how, pct), pct))
-        if rc == 0:
+        if rc == 0 and verify(part, info["duration"]) is None:
             break
+        if rc == 0:
+            err = "rendered file failed the check: " + verify(part, info["duration"])
+        if os.path.exists(part):
+            os.remove(part)
     else:
         raise RuntimeError("render to mp4 failed: " + err[-300:])
-    if os.path.getsize(dst + ".part.mp4") >= os.path.getsize(src):
-        os.remove(dst + ".part.mp4")
+    if os.path.getsize(part) >= os.path.getsize(src):
+        os.remove(part)
         return src
-    os.replace(dst + ".part.mp4", dst)
+    os.replace(part, dst)
     return dst
+
+
+def verify(path, expected_seconds=None):
+    """None when the video is sound, else what is wrong: the container must demux with no errors (a file two
+    ffmpegs wrote into at once fails here in about a second) and last as long as the source (within 2 s)."""
+    if not os.path.exists(path) or os.path.getsize(path) < 1024:
+        return "missing or empty"
+    r = run([tool("ffmpeg"), "-v", "error", "-i", path, "-map", "0", "-c", "copy", "-f", "null", "-"])
+    errors = [l for l in r.stderr.splitlines() if l.strip()]
+    if r.returncode != 0 or errors:
+        return "%d stream errors, e.g. %s" % (len(errors), (errors or [r.stderr])[0][:120])
+    if expected_seconds:
+        got = probe(path)["duration"]
+        if abs(got - expected_seconds) > 2:
+            return "lasts %.0f s instead of %.0f s" % (got, expected_seconds)
+    return None
 
 
 def gpu_status():
@@ -139,7 +160,7 @@ def normalize(src, dst, lufs, tp):
     af = ("loudnorm=I={I}:TP={TP}:LRA=11:measured_I={mi}:measured_TP={mtp}:measured_LRA={mlra}:"
           "measured_thresh={mth}:offset={off}:linear=true").format(
         I=lufs, TP=tp, mi=m["input_i"], mtp=m["input_tp"], mlra=m["input_lra"], mth=m["input_thresh"], off=m["target_offset"])
-    tmp = dst + ".part.mp4"
+    tmp = "%s.%d.part.mp4" % (dst, os.getpid())
     r = run([tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-c:v", "copy", "-af", af,
              "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", tmp])
     if r.returncode != 0 or not os.path.exists(tmp):
