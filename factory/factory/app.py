@@ -357,6 +357,16 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve():
     url = "http://localhost:%d" % PORT
+    import socket
+    probe = socket.socket()
+    probe.settimeout(1)
+    busy = probe.connect_ex(("127.0.0.1", PORT)) == 0   # Windows would let a second server share the port: ask first
+    probe.close()
+    if busy:
+        print("the factory app is already running on " + url)
+        webbrowser.open(url)
+        return
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     except OSError:                                  # already running (another run.cmd): just show it

@@ -65,7 +65,14 @@ Nothing is paid for twice:
 
 ## Setup (any machine: Windows, macOS, Linux)
 
-1. `git clone https://github.com/conf42/src` (and `conf42/static` next to it if you ship slides from this machine).
+1. Get the repo. The full `src` history is ~12 GB; the factory needs only `factory/`, `_db/` and `metadata.yml`, so a slim
+   clone takes seconds (3.5 MB) and can still push the status page and the machine lock:
+
+   ```
+   git clone --depth 1 --filter=blob:none --sparse https://github.com/conf42/src
+   cd src && git sparse-checkout set factory _db
+   ```
+   (Add `conf42/static` next to it only if this machine ships slides.)
 2. Run the one-time setup:
    - **Windows:** double-click `factory\setup.cmd`
    - **macOS / Linux:** `bash factory/setup.sh`
