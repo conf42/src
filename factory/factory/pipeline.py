@@ -27,6 +27,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
 STEPS = ["render", "upload", "edit", "publish", "download", "srt", "loudness", "qa"]
+MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, not a talk
 
 
 def settings():
@@ -54,6 +55,7 @@ class Run:
         self.lock = threading.RLock()
         self.plock = threading.Lock()                 # only one talk creates the Descript project
         self.state = self._load()
+        self.render_futures, self.render_locks = {}, {}
 
     # ---- state ---------------------------------------------------------------------------
     def _load(self):
@@ -195,7 +197,9 @@ class Run:
                     if not self.state["project_id"]:
                         self.state["project_id"] = d.find_project(cfg["project_name"].format(**self.ev))
             if not done("upload") and self.state["project_id"]:
-                existing = {c["name"]: c for c in d.project(self.state["project_id"]).get("compositions", [])}
+                bad = set(t.get("broken_compositions") or [])
+                existing = {c["name"]: c for c in d.project(self.state["project_id"]).get("compositions", [])
+                            if c["id"] not in bad and (c.get("duration") or 0) >= MIN_TALK_SECONDS}
                 if key in existing:
                     t["composition_id"] = existing[key]["id"]
                     self.set(key, "upload", "done", note="already in Descript, reused")
@@ -203,12 +207,11 @@ class Run:
             if done("upload") and not done("render"):
                 self.set(key, "render", "done", note="not needed, already uploaded")
             if not done("render"):
-                self.set(key, "render", "running", label="rendering to mp4", percent=0)
-                lean = os.path.join(self.dir, "mp4", key + ".mp4")
-                os.makedirs(os.path.dirname(lean), exist_ok=True)
-                used = media.render(src, lean, on_progress=progress("render"))
-                self.set(key, "render", "done", file=os.path.basename(used),
-                         note="%.0f MB -> %.0f MB" % (os.path.getsize(src) / 1e6, os.path.getsize(used) / 1e6))
+                fut = self.render_futures.get(key)
+                if fut:
+                    fut.result()                             # rendered in parallel at the start of the run
+                else:
+                    self.render_step(key)
             up = os.path.join(self.dir, "mp4", key + ".mp4")
             if not os.path.exists(up) or (t["steps"].get("render") or {}).get("file") != key + ".mp4":
                 up = src
@@ -225,10 +228,15 @@ class Run:
                         created = True
                     else:
                         created = False
-                if created:
-                    pass
-                else:
-                    pid, cid, _ = d.import_file(up, key, project_id=self.state["project_id"], on_progress=progress("upload"))
+                if not created:
+                    again = len(t.get("broken_compositions") or [])
+                    pid, cid, _ = d.import_file(up, key, project_id=self.state["project_id"], on_progress=progress("upload"),
+                                                media_name=key if not again else "%s (upload %d)" % (key, again + 1))
+                comp = next((c for c in d.project(self.state["project_id"]).get("compositions", []) if c["id"] == cid), {})
+                if (comp.get("duration") or 0) < MIN_TALK_SECONDS:  # the file arrived broken: never build on it
+                    self.forget_composition(key, cid)
+                    raise RuntimeError("Descript got no usable video from the upload (%.0f s) - uploading again"
+                                       % (comp.get("duration") or 0))
                 t["composition_id"] = cid
                 self.set(key, "upload", "done")
             pid, cid = self.state["project_id"], t["composition_id"]
@@ -302,6 +310,8 @@ class Run:
             self.note("done: %s" % key)
             self.publish()
         except Exception as ex:
+            if "no video content" in str(ex) and t.get("composition_id"):
+                self.forget_composition(key, t["composition_id"])
             with self.lock:
                 t["error"] = "%s: %s" % (t.get("current") or "?", ex)
                 cur = t.get("current")
@@ -310,6 +320,46 @@ class Run:
                 self.save()
             self.note("FAILED %s at %s: %s" % (key, t.get("current"), ex))
             traceback.print_exc()
+
+    def forget_composition(self, key, cid):
+        """A composition without real video (cut-off upload): mark it broken, redo render/upload/edit/publish."""
+        with self.lock:
+            t = self.talk(key)
+            t.setdefault("broken_compositions", [])
+            if cid not in t["broken_compositions"]:
+                t["broken_compositions"].append(cid)
+            t["composition_id"] = None
+            for step in ("upload", "edit", "publish", "download", "srt", "loudness", "qa"):
+                t["steps"].pop(step, None)
+            if (t["steps"].get("render") or {}).get("note", "").startswith("not needed"):
+                t["steps"].pop("render", None)
+            self.save()
+        self.note("%s: Descript composition %s has no video (broken upload) - will upload again" % (key, cid[:8]))
+
+    def render_step(self, key):
+        """Render one talk's source to a lean mp4 (GPU). Safe to call from the parallel pre-render pool."""
+        t = self.talk(key)
+        with self.render_locks.setdefault(key, threading.Lock()):
+            if (t["steps"].get("render") or {}).get("status") == "done":
+                return
+            src = os.path.join(self.inp, t["source"])
+            self.set(key, "render", "running", label="rendering to mp4", percent=0)
+            lean = os.path.join(self.dir, "mp4", key + ".mp4")
+            os.makedirs(os.path.dirname(lean), exist_ok=True)
+            used = media.render(src, lean, on_progress=lambda label, percent=None: self.set(
+                key, "render", "running", label=label, percent=percent))
+            self.set(key, "render", "done", file=os.path.basename(used),
+                     note="%.0f MB -> %.0f MB" % (os.path.getsize(src) / 1e6, os.path.getsize(used) / 1e6))
+
+    def check_compositions(self, keys):
+        """Before a run: any talk whose Descript composition holds no real video gets a fresh upload."""
+        if not self.state.get("project_id"):
+            return
+        comps = {c["id"]: c for c in Descript().project(self.state["project_id"]).get("compositions", [])}
+        for k in keys:
+            cid = self.talk(k).get("composition_id")
+            if cid and (comps.get(cid, {}).get("duration") or 0) < MIN_TALK_SECONDS:
+                self.forget_composition(k, cid)
 
     def process_with_retries(self, key, attempts=3, pause=120):
         """A failed talk is retried by the run itself (Descript hiccups, a dropped upload); only a talk that failed
@@ -368,6 +418,16 @@ class Run:
                     self.note("cancelled %d Descript upload(s) left over from a stopped run" % len(gone))
             except Exception as ex:
                 self.note("could not check for leftover Descript uploads: %s" % ex)
+        try:
+            self.check_compositions(keys)
+        except Exception as ex:
+            self.note("could not check the Descript compositions: %s" % ex)
+        need = [k for k in keys if (self.talk(k)["steps"].get("render") or {}).get("status") != "done"
+                and (self.talk(k)["steps"].get("upload") or {}).get("status") != "done"]
+        render_pool = ThreadPoolExecutor(max_workers=max(1, int(self.cfg.get("render_parallel", 4))))
+        self.render_futures = {k: render_pool.submit(self.render_step, k) for k in need}
+        if need:
+            self.note("rendering %d talk(s) to mp4, %d at a time on the GPU" % (len(need), int(self.cfg.get("render_parallel", 4))))
         stop = threading.Event()
         def beat():                                  # keep the heartbeat fresh while Descript jobs are quiet
             while not stop.wait(30):
@@ -376,6 +436,7 @@ class Run:
         with ThreadPoolExecutor(max_workers=max(1, int(self.cfg["parallel_talks"]))) as pool:
             list(pool.map(self.process_with_retries, keys))
         stop.set()
+        render_pool.shutdown(wait=True)
         self.note("run finished")
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}
