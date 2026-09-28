@@ -194,15 +194,19 @@ textarea{width:100%;height:320px;font-family:Consolas,monospace;font-size:13px}
 const $=id=>document.getElementById(id), steps=__STEPS__;
 async function j(u,o){const r=await fetch(u,o);return r.json()}
 async function load(){const es=await j('/api/events');$('ev').innerHTML=es.map(e=>`<option value="${e.short_url}">${e.title} (${e.date})${e.started?' - started':''}</option>`).join('');$('ev').onchange=()=>{refresh();now()};refresh()}
+let alive=false;
 async function refresh(){const d=await j('/api/state?e='+$('ev').value);
  if(!d.state){$('sum').innerHTML='Not started. Put the Drive zips on the Desktop (or ask Claude), then press Start.';$('rows').innerHTML='';$('log').textContent='';return}
  const s=d.summary;$('sum').innerHTML=`<b>${s.finished.length}</b> of <b>${s.matched}</b> videos finished &middot; ${s.in_csv} talks in the CSV`+
  (s.unmatched.length?`<div class=warn>Not matched: ${s.unmatched.map(u=>u.file+' ('+u.why+')').join('; ')}</div>`:'')+
  (s.missing_videos.length?`<div>No video yet: ${s.missing_videos.join(', ')}</div>`:'')+
  (Object.keys(s.flagged).length?`<div class=warn>QA flags: ${Object.entries(s.flagged).map(([k,v])=>k+': '+v.join(', ')).join('; ')}</div>`:'');
- $('rows').innerHTML=Object.entries(d.state.talks).sort().map(([k,t])=>'<tr><td><b>'+k+'</b><br><small>'+(t.title||'')+'</small>'+(t.error?'<div class=warn><small>'+t.error+'</small></div>':'')+'</td>'+
+ const rank=t=>t.finished?4:t.error&&!t.retry?3:t.queued?2:1;
+ const rowsIn=Object.entries(d.state.talks).sort((a,b)=>rank(a[1])-rank(b[1])||(a[1].queued||0)-(b[1].queued||0)||a[0].localeCompare(b[0]));
+ $('rows').innerHTML=rowsIn.map(([k,t])=>'<tr><td><b>'+k+'</b><br><small>'+(t.title||'')+'</small>'+(t.retry?'<div class=lbl style="max-width:none">'+t.retry+'</div>':t.error?'<div class=warn><small>'+t.error+'</small></div>':'')+
+  (t.queued?'<div><span class="s todo" style="background:#e9e4fb;color:#5a37b8">queued #'+t.queued+'</span> <small class=mut>'+(t.size_mb||'?')+' MB, waits for a free slot</small></div>':'')+'</td>'+
   steps.map(st=>{const x=t.steps[st]||{};const c=x.status||'todo';return '<td><span class="s '+c+'" title="'+(x.label||x.error||'')+'">'+(c=='todo'?'-':c)+'</span>'+(c=='running'&&x.label?'<span class=lbl>'+x.label+'</span>':'')+'</td>'}).join('')+
-  '<td>'+(t.error?`<button onclick="retry('${k.replace(/'/g,"\\\\'")}')">Retry</button>`:'')+'</td></tr>').join('');
+  '<td>'+(t.error&&!t.retry&&!alive?`<button onclick="retry('${k.replace(/'/g,"\\\\'")}')">Retry</button>`:'')+'</td></tr>').join('');
  $('log').textContent=(d.state.log||[]).slice(-40).reverse().join('\\n')}
 async function post(a){const r=await j('/api/'+a,{method:'POST',body:JSON.stringify({e:$('ev').value})});$('msg').textContent=r.msg||'';setTimeout(refresh,1500)}
 async function retry(k){const r=await j('/api/retry',{method:'POST',body:JSON.stringify({e:$('ev').value,speakers:k})});$('msg').textContent=r.msg}
@@ -216,10 +220,12 @@ function jrow(x,up){const cls=x.state=='running'?'running':x.state=='stale'?'sta
  const prog=(x.state=='running'&&x.percent!=null?'<div class=pbar><i style="width:'+x.percent+'%"></i></div>'+x.percent+'% ':'')+(x.state=='running'||x.state=='stale'?x.note:'');
  return `<tr><td>${who}</td><td>${x.job}</td><td><span class="s ${cls}">${word}</span></td><td><small>${prog}</small></td><td><small>${when(x.minutes)}</small></td></tr>`}
 async function now(){const e=$('ev').value;if(!e)return;const n=await j('/api/now?e='+e),d=n.descript||{},up=d.uploading_now||[];
+ alive=!!(n.runners&&n.runners.length);const q=n.queue||[];
  const run=n.runners&&n.runners.length?`<span class="dot on"></span><b>Factory is running</b> <span class=mut>(process ${n.runners.map(r=>r.pid).join(', ')}, started ${n.runners[0].since.replace('T',' ')}, last activity ${ago(n.heartbeat)})</span>`
   :`<span class="dot off"></span><b>Factory is not running</b> <span class=mut>(last activity ${ago(n.heartbeat)||'never'})</span>`;
  const jobs=d.jobs||[],running=jobs.filter(x=>x.state=='running'),rest=jobs.filter(x=>x.state!='running').slice(0,8);
- $('now').innerHTML=`<b>Right now</b><div style="margin:6px 0">${run}</div>`+(d.error?`<div class=warn>Descript did not answer: ${d.error}</div>`:
+ $('now').innerHTML=`<b>Right now</b><div style="margin:6px 0">${run}</div>`+
+  (q.length?`<div style="margin:0 0 8px"><b>Queue</b> <span class=mut>(smallest first)</span>: ${q.map((x,i)=>(i+1)+'. '+x.talk+' <span class=mut>('+x.mb+' MB)</span>').join(' &middot; ')}</div>`:'')+(d.error?`<div class=warn>Descript did not answer: ${d.error}</div>`:
   `<div><b>Descript</b> <span class=mut>&middot; ${d.compositions||0} talks in the project &middot; ${n.edits} edits paid, about ${n.credits} AI credits</span>${d.project_url?` &middot; <a href="${d.project_url}" target=_blank>open the project in Descript</a>`:''}</div>`+
   (running.length?'':'<div class=mut style="margin-top:6px">No Descript job running at this moment (the factory may be uploading, downloading or measuring loudness).</div>')+
   '<div class=mut style="margin-top:4px"><small>Descript runs one job per project at a time, so talks take turns: a talk showing "Descript is busy" is waiting in line, not stuck.</small></div>'+
@@ -261,7 +267,9 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, ValueError):
                 pass
             mine = [v for v in ledger.values() if v.get("event") == e]
-            return self.send(200, {"runners": cached("run:" + e, 10, lambda: runners(e)),
+            queue = sorted(({"talk": k, "mb": t.get("size_mb"), "n": t["queued"]} for k, t in st.get("talks", {}).items()
+                            if t.get("queued")), key=lambda x: x["n"])
+            return self.send(200, {"queue": queue, "runners": cached("run:" + e, 10, lambda: runners(e)),
                                    "heartbeat": (st.get("runner") or {}).get("at") or st.get("updated"),
                                    "descript": cached("d:" + e, 20, lambda: descript_now(e)),
                                    "edits": len(mine),

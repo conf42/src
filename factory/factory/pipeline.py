@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import threading
+import time
 import traceback
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -285,6 +286,25 @@ class Run:
             self.note("FAILED %s at %s: %s" % (key, t.get("current"), ex))
             traceback.print_exc()
 
+    def process_with_retries(self, key, attempts=3, pause=120):
+        """A failed talk is retried by the run itself (Descript hiccups, a dropped upload); only a talk that failed
+        every attempt keeps its error for Marek. Out of credits (402) or paused edits are not retried."""
+        t = self.talk(key)
+        for n in range(1, attempts + 1):
+            with self.lock:
+                t["queued"] = None
+                t["retry"] = None
+            self.process(key)
+            err = t.get("error") or ""
+            if not err or n == attempts or "402" in err or "edits paused" in err:
+                return
+            with self.lock:
+                t["retry"] = "failed (%s) - trying again automatically in %d min, attempt %d of %d" % (
+                    err[:120], pause // 60, n + 1, attempts)
+                self.save()
+            self.note("%s failed, retrying in %d min (attempt %d of %d)" % (key, pause // 60, n + 1, attempts))
+            time.sleep(pause)
+
     def publish(self, force=False):
         """Push the progress to the unlisted page conf42.com/factory, at most every status_publish_minutes."""
         every = float(self.cfg.get("status_publish_minutes", 20)) * 60
@@ -306,6 +326,14 @@ class Run:
             except (OSError, KeyError):
                 return 0
         keys.sort(key=size)
+        with self.lock:                              # a fresh queue: stale "running" steps and old errors are gone
+            for i, k in enumerate(keys):
+                t = self.state["talks"][k]
+                for step in list(t["steps"]):
+                    if (t["steps"][step] or {}).get("status") in ("running", "failed"):
+                        del t["steps"][step]
+                t.update(current=None, error=None, retry=None, queued=i + 1, size_mb=round(size(k) / 1e6))
+            self.save()
         self.note("processing %d talk(s), %d at a time" % (len(keys), self.cfg["parallel_talks"]))
         if self.state.get("project_id"):             # uploads left hanging by a stopped run block the whole project
             try:
@@ -320,7 +348,7 @@ class Run:
                 self.save()
         threading.Thread(target=beat, daemon=True).start()
         with ThreadPoolExecutor(max_workers=max(1, int(self.cfg["parallel_talks"]))) as pool:
-            list(pool.map(self.process, keys))
+            list(pool.map(self.process_with_retries, keys))
         stop.set()
         self.note("run finished")
         with self.lock:
