@@ -1,6 +1,7 @@
 """The factory pipeline: Drive download -> Descript -> finished MP4 + SRT on the Desktop.
 
-One state file per event (Desktop/<work_folder>/<short_url>/state.json) records every step of every talk, so a run
+One state file per event (Desktop/<work_folder>/<short_url>/state.json, synced without links to _db/factory_runs on
+every status publish, so a fresh clone on another machine carries on) records every step of every talk, so a run
 can be stopped and restarted at any time: finished steps are skipped and a failed talk is retried on its own.
 
 Steps per talk: match -> probe -> upload -> edit -> publish -> download -> srt -> loudness -> qa
@@ -29,6 +30,48 @@ VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
 STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
 MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, not a talk
+REPO_RUNS = os.path.join(events.REPO, "_db", "factory_runs")   # per event state + YouTube items, and the ledger, in git
+
+
+def sync_to_repo(short_url, work_dir):
+    """Copy this event's state.json (without share/download links, which would expose unlisted videos in the public
+    repo, and without the machine heartbeat), its YouTube items and the shared ledger into _db/factory_runs.
+    Returns the paths to git add."""
+    def clean(v):
+        if isinstance(v, dict):
+            return {k: clean(x) for k, x in v.items() if not (isinstance(x, str) and x.startswith("http"))}
+        if isinstance(v, list):
+            return [clean(x) for x in v]
+        return v
+    dest, paths = os.path.join(REPO_RUNS, short_url), []
+    os.makedirs(dest, exist_ok=True)
+    try:
+        with open(os.path.join(work_dir, "state.json"), encoding="utf-8") as f:
+            st = clean(json.load(f))
+        for k in ("runner", "run_started"):
+            st.pop(k, None)
+        st["log"] = (st.get("log") or [])[-50:]
+        with open(os.path.join(dest, "state.json"), "w", encoding="utf-8") as f:
+            json.dump(st, f, indent=1, ensure_ascii=False)
+        paths.append(os.path.join(dest, "state.json"))
+    except (OSError, ValueError):
+        pass
+    items = os.path.join(work_dir, "YouTube items.txt")
+    if os.path.exists(items):
+        shutil.copyfile(items, os.path.join(dest, "YouTube items.txt"))
+        paths.append(os.path.join(dest, "YouTube items.txt"))
+    led = {}
+    for path in (os.path.join(REPO_RUNS, "ledger.json"), os.path.join(os.path.dirname(work_dir), "ledger.json")):
+        try:
+            with open(path, encoding="utf-8") as f:
+                led.update(json.load(f))
+        except (OSError, ValueError):
+            pass
+    if led:
+        with open(os.path.join(REPO_RUNS, "ledger.json"), "w", encoding="utf-8") as f:
+            json.dump(led, f, indent=1, ensure_ascii=False)
+        paths.append(os.path.join(REPO_RUNS, "ledger.json"))
+    return paths
 
 
 def settings():
@@ -68,6 +111,11 @@ class Run:
     def _load(self):
         if os.path.exists(self.state_path):
             with open(self.state_path, encoding="utf-8") as f:
+                return json.load(f)
+        # a fresh machine: start from the copy in the repo (_db/factory_runs), so finished talks and paid edits carry over
+        synced = os.path.join(REPO_RUNS, self.ev["short_url"], "state.json")
+        if os.path.exists(synced):
+            with open(synced, encoding="utf-8") as f:
                 return json.load(f)
         return {"event": self.ev, "project_id": None, "talks": {}, "unmatched": [], "log": []}
 
@@ -114,11 +162,14 @@ class Run:
         return os.path.join(os.path.dirname(self.dir), "ledger.json")
 
     def ledger(self):
-        try:
-            with open(self.ledger_path(), encoding="utf-8") as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            return {}
+        led = {}
+        for path in (os.path.join(REPO_RUNS, "ledger.json"), self.ledger_path()):   # the repo copy covers other machines
+            try:
+                with open(path, encoding="utf-8") as f:
+                    led.update(json.load(f))
+            except (OSError, ValueError):
+                pass
+        return led
 
     def record_edit(self, composition_id, key, credits):
         with self.lock:
