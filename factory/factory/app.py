@@ -31,8 +31,11 @@ def work_root():
     return machine.work_root(pipeline.settings())
 
 
-def state_of(short_url):
+def state_of(short_url, local_only=False):
+    """This machine's state.json, else (fresh clone) the synced copy in _db/factory_runs."""
     p = os.path.join(work_root(), short_url, "state.json")
+    if not os.path.exists(p) and not local_only:
+        p = os.path.join(pipeline.REPO_RUNS, short_url, "state.json")
     if not os.path.exists(p):
         return None
     with open(p, encoding="utf-8") as f:
@@ -44,7 +47,7 @@ def event_list():
     out = []
     for e in events.all_events():
         date = str(e.get("date", ""))
-        started = os.path.exists(os.path.join(work_root(), e["short_url"], "state.json"))
+        started = any(os.path.exists(os.path.join(d, e["short_url"], "state.json")) for d in (work_root(), pipeline.REPO_RUNS))
         if started or date >= str(datetime.date.today().replace(year=datetime.date.today().year - 1)):
             out.append({"short_url": e["short_url"], "title": "Conf42 %s %s" % (e["name"], date[:4]), "date": date,
                         "started": started})
@@ -195,9 +198,9 @@ def publish_status():
         pass
     old = {e.get("short_url"): e for e in _published().get("events", [])}
     data = {"updated": datetime.datetime.now().isoformat(timespec="seconds"), "events": []}
-    mine = set()
+    mine, synced = set(), []
     for e in event_list():
-        st = state_of(e["short_url"])
+        st = state_of(e["short_url"], local_only=True)
         if not st:
             continue
         r = st.get("runner") or {}
@@ -206,6 +209,7 @@ def publish_status():
         if not alive and prev.get("active") and prev.get("machine") != machine.machine_id():
             continue                                  # another machine is running it: its entry wins
         mine.add(e["short_url"])
+        synced += pipeline.sync_to_repo(e["short_url"], os.path.join(work_root(), e["short_url"]))
         talks = []
         for k, t in sorted(st["talks"].items()):
             qa = (t["steps"].get("qa") or {})
@@ -223,10 +227,10 @@ def publish_status():
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=1, ensure_ascii=False)
     git = _git()
-    git("add", "_db/factory.json")
+    git("add", "_db/factory.json", *[os.path.relpath(p, events.REPO) for p in synced])
     if git("diff", "--cached", "--quiet").returncode == 0:
         return "nothing changed"
-    git("commit", "-m", "factory status update")
+    git("commit", "-m", "factory status + run state update")
     git("pull", "--rebase", "-q")
     r = git("push", "-q")
     return "pushed" if r.returncode == 0 else "commit made, push failed: " + r.stderr[-200:]
@@ -329,6 +333,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {"msg": "retrying " + body["speakers"]})
             if self.path == "/api/openchapters":
                 path = os.path.join(work_root(), e, "YouTube items.txt")
+                if not os.path.exists(path):
+                    path = os.path.join(pipeline.REPO_RUNS, e, "YouTube items.txt")
                 if not os.path.exists(path):
                     return self.send(200, {"msg": "no chapters yet"})
                 machine.open_folder(path)
