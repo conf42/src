@@ -97,11 +97,15 @@ def get_enriched_metadata(base_folder):
         if year not in years:
             years[year] = []
         years[year].append(event)
-        # mark as revealed or not
-        event["reveal_videos"] = False
-        vrd = event.get("videos_reveal_date")
-        if vrd is not None and datetime.date.today() >= vrd:
-            event["reveal_videos"] = True
+        # Timed release: the talks' videos, transcripts and slides go out at the kick-off
+        # (17:00 UTC on the event date, as the event page says), or at `release_at` from
+        # metadata.yml. Pages built before then carry the content behind a wall that the
+        # visitor's browser lifts at that moment (base.html), so no rebuild is needed.
+        # `videos_reveal_date` is no longer read.
+        event["release_at"] = release_time(event)
+        event["release_iso"] = event["release_at"].isoformat().replace("+00:00", "Z")
+        event["released"] = datetime.datetime.now(datetime.timezone.utc) >= event["release_at"]
+        event["reveal_videos"] = event["released"]
         # the event day itself is over (videos may be revealed earlier than that, so this is
         # deliberately separate from reveal_videos)
         event["is_past"] = event.get("date") is not None and event.get("date") < datetime.date.today()
@@ -242,6 +246,19 @@ def get_enriched_metadata(base_folder):
         build_about(event, about_config)
 
     return context
+
+def release_time(event):
+    """ When an event's talks are released, as an aware UTC datetime: `release_at` from
+    metadata.yml (a timestamp with an offset; YAML may hand it over parsed), else 17:00 UTC
+    on the event date, the kick-off. """
+    value = event.get("release_at")
+    if isinstance(value, str):
+        value = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if isinstance(value, datetime.datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=datetime.timezone.utc)
+        return value.astimezone(datetime.timezone.utc)
+    return datetime.datetime.combine(event.get("date"), datetime.time(17, 0), tzinfo=datetime.timezone.utc)
 
 def extract_keywords(talk):
     keywords = ["Conf fourty two"]
