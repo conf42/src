@@ -1,5 +1,15 @@
 name: Build and Deploy
-on: [push]
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time. A running deploy always finishes; if several pushes
+# queue up behind it, only the newest runs (it rebuilds everything anyway).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -11,30 +21,37 @@ jobs:
         run: |
           make deps
 
-      - name: Free disk space
+      # The runner starts with ~86 GB free and the build uses ~2 GB, so the
+      # slow cleanup only runs if that ever stops being true.
+      - name: Free disk space (only if short)
         run: |
-          echo '===== Before ====='
-          df -h
-          
-          echo '===== Cleanup ====='
+          df -h /
+          avail=$(df --output=avail -BG / | tail -n 1 | tr -dc 0-9)
+          if [ "$avail" -ge 20 ]; then
+            echo "${avail} GB free, no cleanup needed"
+            exit 0
+          fi
+          echo "${avail} GB free, cleaning up"
           sudo swapoff -a
           sudo rm -f /swapfile
-          sudo apt clean
-          sudo docker image prune --all --force
-          
-          sudo rm -rf /opt/hostedtoolcache/go
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf /usr/lib/google-cloud-sdk
-          sudo rm -rf /usr/local/julia*
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/share/dotnet
           sudo apt-get clean
-          
-          echo '===== After ====='
-          df -h
+          sudo docker image prune --all --force
+          sudo rm -rf /opt/hostedtoolcache/go /opt/hostedtoolcache/CodeQL \
+            /usr/lib/google-cloud-sdk /usr/local/julia* /usr/local/.ghcup \
+            /usr/share/swift /usr/share/dotnet
+          df -h /
+
+      # The JPEGs are made from the splash PNGs; any changed or added PNG
+      # (or a change to the script) changes the key, so a hit is never stale.
+      - name: Restore converted images
+        id: images
+        uses: actions/cache@v4
+        with:
+          path: docs/assets/splash/*.jpg
+          key: splash-jpg-${{ hashFiles('docs/assets/splash/*.png', 'png_to_jpeg.sh') }}
 
       - name: Optimize images 🖼️
+        if: steps.images.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick jpegoptim
@@ -44,12 +61,18 @@ jobs:
         run: |
           make generate
 
+      # Pages serves the files as they are, without a Jekyll pass: nothing
+      # here uses front matter or _-prefixed paths.
+      - name: Skip Jekyll
+        run: |
+          touch docs/.nojekyll
+
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.0
         with:
           branch: gh-pages
           folder: docs
 
-      - name: Free disk space left
+      - name: Disk left
         run: |
-          df -h
+          df -h /
