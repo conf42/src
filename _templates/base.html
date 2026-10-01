@@ -78,7 +78,66 @@
   <!-- End Reddit Pixel -->
 
   </head>
-  <body>
+  {# Timed release: a talk or event page built before its event's release carries the talks behind a wall
+     (.c42-wall, .c42-before / .c42-after); this script lifts it at the release moment in the visitor's
+     browser, or at once in preview mode (/<event>/show, see 404.html). Secret pages are never walled. #}
+  {% set c42_walled = event is defined and event.release_iso and not event.released and secret_mode is not defined %}
+  <body{% if c42_walled %} data-c42-release="{{ event.release_iso }}" data-c42-event="{{ event.short_url | replace('.html', '') }}"{% endif %}>
+    {% if c42_walled %}
+    <script>
+      (function () {
+        var body = document.body, at = new Date(body.getAttribute("data-c42-release")).getTime();
+        var key = "c42-show:" + body.getAttribute("data-c42-event"), done = false, queue = [], preview = false;
+        try { preview = localStorage.getItem(key) === "1"; } catch (e) {}
+        // talk pages queue what may only start at release (the YouTube player)
+        window.c42OnRelease = function (fn) { if (done) fn(); else queue.push(fn); };
+        function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+        function release() {
+          if (done) return;
+          done = true;
+          body.classList.add("c42-released");
+          each("[data-c42-src]", function (el) { el.setAttribute("src", el.getAttribute("data-c42-src")); });
+          while (queue.length) { try { queue.shift()(); } catch (e) {} }
+        }
+        // "Thursday 1 October at 18:00 your time", in the visitor's language and zone
+        function when() {
+          try {
+            return new Intl.DateTimeFormat(undefined, {weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit"}).format(new Date(at)) + " your time";
+          } catch (e) { return new Date(at).toString(); }
+        }
+        function left(ms) {
+          var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+          var p = function (n) { return (n < 10 ? "0" : "") + n; };
+          return d ? d + "d " + h + "h " + p(m) + "m" : h ? h + "h " + p(m) + "m " + p(x) + "s" : m + "m " + p(x) + "s";
+        }
+        function paint() {
+          var ms = at - Date.now();
+          each("[data-c42-countdown]", function (el) { el.textContent = left(ms); });
+          if (ms <= 0) release();
+        }
+        function previewBar() {
+          var bar = document.createElement("div");
+          bar.className = "c42-preview-bar";
+          bar.innerHTML = '<i class="fe fe-eye"></i><span>Preview: shown before its release on <b></b></span><a href="#">Leave preview</a>';
+          bar.querySelector("b").textContent = when();
+          bar.querySelector("a").onclick = function (e) {
+            e.preventDefault();
+            try { localStorage.removeItem(key); } catch (err) {}
+            location.reload();
+          };
+          body.appendChild(bar);
+        }
+        document.addEventListener("DOMContentLoaded", function () {
+          each("[data-c42-when]", function (el) { el.textContent = when(); });
+          if (preview) { release(); previewBar(); return; }
+          paint();
+          if (!done) {
+            var timer = setInterval(function () { paint(); if (done) clearInterval(timer); }, 1000);
+          }
+        });
+      })();
+    </script>
+    {% endif %}
 
     <!-- NAVBAR -->
     {% if page == "index.html" %}

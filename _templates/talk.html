@@ -18,7 +18,11 @@
     <!-- WELCOME -->
     {# PROPOSAL A (2026-09-21): talk page hero in the event-hero style. The TALK is the headline (it used to be the event
        name again, with the old "- Online / premiere 5PM GMT / Europe/London" lines); the event is a chip that links back. #}
-    {% set can_watch = (secret_mode is defined or event.reveal_videos) and talk.YouTubeId %}
+    {# Timed release: before the event's release (event.released, build/events.py) the video, transcript, slides
+       and takeaways are still rendered, but walled: greyed under a cover with the release time and a countdown,
+       lifted by base.html in the visitor's browser. Secret pages are never walled. #}
+    {% set walled = not event.released and secret_mode is not defined %}
+    {% set can_watch = talk.YouTubeId %}
     {% if event.name == 'Remix' %}
     <section class="ev-hero tk-hero py-5 py-md-8 sp-rainbow-bg">
     {% else %}
@@ -42,7 +46,7 @@
             {% endif %}
             {% if talk.Track %}<span class="ev-chip"><i class="fe fe-layers"></i>{{ talk.Track }}</span>{% endif %}
             {% if can_watch and talk.transcript and talk.transcript.metadata.audio_duration %}
-            <span class="ev-chip" title="Talk duration"><i class="fe fe-clock"></i>{{ (talk.transcript.metadata.audio_duration / 60) | round | int }} min</span>
+            <span class="ev-chip{% if walled %} c42-after{% endif %}" title="Talk duration"><i class="fe fe-clock"></i>{{ (talk.transcript.metadata.audio_duration / 60) | round | int }} min</span>
             {% endif %}
           </div>
 
@@ -61,11 +65,17 @@
             {% if secret_mode is not defined %}
             <a href="#register" class="btn ev-btn ev-btn-main lift">
               <i class="fe fe-user-check me-2"></i>
-              {{ 'Subscribe' if can_watch else 'Subscribe to watch' }}
+              {% if walled and can_watch %}<span class="c42-before">Subscribe to watch</span><span class="c42-after">Subscribe</span>{% else %}{{ 'Subscribe' if can_watch else 'Subscribe to watch' }}{% endif %}
+            </a>
+            {% endif %}
+            {% if can_watch and walled %}
+            <a class="btn ev-btn ev-btn-glass ev-tint-red lift c42-before" href="#watch" title="Releasing at the kick-off">
+              <i class="fe fe-lock me-2"></i>
+              Watch in <span data-c42-countdown></span>
             </a>
             {% endif %}
             {% if can_watch %}
-            <a class="btn ev-btn ev-btn-glass ev-tint-red lift" data-bigpicture='{"ytSrc": "{{ talk.YouTubeId }}"}' href="#">
+            <a class="btn ev-btn ev-btn-glass ev-tint-red lift{% if walled %} c42-after{% endif %}" data-bigpicture='{"ytSrc": "{{ talk.YouTubeId }}"}' href="#">
               <i class="fe fe-youtube me-2"></i>
               Watch this talk
             </a>
@@ -93,7 +103,7 @@
       </div>
     </div>
 
-    {% set can_video = (secret_mode is defined or event.reveal_videos) and talk.YouTube %}
+    {% set can_video = talk.YouTube %}
     {% set n_talks = (event.talks | length) + (event.talks_featured | length) %}
     {% set link_prefix = (event.secret_url ~ '_') if secret_mode is defined else '' %}
     <!-- TALK BODY (2026-09-21): 16:9 player card + action bar, transcript card under it, then content cards -->
@@ -101,10 +111,20 @@
       <div class="container">
 
         {% if can_video %}
+        {% if walled %}
+        <div class="c42-wall" id="watch">
+          <div class="c42-wall-cover">
+            <span class="c42-lock"><i class="fe fe-lock"></i></span>
+            <span class="c42-wall-title">{{ 'Video and transcript' if talk.transcript else 'Video' }} releasing on <span data-c42-when>{{ event.release_at.strftime('%A %-d %B, %H:%M UTC') }}</span></span>
+            <span class="c42-wall-count" data-c42-countdown></span>
+            <span class="c42-wall-note">Ready and waiting: everything unlocks here at the kick-off, no need to reload.</span>
+          </div>
+          <div class="c42-wall-content">
+        {% endif %}
         <div class="tk-watch{% if not (talk.YouTubeId and talk.transcript) %} tk-watch-solo{% endif %}">
           <div class="tk-watch-main">
             <!-- 1. The <iframe> (and video player) will replace the #player <div>. 16:9 card; pinned on phones only -->
-            <div class="tk-player-card sticky">
+            <div class="tk-player-card sticky"{% if walled and talk.YouTubeId %} style="background: #0b1220 url(https://i.ytimg.com/vi/{{ talk.YouTubeId }}/hqdefault.jpg) center / cover;"{% endif %}>
               <div id="video-container">
                 <div id="player"></div>
               </div>
@@ -114,11 +134,14 @@
               var transcript = {{ talk.transcript.chunks|tojson }};
               {% endif %}
 
-              var tag = document.createElement('script');
-
-              tag.src = "https://www.youtube.com/iframe_api";
-              var firstScriptTag = document.getElementsByTagName('script')[0];
-              firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+              // the player (and anything YouTube) loads only once the talk is released
+              function loadYouTubeApi() {
+                var tag = document.createElement('script');
+                tag.src = "https://www.youtube.com/iframe_api";
+                var firstScriptTag = document.getElementsByTagName('script')[0];
+                firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+              }
+              {% if walled %}c42OnRelease(loadYouTubeApi);{% else %}loadYouTubeApi();{% endif %}
 
               // 3. This function creates an <iframe> (and YouTube player)
               //    after the API code downloads.
@@ -415,6 +438,10 @@
             })();
           </script>
         {% endif %}
+        {% if walled %}
+          </div>
+        </div>
+        {% endif %}
         {% endif %}
 
         <div class="tk-cards{% if not (can_video and talk.transcript and talk.transcript.summary) %} tk-cards-solo{% endif %}">
@@ -428,7 +455,14 @@
             {# keyword pills dropped from the abstract card (Marek 2026-09-23) #}
           </div>
           {% if can_video and talk.transcript and talk.transcript.summary %}
-          <div class="tk-card-block tk-takeaways">
+          <div class="tk-card-block tk-takeaways{% if walled %} c42-wall c42-wall-card{% endif %}">
+            {% if walled %}
+            <div class="c42-wall-cover">
+              <span class="c42-lock"><i class="fe fe-lock"></i></span>
+              <span class="c42-wall-title">Key takeaways release in <span data-c42-countdown></span></span>
+            </div>
+            <div class="c42-wall-content">
+            {% endif %}
             <h3><i class="fe fe-check-circle"></i>Key takeaways</h3>
             <ul>
               {% for elem in talk.transcript.summary %}
@@ -439,14 +473,24 @@
             <a href="javascript:void(0);" class="tk-chip-btn mt-2 vis-takeaways" onclick="toggleVisiblity('takeaways')">Show all {{ talk.transcript.summary | length }} takeaways</a>
             <a href="javascript:void(0);" class="tk-chip-btn mt-2 vis-takeaways hidden" onclick="toggleVisiblity('takeaways')">Show fewer</a>
             {% endif %}
+            {% if walled %}</div>{% endif %}
           </div>
           {% endif %}
-          {% if (secret_mode is defined or event.reveal_videos) and talk.Slides %}
-          <div class="tk-card-block tk-slides" id="slides">
+          {% if talk.Slides %}
+          <div class="tk-card-block tk-slides{% if walled %} c42-wall c42-wall-card{% endif %}" id="slides">
+            {% if walled %}
+            <div class="c42-wall-cover">
+              <span class="c42-lock"><i class="fe fe-lock"></i></span>
+              <span class="c42-wall-title">Slides release in <span data-c42-countdown></span></span>
+              <span class="c42-wall-note" data-c42-when>{{ event.release_at.strftime('%A %-d %B, %H:%M UTC') }}</span>
+            </div>
+            <div class="c42-wall-content">
+            {% endif %}
             <h3><i class="fe fe-monitor"></i>Slides
               <a href="{{ talk.Slides }}" class="tk-chip-btn tk-chip-ev ms-auto" target="_blank"><i class="fe fe-download me-2"></i>Download (PDF)</a>
             </h3>
-            <iframe src="{{ talk.Slides }}" width="100%" height="520" loading="lazy" title="Slides"></iframe>
+            <iframe {% if walled %}data-c42-src{% else %}src{% endif %}="{{ talk.Slides }}" width="100%" height="520" loading="lazy" title="Slides"></iframe>
+            {% if walled %}</div>{% endif %}
           </div>
           {% endif %}
         </div>
