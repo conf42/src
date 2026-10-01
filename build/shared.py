@@ -37,6 +37,41 @@ def read_talk_csv(path):
 def make_remote_address(path, name):
     return BASE_STATIC_URL + "/" + path + "/" + quote(name)
 
+STATIC_REPO_API = "https://api.github.com/repos/conf42/static"
+
+
+def list_static_slides():
+    """ File names in conf42/static's slides/ folder, or None if they can't be listed.
+
+    Two API calls: the default branch's tree, then the slides/ subtree (the
+    contents API stops at 1,000 entries). GITHUB_TOKEN, when set, avoids the
+    unauthenticated rate limit that CI runners share. """
+    headers = {"Accept": "application/vnd.github+json"}
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    try:
+        root = requests.get(STATIC_REPO_API + "/git/trees/HEAD", headers=headers, timeout=30)
+        root.raise_for_status()
+        sha = next(e["sha"] for e in root.json()["tree"] if e["path"] == "slides" and e["type"] == "tree")
+        tree = requests.get(STATIC_REPO_API + "/git/trees/" + sha, headers=headers, timeout=30)
+        tree.raise_for_status()
+        return {e["path"] for e in tree.json()["tree"] if e["type"] == "blob"}
+    except Exception as e:
+        print("Couldn't list conf42/static slides, so only the Slides column is used:", e)
+        return None
+
+
+def conventional_slides_name(event, talk):
+    """ The name the factory gives a talk's deck in static/slides:
+    `<Name1>[ & <Name2>] - Conf42 <Event> <Year>.pdf` (factory/factory/slides.py). """
+    speakers = (talk.get("Name1") or "").strip()
+    name2 = (talk.get("Name2") or "").strip()
+    if name2:
+        speakers += " & " + name2
+    return "%s - Conf42 %s %s.pdf" % (speakers, event.get("name"), event.get("year"))
+
+
 def generate_short_url(event, talk):
     url = "{event}_{year}_{name1}{name2}{keywords}".format(
         event=event.get("name", "").replace(" ", "_"),

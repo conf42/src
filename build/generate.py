@@ -24,6 +24,8 @@ from .shared import (
     generate_short_url,
     get_canonical_url,
     get_warnings,
+    list_static_slides,
+    conventional_slides_name,
 )
 from .events import get_enriched_metadata
 
@@ -159,6 +161,10 @@ for event in context.get("events"):
 
 print(DIVIDER)
 print("Checking external assets")
+# Slides uploaded to conf42/static under the factory's name are linked even when
+# the CSV's Slides cell is empty: re-exporting the spreadsheet drops that column.
+static_slides = list_static_slides()
+matched_slides = 0
 for event in context.get("events"):
     # no need for the external events
     if "external_url" in event:
@@ -167,6 +173,11 @@ for event in context.get("events"):
     for talk in event["talks_raw"]:
         # check the slide file exists
         slide_file = talk.get("Slides")
+        if not slide_file and static_slides and talk.get("Name1"):
+            candidate = conventional_slides_name(event, talk)
+            if candidate in static_slides:
+                slide_file = candidate
+                matched_slides += 1
         if slide_file:
             slide_path = make_remote_address("slides", slide_file)
             warn_on_missing_file(slide_path, remote=True)
@@ -178,6 +189,8 @@ for event in context.get("events"):
         talk["Picture"] = picture_path
         talk["short_url"] = generate_short_url(event, talk)
         talk["YouTubeId"] = talk.get("YouTube", "").split("/")[-1]
+if static_slides is not None:
+    print(f"Slides matched by name in conf42/static: {matched_slides} talks ({len(static_slides)} files listed)")
 
 
 print(DIVIDER)
