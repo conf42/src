@@ -3234,7 +3234,8 @@ function handleIntersection(entries) {
 	});
 }
 const observer = new IntersectionObserver(handleIntersection, { threshold: [1] });
-observer.observe(document.querySelector(".sticky"));
+var stickyEl = document.querySelector(".sticky");  // only talk pages have one; null threw and stopped this file
+if (stickyEl) observer.observe(stickyEl);
 
 const resizeKey = "video-container-size";
 function resizeVideo(vh){
@@ -3245,6 +3246,7 @@ function resizeVideo(vh){
 		vh = vh+"vh";
 	}
 	const elem = document.getElementById("video-container");
+	if (!elem) return;  // only talk pages have the player
 	elem.style.height = vh;
 	localStorage.setItem(resizeKey, elem.style.height);
 }
