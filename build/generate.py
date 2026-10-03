@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import datetime
+import hashlib
 import json
 import os
 import subprocess
@@ -17,6 +18,8 @@ from ics import Calendar, Event
 
 
 from .shared import (
+    BASE_STATIC_URL,
+    pick_picture_file,
     read_csv,
     generate_speaker_url,
     make_remote_address,
@@ -68,6 +71,32 @@ def format_sponsors(value, items):
     return value
 env.filters["format_sponsors"] = format_sponsors
 env.filters["speaker_url"] = generate_speaker_url
+
+# "./assets/css/x.css" -> "./assets/css/x.css?v=<content hash>": a file gets a new URL only when its
+# bytes change, so browsers keep CSS/JS/fonts across daily deploys (the git sha changed every push)
+_asset_hashes = {}
+def asset_url(path):
+    if path not in _asset_hashes:
+        try:
+            with open(os.path.join(BASE_FOLDER, path.lstrip("./")), "rb") as f:
+                _asset_hashes[path] = hashlib.sha1(f.read()).hexdigest()[:10]
+        except OSError:
+            _asset_hashes[path] = context["asset_version"]
+    return f"{path}?v={_asset_hashes[path]}"
+env.filters["asset"] = asset_url
+
+# Headshots and podcast covers on conf42.github.io/static have .webp siblings (~70-97% smaller);
+# templates pair this with onerror="...src=<png>" so a fresh upload without its .webp still shows
+def webp_url(url):
+    if url and url.startswith(BASE_STATIC_URL) and url.lower().endswith(".png"):
+        return url[:-4] + ".webp"
+    return url
+env.filters["webp"] = webp_url
+# 160 px version for avatars (shown at 44-60 px): ~5 KB instead of a 500x400 PNG of up to 250 KB
+def webp_small_url(url):
+    small = webp_url(url)
+    return small[:-5] + ".sm.webp" if small != url else url
+env.filters["webp_sm"] = webp_small_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
 
 
@@ -395,6 +424,9 @@ except Exception as e:
 # prepare the posts
 for post in posts:
     post["Date"] = dateutil.parser.parse(post["Date"])
+    # the 500px JPEG of the splash (make jpeg) instead of the 1-1.5 MB PNG, like event cards
+    if post.get("ThumbnailPath"):
+        post["ThumbnailPath"] = pick_picture_file(BASE_FOLDER + "/", post["ThumbnailPath"])
 # template out the posts
 for post in posts:
     # just for dev experience - 2s vs 12s
