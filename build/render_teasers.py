@@ -10,9 +10,11 @@ build: problems are printed as WARN and the page then draws a missing card in th
 
 Content-addressed cache: each card's PNG is kept in .cache/teasers/<key>.png. The key hashes this script, Chrome's major
 version, the card's own HTML, what of the page can change a picture (its styles minus the /*tools*/ ... /*/tools*/ block,
-its <link>s and the /*render*/ ... /*/render*/ script), the bytes of every local file they use and, for the headshots on
-conf42.github.io/static, their ETag (a photo re-uploaded under the same name is redrawn). Only cards whose key is new are
-screenshotted. CI keeps .cache/ between runs with actions/cache; --prune drops entries unused for 14 days.
+its <link>s and the /*render*/ ... /*/render*/ script), the bytes of every local file they use and the bytes of the
+headshots on conf42.github.io/static (a photo re-uploaded under the same name is redrawn; their ETags were tried first and
+differ between GitHub's servers, so keys flipped and every run redrew). A card whose photo can't be fetched gets no key:
+it is neither copied nor drawn this run (the page draws it), so a flaky download never loops deploys. Only cards whose key
+is new are screenshotted. CI keeps .cache/ between runs with actions/cache; --prune drops entries unused for 14 days.
 
 Fast deploys (a deploy takes at most 5 minutes, as on the sister sites):
   --cached-only   the deploy job: copy the PNGs whose key is cached, render nothing; a missing PNG is simply absent (the
@@ -48,7 +50,7 @@ with open(__file__, "rb") as _f:
     SCRIPT_HASH = hashlib.sha256(_f.read()).hexdigest()[:16]
 CARD_RE = re.compile(r'class="tz-card" id="tz-card-\d+" data-file="([^"]+)"')
 REF_RE = re.compile(r'(?:src|href)="([^"]+)"|url\(\s*[\'"]?([^\'")]+)[\'"]?\s*\)')
-_etags = {}
+_photos = {}
 
 
 def find_chrome():
@@ -67,15 +69,18 @@ def find_chrome():
     return None
 
 
-def etag(url):
-    """The remote file's ETag (GitHub Pages sends one), or its name alone when it can't be asked."""
-    if url not in _etags:
-        try:
-            req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "conf42-render-teasers"})
-            _etags[url] = urllib.request.urlopen(req, timeout=10).headers.get("ETag") or ""
-        except Exception:
-            _etags[url] = ""
-    return _etags[url]
+def photo(url):
+    """sha256 of the remote headshot's bytes (3 tries), or None when it can't be fetched."""
+    if url not in _photos:
+        _photos[url] = None
+        for attempt in range(3):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "conf42-render-teasers"})
+                _photos[url] = hashlib.sha256(urllib.request.urlopen(req, timeout=20).read()).hexdigest()
+                break
+            except Exception:
+                time.sleep(1 + attempt)
+    return _photos[url]
 
 
 def page_parts(page):
@@ -109,7 +114,7 @@ def refs_digest(text, base_dir, h, outputs):
             continue
         if ref.startswith(("http:", "https:")):
             if "/headshots/" in ref:
-                h.update(etag(ref).encode())
+                h.update((photo(ref) or "unavailable").encode())
             continue
         try:
             with open(os.path.normpath(os.path.join(base_dir, ref.split("?")[0])), "rb") as f:
@@ -124,12 +129,16 @@ def card_keys(page, chrome_version):
     ctx = hashlib.sha256(("%s|%s|%d|%d|" % (SCRIPT_HASH, chrome_version, CARD, BUDGET_MS)).encode())
     rc = render_context(context)
     ctx.update(rc.encode())
+    print("render_teasers %s: page key %s" % (os.path.basename(page)[:-5], hashlib.sha256(rc.encode()).hexdigest()[:12]))   # differs between runs = every card redraws
     refs_digest(rc, os.path.dirname(page), ctx, outputs)
     urls = [m for c in cards for m in re.findall(r'src="(https://[^"]+/headshots/[^"]+)"', c)]
-    with ThreadPoolExecutor(max_workers=16) as pool:   # the photos' ETags, all at once
-        list(pool.map(etag, urls))
+    with ThreadPoolExecutor(max_workers=8) as pool:   # the photos, all at once
+        list(pool.map(photo, urls))
     keys = []
     for card in cards:
+        if any(photo(u) is None for u in re.findall(r'src="(https://[^"]+/headshots/[^"]+)"', card)):
+            keys.append("skip")   # its photo could not be fetched: left for the page this run
+            continue
         h = ctx.copy()
         h.update(card.encode())
         refs_digest(card, os.path.dirname(page), h, outputs)
@@ -190,7 +199,12 @@ def main():
             print("WARN render_teasers %s: %d pictures but %d slots, not caching" % (event, len(files), len(keys)))
             keys = [None] * len(files)
         missing = []
+        skip = {i for i, k in enumerate(keys) if k == "skip"}
+        if skip:
+            print("WARN render_teasers %s: %d photos could not be fetched, those cards are left for the page" % (event, len(skip)))
         for i, (name, key) in enumerate(zip(files, keys)):
+            if i in skip:
+                continue
             cached = key and os.path.join(CACHE_DIR, key + ".png")
             if key:
                 used.add(key + ".png")
