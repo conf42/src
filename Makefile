@@ -27,7 +27,7 @@ clean:
 	rm -rf ./docs/assets/headshots/*.jpg
 	rm -rf ./docs/assets/splash/*.jpg
 	rm -rf ./docs/assets/podcasts/*.jpg
-	rm -rf ./docs/teasers
+	rm -rf ./docs/teasers ./docs/*/teasers.html ./docs/*/conf42-*.png
 
 env:
 	python3 -m venv env
