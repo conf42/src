@@ -8,15 +8,20 @@ on:
   schedule:
     - cron: "30 17 * * *"
 
-# One deploy at a time. A running deploy always finishes; if several pushes
-# queue up behind it, only the newest runs (it rebuilds everything anyway).
-concurrency:
-  group: pages
-  cancel-in-progress: false
+permissions:
+  contents: write
+  actions: write   # the teaser render job queues one more deploy when it drew new pictures
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # One deploy at a time. A running deploy always finishes; if several pushes
+    # queue up behind it, only the newest runs (it rebuilds everything anyway).
+    # Per job, not per run (as on the sister sites): a deploy never waits for a teaser render job
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    timeout-minutes: 15
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v4
@@ -68,6 +73,18 @@ jobs:
         run: |
           make generate
 
+      # Teaser PNGs (conf42.com/teasers/<event>): content-addressed, so a cached picture is never stale. The deploy
+      # only copies what is cached; the render job below draws the rest and queues one more deploy.
+      - name: Restore teaser cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache
+          key: teaser-cache-${{ github.run_id }}
+          restore-keys: teaser-cache-
+
+      - name: Teaser PNGs from the cache
+        run: python -m build.render_teasers --cached-only   # renders nothing: a card not drawn yet is drawn by the page itself
+
       # Pages serves the files as they are, without a Jekyll pass: nothing
       # here uses front matter or _-prefixed paths.
       - name: Skip Jekyll
@@ -83,3 +100,48 @@ jobs:
       - name: Disk left
         run: |
           df -h /
+
+  # the teaser pictures, after the deploy (as on the sister sites): real Chrome draws the new or changed cards only,
+  # saves them to the cache and queues one more deploy to publish them; when it drew nothing it stops there
+  render-teasers:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    concurrency:
+      group: teaser-render
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install
+        run: make deps
+
+      - name: Restore teaser cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache
+          key: teaser-cache-render-${{ github.run_id }}
+          restore-keys: teaser-cache-
+
+      - name: Build 🔧
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make generate   # the same pages the deploy built, so the cache keys match
+
+      - name: Render teaser PNGs
+        id: render
+        run: python -m build.render_teasers --jobs 4 --prune   # headless Chrome (preinstalled on the runner); never fails
+
+      - name: Save teaser cache
+        if: always() && steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: teaser-cache-render-${{ github.run_id }}
+
+      - name: Publish the new pictures
+        if: steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run static-build.yml --ref ${{ github.ref_name }}
