@@ -1,9 +1,9 @@
-"""Render the conf42.com/teasers/<event> cards to 1080x1080 PNGs with headless Chrome (Marek 2026-10-09; the sister
+"""Render the conf42.com/<event>/teasers cards to 1080x1080 PNGs with headless Chrome (Marek 2026-10-09; the sister
 sites' _build/render_teasers.py, simplified: one kind of picture, no slime, no thumbnails).
 
     python -m build.render_teasers [--cached-only] [--jobs N] [--prune]
 
-For every docs/teasers/<event>.html (written by `make generate`, upcoming events only) it opens the page in headless
+For every docs/<event>/teasers.html (written by `make generate`, upcoming events only) it opens the page in headless
 Chrome with #sheet-<start>-<count> (the page then shows only those cards, stacked at their true 1080 px size), takes one
 screenshot and slices it into the files named by the cards' data-file attributes, next to the page. Never fails the
 build: problems are printed as WARN and the page then draws a missing card in the browser.
@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover
     print("WARN render_teasers: Pillow missing, no PNGs rendered")
     sys.exit(0)
 
-ROOT = "docs/teasers"
+ROOT = "docs"
 CARD = 1080
 CHUNK = 8            # cards per screenshot (8 * 1080 px tall, well under Chrome's surface limit)
 BUDGET_MS = 12000    # virtual time for fonts + photos to settle before the screenshot
@@ -129,7 +129,7 @@ def card_keys(page, chrome_version):
     ctx = hashlib.sha256(("%s|%s|%d|%d|" % (SCRIPT_HASH, chrome_version, CARD, BUDGET_MS)).encode())
     rc = render_context(context)
     ctx.update(rc.encode())
-    print("render_teasers %s: page key %s" % (os.path.basename(page)[:-5], hashlib.sha256(rc.encode()).hexdigest()[:12]))   # differs between runs = every card redraws
+    print("render_teasers %s: page key %s" % (os.path.basename(os.path.dirname(page)), hashlib.sha256(rc.encode()).hexdigest()[:12]))   # differs between runs = every card redraws
     refs_digest(rc, os.path.dirname(page), ctx, outputs)
     urls = [m for c in cards for m in re.findall(r'src="(https://[^"]+/headshots/[^"]+)"', c)]
     with ThreadPoolExecutor(max_workers=8) as pool:   # the photos, all at once
@@ -183,13 +183,13 @@ def main():
         print("WARN render_teasers: no Chrome/Chromium found, no PNGs rendered")
         pages = []
     else:
-        pages = sorted(p for p in glob.glob(os.path.join(ROOT, "*.html")) if os.path.basename(p) != "index.html")
+        pages = sorted(glob.glob(os.path.join(ROOT, "*", "teasers.html")))
         r = subprocess.run([chrome, "--version"], capture_output=True, text=True)
         m = re.search(r"(\d+)\.", r.stdout or r.stderr or "")
         chrome_version = "Chrome %s" % (m.group(1) if m else "unknown")   # only the major version: build numbers change weekly
     os.makedirs(CACHE_DIR, exist_ok=True)
     for page in pages:
-        event = os.path.basename(page)[:-5]
+        event, here = os.path.basename(os.path.dirname(page)), os.path.dirname(page)
         files = CARD_RE.findall(open(page, encoding="utf-8").read())
         if not files:
             print("render_teasers %s: no cards" % event)
@@ -209,7 +209,7 @@ def main():
             if key:
                 used.add(key + ".png")
             if cached and os.path.exists(cached):
-                shutil.copyfile(cached, os.path.join(ROOT, name))
+                shutil.copyfile(cached, os.path.join(here, name))
                 os.utime(cached)   # last used now: --prune keeps it
                 reused_total += 1
             else:
@@ -235,7 +235,7 @@ def main():
                         if blank(tile):
                             print("WARN render_teasers %s: %s came out blank, not published" % (event, files[i]))
                             continue
-                        dest = os.path.join(ROOT, files[i])
+                        dest = os.path.join(here, files[i])
                         tile.save(dest, "PNG", optimize=True)
                         if keys[i]:
                             shutil.copyfile(dest, os.path.join(CACHE_DIR, keys[i] + ".png"))

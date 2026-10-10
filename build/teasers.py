@@ -1,21 +1,25 @@
-"""Talk teasers (Marek 2026-10-09): conf42.com/teasers/<event> - one 1080x1080 liquid-glass card per talk of an upcoming
+"""Talk teasers (Marek 2026-10-09): conf42.com/<event>/teasers - one 1080x1080 liquid-glass card per talk of an upcoming
 event, plus a simplified LinkedIn carousel (a square PDF of the chosen talks). Hidden pages: noindex, never in the sitemap;
-conf42.com/teasers/ lists them. The card: the event's own colour (metadata.yml; Remix: a rainbow), three stacked glass
+conf42.com/teasers/ lists them. A docs/<event>/ folder does not shadow the event page docs/<event>.html: Pages serves
+/<event> from the file and /<event>/teasers from the folder (tested on gh-pages 2026-10-10). The card: the event's own colour (metadata.yml; Remix: a rainbow), three stacked glass
 shards - the event card (logo, event, date) at the back, the speaker card (headshot whole, never cropped), the talk title
 in front with the nameplate tucked under it - and an ONLINE pill. White text everywhere is kept readable: every tint behind
 text is darkened until white on it passes WCAG AA (4.5:1).
 
-The PNGs (conf42-<event>-<speaker>.png, next to the pages) are drawn by build/render_teasers.py after the deploy with
+The PNGs (conf42-<event>-<speaker>.png, next to the page in docs/<event>/) are drawn by build/render_teasers.py after the deploy with
 headless Chrome (#sheet-<start>-<count>); until one exists the page draws that card in the browser (html-to-image).
 """
 import colorsys
 import datetime
+import glob
 import os
 import re
 import shutil
 import unicodedata
 
 RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
+MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
+         '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>')
 TBD = re.compile(r"^\s*(tbd|tba|tbc|to be (announced|confirmed|decided))?\s*[.!]*\s*$", re.I)
 
 
@@ -106,10 +110,18 @@ def upcoming(events, today=None):
 
 
 def generate(env, context, base_folder):
-    """docs/teasers/<event>.html for every upcoming event with talks, and docs/teasers/index.html listing them."""
+    """docs/<event>/teasers.html for every upcoming event with talks, docs/teasers/index.html listing them, and
+    docs/teasers/<event>.html forwarding the first links (Marek 2026-10-10: /<event>/teasers, like the sister sites)."""
     folder = os.path.join(base_folder, "teasers")
-    # the PNGs of events that are over must not linger: the folder is rebuilt from scratch (render_teasers.py refills it)
+    # the pages and PNGs of events that are over must not linger: everything teaser-made is removed first
+    # (render_teasers.py refills the PNGs); an event folder holds nothing else, so an emptied one goes too
     shutil.rmtree(folder, ignore_errors=True)
+    for old in glob.glob(os.path.join(base_folder, "*", "teasers.html")):
+        d = os.path.dirname(old)
+        for f in [old] + glob.glob(os.path.join(d, "conf42-*.png")):
+            os.remove(f)
+        if not os.listdir(d):
+            os.rmdir(d)
     os.makedirs(folder, exist_ok=True)
     listed = []
     page = env.get_template("teasers.html")
@@ -120,9 +132,12 @@ def generate(env, context, base_folder):
         slug = event["short_url"].replace(".html", "")
         ev = dict(name=_event_name(event), full=event.get("name"), slug=slug, date=event["date"],
                   date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat())
-        with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
+        os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
+        with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
             f.write(page.render(ev=ev, cards=items, sc=scheme(event), **context))
+        with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
+            f.write(MOVED % {"to": "../%s/teasers" % slug})
         listed.append(dict(ev, n=len(items), ready=sum(1 for c in items if not c["missing"]), sc=scheme(event)))
-        print("Writing out teasers/%s.html (%d cards)" % (slug, len(items)))
+        print("Writing out %s/teasers.html (%d cards)" % (slug, len(items)))
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
         f.write(env.get_template("teasers_index.html").render(teaser_events=listed))

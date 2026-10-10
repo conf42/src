@@ -458,7 +458,7 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
         if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html", "404.html"]:
             register_url(page.replace(".html",""))
 
-# TEASERS (conf42.com/teasers/<event> - unlisted: noindex, never passed to register_url): one card per talk of every
+# TEASERS (conf42.com/<event>/teasers - unlisted: noindex, never passed to register_url): one card per talk of every
 # upcoming event, the PNGs drawn after the deploy by build/render_teasers.py (Marek 2026-10-09)
 print(DIVIDER)
 print("Generating the talk teasers")
