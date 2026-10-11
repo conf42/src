@@ -141,7 +141,8 @@ def generate(env, context, base_folder):
             continue
         slug = event["short_url"].replace(".html", "")
         ev = dict(name=_event_name(event), full=event.get("name"), slug=slug, date=event["date"],
-                  date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat())
+                  date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat(),
+                  date_long="%s %d, %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year))
         ev["splash"] = _splash(event, base_folder)
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
