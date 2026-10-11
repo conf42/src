@@ -114,11 +114,11 @@ def generate(env, context, base_folder):
     docs/teasers/<event>.html forwarding the first links (Marek 2026-10-10: /<event>/teasers, like the sister sites)."""
     folder = os.path.join(base_folder, "teasers")
     # the pages and PNGs of events that are over must not linger: everything teaser-made is removed first
-    # (render_teasers.py refills the PNGs); an event folder holds nothing else, so an emptied one goes too
+    # (render_teasers.py refills the PNGs, teaser_previews.py their WebP previews); an event folder holds nothing else, so an emptied one goes too
     shutil.rmtree(folder, ignore_errors=True)
     for old in glob.glob(os.path.join(base_folder, "*", "teasers.html")):
         d = os.path.dirname(old)
-        for f in [old] + glob.glob(os.path.join(d, "conf42-*.png")):
+        for f in [old] + glob.glob(os.path.join(d, "conf42-*.png")) + glob.glob(os.path.join(d, "conf42-*.webp")):
             os.remove(f)
         if not os.listdir(d):
             os.rmdir(d)
