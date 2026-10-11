@@ -104,6 +104,16 @@ def cards(event):
     return out
 
 
+def _splash(event, base_folder):
+    """The event's splash art for the Generic covers (Marek 2026-10-11), seen from docs/<event>/: its thumbnail_path,
+    the .jpg next to it when there is one (the PNGs are ~2 MB); none when the file is missing."""
+    p = str(event.get("thumbnail_path") or "").lstrip("./")
+    if not p or not os.path.isfile(os.path.join(base_folder, p)):
+        return ""
+    jpg = os.path.splitext(p)[0] + ".jpg"
+    return "../" + (jpg if os.path.isfile(os.path.join(base_folder, jpg)) else p)
+
+
 def upcoming(events, today=None):
     today = today or datetime.date.today()
     return [e for e in events if "external_url" not in e and e.get("short_url") and e.get("date") and e["date"] >= today - datetime.timedelta(days=1)]
@@ -132,6 +142,7 @@ def generate(env, context, base_folder):
         slug = event["short_url"].replace(".html", "")
         ev = dict(name=_event_name(event), full=event.get("name"), slug=slug, date=event["date"],
                   date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat())
+        ev["splash"] = _splash(event, base_folder)
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
             f.write(page.render(ev=ev, cards=items, sc=scheme(event), **context))
