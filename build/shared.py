@@ -34,7 +34,16 @@ def read_talk_csv(path):
             item["Abstract_l"] = textwrap.shorten(item.get("Abstract",""), 700-len(item.get("title","")), placeholder="...")
     return items
 
+# conf42/static keeps ONE file per name (macOS clones break on names that differ only in case or Unicode form);
+# a CSV that spells one differently (Drive exports, never edited) is pointed at the kept file here
+HEADSHOT_ALIASES = {
+    "archit srivastava_quantum.png": "Archit Srivastava_quantum.png",   # QUANTUM_2023.csv + testimonials.csv
+}
+
+
 def make_remote_address(path, name):
+    if path == "headshots":
+        name = HEADSHOT_ALIASES.get(name, name)
     return BASE_STATIC_URL + "/" + path + "/" + quote(name)
 
 STATIC_REPO_API = "https://api.github.com/repos/conf42/static"
