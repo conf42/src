@@ -484,11 +484,15 @@ with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
 # pages = every url registered for the sitemap, so nothing that is not already public ends up in here.
 print(DIVIDER)
 import json
+from .teasers import _event_name as _teaser_event_name
 _idx_future = {id(e) for e in (context.get("future_events") or [])}
 _idx_events = [e for e in (context.get("events") or []) if "external_url" not in e and e.get("short_url")]
 _idx_events.sort(key=lambda e: e.get("date"), reverse=True)
 _idx = {
-    "events": [{"slug": e.get("short_url").replace(".html", ""), "upcoming": id(e) in _idx_future} for e in _idx_events],
+    # name + date: /<event>/teasers of a past event says "<name> has ended" instead of bouncing (Marek 2026-10-11)
+    "events": [{"slug": e.get("short_url").replace(".html", ""), "upcoming": id(e) in _idx_future, "name": _teaser_event_name(e),
+                "date": "%s %d, %d" % (e["date"].strftime("%b"), e["date"].day, e["date"].year) if e.get("date") else ""}
+               for e in _idx_events],
     "pages": sorted(set(u for u in SITEMAP_URLS if u)),
 }
 with open(BASE_FOLDER + "/404-index.json", "w", encoding="utf-8") as f:
