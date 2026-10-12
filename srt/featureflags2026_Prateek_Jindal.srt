@@ -1,0 +1,1182 @@
+1
+00:00:00,476 --> 00:00:01,166
+Hello, everyone.
+
+2
+00:00:01,543 --> 00:00:04,911
+I'm Prateek Jangal, a staff
+software engineer at Confluent.
+
+3
+00:00:05,446 --> 00:00:10,357
+My work focuses on distributed systems,
+cloud infrastructure, and the control
+
+4
+00:00:10,366 --> 00:00:15,640
+panes that help large-scale platforms
+operate reliably Today, I will
+
+5
+00:00:15,648 --> 00:00:19,556
+discuss building self-healing cloud
+infrastructure with feature flags.
+
+6
+00:00:21,480 --> 00:00:26,183
+Feature flags are usually associated
+with application releases, enabling
+
+7
+00:00:26,183 --> 00:00:30,686
+a feature for a small percentage of
+users and then gradually expanding it.
+
+8
+00:00:32,527 --> 00:00:38,152
+But what if we use them as infrastructure
+controls, allowing systems to
+
+9
+00:00:38,155 --> 00:00:43,257
+change routing, disable unstable
+behavior, activate fallbacks, and
+
+10
+00:00:43,257 --> 00:00:44,952
+recover from predictable failures?
+
+11
+00:00:46,649 --> 00:00:52,434
+The goal is not to eliminate failures,
+it is to detect them early, contain their
+
+12
+00:00:52,437 --> 00:00:59,047
+impact, recover safely, and preserve human
+control when the situation is ambiguous.
+
+13
+00:01:00,890 --> 00:01:05,840
+Let's start with why traditional
+operations struggle at scale The central
+
+14
+00:01:05,840 --> 00:01:10,335
+idea is that self-healing should be
+a feedback loop, not a collection
+
+15
+00:01:10,336 --> 00:01:12,559
+of unrelated scripts or commands.
+
+16
+00:01:13,994 --> 00:01:18,726
+We observe the system detect a
+problem, decide what action is
+
+17
+00:01:18,728 --> 00:01:24,988
+appropriate, recover, and verify the
+result Feature flags can provide a
+
+18
+00:01:24,989 --> 00:01:30,342
+reversible mechanism for changing
+system behavior within this very loop
+
+19
+00:01:31,342 --> 00:01:36,228
+Traditional operations follow a
+similar sequence: alert, investigate,
+
+20
+00:01:36,488 --> 00:01:38,504
+diagnose, and manually remediate.
+
+21
+00:01:39,950 --> 00:01:44,412
+That works for unusual incidents,
+but it becomes expensive when
+
+22
+00:01:44,430 --> 00:01:48,358
+predictable failures repeatedly
+require the same intervention.
+
+23
+00:01:50,275 --> 00:01:55,011
+Consider a distributed service that
+depends on several downstream layers.
+
+24
+00:01:56,144 --> 00:02:02,737
+One dependency becomes unhealthy, retries
+increase, latency rises, and the problem
+
+25
+00:02:02,743 --> 00:02:08,031
+spreads to other services If we already
+understand the failure and have a safe
+
+26
+00:02:08,057 --> 00:02:13,210
+mitigation plan, should an engineer really
+have to intervene every single time?
+
+27
+00:02:14,029 --> 00:02:14,321
+No.
+
+28
+00:02:14,327 --> 00:02:14,712
+Right?
+
+29
+00:02:16,352 --> 00:02:18,990
+Self-healing automates
+known recovery paths.
+
+30
+00:02:19,536 --> 00:02:24,277
+The important qualification is that
+the automation needs clear boundaries.
+
+31
+00:02:24,973 --> 00:02:29,002
+It should not take arbitrary
+actions just because a metric
+
+32
+00:02:29,007 --> 00:02:33,806
+crossed a threshold So what should
+a self-healing system look like?
+
+33
+00:02:34,806 --> 00:02:36,969
+Think of this as a feedback control loop.
+
+34
+00:02:37,285 --> 00:02:43,123
+You observe, detect, decide,
+recover, and observe again.
+
+35
+00:02:44,717 --> 00:02:49,057
+The final step matters the
+most, and it's most important.
+
+36
+00:02:49,978 --> 00:02:54,233
+Successfully executing a command
+or a script does not prove
+
+37
+00:02:54,312 --> 00:02:55,735
+that the system recovered.
+
+38
+00:02:56,854 --> 00:03:01,234
+For example, restarting a service
+may succeed while its downstream
+
+39
+00:03:01,235 --> 00:03:02,787
+dependency remains unhealthy.
+
+40
+00:03:04,563 --> 00:03:09,338
+Without validation, the automation
+could report success while users
+
+41
+00:03:09,370 --> 00:03:11,364
+continue to experience failures.
+
+42
+00:03:12,943 --> 00:03:16,922
+Every recovery action should
+therefore have an expected outcome
+
+43
+00:03:17,418 --> 00:03:21,912
+and a way to measure whether that
+outcome actually occurred or not
+
+44
+00:03:22,912 --> 00:03:25,882
+Therefore, I separate the
+architecture in s- five separate
+
+45
+00:03:25,884 --> 00:03:28,897
+layers First, observability.
+
+46
+00:03:29,322 --> 00:03:33,449
+It includes metrics, logs,
+traces, and flag change events.
+
+47
+00:03:34,142 --> 00:03:35,331
+Then comes detection.
+
+48
+00:03:36,244 --> 00:03:39,317
+Converting this telemetry
+into actionable conditions.
+
+49
+00:03:40,088 --> 00:03:40,979
+And then decision.
+
+50
+00:03:41,622 --> 00:03:44,557
+Evaluating whether intervention
+is justified or not.
+
+51
+00:03:45,335 --> 00:03:46,252
+And then recovery.
+
+52
+00:03:46,828 --> 00:03:50,495
+Performing a bounded action,
+such as disabling a capability
+
+53
+00:03:50,762 --> 00:03:52,128
+or redirecting traffic.
+
+54
+00:03:52,908 --> 00:03:55,056
+And at the end, validation.
+
+55
+00:03:55,357 --> 00:03:57,632
+Confirming that health improved.
+
+56
+00:03:59,502 --> 00:04:02,917
+Keeping these responsibilities
+separate prevents every alert
+
+57
+00:04:02,923 --> 00:04:04,589
+from becoming an automatic action.
+
+58
+00:04:06,253 --> 00:04:08,480
+Detection tells us
+something may be very wrong.
+
+59
+00:04:08,974 --> 00:04:11,787
+Decision determines whether
+we should act or not.
+
+60
+00:04:12,376 --> 00:04:15,852
+Recovery changes the system,
+and then validation determines
+
+61
+00:04:16,155 --> 00:04:18,062
+whether that change helped or not
+
+62
+00:04:19,062 --> 00:04:20,924
+Now, this is the central idea of the talk.
+
+63
+00:04:21,950 --> 00:04:26,339
+A feature flag is a fundamentally
+runtime control decision.
+
+64
+00:04:28,264 --> 00:04:30,691
+It does not have to control
+a user-facing feature.
+
+65
+00:04:31,221 --> 00:04:35,905
+It can select a routing policy,
+caching strategy, fallback dependency,
+
+66
+00:04:35,905 --> 00:04:39,073
+processing path, experimental
+optimization, and whatnot.
+
+67
+00:04:40,225 --> 00:04:43,610
+Imagine a service introducing
+a new routing strategy.
+
+68
+00:04:44,882 --> 00:04:49,493
+Instead of making that strategy active
+for each and every request, we can keep
+
+69
+00:04:49,494 --> 00:04:55,366
+it disabled by default and activate
+it for it-- for a limited scope If the
+
+70
+00:04:55,370 --> 00:05:00,354
+behavior is unhealthy, we can disable
+that specific path without having to
+
+71
+00:05:00,355 --> 00:05:03,621
+necessarily redeploy the entire service.
+
+72
+00:05:05,435 --> 00:05:10,666
+The key point being, feature flags
+can provide a control mechanism for
+
+73
+00:05:10,711 --> 00:05:17,209
+infrastructure behavior separate from the
+mechanism that deploys the very software
+
+74
+00:05:18,209 --> 00:05:22,015
+See, now deployment and activation
+are two very different operations.
+
+75
+00:05:22,529 --> 00:05:26,413
+First, deploy the code while
+keeping the new behavior intact.
+
+76
+00:05:26,967 --> 00:05:33,063
+Next, activate it for the restricted scope
+and monitor the relevant health signals
+
+77
+00:05:34,063 --> 00:05:36,151
+If it remains healthy, expand the scope.
+
+78
+00:05:36,336 --> 00:05:38,175
+If it degrades, you deactivate it.
+
+79
+00:05:39,165 --> 00:05:42,911
+Now, this separation can reduce
+recovery time because we may not need
+
+80
+00:05:42,911 --> 00:05:44,826
+to roll back the entire deployment.
+
+81
+00:05:45,655 --> 00:05:49,710
+It also makes your releases faster
+and releases easier to reason about.
+
+82
+00:05:50,307 --> 00:05:52,884
+Code can be present in an
+environment without immediately
+
+83
+00:05:52,885 --> 00:05:55,716
+affecting anything, anything at all.
+
+84
+00:05:56,527 --> 00:06:03,452
+The caveat is that the old path has to
+remain safe, it has to remain usable, and
+
+85
+00:06:03,452 --> 00:06:07,334
+the flag must be evaluated consistently
+wherever the behavior is controlled.
+
+86
+00:06:08,910 --> 00:06:12,706
+It's very important that we do
+backward compatibility checks.
+
+87
+00:06:12,784 --> 00:06:17,135
+In event of any issue, when you roll
+back your part of the deployment,
+
+88
+00:06:18,469 --> 00:06:20,569
+the prior change should still work
+
+89
+00:06:21,569 --> 00:06:26,067
+Now suppose a new capability is activated
+and latency increases a few minutes later.
+
+90
+00:06:27,302 --> 00:06:30,421
+The system should correlate the
+degradation with a recent flag
+
+91
+00:06:30,424 --> 00:06:35,313
+change, then evaluate whether the
+evidence is strong enough and if
+
+92
+00:06:35,340 --> 00:06:39,711
+the configured conditions are met,
+disable the capability automatically.
+
+93
+00:06:41,305 --> 00:06:44,531
+Then it must check whether the
+health has actually recovered or not.
+
+94
+00:06:45,174 --> 00:06:49,409
+This requires integrating flag
+with system observability.
+
+95
+00:06:51,135 --> 00:06:55,508
+Flag changes should generate telemetry,
+and monitoring should have enough
+
+96
+00:06:55,539 --> 00:07:01,521
+context to connect behavioral changes
+with subsequent outcomes Correlation
+
+97
+00:07:01,547 --> 00:07:06,791
+alone doesn't always prove causation,
+so triggers should be designed
+
+98
+00:07:06,791 --> 00:07:11,414
+carefully to avoid reversing healthy
+changes because of unrelated incidents
+
+99
+00:07:12,414 --> 00:07:18,138
+Now, key reliability principle is to
+limit the change to the smallest practical
+
+100
+00:07:18,147 --> 00:07:22,296
+scope, and this is very important
+to keep your blast radius, small.
+
+101
+00:07:23,156 --> 00:07:27,008
+Instead of activating a new
+behavior everywhere, scope it
+
+102
+00:07:27,635 --> 00:07:29,636
+to a limited set of, users.
+
+103
+00:07:29,762 --> 00:07:33,817
+Like you can scope it to limited
+set of environment, service,
+
+104
+00:07:33,831 --> 00:07:35,877
+cluster, region, or tenant.
+
+105
+00:07:36,686 --> 00:07:41,064
+You start small, you observe real
+production behavior, whether it is
+
+106
+00:07:41,119 --> 00:07:45,956
+doing well or whether it is having
+some issues, and you expand only
+
+107
+00:07:45,957 --> 00:07:48,427
+when the evidence supports doing so.
+
+108
+00:07:50,176 --> 00:07:51,661
+Pre-production testing is essential.
+
+109
+00:07:51,669 --> 00:07:53,376
+Yes, you have to test it.
+
+110
+00:07:53,689 --> 00:07:58,715
+Without that, you cannot proceed forward,
+but it cannot perfectly reproduce every
+
+111
+00:07:58,715 --> 00:08:03,438
+production traffic pattern or customer
+interaction or dependency interaction,
+
+112
+00:08:03,518 --> 00:08:05,244
+any customer-specific workload.
+
+113
+00:08:06,150 --> 00:08:10,484
+So progressive activation gives
+us a controlled way to learn from
+
+114
+00:08:10,487 --> 00:08:14,590
+real conditions without exposing
+the entire fleet simultaneously
+
+115
+00:08:15,590 --> 00:08:18,792
+Now it is very important that
+we do graceful degradation
+
+116
+00:08:18,897 --> 00:08:20,729
+over a failure, right?
+
+117
+00:08:21,165 --> 00:08:26,466
+Now, say consider an external dependency
+that becomes unreliable, right?
+
+118
+00:08:26,483 --> 00:08:30,945
+You might be, say, talking to, S3
+or like DynamoDB, which you don't
+
+119
+00:08:30,947 --> 00:08:32,568
+have any control over, right?
+
+120
+00:08:33,055 --> 00:08:37,343
+Aggressive retries can amplify the
+pressure on an already unhealthy system.
+
+121
+00:08:39,268 --> 00:08:42,962
+If the application supports a
+safe fallback, we may be able to
+
+122
+00:08:42,966 --> 00:08:47,558
+disable the affected integration and
+preserve essential functionality.
+
+123
+00:08:49,540 --> 00:08:54,310
+The service operates in reduced mode
+instead of failing completely, and I feel
+
+124
+00:08:54,323 --> 00:08:58,132
+that is a very thought after compromise.
+
+125
+00:08:58,389 --> 00:09:01,377
+Your customers can still interact
+with your service or with your
+
+126
+00:09:01,377 --> 00:09:04,190
+software, but at a reduced capability.
+
+127
+00:09:05,875 --> 00:09:08,758
+But it may not be appropriate
+for every qu-- operation.
+
+128
+00:09:09,104 --> 00:09:13,518
+We must preserve data integrity and
+the correctness of critical workloads.
+
+129
+00:09:13,819 --> 00:09:20,318
+But whenever a degraded mode is safe,
+making it explicit and controllable
+
+130
+00:09:20,357 --> 00:09:22,670
+can substantially improve resiliency
+
+131
+00:09:23,670 --> 00:09:26,282
+Now, how do you design a
+safe automated remediation?
+
+132
+00:09:27,672 --> 00:09:32,532
+See, automation can be wrong, and
+it can be wrong very efficiently.
+
+133
+00:09:34,073 --> 00:09:38,031
+And I like to apply
+safe-- four safeguards.
+
+134
+00:09:38,666 --> 00:09:41,141
+First, define clear trigger conditions.
+
+135
+00:09:41,440 --> 00:09:43,382
+Avoid reacting to transient fluctuations.
+
+136
+00:09:43,383 --> 00:09:47,603
+If there's a spike, a transient spike,
+say like for a minute or so, or for
+
+137
+00:09:47,703 --> 00:09:51,514
+a short amount of duration, I don't
+want to run my, remediation, right?
+
+138
+00:09:51,798 --> 00:09:54,477
+So we should require a
+sufficiently strong evidence.
+
+139
+00:09:54,890 --> 00:09:57,289
+Second, you limit the remediation scope.
+
+140
+00:09:57,871 --> 00:10:01,134
+Disable one capability
+rather than disrupting entire
+
+141
+00:10:01,134 --> 00:10:02,538
+deployment or entire fleet.
+
+142
+00:10:03,296 --> 00:10:05,241
+And then we validate
+each and every action.
+
+143
+00:10:06,249 --> 00:10:08,604
+A successful command is
+not a proof of recovery.
+
+144
+00:10:08,618 --> 00:10:13,864
+You have to validate when the system got
+restored or system is working correctly.
+
+145
+00:10:15,351 --> 00:10:19,466
+And at the end, prevent endless
+loops and preserve auditability.
+
+146
+00:10:19,467 --> 00:10:21,629
+And I must say this is
+really, really important.
+
+147
+00:10:22,302 --> 00:10:28,064
+If repeated remediation attempts
+fail, it's, it's not likely that
+
+148
+00:10:28,065 --> 00:10:29,588
+the next attempt will succeed.
+
+149
+00:10:30,075 --> 00:10:33,242
+At that moment, we should stop
+and escalate to an engineer
+
+150
+00:10:33,250 --> 00:10:36,825
+rather than repeating the same
+action on and on, and on, and on.
+
+151
+00:10:37,949 --> 00:10:44,270
+Record the condition, decision, action,
+flag change, and resulting health state.
+
+152
+00:10:44,755 --> 00:10:48,579
+This makes the system understandable
+and helps engineers investigate
+
+153
+00:10:48,580 --> 00:10:50,189
+failures in the automation itself
+
+154
+00:10:51,189 --> 00:10:55,161
+Now, my guiding principle is
+that you automate certainty
+
+155
+00:10:55,900 --> 00:10:57,292
+and you escalate ambiguity.
+
+156
+00:10:57,440 --> 00:11:02,690
+When you are in ambiguity, when you don't
+know what to do, let it be on the experts,
+
+157
+00:11:02,691 --> 00:11:08,025
+on the SMEs, on the engineers to take
+action rather than your automated, scripts
+
+158
+00:11:08,027 --> 00:11:09,566
+or your automations decide on that.
+
+159
+00:11:10,635 --> 00:11:14,035
+See, predictable failures with
+known safe mitigations are
+
+160
+00:11:14,058 --> 00:11:15,475
+good candidates for automation.
+
+161
+00:11:16,298 --> 00:11:20,708
+Unclear root causes, simultaneous
+failures across multiple systems,
+
+162
+00:11:21,211 --> 00:11:26,041
+security concerns, and data integrity
+risks may require human judgment,
+
+163
+00:11:26,042 --> 00:11:27,696
+and most of the time it does.
+
+164
+00:11:28,746 --> 00:11:32,831
+Operators must be able to inspect
+and override automated decisions.
+
+165
+00:11:33,080 --> 00:11:34,273
+That is really, really important.
+
+166
+00:11:34,283 --> 00:11:38,742
+You need to have a break glass mechanism
+for each and every automation we do.
+
+167
+00:11:40,520 --> 00:11:42,933
+Each operational flag
+should also have an owner.
+
+168
+00:11:43,623 --> 00:11:46,612
+See, a documented purpose,
+a known default state, clear
+
+169
+00:11:46,616 --> 00:11:49,028
+permissions, and a retirement plan.
+
+170
+00:11:49,474 --> 00:11:52,936
+Otherwise, you can just keep
+on accumulating flags, and it
+
+171
+00:11:52,953 --> 00:11:57,802
+becomes a source of operational
+risk and a major, major tech debt.
+
+172
+00:11:57,846 --> 00:12:02,558
+I am telling you this from experience
+that each flag needs to be scoped down,
+
+173
+00:12:03,162 --> 00:12:07,402
+else you're to-- you're looking at them
+after some time, and you don't know,
+
+174
+00:12:07,403 --> 00:12:10,967
+like, what this flag does, who owns it,
+and whether you can retire it or not
+
+175
+00:12:11,967 --> 00:12:13,538
+So now let, let's connect all the pieces.
+
+176
+00:12:13,539 --> 00:12:15,233
+We have talked about multiple things.
+
+177
+00:12:15,609 --> 00:12:18,298
+So deploy the new path
+while leaving it disabled.
+
+178
+00:12:18,791 --> 00:12:20,219
+Activate it for a limited scope.
+
+179
+00:12:20,219 --> 00:12:23,965
+Scope it to environment, scope it to
+cluster, scope it to maybe even a set
+
+180
+00:12:23,967 --> 00:12:26,388
+of users or availability zone, right?
+
+181
+00:12:26,688 --> 00:12:28,669
+You detect and evaluate degradation.
+
+182
+00:12:28,768 --> 00:12:31,092
+You use metrics, observability, telemetry.
+
+183
+00:12:31,437 --> 00:12:35,230
+See, like, is your system performing
+well or if, system is performing,
+
+184
+00:12:35,639 --> 00:12:37,427
+not so well, it has degraded.
+
+185
+00:12:38,158 --> 00:12:42,123
+If the configured condition
+justify intervention, automatically
+
+186
+00:12:42,124 --> 00:12:44,068
+disable the path, right?
+
+187
+00:12:44,366 --> 00:12:47,815
+You don't want to disable, the path
+on some transient blips, right?
+
+188
+00:12:48,407 --> 00:12:50,466
+So wait for your conditions to be me-met.
+
+189
+00:12:51,191 --> 00:12:56,042
+And at the end, very important, validate
+the recovery and record the outcome.
+
+190
+00:12:56,755 --> 00:13:01,634
+Each step has to be observable,
+bounded, and reversible.
+
+191
+00:13:02,569 --> 00:13:07,173
+Now, this gives an end-to-end workflow
+rather than a disconnected collection of
+
+192
+00:13:07,221 --> 00:13:09,892
+alerts, scripts, commands, and whatnot
+
+193
+00:13:10,892 --> 00:13:12,489
+We build the confidence gradually.
+
+194
+00:13:13,265 --> 00:13:16,751
+Organizations don't need to automate
+everything right away, right?
+
+195
+00:13:17,096 --> 00:13:21,122
+You start in detection-only mode,
+identify problems, and recommend
+
+196
+00:13:21,123 --> 00:13:23,779
+actions while engineers remain
+responsible for remediation.
+
+197
+00:13:24,226 --> 00:13:27,145
+For example, you, you put
+in some alerts, right?
+
+198
+00:13:27,440 --> 00:13:31,437
+And when your threshold crosses,
+they just notify the engineer
+
+199
+00:13:31,439 --> 00:13:32,968
+on call or engineer responsible.
+
+200
+00:13:33,424 --> 00:13:36,084
+You write SOPs for them, you write
+runbooks for them, and they can
+
+201
+00:13:36,085 --> 00:13:37,991
+follow those steps to remediate.
+
+202
+00:13:39,170 --> 00:13:42,032
+So next, then you automate
+the low-risk cases.
+
+203
+00:13:42,093 --> 00:13:46,167
+Maybe like some of the events, they
+just require restarting a Kubernetes
+
+204
+00:13:46,192 --> 00:13:51,564
+pod or restarting, your service, right,
+which are low risk while keeping the
+
+205
+00:13:51,565 --> 00:13:53,489
+critical decisions under human control.
+
+206
+00:13:54,909 --> 00:13:58,832
+You expand the automation as
+operational evidence builds confidence.
+
+207
+00:13:59,835 --> 00:14:02,910
+and then you regularly test
+the recovery mechanism itself.
+
+208
+00:14:03,804 --> 00:14:08,216
+An untested recovery workflow is an
+assumption, not a proven capability
+
+209
+00:14:09,216 --> 00:14:14,118
+And then most important, security,
+life cycle, and platform engineering.
+
+210
+00:14:15,120 --> 00:14:16,492
+These areas do matter.
+
+211
+00:14:18,126 --> 00:14:18,876
+Security.
+
+212
+00:14:19,217 --> 00:14:23,536
+Automated actions need strong
+authentication, authorization, audit
+
+213
+00:14:23,536 --> 00:14:25,759
+logging, and least privilege permissions.
+
+214
+00:14:25,796 --> 00:14:28,373
+Each and every script needs authorization.
+
+215
+00:14:29,658 --> 00:14:33,583
+We cannot have anyone just
+randomly run it, right?
+
+216
+00:14:33,851 --> 00:14:37,779
+If, for example, if you're owning
+service A, it has to be, it has to
+
+217
+00:14:37,779 --> 00:14:43,555
+be that service A users or service
+A developers have control whether a
+
+218
+00:14:43,555 --> 00:14:45,059
+script is getting executed or not.
+
+219
+00:14:45,853 --> 00:14:48,636
+If someone is trying to execute it,
+it requires approvals from them.
+
+220
+00:14:50,113 --> 00:14:51,057
+Then life cycles.
+
+221
+00:14:51,328 --> 00:14:55,635
+Flags should progress from introduction
+to controlled activation, stable
+
+222
+00:14:55,635 --> 00:14:57,184
+operation, and then retirement.
+
+223
+00:14:57,981 --> 00:15:01,096
+Permanent resilience flags
+should be explicitly identified.
+
+224
+00:15:01,323 --> 00:15:04,281
+It is very, very important that
+each flag has a life cycle.
+
+225
+00:15:04,785 --> 00:15:10,659
+Else, we run in this spiral of tech
+debt, spiral of like unclear actions,
+
+226
+00:15:11,006 --> 00:15:13,575
+and it becomes a nightmare to operate.
+
+227
+00:15:15,399 --> 00:15:16,835
+Then platform engineering.
+
+228
+00:15:17,532 --> 00:15:22,182
+Standardizing telemetry, health
+reporting, remediation workflows,
+
+229
+00:15:22,220 --> 00:15:26,223
+and recovery validation makes
+this approach much easier to apply
+
+230
+00:15:26,261 --> 00:15:29,498
+consistently across multiple services
+
+231
+00:15:30,498 --> 00:15:32,761
+Now let me summarize the four principles.
+
+232
+00:15:33,354 --> 00:15:38,057
+First, automate known failure paths
+where safe remediation is understood.
+
+233
+00:15:39,468 --> 00:15:42,646
+Then you make changes
+reversible, so unstable behavior
+
+234
+00:15:42,658 --> 00:15:44,182
+can be deactivated quickly.
+
+235
+00:15:45,508 --> 00:15:49,298
+It is very important you limit the blast
+radius through progressive targeting.
+
+236
+00:15:49,767 --> 00:15:53,979
+And finally, escalate uncertainty
+rather than allowing automation to make
+
+237
+00:15:54,250 --> 00:15:56,465
+increasingly speculative decisions.
+
+238
+00:15:56,516 --> 00:15:57,845
+It's very, very important
+
+239
+00:15:58,845 --> 00:16:02,573
+The goal isn't to build a system
+where nothing fails, and to be
+
+240
+00:16:02,573 --> 00:16:04,359
+practical, that's not even possible.
+
+241
+00:16:04,386 --> 00:16:06,039
+Each and every system fails.
+
+242
+00:16:06,797 --> 00:16:12,349
+It is to build a system which is
+resilient, where failures can occur
+
+243
+00:16:12,388 --> 00:16:17,976
+without becoming major disruptions, and
+that's called a very, very good software
+
+244
+00:16:18,976 --> 00:16:22,198
+Now, towards the closing, if
+you take away one idea from this
+
+245
+00:16:22,207 --> 00:16:24,931
+talk, I would like it to be this.
+
+246
+00:16:25,555 --> 00:16:28,724
+Feature flags don't have to
+be only release mechanisms.
+
+247
+00:16:29,060 --> 00:16:31,994
+They can be infrastructure
+controls for you.
+
+248
+00:16:32,995 --> 00:16:38,860
+Combined with observability, bounded
+remediation, validation, progressive
+
+249
+00:16:38,916 --> 00:16:44,079
+activation, and human governance, they can
+become an important part of a self-healing
+
+250
+00:16:44,081 --> 00:16:46,719
+architecture Thank you for listening in.
+
+251
+00:16:46,786 --> 00:16:50,830
+I am Prateek Jindal, and this
+was Building Self-Healing Cloud
+
+252
+00:16:50,831 --> 00:16:53,057
+Infrastructure with Feature Flags.
+
+253
+00:16:53,430 --> 00:16:54,101
+Have a good day.
+
