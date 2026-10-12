@@ -1,0 +1,1038 @@
+1
+00:00:01,000 --> 00:00:02,035
+Welcome everyone.
+
+2
+00:00:02,309 --> 00:00:07,237
+Today we'll talk about what happens
+when a feature flag changes, not
+
+3
+00:00:07,238 --> 00:00:12,390
+just the application behavior, but
+the data behind an important KPI.
+
+4
+00:00:13,006 --> 00:00:16,963
+We normally think of feature flags
+as a software engineering tool.
+
+5
+00:00:17,641 --> 00:00:22,430
+They let us turn a feature on or
+off, test something with a subset of
+
+6
+00:00:22,451 --> 00:00:24,727
+users, and roll it back if necessary.
+
+7
+00:00:25,359 --> 00:00:27,834
+But there is another side to this.
+
+8
+00:00:28,240 --> 00:00:34,676
+If that feature changes how events
+are generated, which users qualify,
+
+9
+00:00:34,968 --> 00:00:40,566
+or how a transaction is classified,
+then our analytics change too.
+
+10
+00:00:41,238 --> 00:00:45,187
+The goal of this talk is
+to show a practical way to
+
+11
+00:00:45,190 --> 00:00:47,128
+manage that change safely.
+
+12
+00:00:47,527 --> 00:00:52,715
+We will look into metric versioning,
+reconciliation, lineage, dashboard
+
+13
+00:00:52,718 --> 00:00:55,991
+validation, monitoring, and communication
+
+14
+00:00:56,991 --> 00:00:59,819
+Let's start with why it matters.
+
+15
+00:01:00,209 --> 00:01:04,545
+Imagine that a team changes a
+checkout process using a feature flag.
+
+16
+00:01:05,096 --> 00:01:08,855
+From an application perspective,
+the change may be small.
+
+17
+00:01:09,348 --> 00:01:13,021
+But suppose the new checkout
+process changes which sessions are
+
+18
+00:01:13,024 --> 00:01:15,072
+considered eligible for conversion.
+
+19
+00:01:15,848 --> 00:01:18,632
+Now, the denominator of
+the conversion KPI changes.
+
+20
+00:01:19,240 --> 00:01:24,817
+That can affect dashboards,
+scheduled reports, alerts, forecast,
+
+21
+00:01:25,059 --> 00:01:26,630
+and executive presentations.
+
+22
+00:01:27,176 --> 00:01:32,374
+The important lesson is that the
+small application change can become
+
+23
+00:01:32,463 --> 00:01:34,543
+a significant analytics change.
+
+24
+00:01:36,295 --> 00:01:42,343
+The core idea for this talk is
+simple: treat analytics logic like
+
+25
+00:01:42,410 --> 00:01:44,399
+a controlled software deployment.
+
+26
+00:01:44,846 --> 00:01:49,906
+Instead of replacing an old KPI
+calculation immediately, define the
+
+27
+00:01:49,906 --> 00:01:55,158
+existing version control clearly, create
+the new version, and compare the two.
+
+28
+00:01:55,935 --> 00:02:00,602
+Then validate the difference,
+communicate it, and roll the
+
+29
+00:02:00,602 --> 00:02:02,642
+new definition out deliberately.
+
+30
+00:02:03,240 --> 00:02:07,132
+This gives the data team
+something very important: control
+
+31
+00:02:07,163 --> 00:02:09,118
+over the meaning of metric.
+
+32
+00:02:10,908 --> 00:02:12,146
+Here's a simple example.
+
+33
+00:02:12,504 --> 00:02:17,152
+Suppose our old conversion
+rate is completed orders
+
+34
+00:02:17,175 --> 00:02:19,059
+delivered by eligible sessions.
+
+35
+00:02:19,916 --> 00:02:24,392
+Now, we introduce a new checkout
+experience behind a feature flag.
+
+36
+00:02:25,108 --> 00:02:29,976
+The new experience changes which
+session qualify as eligible.
+
+37
+00:02:30,733 --> 00:02:35,206
+Even if the number of completed
+orders stays exactly the same,
+
+38
+00:02:35,771 --> 00:02:37,243
+the denominator can change.
+
+39
+00:02:37,983 --> 00:02:40,942
+That means that the
+conversion rate can change.
+
+40
+00:02:41,406 --> 00:02:45,224
+So when somebody asks,
+"Why did our KPI move?"
+
+41
+00:02:45,870 --> 00:02:49,022
+The answer may not be that the
+business performance changed.
+
+42
+00:02:49,615 --> 00:02:54,458
+The definition of KPI may have been
+affected or they may have been changed.
+
+43
+00:02:55,458 --> 00:02:57,667
+Where can this risk appear?
+
+44
+00:02:58,770 --> 00:03:03,265
+The obvious place is the dashboard, but
+the dashboards are not the only consumer.
+
+45
+00:03:04,071 --> 00:03:09,514
+The same metric can feed scheduled
+reports, alerts, forecasting
+
+46
+00:03:09,516 --> 00:03:13,999
+model, planning spreadsheets,
+API, and executive presentations.
+
+47
+00:03:14,935 --> 00:03:18,798
+This is why changing a metric
+definition requires us to think
+
+48
+00:03:18,813 --> 00:03:20,725
+beyond the dashboard itself.
+
+49
+00:03:21,337 --> 00:03:25,346
+We need to understand the downstream
+impact before we can make the change
+
+50
+00:03:26,346 --> 00:03:31,302
+Feature flags are traditionally
+associated with application functionality.
+
+51
+00:03:31,769 --> 00:03:38,630
+For example, we might say, "Turn the new
+checkout on for ten percent of users."
+
+52
+00:03:39,438 --> 00:03:45,561
+But from a data perspective, we
+should ask another question: What data
+
+53
+00:03:45,608 --> 00:03:48,117
+contract changes when the flag changes?
+
+54
+00:03:48,850 --> 00:03:55,358
+Does the flag change event names,
+eligibility, filters, joins,
+
+55
+00:03:55,412 --> 00:03:57,442
+aggregation, or classification?
+
+56
+00:03:58,088 --> 00:04:05,919
+If the answer is yes, the da-data stream
+team-- the data team needs to know
+
+57
+00:04:06,073 --> 00:04:11,309
+about the flag before the in- the--
+before interpreting the KPI changes.
+
+58
+00:04:13,044 --> 00:04:16,557
+Before changing a metric, map it.
+
+59
+00:04:17,260 --> 00:04:20,904
+Write down exactly what KPI means today.
+
+60
+00:04:21,565 --> 00:04:26,965
+Identify the source table or events,
+filters, business rule, aggregation
+
+61
+00:04:26,988 --> 00:04:29,609
+grain, and downstream consumers.
+
+62
+00:04:30,989 --> 00:04:33,469
+Also, identify who owns the metric.
+
+63
+00:04:34,322 --> 00:04:39,802
+This sounds basic, but is extremely
+valuable if a metric definition
+
+64
+00:04:39,803 --> 00:04:44,373
+exists only inside the SQL code
+or a dashboard calculation.
+
+65
+00:04:44,722 --> 00:04:46,715
+It is difficult to go-govern.
+
+66
+00:04:47,597 --> 00:04:52,568
+A documented definition gives
+us a baseline for comparison.
+
+67
+00:04:54,350 --> 00:05:00,688
+A metric versioning is one of the simplest
+controls we can introduce instead of
+
+68
+00:05:00,695 --> 00:05:03,005
+silently changing conversion rate.
+
+69
+00:05:03,460 --> 00:05:07,364
+We can temporarily have a
+conversion rate version one and
+
+70
+00:05:07,365 --> 00:05:08,605
+conversion rate version two.
+
+71
+00:05:09,118 --> 00:05:14,815
+The versions should have an owner
+definition, effective date, and
+
+72
+00:05:14,817 --> 00:05:16,203
+description of business rule.
+
+73
+00:05:16,747 --> 00:05:21,734
+This does not mean we need
+dozens of pe-permanent metrics.
+
+74
+00:05:22,162 --> 00:05:26,481
+The point is to make transition
+explicit and explainable.
+
+75
+00:05:27,049 --> 00:05:31,426
+When someone looks at the historical
+results later, they can understand
+
+76
+00:05:31,609 --> 00:05:33,303
+which definition was used.
+
+77
+00:05:34,851 --> 00:05:39,539
+Now we get to the most important
+implementation pattern.
+
+78
+00:05:39,976 --> 00:05:42,373
+Run the old and the new logic in parallel.
+
+79
+00:05:42,907 --> 00:05:47,222
+Keep the existing calculation, build
+the candidate calculation beside it.
+
+80
+00:05:47,561 --> 00:05:54,587
+Run both over the same reporting period,
+where possible, the same population.
+
+81
+00:05:55,218 --> 00:05:58,189
+Then store enough information
+to compare the results.
+
+82
+00:05:58,900 --> 00:06:03,480
+The dashboard should not be the first
+place where we discover that new KPI
+
+83
+00:06:03,480 --> 00:06:07,370
+is different What should we reconcile?
+
+84
+00:06:08,414 --> 00:06:14,027
+Start with the basics: event counts, row
+counts, eligible population, numerator,
+
+85
+00:06:14,042 --> 00:06:20,336
+denominator, null value, distinct
+values, and day or weekly KPI trends.
+
+86
+00:06:20,890 --> 00:06:22,317
+Then go into deeper segments.
+
+87
+00:06:22,677 --> 00:06:26,643
+A difference in overall KPI may
+look small while hiding a large
+
+88
+00:06:26,643 --> 00:06:32,524
+difference for one consumer group,
+product, geography, or platform.
+
+89
+00:06:33,033 --> 00:06:38,427
+Reconciliation is about explaining
+the difference, not simply by deciding
+
+90
+00:06:38,441 --> 00:06:40,245
+whether two numbers are equal or not.
+
+91
+00:06:41,995 --> 00:06:44,231
+Here's a simple reconciliation example.
+
+92
+00:06:44,283 --> 00:06:48,736
+On Monday and Tuesday, the new KPI is
+only point two percent percentage points
+
+93
+00:06:48,897 --> 00:06:53,944
+higher, whereas on Wednesday, it jumps
+to one point eight percentage points.
+
+94
+00:06:54,600 --> 00:06:57,711
+That Wednesday difference
+is an investigation signal.
+
+95
+00:06:58,032 --> 00:07:01,696
+We should not immediately say
+that the version two is wrong.
+
+96
+00:07:01,723 --> 00:07:04,175
+We should ask what changed on Wednesday.
+
+97
+00:07:04,764 --> 00:07:06,067
+Was there a deployment?
+
+98
+00:07:06,798 --> 00:07:08,517
+Did the feature flag expand?
+
+99
+00:07:09,019 --> 00:07:11,203
+Did the eligible population change?
+
+100
+00:07:11,803 --> 00:07:13,594
+Was there a data quality issue?
+
+101
+00:07:14,505 --> 00:07:17,869
+The comparison gives us a
+place to start investigating.
+
+102
+00:07:19,515 --> 00:07:22,438
+A useful investigation
+follows the data pipeline.
+
+103
+00:07:22,722 --> 00:07:27,523
+First, compare the source volumes,
+then compare eligibility rules, then
+
+104
+00:07:27,524 --> 00:07:32,523
+compare joins and deduplication, then
+compare aggregation grain, then break
+
+105
+00:07:32,540 --> 00:07:36,312
+the result down by useful segments,
+and finally, connect the difference
+
+106
+00:07:36,425 --> 00:07:38,341
+back to the feature flag cohort.
+
+107
+00:07:38,907 --> 00:07:43,956
+This helps us move from the
+KPI change to this specific
+
+108
+00:07:43,957 --> 00:07:46,475
+business rule caused the change.
+
+109
+00:07:48,262 --> 00:07:52,833
+Cohort analysis is especially useful
+when a feature flag is involved.
+
+110
+00:07:53,153 --> 00:07:57,774
+If only twenty percent of the users
+receive the new experience, compare
+
+111
+00:07:58,195 --> 00:08:00,359
+the flagged and unflagged group.
+
+112
+00:08:00,964 --> 00:08:06,490
+Then examine whether the KPI difference
+is concentrated in the treatment cohort.
+
+113
+00:08:07,010 --> 00:08:14,774
+We can also segment by geography, product,
+cons- customer type, device, or time.
+
+114
+00:08:15,135 --> 00:08:18,943
+The feature flag itself becomes
+useful lineage signal because it
+
+115
+00:08:18,955 --> 00:08:25,538
+tells us which users experienced which
+business logic Data lineage becomes
+
+116
+00:08:25,538 --> 00:08:28,194
+an operational in this situation.
+
+117
+00:08:28,642 --> 00:08:33,025
+We can think of the path as a
+feature flag, application behavior,
+
+118
+00:08:33,085 --> 00:08:37,999
+events, pipelines, metric logic,
+and finally the dashboard.
+
+119
+00:08:39,259 --> 00:08:46,761
+If the document that chain-- If we
+document that chain, we can answer three
+
+120
+00:08:46,761 --> 00:08:52,605
+practical questions quickly: what changed,
+where did it change, and who is affected?
+
+121
+00:08:52,928 --> 00:08:57,416
+Lineage is therefore not just an important
+documentation for compliance, it helps
+
+122
+00:08:57,416 --> 00:09:02,463
+us troubleshoot real KPI production
+chains After the metric is validated,
+
+123
+00:09:02,463 --> 00:09:04,924
+we need to still validate the dashboard.
+
+124
+00:09:05,255 --> 00:09:09,819
+Check the total trend lines, filters,
+drill down, labels, definition,
+
+125
+00:09:09,833 --> 00:09:11,544
+refresh timings, and data freshness.
+
+126
+00:09:12,019 --> 00:09:15,140
+Also, check the alerts that
+depend on these thresholds.
+
+127
+00:09:15,528 --> 00:09:19,974
+For important dashboards, it can be
+useful to compare exported values or
+
+128
+00:09:19,976 --> 00:09:22,973
+screenshots before and after the change.
+
+129
+00:09:23,640 --> 00:09:27,973
+The objective is to make sure that
+the dashboard is reflecting the
+
+130
+00:09:28,006 --> 00:09:34,976
+intended metric, not simply the,
+SQL query, runs successfully Here's
+
+131
+00:09:34,978 --> 00:09:36,901
+the rollout pattern I recommend.
+
+132
+00:09:37,416 --> 00:09:42,072
+First, define the version one and
+version two, then run them in parallel
+
+133
+00:09:42,357 --> 00:09:47,622
+and reconcilia- reconcile the reports,
+review the material differences,
+
+134
+00:09:47,659 --> 00:09:51,610
+communicate the change, release it
+to the limited audience, monitor
+
+135
+00:09:51,630 --> 00:09:53,890
+the results, and expand gradually.
+
+136
+00:09:54,565 --> 00:09:55,454
+Only retire…
+
+137
+00:09:56,711 --> 00:10:04,002
+Sorry Only retire version one
+after we have enough evidence
+
+138
+00:10:04,030 --> 00:10:07,702
+that the new definition is
+understood and working as expected.
+
+139
+00:10:08,243 --> 00:10:13,077
+This is exactly a deployment
+process for an analytical logic.
+
+140
+00:10:14,210 --> 00:10:18,030
+We can think of the entire process
+like a software development life cycle.
+
+141
+00:10:18,428 --> 00:10:23,503
+We move from deployment to validation,
+then shadow comparison, and then
+
+142
+00:10:23,524 --> 00:10:27,479
+limited result-- release, monitoring,
+and the final full release.
+
+143
+00:10:28,011 --> 00:10:30,733
+The important addition is that the new…
+
+144
+00:10:30,898 --> 00:10:32,954
+We define a rollback criteria.
+
+145
+00:10:32,968 --> 00:10:37,389
+If the new logic produces an
+unexpected result, we should know in
+
+146
+00:10:37,424 --> 00:10:42,384
+advance what conditions would cause
+us to pause or reverse the rollout.
+
+147
+00:10:42,938 --> 00:10:48,170
+We should also retain an audit
+trail of what changed and when
+
+148
+00:10:49,170 --> 00:10:51,545
+Monitoring should continue
+after the release.
+
+149
+00:10:52,399 --> 00:10:56,848
+Track the difference between the old and
+the new KPI while both are available.
+
+150
+00:10:57,117 --> 00:10:59,195
+Monitor source and volume freshness.
+
+151
+00:10:59,534 --> 00:11:04,300
+Look at unexpected changes in
+important segments which watch
+
+152
+00:11:04,314 --> 00:11:08,898
+the alerts and thresholds, and
+define an observation window.
+
+153
+00:11:09,554 --> 00:11:13,113
+One common mistake is deleting
+the old calculation immediately.
+
+154
+00:11:13,280 --> 00:11:17,801
+Keeping it temporarily gives us
+a reference point when questions
+
+155
+00:11:17,811 --> 00:11:19,462
+appear after the release.
+
+156
+00:11:20,780 --> 00:11:23,550
+Technical validation is only half the job.
+
+157
+00:11:24,085 --> 00:11:25,980
+We also need to communicate the changes.
+
+158
+00:11:26,000 --> 00:11:30,355
+Con-consumers should know what changed,
+why it changed, and when the new
+
+159
+00:11:30,357 --> 00:11:34,531
+definition becomes effective, and which
+dashboards and reports are affected.
+
+160
+00:11:34,587 --> 00:11:39,052
+If we know the expected
+impact, we should explain it.
+
+161
+00:11:39,490 --> 00:11:44,532
+Most importantly, give people an
+owner or contact for questions.
+
+162
+00:11:44,592 --> 00:11:49,468
+A technically correct metric can still
+create confusion if the customers do not
+
+163
+00:11:49,501 --> 00:11:52,531
+know that its definition has changed.
+
+164
+00:11:53,527 --> 00:11:55,974
+Here's an example of a
+practical change notice.
+
+165
+00:11:56,273 --> 00:12:00,821
+We identify the metric, describe
+the business rule change, give the
+
+166
+00:12:00,822 --> 00:12:05,579
+effective date, explain the expected
+impact, and identify the owner.
+
+167
+00:12:05,980 --> 00:12:10,605
+Notice that we have also s-- we
+also state the old definition
+
+168
+00:12:10,913 --> 00:12:13,025
+remains available for comparison.
+
+169
+00:12:13,533 --> 00:12:18,068
+This kind of short communication can
+prevent, prevent a lot of confusion
+
+170
+00:12:18,377 --> 00:12:23,865
+when executives or analysts see
+a new KPI move after a release.
+
+171
+00:12:25,455 --> 00:12:26,663
+Let's look, look back.
+
+172
+00:12:27,171 --> 00:12:29,831
+let's look at the
+communication failure modes.
+
+173
+00:12:30,364 --> 00:12:33,218
+First is silently changing a definition.
+
+174
+00:12:33,684 --> 00:12:39,647
+Another is changing the dashboard before
+the validation ma-- validating the metric.
+
+175
+00:12:39,976 --> 00:12:43,592
+Another is comparing the totals
+without checking whether the
+
+176
+00:12:43,606 --> 00:12:44,887
+populations are different.
+
+177
+00:12:45,382 --> 00:12:51,302
+If it is also easy to test only
+the overall KPI and miss the
+
+178
+00:12:51,302 --> 00:12:52,913
+major segment-level difference.
+
+179
+00:12:53,458 --> 00:12:57,426
+Finally, teams sometimes remove
+the old metric too quickly.
+
+180
+00:12:58,057 --> 00:13:02,297
+The common theme is lack
+of control transition
+
+181
+00:13:03,297 --> 00:13:07,215
+Here's a simple checklist that
+can be used for future changes.
+
+182
+00:13:07,701 --> 00:13:09,335
+Is the definition documented?
+
+183
+00:13:09,648 --> 00:13:10,713
+Is there an owner?
+
+184
+00:13:10,870 --> 00:13:13,350
+Is there the-- is the metric versioned?
+
+185
+00:13:13,928 --> 00:13:15,364
+Is the lineage mapped?
+
+186
+00:13:15,967 --> 00:13:18,437
+Are old and new values available?
+
+187
+00:13:19,069 --> 00:13:21,390
+Has reconciliation been completed?
+
+188
+00:13:22,238 --> 00:13:24,259
+Has the dashboard been validated?
+
+189
+00:13:25,050 --> 00:13:27,311
+Have the customer been notified?
+
+190
+00:13:28,311 --> 00:13:32,393
+Are rollback criteria defined
+and is the monitoring active?
+
+191
+00:13:33,012 --> 00:13:37,645
+This checklist can be adapted to
+almost any analytics environment.
+
+192
+00:13:39,106 --> 00:13:41,596
+The diagram summarizes the architecture.
+
+193
+00:13:42,485 --> 00:13:45,037
+the feature flag controls
+the application behavior.
+
+194
+00:13:46,242 --> 00:13:48,741
+The-- That behavior produces the events.
+
+195
+00:13:49,079 --> 00:13:52,605
+Those events move through
+raw and staging data.
+
+196
+00:13:52,958 --> 00:13:56,188
+Then we calculate version one
+and version two of the metric.
+
+197
+00:13:56,234 --> 00:13:58,164
+Reconciliation layer compares them.
+
+198
+00:13:58,477 --> 00:14:03,777
+Finally, the certified KPI is consumed
+by dashboards, alerts, and reports.
+
+199
+00:14:04,262 --> 00:14:10,177
+The key design principle is that
+comparison happens before we make
+
+200
+00:14:10,180 --> 00:14:13,190
+the new KPI the official output.
+
+201
+00:14:14,774 --> 00:14:19,643
+This change changes the
+role of the data team.
+
+202
+00:14:19,695 --> 00:14:24,226
+Analytics engineering is no
+longer completely separate
+
+203
+00:14:24,234 --> 00:14:25,463
+from release management.
+
+204
+00:14:26,115 --> 00:14:31,396
+Metric definition become governed
+asset, data quality checks become
+
+205
+00:14:31,400 --> 00:14:35,734
+deployment checks, and lineage
+becomes operational, and communication
+
+206
+00:14:35,736 --> 00:14:37,916
+becomes a part of technical rollout.
+
+207
+00:14:38,323 --> 00:14:41,794
+This is especially important
+as organizations increasingly
+
+208
+00:14:41,794 --> 00:14:45,905
+depend on metrics for operational
+and executive dec-decisions.
+
+209
+00:14:46,900 --> 00:14:51,528
+If you remember only three rules from
+the talk, remember this: First, a feature
+
+210
+00:14:51,528 --> 00:14:56,320
+flag can change analytics even when it
+looks like an application-only change.
+
+211
+00:14:56,720 --> 00:15:02,666
+Second, never replace an important KPI
+definition without comparing the versions.
+
+212
+00:15:02,914 --> 00:15:08,046
+And third, treat metric changes
+as controlled deployment with
+
+213
+00:15:08,085 --> 00:15:13,088
+lineage, validation, communication,
+monitoring, and rollback.
+
+214
+00:15:13,763 --> 00:15:18,703
+These three principles are simple enough
+to apply even in small analytics teams.
+
+215
+00:15:19,828 --> 00:15:21,367
+Let me close with one idea.
+
+216
+00:15:22,554 --> 00:15:26,202
+Feature flags give software
+teams control over behavior.
+
+217
+00:15:26,500 --> 00:15:31,746
+Analytics teams needs the same
+level of control over meaning.
+
+218
+00:15:32,122 --> 00:15:36,418
+When business logic changes, preserve
+the old definition, test the new one,
+
+219
+00:15:36,418 --> 00:15:41,143
+reconcile the difference, communicate
+the impact, and roll it out deliberately.
+
+220
+00:15:41,682 --> 00:15:47,516
+That approach helps us protect trust
+in the numbers while still allowing
+
+221
+00:15:47,528 --> 00:15:49,299
+the business to evolve quickly.
+
+222
+00:15:49,742 --> 00:15:50,187
+Thank you.
+
+223
+00:15:50,513 --> 00:15:54,604
+I'm happy to take this, any
+questions that, you guys may have.
+

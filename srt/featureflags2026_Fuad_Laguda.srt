@@ -1,0 +1,1692 @@
+1
+00:00:00,220 --> 00:00:01,460
+My name is Fuad Laguda.
+
+2
+00:00:01,531 --> 00:00:06,783
+I am an independent engineer in Stirling,
+Scotland, and this is One Flag, No Deploy.
+
+3
+00:00:07,251 --> 00:00:10,096
+We have like 20 minutes,
+so this is going to move.
+
+4
+00:00:10,479 --> 00:00:12,110
+Here is the idea behind this talk.
+
+5
+00:00:12,389 --> 00:00:16,258
+If you've never forced your backup
+to run, you have never seen it work.
+
+6
+00:00:16,541 --> 00:00:20,011
+I had a backup like that from
+the day my app went live.
+
+7
+00:00:20,293 --> 00:00:24,093
+It had a backup writer that
+nobody has ever seen take over.
+
+8
+00:00:24,389 --> 00:00:25,729
+I have never seen take over.
+
+9
+00:00:26,041 --> 00:00:27,549
+So I made it take over.
+
+10
+00:00:28,001 --> 00:00:32,896
+On 24th of September, I pulled the
+plug on my production app on purpose.
+
+11
+00:00:33,230 --> 00:00:37,851
+I recorded it and I will show you the
+diagnostic in the middle of this talk.
+
+12
+00:00:38,804 --> 00:00:40,505
+First, the honest scale.
+
+13
+00:00:40,965 --> 00:00:44,184
+So nobody thinks this is
+a thousand-node story.
+
+14
+00:00:44,581 --> 00:00:49,282
+I run two production and web applications
+and, I'm the only engineer behind both.
+
+15
+00:00:49,483 --> 00:00:50,288
+There is no team.
+
+16
+00:00:50,305 --> 00:00:55,006
+So if something breaks at 11:00
+at night, the person who needs
+
+17
+00:00:55,006 --> 00:00:56,976
+to get up and fix it is me.
+
+18
+00:00:57,050 --> 00:01:00,150
+The person who needs to wake
+up at night and worry about how
+
+19
+00:01:00,155 --> 00:01:02,007
+long the downtime is, is me.
+
+20
+00:01:02,480 --> 00:01:04,334
+Both started as tools for friends.
+
+21
+00:01:04,357 --> 00:01:08,351
+Postbarrel helps people turn their
+stories into social media video
+
+22
+00:01:08,354 --> 00:01:12,369
+scripts, and Programcard helps
+trainers manage their clients.
+
+23
+00:01:12,415 --> 00:01:17,890
+Postbarrel now has plain-paying customers,
+and that is why I need to be very
+
+24
+00:01:17,892 --> 00:01:20,181
+careful with the way the failover works.
+
+25
+00:01:20,988 --> 00:01:23,433
+Here is the constraint
+that everything comes from.
+
+26
+00:01:23,779 --> 00:01:28,467
+When something goes wrong in
+production, I cannot ship a build
+
+27
+00:01:28,523 --> 00:01:31,432
+with more logging in it and wait.
+
+28
+00:01:31,740 --> 00:01:33,253
+A deploy is minutes.
+
+29
+00:01:33,427 --> 00:01:36,067
+Minutes is fine on a Tuesday afternoon.
+
+30
+00:01:36,140 --> 00:01:40,842
+It is not fine when a user is sitting
+there, with a spinner and I'm trying
+
+31
+00:01:40,842 --> 00:01:43,157
+to work out why something is wrong.
+
+32
+00:01:43,645 --> 00:01:48,990
+And I cannot leave the logging on all
+the time either because the detailed
+
+33
+00:01:49,054 --> 00:01:51,577
+trace holds the user's own answers.
+
+34
+00:01:51,618 --> 00:01:56,618
+In Postbarrel, the app I tested this
+on, the trace carries the user script.
+
+35
+00:01:56,678 --> 00:02:01,954
+That is personal data sitting at rest in
+a store and leaving it there because it
+
+36
+00:02:01,954 --> 00:02:04,523
+might be useful one day is not a decision.
+
+37
+00:02:04,589 --> 00:02:08,288
+It's laziness with somebody
+else's personal data.
+
+38
+00:02:09,068 --> 00:02:15,322
+So I needed the diagnostic to be something
+I could raise and lower in seconds from
+
+39
+00:02:15,322 --> 00:02:17,130
+a laptop without shipping anything.
+
+40
+00:02:17,260 --> 00:02:18,663
+That is a flag.
+
+41
+00:02:18,866 --> 00:02:20,349
+It is not a feature flag.
+
+42
+00:02:20,606 --> 00:02:26,639
+nobody is being shown a new button, but
+it is the same mechanism pointed at a
+
+43
+00:02:27,000 --> 00:02:32,605
+different problem and that turns out to
+be the most of what I want to say today
+
+44
+00:02:34,341 --> 00:02:39,870
+The switch is one key in Cloudflare
+Workers KV, which is where my app run.
+
+45
+00:02:40,299 --> 00:02:42,399
+The key is called traceMode.
+
+46
+00:02:42,565 --> 00:02:46,076
+It has three states: off, admin, all.
+
+47
+00:02:46,606 --> 00:02:51,400
+Off is the default, and off is also
+what you get if the key is missing,
+
+48
+00:02:51,453 --> 00:02:56,361
+or if it holds something I do not
+recognize, or if the read fails.
+
+49
+00:02:56,392 --> 00:03:01,027
+I will come back to that last one
+because it matters more than it sounds.
+
+50
+00:03:01,407 --> 00:03:07,627
+Admin means full trace are stored,
+but only for my own admin account.
+
+51
+00:03:07,873 --> 00:03:12,608
+All means full traces are stored
+for every generation by every user,
+
+52
+00:03:12,633 --> 00:03:15,764
+which is the one I almost never use.
+
+53
+00:03:15,999 --> 00:03:21,551
+So every request reads that key, and
+it is not just once at the startup
+
+54
+00:03:21,610 --> 00:03:23,723
+or cached for like five minutes.
+
+55
+00:03:24,096 --> 00:03:29,226
+Every request reads it because a flag
+that is read at startup is not a switch,
+
+56
+00:03:29,247 --> 00:03:32,154
+it is just a deploy with extra steps.
+
+57
+00:03:32,334 --> 00:03:37,207
+Now, people flinch at that, you
+see, because reading a key on every
+
+58
+00:03:37,208 --> 00:03:41,958
+request sounds like you are adding
+a network call to your hot path.
+
+59
+00:03:42,234 --> 00:03:44,501
+But that is what KV is built for.
+
+60
+00:03:44,759 --> 00:03:49,625
+It is designed for high volume
+reads and frequently read values are
+
+61
+00:03:49,634 --> 00:03:51,840
+cached across Cloudflare network.
+
+62
+00:03:52,065 --> 00:03:57,993
+A hot read can be served from the cache
+rather than going all the way back
+
+63
+00:03:58,012 --> 00:03:59,948
+to the central storage every time.
+
+64
+00:04:00,174 --> 00:04:05,827
+My request takes seconds because there
+is, a language model at the end of it, so
+
+65
+00:04:05,828 --> 00:04:09,668
+the KV read is negligible by comparison.
+
+66
+00:04:10,416 --> 00:04:12,303
+Now, there is a trade-off though.
+
+67
+00:04:12,794 --> 00:04:15,611
+KV is eventually consistent.
+
+68
+00:04:15,986 --> 00:04:19,382
+If I change the flag, another
+location can temporarily see the
+
+69
+00:04:19,406 --> 00:04:21,534
+previous value because of caching.
+
+70
+00:04:22,105 --> 00:04:27,092
+Cloudflare says changes can take
+up to sixty seconds or more to
+
+71
+00:04:27,092 --> 00:04:31,450
+become visible in other locations,
+depending on cached values.
+
+72
+00:04:31,840 --> 00:04:34,542
+That is a trade-off I can live with.
+
+73
+00:04:34,542 --> 00:04:39,739
+I, I would rather have a cheap, highly
+readable configuration switch with
+
+74
+00:04:39,739 --> 00:04:44,990
+some propagation delay than turn a
+debugging flag into another deployment.
+
+75
+00:04:45,435 --> 00:04:50,003
+So back to the why three
+states and not a Boolean.
+
+76
+00:04:50,280 --> 00:04:57,278
+A Boolean gives you two bad options:
+logging off- Which is, where you live
+
+77
+00:04:57,462 --> 00:05:02,290
+and logging on for everybody, which is
+where you go when you are desperate.
+
+78
+00:05:02,593 --> 00:05:06,105
+Turning it on for everybody in the
+middle of an incident means you
+
+79
+00:05:06,111 --> 00:05:11,804
+start capturing every user's private
+content in order to debug one person's
+
+80
+00:05:11,809 --> 00:05:16,177
+problem, which can be a problem in
+its own if you forget to turn it off.
+
+81
+00:05:16,211 --> 00:05:20,342
+Imagine every user's private
+writing sitting in logs.
+
+82
+00:05:20,605 --> 00:05:23,145
+Now, the third state removes that choice.
+
+83
+00:05:23,208 --> 00:05:27,851
+Admin means I can reproduce the problem
+on my own account with everything
+
+84
+00:05:27,851 --> 00:05:30,907
+recorded and no other user is touched.
+
+85
+00:05:31,588 --> 00:05:36,427
+Two more details that took me longer
+to arrive at than they should have is
+
+86
+00:05:36,473 --> 00:05:39,038
+that a read failure is treated as off.
+
+87
+00:05:39,305 --> 00:05:43,887
+If KV is unreachable, the code does
+not throw and it does not retry.
+
+88
+00:05:44,369 --> 00:05:48,114
+It logs one line and carries
+on as if the switch were off.
+
+89
+00:05:48,322 --> 00:05:53,574
+In my view, that's okay because the
+worst outcome of a flag failing should
+
+90
+00:05:53,584 --> 00:05:55,640
+be that you lose the diagnostic.
+
+91
+00:05:55,807 --> 00:05:58,075
+It should never be that
+you lose the request.
+
+92
+00:05:58,407 --> 00:06:04,720
+And the trace expire after 24 hours
+because if accidentally I leave this
+
+93
+00:06:04,720 --> 00:06:08,722
+switch on, I do not want the mistake
+following me around for six months.
+
+94
+00:06:08,727 --> 00:06:10,072
+I will forget one day.
+
+95
+00:06:10,087 --> 00:06:10,977
+Everyone forgets.
+
+96
+00:06:11,008 --> 00:06:14,453
+You could leave the switch on and six
+months later you have a huge pile of
+
+97
+00:06:14,470 --> 00:06:15,963
+logs that you don't even care about.
+
+98
+00:06:16,221 --> 00:06:18,781
+So that's why I set
+the expiry to 24 hours.
+
+99
+00:06:18,793 --> 00:06:22,702
+So should there be any issue, I
+know it will just cost me a day.
+
+100
+00:06:23,201 --> 00:06:26,882
+One more thing, because people
+get it wrong, not all logging
+
+101
+00:06:26,888 --> 00:06:28,871
+belongs behind the switch.
+
+102
+00:06:29,352 --> 00:06:34,419
+The cheap lines, which provider
+answered, how many tokens that
+
+103
+00:06:34,430 --> 00:06:38,509
+a retry happened carry no user
+content, so they are always on.
+
+104
+00:06:38,788 --> 00:06:41,197
+They are the first thing I
+read when something breaks.
+
+105
+00:06:41,405 --> 00:06:45,210
+The switch guards only the
+private part, the prompts, the
+
+106
+00:06:45,215 --> 00:06:47,039
+replies, the finished script.
+
+107
+00:06:47,167 --> 00:06:52,784
+If your flag is hiding your operational
+logs, it is on the wrong door.
+
+108
+00:06:53,528 --> 00:06:53,830
+Okay?
+
+109
+00:06:55,247 --> 00:06:58,482
+The admin state is the one I want
+to spend more time on because
+
+110
+00:06:58,527 --> 00:07:00,564
+it is the state I actually use.
+
+111
+00:07:00,744 --> 00:07:04,602
+Here is the shape of a real
+incident for one person.
+
+112
+00:07:05,075 --> 00:07:10,414
+A user writes and says the output
+was wrong, not broken, but wrong.
+
+113
+00:07:10,867 --> 00:07:14,643
+There is no error or operational
+log because the thing worked.
+
+114
+00:07:14,705 --> 00:07:16,390
+The issue is the output.
+
+115
+00:07:16,427 --> 00:07:19,138
+You cannot debug that from counters.
+
+116
+00:07:19,153 --> 00:07:22,284
+You need to see what went
+in and what came out.
+
+117
+00:07:22,294 --> 00:07:25,662
+So switch to admin to reproduce it.
+
+118
+00:07:25,674 --> 00:07:28,775
+Same input as best as I can get them.
+
+119
+00:07:28,780 --> 00:07:33,066
+The full trace is written for
+my generation and nobody else.
+
+120
+00:07:33,419 --> 00:07:35,849
+Read it, find it, switch it back off.
+
+121
+00:07:35,888 --> 00:07:41,564
+The loop is minutes and at no point
+did I look at anyone else's writing.
+
+122
+00:07:42,284 --> 00:07:47,599
+What it costs is honesty about how--
+what the admin can actually do.
+
+123
+00:07:47,670 --> 00:07:50,631
+It only helps when I can
+reproduce the problem.
+
+124
+00:07:50,854 --> 00:07:55,501
+If the fault is specific to that
+user's data, admin is of no use,
+
+125
+00:07:55,845 --> 00:08:00,741
+and the only thing that would help
+is setting everything to all, which
+
+126
+00:08:00,763 --> 00:08:05,585
+records everyone's generation for as
+long as it is on, not just theirs.
+
+127
+00:08:05,790 --> 00:08:08,662
+That is why I have not needed it.
+
+128
+00:08:08,886 --> 00:08:11,250
+If I ever do, it stays on for minutes.
+
+129
+00:08:11,316 --> 00:08:15,066
+The twenty-four-hour expiry
+and the notes in the file are
+
+130
+00:08:15,107 --> 00:08:17,227
+guardrails and I would let them be.
+
+131
+00:08:17,742 --> 00:08:18,818
+That is the trade.
+
+132
+00:08:18,919 --> 00:08:22,279
+A third state does not
+remove the hard case.
+
+133
+00:08:22,311 --> 00:08:26,857
+It removes the easy case from the
+hard pile, which is most of them.
+
+134
+00:08:27,859 --> 00:08:29,949
+Same shape, different problem.
+
+135
+00:08:30,133 --> 00:08:35,108
+The writer for this app is Claude
+Sonnet and if Anthropic API is
+
+136
+00:08:35,113 --> 00:08:37,224
+unavailable, nobody gets a script.
+
+137
+00:08:37,582 --> 00:08:41,400
+That is the whole product
+stopped because somebody else's
+
+138
+00:08:41,452 --> 00:08:43,294
+API is having an afternoon.
+
+139
+00:08:43,634 --> 00:08:48,122
+So there is a fallback and the
+fallback is where the counter comes in.
+
+140
+00:08:48,943 --> 00:08:53,369
+Here is the ladder A call to
+the writer makes four attempts.
+
+141
+00:08:53,600 --> 00:08:58,401
+Between them, it waits one second,
+three seconds, eight seconds, each
+
+142
+00:08:58,434 --> 00:09:03,827
+with a quarter jitter either side so
+that concurrent requests do not all
+
+143
+00:09:03,827 --> 00:09:06,963
+hit a recovering API on the same beat.
+
+144
+00:09:07,235 --> 00:09:10,014
+Each attempt has a hard timeout.
+
+145
+00:09:10,090 --> 00:09:13,968
+Only when all four have failed
+does it go anywhere else.
+
+146
+00:09:14,170 --> 00:09:16,088
+So why four, not one?
+
+147
+00:09:16,113 --> 00:09:21,251
+Because a failed API request does
+not necessarily mean the API is down.
+
+148
+00:09:21,569 --> 00:09:25,259
+Anthropic exposes different
+failure conditions, including
+
+149
+00:09:25,427 --> 00:09:29,485
+rate limiting, internal error
+timeouts, and temporary overload.
+
+150
+00:09:29,784 --> 00:09:34,584
+Some of those are transient, which
+means immediately abandoning the primary
+
+151
+00:09:34,586 --> 00:09:39,698
+provider can send perfectly recoverable
+failures straight to the fallback.
+
+152
+00:09:40,135 --> 00:09:43,579
+And there is a case that is
+deliberately never retried.
+
+153
+00:09:43,887 --> 00:09:49,524
+A definite 400, a bad request that
+is a bug or configuration fault
+
+154
+00:09:49,586 --> 00:09:54,858
+on my side and burning 12 seconds
+of retries on it helps nobody.
+
+155
+00:09:54,908 --> 00:09:56,370
+It throws immediately.
+
+156
+00:09:56,490 --> 00:10:00,617
+That exception matters more than it
+looks, and I will come back to it.
+
+157
+00:10:01,375 --> 00:10:05,446
+When the four attempts are gone, the
+same request is translated and sent to
+
+158
+00:10:05,486 --> 00:10:10,389
+Qwen on Nubius, a different model, a
+different company on a different cloud.
+
+159
+00:10:10,462 --> 00:10:11,966
+That separation matters.
+
+160
+00:10:12,048 --> 00:10:16,986
+If your fallback is another region of
+the same provider, you have built a
+
+161
+00:10:16,986 --> 00:10:23,168
+fallback for a data center problem,
+not necessarily a provider-wide outage
+
+162
+00:10:25,069 --> 00:10:30,035
+Now, this choice was not read off a
+leaderboard or anything like that.
+
+163
+00:10:30,091 --> 00:10:33,785
+I sent the same captured
+prompts to five candidates.
+
+164
+00:10:34,168 --> 00:10:37,750
+Qwen came back the strongest
+for the combination of speed
+
+165
+00:10:37,800 --> 00:10:39,182
+and cost in my testing.
+
+166
+00:10:39,209 --> 00:10:44,728
+So the prompts are tuned for Sonnet and
+tuned separately for Qwen on Nubeos to
+
+167
+00:10:44,728 --> 00:10:47,691
+get as close as I can to the same result.
+
+168
+00:10:49,218 --> 00:10:53,752
+Qwen is not as good as Sonnet,
+and I do not pretend otherwise.
+
+169
+00:10:53,793 --> 00:10:57,419
+It parrots example
+phrases out of the prompt.
+
+170
+00:10:57,441 --> 00:10:59,464
+It sharpens loose numbers.
+
+171
+00:10:59,524 --> 00:11:04,776
+Its endings are soft, and knowing
+exactly how it is worse is the
+
+172
+00:11:04,776 --> 00:11:06,765
+point of having it measured.
+
+173
+00:11:07,049 --> 00:11:09,332
+Two more things the flag
+does is that it tells me.
+
+174
+00:11:09,752 --> 00:11:13,603
+It hands off writes a line naming
+the provider, the model, the tokens,
+
+175
+00:11:13,632 --> 00:11:15,193
+and why the primary one failed.
+
+176
+00:11:15,449 --> 00:11:20,147
+It also sends me one email throttled
+to one an hour, so an outage
+
+177
+00:11:20,168 --> 00:11:22,439
+does not become an inbox event.
+
+178
+00:11:22,736 --> 00:11:26,218
+And the response is tagged with
+which provider served it, so
+
+179
+00:11:26,489 --> 00:11:30,791
+it shows up in the cost report
+rather than just being a mystery.
+
+180
+00:11:31,093 --> 00:11:32,054
+And there is a ping.
+
+181
+00:11:32,511 --> 00:11:36,970
+Every night at 3:00, the app
+sends about 40 tokens through the
+
+182
+00:11:37,204 --> 00:11:39,422
+exact production failover path.
+
+183
+00:11:39,531 --> 00:11:42,113
+Same transition, same URL, same model.
+
+184
+00:11:42,233 --> 00:11:45,781
+It costs less than a penny a year,
+and it emails me if it fails.
+
+185
+00:11:45,791 --> 00:11:51,235
+So I'm not always completely in the dark
+about how each of my model is running.
+
+186
+00:11:51,550 --> 00:11:55,166
+But a 40 token ping is not a script.
+
+187
+00:11:55,166 --> 00:11:58,861
+It doesn't prove that the app
+itself is functioning well.
+
+188
+00:11:59,074 --> 00:12:02,835
+What it does prove is that the door is
+open, but it doesn't prove that there's
+
+189
+00:12:02,880 --> 00:12:08,296
+anything on the other side So it is
+time to do a real production test.
+
+190
+00:12:08,557 --> 00:12:12,892
+Now, I could not wait for Anthropic
+to have a bad day, so I caused one.
+
+191
+00:12:13,259 --> 00:12:16,665
+My question to me was:
+What am I allowed to fake?
+
+192
+00:12:16,852 --> 00:12:20,332
+My first idea was the obvious
+one, put a bad API key.
+
+193
+00:12:20,752 --> 00:12:25,449
+That does not work, and it fails in the
+worst possible way, which is quietly.
+
+194
+00:12:25,742 --> 00:12:30,803
+A bad key returns 401, and 401,
+like 400, is on the never retry
+
+195
+00:12:30,825 --> 00:12:33,296
+list I-- that I mentioned earlier.
+
+196
+00:12:33,574 --> 00:12:37,937
+The code throws on the first attempt
+and the failover is never reached.
+
+197
+00:12:38,274 --> 00:12:42,948
+My second idea was to edit
+the code, record and revert.
+
+198
+00:12:43,474 --> 00:12:49,447
+Now, that is worse because then this
+talk and the test would describe a
+
+199
+00:12:49,455 --> 00:12:54,565
+system that does not exist at the
+moment of the test or after it.
+
+200
+00:12:55,079 --> 00:12:58,091
+So the best idea was to add a second key.
+
+201
+00:12:58,614 --> 00:13:03,598
+Same store, same shape as the
+trace flag off by default.
+
+202
+00:13:03,840 --> 00:13:06,314
+Read the failure treated as off.
+
+203
+00:13:06,579 --> 00:13:11,524
+When it is set, every attempt at
+Anthropic is treated as an overload
+
+204
+00:13:11,611 --> 00:13:13,520
+without the request being made.
+
+205
+00:13:13,850 --> 00:13:17,081
+That is the only thing
+that is faked, the outage.
+
+206
+00:13:17,318 --> 00:13:20,257
+So everything after it will be real.
+
+207
+00:13:20,455 --> 00:13:26,292
+The four attempts run, the, the wait
+happens, the email goes, the transition
+
+208
+00:13:26,292 --> 00:13:31,645
+runs, the Queued call is a real call
+with real tokens and a real bill.
+
+209
+00:13:31,852 --> 00:13:35,981
+The script comes back through
+the real-- with real checks.
+
+210
+00:13:36,208 --> 00:13:42,635
+the log line says "forced" in capital on
+purpose because a log that cannot tell the
+
+211
+00:13:42,636 --> 00:13:47,975
+difference between an outage you suffered
+and one you caused is a log that will lie
+
+212
+00:13:47,975 --> 00:13:52,787
+to somebody eventually one day, and that
+will probably be me in, like, six months.
+
+213
+00:13:53,282 --> 00:13:56,314
+So as you can see, everything here
+at the moment right now is fine.
+
+214
+00:13:56,314 --> 00:14:00,045
+So the first thing we're gonna do is we're
+gonna put the flag on, and we're gonna
+
+215
+00:14:00,046 --> 00:14:02,853
+trigger it, and let's wait for it to run.
+
+216
+00:14:03,703 --> 00:14:08,319
+Here we go And that is the
+60-second timer going on.
+
+217
+00:14:08,604 --> 00:14:12,218
+So while the 60 second is going
+on, we're gonna go to the site.
+
+218
+00:14:12,260 --> 00:14:14,262
+There we go, postbarrel.com
+
+219
+00:14:15,039 --> 00:14:24,226
+and we click on New, click on Storytime,
+click on New Script, Continue.
+
+220
+00:14:24,242 --> 00:14:27,492
+So I have a story here in Notepad.
+
+221
+00:14:27,497 --> 00:14:30,506
+I'm just gonna copy and
+I'm gonna paste it there.
+
+222
+00:14:31,204 --> 00:14:36,774
+Then I'm going to click
+on Write My Script.
+
+223
+00:14:37,415 --> 00:14:41,598
+select a time, two and
+then let's wait for it
+
+224
+00:14:42,598 --> 00:14:45,620
+Now, you would not have noticed it,
+but I've actually skipped forward.
+
+225
+00:14:45,725 --> 00:14:48,126
+Now, if you didn't notice that I've
+skipped forward, that means my video
+
+226
+00:14:48,128 --> 00:14:50,563
+editing skills are, like, legendary.
+
+227
+00:14:50,965 --> 00:14:52,485
+So there has been something here.
+
+228
+00:14:52,625 --> 00:14:56,268
+It dragged longer than it should
+be, but here is the script.
+
+229
+00:14:56,840 --> 00:14:59,943
+So why did it take so long to come out?
+
+230
+00:14:59,943 --> 00:15:01,981
+So that's what we need to find out here.
+
+231
+00:15:02,813 --> 00:15:03,359
+All right.
+
+232
+00:15:03,376 --> 00:15:06,235
+So I will-- I'm going to
+have to go through the logs.
+
+233
+00:15:06,239 --> 00:15:09,272
+So you're gonna go through the logs
+with me, and I can see it here.
+
+234
+00:15:09,787 --> 00:15:13,005
+Now, as you can see, these are all
+the retries, but they seem to be
+
+235
+00:15:13,014 --> 00:15:16,066
+more than one attempt at a retry.
+
+236
+00:15:16,420 --> 00:15:17,068
+So look at that.
+
+237
+00:15:17,081 --> 00:15:22,210
+That is the 529 overload
+error forced by writer fail.
+
+238
+00:15:22,577 --> 00:15:24,087
+So there was one there.
+
+239
+00:15:24,575 --> 00:15:26,858
+Then there was a second retry here.
+
+240
+00:15:27,821 --> 00:15:28,336
+Hmm.
+
+241
+00:15:29,186 --> 00:15:31,617
+And then there is a third retry here.
+
+242
+00:15:33,515 --> 00:15:34,103
+Mm-hmm.
+
+243
+00:15:34,150 --> 00:15:38,060
+This was a correcting retry, and
+then there is a fourth retry here.
+
+244
+00:15:38,612 --> 00:15:41,446
+Each of them, as you can see, the
+writer correction shows Nbius.
+
+245
+00:15:41,657 --> 00:15:46,112
+So it's moved from Claude Sonnet to Nbius.
+
+246
+00:15:46,539 --> 00:15:52,046
+So why has there been four
+retries instead of one?
+
+247
+00:15:53,046 --> 00:15:54,091
+Interesting.
+
+248
+00:15:54,458 --> 00:15:59,344
+I went in to watch one failover, but we
+have four retry lines, one handoff done,
+
+249
+00:15:59,971 --> 00:16:01,917
+and that is what I built in my head.
+
+250
+00:16:01,950 --> 00:16:05,581
+I had been w- saying the writer
+call all the way through this build.
+
+251
+00:16:05,653 --> 00:16:06,616
+Watch the log.
+
+252
+00:16:06,880 --> 00:16:09,250
+Four retries come, the
+handoff come, and it…
+
+253
+00:16:09,267 --> 00:16:10,327
+then it starts again.
+
+254
+00:16:10,352 --> 00:16:14,234
+Four more failed attempts, another
+handoff, then again and again.
+
+255
+00:16:14,457 --> 00:16:18,807
+I sit here thinking that there will only
+be one attempt of four tries, but as
+
+256
+00:16:18,807 --> 00:16:21,231
+you can see, it's done it four times.
+
+257
+00:16:21,254 --> 00:16:24,149
+It already knows Anthropic is down,
+so I don't know why it keeps trying.
+
+258
+00:16:24,183 --> 00:16:28,429
+But anyway, looking at this, I
+can see why it is doing that.
+
+259
+00:16:28,433 --> 00:16:29,240
+This is my bad.
+
+260
+00:16:29,262 --> 00:16:32,976
+In my head, what I built
+was idea, writer, output.
+
+261
+00:16:33,391 --> 00:16:37,346
+I forgot that in the middle
+section I had added a lot of checks
+
+262
+00:16:37,346 --> 00:16:41,235
+and balances to make the output
+unique to each user using the app.
+
+263
+00:16:41,545 --> 00:16:44,872
+So each of these check tries to use
+Sonnet as they were programmed to.
+
+264
+00:16:45,120 --> 00:16:50,370
+So what these checks and balances do is
+that, well, there is a probe that decides
+
+265
+00:16:50,370 --> 00:16:52,341
+whether it needs to ask more question.
+
+266
+00:16:52,397 --> 00:16:55,348
+There is a writer, there is a
+correction pass, and there is a
+
+267
+00:16:55,349 --> 00:16:57,288
+director that writes the delivery notes.
+
+268
+00:16:57,622 --> 00:17:03,935
+And each one of this is actually making
+its own individual call, which is an error
+
+269
+00:17:04,074 --> 00:17:08,249
+from the production side of this app,
+which we need to fix because all of them
+
+270
+00:17:08,250 --> 00:17:10,058
+don't need to go up the ladder again.
+
+271
+00:17:10,127 --> 00:17:14,389
+So the reason why I had to skip
+forward initially wondering why there
+
+272
+00:17:14,389 --> 00:17:16,414
+was a delay was because of this.
+
+273
+00:17:16,687 --> 00:17:17,337
+No problem.
+
+274
+00:17:18,110 --> 00:17:22,817
+The real number is on screen if you can
+look at it here It's telling us that
+
+275
+00:17:22,848 --> 00:17:27,495
+everything took 78,378 milliseconds.
+
+276
+00:17:27,502 --> 00:17:30,523
+So that's practically
+78 seconds end to end.
+
+277
+00:17:30,788 --> 00:17:38,717
+And the cost, the writer just
+cost, 6,000 tokens and 500 out.
+
+278
+00:17:39,090 --> 00:17:43,079
+So the correction pass about
+the same, redirector far less.
+
+279
+00:17:43,089 --> 00:17:47,514
+The whole script, four calls on
+Qwen costs less than half a cent.
+
+280
+00:17:47,973 --> 00:17:52,090
+The same story through Sonnet
+actually cost me six cents.
+
+281
+00:17:52,101 --> 00:17:54,833
+So that is like 15 times more.
+
+282
+00:17:55,345 --> 00:17:59,949
+So let's carry on As you
+can see, the email went.
+
+283
+00:18:00,298 --> 00:18:05,675
+One email on the first handoff
+and the log has the send accepted.
+
+284
+00:18:06,066 --> 00:18:09,907
+Then the next three hands off,
+14 seconds later, if you check
+
+285
+00:18:09,908 --> 00:18:12,627
+it, all of them were not sent.
+
+286
+00:18:12,658 --> 00:18:15,632
+If you look at that, it
+did not send the hands off.
+
+287
+00:18:15,635 --> 00:18:16,970
+They were all suppressed.
+
+288
+00:18:17,234 --> 00:18:17,570
+Okay.
+
+289
+00:18:18,180 --> 00:18:21,819
+So we have one outage and one message.
+
+290
+00:18:21,888 --> 00:18:25,981
+The fallback broke one of my rules
+and the guardrails cut it here.
+
+291
+00:18:26,009 --> 00:18:30,060
+As you can see, there is a pro-- there
+is a punctuation rule in this product.
+
+292
+00:18:30,099 --> 00:18:33,928
+No em dashes, no fancy quotes
+because the whole product is to
+
+293
+00:18:33,936 --> 00:18:37,076
+give you a script that will look
+like as if it was written by you.
+
+294
+00:18:37,563 --> 00:18:40,805
+Sonnet has learned that rule
+from the prompt and follows it.
+
+295
+00:18:40,813 --> 00:18:41,759
+QEM did not.
+
+296
+00:18:42,044 --> 00:18:46,818
+So you can see it here in the log, content
+dates failed, correction punctuation
+
+297
+00:18:46,832 --> 00:18:51,511
+true, and then the correction pass,
+which itself is a model call, which
+
+298
+00:18:51,519 --> 00:18:56,993
+itself had to work the full four attempts
+and hand over to QEM and that is it.
+
+299
+00:18:57,004 --> 00:18:59,706
+So we're gonna put the writer off now
+
+300
+00:19:00,706 --> 00:19:05,158
+Then with the switch off, we're
+gonna start a brand new script.
+
+301
+00:19:05,159 --> 00:19:08,300
+So we're gonna paste the same
+script again, click on start,
+
+302
+00:19:08,301 --> 00:19:13,085
+select the time, and then we're
+gonna wait And there you go.
+
+303
+00:19:14,090 --> 00:19:14,418
+As you…
+
+304
+00:19:14,806 --> 00:19:16,549
+This was a lot faster.
+
+305
+00:19:16,588 --> 00:19:19,481
+I did fast-forward it a
+bit, but it's a lot faster.
+
+306
+00:19:19,498 --> 00:19:23,729
+So if you can check it here,
+the usage probe, Claude.
+
+307
+00:19:24,043 --> 00:19:26,787
+If you check the writer
+usage also, Claude.
+
+308
+00:19:27,090 --> 00:19:30,071
+If you check the writer
+correction usage also, Claude.
+
+309
+00:19:30,125 --> 00:19:31,862
+The director also, Claude.
+
+310
+00:19:31,989 --> 00:19:35,831
+So everything has switched back to
+Claude, which is a more expensive
+
+311
+00:19:35,843 --> 00:19:41,830
+model, but as you can see, the, failover
+works and we've put it back on so
+
+312
+00:19:41,870 --> 00:19:49,334
+everything in production is back to
+normal So what changes after this test?
+
+313
+00:19:49,460 --> 00:19:54,216
+Well, the lesson from all of those
+failed calls is that one failover in a
+
+314
+00:19:54,217 --> 00:19:57,034
+script should count for the whole script.
+
+315
+00:19:57,339 --> 00:20:02,399
+Once the probe has handed over to the
+backup, the writer, the corrections, and
+
+316
+00:20:02,399 --> 00:20:07,694
+the director should go straight to it,
+not each one spending 12 seconds finding
+
+317
+00:20:07,694 --> 00:20:09,919
+out what the first call already knew.
+
+318
+00:20:10,220 --> 00:20:15,427
+The next script still tries Anthropic
+fresh, so a recovery is never missed.
+
+319
+00:20:15,750 --> 00:20:22,020
+That turns the 78 seconds into something
+closer to 40, and this error is a
+
+320
+00:20:22,246 --> 00:20:27,746
+change I would never have caught if I
+did not force the outage and watch it.
+
+321
+00:20:28,628 --> 00:20:33,315
+Five things I would keep if
+I started again tomorrow.
+
+322
+00:20:33,327 --> 00:20:38,387
+One, read the flag per request
+and let a read failure mean off.
+
+323
+00:20:38,754 --> 00:20:42,152
+The worst thing a flag does when
+it breaks should be nothing.
+
+324
+00:20:42,387 --> 00:20:44,511
+Two, three states, not two.
+
+325
+00:20:44,789 --> 00:20:48,826
+The middle state is the one that
+stops you doing something at midnight
+
+326
+00:20:48,851 --> 00:20:51,284
+that you would not do at midday.
+
+327
+00:20:51,757 --> 00:20:53,700
+Three, write down every flip.
+
+328
+00:20:53,736 --> 00:20:59,398
+Date why, when you turn it back, a
+platform of one has no institutional
+
+329
+00:20:59,399 --> 00:21:02,163
+memory except the one you type.
+
+330
+00:21:02,648 --> 00:21:05,846
+Four, count your calls before
+you promise a number and once
+
+331
+00:21:05,932 --> 00:21:10,768
+one call has failed over, let the
+rest of that request follow it.
+
+332
+00:21:11,009 --> 00:21:15,502
+Whatever you think your worst
+case is, find out how many
+
+333
+00:21:15,502 --> 00:21:17,444
+times it happened per request.
+
+334
+00:21:17,694 --> 00:21:22,187
+Five, put a gate downstream
+of every fallback.
+
+335
+00:21:22,580 --> 00:21:27,576
+Force the failover before it forces
+you and force it in a way that works
+
+336
+00:21:27,608 --> 00:21:33,689
+the real path because the value is not
+in seeing it succeed, is in-- it is in
+
+337
+00:21:33,857 --> 00:21:39,149
+finding out which of your assumption was
+wrong while nobody is waiting on you.
+
+338
+00:21:39,404 --> 00:21:44,473
+Now, the part I owe you, none of
+this makes the system reliable.
+
+339
+00:21:44,524 --> 00:21:45,938
+It makes it legible.
+
+340
+00:21:46,657 --> 00:21:51,187
+When the writer fails, I still
+lose Sonnet and users still get a
+
+341
+00:21:51,187 --> 00:21:52,870
+worse script than they came for.
+
+342
+00:21:53,150 --> 00:21:54,662
+The flag does not fix that.
+
+343
+00:21:54,688 --> 00:21:58,716
+It tells me it happened, keeps the
+product, keeps the product alive
+
+344
+00:21:58,761 --> 00:22:03,623
+while it does, and lets me see
+inside without shipping anything.
+
+345
+00:22:03,962 --> 00:22:08,373
+I'm still working out the kinks
+so that Qwen can produce and
+
+346
+00:22:08,373 --> 00:22:12,959
+become the main writer with Sonnet
+as backup and it's not free.
+
+347
+00:22:13,305 --> 00:22:17,716
+There is now a switch in my production
+code that can degrade the writer
+
+348
+00:22:18,056 --> 00:22:20,262
+for everyone if I leave it on.
+
+349
+00:22:20,477 --> 00:22:23,680
+The risk is real, which is
+why my work is not done.
+
+350
+00:22:23,997 --> 00:22:27,806
+Now, Claude is adding a
+signature to his writing.
+
+351
+00:22:28,098 --> 00:22:33,108
+The clock is on me to make sure
+that Qwen is just as good as
+
+352
+00:22:33,198 --> 00:22:36,615
+Claude So that is the talk.
+
+353
+00:22:36,912 --> 00:22:40,753
+So now, at the moment right now,
+there is no room to get questions,
+
+354
+00:22:40,753 --> 00:22:44,392
+so if you have any questions for
+me, I would love to hear about it.
+
+355
+00:22:44,404 --> 00:22:46,187
+So please do get in touch.
+
+356
+00:22:46,191 --> 00:22:47,802
+You have to start a conversation.
+
+357
+00:22:47,838 --> 00:22:51,759
+If you force your own failover after
+watching this and it does not fire,
+
+358
+00:22:51,966 --> 00:22:56,235
+I would genuinely like to hear what
+broke because that is more useful
+
+359
+00:22:56,454 --> 00:22:58,318
+than if everything works fine.
+
+360
+00:22:58,524 --> 00:23:02,886
+Now, you can find me on LinkedIn and the
+whole camera investigation that got me
+
+361
+00:23:02,923 --> 00:23:06,543
+into this habit is written up on dev.to
+
+362
+00:23:06,633 --> 00:23:08,105
+under Fuad Laguda.
+
+363
+00:23:08,317 --> 00:23:08,799
+That's me.
+
+364
+00:23:09,314 --> 00:23:10,819
+So thank you for watching.
+
+365
+00:23:10,875 --> 00:23:13,120
+Enjoy the rest of your conference
+
