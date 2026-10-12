@@ -50,6 +50,7 @@ def talks(ev):
 
 
 def _norm(s):
+    s = re.sub(r"([a-z])([A-Z])", r"\1 \2", s)   # "PrateekJindal_..." -> "Prateek Jindal"
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
     s = re.sub(r"[^a-z0-9]+", " ", s)
     s = re.sub(r"\b(conf42|version|final|v\d+|edited|recording|talk|video|copy|slides?|deck|presentation|ppt|pptx|pdf|\d{4})\b", " ", s)
