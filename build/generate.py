@@ -447,6 +447,14 @@ print("Loading the brands page data")
 from .brands import brands_context
 context["brands"] = brands_context("./brands.yaml", context.get("events") or [])
 
+# Sponsorship page carousel (Marek 2026-10-12): only companies that sponsored at least one event at a paid level -
+# media, newsletter and podcast partners (and sponsors.csv rows no event uses) are left out.
+PARTNER_LEVELS = {"media", "newsletter", "podcast"}
+_paid = {sid for e in context.get("events") or [] for level, ids in (e.get("sponsors") or {}).items()
+         if level not in PARTNER_LEVELS for sid in ids}
+context["paid_sponsors"] = [s for s in context.get("sponsors") or [] if s.get("id") in _paid]
+print("Paid sponsors for the sponsorship page: %d of %d" % (len(context["paid_sponsors"]), len(context.get("sponsors") or [])))
+
 # MAIN PAGES
 print(DIVIDER)
 print("Generating main pages")
