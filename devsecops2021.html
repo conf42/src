@@ -2266,11 +2266,25 @@
       if (!q || !all) return;
       var talks = [].slice.call(all.querySelectorAll('.tk-talk')), pills = [].slice.call(document.querySelectorAll('.tk-track-nav a'));
       function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }   // "garcia" finds "García"
-      talks.forEach(function (t) { t._q = fold(t.getAttribute('data-q')); });
+      talks.forEach(function (t) { t._q = fold(t.getAttribute('data-q')); t._w = t._q.split(/[^a-z0-9]+/).filter(Boolean); });
+      // slight typos, as on the teaser pages: a typed word matches when it appears as is, or when a word of the talk (or its
+      // start) is at most one letter off - missing, extra, swapped or different: "kubernets", "pawlikowsky", "obervability"
+      function lev1(a, b) {                      // edit distance of a and b is at most 1
+        if (a === b) return true;
+        if (Math.abs(a.length - b.length) > 1) return false;
+        var i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+        if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+        return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+      }
+      function wordClose(w, x) {
+        if (w.length < 4) return false;          // "ai", "k8s", "sre": exact only, or every title would match
+        return lev1(w, x) || lev1(w, x.slice(0, w.length)) || lev1(w, x.slice(0, w.length - 1)) || lev1(w, x.slice(0, w.length + 1));
+      }
+      function has(t, w) { return t._q.indexOf(w) >= 0 || t._w.some(function (x) { return wordClose(w, x); }); }
       function run() {
         var words = fold(q.value).split(/\s+/).filter(Boolean), on = words.length > 0, n = 0;
         talks.forEach(function (t) {
-          var hit = !on || words.every(function (w) { return t._q.indexOf(w) >= 0; });
+          var hit = !on || words.every(function (w) { return has(t, w); });
           t.classList.toggle('tk-hide', !hit); if (on && hit) n++;
         });
         all.classList.toggle('tk-searching', on);
