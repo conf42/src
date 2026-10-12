@@ -198,6 +198,9 @@ class Run:
                                     shutil.copyfileobj(a, b, 16 << 20)
                 elif z.lower().endswith(VIDEO_EXT) and os.path.dirname(os.path.abspath(z)) != self.inp:
                     shutil.copy2(z, self.inp)
+                elif z.lower().endswith(SLIDE_EXT) and os.path.dirname(os.path.abspath(z)) != self.slides_dir \
+                        and not os.path.exists(os.path.join(self.slides_dir, os.path.basename(z))):
+                    shutil.copy2(z, self.slides_dir)     # loose decks (a folder of files, not a Drive zip)
 
     # ---- 2. match: one video per talk, named after the speaker(s) exactly as on the site ---
     def match(self):
