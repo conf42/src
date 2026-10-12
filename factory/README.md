@@ -55,6 +55,9 @@ Decks from the Drive download are matched to talks like the videos, then:
 
 ## Rate limits and credits
 
+Talks are uploaded in alphabetical order (speaker names), so every Descript project lists its talks A-Z. A talk waits for the
+names before it to finish uploading; one that fails drops out of the order instead of holding up the rest.
+
 Descript runs ONE job per project at a time; anything else gets 429 "A job is already running for this project". The client waits and retries for up to an hour, so talks simply take turns. An upload that died with a stopped run keeps its import job waiting forever and blocks the project: every run starts by cancelling those (`DELETE /jobs/<id>`).
 
 The edit prompt names the talk's composition (`{composition}`). Without that, "apply to all clips" made the AI editor re-edit every talk in the project (48 credits instead of ~8). As a safety net, an edit costing more than `max_edit_credits` pauses all further edits (`edits_paused` in state.json).

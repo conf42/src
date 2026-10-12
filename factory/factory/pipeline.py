@@ -104,6 +104,9 @@ class Run:
         self.state_path = os.path.join(self.dir, "state.json")
         self.lock = threading.RLock()
         self.plock = threading.Lock()                 # only one talk creates the Descript project
+        # uploads go in alphabetical order, so the Descript project lists the talks A-Z (Marek 2026-10-11): a talk
+        # uploads only once every earlier name in the run has uploaded, or has failed and dropped out of the order
+        self.up_cv, self.up_order, self.up_settled = threading.Condition(), [], set()
         self.state = self._load()
         self.render_futures, self.render_locks = {}, {}
 
@@ -265,6 +268,7 @@ class Run:
                 if key in existing:
                     t["composition_id"] = existing[key]["id"]
                     self.set(key, "upload", "done", note="already in Descript, reused")
+                    self.upload_settled(key)
             # render: a lean H.264/AAC mp4 (GPU) instead of the camera file - smaller, faster upload (Marek 2026-09-28)
             if done("upload") and not done("render"):
                 self.set(key, "render", "done", note="not needed, already uploaded")
@@ -286,6 +290,7 @@ class Run:
             if not os.path.exists(up) or (t["steps"].get("render") or {}).get("file") != key + ".mp4":
                 up = src
             if not done("upload"):
+                self.upload_turn(key)
                 self.set(key, "upload", "running", label="uploading %.0f MB" % (os.path.getsize(up) / 1e6), percent=0)
                 with self.plock:                                 # the first upload creates (or finds) the project
                     if not self.state["project_id"]:
@@ -309,6 +314,7 @@ class Run:
                                        % (comp.get("duration") or 0))
                 t["composition_id"] = cid
                 self.set(key, "upload", "done")
+                self.upload_settled(key)
             pid, cid = self.state["project_id"], t["composition_id"]
             # credit guard 2: never pay for the same edit twice - the ledger of paid edits (survives a lost state file)
             # or a composition already shorter than its media (filler words / gaps were cut) means it's edited
@@ -560,6 +566,22 @@ class Run:
             if cid and (comps.get(cid, {}).get("duration") or 0) < MIN_TALK_SECONDS:
                 self.forget_composition(k, cid)
 
+    def upload_turn(self, key):
+        """Wait until every talk before this one (A-Z) has uploaded or dropped out."""
+        with self.up_cv:
+            if key not in self.up_order:
+                return
+            before = self.up_order[:self.up_order.index(key)]
+            ready = lambda: all(k in self.up_settled for k in before)
+            if not ready():
+                self.set(key, "upload", "running", label="waiting - uploads go in alphabetical order")
+                self.up_cv.wait_for(ready)
+
+    def upload_settled(self, key):
+        with self.up_cv:
+            self.up_settled.add(key)
+            self.up_cv.notify_all()
+
     def process_with_retries(self, key, attempts=3, pause=120):
         """A failed talk is retried by the run itself (Descript hiccups, a dropped upload); only a talk that failed
         every attempt keeps its error for Marek. Out of credits (402) or paused edits are not retried."""
@@ -570,6 +592,8 @@ class Run:
                 t["retry"] = None
             self.process(key)
             err = t.get("error") or ""
+            if err or (t["steps"].get("upload") or {}).get("status") == "done":
+                self.upload_settled(key)                 # a failed talk never holds up the uploads after it
             if not err or n == attempts or "402" in err or "edits paused" in err:
                 return
             with self.lock:
@@ -605,12 +629,15 @@ class Run:
         self.save()
         self.publish(force=True)                     # claims the lock (and updates conf42.com/factory)
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
-        def size(k):                                 # smallest video first: quick uploads finish early and
-            try:                                     # never queue behind a 1 GB file (one Descript job per project)
+        def size(k):
+            try:
                 return os.path.getsize(os.path.join(self.inp, self.state["talks"][k]["source"]))
             except (OSError, KeyError):
                 return 0
-        keys.sort(key=size)
+        keys.sort(key=lambda k: k.casefold())        # A-Z: the Descript project lists talks in upload order (was smallest first)
+        with self.up_cv:
+            self.up_order = list(keys)
+            self.up_settled = {k for k in keys if (self.talk(k)["steps"].get("upload") or {}).get("status") == "done"}
         with self.lock:                              # a fresh queue: stale "running" steps and old errors are gone
             for i, k in enumerate(keys):
                 t = self.state["talks"][k]
