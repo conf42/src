@@ -1,4 +1,4 @@
-"""Render the conf42.com/<event>/teasers cards to 1080x1080 PNGs with headless Chrome (Marek 2026-10-09; the sister
+"""Render the conf42.com/<event>/teasers cards to 1500x1500 PNGs (1080 px CSS cards at device scale 1500/1080) with headless Chrome (Marek 2026-10-09; the sister
 sites' _build/render_teasers.py, simplified: one kind of picture, no slime, no thumbnails).
 
     python -m build.render_teasers [--cached-only] [--jobs N] [--prune]
@@ -41,8 +41,9 @@ except ImportError:  # pragma: no cover
     sys.exit(0)
 
 ROOT = "docs"
-CARD = 1080
-CHUNK = 8            # cards per screenshot (8 * 1080 px tall, well under Chrome's surface limit)
+CARD = 1080          # the card's CSS size
+OUT = 1500           # the PNG (Marek 2026-10-12: 1500 x 1500; the carousel PDF still scales its pages to 1080)
+CHUNK = 8            # cards per screenshot (8 * 1500 px tall, well under Chrome's surface limit)
 BUDGET_MS = 12000    # virtual time for fonts + photos to settle before the screenshot
 CACHE_DIR = os.path.join(os.environ.get("SITE_CACHE_DIR", ".cache"), "teasers")
 PRUNE_DAYS = 14
@@ -126,7 +127,7 @@ def refs_digest(text, base_dir, h, outputs):
 def card_keys(page, chrome_version):
     context, cards = page_parts(page)
     outputs = set(CARD_RE.findall(open(page, encoding="utf-8").read()))
-    ctx = hashlib.sha256(("%s|%s|%d|%d|" % (SCRIPT_HASH, chrome_version, CARD, BUDGET_MS)).encode())
+    ctx = hashlib.sha256(("%s|%s|%d|%d|%d|" % (SCRIPT_HASH, chrome_version, CARD, OUT, BUDGET_MS)).encode())
     rc = render_context(context)
     ctx.update(rc.encode())
     print("render_teasers %s: page key %s" % (os.path.basename(os.path.dirname(page)), hashlib.sha256(rc.encode()).hexdigest()[:12]))   # differs between runs = every card redraws
@@ -158,7 +159,7 @@ def runs_of(indices):
 
 def shoot(chrome, url, height, out_png):
     cmd = [chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-sandbox", "--disable-dev-shm-usage",
-           "--allow-file-access-from-files", "--force-device-scale-factor=1", "--window-size=%d,%d" % (CARD, height),
+           "--allow-file-access-from-files", "--force-device-scale-factor=%.7f" % (OUT / CARD), "--window-size=%d,%d" % (CARD, height),
            "--virtual-time-budget=%d" % BUDGET_MS, "--screenshot=%s" % out_png, url]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
@@ -231,7 +232,10 @@ def main():
                         continue
                     sheet = Image.open(shot).convert("RGB")
                     for n, i in enumerate(run):
-                        tile = sheet.crop((0, n * CARD, CARD, (n + 1) * CARD))
+                        if sheet.width < OUT or sheet.height < (n + 1) * OUT:
+                            print("WARN render_teasers %s: %s is outside the %dx%d screenshot, not published" % (event, files[i], sheet.width, sheet.height))
+                            continue
+                        tile = sheet.crop((0, n * OUT, OUT, (n + 1) * OUT))
                         if blank(tile):
                             print("WARN render_teasers %s: %s came out blank, not published" % (event, files[i]))
                             continue
