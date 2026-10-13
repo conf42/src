@@ -65,6 +65,9 @@ def main():
                 gone += 1
         print("teaser_previews: pruned %d cache entries unused for %d days" % (gone, PRUNE_DAYS))
     print("teaser_previews: %d made, %d from cache" % (made, reused))
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            f.write("made=%d\n" % made)   # the render job saves the cache when it made new previews, even with no new picture
 
 
 if __name__ == "__main__":
