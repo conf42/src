@@ -342,6 +342,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/open":
                 machine.open_folder(os.path.join(work_root(), e))
                 return self.send(200, {"msg": ""})
+            if self.path == "/api/openfinal":
+                machine.open_folder(machine.final_folder(pipeline.settings()))
+                return self.send(200, {"msg": ""})
             if self.path == "/api/publish":
                 return self.send(200, {"msg": publish_status()})
             if self.path == "/api/settings":
