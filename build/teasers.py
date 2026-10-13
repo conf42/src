@@ -20,6 +20,7 @@ import unicodedata
 RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
 MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
          '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>')
+PAST_FROM = datetime.date(2026, 1, 1)
 TBD = re.compile(r"^\s*(tbd|tba|tbc|to be (announced|confirmed|decided))?\s*[.!]*\s*$", re.I)
 
 
@@ -119,8 +120,17 @@ def thumbnails(event, items):
     title doesn't matter here: the thumbnail is the speaker alone, on its topic's sky). Remix re-runs talks whose videos
     already have thumbnails, so it gets them for its keynotes only."""
     remix = (event.get("name") or "").strip().lower() == "remix"
-    return dict(talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"])
+    return dict(talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"],
+                            search=c["search"], first=c["first"], last=c["last"])   # the tab sorts and searches by itself (past events have no cards)
                        for c in items if c["photo"] and (c["keynote"] or not remix)])
+
+
+def overlays(event, ev):
+    """What the Overlays tab draws (Marek 2026-10-13): the OBS recording overlays speakers record their talk in, 1920x1080
+    with transparent holes, in the event's metadata.yml colour as it is, with "CONF42 <EVENT> <YEAR>" and "<MONTH> <DAY>"."""
+    c = str(event.get("color") or "")
+    return dict(color=c if re.match(r"^#[0-9a-fA-F]{6}$", c) else "#838383", title=("Conf42 %s %d" % (ev["name"], ev["date"].year)).upper(),
+                date=("%s %d" % (ev["date"].strftime("%B"), ev["date"].day)).upper(), slug=ev["slug"])
 
 
 def _size(path):
@@ -137,8 +147,18 @@ def upcoming(events, today=None):
     return [e for e in events if "external_url" not in e and e.get("short_url") and e.get("date") and e["date"] >= today - datetime.timedelta(days=1)]
 
 
+def past(events, today=None):
+    """Events that are over but keep a page with their Thumbnails and Overlays tabs (Marek 2026-10-13: both stay useful
+    after the event - videos go up later, late recordings). From 2026 on: 2025 events never had thumbnails. Newest first."""
+    today = today or datetime.date.today()
+    keep = [e for e in events if "external_url" not in e and e.get("short_url") and e.get("date")
+            and PAST_FROM <= e["date"] < today - datetime.timedelta(days=1)]
+    return sorted(keep, key=lambda e: e["date"], reverse=True)
+
+
 def generate(env, context, base_folder):
-    """docs/<event>/teasers.html for every upcoming event with talks, docs/teasers/index.html listing them, and
+    """docs/<event>/teasers.html for every upcoming event with talks (and, Thumbnails + Overlays only, every past one since
+    PAST_FROM), docs/teasers/index.html listing them, and
     docs/teasers/<event>.html forwarding the first links (Marek 2026-10-10: /<event>/teasers, like the sister sites)."""
     folder = os.path.join(base_folder, "teasers")
     # the pages and PNGs of events that are over must not linger: everything teaser-made is removed first
@@ -151,9 +171,12 @@ def generate(env, context, base_folder):
         if not os.listdir(d):
             os.rmdir(d)
     os.makedirs(folder, exist_ok=True)
-    listed = []
+    listed, over = [], []
     page = env.get_template("teasers.html")
-    for event in upcoming(context.get("events") or []):
+    events = context.get("events") or []
+    up = upcoming(events)
+    for event in up + past(events):
+        is_past = event not in up
         items = cards(event)
         if not items:
             continue
@@ -170,12 +193,18 @@ def generate(env, context, base_folder):
         ev["splash_full"] = "../" + p if p and os.path.isfile(os.path.join(base_folder, p)) else ""
         ev["splash_size"] = _size(os.path.join(base_folder, p)) if ev["splash_full"] else ""
         th = thumbnails(event, items)
+        if is_past:   # Thumbnails and Overlays only: no cards (so render_teasers.py draws nothing), no Generic, no Carousel
+            ev["splash"] = ""
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
-            f.write(page.render(ev=ev, cards=items, sc=scheme(event), th=th, **context))
+            f.write(page.render(ev=ev, cards=[] if is_past else items, sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, **context))
         with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
             f.write(MOVED % {"to": "../%s/teasers" % slug})
+        if is_past:
+            over.append(dict(ev, n=len(th["talks"]), sc=scheme(event)))
+            print("Writing out %s/teasers.html (past: %d thumbnails, overlays)" % (slug, len(th["talks"])))
+            continue
         listed.append(dict(ev, n=len(items), ready=sum(1 for c in items if not c["missing"]), sc=scheme(event)))
         print("Writing out %s/teasers.html (%d cards)" % (slug, len(items)))
     with open(os.path.join(folder, "index.html"), "w", encoding="utf-8") as f:
-        f.write(env.get_template("teasers_index.html").render(teaser_events=listed))
+        f.write(env.get_template("teasers_index.html").render(teaser_events=listed, past_events=over))

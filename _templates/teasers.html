@@ -6,7 +6,9 @@
      preview (build/teaser_previews.py, made from the PNG in the deploy); only a card without one is drawn live. Tabs: Talk teasers (search, sort, download one or
      all as a ZIP), Generic, Carousel (a LinkedIn document post: one square PDF of the ticked talks) and Thumbnails (the YouTube
      thumbnails build/youtube_thumbnails.py draws after the deploy, 1280x720, built in JS from <script id="th-data"> outside the render key). A talk without a photo or
-     with an empty / TBD title is greyed out and never downloaded. Never in the sitemap.
+     with an empty / TBD title is greyed out and never downloaded. Overlays (Marek 2026-10-13): the three OBS recording overlays
+     (1920x1080 PNG, transparent holes), drawn here on a canvas from <script id="ov-data">. A past event (since 2026, `past`)
+     keeps only Thumbnails and Overlays: no cards, so nothing is rendered for it. Never in the sitemap.
      Render key (render_teasers.py): the card markup, the styles outside /*tools*/ ... /*/tools*/, the /*render*/ script and
      the files they use - change anything else freely, no card is redrawn. ── #}
 <!DOCTYPE html>
@@ -181,10 +183,26 @@
       box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 2; pointer-events: none; }
     .th-slot .tz-dl { right: 8px; bottom: 8px; width: 34px; height: 34px; }
     .th-slot .tz-dl svg { width: 18px; height: 18px; }
+    /* Overlays tab (Marek 2026-10-13): the OBS recording overlays, drawn on a canvas in the browser - no build work */
+    #ov-sec { display: none; }
+    body.ov-mode #ov-sec { display: block; }
+    body.ov-mode #tz-pool, body.ov-mode #tz-controls, body.ov-mode #tz-none { display: none !important; }
+    body.past #tz-pool, body.past #tz-none, body.past #tz-all, body.past #tz-count { display: none !important; }
+    .ov-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 16px; }
+    .ov-bar .tz-count { margin-left: 0; }
+    .ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 22px; }
+    .ov-slot { position: relative; margin: 0; }
+    .ov-frame { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.16);
+      background: repeating-conic-gradient(#e4e3ea 0% 25%, #fafafc 0% 50%) 0 0 / 22px 22px; }   /* the holes show as a checkerboard: transparent in OBS */
+    .ov-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .ov-slot figcaption { margin-top: 10px; font-size: .9rem; color: #444; }
+    .ov-slot figcaption b { display: block; color: #111; font-size: 1rem; }
+    .ov-slot .tz-dl { right: 8px; bottom: 8px; width: 34px; height: 34px; top: auto; }
+    .ov-slot .tz-dl svg { width: 18px; height: 18px; }
     /*/tools*/
   </style>
 </head>
-<body>
+<body{% if past %} class="past"{% endif %}>
   <div class="tz-page">
     <div class="tz-head">
       <div>
@@ -194,10 +212,11 @@
       <a class="tz-btn" href="../{{ ev.slug }}" style="text-decoration:none">Event page</a>
     </div>
     <div class="tz-tabs" role="tablist">
-      <button type="button" role="tab" data-tab="tz" aria-selected="true">Talk teasers</button>
+      {% if not past %}<button type="button" role="tab" data-tab="tz" aria-selected="true">Talk teasers</button>{% endif %}
       {% if ev.splash %}<button type="button" role="tab" data-tab="gn" aria-selected="false">Generic</button>{% endif %}
-      <button type="button" role="tab" data-tab="cr" aria-selected="false">Carousel</button>
+      {% if not past %}<button type="button" role="tab" data-tab="cr" aria-selected="false">Carousel</button>{% endif %}
       {% if th.talks %}<button type="button" role="tab" data-tab="th" aria-selected="false">Thumbnails</button>{% endif %}
+      <button type="button" role="tab" data-tab="ov" aria-selected="false">Overlays</button>
       <span class="tz-ink"></span>
     </div>
     <div class="tz-controls" id="tz-controls">
@@ -298,6 +317,11 @@
     </div>{% endif %}
     {% if th.talks %}<div id="th-sec"></div>
     <script type="application/json" id="th-data">{{ th|tojson }}</script>{% endif %}
+    <div id="ov-sec">
+      <div class="ov-bar"><button class="tz-btn" type="button" id="ov-all">Download all</button><span class="tz-count">3 overlays &middot; 1920 &times; 1080 PNG &middot; in OBS: add as an Image source on top of the scene</span></div>
+      <div class="ov-grid" id="ov-grid"></div>
+    </div>
+    <script type="application/json" id="ov-data">{{ ov|tojson }}</script>
     <div class="tz-sub tz-hint" id="tz-sub">One card per talk (1500 &times; 1500 PNG) for LinkedIn, X and Instagram. Download one, or all of them as a ZIP.</div>
   </div>
   <script>
@@ -436,15 +460,18 @@
         document.body.classList.toggle('cr-mode', t === 'cr');
         document.body.classList.toggle('gn-mode', t === 'gn');
         document.body.classList.toggle('th-mode', t === 'th');
+        document.body.classList.toggle('ov-mode', t === 'ov');
         document.querySelectorAll('.tz-tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false'); });
         document.getElementById('tz-sub').textContent = t === 'cr' ? 'A LinkedIn carousel: one square PDF - a cover if you like, then a page per talk. Tick the talks, then Download PDF. Rendered here in your browser.'
           : t === 'gn' ? 'Covers for the whole event (1500 \u00d7 1500 PNG): its splash art, name, date and ONLINE, rendered here in your browser - and the splash art itself, as it is.'
-          : t === 'th' ? 'YouTube thumbnails (1280 \u00d7 720 PNG): the speaker\u2019s headshot on the event\u2019s starfield, one per talk with a photo. Download one, or all of them as a ZIP.' : subTz;
+          : t === 'th' ? 'YouTube thumbnails (1280 \u00d7 720 PNG): the speaker\u2019s headshot on the event\u2019s starfield, one per talk with a photo. Download one, or all of them as a ZIP.'
+          : t === 'ov' ? 'Recording overlays for OBS (1920 \u00d7 1080 PNG, transparent where the camera and slides go), in the event\u2019s colour. Send speakers the one that fits their setup.' : subTz;
         moveInk();
         ready.then(function () { if (t === 'cr') crDraw(); if (t === 'gn') gnFit(); scale(); });
+        if (t === 'ov') ovShow();
       }
       document.querySelectorAll('.tz-tabs button').forEach(function (b) {
-        b.addEventListener('click', function () { setTab(b.dataset.tab); history.replaceState(null, '', b.dataset.tab === 'cr' ? '#carousel' : b.dataset.tab === 'gn' ? '#generic' : b.dataset.tab === 'th' ? '#thumbnails' : location.pathname); });
+        b.addEventListener('click', function () { setTab(b.dataset.tab); history.replaceState(null, '', b.dataset.tab === 'cr' ? '#carousel' : b.dataset.tab === 'gn' ? '#generic' : b.dataset.tab === 'th' ? '#thumbnails' : b.dataset.tab === 'ov' ? '#overlays' : location.pathname); });
       });
       window.addEventListener('resize', moveInk);
 
@@ -710,7 +737,7 @@
       // deploy; until then the tile shows the headshot faded with a note. Follows the teasers' search and sort.
       var thData = document.getElementById('th-data'), thSec = document.getElementById('th-sec'), thItems = [];
       if (thData) JSON.parse(thData.textContent).talks.forEach(function (t) {
-        var el = document.createElement('div'), slot = slots.filter(function (s) { return +s.dataset.i === t.i; })[0];
+        var el = document.createElement('div');
         el.className = 'th-slot';
         el.innerHTML = '<div class="th-frame"><img class="th-ph" alt=""><img class="th-pv" alt="' + esc(t.name) + '" loading="lazy" decoding="async" src="' + esc(t.file.replace(/\.png$/, '.webp')) + '"><span class="th-wait">Being drawn - check back in a few minutes</span></div>'
           + '<span class="th-name">' + esc(t.name) + '</span>'
@@ -718,13 +745,18 @@
         var pv = el.querySelector('.th-pv');
         pv.onload = function () { el.classList.add('th-ok'); };
         pv.onerror = function () { el.classList.add('th-none'); el.querySelector('.th-ph').src = t.photo; };   // not drawn yet: the headshot, faded
-        if (slot) thItems.push({ el: el, slot: slot, t: t });
+        thItems.push({ el: el, t: t });
       });
       function thRender() {
         if (!thSec) return;
         var shown = 0;
-        [].forEach.call(pool.querySelectorAll('.tz-slot'), function (s) {          // the teasers' order and search
-          thItems.forEach(function (x) { if (x.slot === s) { x.el.hidden = s.hidden; if (!s.hidden) shown++; thSec.appendChild(x.el); } });
+        thItems.slice().sort(function (a, b) {                                     // the teasers' order and search, from its own data
+          if (sortBy === 'web') return a.t.i - b.t.i;
+          return a.t[sortBy].localeCompare(b.t[sortBy]) || a.t.i - b.t.i;
+        }).forEach(function (x) {
+          x.el.hidden = !!q && x.t.search.indexOf(q) < 0;
+          if (!x.el.hidden) shown++;
+          thSec.appendChild(x.el);
         });
         var b = document.getElementById('th-all');
         b.disabled = !shown; b.textContent = q ? 'Download these ' + shown : 'Download all';
@@ -753,7 +785,120 @@
         }).catch(function (err) { alert('Could not make the ZIP: ' + err); })
           .then(function () { btn.disabled = false; btn.textContent = keep; zpEnd(btn); thRender(); });
       });
-      setTab(location.hash === '#carousel' ? 'cr' : location.hash === '#generic' && document.getElementById('gn-pool') ? 'gn' : location.hash === '#thumbnails' && thSec ? 'th' : 'tz');
+      // 7. Overlays (Marek 2026-10-13): the OBS recording overlays speakers record their talk in - 1920 x 1080 PNG, the event's
+      // colour, transparent where the facecam and the slides go. Drawn here on a canvas (no build work, never stale), the
+      // layouts measured off Marek's own three files; text in Lato Bold, loaded on first use.
+      var ovData = JSON.parse(document.getElementById('ov-data').textContent), ovGrid = document.getElementById('ov-grid'), ovDone = null;
+      var OV = [
+        { id: 'default', name: 'Default', note: 'Facecam in the circle, slides in the window.' },
+        { id: 'co-talk', name: 'Co-talk', note: 'Two speakers: a facecam each, slides in the middle.' },
+        { id: 'no-facecam', name: 'No facecam or no slides', note: 'One big window: the slides, or the camera alone.' }
+      ];
+      function ovText(x, cx, base, size, parts, track, maxW) {
+        // parts: strings and null (a round bullet), in tracked capitals centred on cx with the baseline at base; shrinks to maxW
+        var sp, dot, gap, w, items;
+        function lay() {
+          x.font = '700 ' + size + 'px Lato';
+          sp = size * track; dot = size * (size > 28 ? .48 : .44); gap = size * .62; w = 0; items = [];
+          parts.forEach(function (p, k) {
+            if (k) { items.push({ gap: gap }); w += gap; }
+            if (p === null) { items.push({ dot: true }); w += dot; return; }
+            for (var i = 0; i < p.length; i++) { var cw = x.measureText(p[i]).width; items.push({ ch: p[i], w: cw }); w += cw + (i < p.length - 1 ? sp : 0); }
+          });
+        }
+        lay();
+        if (w > maxW) { var was = size; size = size * maxW / w; base -= (was - size) * .36; lay(); }   // too long: smaller, on the same middle line
+        var at = cx - w / 2;
+        items.forEach(function (it, k) {
+          if (it.gap) { at += it.gap; return; }
+          if (it.dot) { x.beginPath(); x.arc(at + dot / 2, base - size * .32, dot / 2, 0, 7); x.fill(); at += dot; return; }
+          x.fillText(it.ch, at, base);
+          at += it.w + (items[k + 1] && items[k + 1].ch ? sp : 0);
+        });
+      }
+      function ovDraw(cv, kind, d, logo) {
+        cv.width = 1920; cv.height = 1080;
+        var x = cv.getContext('2d'), band = 'rgba(255,255,255,.1)';
+        x.clearRect(0, 0, 1920, 1080);
+        x.fillStyle = d.color; x.fillRect(0, 0, 1920, 1080);
+        function hole(f) { x.save(); x.globalCompositeOperation = 'destination-out'; x.fillStyle = '#000'; f(); x.restore(); }
+        function ring(cx, cy, ro, ri) {         // the facecam: a transparent disc in a white ring
+          x.fillStyle = '#fff'; x.beginPath(); x.arc(cx, cy, ro, 0, 7); x.fill();
+          hole(function () { x.beginPath(); x.arc(cx, cy, ri, 0, 7); x.fill(); });
+        }
+        if (kind === 'default') {
+          x.fillStyle = band; x.fillRect(188, 20, 1732, 156);
+          hole(function () { x.fillRect(373.1, 203.75, 1532.9, 862.25); });
+          ring(188, 188, 167.5, 159);
+          x.fillStyle = '#fff';
+          ovText(x, 1112.5, 79, 32, [d.title], .16, 1440);
+          ovText(x, 1112.5, 141, 32, [d.date, null, 'ONLINE'], .16, 1440);
+        } else if (kind === 'co-talk') {
+          x.fillStyle = band; x.fillRect(214.5, 40, 1491, 197);
+          hole(function () { x.fillRect(336.66, 360.95, 1246.68, 701.25); });
+          ring(214.5, 214.5, 174, 164.3); ring(1705.5, 214.5, 174, 164.3);
+          x.fillStyle = '#fff';
+          ovText(x, 960, 118, 32, [d.title], .16, 1100);
+          ovText(x, 960, 180, 32, [d.date, null, 'ONLINE'], .16, 1100);
+        } else {
+          x.fillStyle = band; x.beginPath(); x.moveTo(0, 0); x.lineTo(125.5, 0); x.lineTo(0, 148); x.closePath(); x.fill();
+          hole(function () { x.fillRect(84.87, 47.74, 1750.26, 984.52); });
+          if (logo) x.drawImage(logo, 13, 10, 59 * logo.naturalWidth / logo.naturalHeight, 59);   // the planet, white, as on the original
+          x.fillStyle = '#fff';
+          ovText(x, 960, 1066, 24, [d.title, null, d.date, null, 'ONLINE'], .19, 1700);
+        }
+      }
+      function ovFile(o) { return 'conf42-' + ovData.slug + '-overlay-' + o.id + '.png'; }
+      function ovReady() {
+        ovDone = ovDone || new Promise(function (ok) {
+          var l = document.createElement('link'); l.rel = 'stylesheet';
+          l.href = 'https://fonts.googleapis.com/css2?family=Lato:wght@700&display=block'; document.head.appendChild(l);
+          var logo = new Image(); logo.src = '../assets/conf42/conf42_planet_white.png';
+          var font = new Promise(function (f) { l.onload = f; l.onerror = f; }).then(function () { return document.fonts.load('700 32px Lato'); }).catch(function () {});
+          var pic = new Promise(function (f) { logo.onload = f; logo.onerror = f; });
+          Promise.all([font, pic]).then(function () { ok(logo.naturalWidth ? logo : null); });
+        });
+        return ovDone;
+      }
+      var ovCanvases = {};
+      function ovShow() {
+        if (ovGrid.children.length) return;
+        OV.forEach(function (o) {
+          var el = document.createElement('figure'); el.className = 'ov-slot';
+          el.innerHTML = '<div class="ov-frame"><canvas width="1920" height="1080" aria-label="' + esc(o.name) + ' overlay"></canvas></div>'
+            + '<a class="tz-dl" href="#" title="Download ' + esc(ovFile(o)) + '" aria-label="Download the ' + esc(o.name) + ' overlay"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg></a>'
+            + '<figcaption><b>' + esc(o.name) + '</b>' + esc(o.note) + '</figcaption>';
+          ovGrid.appendChild(el);
+          ovCanvases[o.id] = el.querySelector('canvas');
+          el.querySelector('.tz-dl').addEventListener('click', function (e) {
+            e.preventDefault();
+            ovBlob(o).then(function (b) { var u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = ovFile(o); document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 60000); });
+          });
+        });
+        ovReady().then(function (logo) { OV.forEach(function (o) { ovDraw(ovCanvases[o.id], o.id, ovData, logo); }); });
+      }
+      function ovBlob(o) {
+        return ovReady().then(function (logo) {
+          var c = document.createElement('canvas'); ovDraw(c, o.id, ovData, logo);
+          return new Promise(function (ok) { c.toBlob(ok, 'image/png'); });
+        });
+      }
+      document.getElementById('ov-all').addEventListener('click', function () {
+        var btn = this, files = [];
+        btn.disabled = true; zpStart(btn);
+        OV.reduce(function (done, o, i) {
+          return done.then(function () { return ovBlob(o); }).then(function (b) { return b.arrayBuffer(); })
+            .then(function (b) { files.push({ name: ovFile(o), bytes: new Uint8Array(b) }); zpStep(btn, i + 1, OV.length); });
+        }, Promise.resolve()).then(function () {
+          var url = URL.createObjectURL(zipOf(files)), z = document.createElement('a');
+          z.href = url; z.download = 'conf42-' + ovData.slug + '-overlays.zip';
+          document.body.appendChild(z); z.click(); z.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        }).catch(function (err) { alert('Could not make the ZIP: ' + err); })
+          .then(function () { btn.disabled = false; zpEnd(btn); });
+      });
+      var first = document.querySelector('.tz-tabs [data-tab]').dataset.tab;   // a past event starts on Thumbnails (or Overlays)
+      setTab(location.hash === '#carousel' && first === 'tz' ? 'cr' : location.hash === '#generic' && document.getElementById('gn-pool') ? 'gn'
+        : location.hash === '#thumbnails' && thSec ? 'th' : location.hash === '#overlays' ? 'ov' : first);
     })();
   </script>
 </body>
