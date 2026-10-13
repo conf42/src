@@ -477,6 +477,11 @@ print("Generating the talk teasers")
 from .teasers import generate as generate_teasers
 generate_teasers(env, context, BASE_FOLDER)
 
+# HEADSHOTS (conf42.com/headshots - unlisted organizer tool: noindex, never passed to register_url): the headshot
+# maker, every current and future event's background in a dropdown (Marek 2026-10-13)
+from .headshots import generate as generate_headshots
+generate_headshots(env, context, BASE_FOLDER)
+
 # FACTORY (conf42.com/factory - unlisted: noindex, never passed to register_url, so not in the sitemap or
 # 404-index.json). Progress of the factory runs (factory/, the local Descript video pipeline), from _db/factory.json
 # which the factory app writes and pushes ("Publish status").
