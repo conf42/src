@@ -15,8 +15,12 @@ Per talk:
 4. **Publish** (unlisted) at the largest size not above the source or `max_resolution`, and **download** the MP4.
 5. **SRT** transcript, named `<short_url>_<Name1>.srt`, which is what the site expects in `src/srt/`.
 6. **Loudness**: ffmpeg measures each video and sets it to YouTube's level (-14 LUFS, true peak -1.5 dB).
-   The video stream is copied, so there's no quality loss.
-7. **QA** measures the result and flags talks whose loudness is off or where the edit cut too much.
+   The video stream is copied, so there's no quality loss. In the same pass the video is **trimmed to the speech**:
+   it starts 0.3 s before the first word and ends 1 s after the last one (from the transcript). The SRT and the
+   chapters move with it. Settings: `trim_to_speech`, `trim_lead_seconds`, `trim_tail_seconds`.
+7. **QA** measures the result and flags talks whose loudness is off or where the edit cut too much. It also flags a
+   talk whose picture changes in its first 12 seconds ("check the start"). That is usually the speaker's OBS or
+   desktop before the slides; it is never cut automatically.
 
 Finished videos of every event go to one folder, `Desktop\talk-factory\final videos for YouTube\`, named
 `<speakers> - Conf42 <Event> <Year>.mp4` (the dashboard's "Final videos for YouTube" button opens it; `final_folder` in

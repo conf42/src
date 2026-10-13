@@ -376,8 +376,12 @@ class Run:
                 self.chapters_step(key, d)
             if not done("loudness"):
                 self.set(key, "loudness", "running", label="ffmpeg to %s LUFS" % cfg["loudness_lufs"])
-                media.normalize(raw, final, cfg["loudness_lufs"], cfg["true_peak_db"])
-                self.set(key, "loudness", "done", file=os.path.basename(final))
+                trim = self.plan_trim(key, raw, srt_path)
+                media.normalize(raw, final, cfg["loudness_lufs"], cfg["true_peak_db"], trim.get("start"), trim.get("end"))
+                self.apply_trim(key, srt_path)
+                self.set(key, "loudness", "done", file=os.path.basename(final),
+                         note="trimmed %.1f s at the start, %.1f s at the end" % (trim.get("start") or 0, trim.get("tail") or 0)
+                         if trim.get("start") or trim.get("tail") else None)
             if not done("qa"):
                 self.set(key, "qa", "running")
                 lufs, peak = media.loudness(final)
@@ -390,6 +394,9 @@ class Run:
                     flags.append("edit removed %.0f%% of the talk" % cut)
                 if out["height"] and t["probe"]["height"] and min(out["width"], out["height"]) < 480:
                     flags.append("low resolution")
+                jump = media.early_cut(final)               # opens on the speaker's setup (OBS, a desktop)?
+                if jump is not None:
+                    flags.append("picture changes at 0:%04.1f - check the start (setup screen?)" % jump)
                 self.set(key, "qa", "done", lufs=lufs, peak=peak, minutes_before=round(t["probe"]["duration"] / 60, 1),
                          minutes_after=round(out["duration"] / 60, 1), cut_percent=round(cut, 1), flags=flags)
             with self.lock:
@@ -431,7 +438,61 @@ class Run:
         chapters, problem = youtube_chapters(text, length)
         self.set(key, "chapters", "done", chapters=chapters, credits=res.get("ai_credits_used"),
                  note=problem or "%d chapters" % len(chapters), raw=None if chapters else text[:500])
+        if (t.get("trim") or {}).get("applied"):        # the video was trimmed already: move them with it
+            self.shift_chapters(key)
         self.write_chapters()
+
+    # ---- trim to the speech (Marek 2026-10-13) --------------------------------------------
+    def plan_trim(self, key, raw, srt_path):
+        """Where the finished video starts and ends: `trim_lead_seconds` before the first word and `trim_tail_seconds`
+        after the last one (from the talk's transcript), when that cuts something worth cutting. Decided once and
+        kept in state, so a retried loudness step cuts the same and the transcript is shifted only once."""
+        t, cfg = self.talk(key), self.cfg
+        if "trim" in t:
+            return t["trim"]
+        trim = {}
+        cues = srt_cues(srt_path) if cfg.get("trim_to_speech", True) and os.path.exists(srt_path) else []
+        if cues:
+            lead, tail = float(cfg.get("trim_lead_seconds", 0.3)), float(cfg.get("trim_tail_seconds", 1.0))
+            start = cues[0][0] - lead
+            if 0.5 <= start <= 300:
+                trim["start"] = round(start, 3)
+            length = media.probe(raw)["duration"]
+            end = cues[-1][1] + tail
+            if length and length - end > 1.5:
+                trim["end"], trim["tail"] = round(end, 3), round(length - end, 1)
+        with self.lock:
+            t["trim"] = trim
+            self.save()
+        return trim
+
+    def apply_trim(self, key, srt_path):
+        """After the trimmed render: move the transcript and the chapters to the new start (once)."""
+        t = self.talk(key)
+        trim = t.get("trim") or {}
+        if trim.get("applied"):
+            return
+        if trim.get("start") and os.path.exists(srt_path):
+            shift_srt(srt_path, trim["start"])
+        with self.lock:
+            trim["applied"] = True
+            self.save()
+        self.shift_chapters(key)
+
+    def shift_chapters(self, key):
+        t = self.talk(key)
+        step, off = t["steps"].get("chapters") or {}, (t.get("trim") or {}).get("start") or 0
+        if not off or not step.get("chapters") or step.get("trimmed"):
+            return
+        out = []
+        for i, c in enumerate(step["chapters"]):
+            sec = 0 if i == 0 else max(0, _secs(c["at"]) - int(round(off)))
+            if out and sec - out[-1][0] < 10:
+                continue
+            out.append((sec, c["title"]))
+        with self.lock:
+            step["chapters"], step["trimmed"] = [{"at": _stamp(s), "title": x} for s, x in out], off
+            self.save()
 
     def chapters_pass(self):
         """Chapters for finished talks that do not have them yet (talks processed before the step existed)."""
@@ -693,6 +754,42 @@ class Run:
                 json.dump(self.state, f, indent=1, ensure_ascii=False)
             os.replace(tmp, self.state_path)
         self.publish(force=True)
+
+
+def _srt_time(s):
+    h, m, rest = s.strip().split(":")
+    sec, ms = rest.split(",")
+    return int(h) * 3600 + int(m) * 60 + int(sec) + int(ms) / 1000.0
+
+
+def _srt_stamp(x):
+    ms = int(round(x * 1000))
+    return "%02d:%02d:%02d,%03d" % (ms // 3600000, ms // 60000 % 60, ms // 1000 % 60, ms % 1000)
+
+
+def srt_cues(path):
+    """[(start, end)] seconds of every cue in an SRT file."""
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        return [(_srt_time(a), _srt_time(b)) for a, b in re.findall(r"(\d+:\d+:\d+,\d+)\s*-->\s*(\d+:\d+:\d+,\d+)", f.read())]
+
+
+def shift_srt(path, by):
+    """Move every cue `by` seconds earlier (the video was trimmed at the start); cues that end before 0 are dropped,
+    the rest renumbered."""
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        blocks = re.split(r"\n\s*\n", f.read().replace("\r\n", "\n").strip())
+    out = []
+    for b in blocks:
+        lines = b.split("\n")
+        i = next((k for k, l in enumerate(lines) if "-->" in l), None)
+        if i is None:
+            continue
+        a, z = [_srt_time(x) - by for x in lines[i].split("-->")]
+        if z <= 0:
+            continue
+        out.append("%d\n%s --> %s\n%s" % (len(out) + 1, _srt_stamp(max(0, a)), _srt_stamp(z), "\n".join(lines[i + 1:])))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(out) + "\n")
 
 
 def _secs(stamp):
