@@ -18,9 +18,11 @@ Per talk:
    The video stream is copied, so there's no quality loss.
 7. **QA** measures the result and flags talks whose loudness is off or where the edit cut too much.
 
-Output goes to `Desktop\talk-factory\<short_url>\`:
+Finished videos of every event go to one folder, `Desktop\talk-factory\final videos for YouTube\`, named
+`<speakers> - Conf42 <Event> <Year>.mp4` (the dashboard's "Final videos for YouTube" button opens it; `final_folder` in
+settings.yml). Everything else stays per event in `Desktop\talk-factory\<short_url>\`:
 
-- `out\<speakers> - Conf42 <Event> <Year>.mp4`: finished videos.
+- `out\_descript\`: Descript's downloads, before the loudness pass (not for YouTube).
 - `srt\`: transcripts.
 - `in\`: renamed source videos.
 - `slides\`: any decks that were in the zips.

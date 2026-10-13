@@ -44,6 +44,12 @@ def work_root(cfg):
     return os.path.expanduser(root) if root else os.path.join(desktop(), cfg.get("work_folder") or "talk-factory")
 
 
+def final_folder(cfg):
+    """Where the finished videos of every event land, ready for YouTube (Marek 2026-10-13: the event folders' out/
+    held them next to Descript's raw downloads, so it wasn't clear which were final): <work root>/<final_folder>."""
+    return os.path.join(work_root(cfg), cfg.get("final_folder") or "final videos for YouTube")
+
+
 def soffice():
     """LibreOffice's command-line converter, or None."""
     for name in ("soffice", "libreoffice"):

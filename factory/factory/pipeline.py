@@ -99,8 +99,12 @@ class Run:
         self.ev = events.event(short_url)
         self.dir = os.path.join(machine.work_root(self.cfg), short_url)
         self.inp, self.out, self.srt_dir, self.slides_dir = (os.path.join(self.dir, d) for d in ("in", "out", "srt", "slides"))
-        for d in (self.inp, self.out, self.srt_dir, self.slides_dir):
+        self.final_dir = machine.final_folder(self.cfg)   # finished videos of every event, in one place
+        for d in (self.inp, self.out, self.srt_dir, self.slides_dir, self.final_dir):
             os.makedirs(d, exist_ok=True)
+        for old in glob.glob(os.path.join(self.out, "*.mp4")):   # finished before 2026-10-13: out/ -> the final folder
+            if not os.path.exists(os.path.join(self.final_dir, os.path.basename(old))):
+                shutil.move(old, os.path.join(self.final_dir, os.path.basename(old)))
         self.state_path = os.path.join(self.dir, "state.json")
         self.lock = threading.RLock()
         self.plock = threading.Lock()                 # only one talk creates the Descript project
@@ -245,8 +249,8 @@ class Run:
         t, cfg, d = self.talk(key), self.cfg, Descript()
         done = lambda s: (t["steps"].get(s) or {}).get("status") == "done"
         src = os.path.join(self.inp, t["source"])
-        final = os.path.join(self.out, "%s - %s.mp4" % (key, self.ev["title"]))
-        raw = os.path.join(self.out, "_descript", key + ".mp4")
+        final = os.path.join(self.final_dir, "%s - %s.mp4" % (key, self.ev["title"]))
+        raw = os.path.join(self.out, "_descript", key + ".mp4")      # Descript's download, before the loudness pass
         srt_path = os.path.join(self.srt_dir, ("%s_%s.srt" % (self.ev["short_url"], t["name1"])).replace(" ", "_"))
         progress = lambda step: (lambda label, percent=None: self.set(key, step, "running", label=label, percent=percent))
         try:
