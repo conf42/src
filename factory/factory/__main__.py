@@ -6,6 +6,9 @@
   python -m factory status <short_url>                    progress summary
   python -m factory chapters <short_url>                  YouTube titles + descriptions + chapters -> <event>/YouTube items.txt
   python -m factory retry  <short_url> "<speaker(s)>"     retry one talk from its failed step
+  python -m factory drive-check <short_url> <listing.json>  flag talks whose video was uploaded to Drive after the last pass
+                                                          (listing = the Drive folder's files; then pass the new files to run)
+  python -m factory redo   <short_url> "<speaker(s)>"     do one talk again from scratch (its current source video)
   python -m factory serve                                 the local app on http://localhost:8042
   python -m factory doctor                                check this machine (tools, GPU, token, git, disk)
   python -m factory setup                                 one-time setup on a new machine (token, launcher, check)
@@ -116,6 +119,18 @@ def main(argv):
             return
         run.chapters_pass()
         print(open(os.path.join(run.dir, "YouTube items.txt"), encoding="utf-8").read())
+    elif cmd == "drive-check":
+        with open(argv[2], encoding="utf-8") as f:
+            listing = json.load(f)
+        rep = run.drive_check(listing.get("files", listing) if isinstance(listing, dict) else listing)
+        for x in rep["newer"]:
+            print("NEWER  %-28s %s uploaded %s, last pass %s" % (x["speakers"], x["file"], x["uploaded"][:16], x["last_pass"]))
+        for x in rep["new"]:
+            print("NEW    %-28s %s uploaded %s (never processed)" % (x["speakers"], x["file"], x["uploaded"][:16]))
+        print("%d up to date, %d newer on Drive, %d not processed yet" % (rep["same"], len(rep["newer"]), len(rep["new"])))
+    elif cmd == "redo":
+        run.redo(argv[2], "redo asked for")
+        run.run(only=[argv[2]], force=force)
     elif cmd == "status":
         print(json.dumps(pipeline.summary(run.state), indent=1))
     elif cmd == "retry":

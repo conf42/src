@@ -34,6 +34,16 @@ settings.yml). Everything else stays per event in `Desktop\talk-factory\<short_u
 
 A run can be stopped and started again at any time. Finished steps are skipped, and a failed talk is retried on its own.
 
+**New versions on Drive** (Marek 2026-10-13): a speaker who uploads a corrected video gets their talk done again.
+- `python -m factory drive-check <short_url> listing.json` compares the event's Drive folder (a JSON list of its files:
+  title, id, createdTime, modifiedTime, fileSize, mimeType, as Claude's Drive connector or the Drive API returns them)
+  with the factory's passes. A video uploaded after its talk last finished is flagged "newer video on Drive - redo" on
+  the dashboard; talks never processed are listed as NEW.
+- Passing the new file to `match` / `run` redoes the talk from scratch: the new video replaces the source, the old
+  Descript composition is never reused, and the old finished video moves to `<event>/out/replaced/` (kept). A file
+  the talk already had (same size as any earlier version) is a duplicate and is dropped.
+- `python -m factory redo <short_url> "<speaker(s)>"` redoes one talk with its current video.
+
 ## Use
 
 - **App:** double-click `run.cmd` and it opens http://localhost:8042. Pick the event and press Start. The app shows per-talk progress and has Retry, Settings, Open folder and "Publish status" buttons. Publish status updates the hidden page `conf42.com/factory`.
