@@ -17,6 +17,7 @@ import dateutil.parser
 from ics import Calendar, Event
 
 
+from .webinars import load_webinars
 from .shared import (
     BASE_STATIC_URL,
     pick_picture_file,
@@ -58,6 +59,7 @@ print(DIVIDER)
 print("Loading the context")
 context = get_enriched_metadata(BASE_FOLDER)
 context["asset_version"] = get_asset_version()
+context.update(load_webinars(BASE_FOLDER))
 print("Asset version:", context["asset_version"])
 
 # init the jinja stuff
@@ -98,6 +100,8 @@ def webp_small_url(url):
     return small[:-5] + ".sm.webp" if small != url else url
 env.filters["webp_sm"] = webp_small_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
+# "December 3 2026", not "December 03 2026" (Marek 2026-10-12)
+env.filters["long_date"] = lambda d: "%s %d %d" % (d.strftime("%B"), d.day, d.year)
 
 
 # SPONSORSHIPS
