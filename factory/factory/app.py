@@ -217,7 +217,7 @@ def publish_status():
                           "steps": {s: (t["steps"].get(s) or {}).get("status", "") for s in pipeline.STEPS},
                           "finished": t.get("finished", ""), "error": bool(t.get("error")),
                           "minutes": qa.get("minutes_after"), "cut_percent": qa.get("cut_percent"),
-                          "lufs": qa.get("lufs"), "flags": qa.get("flags", [])})
+                          "lufs": qa.get("lufs"), "flags": qa.get("flags", []) + (["newer video on Drive - redo"] if t.get("drive_newer") else [])})
         data["events"].append({"short_url": e["short_url"], "title": e["title"], "talks": talks,
                                "missing_videos": pipeline.summary(st)["missing_videos"],
                                "runner": {"machine": machine.machine_id(), "name": r.get("name") or "",

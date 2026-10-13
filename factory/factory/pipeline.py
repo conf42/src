@@ -185,6 +185,59 @@ class Run:
             with open(self.ledger_path(), "w", encoding="utf-8") as f:
                 json.dump(led, f, indent=1, ensure_ascii=False)
 
+    # ---- redo: a newer upload replaces a finished talk (Marek 2026-10-13) -------------------
+    def redo(self, key, why):
+        """Start a talk again from scratch with its new source video. The old Descript composition is never reused
+        (it is the old video); the old finished file moves to <event>/out/replaced/ (kept, never deleted) so a stale
+        video can't be uploaded to YouTube by mistake. Called with self.lock held or from match()."""
+        t = self.talk(key)
+        old_final = os.path.join(self.final_dir, "%s - %s.mp4" % (key, self.ev["title"]))
+        if os.path.exists(old_final):
+            os.makedirs(os.path.join(self.out, "replaced"), exist_ok=True)
+            shutil.move(old_final, os.path.join(self.out, "replaced", "%s %s" % (now().replace(":", "-"), os.path.basename(old_final))))
+        for leftover in (os.path.join(self.dir, "mp4", key + ".mp4"), os.path.join(self.out, "_descript", key + ".mp4")):
+            if os.path.exists(leftover):
+                os.remove(leftover)                     # intermediate files of the old video
+        if t.get("composition_id"):
+            t.setdefault("broken_compositions", []).append(t["composition_id"])
+        for k in ("probe", "resolution", "composition_id", "finished", "trim", "drive_newer", "error", "retry", "current"):
+            t.pop(k, None)
+        t["steps"] = {}
+        t.setdefault("redone", []).append({"at": now(), "why": why})
+        self.note("%s: %s - doing it again" % (key, why))
+        self.save()
+
+    def drive_check(self, listing):
+        """Compare the event's Drive folder with what the factory did. listing: [{title, id, createdTime, modifiedTime,
+        fileSize, mimeType}] (the Drive folder as Claude's Drive connector or the Drive API lists it). A video uploaded
+        after its talk's last pass is flagged (drive_newer) - redo it by passing the new file to `match` / `run`.
+        Returns {"newer": [...], "new": [...], "same": n}."""
+        talk_list, rep = events.talks(self.ev), {"newer": [], "new": [], "same": 0}
+        for f in listing:
+            mime, name = f.get("mimeType") or "", f.get("title") or f.get("name") or ""
+            if not mime.startswith("video/"):
+                continue                                 # Google Vids projects, docs, decks
+            t, _ = events.match(name, talk_list)
+            if not t:
+                continue
+            key, up = t["speakers"], max(f.get("createdTime") or "", f.get("modifiedTime") or "")
+            mine = self.state["talks"].get(key)
+            if not mine:
+                rep["new"].append({"speakers": key, "file": name, "uploaded": up})
+                continue
+            last = mine.get("finished") or mine.get("matched_at")
+            last_utc = datetime.datetime.fromisoformat(last).astimezone(datetime.timezone.utc).isoformat() if last else ""
+            with self.lock:
+                mine["drive"] = {"id": f.get("id"), "file": name, "uploaded": up, "size": f.get("fileSize")}
+                if last_utc and up and datetime.datetime.fromisoformat(up.replace("Z", "+00:00")) > datetime.datetime.fromisoformat(last_utc):
+                    mine["drive_newer"] = {"id": f.get("id"), "file": name, "uploaded": up}
+                    rep["newer"].append({"speakers": key, "file": name, "uploaded": up, "last_pass": last})
+                else:
+                    mine.pop("drive_newer", None)
+                    rep["same"] += 1
+        self.save()
+        return rep
+
     # ---- 1. collect: unzip Drive downloads, split videos and slides ----------------------
     def collect(self, sources):
         for src in sources:
@@ -226,13 +279,28 @@ class Run:
                     continue
                 key = t["speakers"]
                 if key in self.state["talks"]:
-                    self.state["unmatched"].append({"file": os.path.basename(path), "why": "second video for %s" % key})
+                    mine = self.state["talks"][key]
+                    old = os.path.join(self.inp, mine["source"])
+                    seen = set(mine.get("sizes_seen") or []) | ({os.path.getsize(old)} if os.path.exists(old) else set())
+                    if os.path.getsize(path) in seen:
+                        os.remove(path)                  # a version we already had (a download unzipped again)
+                        continue
+                    mine["sizes_seen"] = sorted(seen | {os.path.getsize(path)})
+                    # a different video for a talk we already have = the speaker uploaded a new version: it replaces
+                    # the old one and the talk is done again from scratch (Marek 2026-10-13)
+                    canonical = key + os.path.splitext(path)[1].lower()
+                    if os.path.exists(old) and os.path.abspath(old) != os.path.abspath(os.path.join(self.inp, canonical)):
+                        os.remove(old)                  # the source copy only (the speaker's file stays on Drive)
+                    os.replace(path, os.path.join(self.inp, canonical))
+                    self.state["talks"][key]["source"] = canonical
+                    self.redo(key, "new version of the video (%s)" % os.path.basename(path))
                     continue
                 canonical = key + os.path.splitext(path)[1].lower()
                 if os.path.basename(path) != canonical:
                     os.replace(path, os.path.join(self.inp, canonical))   # rename in place: the Desktop mirrors the site
                 self.state["talks"][key] = {"speakers": key, "name1": t["name1"], "title": t["title"], "source": canonical,
-                                            "matched": why, "steps": {}, "current": None, "error": None}
+                                            "matched": why, "matched_at": now(), "steps": {}, "current": None, "error": None,
+                                            "sizes_seen": [os.path.getsize(os.path.join(self.inp, canonical))]}
             self.save()
 
     def slides(self, talk_list=None):
@@ -830,6 +898,9 @@ def summary(state):
     failed = [k for k, t in talks.items() if t.get("error")]
     running = {k: t.get("current") for k, t in talks.items() if t.get("current") and not t.get("error")}
     flagged = {k: t["steps"]["qa"]["flags"] for k, t in talks.items() if (t["steps"].get("qa") or {}).get("flags")}
+    for k, t in talks.items():
+        if t.get("drive_newer"):
+            flagged.setdefault(k, []).append("newer video on Drive (%s) - redo" % t["drive_newer"]["uploaded"][:16])
     return {"matched": len(talks), "in_csv": len(state.get("talks_in_csv", [])), "finished": fin, "failed": failed,
             "running": running, "flagged": flagged, "unmatched": state.get("unmatched", []),
             "missing_videos": [s for s in state.get("talks_in_csv", []) if s not in talks]}
