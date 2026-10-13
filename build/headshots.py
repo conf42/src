@@ -5,7 +5,7 @@ starfield background, black and white, framed tight like every Conf42 headshot: 
 below the jaw. Output: the 500x400 PNG static/headshots/ uses, named "<Speaker>_<suffix>.png". One by one with every
 setting, or batches of up to 30 with Auto. Everything runs in the browser; nothing is uploaded.
 
-The dropdown lists every current and future event, each with its background: headshot-backgrounds/<event name>.png
+The dropdown lists every conference theme with a current or future event, alphabetically, each with its background: headshot-backgrounds/<event name>.png
 (Marek's templates; Chaos Engineering is the background measured from its 2025 headshots, Tokenomics the Cloud Native
 template recoloured to #20633E: no Conf42 headshots exist on it yet). They are copied to docs/assets/headshot-bg/.
 
@@ -40,12 +40,15 @@ def _suffix(event):
 
 
 def options(events, base_folder, today=None):
-    """[{label, bg, suffix, color, date}] for every event from today on that has a background, soonest first."""
+    """[{label, bg, suffix, color, soonest}] - one per conference theme with an event from today on (Marek 2026-10-13:
+    the themes alphabetically, no dates), each with the background, suffix and colour of its soonest event."""
     today = today or datetime.date.today()
     os.makedirs(os.path.join(base_folder, DEST), exist_ok=True)
-    out = []
+    themes = {}
     for e in sorted((e for e in events if e.get("date") and e["date"] >= today and "external_url" not in e), key=lambda e: e["date"]):
         name = (e.get("name") or "").strip()
+        if name in themes:
+            continue
         src = os.path.join(SRC, name + ".png")
         if not os.path.isfile(src):
             print("WARN headshots: no background for %s (%s)" % (name, src))
@@ -53,8 +56,12 @@ def options(events, base_folder, today=None):
         dest = os.path.join(base_folder, DEST, name + ".png")
         if not os.path.exists(dest) or os.path.getmtime(dest) < os.path.getmtime(src):
             shutil.copyfile(src, dest)
-        out.append(dict(label="%s %d" % (name, e["date"].year), date="%s %d %d" % (e["date"].strftime("%B"), e["date"].day, e["date"].year),
-                        bg="./" + DEST.replace(os.sep, "/") + "/" + name + ".png", suffix=_suffix(e), color=str(e.get("color") or "#1b2a4e")))
+        themes[name] = dict(label=name, date=e["date"].isoformat(), bg="./" + DEST.replace(os.sep, "/") + "/" + name + ".png",
+                            suffix=_suffix(e), color=str(e.get("color") or "#1b2a4e"))
+    out = sorted(themes.values(), key=lambda t: t["label"].lower())
+    soonest = min(out, key=lambda t: t["date"]) if out else None
+    for t in out:
+        t["soonest"] = t is soonest                                    # preselected: the next event's theme
     return out
 
 
