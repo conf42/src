@@ -114,6 +114,17 @@ def _splash(event, base_folder):
     return "../" + (jpg if os.path.isfile(os.path.join(base_folder, jpg)) else p)
 
 
+def thumbnails(event, items):
+    """What build/youtube_thumbnails.py needs for the Thumbnails tab (Marek 2026-10-12): the template names to look for in
+    thumbnails/ (name and year first: "Remix 2026"), the tint for an event without one, and every talk with a photo
+    (a missing title doesn't matter here: the thumbnail is the speaker alone)."""
+    name, year = (event.get("name") or "").strip(), event["date"].year
+    color = str(event.get("color") or "")
+    return dict(templates=list(dict.fromkeys(n for n in ("%s %d" % (name, year), name, "%s %d" % (_event_name(event), year), _event_name(event)) if n.strip())),
+                tint=color if re.match(r"^#[0-9a-fA-F]{6}$", color) else "#838383",
+                talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"]) for c in items if c["photo"]])
+
+
 def upcoming(events, today=None):
     today = today or datetime.date.today()
     return [e for e in events if "external_url" not in e and e.get("short_url") and e.get("date") and e["date"] >= today - datetime.timedelta(days=1)]
@@ -144,9 +155,10 @@ def generate(env, context, base_folder):
                   date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat(),
                   date_long="%s %d, %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year))
         ev["splash"] = _splash(event, base_folder)
+        th = thumbnails(event, items)
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
-            f.write(page.render(ev=ev, cards=items, sc=scheme(event), **context))
+            f.write(page.render(ev=ev, cards=items, sc=scheme(event), th=th, **context))
         with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
             f.write(MOVED % {"to": "../%s/teasers" % slug})
         listed.append(dict(ev, n=len(items), ready=sum(1 for c in items if not c["missing"]), sc=scheme(event)))

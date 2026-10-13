@@ -85,6 +85,9 @@ jobs:
       - name: Teaser PNGs from the cache
         run: python -m build.render_teasers --cached-only   # renders nothing: a card not drawn yet is drawn by the page itself
 
+      - name: YouTube thumbnails from the cache
+        run: python -m build.youtube_thumbnails --cached-only   # the Thumbnails tab: drawn by the render job below, copied here
+
       - name: Teaser previews
         run: python -m build.teaser_previews   # a 720 px WebP beside each PNG: what the page shows instead of the live card
 
@@ -136,15 +139,20 @@ jobs:
         id: render
         run: python -m build.render_teasers --jobs 4 --prune   # headless Chrome (preinstalled on the runner); never fails
 
+      - name: Draw YouTube thumbnails
+        id: thumbs
+        if: always()
+        run: python -m build.youtube_thumbnails --prune   # Pillow + numpy, ~0.6 s a new picture; never fails
+
       - name: Save teaser cache
-        if: always() && steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != ''
+        if: always() && ((steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != '') || (steps.thumbs.outputs.rendered != '0' && steps.thumbs.outputs.rendered != ''))
         uses: actions/cache/save@v4
         with:
           path: .cache
           key: teaser-cache-render-${{ github.run_id }}
 
       - name: Publish the new pictures
-        if: steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != ''
+        if: always() && ((steps.render.outputs.rendered != '0' && steps.render.outputs.rendered != '') || (steps.thumbs.outputs.rendered != '0' && steps.thumbs.outputs.rendered != ''))
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run static-build.yml --ref ${{ github.ref_name }}
