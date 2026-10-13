@@ -43,7 +43,8 @@ except ImportError:  # pragma: no cover
 ROOT = "docs"
 CARD = 1080          # the card's CSS size
 OUT = 1500           # the PNG (Marek 2026-10-12: 1500 x 1500; the carousel PDF still scales its pages to 1080)
-CHUNK = 8            # cards per screenshot (8 * 1500 px tall, well under Chrome's surface limit)
+CHUNK = 4            # cards per screenshot: 4 * 1500 = 6000 px. At 8 (12000 px) Chrome dropped the blurred colour blobs of
+                     # every card below ~8000 px and they came out on black (2026-10-12)
 BUDGET_MS = 12000    # virtual time for fonts + photos to settle before the screenshot
 CACHE_DIR = os.path.join(os.environ.get("SITE_CACHE_DIR", ".cache"), "teasers")
 PRUNE_DAYS = 14
@@ -169,9 +170,11 @@ def shoot(chrome, url, height, out_png):
 
 
 def blank(tile):
-    """A tile that is one flat colour (a page that did not load) is never published."""
+    """A tile that is one flat colour (a page that did not load), or whose background lost its colour blobs (a pure black
+    corner: the card's own base colour is never black), is never published."""
     lo, hi = tile.convert("L").getextrema()
-    return hi - lo < 12
+    corner = tile.crop((10, 10, 150, 150)).convert("L").getextrema()[1]
+    return hi - lo < 12 or corner < 3
 
 
 def main():
