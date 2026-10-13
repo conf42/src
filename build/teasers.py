@@ -123,6 +123,15 @@ def thumbnails(event, items):
                        for c in items if c["photo"] and (c["keynote"] or not remix)])
 
 
+def _size(path):
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            return "%d \u00d7 %d" % im.size
+    except Exception:
+        return ""
+
+
 def upcoming(events, today=None):
     today = today or datetime.date.today()
     return [e for e in events if "external_url" not in e and e.get("short_url") and e.get("date") and e["date"] >= today - datetime.timedelta(days=1)]
@@ -150,9 +159,16 @@ def generate(env, context, base_folder):
             continue
         slug = event["short_url"].replace(".html", "")
         ev = dict(name=_event_name(event), full=event.get("name"), slug=slug, date=event["date"],
-                  date_text="%s %d, %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat(),
-                  date_long="%s %d, %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year))
+                  date_text="%s %d %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat(),
+                  date_long="%s %d %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year))   # no comma (Marek 2026-10-12)
         ev["splash"] = _splash(event, base_folder)
+        p = str(event.get("thumbnail_path") or "").lstrip("./")   # the splash art as it is, for the Generic tab's download:
+        for ext in (".png", ".jpeg", ".webp"):                    # the original, not the 500 px .jpg the site shows (pick_picture_file)
+            if os.path.isfile(os.path.join(base_folder, os.path.splitext(p)[0] + ext)):
+                p = os.path.splitext(p)[0] + ext
+                break
+        ev["splash_full"] = "../" + p if p and os.path.isfile(os.path.join(base_folder, p)) else ""
+        ev["splash_size"] = _size(os.path.join(base_folder, p)) if ev["splash_full"] else ""
         th = thumbnails(event, items)
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
