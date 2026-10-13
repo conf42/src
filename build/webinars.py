@@ -29,6 +29,10 @@ def load_webinars(base_folder, path=WEBINARS_CSV):
         w["start_iso"] = start.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         w["thumbnail_path"] = pick_picture_file(base_folder + "/", SPLASH_FOLDER + w["Splash"]) if w.get("Splash") else ""
         w["picture"] = make_remote_address("headshots", w["Picture1"]) if w.get("Picture1") else ""
+        # the presenters (a second one optional since 2026-10-13): name, job title, company, LinkedIn
+        w["hosts"] = [dict(name=w["Name%d" % k].strip(), title=(w.get("JobTitle%d" % k) or "").strip(),
+                           company=(w.get("Company%d" % k) or "").strip(), linkedin=(w.get("LinkedIn%d" % k) or "").strip())
+                      for k in (1, 2) if (w.get("Name%d" % k) or "").strip()]
         w["is_past"] = end <= now
         if w["is_past"] and w.get("YouTube"):
             w["url"] = w["YouTube"]
