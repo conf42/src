@@ -41,29 +41,35 @@ def _lum(c):
     return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]
 
 
-def _safe(c, sat, l=.52, dh=0.0):
-    """c as light as it can be while white text on it still passes WCAG AA (4.5:1, with a little margin)"""
-    while 1.05 / (_lum(_shade(c, l, sat, dh)) + .05) < 4.6 and l > .1:
+def _safe(c, sat, l=.52, dh=0.0, ratio=4.6):
+    """c as light as it can be (from lightness l down) while white text on it still passes WCAG AA: 4.5:1 for normal
+    text (the page's buttons), 3:1 for large text (every card text is 22 px bold or bigger), with a little margin."""
+    while 1.05 / (_lum(_shade(c, l, sat, dh)) + .05) < ratio and l > .1:
         l -= .01
     return _shade(c, l, sat, dh)
 
 
 def scheme(event):
-    """The CSS colours of an event's cards: its metadata colour, hue kept and saturation only nudged; Remix is a rainbow."""
+    """The CSS colours of an event's cards, built on its metadata.yml colour itself (Marek 2026-10-13: the cards only
+    vaguely matched it). Hue, saturation and lightness are the event's own; the blobs vary around it a little
+    (lightness +-0.1, hue +-0.015) to give the glass shards some punch. The base under them is the same colour,
+    darker. The event shard is the colour as it is, darkened only as far as white large text needs (3:1).
+    Remix is a rainbow."""
     c = str(event.get("color") or "#838383")
     if event.get("name", "").strip().lower() == "remix" or not re.match(r"^#[0-9a-fA-F]{6}$", c):
         return dict(base="#0d0b18", soft="#efe6ff", glass1=_rgba("#ffffff", .13), glass2=_rgba("#ffffff", .04),
                     dark1=_rgba("#14112a", .55), dark2=_rgba("#14112a", .38),
-                    ev="linear-gradient(100deg,%s)" % ",".join(_rgba(_safe(x, .85), .9) for x in RAINBOW),
+                    ev="linear-gradient(100deg,%s)" % ",".join(_rgba(_safe(x, .85, ratio=3.1), .9) for x in RAINBOW),
                     blobs=[RAINBOW[0], RAINBOW[3], RAINBOW[2], RAINBOW[1], RAINBOW[4]], ui=_safe("#a57bff", .85), rainbow=True)
     r, g, b = (int(c[i:i + 2], 16) / 255 for i in (1, 3, 5))
-    sat = min(colorsys.rgb_to_hls(r, g, b)[2] * 1.2, .85)
-    dark, light = _shade(c, .1, sat), _shade(c, .85, sat)
-    return dict(base=_shade(c, .07, sat), soft=_shade(c, .86, sat), glass1=_rgba(light, .13), glass2=_rgba(light, .04),
+    _, l0, sat = colorsys.rgb_to_hls(r, g, b)
+    at = lambda d: min(max(l0 + d, .1), .85)
+    dark, light = _shade(c, max(l0 * .35, .06), sat), _shade(c, .86, sat)
+    return dict(base=_shade(c, min(max(l0 * .7, .06), .4), sat), soft=light, glass1=_rgba(light, .13), glass2=_rgba(light, .04),
                 dark1=_rgba(dark, .55), dark2=_rgba(dark, .38),
-                ev="linear-gradient(145deg,%s,%s)" % (_rgba(_safe(c, sat), .92), _rgba(_safe(c, sat, dh=.03), .8)),
-                blobs=[_shade(c, .52, sat), _shade(c, .40, sat, dh=.02), _shade(c, .58, sat, dh=-.02), _shade(c, .68, sat), _shade(c, .45, sat)],
-                ui=_safe(c, sat), rainbow=False)
+                ev="linear-gradient(145deg,%s,%s)" % (_rgba(_safe(c, sat, l0, ratio=3.1), .94), _rgba(_safe(c, sat, l0, dh=.015, ratio=3.1), .86)),
+                blobs=[_shade(c, at(.04), sat), _shade(c, at(-.1), sat, dh=.015), _shade(c, at(.1), sat, dh=-.015), _shade(c, at(.02), sat), _shade(c, at(-.05), sat)],
+                ui=_safe(c, sat, max(l0, .52)), rainbow=False)
 
 
 def _slug(s):
