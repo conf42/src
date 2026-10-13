@@ -32,7 +32,9 @@ def main():
         if not os.path.exists(os.path.join(os.path.dirname(png), "teasers.html")):
             continue
         try:
-            Image.open(png).convert("RGB").resize((SIZE, SIZE), Image.LANCZOS).save(png[:-4] + ".webp", "WEBP", quality=QUALITY, method=6)
+            im = Image.open(png).convert("RGB")
+            im.thumbnail((SIZE, SIZE), Image.LANCZOS)   # squares: 720 x 720; YouTube thumbnails (16:9): 720 x 405
+            im.save(png[:-4] + ".webp", "WEBP", quality=QUALITY, method=6)
             made += 1
         except Exception as e:
             print("WARN teaser_previews: %s: %s" % (png, e))
