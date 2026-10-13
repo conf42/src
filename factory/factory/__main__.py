@@ -79,7 +79,7 @@ def table(run):
     for u in s["unmatched"]:
         print("  NOT MATCHED  %-28s %s" % (u["file"], u["why"]))
     if s["missing_videos"]:
-        print("  no video yet: " + ", ".join(s["missing_videos"]))
+        print("  no video yet (normal for a remote conference, flagged for a follow-up): " + ", ".join(s["missing_videos"]))
 
 
 def main(argv):
