@@ -98,7 +98,7 @@ def cards(event):
         first = " & ".join(n.split()[0] for n in names)
         last = " & ".join(n.split()[-1] for n in names)
         out.append(dict(i=i, title=title or "TBD", people=people, plate=plate, photo=photo if has_photo else "", missing=missing,
-                        file=file + ".png", name=" & ".join(names), org=" & ".join(dict.fromkeys(c for _, c in people if c)),
+                        file=file + ".png", name=" & ".join(names), keynote=(t.get("Featured") or "").lower() == "yes", org=" & ".join(dict.fromkeys(c for _, c in people if c)),
                         first=first.lower(), last=last.lower(),
                         search=" ".join([title] + [n for n, _ in people] + [c for _, c in people]).lower()))
     return out
@@ -115,14 +115,12 @@ def _splash(event, base_folder):
 
 
 def thumbnails(event, items):
-    """What build/youtube_thumbnails.py needs for the Thumbnails tab (Marek 2026-10-12): the template names to look for in
-    thumbnails/ (name and year first: "Remix 2026"), the tint for an event without one, and every talk with a photo
-    (a missing title doesn't matter here: the thumbnail is the speaker alone)."""
-    name, year = (event.get("name") or "").strip(), event["date"].year
-    color = str(event.get("color") or "")
-    return dict(templates=list(dict.fromkeys(n for n in ("%s %d" % (name, year), name, "%s %d" % (_event_name(event), year), _event_name(event)) if n.strip())),
-                tint=color if re.match(r"^#[0-9a-fA-F]{6}$", color) else "#838383",
-                talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"]) for c in items if c["photo"]])
+    """What build/youtube_thumbnails.py needs for the Thumbnails tab (Marek 2026-10-12): every talk with a photo (a missing
+    title doesn't matter here: the thumbnail is the speaker alone, on its topic's sky). Remix re-runs talks whose videos
+    already have thumbnails, so it gets them for its keynotes only."""
+    remix = (event.get("name") or "").strip().lower() == "remix"
+    return dict(talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"])
+                       for c in items if c["photo"] and (c["keynote"] or not remix)])
 
 
 def upcoming(events, today=None):
