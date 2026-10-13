@@ -129,7 +129,11 @@ def overlays(event, ev):
     """What the Overlays tab draws (Marek 2026-10-13): the OBS recording overlays speakers record their talk in, 1920x1080
     with transparent holes, in the event's metadata.yml colour as it is, with "CONF42 <EVENT> <YEAR>" and "<MONTH> <DAY>"."""
     c = str(event.get("color") or "")
-    return dict(color=c if re.match(r"^#[0-9a-fA-F]{6}$", c) else "#838383", title=("Conf42 %s %d" % (ev["name"], ev["date"].year)).upper(),
+    c = c if re.match(r"^#[0-9a-fA-F]{6}$", c) else "#838383"
+    _, l, sat = colorsys.rgb_to_hls(*(int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)))
+    # the New design (Marek 2026-10-13, "a-frost"): soft lighter and darker pools of the colour under white frosted glass
+    pools = [_shade(c, min(l + d, .92), sat) for d in (.12, -.10, .09, -.08)]
+    return dict(color=c, pools=pools, title=("Conf42 %s %d" % (ev["name"], ev["date"].year)).upper(),
                 date=("%s %d" % (ev["date"].strftime("%B"), ev["date"].day)).upper(), slug=ev["slug"])
 
 
