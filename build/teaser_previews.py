@@ -13,8 +13,11 @@ the page. Kept out of render_teasers.py on purpose: its own hash is in every car
 key, so editing it would redraw every card.
 """
 import glob
+import hashlib
 import os
+import shutil
 import sys
+import time
 
 try:
     from PIL import Image
@@ -24,21 +27,44 @@ except ImportError:  # pragma: no cover
 
 SIZE = 720           # sharp at the grid's ~360-440 px columns on a 2x screen
 QUALITY = 80
+# previews are content-addressed too (2026-10-12, with the YouTube thumbnails: 192 WebPs at ~60 ms each every deploy):
+# .cache/previews/<sha of the PNG + settings>.webp. The render job makes and saves the new ones with the pictures it drew;
+# the deploy copies them and only encodes what is missing. --prune drops entries unused for 14 days.
+CACHE_DIR = os.path.join(os.environ.get("SITE_CACHE_DIR", ".cache"), "previews")
+PRUNE_DAYS = 14
 
 
 def main():
-    made = 0
+    made, reused, used = 0, 0, set()
+    os.makedirs(CACHE_DIR, exist_ok=True)
     for png in sorted(glob.glob(os.path.join("docs", "*", "conf42-*.png"))):
         if not os.path.exists(os.path.join(os.path.dirname(png), "teasers.html")):
             continue
         try:
+            with open(png, "rb") as f:
+                key = hashlib.sha256(b"%d|%d|" % (SIZE, QUALITY) + f.read()).hexdigest() + ".webp"
+            used.add(key)
+            cached = os.path.join(CACHE_DIR, key)
+            if os.path.exists(cached):
+                shutil.copyfile(cached, png[:-4] + ".webp")
+                os.utime(cached)
+                reused += 1
+                continue
             im = Image.open(png).convert("RGB")
             im.thumbnail((SIZE, SIZE), Image.LANCZOS)   # squares: 720 x 720; YouTube thumbnails (16:9): 720 x 405
             im.save(png[:-4] + ".webp", "WEBP", quality=QUALITY, method=6)
+            shutil.copyfile(png[:-4] + ".webp", cached)
             made += 1
         except Exception as e:
             print("WARN teaser_previews: %s: %s" % (png, e))
-    print("teaser_previews: %d previews" % made)
+    if "--prune" in sys.argv:
+        cut, gone = time.time() - PRUNE_DAYS * 86400, 0
+        for f in glob.glob(os.path.join(CACHE_DIR, "*.webp")):
+            if os.path.basename(f) not in used and os.path.getmtime(f) < cut:
+                os.remove(f)
+                gone += 1
+        print("teaser_previews: pruned %d cache entries unused for %d days" % (gone, PRUNE_DAYS))
+    print("teaser_previews: %d made, %d from cache" % (made, reused))
 
 
 if __name__ == "__main__":
