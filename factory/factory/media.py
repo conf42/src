@@ -154,16 +154,29 @@ def loudness(path):
     return (float(i.group(1)) if i else None, float(tp.group(1)) if tp else None)
 
 
-def normalize(src, dst, lufs, tp):
-    """Two-pass loudnorm to the target; the video stream is copied untouched."""
-    first = run([tool("ffmpeg"), "-hide_banner", "-nostats", "-i", src, "-af",
+def early_cut(path, window=12, threshold=0.25):
+    """Seconds into the video of the first hard picture change in its first `window` seconds, or None. A talk whose
+    picture jumps right at the start usually opens on the speaker's setup (OBS, a desktop) before the slides
+    (Marek 2026-10-13). On Feature Flags 2026 this caught exactly the one such talk out of 13."""
+    r = run([tool("ffmpeg"), "-hide_banner", "-nostats", "-t", str(window), "-i", path, "-an",
+             "-vf", "scale=320:-1,select='gt(scene\\,%s)',showinfo" % threshold, "-f", "null", "-"])
+    m = re.search(r"pts_time:([0-9.]+)", r.stderr or "")
+    return float(m.group(1)) if m else None
+
+
+def normalize(src, dst, lufs, tp, start=None, end=None):
+    """Two-pass loudnorm to the target; the video stream is copied untouched. start / end (seconds) keep only that
+    part of the talk (the trim to the first and last words): the video then starts at the keyframe before `start`,
+    and the player starts at `start` exactly."""
+    cut = (["-ss", "%.3f" % start] if start else []) + (["-to", "%.3f" % end] if end else [])
+    first = run([tool("ffmpeg"), "-hide_banner", "-nostats"] + cut + ["-i", src, "-af",
                  "loudnorm=I=%s:TP=%s:LRA=11:print_format=json" % (lufs, tp), "-f", "null", "-"]).stderr
     m = json.loads(first[first.rfind("{"):first.rfind("}") + 1])
     af = ("loudnorm=I={I}:TP={TP}:LRA=11:measured_I={mi}:measured_TP={mtp}:measured_LRA={mlra}:"
           "measured_thresh={mth}:offset={off}:linear=true").format(
         I=lufs, TP=tp, mi=m["input_i"], mtp=m["input_tp"], mlra=m["input_lra"], mth=m["input_thresh"], off=m["target_offset"])
     tmp = "%s.%d.part.mp4" % (dst, os.getpid())
-    r = run([tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-c:v", "copy", "-af", af,
+    r = run([tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y"] + cut + ["-i", src, "-c:v", "copy", "-af", af,
              "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", tmp])
     if r.returncode != 0 or not os.path.exists(tmp):
         raise RuntimeError("ffmpeg loudness step failed: " + r.stderr[-400:])
