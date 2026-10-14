@@ -58,6 +58,11 @@ A run can be stopped and started again at any time. Finished steps are skipped, 
 
 - **Watching it:** the app's "Right now" box shows whether a factory run is alive (process + last activity), every Descript job of the event's project with its progress bar (upload, edit, publish, mapped to talk names), the AI credits paid so far, and a link to the project in Descript. Running steps show their live label in the talk table ("uploading 45% of 1.2 GB", "Descript is busy ..."). Running `run.cmd` again when the app is already up just opens the page. conf42.com/factory shows the same table, updated every `status_publish_minutes`.
 - **With Claude:** say "here are the drive videos for Conf42 DevSecOps", or share the Drive folder link, and it runs the whole loop, slides included.
+- **Getting the files from Drive:** the event's upload folders are shared as "anyone with the link", so videos and decks
+  download straight from Drive by file id, no browser and no sign-in (Marek 2026-10-14):
+  `curl -L -o "<name>" "https://drive.usercontent.google.com/download?id=<file id>&export=download&confirm=t"`
+  (`confirm=t` skips Drive's "too large to scan for viruses" page). List the folder (Claude's Drive connector or the Drive
+  API) for the ids, check each download's size against the listing, then pass the files to `match` / `run`.
 
 ## Slides
 
