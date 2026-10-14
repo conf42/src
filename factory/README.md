@@ -58,11 +58,20 @@ A run can be stopped and started again at any time. Finished steps are skipped, 
 
 - **Watching it:** the app's "Right now" box shows whether a factory run is alive (process + last activity), every Descript job of the event's project with its progress bar (upload, edit, publish, mapped to talk names), the AI credits paid so far, and a link to the project in Descript. Running steps show their live label in the talk table ("uploading 45% of 1.2 GB", "Descript is busy ..."). Running `run.cmd` again when the app is already up just opens the page. conf42.com/factory shows the same table, updated every `status_publish_minutes`.
 - **With Claude:** say "here are the drive videos for Conf42 DevSecOps", or share the Drive folder link, and it runs the whole loop, slides included.
-- **Getting the files from Drive:** the event's upload folders are shared as "anyone with the link", so videos and decks
-  download straight from Drive by file id, no browser and no sign-in (Marek 2026-10-14):
-  `curl -L -o "<name>" "https://drive.usercontent.google.com/download?id=<file id>&export=download&confirm=t"`
-  (`confirm=t` skips Drive's "too large to scan for viruses" page). List the folder (Claude's Drive connector or the Drive
-  API) for the ids, check each download's size against the listing, then pass the files to `match` / `run`.
+- **Getting the files from Drive** (Marek 2026-10-14, "make it work every time"): the event's upload folders are shared as
+  "anyone with the link", so the factory fetches them itself, with no browser, no sign-in and no zip:
+
+  ```
+  ../env/bin/python -m factory drive featureflags2026 https://drive.google.com/drive/folders/<event folder>
+  ../env/bin/python -m factory drive featureflags2026        # later: the folder is remembered
+  ```
+
+  It lists the folder and its Talks / Slides subfolders (OBS overlays skipped), checks each file's size and upload time
+  with a HEAD request, downloads only what is new or changed into `<event>/drive/` (sizes checked), flags the talks like
+  `drive-check`, then runs `match` + `run`. Files this machine already has from an earlier zip are recognised by size and
+  not downloaded again; Google Vids projects can't be downloaded and are skipped. Code: `factory/drive.py`.
+  **Claude:** when Marek shares an event's Drive folder link (or says "activate the factory"), run `drive <short_url> <link>`.
+  Never download through a browser.
 
 ## Slides
 
