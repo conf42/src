@@ -280,8 +280,12 @@ class Run:
             self.note("Drive: downloading %s (%.0f MB)" % (name, size / 1e6))
             dest = os.path.join(ddir, os.path.basename(name))
             drive.download(f["id"], dest, size, self.note)
-            fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "fetched": now()}
-            got.append(dest)
+            fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "fetched": now(), "pending": True}
+        # everything downloaded and not yet handed to a run (also from a fetch whose run never got to it)
+        for v in fetched.values():
+            p = os.path.join(ddir, os.path.basename(v["file"]))
+            if v.pop("pending", False) and os.path.exists(p):
+                got.append(p)
         self.save()
         rep = self.drive_check(listing)
         self.note("Drive: %d files in the folder, %d downloaded, %d talks up to date, %d newer, %d new"

@@ -13,6 +13,7 @@ import email.utils
 import html
 import os
 import re
+import time
 import urllib.request
 
 UA = {"User-Agent": "Mozilla/5.0 (conf42 factory)"}
@@ -46,11 +47,19 @@ def list_folder(fid, depth=3, path=""):
     return out
 
 
-def head(fid):
-    """(size in bytes, upload time as ISO UTC) of a downloadable file; raises for Google-native files (Vids, Docs)."""
-    with _open(DL % fid, "HEAD") as r:
-        size = int(r.headers.get("Content-Length") or 0)
-        lm = r.headers.get("Last-Modified")
+def head(fid, tries=3):
+    """(size in bytes, upload time as ISO UTC) of a downloadable file; raises for Google-native files (Vids, Docs).
+    Drive answers the odd 500 for a real file too, so it is asked up to three times."""
+    for n in range(tries):
+        try:
+            with _open(DL % fid, "HEAD") as r:
+                size = int(r.headers.get("Content-Length") or 0)
+                lm = r.headers.get("Last-Modified")
+            break
+        except Exception:                                # noqa: BLE001
+            if n == tries - 1:
+                raise
+            time.sleep(2 * (n + 1))
     up = email.utils.parsedate_to_datetime(lm).astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if lm else ""
     return size, up
 
