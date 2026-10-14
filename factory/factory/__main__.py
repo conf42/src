@@ -6,6 +6,9 @@
   python -m factory status <short_url>                    progress summary
   python -m factory chapters <short_url>                  YouTube titles + descriptions + chapters -> <event>/YouTube items.txt
   python -m factory retry  <short_url> "<speaker(s)>"     retry one talk from its failed step
+  python -m factory drive  <short_url> [Drive folder link]  fetch the event's Drive folder (anyone-with-the-link) straight from
+                                                          Drive - new and changed videos and decks only - then match + run.
+                                                          The link is remembered: later, just `drive <short_url>`
   python -m factory drive-check <short_url> <listing.json>  flag talks whose video was uploaded to Drive after the last pass
                                                           (listing = the Drive folder's files; then pass the new files to run)
   python -m factory redo   <short_url> "<speaker(s)>"     do one talk again from scratch (its current source video)
@@ -102,6 +105,9 @@ def main(argv):
         run.collect(argv[2:])
         print(json.dumps(run.slides(), indent=1, ensure_ascii=False))
         return
+    if cmd == "drive":                                   # the Drive folder in place of a zip, then the whole run
+        argv = [argv[0], argv[1]] + run.drive_fetch(argv[2] if len(argv) > 2 else None)
+        cmd = "run"
     if cmd in ("match", "run"):
         run.collect(argv[2:])
         run.match()

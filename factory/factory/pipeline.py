@@ -238,6 +238,56 @@ class Run:
         self.save()
         return rep
 
+    def drive_fetch(self, link=None):
+        """Pull the event's Drive upload folder (shared as "anyone with the link") straight from Drive: list it, download
+        every video and deck that is new or changed since the last fetch into <event>/drive/, and flag the talks
+        (drive_check). The folder is remembered, so later fetches need no link. Returns the downloaded paths, which go
+        to collect / match like a Drive zip."""
+        from . import drive
+        fid = drive.folder_id(link) if link else self.state.get("drive_folder")
+        if not fid:
+            raise ValueError("no Drive folder for %s yet: pass the folder link once" % self.ev["short_url"])
+        with self.lock:
+            self.state["drive_folder"] = fid
+        ddir = os.path.join(self.dir, "drive")
+        os.makedirs(ddir, exist_ok=True)
+        fetched = self.state.setdefault("drive_fetched", {})
+        # files this machine already has (earlier zips, renamed sources, decks and their originals), by size: an event
+        # that ran before this command existed is not downloaded again
+        have = set()
+        for d in (self.inp, self.slides_dir, os.path.join(self.dir, "slides originals"), ddir):
+            for f in glob.glob(os.path.join(d, "*")):
+                if os.path.isfile(f) and not f.endswith(".part"):
+                    have.add(os.path.getsize(f))
+        listing, got = [], []
+        for f in drive.list_folder(fid):
+            name = f["title"]
+            if not name.lower().endswith(VIDEO_EXT + SLIDE_EXT):
+                continue                                 # Google Vids projects, docs, images
+            try:
+                size, up = drive.head(f["id"])
+            except Exception as e:                       # noqa: BLE001 - one odd file must not stop the fetch
+                self.note("Drive: %s skipped (%s)" % (name, e))
+                continue
+            listing.append({"title": name, "id": f["id"], "createdTime": up, "modifiedTime": up, "fileSize": str(size),
+                            "mimeType": "video/mp4" if name.lower().endswith(VIDEO_EXT) else "application/octet-stream"})
+            old = fetched.get(f["id"])
+            if old and old.get("size") == size and old.get("uploaded") == up:
+                continue                                 # unchanged since the last fetch
+            if not old and size in have:
+                fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "seen": now()}
+                continue                                 # already here from a zip
+            self.note("Drive: downloading %s (%.0f MB)" % (name, size / 1e6))
+            dest = os.path.join(ddir, os.path.basename(name))
+            drive.download(f["id"], dest, size, self.note)
+            fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "fetched": now()}
+            got.append(dest)
+        self.save()
+        rep = self.drive_check(listing)
+        self.note("Drive: %d files in the folder, %d downloaded, %d talks up to date, %d newer, %d new"
+                  % (len(listing), len(got), rep["same"], len(rep["newer"]), len(rep["new"])))
+        return got
+
     # ---- 1. collect: unzip Drive downloads, split videos and slides ----------------------
     def collect(self, sources):
         for src in sources:
