@@ -3,7 +3,7 @@
 A hidden organizer tool (noindex, never in the sitemap). Keyed (transparent) photos go onto the chosen event's
 starfield background, black and white, framed tight like every Conf42 headshot: from the top of the hair to just
 below the jaw. Output: the 500x400 PNG static/headshots/ uses, named "<Speaker>_<suffix>.png". One by one with every
-setting, or batches of up to 30 with Auto. Everything runs in the browser; nothing is uploaded.
+setting, or batches of up to 100 with Auto. Everything runs in the browser; nothing is uploaded.
 
 The dropdown lists every conference theme with a current or future event, alphabetically, each with its background: headshot-backgrounds/<event name>.png
 (Marek's templates; Chaos Engineering is the background measured from its 2025 headshots, Tokenomics the Cloud Native
