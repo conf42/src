@@ -1,5 +1,7 @@
 # factory - Conf42 talk videos and slides, from the Drive download to finished files
 
+> **Team manual:** `MANUAL.md` next to this file is the step-by-step guide for the team, published unlisted at conf42.com/factory (noindex, not in the sitemap). **Whenever the factory changes in a way the team would notice (a step, a button, a setting, a fix), update MANUAL.md and its Changelog in the same commit.**
+
 Conf42 talk videos, from the Google Drive download to finished, YouTube-ready files on the Desktop:
 
 ```

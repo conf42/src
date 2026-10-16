@@ -12,6 +12,7 @@
   python -m factory drive-check <short_url> <listing.json>  flag talks whose video was uploaded to Drive after the last pass
                                                           (listing = the Drive folder's files; then pass the new files to run)
   python -m factory redo   <short_url> "<speaker(s)>"     do one talk again from scratch (its current source video)
+  python -m factory unpause <short_url>                   clear "edits paused" after checking the talk in Descript
   python -m factory serve                                 the local app on http://localhost:8042
   python -m factory doctor                                check this machine (tools, GPU, token, git, disk)
   python -m factory setup                                 one-time setup on a new machine (token, launcher, check)
@@ -137,6 +138,10 @@ def main(argv):
     elif cmd == "redo":
         run.redo(argv[2], "redo asked for")
         run.run(only=[argv[2]], force=force)
+    elif cmd == "unpause":
+        why = run.state.pop("edits_paused", None)
+        run.save()
+        print(("edits resumed (was: %s) - start the run again" % why) if why else "edits were not paused")
     elif cmd == "status":
         print(json.dumps(pipeline.summary(run.state), indent=1))
     elif cmd == "retry":

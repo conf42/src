@@ -490,9 +490,16 @@ try:
         video_factory = json.load(f)
 except (OSError, ValueError):
     video_factory = {"updated": "", "events": []}
+# the team manual under the status table (Marek 2026-10-16: "let our team run it as well"): factory/MANUAL.md, kept up
+# to date with the factory itself
+try:
+    with open("./factory/MANUAL.md", encoding="utf-8") as f:
+        factory_manual = markdown.markdown(f.read(), extensions=["tables", "pymdownx.superfences", "toc", "sane_lists"])
+except OSError:
+    factory_manual = ""
 with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     print("Writing out factory.html (unlisted)")
-    f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory,
+    f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual,
                                                            steps=["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 
 # 404 INDEX
