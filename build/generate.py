@@ -491,7 +491,7 @@ try:
 except (OSError, ValueError):
     video_factory = {"updated": "", "events": []}
 # the team password's SHA-256 (the same as on sreday/llmday/platformday.com/factory); "" = no gate (Marek 2026-10-16)
-FACTORY_GATE_SHA256 = "cd08c4c4316df20d9c30450fe776dcde4810029e641cde526c5bbffec1f770a3"
+FACTORY_GATE_SHA256 = "54b6ca6e5c7e0eb7e2e0cfdda988cb822dcbb539661d3359c1ac12398061d267"
 # the team manual under the status table (Marek 2026-10-16: "let our team run it as well"): factory/MANUAL.md, kept up
 # to date with the factory itself
 try:
