@@ -8,7 +8,7 @@ It also prepares the slide decks for the site.
 speakers' Drive folder  →  match to the talks  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
 ```
 
-The live status of every event is at the top of this page. The technical details live in `factory/README.md` in the
+The status of every event is on this page's **Factory** tab - it updates live, every minute. The technical details live in `factory/README.md` in the
 conf42 repo. When the tool changes, this manual changes with it - see **Changelog** at the bottom.
 
 ---
@@ -115,8 +115,8 @@ Redo one talk with the video it has: `python -m factory redo <short_url> "<speak
 
 ### Step 7 - Share progress
 
-**Publish to conf42.com/factory** in the app updates the table at the top of this page (it also happens by itself every 20 minutes
-during a run).
+**Publish to conf42.com/factory** in the app updates this page's **Factory** tab. Runs also publish by themselves:
+whenever a talk finishes (at most every 20 minutes) and at the end of the run.
 
 ---
 
@@ -155,4 +155,6 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-16** - The Factory tab updates live (every minute), no need to wait for the site to rebuild.
+- **2026-10-16** - The page has two tabs: **Manual** (this) and **Factory** (the status of the runs).
 - **2026-10-16** - First version of this manual. `unpause` command added for paused edits.

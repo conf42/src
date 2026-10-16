@@ -25,7 +25,18 @@
     .done { background: #dff5e6; color: #17693a; } .running { background: #fff3cd; color: #8a6100; }
     .failed { background: #fde2e1; color: #a4231c; } .todo { background: #eee; color: #999; }
     .flag { color: #a4231c; font-size: .8rem; } small { color: #6b7a99; }
-    nav.tabs { display: flex; gap: 18px; margin: 0 0 18px; font-weight: 600; } nav.tabs a { color: var(--accent); text-decoration: none; }
+    nav.tabs { display: flex; gap: 4px; margin: 0 0 18px; border-bottom: 2px solid #e3e8f4; }
+    nav.tabs a { color: #6b7a99; text-decoration: none; font-weight: 700; padding: 8px 18px; border-radius: 8px 8px 0 0; }
+    nav.tabs a.on { color: var(--accent); background: #fff; box-shadow: 0 -1px 4px rgba(27,42,78,.06); }
+    .tab { display: none; } .tab.on { display: block; }
+    #gate { display: none; position: fixed; inset: 0; background: #1b2a4e; z-index: 50; align-items: center; justify-content: center; }
+    body.locked #gate { display: flex; } body.locked header, body.locked main { display: none; }
+    #gate form { background: #fff; color: #1d1d1f; padding: 26px 28px; border-radius: 12px; width: min(340px, 90vw); font-family: Arial, sans-serif; }
+    #gate h2 { margin: 0 0 6px; font-size: 20px; border: 0; padding: 0; } #gate p { margin: 0 0 14px; color: #6b6b70; font-size: 14px; }
+    #gate input { width: 100%; padding: 9px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; }
+    #gate button { margin-top: 10px; width: 100%; padding: 9px; font-size: 15px; border: 0; border-radius: 8px; background: var(--gbtn, #335eea); color: #fff; cursor: pointer; }
+    #gate .err { color: #b3261e; font-size: 13px; min-height: 18px; margin-top: 6px; }
+
     .manual { background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(27,42,78,.08); padding: 8px 28px 28px; margin-top: 40px; line-height: 1.6; }
     .manual h1 { margin-top: 24px; } .manual h2 { margin-top: 34px; padding-top: 10px; border-top: 1px solid #eef0f5; }
     .manual h3 { margin: 26px 0 6px; } .manual table { min-width: 0; margin: 10px 0; }
@@ -37,9 +48,30 @@
   </style>
 </head>
 <body>
+{% if gate %}<div id="gate"><form onsubmit="return enterFactory(event)">
+  <h2>The factory</h2><p>Team only - enter the factory password.</p>
+  <input type="password" id="gate-pw" autocomplete="current-password" autofocus>
+  <button type="submit">Enter</button><div class="err" id="gate-err"></div></form></div>
+<script>
+  // a soft gate for the team (Marek 2026-10-16): the password's SHA-256 is compared in the browser and remembered on
+  // this device. It keeps casual visitors out; it is not encryption - the sources of this page are in a public repo.
+  const GATE = {{ gate | tojson }};
+  if (localStorage.getItem('factory-gate') !== GATE) document.body.classList.add('locked');
+  async function enterFactory(ev) {
+    ev.preventDefault();
+    const pw = document.getElementById('gate-pw').value.trim();
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    if (hex === GATE) { try { localStorage.setItem('factory-gate', GATE); } catch (e) {} document.body.classList.remove('locked'); }
+    else document.getElementById('gate-err').textContent = 'Not that one.';
+    return false;
+  }
+</script>{% endif %}
 <main>
-  <h1 id="status">Factory</h1>
-  {% if manual %}<nav class="tabs"><a href="#status">Status</a><a href="#manual">Manual - how to run it</a></nav>{% endif %}
+  <h1>Factory</h1>
+  <nav class="tabs"><a href="#manual" data-tab="manual" class="on">Manual</a><a href="#factory" data-tab="factory">Factory</a></nav>
+  {% if manual %}<section class="tab on manual" id="tab-manual" style="margin-top:0">{{ manual | safe }}</section>{% endif %}
+  <section class="tab{{ " on" if not manual }}" id="tab-factory">
   <div class="sub">Conf42 talk videos on their way through the factory.{% if vf.updated %} Last update {{ vf.updated | replace("T", " ") }}.{% endif %}</div>
   {% if not vf.events %}<p>Nothing published yet.</p>{% endif %}
   {% for e in vf.events %}
@@ -60,7 +92,56 @@
       </tbody>
     </table></div>
   {% endfor %}
-  {% if manual %}<section class="manual" id="manual">{{ manual | safe }}</section>{% endif %}
+  </section>
 </main>
+<script>
+  // Manual by default; #factory opens the Factory tab (the status of the runs)
+  function show(name) {
+    if (name !== 'factory' && document.getElementById('tab-manual')) name = 'manual'; else name = 'factory';
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + name));
+    document.querySelectorAll('nav.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === name));
+  }
+  window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+
+  // live: the Factory tab re-reads _db/factory.json from GitHub every minute (the factory pushes it as talks finish),
+  // so it is current without waiting for a site rebuild; the table the build rendered is the starting point
+  (function () {
+    const SRC = 'https://raw.githubusercontent.com/conf42/src/main/_db/factory.json';
+    const STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"];
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+    const head = s => ({srt: 'SRT', qa: 'QA'})[s] || s.charAt(0).toUpperCase() + s.slice(1);
+    const tab = document.getElementById('tab-factory');
+    const live = document.createElement('div'); live.className = 'meta'; tab.prepend(live);
+    async function load() {
+      try {
+        const vf = await (await fetch(SRC + '?t=' + Math.floor(Date.now() / 60000), {cache: 'no-store'})).json();
+        let h = `<div class="sub">Conf42 talk videos on their way through the factory.${vf.updated ? ' Last update ' + esc(vf.updated.replace('T', ' ')) + '.' : ''}</div>`;
+        if (!(vf.events || []).length) h += '<p>Nothing published yet.</p>';
+        for (const e of vf.events || []) {
+          const fin = (e.talks || []).filter(t => t.finished).length;
+          h += `<h2>${esc(e.title)}</h2><div class="meta">${fin} of ${(e.talks || []).length} videos finished` +
+            ((e.missing_videos || []).length ? ` &middot; no video yet (${e.missing_videos.length}, flagged for a follow-up): ${e.missing_videos.map(esc).join(', ')}` : '') +
+            ((e.runner || {}).active ? ` &middot; <b>running on ${esc(e.runner.name || 'a factory computer')}</b>` : '') + '</div>';
+          h += `<div class="wrap"><table><thead><tr><th>Talk</th>${STEPS.map(s => `<th>${head(s)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+          for (const t of e.talks || []) {
+            h += `<tr><td><b>${esc(t.speakers)}</b><br><small>${esc(t.title)}</small></td>` +
+              STEPS.map(s => { const st = (t.steps || {})[s] || 'todo'; return `<td><span class="p ${esc(st)}">${st === 'todo' ? '-' : esc(st)}</span></td>`; }).join('') +
+              `<td>${t.minutes ? t.minutes + ' min' + (t.cut_percent ? ', ' + t.cut_percent + '% cut' : '') + (t.lufs ? '<br><small>' + t.lufs + ' LUFS</small>' : '') : ''}` +
+              (t.flags || []).map(f => `<div class="flag">${esc(f)}</div>`).join('') + (t.error ? '<div class="flag">needs a retry</div>' : '') + '</td></tr>';
+          }
+          h += '</tbody></table></div>';
+        }
+        [...tab.children].forEach(c => { if (c !== live) c.remove(); });
+        tab.insertAdjacentHTML('beforeend', h);
+        live.innerHTML = '&#9679; live - checked ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        live.textContent = 'live update failed (' + err.message + ') - showing the last build; trying again in a minute';
+      }
+    }
+    load();
+    setInterval(load, 60000);
+  })();
+</script>
 </body>
 </html>
