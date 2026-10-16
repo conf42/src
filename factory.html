@@ -22,7 +22,18 @@
     .done { background: #dff5e6; color: #17693a; } .running { background: #fff3cd; color: #8a6100; }
     .failed { background: #fde2e1; color: #a4231c; } .todo { background: #eee; color: #999; }
     .flag { color: #a4231c; font-size: .8rem; } small { color: #6b7a99; }
-    nav.tabs { display: flex; gap: 18px; margin: 0 0 18px; font-weight: 600; } nav.tabs a { color: var(--accent); text-decoration: none; }
+    nav.tabs { display: flex; gap: 4px; margin: 0 0 18px; border-bottom: 2px solid #e3e8f4; }
+    nav.tabs a { color: #6b7a99; text-decoration: none; font-weight: 700; padding: 8px 18px; border-radius: 8px 8px 0 0; }
+    nav.tabs a.on { color: var(--accent); background: #fff; box-shadow: 0 -1px 4px rgba(27,42,78,.06); }
+    .tab { display: none; } .tab.on { display: block; }
+    #gate { display: none; position: fixed; inset: 0; background: #1b2a4e; z-index: 50; align-items: center; justify-content: center; }
+    body.locked #gate { display: flex; } body.locked header, body.locked main { display: none; }
+    #gate form { background: #fff; color: #1d1d1f; padding: 26px 28px; border-radius: 12px; width: min(340px, 90vw); font-family: Arial, sans-serif; }
+    #gate h2 { margin: 0 0 6px; font-size: 20px; border: 0; padding: 0; } #gate p { margin: 0 0 14px; color: #6b6b70; font-size: 14px; }
+    #gate input { width: 100%; padding: 9px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; }
+    #gate button { margin-top: 10px; width: 100%; padding: 9px; font-size: 15px; border: 0; border-radius: 8px; background: var(--gbtn, #335eea); color: #fff; cursor: pointer; }
+    #gate .err { color: #b3261e; font-size: 13px; min-height: 18px; margin-top: 6px; }
+
     .manual { background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(27,42,78,.08); padding: 8px 28px 28px; margin-top: 40px; line-height: 1.6; }
     .manual h1 { margin-top: 24px; } .manual h2 { margin-top: 34px; padding-top: 10px; border-top: 1px solid #eef0f5; }
     .manual h3 { margin: 26px 0 6px; } .manual table { min-width: 0; margin: 10px 0; }
@@ -34,9 +45,191 @@
   </style>
 </head>
 <body>
+
 <main>
-  <h1 id="status">Factory</h1>
-  <nav class="tabs"><a href="#status">Status</a><a href="#manual">Manual - how to run it</a></nav>
+  <h1>Factory</h1>
+  <nav class="tabs"><a href="#manual" data-tab="manual" class="on">Manual</a><a href="#factory" data-tab="factory">Factory</a></nav>
+  <section class="tab on manual" id="tab-manual" style="margin-top:0"><h1 id="conf42-talk-factory-team-manual">Conf42 talk factory - team manual</h1>
+<p>Turns the talk videos speakers upload for a Conf42 event into finished, YouTube-ready files: it matches each video to
+its talk, has Descript clean it up, and hands you an MP4, subtitles and the YouTube title, description and chapters.
+It also prepares the slide decks for the site.</p>
+<div class="highlight"><pre><span></span><code>speakers&#39; Drive folder  →  match to the talks  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
+</code></pre></div>
+<p>The status of every event is on this page's <strong>Factory</strong> tab - it updates live, every minute. The technical details live in <code>factory/README.md</code> in the
+conf42 repo. When the tool changes, this manual changes with it - see <strong>Changelog</strong> at the bottom.</p>
+<hr />
+<h2 id="1-one-time-setup-on-your-computer">1. One-time setup on your computer</h2>
+<p>You need: a Windows PC, a Mac or Linux, about <strong>50 GB free</strong> for an event, Git, and Python 3.9 or newer (the setup
+installs the rest: ffmpeg and LibreOffice).</p>
+<ol>
+<li>
+<p><strong>Get the repo</strong> - a slim copy is enough (a few MB instead of 12 GB):</p>
+<div class="highlight"><pre><span></span><code>git clone --depth 1 --filter=blob:none --sparse https://github.com/conf42/src
+cd src
+git sparse-checkout set factory _db
+</code></pre></div>
+</li>
+<li>
+<p><strong>Run the setup</strong>, once:</p>
+<ul>
+<li><strong>Windows:</strong> double-click <code>factory\setup.cmd</code></li>
+<li><strong>Mac / Linux:</strong> <code>bash factory/setup.sh</code></li>
+</ul>
+<p>It asks for a name for your computer and a <strong>Descript API token</strong>: in Descript go to <strong>Settings → API tokens →
+Create</strong> (the team's Descript account). The token stays on your computer, never in git. It puts a
+<strong>Conf42 factory</strong> launcher on your Desktop, checks the machine and opens the app.</p>
+</li>
+<li>
+<p>To push the status page and claim events (so two people never process the same one), you need to be signed in to
+    GitHub on that computer (<code>gh auth login</code>). Without it everything works, but only on your machine.</p>
+</li>
+</ol>
+<p><strong>Start the app:</strong> double-click <strong>Conf42 factory</strong> on your Desktop. It opens http://localhost:8042.</p>
+<p>Health check any time: <code>python -m factory doctor</code> from the <code>factory</code> folder (with the repo's <code>env</code>).</p>
+<hr />
+<h2 id="2-process-an-event-step-by-step">2. Process an event, step by step</h2>
+<p>Each event has a short name - its <code>short_url</code>, e.g. <code>devsecops2026</code> or <code>featureflags2026</code> (the end of its conf42.com
+address).</p>
+<h3 id="step-1-get-the-videos">Step 1 - Get the videos</h3>
+<p>Speakers upload their videos (and decks) to the event's Google Drive folder, shared as "anyone with the link".
+Copy that folder's link, then from the <code>factory</code> folder:</p>
+<div class="highlight"><pre><span></span><code>../env/bin/python -m factory drive featureflags2026 https://drive.google.com/drive/folders/&lt;folder id&gt;
+</code></pre></div>
+<p>(Windows: <code>..\env\Scripts\python</code>.)</p>
+<p>The factory lists the folder, downloads only what is new or changed, matches every video to its talk and starts the
+whole run. The link is remembered: next time just <code>... factory drive featureflags2026</code>.</p>
+<p>No Drive link? Download the folder as zip(s) and use the app (step 2) or
+<code>python -m factory run featureflags2026 C:\Users\you\Downloads\drive-download-*.zip</code>.</p>
+<h3 id="step-2-watch-it-run">Step 2 - Watch it run</h3>
+<p>In the app, pick the event. You see:</p>
+<ul>
+<li>
+<p>every talk with its steps - <strong>render → upload → edit → publish → download → srt → chapters → loudness → QA</strong> - and
+    what it is doing right now ("uploading 45% of 1.2 GB", "Descript is busy, waiting in line");</p>
+</li>
+<li>
+<p><strong>NOT MATCHED</strong> files - videos whose name matches no speaker. Rename the file to the speaker's name as on the site
+    and run again;</p>
+</li>
+<li>
+<p><strong>No video yet</strong> - talks with nothing uploaded. Normal for a remote conference; chase those speakers.</p>
+</li>
+</ul>
+<p>You can close the app - the run continues in the background. <strong>Start / resume</strong> in the app (re)starts the run; finished steps
+are never redone.</p>
+<p>What Descript does to every talk: <strong>Studio Sound 80%</strong>, limiter, volume, filler words removed, pauses over 2 s
+shortened to 1 s. Then the factory sets YouTube's loudness and trims the video to the first and last word.</p>
+<h3 id="step-3-check-the-results">Step 3 - Check the results</h3>
+<p>When a talk shows <strong>QA</strong> done, look at its flags:</p>
+<ul>
+<li><strong>loudness off</strong> or <strong>the edit removed more than 25%</strong> - watch it;</li>
+<li><strong>picture changes in the first 12 seconds - check the start</strong> - often the speaker's OBS or desktop before the
+    slides. It is never cut automatically: trim it by hand if needed.</li>
+</ul>
+<p>The finished videos are in <code>Desktop/talk-factory/final videos for YouTube/</code>, named
+<code>&lt;speakers&gt; - Conf42 &lt;Event&gt; &lt;Year&gt;.mp4</code>. Subtitles are in the event folder's <code>srt/</code>.</p>
+<h3 id="step-4-slides">Step 4 - Slides</h3>
+<p>Decks from the Drive folder are matched to the talks like the videos, converted to PDF, renamed for the site and
+compressed under 5 MB. They are in the event folder's <code>slides/</code>. Only decks: <code>python -m factory slides &lt;short_url&gt;</code>.</p>
+<h3 id="step-5-youtube">Step 5 - YouTube</h3>
+<p>The app's <strong>YouTube items</strong> button (or <code>python -m factory chapters &lt;short_url&gt;</code>) writes <code>YouTube items.txt</code> in the
+event folder: per talk the <strong>title</strong> (<code>&lt;short title&gt; | &lt;speakers&gt; | Conf42 &lt;CODE&gt;&lt;YEAR&gt;</code>, at most 100 characters) and
+the <strong>description</strong> (abstract link, event, CFP, Discord, chapters). The thumbnails are on the event's teasers page:
+<code>conf42.com/&lt;event&gt;/teasers#thumbnails</code>.</p>
+<h3 id="step-6-a-speaker-uploads-a-new-version">Step 6 - A speaker uploads a new version</h3>
+<p>Run <code>drive &lt;short_url&gt;</code> again: a video uploaded after its talk was finished is flagged <strong>newer video on Drive - redo</strong>,
+downloaded, and the talk is done again from scratch. The old finished video moves to <code>out/replaced/</code> (kept).
+Redo one talk with the video it has: <code>python -m factory redo &lt;short_url&gt; "&lt;speaker&gt;"</code>.</p>
+<h3 id="step-7-share-progress">Step 7 - Share progress</h3>
+<p><strong>Publish to conf42.com/factory</strong> in the app updates this page's <strong>Factory</strong> tab. Runs also publish by themselves:
+whenever a talk finishes (at most every 20 minutes) and at the end of the run.</p>
+<hr />
+<h2 id="3-when-something-goes-wrong">3. When something goes wrong</h2>
+<table>
+<thead>
+<tr>
+<th>What you see</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A talk <strong>failed</strong></td>
+<td>Press <strong>Retry</strong> (it was already retried 3 times automatically).</td>
+</tr>
+<tr>
+<td><strong>Not started: this event is running on another computer</strong></td>
+<td>Someone else is processing it. If that computer is really off, Shift + click <strong>Start / resume</strong> to take over.</td>
+</tr>
+<tr>
+<td><strong>EDITS PAUSED</strong></td>
+<td>An edit cost unusually many credits, or its report mentioned other talks. Check the talk in Descript; if it's fine: <code>python -m factory unpause &lt;short_url&gt;</code>, then <strong>Start / resume</strong>.</td>
+</tr>
+<tr>
+<td>Descript says <strong>402</strong></td>
+<td>Out of Descript credits or media minutes. Top up, then <strong>Start / resume</strong> - nothing is paid twice.</td>
+</tr>
+<tr>
+<td><strong>NOT MATCHED</strong> video</td>
+<td>Rename it to the speaker's name as on the site (<code>Name1</code> or <code>Name1 &amp; Name2</code>), run again.</td>
+</tr>
+<tr>
+<td>Descript seems stuck ("waiting in line")</td>
+<td>Descript runs one job per project at a time - talks take turns. A job left over from a stopped run is cancelled at the next <strong>Start / resume</strong>.</td>
+</tr>
+<tr>
+<td>The app doesn't open</td>
+<td>Double-click the launcher again; then <code>python -m factory doctor</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>One computer per event</strong> - the factory claims each event so a second computer refuses to start it.</p>
+<hr />
+<h2 id="4-where-things-are">4. Where things are</h2>
+<p><code>Desktop/talk-factory/&lt;short_url&gt;/</code> on the computer that runs the event:</p>
+<table>
+<thead>
+<tr>
+<th>Folder / file</th>
+<th>What's in it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>in/</code></td>
+<td>the speakers' videos, renamed to the speakers</td>
+</tr>
+<tr>
+<td><code>out/_descript/</code></td>
+<td>Descript's downloads (not for YouTube)</td>
+</tr>
+<tr>
+<td><code>srt/</code></td>
+<td>subtitles, named for the site</td>
+</tr>
+<tr>
+<td><code>slides/</code></td>
+<td>decks ready for the site</td>
+</tr>
+<tr>
+<td><code>YouTube items.txt</code></td>
+<td>titles, descriptions, chapters</td>
+</tr>
+<tr>
+<td><code>state.json</code></td>
+<td>progress of every step</td>
+</tr>
+</tbody>
+</table>
+<p>Finished videos of every event: <code>Desktop/talk-factory/final videos for YouTube/</code>.</p>
+<hr />
+<h2 id="changelog">Changelog</h2>
+<ul>
+<li><strong>2026-10-16</strong> - The Factory tab updates live (every minute), no need to wait for the site to rebuild.</li>
+<li><strong>2026-10-16</strong> - The page has two tabs: <strong>Manual</strong> (this) and <strong>Factory</strong> (the status of the runs).</li>
+<li><strong>2026-10-16</strong> - First version of this manual. <code>unpause</code> command added for paused edits.</li>
+</ul></section>
+  <section class="tab" id="tab-factory">
   <div class="sub">Conf42 talk videos on their way through the factory. Last update 2026-10-14 00:37:42.</div>
   
   
@@ -305,184 +498,56 @@
       </tbody>
     </table></div>
   
-  <section class="manual" id="manual"><h1 id="conf42-talk-factory-team-manual">Conf42 talk factory - team manual</h1>
-<p>Turns the talk videos speakers upload for a Conf42 event into finished, YouTube-ready files: it matches each video to
-its talk, has Descript clean it up, and hands you an MP4, subtitles and the YouTube title, description and chapters.
-It also prepares the slide decks for the site.</p>
-<div class="highlight"><pre><span></span><code>speakers&#39; Drive folder  →  match to the talks  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
-</code></pre></div>
-<p>The live status of every event is at the top of this page. The technical details live in <code>factory/README.md</code> in the
-conf42 repo. When the tool changes, this manual changes with it - see <strong>Changelog</strong> at the bottom.</p>
-<hr />
-<h2 id="1-one-time-setup-on-your-computer">1. One-time setup on your computer</h2>
-<p>You need: a Windows PC, a Mac or Linux, about <strong>50 GB free</strong> for an event, Git, and Python 3.9 or newer (the setup
-installs the rest: ffmpeg and LibreOffice).</p>
-<ol>
-<li>
-<p><strong>Get the repo</strong> - a slim copy is enough (a few MB instead of 12 GB):</p>
-<div class="highlight"><pre><span></span><code>git clone --depth 1 --filter=blob:none --sparse https://github.com/conf42/src
-cd src
-git sparse-checkout set factory _db
-</code></pre></div>
-</li>
-<li>
-<p><strong>Run the setup</strong>, once:</p>
-<ul>
-<li><strong>Windows:</strong> double-click <code>factory\setup.cmd</code></li>
-<li><strong>Mac / Linux:</strong> <code>bash factory/setup.sh</code></li>
-</ul>
-<p>It asks for a name for your computer and a <strong>Descript API token</strong>: in Descript go to <strong>Settings → API tokens →
-Create</strong> (the team's Descript account). The token stays on your computer, never in git. It puts a
-<strong>Conf42 factory</strong> launcher on your Desktop, checks the machine and opens the app.</p>
-</li>
-<li>
-<p>To push the status page and claim events (so two people never process the same one), you need to be signed in to
-    GitHub on that computer (<code>gh auth login</code>). Without it everything works, but only on your machine.</p>
-</li>
-</ol>
-<p><strong>Start the app:</strong> double-click <strong>Conf42 factory</strong> on your Desktop. It opens http://localhost:8042.</p>
-<p>Health check any time: <code>python -m factory doctor</code> from the <code>factory</code> folder (with the repo's <code>env</code>).</p>
-<hr />
-<h2 id="2-process-an-event-step-by-step">2. Process an event, step by step</h2>
-<p>Each event has a short name - its <code>short_url</code>, e.g. <code>devsecops2026</code> or <code>featureflags2026</code> (the end of its conf42.com
-address).</p>
-<h3 id="step-1-get-the-videos">Step 1 - Get the videos</h3>
-<p>Speakers upload their videos (and decks) to the event's Google Drive folder, shared as "anyone with the link".
-Copy that folder's link, then from the <code>factory</code> folder:</p>
-<div class="highlight"><pre><span></span><code>../env/bin/python -m factory drive featureflags2026 https://drive.google.com/drive/folders/&lt;folder id&gt;
-</code></pre></div>
-<p>(Windows: <code>..\env\Scripts\python</code>.)</p>
-<p>The factory lists the folder, downloads only what is new or changed, matches every video to its talk and starts the
-whole run. The link is remembered: next time just <code>... factory drive featureflags2026</code>.</p>
-<p>No Drive link? Download the folder as zip(s) and use the app (step 2) or
-<code>python -m factory run featureflags2026 C:\Users\you\Downloads\drive-download-*.zip</code>.</p>
-<h3 id="step-2-watch-it-run">Step 2 - Watch it run</h3>
-<p>In the app, pick the event. You see:</p>
-<ul>
-<li>
-<p>every talk with its steps - <strong>render → upload → edit → publish → download → srt → chapters → loudness → QA</strong> - and
-    what it is doing right now ("uploading 45% of 1.2 GB", "Descript is busy, waiting in line");</p>
-</li>
-<li>
-<p><strong>NOT MATCHED</strong> files - videos whose name matches no speaker. Rename the file to the speaker's name as on the site
-    and run again;</p>
-</li>
-<li>
-<p><strong>No video yet</strong> - talks with nothing uploaded. Normal for a remote conference; chase those speakers.</p>
-</li>
-</ul>
-<p>You can close the app - the run continues in the background. <strong>Start / resume</strong> in the app (re)starts the run; finished steps
-are never redone.</p>
-<p>What Descript does to every talk: <strong>Studio Sound 80%</strong>, limiter, volume, filler words removed, pauses over 2 s
-shortened to 1 s. Then the factory sets YouTube's loudness and trims the video to the first and last word.</p>
-<h3 id="step-3-check-the-results">Step 3 - Check the results</h3>
-<p>When a talk shows <strong>QA</strong> done, look at its flags:</p>
-<ul>
-<li><strong>loudness off</strong> or <strong>the edit removed more than 25%</strong> - watch it;</li>
-<li><strong>picture changes in the first 12 seconds - check the start</strong> - often the speaker's OBS or desktop before the
-    slides. It is never cut automatically: trim it by hand if needed.</li>
-</ul>
-<p>The finished videos are in <code>Desktop/talk-factory/final videos for YouTube/</code>, named
-<code>&lt;speakers&gt; - Conf42 &lt;Event&gt; &lt;Year&gt;.mp4</code>. Subtitles are in the event folder's <code>srt/</code>.</p>
-<h3 id="step-4-slides">Step 4 - Slides</h3>
-<p>Decks from the Drive folder are matched to the talks like the videos, converted to PDF, renamed for the site and
-compressed under 5 MB. They are in the event folder's <code>slides/</code>. Only decks: <code>python -m factory slides &lt;short_url&gt;</code>.</p>
-<h3 id="step-5-youtube">Step 5 - YouTube</h3>
-<p>The app's <strong>YouTube items</strong> button (or <code>python -m factory chapters &lt;short_url&gt;</code>) writes <code>YouTube items.txt</code> in the
-event folder: per talk the <strong>title</strong> (<code>&lt;short title&gt; | &lt;speakers&gt; | Conf42 &lt;CODE&gt;&lt;YEAR&gt;</code>, at most 100 characters) and
-the <strong>description</strong> (abstract link, event, CFP, Discord, chapters). The thumbnails are on the event's teasers page:
-<code>conf42.com/&lt;event&gt;/teasers#thumbnails</code>.</p>
-<h3 id="step-6-a-speaker-uploads-a-new-version">Step 6 - A speaker uploads a new version</h3>
-<p>Run <code>drive &lt;short_url&gt;</code> again: a video uploaded after its talk was finished is flagged <strong>newer video on Drive - redo</strong>,
-downloaded, and the talk is done again from scratch. The old finished video moves to <code>out/replaced/</code> (kept).
-Redo one talk with the video it has: <code>python -m factory redo &lt;short_url&gt; "&lt;speaker&gt;"</code>.</p>
-<h3 id="step-7-share-progress">Step 7 - Share progress</h3>
-<p><strong>Publish to conf42.com/factory</strong> in the app updates the table at the top of this page (it also happens by itself every 20 minutes
-during a run).</p>
-<hr />
-<h2 id="3-when-something-goes-wrong">3. When something goes wrong</h2>
-<table>
-<thead>
-<tr>
-<th>What you see</th>
-<th>What to do</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A talk <strong>failed</strong></td>
-<td>Press <strong>Retry</strong> (it was already retried 3 times automatically).</td>
-</tr>
-<tr>
-<td><strong>Not started: this event is running on another computer</strong></td>
-<td>Someone else is processing it. If that computer is really off, Shift + click <strong>Start / resume</strong> to take over.</td>
-</tr>
-<tr>
-<td><strong>EDITS PAUSED</strong></td>
-<td>An edit cost unusually many credits, or its report mentioned other talks. Check the talk in Descript; if it's fine: <code>python -m factory unpause &lt;short_url&gt;</code>, then <strong>Start / resume</strong>.</td>
-</tr>
-<tr>
-<td>Descript says <strong>402</strong></td>
-<td>Out of Descript credits or media minutes. Top up, then <strong>Start / resume</strong> - nothing is paid twice.</td>
-</tr>
-<tr>
-<td><strong>NOT MATCHED</strong> video</td>
-<td>Rename it to the speaker's name as on the site (<code>Name1</code> or <code>Name1 &amp; Name2</code>), run again.</td>
-</tr>
-<tr>
-<td>Descript seems stuck ("waiting in line")</td>
-<td>Descript runs one job per project at a time - talks take turns. A job left over from a stopped run is cancelled at the next <strong>Start / resume</strong>.</td>
-</tr>
-<tr>
-<td>The app doesn't open</td>
-<td>Double-click the launcher again; then <code>python -m factory doctor</code>.</td>
-</tr>
-</tbody>
-</table>
-<p><strong>One computer per event</strong> - the factory claims each event so a second computer refuses to start it.</p>
-<hr />
-<h2 id="4-where-things-are">4. Where things are</h2>
-<p><code>Desktop/talk-factory/&lt;short_url&gt;/</code> on the computer that runs the event:</p>
-<table>
-<thead>
-<tr>
-<th>Folder / file</th>
-<th>What's in it</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>in/</code></td>
-<td>the speakers' videos, renamed to the speakers</td>
-</tr>
-<tr>
-<td><code>out/_descript/</code></td>
-<td>Descript's downloads (not for YouTube)</td>
-</tr>
-<tr>
-<td><code>srt/</code></td>
-<td>subtitles, named for the site</td>
-</tr>
-<tr>
-<td><code>slides/</code></td>
-<td>decks ready for the site</td>
-</tr>
-<tr>
-<td><code>YouTube items.txt</code></td>
-<td>titles, descriptions, chapters</td>
-</tr>
-<tr>
-<td><code>state.json</code></td>
-<td>progress of every step</td>
-</tr>
-</tbody>
-</table>
-<p>Finished videos of every event: <code>Desktop/talk-factory/final videos for YouTube/</code>.</p>
-<hr />
-<h2 id="changelog">Changelog</h2>
-<ul>
-<li><strong>2026-10-16</strong> - First version of this manual. <code>unpause</code> command added for paused edits.</li>
-</ul></section>
+  </section>
 </main>
+<script>
+  // Manual by default; #factory opens the Factory tab (the status of the runs)
+  function show(name) {
+    if (name !== 'factory' && document.getElementById('tab-manual')) name = 'manual'; else name = 'factory';
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + name));
+    document.querySelectorAll('nav.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === name));
+  }
+  window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+
+  // live: the Factory tab re-reads _db/factory.json from GitHub every minute (the factory pushes it as talks finish),
+  // so it is current without waiting for a site rebuild; the table the build rendered is the starting point
+  (function () {
+    const SRC = 'https://raw.githubusercontent.com/conf42/src/main/_db/factory.json';
+    const STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"];
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+    const head = s => ({srt: 'SRT', qa: 'QA'})[s] || s.charAt(0).toUpperCase() + s.slice(1);
+    const tab = document.getElementById('tab-factory');
+    const live = document.createElement('div'); live.className = 'meta'; tab.prepend(live);
+    async function load() {
+      try {
+        const vf = await (await fetch(SRC + '?t=' + Math.floor(Date.now() / 60000), {cache: 'no-store'})).json();
+        let h = `<div class="sub">Conf42 talk videos on their way through the factory.${vf.updated ? ' Last update ' + esc(vf.updated.replace('T', ' ')) + '.' : ''}</div>`;
+        if (!(vf.events || []).length) h += '<p>Nothing published yet.</p>';
+        for (const e of vf.events || []) {
+          const fin = (e.talks || []).filter(t => t.finished).length;
+          h += `<h2>${esc(e.title)}</h2><div class="meta">${fin} of ${(e.talks || []).length} videos finished` +
+            ((e.missing_videos || []).length ? ` &middot; no video yet (${e.missing_videos.length}, flagged for a follow-up): ${e.missing_videos.map(esc).join(', ')}` : '') +
+            ((e.runner || {}).active ? ` &middot; <b>running on ${esc(e.runner.name || 'a factory computer')}</b>` : '') + '</div>';
+          h += `<div class="wrap"><table><thead><tr><th>Talk</th>${STEPS.map(s => `<th>${head(s)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+          for (const t of e.talks || []) {
+            h += `<tr><td><b>${esc(t.speakers)}</b><br><small>${esc(t.title)}</small></td>` +
+              STEPS.map(s => { const st = (t.steps || {})[s] || 'todo'; return `<td><span class="p ${esc(st)}">${st === 'todo' ? '-' : esc(st)}</span></td>`; }).join('') +
+              `<td>${t.minutes ? t.minutes + ' min' + (t.cut_percent ? ', ' + t.cut_percent + '% cut' : '') + (t.lufs ? '<br><small>' + t.lufs + ' LUFS</small>' : '') : ''}` +
+              (t.flags || []).map(f => `<div class="flag">${esc(f)}</div>`).join('') + (t.error ? '<div class="flag">needs a retry</div>' : '') + '</td></tr>';
+          }
+          h += '</tbody></table></div>';
+        }
+        [...tab.children].forEach(c => { if (c !== live) c.remove(); });
+        tab.insertAdjacentHTML('beforeend', h);
+        live.innerHTML = '&#9679; live - checked ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        live.textContent = 'live update failed (' + err.message + ') - showing the last build; trying again in a minute';
+      }
+    }
+    load();
+    setInterval(load, 60000);
+  })();
+</script>
 </body>
 </html>
