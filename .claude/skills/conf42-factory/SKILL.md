@@ -44,6 +44,6 @@ Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `red
 - One computer per event (the app claims it through `_db/factory.json`); `--force` only when the person says the other
   computer is off.
 - Never put a Descript token or password in a file, commit or the chat. Don't delete work files without asking.
-- "Publish to conf42.com/factory" (app) updates the website's Factory tab; runs also publish by themselves.
+- "Publish to conf42.com/factory" (app) updates the website's Factory logs tab; runs also publish by themselves.
 - If you change the factory: update `factory/MANUAL.md` (and `MANUAL-CLAUDE.md`) plus the Changelog in the same commit,
   run `../env/bin/python tests/smoke.py`, and commit only your files.

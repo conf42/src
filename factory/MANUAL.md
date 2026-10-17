@@ -8,7 +8,7 @@ It also prepares the slide decks for the site.
 speakers' Drive folder  →  match to the talks  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
 ```
 
-The status of every event is on this page's **Factory** tab - it updates live, every minute. The technical details live in `factory/README.md` in the
+The status of every event is on this page's **Factory logs** tab - it updates live, every minute. The technical details live in `factory/README.md` in the
 conf42 repo. When the tool changes, this manual changes with it - see **Changelog** at the bottom.
 
 ---
@@ -115,7 +115,7 @@ Redo one talk with the video it has: `python -m factory redo <short_url> "<speak
 
 ### Step 7 - Share progress
 
-**Publish to conf42.com/factory** in the app updates this page's **Factory** tab. Runs also publish by themselves:
+**Publish to conf42.com/factory** in the app updates this page's **Factory logs** tab. Runs also publish by themselves:
 whenever a talk finishes (at most every 20 minutes) and at the end of the run.
 
 ---
@@ -155,6 +155,7 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.
 - **2026-10-16** - New **With Claude** tab: run the factory by talking to Claude Code (the conf42-factory skill comes
   with the conf42 repo).
 - **2026-10-16** - This page asks for the team password once per device (ask Mark).
