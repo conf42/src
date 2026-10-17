@@ -155,6 +155,8 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-16** - New **With Claude** tab: run the factory by talking to Claude Code (the conf42-factory skill comes
+  with the conf42 repo).
 - **2026-10-16** - This page asks for the team password once per device (ask Mark).
 - **2026-10-16** - The Factory tab updates live (every minute), no need to wait for the site to rebuild.
 - **2026-10-16** - The page has two tabs: **Manual** (this) and **Factory** (the status of the runs).
