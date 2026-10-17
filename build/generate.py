@@ -499,9 +499,14 @@ try:
         factory_manual = markdown.markdown(f.read(), extensions=["tables", "pymdownx.superfences", "toc", "sane_lists"])
 except OSError:
     factory_manual = ""
+try:                                                  # the "With Claude" tab: factory/MANUAL-CLAUDE.md
+    with open("./factory/MANUAL-CLAUDE.md", encoding="utf-8") as f:
+        factory_manual_claude = markdown.markdown(f.read(), extensions=["tables", "pymdownx.superfences", "toc", "sane_lists"])
+except OSError:
+    factory_manual_claude = ""
 with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     print("Writing out factory.html (unlisted)")
-    f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual,
+    f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual, manual_claude=factory_manual_claude,
                                                            gate=FACTORY_GATE_SHA256,
                                                            steps=["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 
