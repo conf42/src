@@ -155,6 +155,8 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-16** - **Factory logs**: an event folds into one line 24 h after its release (click to open it); the top says
+  which upcoming Conf42 event the factory is ready for, or what it is working on.
 - **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.
 - **2026-10-16** - New **With Claude** tab: run the factory by talking to Claude Code (the conf42-factory skill comes
   with the conf42 repo).

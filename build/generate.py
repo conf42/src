@@ -504,9 +504,21 @@ try:                                                  # the "With Claude" tab: f
         factory_manual_claude = markdown.markdown(f.read(), extensions=["tables", "pymdownx.superfences", "toc", "sane_lists"])
 except OSError:
     factory_manual_claude = ""
+# every event's title, date and release (17:00 UTC on the day, or release_at) - the Factory logs tab folds an event 24 h
+# after its release - and the next event, which the tab says the factory is ready for (Marek 2026-10-16)
+fx_events, fx_next = {}, None
+for _y in context.get("years", {}).values():
+    for _e in _y:
+        if _e.get("short_url") and _e.get("date"):
+            fx_events[_e["short_url"]] = {"title": "Conf42 %s %s" % (_e.get("name", ""), _e["date"].year),
+                                          "date": str(_e["date"]), "release": _e.get("release_iso")}
+_fx_up = sorted((v for v in fx_events.values() if v["release"] and v["release"] > datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
+                key=lambda v: v["release"])
+fx_next = _fx_up[0] if _fx_up else None
 with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     print("Writing out factory.html (unlisted)")
     f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual, manual_claude=factory_manual_claude,
+                                                           fx_events=fx_events, fx_next=fx_next,
                                                            gate=FACTORY_GATE_SHA256,
                                                            steps=["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 

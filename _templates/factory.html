@@ -33,6 +33,14 @@
     nav.tabs a:hover { background: rgba(255,255,255,.1); }
     nav.tabs a.on { color: var(--accent); background: #f4f4f6; }
     .tab { display: none; } .tab.on { display: block; }
+    .ready { background: #e8f6ee; color: #14532d; border-radius: 12px; padding: 14px 18px; margin: 4px 0 14px; font-size: 1.05rem; }
+    .ready.busy { background: #eef2fd; color: #1b2a4e; }
+    details.ev { margin: 14px 0; } details.ev summary { cursor: pointer; list-style: none; display: flex; gap: 14px; align-items: baseline;
+      flex-wrap: wrap; padding: 10px 14px; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(27,42,78,.06); }
+    details.ev summary::-webkit-details-marker { display: none; }
+    details.ev summary::before { content: "\25B8"; color: #55627f; } details.ev[open] summary::before { content: "\25BE"; }
+    details.ev .evt { font-weight: 800; font-size: 1.1rem; } details.ev .evs { color: #55627f; font-size: .9rem; }
+    details.ev[open] summary { margin-bottom: 10px; }
     #gate { display: none; position: fixed; inset: 0; background: #1b2a4e; z-index: 50; align-items: center; justify-content: center; }
     body.locked #gate { display: flex; } body.locked header, body.locked main { display: none; }
     #gate form { background: #fff; color: #1d1d1f; padding: 26px 28px; border-radius: 12px; width: min(340px, 90vw); font-family: Arial, sans-serif; }
@@ -111,41 +119,69 @@
   window.addEventListener('hashchange', () => show(location.hash.slice(1)));
   show(location.hash.slice(1));
 
-  // live: the Factory tab re-reads _db/factory.json from GitHub every minute (the factory pushes it as talks finish),
-  // so it is current without waiting for a site rebuild; the table the build rendered is the starting point
+  // Factory logs, live (Marek 2026-10-16): re-reads _db/factory.json from GitHub every minute (the factory pushes it as
+  // talks finish), starting from the copy baked into this build. On top: what the factory is ready for - the next Conf42
+  // event - or what it is working on. An event 24 h past its release (17:00 UTC on the day, or release_at) folds into one
+  // line, details a click away; events still in work stay open.
   (function () {
     const SRC = 'https://raw.githubusercontent.com/conf42/src/main/_db/factory.json';
     const STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"];
+    const FX = {{ fx_events | tojson }};          // short_url -> {title, date, release}
+    const NEXT = {{ fx_next | tojson }};          // the next Conf42 event: {title, date, release} or null
+    let VF = {{ vf | tojson }};
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
     const head = s => ({srt: 'SRT', qa: 'QA'})[s] || s.charAt(0).toUpperCase() + s.slice(1);
+    const day = iso => new Date(iso).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
     const tab = document.getElementById('tab-factory');
-    const live = document.createElement('div'); live.className = 'meta'; tab.prepend(live);
+    const open = new Set();                        // events the visitor unfolded stay unfolded across refreshes
+    tab.addEventListener('toggle', ev => { const d = ev.target; if (d.dataset && d.dataset.ev) d.open ? open.add(d.dataset.ev) : open.delete(d.dataset.ev); }, true);
+    function render(liveNote) {
+      const now = Date.now();
+      const evs = (VF.events || []).map(e => {
+        const fx = FX[e.short_url] || {};
+        const rel = fx.release ? new Date(fx.release).getTime() : null;
+        const working = (e.runner || {}).active || (e.talks || []).some(t => !t.finished && !t.error && Object.values(t.steps || {}).some(v => v === 'running'));
+        return Object.assign({}, e, {fx, rel, working, done: !working && rel !== null && now > rel + 24 * 3600 * 1000});
+      });
+      let h = '';
+      const busy = evs.filter(e => e.working);
+      if (busy.length) h += `<div class="ready busy">Working on <b>${busy.map(e => esc(e.title)).join(', ')}</b> right now.</div>`;
+      else if (NEXT) {
+        const days = Math.ceil((new Date(NEXT.date + 'T00:00:00Z') - now) / 86400000);
+        h += `<div class="ready">&#10003; The factory is ready for <b>${esc(NEXT.title)}</b> - ${day(NEXT.date + 'T12:00:00Z')}` +
+             (days > 1 ? ` (in ${days} days)` : days === 1 ? ' (tomorrow)' : ' (today)') + '.</div>';
+      }
+      h += `<div class="meta">${esc(liveNote || '')}${VF.updated ? ' · factory last published ' + esc(VF.updated.replace('T', ' ')) : ''}</div>`;
+      if (!evs.length) h += '<p>Nothing published yet.</p>';
+      for (const e of evs) {
+        const talks = e.talks || [], fin = talks.filter(t => t.finished).length;
+        const summary = `${fin} of ${talks.length} videos finished` +
+          ((e.missing_videos || []).length ? ` · no video yet: ${e.missing_videos.length}` : '') +
+          (e.fx.release ? ` · ${e.rel <= now ? 'released' : 'releases'} ${day(e.fx.release)}` : '') +
+          (e.working ? ' · <b>in work</b>' : e.done ? ' · done' : '');
+        h += `<details class="ev" data-ev="${esc(e.short_url)}"${!e.done || open.has(e.short_url) ? ' open' : ''}>` +
+             `<summary><span class="evt">${esc(e.title)}</span><span class="evs">${summary}</span></summary>`;
+        if ((e.missing_videos || []).length) h += `<div class="meta">No video yet (flagged for a follow-up): ${e.missing_videos.map(esc).join(', ')}</div>`;
+        h += `<div class="wrap"><table><thead><tr><th>Talk</th>${STEPS.map(s => `<th>${head(s)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
+        for (const t of talks) {
+          h += `<tr><td><b>${esc(t.speakers)}</b><br><small>${esc(t.title)}</small></td>` +
+            STEPS.map(s => { const st = (t.steps || {})[s] || 'todo'; return `<td><span class="p ${esc(st)}">${st === 'todo' ? '-' : esc(st)}</span></td>`; }).join('') +
+            `<td>${t.minutes ? t.minutes + ' min' + (t.cut_percent ? ', ' + t.cut_percent + '% cut' : '') + (t.lufs ? '<br><small>' + t.lufs + ' LUFS</small>' : '') : ''}` +
+            (t.flags || []).map(f => `<div class="flag">${esc(f)}</div>`).join('') + (t.error ? '<div class="flag">needs a retry</div>' : '') + '</td></tr>';
+        }
+        h += '</tbody></table></div></details>';
+      }
+      tab.innerHTML = h;
+    }
     async function load() {
       try {
-        const vf = await (await fetch(SRC + '?t=' + Math.floor(Date.now() / 60000), {cache: 'no-store'})).json();
-        let h = `<div class="sub">Conf42 talk videos on their way through the factory.${vf.updated ? ' Last update ' + esc(vf.updated.replace('T', ' ')) + '.' : ''}</div>`;
-        if (!(vf.events || []).length) h += '<p>Nothing published yet.</p>';
-        for (const e of vf.events || []) {
-          const fin = (e.talks || []).filter(t => t.finished).length;
-          h += `<h2>${esc(e.title)}</h2><div class="meta">${fin} of ${(e.talks || []).length} videos finished` +
-            ((e.missing_videos || []).length ? ` &middot; no video yet (${e.missing_videos.length}, flagged for a follow-up): ${e.missing_videos.map(esc).join(', ')}` : '') +
-            ((e.runner || {}).active ? ` &middot; <b>running on ${esc(e.runner.name || 'a factory computer')}</b>` : '') + '</div>';
-          h += `<div class="wrap"><table><thead><tr><th>Talk</th>${STEPS.map(s => `<th>${head(s)}</th>`).join('')}<th>Result</th></tr></thead><tbody>`;
-          for (const t of e.talks || []) {
-            h += `<tr><td><b>${esc(t.speakers)}</b><br><small>${esc(t.title)}</small></td>` +
-              STEPS.map(s => { const st = (t.steps || {})[s] || 'todo'; return `<td><span class="p ${esc(st)}">${st === 'todo' ? '-' : esc(st)}</span></td>`; }).join('') +
-              `<td>${t.minutes ? t.minutes + ' min' + (t.cut_percent ? ', ' + t.cut_percent + '% cut' : '') + (t.lufs ? '<br><small>' + t.lufs + ' LUFS</small>' : '') : ''}` +
-              (t.flags || []).map(f => `<div class="flag">${esc(f)}</div>`).join('') + (t.error ? '<div class="flag">needs a retry</div>' : '') + '</td></tr>';
-          }
-          h += '</tbody></table></div>';
-        }
-        [...tab.children].forEach(c => { if (c !== live) c.remove(); });
-        tab.insertAdjacentHTML('beforeend', h);
-        live.innerHTML = '&#9679; live - checked ' + new Date().toLocaleTimeString();
+        VF = await (await fetch(SRC + '?t=' + Math.floor(Date.now() / 60000), {cache: 'no-store'})).json();
+        render('\u25CF live - checked ' + new Date().toLocaleTimeString());
       } catch (err) {
-        live.textContent = 'live update failed (' + err.message + ') - showing the last build; trying again in a minute';
+        render('live update failed (' + err.message + ') - showing the last build; trying again in a minute');
       }
     }
+    render('');
     load();
     setInterval(load, 60000);
   })();
