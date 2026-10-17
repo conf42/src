@@ -1,6 +1,6 @@
 # Conf42 talk factory - with Claude
 
-The same job as the **Manual** tab, but you talk to Claude and it runs the factory for you: it fetches the speakers'
+The same job as the **No Claude, manual** tab, but you talk to Claude and it runs the factory for you: it fetches the speakers'
 videos from the event's Drive folder, matches them to the talks, sends them through Descript, checks the results and
 writes the YouTube texts. You check the results and do the YouTube upload.
 
@@ -48,7 +48,7 @@ works the same way.
 
 - *"Retry Emmy Eide."* / *"Redo Girish Konda with his current video."*
 - *"Edits are paused - what happened?"* - Claude reads the edit report and tells you what to check in Descript.
-- *"Publish the status."* - updates the Factory tab of this page.
+- *"Publish the status."* - updates the Factory logs tab of this page.
 - *"Which talks still have no video, and how many days are left?"*
 
 ## 4. What Claude won't do on its own
@@ -62,4 +62,5 @@ works the same way.
 
 ## Changelog
 
+- **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.
 - **2026-10-16** - First version, with the conf42-factory skill in the conf42 repo.
