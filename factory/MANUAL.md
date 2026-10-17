@@ -1,5 +1,7 @@
 # Conf42 talk factory - team manual
 
+<p class="tag-slow">Probably slower than manual editing for non-tech people...</p>
+
 Turns the talk videos speakers upload for a Conf42 event into finished, YouTube-ready files: it matches each video to
 its talk, has Descript clean it up, and hands you an MP4, subtitles and the YouTube title, description and chapters.
 It also prepares the slide decks for the site.

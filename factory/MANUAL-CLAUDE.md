@@ -1,4 +1,4 @@
-# Conf42 talk factory - with Claude
+# Conf42 talk factory - with Claude <span class="tag-good">Recommended!</span>
 
 The same job as the **No Claude, manual** tab, but you talk to Claude and it runs the factory for you: it fetches the speakers'
 videos from the event's Drive folder, matches them to the talks, sends them through Descript, checks the results and
