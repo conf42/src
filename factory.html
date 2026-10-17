@@ -28,8 +28,13 @@
     nav.tabs { display: flex; gap: 4px; margin-top: 16px; flex-wrap: wrap; }
     nav.tabs a { color: #fff; text-decoration: none; font-weight: 700; padding: 10px 20px; border-radius: 10px 10px 0 0; }
     nav.tabs a:hover { background: rgba(255,255,255,.1); }
+    nav.tabs a { transition: background-color .22s ease, color .22s ease; }
     nav.tabs a.on { color: var(--accent); background: #f4f4f6; }
     .tab { display: none; } .tab.on { display: block; }
+    /* tab change (Marek 2026-10-16): the new tab fades in and rises a few pixels; the highlight eases over */
+    .tab.on { animation: tab-in .28s cubic-bezier(.2,.7,.3,1); }
+    @keyframes tab-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .tab.on { animation: none; } nav a, nav.tabs a { transition: none; } }
     .ready { background: #e8f6ee; color: #14532d; border-radius: 12px; padding: 14px 18px; margin: 4px 0 14px; font-size: 1.05rem; }
     .ready.busy { background: #eef2fd; color: #1b2a4e; }
     details.ev { margin: 14px 0; } details.ev summary { cursor: pointer; list-style: none; display: flex; gap: 14px; align-items: baseline;
@@ -67,14 +72,37 @@
   // a soft gate for the team (Marek 2026-10-16): the password's SHA-256 is compared in the browser and remembered on
   // this device. It keeps casual visitors out; it is not encryption - the sources of this page are in a public repo.
   const GATE = "54b6ca6e5c7e0eb7e2e0cfdda988cb822dcbb539661d3359c1ac12398061d267";
-  if (localStorage.getItem('factory-gate') !== GATE) document.body.classList.add('locked');
+  // 5 wrong passwords lock this browser out for 24 h (Marek 2026-10-16) - kept in this browser's storage, so like the
+  // gate itself it stops casual guessing, not a determined person
+  const TRIES = 5, LOCK_MS = 24 * 3600 * 1000;
+  const store = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                 set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+                 del: k => { try { localStorage.removeItem(k); } catch (e) {} }};
+  function lockedUntil() { const u = +(store.get('factory-gate-lock') || 0); return u > Date.now() ? u : 0; }
+  function showLock() {
+    const u = lockedUntil(); if (!u) return false;
+    const when = new Date(u).toLocaleString([], {weekday: 'short', hour: '2-digit', minute: '2-digit'});
+    document.getElementById('gate-pw').disabled = true;
+    document.querySelector('#gate button').disabled = true;
+    document.getElementById('gate-err').textContent = 'Too many wrong passwords - the factory is closed on this browser until ' + when + '.';
+    return true;
+  }
+  if (store.get('factory-gate') !== GATE) { document.body.classList.add('locked'); showLock(); }
   async function enterFactory(ev) {
     ev.preventDefault();
+    if (showLock()) return false;
     const pw = document.getElementById('gate-pw').value.trim();
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
     const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-    if (hex === GATE) { try { localStorage.setItem('factory-gate', GATE); } catch (e) {} document.body.classList.remove('locked'); }
-    else document.getElementById('gate-err').textContent = 'Not that one.';
+    if (hex === GATE) {
+      store.set('factory-gate', GATE); store.del('factory-gate-fails'); store.del('factory-gate-lock');
+      document.body.classList.remove('locked');
+    } else {
+      const n = +(store.get('factory-gate-fails') || 0) + 1;
+      if (n >= TRIES) { store.set('factory-gate-lock', String(Date.now() + LOCK_MS)); store.del('factory-gate-fails'); showLock(); }
+      else { store.set('factory-gate-fails', String(n));
+             document.getElementById('gate-err').textContent = 'Not that one. ' + (TRIES - n) + (TRIES - n === 1 ? ' try' : ' tries') + ' left before a 24-hour lock.'; }
+    }
     return false;
   }
 </script>
