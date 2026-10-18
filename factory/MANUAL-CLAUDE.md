@@ -62,8 +62,13 @@ works the same way.
 
 ---
 
+**Disk full?** Claude offers to clean up junk and cache files on your drive (the Trash, app and browser caches, old
+installers). It shows you what they are and how big, and deletes only what you pick. Your videos and documents are never
+on the list.
+
 ## Changelog
 
+- **2026-10-17** - When the disk is low, Claude offers to clean up junk and cache files and shows you what first.
 - **2026-10-17** - Each event gets its own Desktop folder named after the conference (`video factory - Conf42 Prompt
   Engineering 2026`).
 - **2026-10-17** - Health check before the upload: one-channel sound fixed, setup junk cut unless the speaker talks
