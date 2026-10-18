@@ -289,7 +289,7 @@ def doctor(cfg, repo, check_descript=True):
     try:
         os.makedirs(root, exist_ok=True)
         free = shutil.disk_usage(root).free / 1e9
-        add("Work folder", free > 20, "%s (%.0f GB free)" % (root, free), "free some space (a batch needs ~3x its videos)")
+        add("Work folder", free > 20, "%s (%.0f GB free)" % (root, free), "free some space - ask Claude to clean up junk and cache files (a batch needs ~3x its videos)")
     except OSError as ex:
         add("Work folder", False, str(ex), "set work_root in factory/settings.local.yml")
     tok = read_token()
