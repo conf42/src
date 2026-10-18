@@ -36,7 +36,8 @@ the person). Technical details: `factory/README.md` - read the section you need 
    speaker must re-upload), files NOT MATCHED (ask the person which speaker they belong to, then rename to the speaker's name
    exactly as on the site and run again), and talks with **no video yet** - a normal follow-up list for a remote
    conference (with the days left before the event), never an alarm.
-3. Outputs: `<Desktop>/talk-factory/final videos for YouTube/`, `<event>/srt/`, `<event>/slides/`,
+3. Outputs, in the event's folder `<Desktop>/video factory - Conf42 <Event> <Year>/` (one per conference, so several can
+   run at once): `final videos for YouTube/`, `srt/`, `slides/`,
    `<event>/YouTube items.txt` (`chapters <short_url>` rewrites it).
 
 Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `redo <short_url> "<speakers>"`,

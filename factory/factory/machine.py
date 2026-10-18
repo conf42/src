@@ -7,9 +7,11 @@ The Descript token is never in the repo: an environment variable DESCRIPT_API_TO
 set by setx, or a private file ~/.conf42-factory/descript_token (0600) written by `python -m factory setup`.
 """
 import glob
+import json
 import hashlib
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -39,15 +41,59 @@ def desktop():
 
 
 def work_root(cfg):
-    """Folder holding one sub-folder per event: settings `work_root` (absolute) or Desktop/<work_folder>."""
+    """Where the events' folders go: settings `work_root` (absolute, e.g. a bigger disk) or the Desktop."""
     root = cfg.get("work_root")
-    return os.path.expanduser(root) if root else os.path.join(desktop(), cfg.get("work_folder") or "talk-factory")
+    return os.path.expanduser(root) if root else desktop()
 
 
-def final_folder(cfg):
-    """Where the finished videos of every event land, ready for YouTube (Marek 2026-10-13: the event folders' out/
-    held them next to Descript's raw downloads, so it wasn't clear which were final): <work root>/<final_folder>."""
-    return os.path.join(work_root(cfg), cfg.get("final_folder") or "final videos for YouTube")
+def legacy_root(cfg):
+    """Before 2026-10-17 every event sat in <Desktop>/talk-factory/<short_url>."""
+    return os.path.join(work_root(cfg), "talk-factory") if not cfg.get("work_root") else work_root(cfg)
+
+
+def event_dir(cfg, short_url, title=None):
+    """One folder per event, named after the conference so several can run side by side (Marek 2026-10-17):
+    "<work root>/video factory - Conf42 Prompt Engineering 2026" (settings `event_folder`). A folder from before
+    that (<Desktop>/talk-factory/<short_url>) is used where it still exists."""
+    if title is None:
+        from . import events
+        title = events.event(short_url)["title"]
+    name = (cfg.get("event_folder") or "video factory - {event}").format(event=title, id=short_url)
+    new = os.path.join(work_root(cfg), re.sub(r'[<>:"/\\|?*]', "-", name).strip())
+    old = os.path.join(legacy_root(cfg), short_url)
+    return old if not os.path.exists(new) and os.path.exists(os.path.join(old, "state.json")) else new
+
+
+def event_dirs(cfg):
+    """The event folders on this machine that have been started: {short_url: folder}."""
+    out = {}
+    for root in {work_root(cfg), legacy_root(cfg)}:
+        for name in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+            st = os.path.join(root, name, "state.json")
+            if os.path.exists(st):
+                try:
+                    with open(st, encoding="utf-8") as f:
+                        d = json.load(f)
+                    sid = (d.get("event") or {}).get("short_url")
+                    if sid:                           # a Conf42 event (the LIVE factory's folders carry an "id" instead)
+                        out.setdefault(sid, os.path.join(root, name))
+                except (OSError, ValueError):
+                    pass
+    return out
+
+
+def shared_dir(cfg):
+    """Machine-wide files that belong to no single event (the ledger of paid Descript edits): factory/local/ next to
+    the code (git-ignored)."""
+    d = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "local")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def final_folder(cfg, event_dir_path):
+    """The event's finished videos, ready for YouTube, inside its own folder (Marek 2026-10-13: not in out/ next to
+    Descript's raw downloads, so it's clear which are final)."""
+    return os.path.join(event_dir_path, cfg.get("final_folder") or "final videos for YouTube")
 
 
 def soffice():

@@ -104,7 +104,7 @@ When a talk shows **QA** done, look at its flags:
     start / end and trim by hand if needed;
 - **Health failed: needs a new video** - no sound, muted, or almost no sound. Ask the speaker for a new upload.
 
-The finished videos are in `Desktop/talk-factory/final videos for YouTube/`, named
+The finished videos are in the event's folder, `Desktop/video factory - <event>/final videos for YouTube/`, named
 `<speakers> - Conf42 <Event> <Year>.mp4`. Subtitles are in the event folder's `srt/`.
 
 ### Step 4 - Slides
@@ -150,7 +150,8 @@ whenever a talk finishes (at most every 20 minutes) and at the end of the run.
 
 ## 4. Where things are
 
-`Desktop/talk-factory/<short_url>/` on the computer that runs the event:
+One folder per conference on the Desktop of the computer that runs the event, e.g.
+`Desktop/video factory - Conf42 Prompt Engineering 2026/`, so several events can run side by side:
 
 | Folder / file | What's in it |
 |---|---|
@@ -160,13 +161,15 @@ whenever a talk finishes (at most every 20 minutes) and at the end of the run.
 | `slides/` | decks ready for the site |
 | `YouTube items.txt` | titles, descriptions, chapters |
 | `state.json` | progress of every step |
+| `final videos for YouTube/` | the finished videos of this event |
 
-Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`.
 
 ---
 
 ## Changelog
 
+- **2026-10-17** - One folder per event on the Desktop, named after the conference: `video factory - Conf42 Prompt
+  Engineering 2026`, with its own `final videos for YouTube/`.
 - **2026-10-17** - Starting the app while an older copy is still running replaces that copy (jobs already
   running carry on), so you never work in an out-of-date app.
 - **2026-10-17** - New **Health** step before the upload: fixes sound on one channel only, cuts the speaker's setup
