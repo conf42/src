@@ -167,6 +167,8 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-17** - Starting the app while an older copy is still running replaces that copy (jobs already
+  running carry on), so you never work in an out-of-date app.
 - **2026-10-17** - New **Health** step before the upload: fixes sound on one channel only, cuts the speaker's setup
   (clicking around, the desktop before the slides, "stop sharing") unless they talk over it, and stops videos with no
   usable sound before they cost Descript credits.

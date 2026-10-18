@@ -17,6 +17,12 @@ the person). Technical details: `factory/README.md` - read the section you need 
   Descript token, which never goes through you). Health check: `-m factory doctor`.
 - Events are named by their `short_url` (e.g. `featureflags2026`), from `metadata.yml`.
 - Long jobs go in the background. The app is http://localhost:8042 (`run.sh` / `run.cmd`).
+- **"Launch / activate the factory" always opens the app**: `... -m factory serve` in the background opens
+  http://localhost:8042, reusing an app that's current and replacing one running older code - every time
+  (Marek, 2026-10-17).
+- **Keep the factories in step with the websites**: when a site change alters something a factory reads (folder
+  layout, CSV columns, metadata keys, teaser/thumbnail URLs), adapt this factory and the LIVE factory
+  (sreday repo, `live-factory/`) in the same job, test them, and update their manuals (Marek, 2026-10-17).
 
 ## The usual job: "activate the factory" + a Drive folder link
 
