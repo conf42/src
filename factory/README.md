@@ -12,17 +12,23 @@ Per talk:
 
 1. **Match** the video to its talk in `_db/<EVENT>.csv` and rename it to the speaker(s) exactly as on the site
    (`Name1` or `Name1 & Name2`). Files that match nobody are never guessed; they are listed as "not matched".
-2. **Upload** to one Descript project per event, named from `settings.yml` (`Conf42 DevSecOps 2026`), one composition per talk.
-3. **Edit** with Descript's AI editor: Studio Sound 80%, limiter, volume 300%, filler words removed, word gaps over 2s cut to 1s.
-4. **Publish** (unlisted) at the largest size not above the source or `max_resolution`, and **download** the MP4.
-5. **SRT** transcript, named `<short_url>_<Name1>.srt`, which is what the site expects in `src/srt/`.
-6. **Loudness**: ffmpeg measures each video and sets it to YouTube's level (-14 LUFS, true peak -1.5 dB).
+2. **Health check**, locally before the upload, so a broken talk never costs Descript credits (`media.health`):
+   sound on only one channel (or two channels cancelling out) is fixed; no sound track, muted sound or sound in under
+   15 % of the video stops the talk (not uploaded, "needs a new video from the speaker"); setup junk at the start and
+   end - clicking around, the desktop before the slides, "stop sharing" - is cut off, up to 2 min at each end, unless
+   the speaker talks over it (then it is only flagged). The cut is one encode from the original file
+   (`mp4/<speakers>.health.mp4`). Settings: `health_*`.
+3. **Upload** to one Descript project per event, named from `settings.yml` (`Conf42 DevSecOps 2026`), one composition per talk.
+4. **Edit** with Descript's AI editor: Studio Sound 80%, limiter, volume 300%, filler words removed, word gaps over 2s cut to 1s.
+5. **Publish** (unlisted) at the largest size not above the source or `max_resolution`, and **download** the MP4.
+6. **SRT** transcript, named `<short_url>_<Name1>.srt`, which is what the site expects in `src/srt/`.
+7. **Loudness**: ffmpeg measures each video and sets it to YouTube's level (-14 LUFS, true peak -1.5 dB).
    The video stream is copied, so there's no quality loss. In the same pass the video is **trimmed to the speech**:
    it starts 0.3 s before the first word and ends 1 s after the last one (from the transcript). The SRT and the
    chapters move with it. Settings: `trim_to_speech`, `trim_lead_seconds`, `trim_tail_seconds`.
-7. **QA** measures the result and flags talks whose loudness is off or where the edit cut too much. It also flags a
+8. **QA** measures the result and flags talks whose loudness is off or where the edit cut too much. It also flags a
    talk whose picture changes in its first 12 seconds ("check the start"). That is usually the speaker's OBS or
-   desktop before the slides; it is never cut automatically.
+   desktop before the slides that the health check left in because the speaker talks over it.
 
 Finished videos of every event go to one folder, `Desktop\talk-factory\final videos for YouTube\`, named
 `<speakers> - Conf42 <Event> <Year>.mp4` (the dashboard's "Final videos for YouTube" button opens it; `final_folder` in

@@ -7,7 +7,7 @@ its talk, has Descript clean it up, and hands you an MP4, subtitles and the YouT
 It also prepares the slide decks for the site.
 
 ```
-speakers' Drive folder  →  match to the talks  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
+speakers' Drive folder  →  match to the talks  →  health check  →  Descript (Studio Sound, fillers, pauses)  →  MP4 + subtitles  →  loudness + QA  →  YouTube
 ```
 
 The status of every event is on this page's **Factory logs** tab - it updates live, every minute. The technical details live in `factory/README.md` in the
@@ -86,13 +86,23 @@ are never redone.
 What Descript does to every talk: **Studio Sound 80%**, limiter, volume, filler words removed, pauses over 2 s
 shortened to 1 s. Then the factory sets YouTube's loudness and trims the video to the first and last word.
 
+Before any of that, the **health check** looks at every video on your computer:
+
+- sound on only one channel (or two channels cancelling each other out) - **fixed** automatically;
+- the speaker clicking around, the desktop before the slides, "stop sharing" at the end - **cut off** automatically
+    (up to 2 minutes at each end), unless the speaker is talking over it;
+- no sound track, muted sound, or almost no sound - the talk **stops here** and is not sent to Descript: it needs a
+    new video from the speaker.
+
 ### Step 3 - Check the results
 
 When a talk shows **QA** done, look at its flags:
 
 - **loudness off** or **the edit removed more than 25%** - watch it;
-- **picture changes in the first 12 seconds - check the start** - often the speaker's OBS or desktop before the
-    slides. It is never cut automatically: trim it by hand if needed.
+- **setup on screen ... the speaker talks over it - not cut** (Health) or **picture changes in the first 12 seconds -
+    check the start** (QA) - the speaker's desktop or OBS is still in the video because they talk over it. Watch the
+    start / end and trim by hand if needed;
+- **Health failed: needs a new video** - no sound, muted, or almost no sound. Ask the speaker for a new upload.
 
 The finished videos are in `Desktop/talk-factory/final videos for YouTube/`, named
 `<speakers> - Conf42 <Event> <Year>.mp4`. Subtitles are in the event folder's `srt/`.
@@ -157,6 +167,9 @@ Finished videos of every event: `Desktop/talk-factory/final videos for YouTube/`
 
 ## Changelog
 
+- **2026-10-17** - New **Health** step before the upload: fixes sound on one channel only, cuts the speaker's setup
+  (clicking around, the desktop before the slides, "stop sharing") unless they talk over it, and stops videos with no
+  usable sound before they cost Descript credits.
 - **2026-10-16** - **Factory logs**: an event folds into one line 24 h after its release (click to open it); the top says
   which upcoming Conf42 event the factory is ready for, or what it is working on.
 - **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.
