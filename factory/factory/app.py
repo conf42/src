@@ -238,6 +238,16 @@ def publish_status():
 
 PAGE_FILE = os.path.join(os.path.dirname(__file__), "dashboard.html")
 
+
+def code_stamp():
+    """When the factory's code last changed: an app started before that is stale and gets replaced (the LIVE factory,
+    2026-10-17: an app left running from the day before showed the wrong event)."""
+    d = os.path.dirname(__file__)
+    return max(os.path.getmtime(os.path.join(d, f)) for f in os.listdir(d) if f.endswith((".py", ".html")))
+
+
+STARTED_STAMP = code_stamp()
+
 # Expected seconds per step = a + b * video minutes + c * MB, then scaled by how long finished steps really took
 # (median ratio, so the bars learn this PC's upload speed and Descript's pace). Seeds from 2026-09-28 Descript jobs.
 DEFAULT_SECS = {"render": (5, 4, 0), "health": (5, 0.5, 0), "upload": (70, 0, 0.25), "edit": (75, 0, 0), "publish": (40, 14, 0),
@@ -278,6 +288,8 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/":
             with open(PAGE_FILE, encoding="utf-8") as f:
                 return self.send(200, f.read().replace("__STEPS__", json.dumps(pipeline.STEPS)), "text/html")
+        if u.path == "/api/version":
+            return self.send(200, {"stamp": STARTED_STAMP, "pid": os.getpid()})
         if u.path == "/api/events":
             return self.send(200, event_list())
         if u.path == "/api/state":
@@ -319,6 +331,10 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(n) or b"{}")
         e = body.get("e", "")
         try:
+            if self.path == "/api/quit":           # a newer copy of the app is taking over the port
+                import threading
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return self.send(200, {"msg": "bye"})
             if self.path == "/api/start":
                 os.makedirs(os.path.join(work_root(), e), exist_ok=True)
                 holder = lock_holder(e)
@@ -357,17 +373,49 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404, {"msg": "not found"})
 
 
-def serve():
-    url = "http://localhost:%d" % PORT
+def _ask(method, path):
+    from urllib.request import Request, urlopen
+    with urlopen(Request("http://127.0.0.1:%d%s" % (PORT, path), data=b"{}" if method == "POST" else None,
+                         method=method, headers={"Content-Type": "application/json"}), timeout=3) as r:
+        return json.loads(r.read() or b"{}")
+
+
+def _port_busy():
     import socket
     probe = socket.socket()
     probe.settimeout(1)
     busy = probe.connect_ex(("127.0.0.1", PORT)) == 0   # Windows would let a second server share the port: ask first
     probe.close()
-    if busy:
-        print("the factory app is already running on " + url)
-        webbrowser.open(url)
-        return
+    return busy
+
+
+def serve():
+    """The app in the browser. One already running is reused when it has today's code and replaced when it's older;
+    jobs run in their own processes and carry on either way."""
+    import time
+    url = "http://localhost:%d" % PORT
+    if _port_busy():
+        try:
+            stale = _ask("GET", "/api/version").get("stamp", 0) < code_stamp()
+        except Exception:
+            stale = True                       # an app from before /api/version existed
+        if not stale:
+            print("the factory app is already running on " + url)
+            webbrowser.open(url)
+            return
+        try:
+            _ask("POST", "/api/quit")
+        except Exception:
+            pass
+        for _ in range(20):
+            if not _port_busy():
+                break
+            time.sleep(0.25)
+        if _port_busy():
+            print("an older factory app is still running on port %d and won't stop - close its window (or end its "
+                  "python process), then start this again" % PORT)
+            return
+        print("replaced the older app that was running")
     ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
