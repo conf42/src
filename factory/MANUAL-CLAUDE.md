@@ -41,7 +41,7 @@ works the same way.
 | Start | *"Activate the factory for Feature Flags 2026: https://drive.google.com/drive/folders/…"* | Claude fetches the Drive folder (only new or changed files), matches every video to its talk and starts the whole run in the background. |
 | Watch | *"How is it going?"* - or open http://localhost:8042 | Per talk: render, upload, Descript edit, publish, download, subtitles, chapters, loudness, QA. |
 | Unmatched files | Claude asks you which speaker a file belongs to | It renames it and runs it. |
-| Check | *"What needs my attention?"* | Talks with QA flags (loudness, too much cut, "check the start"), failed talks, and the **no video yet** follow-up list. Watch the flagged ones. |
+| Check | *"What needs my attention?"* | Talks with QA or health flags (loudness, too much cut, setup the speaker talks over), talks that **need a new video** (no or muted sound - not sent to Descript), failed talks, and the **no video yet** follow-up list. Watch the flagged ones. |
 | New upload | *"Some speakers uploaded new versions - check the Drive again."* | Claude fetches the folder again; re-uploaded talks are done again from scratch. |
 | Slides | *"Prepare the slides."* | Decks matched, converted to PDF, renamed for the site, compressed. |
 | YouTube | *"Write the YouTube items."* | Titles, descriptions and chapters, ready to paste. Thumbnails: conf42.com/<event>/teasers#thumbnails. You upload. |
@@ -64,5 +64,7 @@ works the same way.
 
 ## Changelog
 
+- **2026-10-17** - Health check before the upload: one-channel sound fixed, setup junk cut unless the speaker talks
+  over it, talks with no usable sound stopped (ask Claude *"Which talks need a new video?"*).
 - **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.
 - **2026-10-16** - First version, with the conf42-factory skill in the conf42 repo.

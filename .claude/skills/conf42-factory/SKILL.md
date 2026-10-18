@@ -24,8 +24,10 @@ the person). Technical details: `factory/README.md` - read the section you need 
    videos and decks (size-checked), flags talks whose video was re-uploaded, matches files to speakers and runs the
    whole pipeline. The link is remembered: later just `drive <short_url>`. **Never download through a browser**, never
    ask the person to download.
-2. When it ends, report: finished / failed talks, QA flags (loudness, >25 % cut, "picture changes in the first 12 s -
-   check the start"), files NOT MATCHED (ask the person which speaker they belong to, then rename to the speaker's name
+2. When it ends, report: finished / failed talks, QA and health flags (loudness, >25 % cut, "picture changes in the
+   first 12 s - check the start", setup the speaker talks over), what the health check fixed or cut, talks that **need
+   a new video** (`needs_new_video` in the status summary: no sound, muted, almost no sound - never uploaded; the
+   speaker must re-upload), files NOT MATCHED (ask the person which speaker they belong to, then rename to the speaker's name
    exactly as on the site and run again), and talks with **no video yet** - a normal follow-up list for a remote
    conference (with the days left before the event), never an alarm.
 3. Outputs: `<Desktop>/talk-factory/final videos for YouTube/`, `<event>/srt/`, `<event>/slides/`,

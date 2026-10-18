@@ -520,7 +520,7 @@ with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual, manual_claude=factory_manual_claude,
                                                            fx_events=fx_events, fx_next=fx_next,
                                                            gate=FACTORY_GATE_SHA256,
-                                                           steps=["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
+                                                           steps=["render", "health", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 
 # 404 INDEX
 # /404-index.json feeds docs/404.html (see _templates/404.html): slip redirects + the single "Did you mean" link.

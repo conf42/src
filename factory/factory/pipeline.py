@@ -28,7 +28,11 @@ from .descript import Descript
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
-STEPS = ["render", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
+STEPS = ["render", "health", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
+class HealthBlocked(RuntimeError):
+    """The video is not good enough for a conference talk (no sound, muted, almost no sound): never uploaded."""
+
+
 MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, not a talk
 REPO_RUNS = os.path.join(events.REPO, "_db", "factory_runs")   # per event state + YouTube items, and the ledger, in git
 
@@ -195,12 +199,14 @@ class Run:
         if os.path.exists(old_final):
             os.makedirs(os.path.join(self.out, "replaced"), exist_ok=True)
             shutil.move(old_final, os.path.join(self.out, "replaced", "%s %s" % (now().replace(":", "-"), os.path.basename(old_final))))
-        for leftover in (os.path.join(self.dir, "mp4", key + ".mp4"), os.path.join(self.out, "_descript", key + ".mp4")):
+        for leftover in (os.path.join(self.dir, "mp4", key + ".mp4"), os.path.join(self.dir, "mp4", key + ".health.mp4"),
+                         os.path.join(self.out, "_descript", key + ".mp4")):
             if os.path.exists(leftover):
                 os.remove(leftover)                     # intermediate files of the old video
         if t.get("composition_id"):
             t.setdefault("broken_compositions", []).append(t["composition_id"])
-        for k in ("probe", "resolution", "composition_id", "finished", "trim", "drive_newer", "error", "retry", "current"):
+        for k in ("probe", "resolution", "composition_id", "finished", "trim", "drive_newer", "error", "retry", "current",
+                  "needs_new_video"):
             t.pop(k, None)
         t["steps"] = {}
         t.setdefault("redone", []).append({"at": now(), "why": why})
@@ -398,6 +404,8 @@ class Run:
             # render: a lean H.264/AAC mp4 (GPU) instead of the camera file - smaller, faster upload (Marek 2026-09-28)
             if done("upload") and not done("render"):
                 self.set(key, "render", "done", note="not needed, already uploaded")
+            if done("upload") and not done("health"):
+                self.set(key, "health", "done", note="not needed, already uploaded")
             if not done("render"):
                 fut = self.render_futures.get(key)
                 if fut:
@@ -415,6 +423,11 @@ class Run:
                     self.render_step(key)
             if not os.path.exists(up) or (t["steps"].get("render") or {}).get("file") != key + ".mp4":
                 up = src
+            if not done("upload") and not done("health"):
+                self.health_step(key, src, up)
+            fixed = os.path.join(self.dir, "mp4", (t["steps"].get("health") or {}).get("file") or "-")
+            if not done("upload") and os.path.exists(fixed):
+                up = fixed                                   # the talk with its setup cut / sound fixed
             if not done("upload"):
                 self.upload_turn(key)
                 self.set(key, "upload", "running", label="uploading %.0f MB" % (os.path.getsize(up) / 1e6), percent=0)
@@ -508,7 +521,9 @@ class Run:
                 self.set(key, "qa", "running")
                 lufs, peak = media.loudness(final)
                 out = media.probe(final)
-                cut = 100 * (1 - out["duration"] / t["probe"]["duration"]) if t["probe"]["duration"] else 0
+                hc = t["steps"].get("health") or {}           # the setup the health check cut is not the edit's cut
+                sent = ((hc.get("end") or t["probe"]["duration"]) - (hc.get("start") or 0)) if hc.get("file") else t["probe"]["duration"]
+                cut = 100 * (1 - out["duration"] / sent) if sent else 0
                 flags = []
                 if lufs is None or abs(lufs - cfg["loudness_lufs"]) > cfg["qa_loudness_tolerance"]:
                     flags.append("loudness %s LUFS" % lufs)
@@ -538,6 +553,42 @@ class Run:
                 self.save()
             self.note("FAILED %s at %s: %s" % (key, t.get("current"), ex))
             traceback.print_exc()
+
+    # ---- video health check, before the upload (Marek 2026-10-17) -----------------------------------
+    def health_step(self, key, src, up):
+        """Check the rendered talk locally before it costs Descript minutes and credits: sound on one channel only or
+        two channels cancelling out is fixed, setup junk at the start / end (clicking around, the desktop before the
+        slides, "stop sharing") is cut when nobody talks over it, and a talk with no usable sound is stopped here -
+        it needs a new video from the speaker. The fixed talk is mp4/<key>.health.mp4, made in one encode from the
+        speaker's original file, so the picture loses nothing."""
+        t = self.talk(key)
+        if not self.cfg.get("health_check", True):
+            self.set(key, "health", "done", note="switched off in settings")
+            return
+        self.set(key, "health", "running", label="checking the sound and the start / end of the video")
+        rep = media.health(up, self.cfg)
+        info = {k: rep.get(k) for k in ("fixes", "flags", "start", "end", "length", "sound_percent", "audio")}
+        if rep["block"]:
+            with self.lock:
+                t["needs_new_video"] = "; ".join(rep["block"])
+            self.set(key, "health", "failed", **info)
+            raise HealthBlocked("%s - not uploaded; ask the speaker for a new video" % "; ".join(rep["block"]))
+        out = None
+        if rep["start"] or rep["end"]:
+            self.set(key, "health", "running", label="cutting the setup off: " + "; ".join(rep["fixes"]), percent=0)
+            out = media.render(src, os.path.join(self.dir, "mp4", key + ".health.mp4"), start=rep["start"],
+                               end=rep["end"], af=rep["af"], force=True,
+                               on_progress=lambda label, percent=None: self.set(key, "health", "running",
+                                                                                label="cutting the setup off - " + label, percent=percent))
+        elif rep["af"]:
+            self.set(key, "health", "running", label="fixing the sound: " + "; ".join(rep["fixes"]))
+            out = media.fix_audio(up, os.path.join(self.dir, "mp4", key + ".health.mp4"), rep["af"])
+        with self.lock:
+            t.pop("needs_new_video", None)
+        self.set(key, "health", "done", file=os.path.basename(out) if out else None,
+                 note="; ".join(rep["fixes"] + rep["flags"]) or "all good", **info)
+        if rep["fixes"]:
+            self.note("%s: %s" % (key, "; ".join(rep["fixes"])))
 
     def chapters_step(self, key, d=None):
         """YouTube chapters from Descript's AI editor (read-only prompt, about 6 AI credits), cleaned to YouTube's
@@ -781,7 +832,7 @@ class Run:
             err = t.get("error") or ""
             if err or (t["steps"].get("upload") or {}).get("status") == "done":
                 self.upload_settled(key)                 # a failed talk never holds up the uploads after it
-            if not err or n == attempts or "402" in err or "edits paused" in err:
+            if not err or n == attempts or "402" in err or "edits paused" in err or err.startswith("health:"):
                 return
             with self.lock:
                 t["retry"] = "failed (%s) - trying again automatically in %d min, attempt %d of %d" % (
@@ -953,8 +1004,12 @@ def summary(state):
     running = {k: t.get("current") for k, t in talks.items() if t.get("current") and not t.get("error")}
     flagged = {k: t["steps"]["qa"]["flags"] for k, t in talks.items() if (t["steps"].get("qa") or {}).get("flags")}
     for k, t in talks.items():
+        for f in (t["steps"].get("health") or {}).get("flags") or []:
+            flagged.setdefault(k, []).append(f)
+    for k, t in talks.items():
         if t.get("drive_newer"):
             flagged.setdefault(k, []).append("newer video on Drive (%s) - redo" % t["drive_newer"]["uploaded"][:16])
     return {"matched": len(talks), "in_csv": len(state.get("talks_in_csv", [])), "finished": fin, "failed": failed,
             "running": running, "flagged": flagged, "unmatched": state.get("unmatched", []),
-            "missing_videos": [s for s in state.get("talks_in_csv", []) if s not in talks]}
+            "missing_videos": [s for s in state.get("talks_in_csv", []) if s not in talks],
+            "needs_new_video": {k: t["needs_new_video"] for k, t in talks.items() if t.get("needs_new_video")}}

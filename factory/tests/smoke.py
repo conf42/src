@@ -88,6 +88,46 @@ def main():
         except Exception as ex:
             check("loudness -14 LUFS", False, ex)
 
+    # 5b. video health check: a 3-minute talk with 12 s of clicking on the desktop before the slides, 8 s of "stop
+    # sharing" after them and its sound on the left channel only -> sound copied to both, both ends cut; the same talk
+    # with someone talking over the junk -> nothing cut; muted / no sound track -> stopped before the upload
+    try:
+        ff = media.tool("ffmpeg")
+        talk = os.path.join(tmp, "health.mp4")
+        r = subprocess.run([ff, "-hide_banner", "-loglevel", "error", "-y",
+                            "-f", "lavfi", "-i", "color=c=gray:s=320x180:r=25:d=178", "-f", "lavfi", "-i", "color=c=red:s=8x8:r=25:d=178",
+                            "-f", "lavfi", "-i", "color=c=navy:s=320x180:r=25:d=78", "-f", "lavfi", "-i", "color=c=darkgreen:s=320x180:r=25:d=80",
+                            "-f", "lavfi", "-i", "aevalsrc='if(between(t,5,5.25),0.3*sin(2*PI*900*t),0)':s=48000:d=12",
+                            "-f", "lavfi", "-i", "sine=frequency=220:sample_rate=48000:duration=158",
+                            "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=8",
+                            "-filter_complex", "[0:v][1:v]overlay=x='mod(t*60,300)':y=80[desk];[desk]split=2[d1][d2];"
+                            "[d1]trim=0:12,setpts=PTS-STARTPTS[a1];[d2]trim=170:178,setpts=PTS-STARTPTS[a3];"
+                            "[a1][2:v][3:v][a3]concat=n=4:v=1:a=0[v];[4:a][5:a][6:a]concat=n=3:v=0:a=1,volume=-12dB[m];"
+                            "anullsrc=r=48000:cl=mono,atrim=0:178[z];[m][z]amerge=inputs=2[a]",
+                            "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-t", "178", talk],
+                           capture_output=True, text=True)
+        check("make a test talk with setup junk", r.returncode == 0, r.stderr[-200:])
+        h = media.health(talk, cfg)
+        check("health: one-channel sound fixed", h["af"] == "pan=stereo|c0=c0|c1=c0" and not h["block"], h["fixes"])
+        check("health: setup cut at the start", h["start"] is not None and abs(h["start"] - 12) <= 1, h["start"])
+        check("health: setup cut at the end", h["end"] is not None and abs(h["end"] - 170) <= 1, h["end"])
+        fixed = media.render(talk, os.path.join(tmp, "health.health.mp4"), start=h["start"], end=h["end"], af=h["af"], force=True)
+        lv = media.audio_levels(fixed)
+        got = media.probe(fixed)["duration"]
+        check("health: fixed talk", abs(got - (h["end"] - h["start"])) <= 1.5 and abs(lv["left"] - lv["right"]) < 3,
+              "%.1f s, left %s / right %s dB" % (got, lv["left"], lv["right"]))
+        for name, extra, want in (("talking over the junk", ["-f", "lavfi", "-i", "sine=frequency=200:sample_rate=48000:duration=178",
+                                                            "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-ac", "2"], "kept"),
+                                  ("muted", ["-map", "0", "-c:v", "copy", "-af", "volume=0", "-c:a", "aac"], "block"),
+                                  ("no sound track", ["-map", "0:v", "-c:v", "copy"], "block")):
+            v = os.path.join(tmp, "health-%s.mp4" % name.replace(" ", "-"))
+            subprocess.run([ff, "-hide_banner", "-loglevel", "error", "-y", "-i", talk] + extra + [v], capture_output=True)
+            h = media.health(v, cfg)
+            ok = (bool(h["block"]) if want == "block" else (not h["block"] and h["start"] is None and h["end"] is None and len(h["flags"]) == 2))
+            check("health: %s -> %s" % (name, "stopped" if want == "block" else "not cut, flagged"), ok, h["block"] or h["flags"])
+    except Exception as ex:
+        check("health check", False, ex)
+
     # 6. slides: a heavy 3-page PDF is compressed under the limit with every page kept
     try:
         from PIL import Image
