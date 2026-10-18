@@ -1,6 +1,6 @@
 """The factory pipeline: Drive download -> Descript -> finished MP4 + SRT on the Desktop.
 
-One state file per event (Desktop/<work_folder>/<short_url>/state.json, synced without links to _db/factory_runs on
+One state file per event (Desktop/video factory - <event>/state.json, synced without links to _db/factory_runs on
 every status publish, so a fresh clone on another machine carries on) records every step of every talk, so a run
 can be stopped and restarted at any time: finished steps are skipped and a failed talk is retried on its own.
 
@@ -101,9 +101,9 @@ class Run:
     def __init__(self, short_url):
         self.cfg = settings()
         self.ev = events.event(short_url)
-        self.dir = os.path.join(machine.work_root(self.cfg), short_url)
+        self.dir = machine.event_dir(self.cfg, short_url, self.ev["title"])
         self.inp, self.out, self.srt_dir, self.slides_dir = (os.path.join(self.dir, d) for d in ("in", "out", "srt", "slides"))
-        self.final_dir = machine.final_folder(self.cfg)   # finished videos of every event, in one place
+        self.final_dir = machine.final_folder(self.cfg, self.dir)   # the event's finished videos, in its own folder
         for d in (self.inp, self.out, self.srt_dir, self.slides_dir, self.final_dir):
             os.makedirs(d, exist_ok=True)
         for old in glob.glob(os.path.join(self.out, "*.mp4")):   # finished before 2026-10-13: out/ -> the final folder
@@ -168,9 +168,9 @@ class Run:
             t["current"] = step if status in ("running", "waiting") else t.get("current")
             self.save()
 
-    # ---- the ledger of paid Descript edits, shared by all events (Desktop/<work_folder>/ledger.json) ----------
+    # ---- the ledger of paid Descript edits, shared by all events (factory/local/ledger.json) ----------
     def ledger_path(self):
-        return os.path.join(os.path.dirname(self.dir), "ledger.json")
+        return os.path.join(machine.shared_dir(self.cfg), "ledger.json")
 
     def ledger(self):
         led = {}

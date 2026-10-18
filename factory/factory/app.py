@@ -31,9 +31,17 @@ def work_root():
     return machine.work_root(pipeline.settings())
 
 
+def event_dir(short_url):
+    """The event's folder, "video factory - <event>" (machine.event_dir)."""
+    try:
+        return machine.event_dir(pipeline.settings(), short_url)
+    except Exception:                                 # not in events any more: wherever its state is
+        return machine.event_dirs(pipeline.settings()).get(short_url) or os.path.join(work_root(), short_url)
+
+
 def state_of(short_url, local_only=False):
     """This machine's state.json, else (fresh clone) the synced copy in _db/factory_runs."""
-    p = os.path.join(work_root(), short_url, "state.json")
+    p = os.path.join(event_dir(short_url), "state.json")
     if not os.path.exists(p) and not local_only:
         p = os.path.join(pipeline.REPO_RUNS, short_url, "state.json")
     if not os.path.exists(p):
@@ -44,10 +52,11 @@ def state_of(short_url, local_only=False):
 
 def event_list():
     today = datetime.date.today().isoformat()
+    dirs = machine.event_dirs(pipeline.settings())
     out = []
     for e in events.all_events():
         date = str(e.get("date", ""))
-        started = any(os.path.exists(os.path.join(d, e["short_url"], "state.json")) for d in (work_root(), pipeline.REPO_RUNS))
+        started = e["short_url"] in dirs or os.path.exists(os.path.join(pipeline.REPO_RUNS, e["short_url"], "state.json"))
         if started or date >= str(datetime.date.today().replace(year=datetime.date.today().year - 1)):
             out.append({"short_url": e["short_url"], "title": "Conf42 %s %s" % (e["name"], date[:4]), "date": date,
                         "started": started})
@@ -148,7 +157,8 @@ def usage_month():
 
 
 def spawn(args, short_url):
-    log = open(os.path.join(work_root(), short_url, "run.log"), "a", encoding="utf-8")
+    os.makedirs(event_dir(short_url), exist_ok=True)
+    log = open(os.path.join(event_dir(short_url), "run.log"), "a", encoding="utf-8")
     extra = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {"start_new_session": True}
     subprocess.Popen([PY, "-m", "factory"] + args, cwd=HERE, stdout=log, stderr=subprocess.STDOUT,
                      env={**os.environ, "PYTHONUTF8": "1"}, **extra)
@@ -209,7 +219,7 @@ def publish_status():
         if not alive and prev.get("active") and prev.get("machine") != machine.machine_id():
             continue                                  # another machine is running it: its entry wins
         mine.add(e["short_url"])
-        synced += pipeline.sync_to_repo(e["short_url"], os.path.join(work_root(), e["short_url"]))
+        synced += pipeline.sync_to_repo(e["short_url"], event_dir(e["short_url"]))
         talks = []
         for k, t in sorted(st["talks"].items()):
             qa = (t["steps"].get("qa") or {})
@@ -307,7 +317,7 @@ class Handler(BaseHTTPRequestHandler):
             st = state_of(e) or {}
             ledger = {}
             try:
-                with open(os.path.join(work_root(), "ledger.json"), encoding="utf-8") as f:
+                with open(os.path.join(machine.shared_dir(pipeline.settings()), "ledger.json"), encoding="utf-8") as f:
                     ledger = json.load(f)
             except (OSError, ValueError):
                 pass
@@ -336,7 +346,7 @@ class Handler(BaseHTTPRequestHandler):
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return self.send(200, {"msg": "bye"})
             if self.path == "/api/start":
-                os.makedirs(os.path.join(work_root(), e), exist_ok=True)
+                os.makedirs(event_dir(e), exist_ok=True)
                 holder = lock_holder(e)
                 if holder and not body.get("force"):
                     return self.send(200, {"msg": "Not started: this event is running on %s (last seen %s). Stop it "
@@ -348,7 +358,7 @@ class Handler(BaseHTTPRequestHandler):
                 spawn(["retry", e, body["speakers"]], e)
                 return self.send(200, {"msg": "retrying " + body["speakers"]})
             if self.path == "/api/openchapters":
-                path = os.path.join(work_root(), e, "YouTube items.txt")
+                path = os.path.join(event_dir(e), "YouTube items.txt")
                 if not os.path.exists(path):
                     path = os.path.join(pipeline.REPO_RUNS, e, "YouTube items.txt")
                 if not os.path.exists(path):
@@ -356,10 +366,10 @@ class Handler(BaseHTTPRequestHandler):
                 machine.open_folder(path)
                 return self.send(200, {"msg": ""})
             if self.path == "/api/open":
-                machine.open_folder(os.path.join(work_root(), e))
+                machine.open_folder(event_dir(e))
                 return self.send(200, {"msg": ""})
             if self.path == "/api/openfinal":
-                machine.open_folder(machine.final_folder(pipeline.settings()))
+                machine.open_folder(machine.final_folder(pipeline.settings(), event_dir(e)))
                 return self.send(200, {"msg": ""})
             if self.path == "/api/publish":
                 return self.send(200, {"msg": publish_status()})

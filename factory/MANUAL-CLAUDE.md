@@ -64,6 +64,8 @@ works the same way.
 
 ## Changelog
 
+- **2026-10-17** - Each event gets its own Desktop folder named after the conference (`video factory - Conf42 Prompt
+  Engineering 2026`).
 - **2026-10-17** - Health check before the upload: one-channel sound fixed, setup junk cut unless the speaker talks
   over it, talks with no usable sound stopped (ask Claude *"Which talks need a new video?"*).
 - **2026-10-16** - Tabs renamed and reordered: **Run with Claude** (first), **No Claude, manual**, **Factory logs**.

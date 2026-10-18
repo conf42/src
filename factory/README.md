@@ -30,9 +30,12 @@ Per talk:
    talk whose picture changes in its first 12 seconds ("check the start"). That is usually the speaker's OBS or
    desktop before the slides that the health check left in because the speaker talks over it.
 
-Finished videos of every event go to one folder, `Desktop\talk-factory\final videos for YouTube\`, named
+Each event has its own folder on the Desktop, named after the conference so several can run side by side:
+`Desktop\video factory - Conf42 Prompt Engineering 2026\` (`event_folder` in settings.yml; folders from before
+2026-10-17, `Desktop\talk-factory\<short_url>\`, are still found). Its finished videos go to its own
+`final videos for YouTube\`, named
 `<speakers> - Conf42 <Event> <Year>.mp4` (the dashboard's "Final videos for YouTube" button opens it; `final_folder` in
-settings.yml). Everything else stays per event in `Desktop\talk-factory\<short_url>\`:
+settings.yml). Everything else in that folder:
 
 - `out\_descript\`: Descript's downloads, before the loudness pass (not for YouTube).
 - `srt\`: transcripts.
@@ -102,7 +105,7 @@ The edit prompt names the talk's composition (`{composition}`). Without that, "a
 
 Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again
-- an edit is skipped when the ledger of paid edits (`Desktop\talk-factory\ledger.json`) lists it, or when the composition is already shorter than its media
+- an edit is skipped when the ledger of paid edits (`factory\local\ledger.json`, machine-wide) lists it, or when the composition is already shorter than its media
 
 ## Setup (any machine: Windows, macOS, Linux)
 
@@ -128,7 +131,7 @@ Where things live:
 - **Descript token:** never in git (this repo is public). Windows: the user environment variable `DESCRIPT_API_TOKEN`;
   macOS/Linux: `~/.conf42-factory/descript_token` (readable by you only). An environment variable always wins.
 - **Per-machine settings:** `factory/settings.local.yml` (git-ignored) overrides `settings.yml`: `machine_name`,
-  `work_root` (default `<Desktop>/talk-factory`, OneDrive Desktops included), `render_parallel` (`auto` = up to 8 renders
+  `work_root` (where the event folders go; default the Desktop, OneDrive Desktops included), `render_parallel` (`auto` = up to 8 renders
   on an RTX 5090, 3 on other NVIDIA cards, Apple's media engine on Macs, 2 on CPU).
 - **Work files** (videos, state, ledger of paid edits) stay on the machine that runs the event.
 

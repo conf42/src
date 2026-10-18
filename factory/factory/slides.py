@@ -1,6 +1,6 @@
 """Slide decks: one PDF per talk, named as the site expects, every one under the size limit.
 
-For each deck in Desktop/<work_folder>/<short_url>/slides/ (unzipped from the Drive download):
+For each deck in Desktop/video factory - <event>/slides/ (unzipped from the Drive download):
   1. match it to its talk (same speaker matching as the videos; never guessed),
   2. keep ONE deck per talk: a PDF beats a PPTX/KEY/ODP, identical duplicates are dropped,
   3. convert anything that isn't a PDF with LibreOffice,
