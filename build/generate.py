@@ -87,17 +87,18 @@ def asset_url(path):
     return f"{path}?v={_asset_hashes[path]}"
 env.filters["asset"] = asset_url
 
-# Headshots and podcast covers on conf42.github.io/static have .webp siblings (~70-97% smaller);
-# templates pair this with onerror="...src=<png>" so a fresh upload without its .webp still shows
-def webp_url(url):
+# Headshots and podcast covers on conf42.github.io/static have .webp versions in a webp/ subfolder
+# (~70-97% smaller): headshots/x.png -> headshots/webp/x.webp. Templates pair this with
+# onerror="...src=<png>" so a fresh upload without its .webp still shows
+def webp_url(url, sub="webp"):
     if url and url.startswith(BASE_STATIC_URL) and url.lower().endswith(".png"):
-        return url[:-4] + ".webp"
+        folder, name = url.rsplit("/", 1)
+        return f"{folder}/{sub}/{name[:-4]}.webp"
     return url
 env.filters["webp"] = webp_url
 # 160 px version for avatars (shown at 44-60 px): ~5 KB instead of a 500x400 PNG of up to 250 KB
 def webp_small_url(url):
-    small = webp_url(url)
-    return small[:-5] + ".sm.webp" if small != url else url
+    return webp_url(url, "webp/sm")
 env.filters["webp_sm"] = webp_small_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
 # "December 3 2026", not "December 03 2026" (Marek 2026-10-12)
