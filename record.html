@@ -202,6 +202,26 @@
     .msg.ok { border-color: color-mix(in srgb, var(--green) 70%, transparent); }
     .msg.warn { border-color: color-mix(in srgb, var(--amber) 75%, transparent); }
     .msg.bad { border-color: color-mix(in srgb, var(--pink) 75%, transparent); }
+    /* the ship's dials (Marek 2026-10-23): the laptop's health while recording - what Chrome lets a page see */
+    .hud { margin-top: 12px; padding: 12px 12px 10px; border-radius: 14px; background: rgba(6,10,26,.7); border: 1px solid var(--edge); animation: rise .35s cubic-bezier(.3,.7,.2,1);
+      background-image: repeating-linear-gradient(0deg, rgba(146,181,242,.035) 0 1px, transparent 1px 4px); }
+    .hud h3 { margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+    .hud h3 b { color: var(--green); letter-spacing: .1em; text-shadow: 0 0 8px currentColor; transition: color .3s; }
+    .hud.warn h3 b { color: var(--amber); } .hud.bad h3 b { color: #ff4f61; animation: glow 1s ease-in-out infinite alternate; }
+    .hud.bad { border-color: #ff4f61; box-shadow: 0 0 22px rgba(255,79,97,.35), inset 0 0 18px rgba(255,79,97,.12); }
+    .dials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 6px; }
+    .dial { position: relative; text-align: center; --c: var(--green); }
+    .dial.warn { --c: var(--amber); } .dial.bad { --c: #ff4f61; } .dial.na { --c: #5b6690; }
+    .dial svg { display: block; width: 100%; max-width: 92px; margin: 0 auto; overflow: visible; }
+    .dial .track { fill: none; stroke: rgba(146,181,242,.12); stroke-width: 7; stroke-linecap: round; }
+    .dial .ticks { fill: none; stroke: rgba(146,181,242,.28); stroke-width: 2; stroke-dasharray: 1 6.5; }
+    .dial .arc { fill: none; stroke: var(--c); stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 4px var(--c)); transition: stroke-dashoffset .8s ease, stroke .3s; }
+    .dial .v { position: absolute; left: 0; right: 0; top: 34%; font-size: .9rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+    .dial .v small { font-size: .62rem; font-weight: 700; color: var(--muted); margin-left: 1px; }
+    .dial b { display: block; margin-top: -4px; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    .dial em { display: block; font-style: normal; font-size: .6rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--c); text-shadow: 0 0 6px var(--c); }
+    .dial.bad { animation: glow 1s ease-in-out infinite alternate; }
+    @keyframes glow { from { filter: none; } to { filter: drop-shadow(0 0 8px #ff4f61) brightness(1.15); } }
     /* big choice cards (camera yes/no, what fills the window) */
     .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .card { font: inherit; text-align: left; color: var(--text); background: var(--glass); border: 2px solid var(--edge); border-radius: 14px; padding: 14px 16px;
@@ -379,6 +399,7 @@
             <div class="body slot" data-ctl="win" hidden></div>
           </div>
           <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose where to save the video (your Desktop is best); it's written there as you record.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br><b>Some settings will freeze when you record, make sure to double check everything!</b></div>
+          <div class="hud" id="hud" hidden><h3>Ship systems <b id="hud-all">All in check</b></h3><div class="dials" id="dials"></div></div>
         </div>
       </aside>
         <!-- the corgi: every tip and warning comes out of its mouth (Marek 2026-10-23) -->
@@ -538,7 +559,7 @@
     };
     var store = { get: function (k) { try { return localStorage.getItem('c42rec.' + k); } catch (e) { return null; } },
                   set: function (k, v) { try { localStorage.setItem('c42rec.' + k, v); } catch (e) {} } };
-    var worker = new Worker('./assets/js/record-worker.js?v=8efaffaf4f');
+    var worker = new Worker('./assets/js/record-worker.js?v=9640f139b4');
     var display = $('pv').transferControlToOffscreen();   // the engine draws the preview itself
     worker.postMessage({ type: 'display', canvas: display }, [display]);
     // the preview's pixels follow its size on screen (it was a fixed 1280x720, stretched - soft slides on a Retina screen)
@@ -1033,6 +1054,72 @@
       S.sameSaid = same;
     }
 
+    // ── the health dials (Marek 2026-10-23), only while recording: is the laptop keeping up? Frames (made vs dropped),
+    // CPU (Chrome's pressure reading: nominal, fair, serious, critical = throttling), the tab's memory, disk space (the
+    // browser's estimate of what it may still use - it follows free space) as hours of recording left, the encoder's
+    // queue and the file's write backlog. Dropping frames glows red, and the corgi says so
+    var DIALS = [['fps', 'Frames', 'Every frame of the video, 60 a second. Red: the laptop can’t keep up and frames are being dropped - close other apps.'],
+      ['cpu', 'CPU', 'How hard the processor is working, as macOS / Windows tell Chrome. “Throttling” means it’s slowing itself down (heat or battery saving).'],
+      ['mem', 'Memory', 'Memory this tab uses. It should stay roughly level during a long recording.'],
+      ['disk', 'Disk', 'Free space, as hours of recording left (the video plus its backup copy in the browser).'],
+      ['enc', 'Encoder', 'Frames waiting for the video encoder. It should sit at zero.'],
+      ['io', 'Writing', 'Video waiting to be written to your file. It should sit near zero.']];
+    $('dials').innerHTML = DIALS.map(function (d) {
+      return '<div class="dial" id="d-' + d[0] + '" data-tip="' + d[2] + '"><svg viewBox="0 0 100 80"><path class="track" d="M18 70A40 40 0 1 1 82 70"/>' +
+        '<path class="ticks" d="M24 64A32 32 0 1 1 76 64"/><path class="arc" d="M18 70A40 40 0 1 1 82 70" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></svg>' +
+        '<div class="v">-</div><b>' + d[1] + '</b><em>…</em></div>';
+    }).join('');
+    var H = null;
+    function dial(k, frac, value, word, state) {
+      var el = $('d-' + k);
+      el.className = 'dial ' + (state || '');
+      var arc = el.querySelector('.arc'); frac = Math.max(0, Math.min(1, frac));
+      arc.style.strokeDashoffset = 100 - frac * 100; arc.style.opacity = frac > .01 ? 1 : 0;   // empty: no stray round cap
+      el.querySelector('.v').innerHTML = value; el.querySelector('em').textContent = word;
+      return state;
+    }
+    function hudStart() {
+      H = { t: performance.now(), frames: 0, dropped: 0, drops: [], fps: 60, cpu: '', est: null, rate: 0, bytes: 0, said: 0 };
+      if (window.PressureObserver) try {
+        H.po = new PressureObserver(function (rs) { H.cpu = rs[rs.length - 1].state; });
+        H.po.observe('cpu', { sampleInterval: 2000 }).catch(function () {});
+      } catch (e) {}
+      $('hud').hidden = false; hudDisk(); H.diskT = setInterval(hudDisk, 10000);
+    }
+    function hudStop() { if (!H) return; if (H.po) try { H.po.disconnect(); } catch (e) {} clearInterval(H.diskT); H = null; $('hud').hidden = true; }
+    function hudDisk() { if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(function (e) { if (H) H.est = e; }).catch(function () {}); }
+    function hudTick(m) {
+      if (!H) return;
+      var t = performance.now(), dt = (t - H.t) / 1000;
+      if (dt < 1) return;   // once a second
+      if (!S.paused) {
+        H.fps = Math.min(60, (m.frames - H.frames) / dt);
+        var nd = m.dropped - H.dropped; if (nd > 0) H.drops.push([t, nd]);
+        H.rate = (m.bytes - H.bytes) / dt;
+      }
+      H.t = t; H.frames = m.frames; H.dropped = m.dropped; H.bytes = m.bytes;
+      H.drops = H.drops.filter(function (d) { return t - d[0] < 10000; });
+      var drop10 = H.drops.reduce(function (a, d) { return a + d[1]; }, 0), st = [];
+      st.push(dial('fps', H.fps / 60, (S.paused ? '–' : Math.round(H.fps)) + '<small>fps</small>', drop10 > 2 ? 'Dropping' : drop10 ? 'A few drops' : S.paused ? 'Paused' : 'In check', drop10 > 2 ? 'bad' : drop10 ? 'warn' : ''));
+      var P = { nominal: [.25, 'Calm', ''], fair: [.5, 'In check', ''], serious: [.8, 'Strained', 'warn'], critical: [1, 'Throttling', 'bad'] }[H.cpu];
+      st.push(P ? dial('cpu', P[0], P[1] === 'Throttling' ? '!!' : Math.round(P[0] * 100) + '<small>%</small>', P[1], P[2]) : dial('cpu', 0, '–', 'No reading', 'na'));
+      var pm = performance.memory;
+      if (pm && pm.jsHeapSizeLimit) { var f = pm.usedJSHeapSize / pm.jsHeapSizeLimit; st.push(dial('mem', f, Math.round(pm.usedJSHeapSize / 1048576) + '<small>MB</small>', f > .85 ? 'Too high' : f > .6 ? 'High' : 'In check', f > .85 ? 'bad' : f > .6 ? 'warn' : '')); }
+      else st.push(dial('mem', 0, '–', 'No reading', 'na'));
+      if (H.est && H.est.quota) {
+        var free = Math.max(0, H.est.quota - H.est.usage), perH = Math.max(H.rate, 300000) * 3600 * 2, hrs = free / perH;   // the file + the browser's copy
+        st.push(dial('disk', Math.min(1, hrs / 10), (free > 1e9 ? Math.round(free / 1e9) + '<small>GB</small>' : Math.round(free / 1e6) + '<small>MB</small>'),
+          hrs < .25 ? 'Almost full' : hrs < 2 ? Math.round(hrs * 60) + ' min left' : 'In check', hrs < .25 ? 'bad' : hrs < 2 ? 'warn' : ''));
+      } else st.push(dial('disk', 0, '–', 'No reading', 'na'));
+      st.push(dial('enc', m.queue / 10, m.queue + '', m.queue > 6 ? 'Backed up' : m.queue > 2 ? 'Busy' : 'In check', m.queue > 6 ? 'bad' : m.queue > 2 ? 'warn' : ''));
+      var mb = m.backlog / 1048576;
+      st.push(dial('io', Math.min(1, mb / 64), (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + '<small>MB</small>', mb > 64 ? 'Falling behind' : mb > 8 ? 'Busy' : 'In check', mb > 64 ? 'bad' : mb > 8 ? 'warn' : ''));
+      var worst = st.indexOf('bad') >= 0 ? 'bad' : st.indexOf('warn') >= 0 ? 'warn' : '';
+      $('hud').className = 'hud ' + worst;
+      $('hud-all').textContent = drop10 > 2 ? 'Dropping frames!' : worst === 'bad' ? 'Trouble' : worst ? 'Watch it' : 'All in check';
+      if (drop10 > 2 && t - H.said > 60000) { H.said = t; say('Your video is dropping frames - close other apps and browser tabs, and plug in your charger.', 10000, 'bad'); }
+    }
+
     worker.onmessage = function (e) {
       var m = e.data;
       if (m.type === 'alike') { S.same = m.r > .8 ? Math.min((S.same || 0) + 1, 5) : 0; sameShown(); }
@@ -1041,7 +1128,7 @@
         if (dark && !S.darkSaid && Date.now() - (S.darkAt || 0) > 60000) { S.darkAt = Date.now(); say('Your picture is dark. Put a lamp or a window in front of you, not behind.', 9000, 'warn'); }
         S.darkSaid = dark; } }
       else if (m.type === 'tick') {
-        $('tc').textContent = hms(m.us);
+        $('tc').textContent = hms(m.us); hudTick(m);
         // the engine stops by itself at 2 hours (record-worker.js MAX_US); warned 10 minutes and 1 minute ahead
         var left = 7200 - m.us / 1e6;
         if (left < 600 && !S.warn10) { S.warn10 = 1; toast('10 minutes left: the recording stops by itself at 2 hours.', 10000, 'warn'); }
@@ -1258,6 +1345,7 @@
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
+        hudStart();
         S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
@@ -1293,6 +1381,7 @@
       }, 1000);
     });
     function stopped() {
+      hudStop();
       S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('held').hidden = true; document.body.classList.remove('held-on'); $('zoom0').disabled = $('zoom1').disabled = false; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
       document.body.classList.remove('locked');
       $('rec').disabled = false; $('rec').classList.remove('live'); $('rec').textContent = 'Record';

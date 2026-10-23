@@ -178,7 +178,9 @@ function tick() {
     if (soft) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,' + (dim ? .5 : .3) + ')'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
   if (frameNo % FPS === 0 && !rec) brightness();   // the dark / same-person hints are setup's; a recording skips the read-back
-  if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
+  // with what the page's health dials need (Marek 2026-10-23): frames made and dropped, the encoder's queue, the disk's backlog
+  if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped, frames: rec.frames,
+                                         queue: rec.venc ? rec.venc.encodeQueueSize : 0, backlog: rec.backlog || 0 });
   frameNo++;
 }
 var next = performance.now(), stat = { n: 0, busy: 0, at: performance.now() };
@@ -220,8 +222,10 @@ function write(data, pos) {
   rec.bytes = Math.max(rec.bytes, pos + data.byteLength);
   if (rec.sync) { try { rec.sync.write(data, { at: pos }); } catch (e) { rec.syncErr = e.message; } }
   if (rec.desk && !rec.deskErr) {
-    var copy = data.slice();
-    rec.deskChain = rec.deskChain.then(function () { return rec.desk.write({ type: 'write', position: pos, data: copy }); })
+    var copy = data.slice(), r = rec;
+    r.backlog = (r.backlog || 0) + copy.byteLength;   // bytes handed to the file, not written yet
+    r.deskChain = r.deskChain.then(function () { return r.desk.write({ type: 'write', position: pos, data: copy }); })
+      .then(function () { r.backlog -= copy.byteLength; }, function (e) { r.backlog -= copy.byteLength; throw e; })
       .catch(function (e) { if (!rec.deskErr) { rec.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: rec.deskErr }); } });
   }
 }
