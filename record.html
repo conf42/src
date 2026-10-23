@@ -559,7 +559,7 @@
     };
     var store = { get: function (k) { try { return localStorage.getItem('c42rec.' + k); } catch (e) { return null; } },
                   set: function (k, v) { try { localStorage.setItem('c42rec.' + k, v); } catch (e) {} } };
-    var worker = new Worker('./assets/js/record-worker.js?v=9640f139b4');
+    var worker = new Worker('./assets/js/record-worker.js?v=ce5ef76956');
     var display = $('pv').transferControlToOffscreen();   // the engine draws the preview itself
     worker.postMessage({ type: 'display', canvas: display }, [display]);
     // the preview's pixels follow its size on screen (it was a fixed 1280x720, stretched - soft slides on a Retina screen)
@@ -1072,7 +1072,7 @@
     // CPU (Chrome's pressure reading: nominal, fair, serious, critical = throttling), the tab's memory, disk space (the
     // browser's estimate of what it may still use - it follows free space) as hours of recording left, the encoder's
     // queue and the file's write backlog. Dropping frames glows red, and the corgi says so
-    var DIALS = [['fps', 'Frames', 'Every frame of the video, 60 a second. Red: the laptop can’t keep up and frames are being dropped - close other apps.'],
+    var DIALS = [['fps', 'Frames', 'Every frame of the video, 60 a second. If the computer can’t keep up for a minute, saver mode draws every other frame (the video stays 60 fps and full sharpness). Red: frames are being dropped - close other apps.'],
       ['cpu', 'CPU', 'How strained the whole computer is (every app, not just this page), as macOS / Windows tell Chrome: green calm, yellow strained, orange throttling. While your frames stay at 60, the video is fine.'],
       ['mem', 'Memory', 'Memory this tab uses. It should stay roughly level during a long recording.'],
       ['disk', 'Disk', 'Free space, as hours of recording left (the video plus its backup copy in the browser).'],
@@ -1089,7 +1089,7 @@
       return level === 'na' ? 0 : level;
     }
     function hudStart() {
-      H = { t: performance.now(), frames: 0, dropped: 0, drops: [], fps: 60, cpu: '', est: null, rate: 0, bytes: 0, said: 0 };
+      H = { t: performance.now(), frames: 0, dropped: 0, drops: [], fps: 60, cpu: '', est: null, rate: 0, bytes: 0, said: 0, target: 60, slow: 0, hot: 0 };
       if (window.PressureObserver) try {
         H.po = new PressureObserver(function (rs) { H.cpu = rs[rs.length - 1].state; });
         H.po.observe('cpu', { sampleInterval: 2000 }).catch(function () {});
@@ -1104,6 +1104,16 @@
       if (dt < 1) return;   // once a second
       if (!S.paused) {
         H.fps = Math.min(60, (m.frames - H.frames) / dt);
+        // a laptop that can't keep up (Marek 2026-10-23: ThinkPads and the like): under 50 fps, or the CPU at Chrome's
+        // top pressure level ("critical" - the nearest to 85 %+), for a minute straight -> saver mode for the rest of the
+        // recording: still a 60 fps file at full resolution and sharpness, every other frame drawn. One way only
+        if (H.target === 60) {
+          H.slow = H.fps < 50 ? H.slow + dt : 0; H.hot = H.cpu === 'critical' ? H.hot + dt : 0;
+          if (H.slow >= 60 || H.hot >= 60) {
+            H.target = 30; H.drops = []; worker.postMessage({ type: 'saver' });
+            say('Your computer is struggling, so I’m drawing every other frame to keep the video smooth - still full sharpness. Closing other apps helps too.', 12000, 'warn');
+          }
+        }
         var nd = m.dropped - H.dropped; if (nd > 0) H.drops.push([t, nd]);
         H.rate = (m.bytes - H.bytes) / dt;
       }
@@ -1111,7 +1121,7 @@
       H.drops = H.drops.filter(function (d) { return t - d[0] < 10000; });
       var drop10 = H.drops.reduce(function (a, d) { return a + d[1]; }, 0), st = [];
       function lv(x, a, b, c) { return x >= c ? 3 : x >= b ? 2 : x >= a ? 1 : 0; }
-      st.push(dial('fps', lv(drop10, 1, 2, 3), S.paused ? 'paused' : Math.round(H.fps) + ' fps', drop10 > 2 ? 'Dropping frames' : drop10 ? 'A few drops' : S.paused ? 'Paused' : 'In check'));
+      st.push(dial('fps', lv(drop10, 1, 2, 3), S.paused ? 'paused' : Math.round(H.fps) + ' fps', drop10 > 2 ? 'Dropping frames' : drop10 ? 'A few drops' : S.paused ? 'Paused' : H.target < 60 ? 'Saver mode' : 'In check'));
       // Chrome gives a level for the whole computer, not a percentage; red stays for the video itself suffering
       var P = { nominal: [0, 'Calm'], fair: [0, 'In check'], serious: [1, 'Strained'], critical: [2, 'Throttling'] }[H.cpu];
       st.push(P ? dial('cpu', P[0], '', P[1]) : dial('cpu', 'na', '', 'No reading'));

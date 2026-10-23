@@ -146,15 +146,23 @@ function tick() {
   var held = !!(rec && rec.paused), encoding = !!(rec && rec.muxer && !rec.stopping && !held);
   // paused, or a card over the page (the welcome card, Marek 2026-10-23): the preview soft and dark, at 10 fps
   var soft = held || dim, showing = dx && visible && frameNo % (soft ? 6 : previewEvery) === 0;
-  if (encoding || showing) render();   // not recording: drawn only for the preview, at its 30 fps
+  // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is absorbed);
+  // only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out. A laptop
+  // that can't keep up gets saver mode (the page decides, Marek 2026-10-23): the file stays 60 fps at full size and
+  // sharpness, but only every other frame is drawn - the one in between is the same picture again (no copy), which
+  // the encoder turns into a few bytes
+  var at = encoding ? now() * FPS / 1e6 : 0, n = encoding ? rec.lastN + 1 : 0;
+  if (encoding && at > n + 3) n = Math.round(at);
+  var due = encoding && at >= n - .5, fresh = due && (!rec.half || n % 2 === 0 || !rec.lastVf);
+  if (fresh || showing) render();   // not recording: drawn only for the preview, at its 30 fps
   if (encoding) {
-    // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is
-    // absorbed); only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out
-    var at = now() * FPS / 1e6, n = rec.lastN + 1;
-    if (at > n + 3) n = Math.round(at);
-    if (at >= n - .5) {
+    if (due) {
       if (rec.venc.encodeQueueSize < 10) {
-        var vf = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+        var ts = { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) }, vf;
+        if (fresh) {
+          vf = new VideoFrame(cv, ts);
+          if (rec.half) { if (rec.lastVf) rec.lastVf.close(); rec.lastVf = vf.clone(); }
+        } else vf = new VideoFrame(rec.lastVf, ts);   // saver mode: the last picture, stamped for this slot
         rec.venc.encode(vf, { keyFrame: n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0 });
         if (n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0) rec.lastKey = n;
         vf.close(); rec.frames++;
@@ -302,6 +310,7 @@ function stop(why) {
   var r = rec;
   if (!r || r.stopping) return;
   r.stopping = true;
+  if (r.lastVf) { r.lastVf.close(); r.lastVf = null; }
   if (r.audio) r.audio.stop();
   clearInterval(r.metaTimer);
   post({ type: 'finishing' });
@@ -331,6 +340,8 @@ self.onmessage = function (e) {
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
+  // saver mode for the rest of the recording (new pictures 30 times a second, the file still 60 fps), from a keyframe
+  else if (m.type === 'saver' && rec) { rec.half = true; rec.lastKey = -KEY_EVERY; }
   else if (m.type === 'visible') { visible = m.on; pvStale = true; }
   else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; dirty = true; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; dirty = true; }
