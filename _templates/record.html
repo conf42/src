@@ -22,7 +22,7 @@
   <style>
     /* conf42.com's dark hero (navy, #92B5F2 highlight, Plus Jakarta Sans 800) with the teasers' vivid colours: one
        colour per step - microphone blue, camera violet, window green - and a pink-red record button */
-    :root { --navy: #0f1733; --hi: #92B5F2; --blue: #5aa8ff; --violet: #a57bff; --green: #4fd1a1;
+    :root { --navy: #0f1733; --hi: #92B5F2; --blue: #5aa8ff; --violet: #a57bff; --green: #4fd1a1; --green-btn: #12805a;
       --pink: #ff5e7e; --amber: #ffb547; --text: #f4f6ff; --muted: #a9b3d6;
       --glass: rgba(255,255,255,.07); --glass2: rgba(255,255,255,.12); --edge: rgba(255,255,255,.14); }
     * { box-sizing: border-box; }
@@ -95,7 +95,7 @@
     .seg { display: inline-flex; box-sizing: border-box; height: 52px; padding: 3px; gap: 3px; border-radius: 999px; background: rgba(8,12,30,.5); border: 1px solid var(--edge); }
     .seg button { font: inherit; font-weight: 800; font-size: 1.05rem; color: var(--muted); background: transparent; border: 0; border-radius: 999px;
       padding: 0 24px; cursor: pointer; }
-    .seg button.on { color: #fff; background: #12805a; }
+    .seg button.on { color: #fff; background: var(--green-btn); }
     .seg button.off { opacity: .35; cursor: not-allowed; }
     .prog { height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
@@ -125,7 +125,9 @@
       color: var(--text); background: var(--glass2); }
     .btn:hover:not(:disabled) { border-color: var(--hi); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .btn.go { flex: 1; border: 0; color: #06102a; background: var(--c, var(--hi)); box-shadow: 0 8px 24px color-mix(in srgb, var(--c, var(--hi)) 35%, transparent); }
+    .btn.go { flex: 1; border: 0; color: var(--btn-text, #06102a); background: var(--btn, var(--c, var(--hi))); box-shadow: 0 8px 24px color-mix(in srgb, var(--btn, var(--c, var(--hi))) 35%, transparent); }
+    /* green buttons: darker green, white text, like the Slides / Screen switch (Marek 2026-10-23) */
+    [style*="var(--green)"] { --btn: var(--green-btn); --btn-text: #fff; }
     .btn.wide { width: 100%; }
     label.l { display: block; font-size: .75rem; color: var(--muted); font-weight: 700; margin: 12px 0 5px; letter-spacing: .02em; }
     .meter { height: 14px; border-radius: 7px; background: rgba(8,12,30,.6); border: 1px solid var(--edge); overflow: hidden; margin-top: 12px; }
@@ -143,7 +145,7 @@
     .card svg { width: 30px; height: 30px; stroke: var(--c); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .card b { font-size: .95rem; }
     .pill { position: absolute; top: 14px; right: 14px; padding: 3px 9px; border-radius: 999px; font-size: .66rem; font-weight: 800;
-      letter-spacing: .02em; color: #062a1c; background: var(--green); }
+      letter-spacing: .02em; color: #fff; background: var(--green-btn); }
     /* alone or with a co-presenter (Marek 2026-10-23): alone is the default, every time */
     .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
     .duo button { font: inherit; font-size: .8rem; font-weight: 700; line-height: 1.3; color: var(--muted); background: var(--glass); border: 2px solid var(--edge);
@@ -794,7 +796,13 @@
       var m = e.data;
       if (m.type === 'alike') { S.same = m.r > .8 ? Math.min((S.same || 0) + 1, 5) : 0; sameShown(); }
       else if (m.type === 'light') { if (m.slot === 0) { S.dark = (S.dark || 0) * .7 + (m.luma < 55 ? .3 : 0); $('dark-warn').hidden = S.dark < .5 || !S.cam[0]; } }
-      else if (m.type === 'tick') $('tc').textContent = hms(m.us);
+      else if (m.type === 'tick') {
+        $('tc').textContent = hms(m.us);
+        // the engine stops by itself at 2 hours (record-worker.js MAX_US); warned 10 minutes and 1 minute ahead
+        var left = 7200 - m.us / 1e6;
+        if (left < 600 && !S.warn10) { S.warn10 = 1; toast('10 minutes left: the recording stops by itself at 2 hours.', 10000); }
+        if (left < 60 && !S.warn1) { S.warn1 = 1; toast('1 minute left: the recording stops by itself at 2 hours.', 10000); }
+      }
       else if (m.type === 'finishing') status('Finishing the file… don’t close the page.');
       else if (m.type === 'warn') { if (m.what === 'disk') toast('Could not write to the file you picked - the recording is kept in the browser instead.', 8000); }
       else if (m.type === 'error') { toast('Problem: ' + m.message, 10000); console.error('[recorder]', m.message); if (S.recording) stopped(); }
@@ -962,7 +970,7 @@
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
-        S.recording = true; S.file = name + '.mp4';
+        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0;
         document.body.classList.add('locked');
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
