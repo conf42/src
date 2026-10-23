@@ -17,7 +17,11 @@ var OPFS_MP4 = 'c42-recording.mp4', OPFS_META = 'c42-recording.json';
 var cv = new OffscreenCanvas(W, H), x = cv.getContext('2d', { alpha: false });
 var light = new OffscreenCanvas(32, 18), lx = light.getContext('2d', { willReadFrequently: true });
 var geo = null, overlay = null, slide = null, source = 'slides', bg = '#111';
-var frameNo = 0, previewEvery = 2, dx = null;
+var frameNo = 0, previewEvery = 2, dx = null, visible = true;
+// only what changed is drawn again (Marek 2026-10-23: "optimize the hell out of it"): the canvas keeps the last frame,
+// a new camera or screen picture repaints just its own box, anything else (layout, overlay, slide, source) the whole
+// frame. A frame with nothing new isn't drawn at all - the encoder gets the same canvas again
+var dirty = true, wasRec = false, pvStale = true, wasHeld = false;
 var rec = null;
 
 function post(m, t) { self.postMessage(m, t || []); }
@@ -34,7 +38,7 @@ function feed(readable, put) {
   return live;
 }
 var cams = [{ feed: null, frame: null, zoom: 1 }, { feed: null, frame: null, zoom: 1 }], scr = { feed: null, frame: null };
-function setFrame(slot) { return function (f) { if (slot.frame) slot.frame.close(); slot.frame = f; }; }
+function setFrame(slot) { return function (f) { if (slot.frame) slot.frame.close(); slot.frame = f; slot.fresh = true; }; }
 
 function cover(src, sw, sh, dx, dy, dw, dh, up, zoom) {
   // src scaled to fill dx,dy,dw,dh, cropped centred (up: a little nearer the top, where the face usually is); zoom > 1 crops in
@@ -87,6 +91,23 @@ function draw() {
   });
   if (overlay) x.drawImage(overlay, 0, 0);
 }
+function paint(b) {   // the whole frame, within box b only (a rectangle clip: the GPU touches just those pixels)
+  x.save(); x.beginPath(); x.rect(b[0], b[1], b[2], b[3]); x.clip(); draw(); x.restore();
+}
+function box(l, t, w, h) { var a = Math.floor(l) - 2, b = Math.floor(t) - 2; return [a, b, Math.ceil(l + w) + 2 - a, Math.ceil(t + h) + 2 - b]; }
+function render() {
+  if (dirty || !geo) { draw(); dirty = false; pvStale = true; }
+  else {
+    var r = geo.rect;
+    if ((source === 'screen' && scr.fresh) || (source === 'none' && cams[0].fresh)) { paint(box(r[0], r[1], r[2], r[3])); pvStale = true; }
+    geo.cams.forEach(function (g, i) {
+      if (!cams[i].fresh) return;
+      var d = 2 * g[2] + 6;
+      paint(box(g[0] - d / 2, g[1] - d / 2, d, d)); pvStale = true;
+    });
+  }
+  scr.fresh = cams[0].fresh = cams[1].fresh = false;
+}
 
 function brightness() {
   var sigs = [];
@@ -121,8 +142,11 @@ function heard(us) {
 }
 
 function tick() {
-  draw();
-  if (rec && rec.muxer && !rec.stopping && !rec.paused) {
+  if (!!rec !== wasRec) { wasRec = !!rec; dirty = true; }   // the empty window's placeholder is the preview's only
+  var held = !!(rec && rec.paused), encoding = !!(rec && rec.muxer && !rec.stopping && !held);
+  var showing = dx && visible && frameNo % (held ? 6 : previewEvery) === 0;
+  if (encoding || showing) render();   // not recording: drawn only for the preview, at its 30 fps
+  if (encoding) {
     // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is
     // absorbed); only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out
     var at = now() * FPS / 1e6, n = rec.lastN + 1;
@@ -142,14 +166,17 @@ function tick() {
   // the page's preview: its canvas was handed over to this worker, so the page itself does nothing per frame (posting
   // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
   // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
-  var held = rec && rec.paused;
-  if (dx && frameNo % (held ? 6 : previewEvery) === 0) {
+  // not drawn while the page is hidden (a demo in another window) or when nothing changed since the last one
+  if (held !== wasHeld) { wasHeld = held; pvStale = true; }
+  if (showing && pvStale) {
+    pvStale = false;
     var pw = dx.canvas.width, ph = dx.canvas.height, o = held ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
     dx.filter = held ? 'blur(10px)' : 'none';
+    dx.imageSmoothingQuality = pw < W ? 'high' : 'low';   // shrunk (a small or non-Retina screen): the slides' text stays clean
     dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
     if (held) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,.3)'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
-  if (frameNo % FPS === 0) brightness();
+  if (frameNo % FPS === 0 && !rec) brightness();   // the dark / same-person hints are setup's; a recording skips the read-back
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
   frameNo++;
 }
@@ -297,12 +324,13 @@ self.onmessage = function (e) {
   var m = e.data;
   if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false });
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
-  else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; } }
-  else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; }
-  else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; }
-  else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; }
-  else if (m.type === 'source') source = m.source;
-  else if (m.type === 'zoom') cams[m.slot].zoom = m.zoom;
+  else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvStale = true; } }
+  else if (m.type === 'visible') { visible = m.on; pvStale = true; }
+  else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; dirty = true; }
+  else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; dirty = true; }
+  else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; dirty = true; }
+  else if (m.type === 'source') { if (source !== m.source) dirty = true; source = m.source; }
+  else if (m.type === 'zoom') { cams[m.slot].zoom = m.zoom; cams[m.slot].fresh = true; }
   else if (m.type === 'cam') {
     var s = cams[m.slot];
     if (s.feed) s.feed.stop();
