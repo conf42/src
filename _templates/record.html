@@ -109,6 +109,8 @@
     .seg .knob { position: absolute; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 999px; background: var(--green-btn); opacity: 0;
       transition: transform .32s cubic-bezier(.3,.7,.2,1), width .32s cubic-bezier(.3,.7,.2,1), opacity .2s ease; }
     .seg button.off { opacity: .35; cursor: not-allowed; }
+    /* before recording an empty side can still be looked at (Marek 2026-10-23): the placeholder grid with its hint */
+    body:not(.locked) .seg button.off { cursor: pointer; } .seg button.off.on { opacity: .7; }
     .prog { height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
     .pause { font: inherit; font-weight: 800; font-size: 1.05rem; height: 52px; padding: 0 22px; border-radius: 999px; cursor: pointer;
@@ -854,18 +856,27 @@
         : 'Could not open the microphone: ' + esc(e && e.message || e);
       $('mic-err').innerHTML = t; $('mic-err').hidden = false;
     }
+    // a phone next to the Mac (Continuity: iPhone microphone / camera) is never picked by itself - opening it pops up
+    // "Connect microphone to conf42.com?" on the phone, which scares people (Marek 2026-10-23). Only a speaker who picks
+    // it in the list gets it, and only a pick made by hand is remembered for next time
+    var PHONE = /iphone|ipad|continuity/i;
     function fill(sel, kind, list, none) {
-      var keep = sel.value || store.get(sel.id) || ''; sel.innerHTML = '';
+      var keep = sel.value || store.get(sel.id + '.picked') || ''; sel.innerHTML = '';
       if (none) { var o = document.createElement('option'); o.value = ''; o.textContent = none; sel.appendChild(o); }
       list.filter(function (d) { return d.kind === kind && d.deviceId; }).forEach(function (d, i) {
         var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || (kind === 'videoinput' ? 'Camera ' : 'Microphone ') + (i + 1); sel.appendChild(o);
       });
       if (keep && sel.querySelector('option[value="' + CSS.escape(keep) + '"]')) sel.value = keep;
+      else {
+        var ok = [].filter.call(sel.options, function (o) { return o.value && !PHONE.test(o.textContent); })[0];
+        if (ok) sel.value = ok.value;
+      }
     }
     function allowMic() {
       $('mic-err').hidden = true;
-      return navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); return navigator.mediaDevices.enumerateDevices(); })
+      // allowed before: straight to the list (asking again would open the default microphone - maybe the phone's)
+      return (S.micOk ? Promise.resolve() : navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); }))
+        .then(function () { return navigator.mediaDevices.enumerateDevices(); })
         .then(function (list) { fill($('mic'), 'audioinput', list); $('allow-mic').hidden = true; $('mic-on').hidden = false; return openMic(); })
         .catch(micError);
     }
@@ -885,7 +896,7 @@
       if (S.micBuiltin && shown && S.micSaid !== S.micBuiltin) { S.micSaid = S.micBuiltin; say('This looks like your computer’s built-in microphone. Make sure to sit close to your laptop when presenting!', 10000, 'warn'); }
     }
     function openMic() {
-      var id = $('mic').value; store.set('mic', id);
+      var id = $('mic').value;
       if (S.micStream) S.micStream.getTracks().forEach(function (t) { t.stop(); });
       S.micBuiltin = /built-?in|macbook|internal|default.*array|realtek|integrated|laptop/i.test(label($('mic'))) ? id : ''; micTip();
       S.verdict = ''; $('check-out').hidden = true; $('check').textContent = 'Test my sound (5 seconds)';
@@ -910,7 +921,7 @@
           summaries();
         }).catch(micError);
     }
-    $('mic').addEventListener('change', openMic);
+    $('mic').addEventListener('change', function () { store.set('mic.picked', this.value); openMic(); });
     if (store.get('tested') === '1') $('mic-lead').textContent = 'Good sound matters more than good video. Pick your microphone. You’ve tested before, so the 5-second sound test is optional - but worth it in a new room.';
 
     // the level meters, and while recording the alarms: silence for 10 s, clipping
@@ -999,8 +1010,8 @@
         relayout(); return;
       }
       if (S.modeBack) { var mb = S.modeBack; S.modeBack = null; setMode(mb); }
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); return navigator.mediaDevices.enumerateDevices(); })
+      (S.camOk ? Promise.resolve() : navigator.mediaDevices.getUserMedia({ video: true }).then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); }))
+        .then(function () { return navigator.mediaDevices.enumerateDevices(); })
         .then(function (list) {
           if (seq !== S.camSeq) return;
           fill($('cam'), 'videoinput', list); fill($('cam2'), 'videoinput', list);
@@ -1024,7 +1035,6 @@
     }
     function openCam(slot) {
       var sel = slot ? $('cam2') : $('cam'), id = sel.value;
-      if (!slot) store.set(sel.id, id);
       closeCam(slot); S.same = 0; sameShown();
       if (!id || (slot && !S.duo)) { relayout(); return Promise.resolve(); }
       var seq = S.openSeq[slot] = (S.openSeq[slot] || 0) + 1;
@@ -1040,7 +1050,7 @@
           relayout();
         }).catch(camError);
     }
-    $('cam').addEventListener('change', function () { openCam(0); });
+    $('cam').addEventListener('change', function () { store.set('cam.picked', this.value); openCam(0); });
     $('cam2').addEventListener('change', function () { openCam(1); });
     function zoom(i) {   // a camera, zoomed in on the face (Marek 2026-10-23: up to 50 %, none by default), each on its own
       var p = +$('zoom' + i).value; $('zoom-v' + i).textContent = p + '%'; store.set('zoom2.' + i, p);
@@ -1118,7 +1128,7 @@
       H.drops = H.drops.filter(function (d) { return t - d[0] < 10000; });
       var drop10 = H.drops.reduce(function (a, d) { return a + d[1]; }, 0), st = [];
       st.push(dial('fps', H.fps / 60, (S.paused ? '–' : Math.round(H.fps)) + '<small>fps</small>', drop10 > 2 ? 'Dropping' : drop10 ? 'A few drops' : S.paused ? 'Paused' : 'In check', drop10 > 2 ? 'bad' : drop10 ? 'warn' : ''));
-      var P = { nominal: [.25, 'Calm', ''], fair: [.5, 'In check', ''], serious: [.8, 'Strained', 'warn'], critical: [1, 'Throttling', 'bad'] }[H.cpu];
+      var P = { nominal: [.25, 'Calm', ''], fair: [.5, 'In check', ''], serious: [.8, 'Strained', 'warn'], critical: [1, 'Throttling', 'warn'] }[H.cpu];   // amber: red is for the video actually suffering (dropped frames)
       st.push(P ? dial('cpu', P[0], P[1] === 'Throttling' ? '!!' : Math.round(P[0] * 100) + '<small>%</small>', P[1], P[2]) : dial('cpu', 0, '–', 'No reading', 'na'));
       var pm = performance.memory;
       if (pm && pm.jsHeapSizeLimit) { var f = pm.usedJSHeapSize / pm.jsHeapSizeLimit; st.push(dial('mem', f, Math.round(pm.usedJSHeapSize / 1048576) + '<small>MB</small>', f > .85 ? 'Too high' : f > .6 ? 'High' : 'In check', f > .85 ? 'bad' : f > .6 ? 'warn' : '')); }
@@ -1165,7 +1175,12 @@
       // (Marek 2026-10-23) camera + slides + screen, just slides / screen (no camera), or just the camera
       setSrc(mode === 'none' || !mode ? 'none' : S.pdf || !S.screenTrack ? 'slides' : 'screen');
     }
-    all('#live-src button').forEach(function (b) { b.addEventListener('click', function () { if (!b.classList.contains('off')) setSrc(b.dataset.src); b.blur(); }); });
+    all('#live-src button').forEach(function (b) { b.addEventListener('click', function () { if (!b.classList.contains('off') || !S.recording) setSrc(b.dataset.src); b.blur(); }); });
+    function srcUsable() {   // at Record: never start on an empty side
+      var ok = { slides: !!S.pdf, screen: !!S.screenTrack, none: !!S.cam[0] }, win = S.mode === 'both' || S.mode === 'window';
+      if (S.mode === 'none' ? ok.none && S.src === 'none' : ok[S.src] && (S.src === 'none' ? S.mode === 'both' : win)) return;
+      setSrc(S.mode === 'none' ? 'none' : S.pdf ? 'slides' : S.screenTrack ? 'screen' : 'none');
+    }
     function srcState() {   // which side of the switch has something behind it; hints on the greyed one
       var win = S.mode === 'both' || S.mode === 'window', ok = { slides: !!S.pdf && win, screen: !!S.screenTrack && win, none: !!S.cam[0] };
       all('#live-src button').forEach(function (b) {
@@ -1356,6 +1371,7 @@
       var t = setInterval(function () {
         if (--n > 0) { $('count-n').textContent = n; replay($('count-n')); return; }
         clearInterval(t); el.hidden = true;
+        srcUsable();
         S.recMic = S.micTrack.clone();
         var r = new MediaStreamTrackProcessor({ track: S.recMic }).readable;
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
@@ -1447,8 +1463,12 @@
     goStep(1);
     $('name').value = store.get('name') || ''; hello();
     if (navigator.permissions) {
-      navigator.permissions.query({ name: 'microphone' }).then(function (p) { if (p.state === 'granted') allowMic(); }).catch(function () {});
+      navigator.permissions.query({ name: 'microphone' }).then(function (p) {
+        S.micOk = p.state === 'granted'; p.onchange = function () { S.micOk = p.state === 'granted'; };
+        if (S.micOk) allowMic();
+      }).catch(function () {});
       navigator.permissions.query({ name: 'camera' }).then(function (p) {
+        S.camOk = p.state === 'granted'; p.addEventListener('change', function () { S.camOk = p.state === 'granted'; });
         if (p.state === 'granted' && store.get('camWanted') !== '0') setCam(true);
       }).catch(function () {});
     }
