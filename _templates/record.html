@@ -109,7 +109,9 @@
     .pause:disabled { opacity: .45; cursor: not-allowed; }
     .pause.on { color: #fff; background: var(--green-btn); border-color: transparent; }
     .badge.paused i { background: var(--amber); }
-    .held { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .held { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; pointer-events: none; }
+    .held p { margin: 0; text-align: center; font-weight: 700; line-height: 1.4; padding: 10px 20px; border-radius: 14px; color: #fff;
+      background: #3a1424; border: 1px solid var(--pink); box-shadow: 0 10px 40px rgba(0,0,0,.4); animation: rise .3s cubic-bezier(.3,.7,.2,1); }
     .held span { font-size: 2rem; font-weight: 800; padding: 14px 30px; border-radius: 999px; background: rgba(10,14,35,.72); border: 1px solid var(--edge);
       box-shadow: 0 10px 40px rgba(0,0,0,.4); }
     .badge.paused i, .rec.held::after { animation-play-state: paused; }
@@ -154,6 +156,8 @@
     .card { font: inherit; text-align: left; color: var(--text); background: var(--glass); border: 2px solid var(--edge); border-radius: 14px; padding: 14px 16px;
       cursor: pointer; display: flex; flex-direction: column; gap: 8px; position: relative; }
     .card.wide { grid-column: 1 / -1; }
+    .tick { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: .84rem; color: var(--muted); cursor: pointer; }
+    .tick input { width: 16px; height: 16px; accent-color: var(--green-btn); margin: 0; }
     .card:hover { border-color: color-mix(in srgb, var(--c) 60%, transparent); }
     .card.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 18%, transparent); }
     .card svg { width: 30px; height: 30px; stroke: var(--c); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -174,6 +178,9 @@
     .x2.same span { display: block; }
     .x2.same i { animation: blink 1s infinite; }
     .locked .x2 { display: none; }
+    /* the zoom is set before recording (Marek 2026-10-23): greyed out while it runs, blurred with the preview when paused */
+    .locked .zoom { opacity: .4; pointer-events: none; transition: opacity .25s ease, filter .25s ease; }
+    .locked.held-on .zoom { filter: blur(4px); }
     .card small { color: var(--muted); font-size: .76rem; line-height: 1.35; }
     .drop { display: block; border: 2px dashed var(--edge); border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; color: var(--muted);
       font-size: .86rem; margin-top: 12px; line-height: 1.45; }
@@ -240,7 +247,7 @@
           <div class="glow" id="glow"></div>
           <div class="stage">
             <canvas id="pv" width="1280" height="720"></canvas>
-            <div class="held" id="held" hidden><span>Recording paused</span></div>
+            <div class="held" id="held" hidden><span>Recording paused</span><p id="spam" hidden>Please don’t spam pause/resume,<br>it might bug out your video!</p></div>
             <div class="count" id="count" hidden>3</div>
             <div class="badge" id="badge" hidden><i></i><span id="tc">0:00:00</span></div>
             <div class="tag" id="tag">This is exactly what <br>your recording will look like</div>
@@ -361,6 +368,8 @@
         </div>
       </div>
       <button class="btn wide" id="share" style="margin-top:12px" hidden>Choose a screen or window</button>
+      <label class="tick" id="jump-wrap" hidden><input type="checkbox" id="jump"> Jump to that window or tab once it's shared</label>
+      <div class="msg" id="share-note" hidden></div>
     </div>
   </div>
 
@@ -857,7 +866,8 @@
       S.mode = mode; if (mode) store.set('mode', mode);
       all('#ctl-win .card').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
       // (Marek 2026-10-23) camera + slides + screen, just slides / screen (no camera), or just the camera
-      $('drop').hidden = $('gs').hidden = $('share').hidden = !(mode === 'both' || mode === 'window');
+      $('drop').hidden = $('gs').hidden = $('share').hidden = $('jump-wrap').hidden = !(mode === 'both' || mode === 'window');
+      $('share-note').hidden = $('share').hidden || !S.screenTrack;
       setSrc(mode === 'none' || !mode ? 'none' : S.pdf || !S.screenTrack ? 'slides' : 'screen');
     }
     all('#live-src button').forEach(function (b) { b.addEventListener('click', function () { if (!b.classList.contains('off')) setSrc(b.dataset.src); b.blur(); }); });
@@ -884,15 +894,30 @@
       $('share').textContent = S.screenTrack ? 'Share a different screen or window' : 'Choose a screen or window';
       relayout(); navState();
     }
+    // sharing doesn't take the speaker away from the studio (Marek 2026-10-23), unless they tick "jump to it" first:
+    // Chrome only lets a page decide that at the moment of sharing (CaptureController.setFocusBehavior), never later
+    $('jump').checked = store.get('jump') === '1';
+    $('jump').addEventListener('change', function () { store.set('jump', this.checked ? '1' : '0'); });
+    function shareNote(t) {
+      var kind = (t.getSettings && t.getSettings().displaySurface) || '', mac = /Mac/i.test(navigator.platform), el = $('share-note');
+      el.innerHTML = kind === 'browser' ? 'Sharing the tab <b>' + esc(t.label || '') + '</b>. To jump there, click <b>Switch to tab</b> in Chrome\u2019s sharing bar.'
+        : kind === 'window' ? 'Sharing a window. To jump there, press <b>' + (mac ? '\u2318 Cmd + Tab' : 'Alt + Tab') + '</b>.'
+        : 'Sharing your whole screen - everything on it is recorded when you switch to Screen.';
+      el.hidden = false;
+    }
     function share() {
+      var cc = window.CaptureController ? new CaptureController() : null;
       return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
-                                                     selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
+                                                     selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include', controller: cc || undefined })
         .then(function (s) {
+          var t = s.getVideoTracks()[0];
+          // straight away, or Chrome decides for us (and switches to the shared tab or window)
+          if (cc && t.getSettings().displaySurface !== 'monitor') try { cc.setFocusBehavior($('jump').checked ? 'focus-captured-surface' : 'focus-capturing-application'); } catch (e) {}
           if (S.screenTrack) S.screenTrack.stop();
-          var t = s.getVideoTracks()[0]; S.screenTrack = t;
+          S.screenTrack = t; shareNote(t);
           t.addEventListener('ended', function () {   // the share ended: back to the slides, or the camera alone
             if (S.screenTrack !== t) return;
-            S.screenTrack = null; worker.postMessage({ type: 'screen', readable: null });
+            S.screenTrack = null; worker.postMessage({ type: 'screen', readable: null }); $('share-note').hidden = true;
             setSrc(S.mode === 'none' ? 'none' : 'slides');
           });
           var r = new MediaStreamTrackProcessor({ track: t }).readable;
@@ -1022,7 +1047,7 @@
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
-        document.body.classList.add('locked');
+        document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
         $('badge').hidden = false; $('tc').textContent = '0:00:00'; $('glow').classList.add('live');
@@ -1033,16 +1058,16 @@
     // pause / resume: nothing is recorded while paused; slides and screen can still be changed
     function pauseShown() {
       $('pause').textContent = S.paused ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', S.paused);
-      $('badge').classList.toggle('paused', S.paused); $('held').hidden = !S.paused; $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
+      $('badge').classList.toggle('paused', S.paused); $('held').hidden = !S.paused; document.body.classList.toggle('held-on', S.paused); $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
       if (S.recording) status(S.paused ? '❚❚ Paused - nothing is being recorded. Press <b>Resume</b> to carry on.' : '● Recording. Press <b>Pause</b> for a break, <b>Stop</b> when you’re done.');
     }
     $('pause').addEventListener('click', function () {
       if (!S.recording || S.finishing) return;
       this.blur();
       if (!S.paused) {
-        // a 2nd pause within a minute of the last one (Marek 2026-10-23): ask them to go easy on it
+        // a 3rd pause within a minute (Marek 2026-10-23): ask them, under "Recording paused", to go easy on it
         var t0 = Date.now(); S.pauses = (S.pauses || []).filter(function (x) { return t0 - x < 60000; }).concat(t0);
-        if (S.pauses.length >= 2) toast('Please don’t spam pause/resume too hard, it might lead to recording bugging out!', 8000);
+        $('spam').hidden = S.pauses.length < 3;
         S.paused = true; worker.postMessage({ type: 'pause' }); pauseShown(); return;
       }
       // resuming: a 3-2-1 first, like the start (Marek 2026-10-23); still paused until it ends
@@ -1056,7 +1081,7 @@
       }, 1000);
     });
     function stopped() {
-      S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('held').hidden = true; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
+      S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('held').hidden = true; document.body.classList.remove('held-on'); $('zoom0').disabled = $('zoom1').disabled = false; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
       document.body.classList.remove('locked');
       $('rec').disabled = false; $('rec').classList.remove('live'); $('rec').textContent = 'Record';
       $('badge').hidden = true; $('glow').classList.remove('live');
