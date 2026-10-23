@@ -39,6 +39,14 @@
     .ghost { font: inherit; font-weight: 600; font-size: .85rem; color: var(--hi); background: transparent; border: 1px solid var(--edge);
       border-radius: 10px; padding: 9px 12px; cursor: pointer; white-space: nowrap; }
     .ghost:hover { border-color: var(--hi); }
+    /* the laptop's battery, drawn like the Mac's menu bar one (Marek 2026-10-23) */
+    .batt { display: flex; align-items: center; gap: 7px; font-size: .85rem; font-weight: 600; color: var(--muted); white-space: nowrap; animation: fade .25s ease; }
+    .batt i { position: relative; width: 26px; height: 13px; border: 1.5px solid currentColor; border-radius: 4px; padding: 1.5px; box-sizing: border-box; opacity: .9; }
+    .batt i::after { content: ''; position: absolute; right: -4px; top: 3.5px; width: 2px; height: 4px; border-radius: 0 2px 2px 0; background: currentColor; }
+    .batt b { display: block; height: 100%; border-radius: 1.5px; background: var(--text); transition: width .4s ease; }
+    .batt.low b { background: #ffd23f; } .batt.low { color: #ffe27a; } .batt.crit b { background: #ff4d5e; } .batt.crit { color: #ff8a95; }
+    .batt.on b { background: var(--green); }
+    .batt svg { width: 11px; height: 11px; fill: currentColor; display: none; } .batt.on svg { display: block; }
     main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; padding: 18px 22px; min-height: 0; }
     /* the stage, as large as fits (container units), and the bar under it */
     .left { display: flex; flex-direction: column; min-height: 0; gap: 12px; }
@@ -238,6 +246,7 @@
       <img class="logo" src="./assets/conf42/CONF42_WHITE.png" alt="Conf42">
       <h1>Speaker <span>studio</span></h1>
       <div class="talkpick" id="who-bar"></div>
+      <div class="batt" id="batt" hidden title="Battery"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><i><b id="batt-f"></b></i><span id="batt-v"></span></div>
       <button class="ghost" id="guide">Setup guide</button>
     </header>
     <main>
@@ -288,7 +297,7 @@
               <div class="slot" data-ctl="mic"></div>
             </div>
             <div data-step="3" style="--c:var(--green)" hidden>
-              <div class="kicker">Step 3 of 3 · The big window</div>
+              <div class="kicker">Step 3 of 3 · Sharing stuff</div>
               <h2>What do you want to show?</h2>
               <p class="lead">Add your slides, share a screen, or both - you switch between them while you record.</p>
               <div class="slot" data-ctl="win"></div>
@@ -312,7 +321,7 @@
             <div class="body slot" data-ctl="mic" hidden></div>
           </div>
           <div class="row" style="--c:var(--green)">
-            <button><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg><span><b>Big window</b><em id="sum-win">-</em></span><i>Change</i></button>
+            <button><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg><span><b>Sharing stuff</b><em id="sum-win">-</em></span><i>Change</i></button>
             <div class="body slot" data-ctl="win" hidden></div>
           </div>
           <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose where to save the video (your Desktop is best); it's written there as you record.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br><b>Some settings will freeze when you record, make sure to double check everything!</b></div>
@@ -1043,6 +1052,24 @@
 
     // ── recording ──
     var wake = null;
+    // the battery (Chrome's Battery Status API: the level and whether it charges, nothing else). A Mac without one
+    // (iMac, Mac mini) reports full and charging forever: no icon there. Running low unplugged: a nudge to plug in,
+    // since a laptop going to sleep ends the recording
+    if (navigator.getBattery) navigator.getBattery().then(function (b) {
+      var told = 0;
+      function show() {
+        var pct = Math.round(b.level * 100), el = $('batt');
+        el.hidden = b.charging && pct === 100 && !b.chargingTime;
+        $('batt-v').textContent = pct + '%'; $('batt-f').style.width = pct + '%';
+        el.classList.toggle('on', b.charging); el.classList.toggle('low', !b.charging && pct <= 50); el.classList.toggle('crit', !b.charging && pct <= 25);   // yellow at 50 %, red at 25 % (Marek 2026-10-23)
+        el.title = b.charging ? 'Battery ' + pct + '%, charging' : 'Battery ' + pct + '%';
+        var lvl = b.charging ? 0 : pct <= 25 ? 2 : pct <= 50 ? 1 : 0;
+        if (lvl > told) toast('Battery at ' + pct + '% - plug in your charger' + (S.recording ? ' so the recording isn’t cut short.' : ' before you record.'), 8000);
+        told = lvl;
+      }
+      ['levelchange', 'chargingchange', 'chargingtimechange'].forEach(function (k) { b.addEventListener(k, show); });
+      show();
+    }).catch(function () {});
     function lockWake() { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
     document.addEventListener('visibilitychange', function () { if (S.recording && document.visibilityState === 'visible') lockWake(); });
     window.addEventListener('beforeunload', function (e) { if (S.recording || S.finishing) { e.preventDefault(); e.returnValue = ''; } });
@@ -1054,7 +1081,7 @@
       if (!name) { hello(); return; }
       var missing = !ready(1) ? 1 : !ready(2) ? 2 : !ready(3) ? 3 : 0;
       if (missing) {
-        toast(['', 'Set up your microphone first.', 'Choose whether to appear on camera first.', 'Choose what goes in the big window first.'][missing]);
+        toast(['', 'Choose whether to appear on camera first.', 'Set up your microphone first.', 'Choose what you\u2019re sharing first.'][missing]);
         if ($('wizard').hidden) guide();
         goStep(missing); return;
       }
