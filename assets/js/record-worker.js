@@ -122,8 +122,9 @@ function tick() {
   // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
   var held = rec && rec.paused;
   if (dx && frameNo % (held ? 6 : previewEvery) === 0) {
+    var pw = dx.canvas.width, ph = dx.canvas.height, o = held ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
     dx.filter = held ? 'blur(10px)' : 'none';
-    dx.drawImage(cv, 0, 0, dx.canvas.width, dx.canvas.height);
+    dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
   }
   if (frameNo % FPS === 0) brightness();
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
