@@ -125,6 +125,7 @@ function tick() {
     var pw = dx.canvas.width, ph = dx.canvas.height, o = held ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
     dx.filter = held ? 'blur(10px)' : 'none';
     dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
+    if (held) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,.3)'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
   if (frameNo % FPS === 0) brightness();
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
