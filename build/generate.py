@@ -483,6 +483,11 @@ generate_teasers(env, context, BASE_FOLDER)
 from .headshots import generate as generate_headshots
 generate_headshots(env, context, BASE_FOLDER)
 
+# RECORD (conf42.com/record - unlisted speaker tool: noindex, never passed to register_url): the in-browser talk
+# recorder that replaces OBS (Marek 2026-10-22), from build/record.py
+from .record import generate as generate_record
+generate_record(env, context, BASE_FOLDER)
+
 # FACTORY (conf42.com/factory - unlisted: noindex, never passed to register_url, so not in the sitemap or
 # 404-index.json). Progress of the factory runs (factory/, the local Descript video pipeline), from _db/factory.json
 # which the factory app writes and pushes ("Publish status").

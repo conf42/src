@@ -143,3 +143,13 @@ def start_time(event):
         month=event.month,
         day=event.day,
     )
+
+def asset_version(base_folder, path):
+    """A short hash of a file under docs/, for ?v= on a script URL (2026-10-22): a changed file gets a new URL, so a
+    browser never runs a stale copy of it (pages stay fresh; only content-addressed URLs may be cached)."""
+    import hashlib
+    try:
+        with open(os.path.join(base_folder, path), "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()[:10]
+    except OSError:
+        return "0"
