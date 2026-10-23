@@ -82,10 +82,14 @@
     .thumb { width: 92px; height: 52px; border-radius: 8px; background: #000; border: 1px solid var(--edge); }
     .spacer { flex: 1; }
     /* the Slides / Screen switch, as big as Record (Marek 2026-10-23); always there, the side not provided greyed out */
-    .seg { display: inline-flex; box-sizing: border-box; height: 52px; padding: 3px; gap: 3px; border-radius: 999px; background: rgba(8,12,30,.5); border: 1px solid var(--edge); }
+    .seg { position: relative; display: inline-flex; box-sizing: border-box; height: 52px; padding: 3px; gap: 3px; border-radius: 999px; background: rgba(8,12,30,.5); border: 1px solid var(--edge); }
     .seg button { font: inherit; font-weight: 800; font-size: 1.05rem; color: var(--muted); background: transparent; border: 0; border-radius: 999px;
       padding: 0 24px; cursor: pointer; }
-    .seg button.on { color: #fff; background: var(--green-btn); }
+    .seg button { position: relative; z-index: 1; transition: color .25s ease, opacity .25s ease; }
+    .seg button.on { color: #fff; }
+    /* the green knob slides under the chosen one (Marek 2026-10-23) */
+    .seg .knob { position: absolute; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 999px; background: var(--green-btn); opacity: 0;
+      transition: transform .32s cubic-bezier(.3,.7,.2,1), width .32s cubic-bezier(.3,.7,.2,1), opacity .2s ease; }
     .seg button.off { opacity: .35; cursor: not-allowed; }
     .prog { height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
@@ -184,7 +188,20 @@
     .locked .talkpick, .locked #guide { pointer-events: none; opacity: .55; }
     .banner { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 5; background: #2a2140; border: 1px solid var(--amber); border-radius: 14px;
       padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 12px 40px rgba(0,0,0,.5); font-size: .88rem; }
-    .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 9; background: #3a1424; border: 1px solid var(--pink); color: #fff;
+    /* things slide in rather than pop (Marek 2026-10-23): an element shown again replays its entrance */
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes slidein { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+    @keyframes toastin { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    [data-step] { animation: slidein .35s cubic-bezier(.3,.7,.2,1); }
+    .msg, .row .body, #cam-on, #cam2-wrap, .drop, #gs, #gs-go, #share, .zoom, .x2, #match { animation: rise .3s cubic-bezier(.3,.7,.2,1); }
+    .held, .pause, .badge { animation: fade .25s ease; }
+    .count { animation: pop .3s ease; }
+    .btn, .card, .nav, .ghost, .pause, .duo button, .rec { transition: background-color .2s ease, border-color .2s ease, color .2s ease, opacity .2s ease, box-shadow .2s ease, transform .15s ease; }
+    .btn:active:not(:disabled), .card:active, .nav:active:not(:disabled), .pause:active:not(:disabled), .rec:active:not(:disabled), .duo button:active { transform: scale(.97); }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+    .toast { animation: toastin .3s cubic-bezier(.3,.7,.2,1); position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 9; background: #3a1424; border: 1px solid var(--pink); color: #fff;
       padding: 12px 18px; border-radius: 12px; font-weight: 700; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
     /* the browser lock (Marek 2026-10-22): Chrome and Edge only */
     .blocker { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -229,7 +246,7 @@
           <button class="nav" id="next" title="Next slide (→ or Space)" aria-label="Next slide">▶</button>
           <canvas class="thumb" id="thumb" width="184" height="104" title="Next slide" style="visibility:hidden"></canvas>
           <span class="spacer"></span>
-          <div class="seg" id="live-src"><button data-src="slides">Slides</button><button data-src="screen">Screen</button></div>
+          <div class="seg" id="live-src"><i class="knob" id="knob"></i><button data-src="slides">Slides</button><button data-src="screen">Screen</button><button data-src="none">Me</button></div>
           <div class="mini" title="Microphone level"><i id="lvl2"></i></div>
           <button class="pause" id="pause" hidden>Pause</button>
           <button class="rec" id="rec">Record</button>
@@ -413,6 +430,7 @@
     var S = { ev: null, talk: null, kind: null, camWanted: null, mode: null, src: 'none', cam: [null, null], micTrack: null, screenTrack: null,
               pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '' };
 
+    function replay(el) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }   // the entrance again (a new count)
     function toast(t, ms) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { el.hidden = true; }, ms || 5000); }
     function status(t, cls) { var el = $('status'); el.className = 'msg ' + (cls || ''); el.innerHTML = t; }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -737,7 +755,7 @@
       $('mode-none').hidden = $('mode-both').hidden = !yes;
       if (!yes) {
         $('cam-on').hidden = true; closeCam(0); closeCam(1);
-        if (S.mode === 'none') setMode(null); else if (S.mode === 'both') setMode('window');
+        if (S.mode === 'none') setMode(null); else if (S.mode === 'both') setMode('window'); else if (S.src === 'none' && S.mode) setSrc('slides');
         relayout(); return;
       }
       navigator.mediaDevices.getUserMedia({ video: true })
@@ -822,13 +840,22 @@
     }
     all('#live-src button').forEach(function (b) { b.addEventListener('click', function () { if (!b.classList.contains('off')) setSrc(b.dataset.src); b.blur(); }); });
     function srcState() {   // which side of the switch has something behind it; hints on the greyed one
-      var win = S.mode === 'both' || S.mode === 'window', ok = { slides: !!S.pdf && win, screen: !!S.screenTrack && win };
+      var win = S.mode === 'both' || S.mode === 'window', ok = { slides: !!S.pdf && win, screen: !!S.screenTrack && win, none: !!S.cam[0] };
       all('#live-src button').forEach(function (b) {
         var k = b.dataset.src, off = !ok[k];
         b.classList.toggle('off', off);
-        b.title = !off ? '' : k === 'slides' ? 'No slides provided, select one in settings to activate' : 'No screen shared, share in settings to activate';
+        b.title = !off ? '' : k === 'slides' ? 'No slides provided, select one in settings to activate'
+          : k === 'screen' ? 'No screen shared, share in settings to activate' : 'No camera, turn it on in settings to activate';
       });
+      knob();
     }
+    function knob() {   // under the chosen side
+      var b = document.querySelector('#live-src button.on'), k = $('knob');
+      k.style.opacity = b ? 1 : 0;
+      if (b) { k.style.width = b.offsetWidth + 'px'; k.style.transform = 'translateX(' + b.offsetLeft + 'px)'; }
+    }
+    window.addEventListener('resize', knob);
+    if (document.fonts) document.fonts.ready.then(knob);
     function setSrc(s) {
       S.src = s;
       all('#live-src button').forEach(function (b) { b.classList.toggle('on', b.dataset.src === s); });
@@ -965,7 +992,7 @@
       var n = 3, el = $('count');
       $('rec').disabled = true; el.hidden = false; el.textContent = n;
       var t = setInterval(function () {
-        if (--n > 0) { el.textContent = n; return; }
+        if (--n > 0) { el.textContent = n; replay(el); return; }
         clearInterval(t); el.hidden = true;
         S.recMic = S.micTrack.clone();
         var r = new MediaStreamTrackProcessor({ track: S.recMic }).readable;
@@ -1000,7 +1027,7 @@
       var n = 3, el = $('count'), btns = [$('pause'), $('rec')];
       btns.forEach(function (b) { b.disabled = true; }); $('held').hidden = true; el.hidden = false; el.textContent = n;
       var t = setInterval(function () {
-        if (--n > 0) { el.textContent = n; return; }
+        if (--n > 0) { el.textContent = n; replay(el); return; }
         clearInterval(t); el.hidden = true; btns.forEach(function (b) { b.disabled = false; });
         if (!S.recording) return;
         S.paused = false; worker.postMessage({ type: 'resume' }); pauseShown();
