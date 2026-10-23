@@ -67,13 +67,25 @@ function draw() {
 }
 
 function brightness() {
+  var sigs = [];
   cams.forEach(function (s, i) {
     if (!s.frame) return;
     lx.drawImage(s.frame, 0, 0, 32, 18);
-    var p = lx.getImageData(0, 0, 32, 18).data, sum = 0;
-    for (var k = 0; k < p.length; k += 4) sum += .2126 * p[k] + .7152 * p[k + 1] + .0722 * p[k + 2];
+    var p = lx.getImageData(0, 0, 32, 18).data, sum = 0, g = [];
+    for (var k = 0; k < p.length; k += 4) { var l = .2126 * p[k] + .7152 * p[k + 1] + .0722 * p[k + 2]; g.push(l); sum += l; }
+    sigs[i] = g;
     post({ type: 'light', slot: i, luma: sum / (p.length / 4) });
   });
+  // the two cameras alike? (the page suggests removing the 2nd when it's one person twice): the correlation of the
+  // two 32 x 18 grey pictures, 1 = the same picture
+  if (sigs[0] && sigs[1]) post({ type: 'alike', r: corr(sigs[0], sigs[1]) });
+}
+function corr(a, b) {
+  var n = a.length, ma = 0, mb = 0, sab = 0, saa = 0, sbb = 0, i;
+  for (i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  for (i = 0; i < n; i++) { var da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+  return saa && sbb ? sab / Math.sqrt(saa * sbb) : 0;   // a flat picture (a camera still starting) proves nothing
 }
 
 // the clock: the wall clock, gently pulled onto the audio clock (samples counted). Audio arrives in bursts, so the
