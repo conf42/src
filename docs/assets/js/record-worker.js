@@ -9,7 +9,9 @@
 // The picture follows the audio clock (samples counted), so the voice and the face never drift apart, even over 2 hours.
 importScripts('vendor/mp4-muxer-5.1.3.min.js');
 
-var W = 1920, H = 1080, FPS = 60, KEY_EVERY = 2 * FPS, VBITRATE = 2500000, ABITRATE = 128000, MAX_US = 2 * 3600 * 1e6;
+var W = 1920, H = 1080, FPS = 60, KEY_EVERY = 2 * FPS, VBITRATE = 2500000, MAX_US = 2 * 3600 * 1e6;
+// the sound is what matters most (Marek 2026-10-22): the highest AAC bitrate the browser takes, mono
+var ABITRATES = [320000, 256000, 192000, 128000];
 var OPFS_MP4 = 'c42-recording.mp4', OPFS_META = 'c42-recording.json';
 
 var cv = new OffscreenCanvas(W, H), x = cv.getContext('2d', { alpha: false });
@@ -31,12 +33,12 @@ function feed(readable, put) {
   })();
   return live;
 }
-var cams = [{ feed: null, frame: null }, { feed: null, frame: null }], scr = { feed: null, frame: null };
+var cams = [{ feed: null, frame: null, zoom: 1 }, { feed: null, frame: null, zoom: 1 }], scr = { feed: null, frame: null };
 function setFrame(slot) { return function (f) { if (slot.frame) slot.frame.close(); slot.frame = f; }; }
 
-function cover(src, sw, sh, dx, dy, dw, dh, up) {
-  // src scaled to fill dx,dy,dw,dh, cropped centred (up: a little nearer the top, where the face usually is)
-  var s = Math.max(dw / sw, dh / sh), cw = dw / s, ch = dh / s;
+function cover(src, sw, sh, dx, dy, dw, dh, up, zoom) {
+  // src scaled to fill dx,dy,dw,dh, cropped centred (up: a little nearer the top, where the face usually is); zoom > 1 crops in
+  var s = Math.max(dw / sw, dh / sh) * (zoom || 1), cw = dw / s, ch = dh / s;
   x.drawImage(src, (sw - cw) / 2, (sh - ch) * (up ? .4 : .5), cw, ch, dx, dy, dw, dh);
 }
 function contain(src, sw, sh, r) {
@@ -51,11 +53,11 @@ function draw() {
   x.save(); x.beginPath(); x.rect(r[0], r[1], r[2], r[3]); x.clip();
   if (source === 'screen' && f) contain(f, f.displayWidth, f.displayHeight, r);
   else if (source === 'slides' && slide) x.drawImage(slide, r[0] + (r[2] - slide.width) / 2, r[1] + (r[3] - slide.height) / 2);
-  else if (!geo.cams.length && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true); }   // no slides: the camera alone in the big window
+  else if (!geo.cams.length && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
   x.restore();
   geo.cams.forEach(function (g, i) {
     var c = cams[i].frame, d = 2 * g[2] + 6;
-    if (c) cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true);
+    if (c) cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom);
   });
   if (overlay) x.drawImage(overlay, 0, 0);
 }
@@ -132,9 +134,13 @@ function pickVideo() {
   }, Promise.resolve(null));
 }
 function pickAudio(rate) {
-  var aac = { codec: 'mp4a.40.2', sampleRate: rate, numberOfChannels: 1, bitrate: ABITRATE };
-  var opus = { codec: 'opus', sampleRate: rate, numberOfChannels: 1, bitrate: ABITRATE };
-  return AudioEncoder.isConfigSupported(aac).then(function (s) { return s.supported ? [aac, 'aac'] : AudioEncoder.isConfigSupported(opus).then(function (o) { return o.supported ? [opus, 'opus'] : null; }); });
+  var tries = [];
+  ['aac', 'opus'].forEach(function (k) {
+    ABITRATES.forEach(function (b) { tries.push([{ codec: k === 'aac' ? 'mp4a.40.2' : 'opus', sampleRate: rate, numberOfChannels: 1, bitrate: b, bitrateMode: 'constant' }, k]); });
+  });
+  return tries.reduce(function (p, t) {
+    return p.then(function (found) { return found || AudioEncoder.isConfigSupported(t[0]).then(function (s) { return s.supported ? t : null; }, function () { return null; }); });
+  }, Promise.resolve(null));
 }
 
 function write(data, pos) {
@@ -202,7 +208,7 @@ function start(m) {
           r.acodec = ac[1];
           r.metaTimer = setInterval(function () { meta(); if (r.sync) try { r.sync.flush(); } catch (e) {} }, 5000);
           meta();
-          post({ type: 'started', video: r.vcodec, audio: ac[1] });
+          post({ type: 'started', video: r.vcodec, audio: ac[1] + ' ' + Math.round(ac[0].bitrate / 1000) + 'k' });
         }).catch(function (e) { post({ type: 'error', message: e.message }); });
         d.close(); return;
       }
@@ -249,6 +255,7 @@ self.onmessage = function (e) {
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; }
   else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; }
   else if (m.type === 'source') source = m.source;
+  else if (m.type === 'zoom') cams[m.slot].zoom = m.zoom;
   else if (m.type === 'cam') {
     var s = cams[m.slot];
     if (s.feed) s.feed.stop();
