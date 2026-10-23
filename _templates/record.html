@@ -438,7 +438,7 @@
     var display = $('pv').transferControlToOffscreen();   // the engine draws the preview itself
     worker.postMessage({ type: 'display', canvas: display }, [display]);
     var S = { ev: null, talk: null, kind: null, camWanted: null, mode: null, src: 'none', cam: [null, null], micTrack: null, screenTrack: null,
-              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '' };
+              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '', openSeq: [] };
 
     function replay(el) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }   // the entrance again (a new count)
     function toast(t, ms) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { el.hidden = true; }, ms || 5000); }
@@ -763,20 +763,27 @@
       all('#ctl-cam .card').forEach(function (b) { b.classList.toggle('on', (b.dataset.cam === 'yes') === yes); });
       $('cam-err').hidden = true;
       $('mode-none').hidden = $('mode-both').hidden = !yes;
+      var seq = S.camSeq = (S.camSeq || 0) + 1;   // a quick Yes / Voice only / Yes: only the last click counts
       if (!yes) {
         $('cam-on').hidden = true; closeCam(0); closeCam(1);
-        if (S.mode === 'none') setMode(null); else if (S.mode === 'both') setMode('window'); else if (S.src === 'none' && S.mode) setSrc('slides');
+        // the camera's own layouts give way to the window - and come back with the camera (bug 2026-10-23: Voice only
+        // and back left "Just slides / screen" behind, so the camera never showed)
+        if (S.mode === 'none' || S.mode === 'both') { S.modeBack = S.mode; setMode(S.mode === 'none' ? null : 'window'); }
+        else if (S.src === 'none' && S.mode) setSrc('slides');
         relayout(); return;
       }
+      if (S.modeBack) { var mb = S.modeBack; S.modeBack = null; setMode(mb); }
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); return navigator.mediaDevices.enumerateDevices(); })
         .then(function (list) {
+          if (seq !== S.camSeq) return;
           fill($('cam'), 'videoinput', list); fill($('cam2'), 'videoinput', list);
           $('cam-on').hidden = false; setDuo(false);   // presenting alone by default, every time (Marek 2026-10-23)
           return openCam(0);
         }).catch(camError);
     }
     function closeCam(slot) {
+      S.openSeq[slot] = (S.openSeq[slot] || 0) + 1;   // and any camera still opening for this slot is dropped
       if (S.cam[slot]) { S.cam[slot].stop(); S.cam[slot] = null; }
       worker.postMessage({ type: 'cam', slot: slot, readable: null });
     }
@@ -785,9 +792,14 @@
       if (!slot) store.set(sel.id, id);
       closeCam(slot); S.same = 0; sameShown();
       if (!id || (slot && !S.duo)) { relayout(); return Promise.resolve(); }
+      var seq = S.openSeq[slot] = (S.openSeq[slot] || 0) + 1;
       return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } })
         .then(function (s) {
-          var t = s.getVideoTracks()[0]; S.cam[slot] = t;
+          var t = s.getVideoTracks()[0];
+          // overtaken (another camera picked, Voice only, a 2nd click): this one isn't wanted any more
+          if (seq !== S.openSeq[slot] || !S.camWanted || (slot && !S.duo)) { t.stop(); return; }
+          if (S.cam[slot]) S.cam[slot].stop();
+          S.cam[slot] = t;
           var r = new MediaStreamTrackProcessor({ track: t }).readable;
           worker.postMessage({ type: 'cam', slot: slot, readable: r }, [r]);
           relayout();
@@ -840,7 +852,7 @@
     };
 
     // ── 3. the big window: slides (PDF), a shared screen or window, both, or just the speaker ──
-    all('#ctl-win .card').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+    all('#ctl-win .card').forEach(function (b) { b.addEventListener('click', function () { S.modeBack = null; setMode(b.dataset.mode); }); });
     function setMode(mode) {
       S.mode = mode; if (mode) store.set('mode', mode);
       all('#ctl-win .card').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === mode); });
