@@ -57,7 +57,11 @@ function draw() {
   x.restore();
   geo.cams.forEach(function (g, i) {
     var c = cams[i].frame, d = 2 * g[2] + 6;
-    if (c) cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom);
+    if (!c) return;
+    // clipped to the circle: the square around it reaches into the slides' window in co-talk (Marek 2026-10-23)
+    x.save(); x.beginPath(); x.arc(g[0], g[1], d / 2, 0, 2 * Math.PI); x.clip();
+    cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom);
+    x.restore();
   });
   if (overlay) x.drawImage(overlay, 0, 0);
 }
