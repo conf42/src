@@ -119,7 +119,12 @@ function tick() {
   }
   // the page's preview: its canvas was handed over to this worker, so the page itself does nothing per frame (posting
   // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
-  if (frameNo % previewEvery === 0 && dx) dx.drawImage(cv, 0, 0, dx.canvas.width, dx.canvas.height);
+  // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
+  var held = rec && rec.paused;
+  if (dx && frameNo % (held ? 6 : previewEvery) === 0) {
+    dx.filter = held ? 'blur(10px)' : 'none';
+    dx.drawImage(cv, 0, 0, dx.canvas.width, dx.canvas.height);
+  }
   if (frameNo % FPS === 0) brightness();
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
   frameNo++;
