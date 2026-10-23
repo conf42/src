@@ -21,7 +21,7 @@ var frameNo = 0, previewEvery = 2, dx = null, visible = true;
 // only what changed is drawn again (Marek 2026-10-23: "optimize the hell out of it"): the canvas keeps the last frame,
 // a new camera or screen picture repaints just its own box, anything else (layout, overlay, slide, source) the whole
 // frame. A frame with nothing new isn't drawn at all - the encoder gets the same canvas again
-var dirty = true, wasRec = false, pvStale = true, wasHeld = false;
+var dirty = true, wasRec = false, pvStale = true, wasHeld = false, dim = false;
 var rec = null;
 
 function post(m, t) { self.postMessage(m, t || []); }
@@ -144,7 +144,8 @@ function heard(us) {
 function tick() {
   if (!!rec !== wasRec) { wasRec = !!rec; dirty = true; }   // the empty window's placeholder is the preview's only
   var held = !!(rec && rec.paused), encoding = !!(rec && rec.muxer && !rec.stopping && !held);
-  var showing = dx && visible && frameNo % (held ? 6 : previewEvery) === 0;
+  // paused, or a card over the page (the welcome card, Marek 2026-10-23): the preview soft and dark, at 10 fps
+  var soft = held || dim, showing = dx && visible && frameNo % (soft ? 6 : previewEvery) === 0;
   if (encoding || showing) render();   // not recording: drawn only for the preview, at its 30 fps
   if (encoding) {
     // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is
@@ -167,14 +168,14 @@ function tick() {
   // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
   // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
   // not drawn while the page is hidden (a demo in another window) or when nothing changed since the last one
-  if (held !== wasHeld) { wasHeld = held; pvStale = true; }
+  if (soft !== wasHeld) { wasHeld = soft; pvStale = true; }
   if (showing && pvStale) {
     pvStale = false;
-    var pw = dx.canvas.width, ph = dx.canvas.height, o = held ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
-    dx.filter = held ? 'blur(10px)' : 'none';
+    var pw = dx.canvas.width, ph = dx.canvas.height, o = soft ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
+    dx.filter = soft ? 'blur(10px)' : 'none';
     dx.imageSmoothingQuality = pw < W ? 'high' : 'low';   // shrunk (a small or non-Retina screen): the slides' text stays clean
     dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
-    if (held) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,.3)'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
+    if (soft) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,' + (dim ? .5 : .3) + ')'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
   if (frameNo % FPS === 0 && !rec) brightness();   // the dark / same-person hints are setup's; a recording skips the read-back
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
@@ -325,6 +326,7 @@ self.onmessage = function (e) {
   if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false });
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvStale = true; } }
+  else if (m.type === 'dim') dim = m.on;
   else if (m.type === 'visible') { visible = m.on; pvStale = true; }
   else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; dirty = true; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; dirty = true; }
