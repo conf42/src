@@ -89,6 +89,12 @@
     .seg button.off { opacity: .35; cursor: not-allowed; }
     .prog { height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
+    .pause { font: inherit; font-weight: 800; font-size: 1.05rem; height: 52px; padding: 0 22px; border-radius: 999px; cursor: pointer;
+      color: var(--text); background: var(--glass2); border: 1px solid var(--edge); white-space: nowrap; }
+    .pause:hover { border-color: var(--hi); }
+    .pause.on { color: #fff; background: var(--green-btn); border-color: transparent; }
+    .badge.paused i { background: var(--amber); }
+    .badge.paused i, .rec.held::after { animation-play-state: paused; }
     .mini { width: 90px; height: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .mini i, .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green) 0 70%, var(--amber) 70% 90%, var(--pink) 90%); transition: width .06s; }
     .rec { position: relative; font: inherit; font-weight: 800; font-size: 1.05rem; color: #fff; border: 0; cursor: pointer; border-radius: 999px;
@@ -184,7 +190,7 @@
     .blocker .get { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
     .blocker a.btn { text-decoration: none; }
     .blocker .anyway { margin-top: 18px; font-size: .82rem; }
-    @media (max-height: 760px) { .wiz h2 { font-size: 1.25rem; } .wiz p.lead { margin-bottom: 10px; } .card small { display: none; } .nav { height: 44px; } .rec, .seg { height: 44px; } }
+    @media (max-height: 760px) { .wiz h2 { font-size: 1.25rem; } .wiz p.lead { margin-bottom: 10px; } .card small { display: none; } .nav { height: 44px; } .rec, .seg, .pause { height: 44px; } }
     @media (max-width: 1100px) { main { grid-template-columns: minmax(0, 1fr) 340px; } header h1 { display: none; } }
   </style>
 </head>
@@ -220,6 +226,7 @@
           <span class="spacer"></span>
           <div class="seg" id="live-src"><button data-src="slides">Slides</button><button data-src="screen">Screen</button></div>
           <div class="mini" title="Microphone level"><i id="lvl2"></i></div>
+          <button class="pause" id="pause" hidden>Pause</button>
           <button class="rec" id="rec">Record</button>
         </div>
       </section>
@@ -395,7 +402,7 @@
     };
     var store = { get: function (k) { try { return localStorage.getItem('c42rec.' + k); } catch (e) { return null; } },
                   set: function (k, v) { try { localStorage.setItem('c42rec.' + k, v); } catch (e) {} } };
-    var worker = new Worker('./assets/js/record-worker.js?v=710da3cac4');
+    var worker = new Worker('./assets/js/record-worker.js?v=776317669a');
     var display = $('pv').transferControlToOffscreen();   // the engine draws the preview itself
     worker.postMessage({ type: 'display', canvas: display }, [display]);
     var S = { ev: null, talk: null, kind: null, camWanted: null, mode: null, src: 'none', cam: [null, null], micTrack: null, screenTrack: null,
@@ -663,7 +670,7 @@
     setInterval(function () {
       var l = level(), d = db(l.rms), w = Math.max(0, Math.min(100, (d + 60) / 60 * 100)) + '%';
       $('lvl').style.width = w; $('lvl2').style.width = w;
-      if (!S.recording) { silentFor = 0; return; }
+      if (!S.recording || S.paused) { silentFor = 0; return; }
       silentFor = d < -55 ? silentFor + .1 : 0;
       if (silentFor > 10 && silentFor < 10.15) toast('We can’t hear you - is the microphone muted or unplugged?', 6000);
       if (l.peak > .99 && Date.now() - lastLoud > 15000) { lastLoud = Date.now(); toast('Too loud: move a little further from the microphone.'); }
@@ -934,7 +941,7 @@
 
     $('rec').addEventListener('click', function () {
       this.blur();   // Space is the next slide, not this button
-      if (S.recording) { worker.postMessage({ type: 'stop' }); S.recording = false; S.finishing = true; $('rec').disabled = true; return; }
+      if (S.recording) { worker.postMessage({ type: 'stop' }); S.recording = false; S.finishing = true; $('rec').disabled = true; $('pause').hidden = true; return; }
       var name = speaker();
       if (!name) { hello(); return; }
       var missing = !ready(1) ? 1 : !ready(2) ? 2 : !ready(3) ? 3 : 0;
@@ -960,7 +967,7 @@
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
-        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0;
+        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked');
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
@@ -969,8 +976,18 @@
         lockWake();
       }, 1000);
     }
+    // pause / resume: nothing is recorded while paused; slides and screen can still be changed
+    function pauseShown() {
+      $('pause').textContent = S.paused ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', S.paused);
+      $('badge').classList.toggle('paused', S.paused); $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
+      if (S.recording) status(S.paused ? '❚❚ Paused - nothing is being recorded. Press <b>Resume</b> to carry on.' : '● Recording. Press <b>Pause</b> for a break, <b>Stop</b> when you’re done.');
+    }
+    $('pause').addEventListener('click', function () {
+      if (!S.recording || S.finishing) return;
+      S.paused = !S.paused; worker.postMessage({ type: S.paused ? 'pause' : 'resume' }); pauseShown(); this.blur();
+    });
     function stopped() {
-      S.recording = false; S.finishing = false;
+      S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
       document.body.classList.remove('locked');
       $('rec').disabled = false; $('rec').classList.remove('live'); $('rec').textContent = 'Record';
       $('badge').hidden = true; $('glow').classList.remove('live');

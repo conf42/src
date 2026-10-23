@@ -90,7 +90,7 @@ function corr(a, b) {
 
 // the clock: the wall clock, gently pulled onto the audio clock (samples counted). Audio arrives in bursts, so the
 // offset between the two is smoothed over a few seconds: the picture runs evenly and still never drifts from the voice
-function now() { return rec && rec.w0 ? (performance.now() - rec.w0) * 1000 + rec.off : 0; }
+function now() { return rec && rec.w0 ? ((rec.paused || performance.now()) - rec.w0) * 1000 + rec.off : 0; }   // stands still while paused
 function heard(us) {
   var w = performance.now();
   if (!rec.w0) { rec.w0 = w; rec.off = us; return; }
@@ -100,7 +100,7 @@ function heard(us) {
 
 function tick() {
   draw();
-  if (rec && rec.muxer && !rec.stopping) {
+  if (rec && rec.muxer && !rec.stopping && !rec.paused) {
     // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is
     // absorbed); only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out
     var at = now() * FPS / 1e6, n = rec.lastN + 1;
@@ -228,7 +228,7 @@ function start(m) {
         }).catch(function (e) { post({ type: 'error', message: e.message }); });
         d.close(); return;
       }
-      if (!r.muxer) { d.close(); return; }
+      if (!r.muxer || r.paused) { d.close(); return; }   // paused: the sound isn't counted, so the timeline just continues
       var a = mono(d), rate2 = d.sampleRate;
       d.close();
       heard(r.samples * 1e6 / rate2);
@@ -283,4 +283,8 @@ self.onmessage = function (e) {
     scr.feed = m.readable ? feed(m.readable, setFrame(scr)) : null;
   } else if (m.type === 'start') start(m);
   else if (m.type === 'stop') stop('stop');
+  // pause / resume (Marek 2026-10-23): nothing is written while paused; on resume the clock is moved on by the pause, so
+  // the file plays straight through, and the first picture after it is a keyframe (a clean cut for the editors)
+  else if (m.type === 'pause' && rec && !rec.paused && rec.w0) rec.paused = performance.now();
+  else if (m.type === 'resume' && rec && rec.paused) { rec.w0 += performance.now() - rec.paused; rec.paused = 0; rec.lastKey = -KEY_EVERY; }
 };
