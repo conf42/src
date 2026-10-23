@@ -15,7 +15,7 @@ var OPFS_MP4 = 'c42-recording.mp4', OPFS_META = 'c42-recording.json';
 var cv = new OffscreenCanvas(W, H), x = cv.getContext('2d', { alpha: false });
 var light = new OffscreenCanvas(32, 18), lx = light.getContext('2d', { willReadFrequently: true });
 var geo = null, overlay = null, slide = null, source = 'slides', bg = '#111';
-var frameNo = 0, previewEvery = 2;
+var frameNo = 0, previewEvery = 2, dx = null;
 var rec = null;
 
 function post(m, t) { self.postMessage(m, t || []); }
@@ -99,7 +99,9 @@ function tick() {
     }
     if (now() >= MAX_US) stop('limit');
   }
-  if (frameNo % previewEvery === 0) { var b = cv.transferToImageBitmap(); post({ type: 'preview', bitmap: b }, [b]); }
+  // the page's preview: its canvas was handed over to this worker, so the page itself does nothing per frame (posting
+  // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
+  if (frameNo % previewEvery === 0 && dx) dx.drawImage(cv, 0, 0, dx.canvas.width, dx.canvas.height);
   if (frameNo % FPS === 0) brightness();
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped });
   frameNo++;
@@ -242,7 +244,8 @@ function stop(why) {
 
 self.onmessage = function (e) {
   var m = e.data;
-  if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; }
+  if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false });
+  else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; }
   else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; }
   else if (m.type === 'source') source = m.source;
