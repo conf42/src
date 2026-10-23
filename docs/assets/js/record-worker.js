@@ -46,6 +46,26 @@ function contain(src, sw, sh, r) {
   x.drawImage(src, r[0] + (r[2] - w) / 2, r[1] + (r[3] - h) / 2, w, h);
 }
 
+// the empty window before anything is added (Marek 2026-10-23): a transparency grid and what goes there
+var checker = null, checkerBg = '';
+function tint(hex, w) {   // the conference colour, w of the way to white
+  var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex) || [0, '88', '99', 'bb'];
+  return 'rgb(' + [1, 2, 3].map(function (i) { var v = parseInt(m[i], 16); return Math.round(v + (255 - v) * w); }).join(',') + ')';
+}
+function empty(r) {
+  if (!checker || checkerBg !== bg) {   // tinted with the conference's colour (Marek 2026-10-23)
+    var c = new OffscreenCanvas(80, 80), g = c.getContext('2d');
+    g.fillStyle = tint(bg, .82); g.fillRect(0, 0, 80, 80); g.fillStyle = tint(bg, .68); g.fillRect(0, 0, 40, 40); g.fillRect(40, 40, 40, 40);
+    checker = x.createPattern(c, 'repeat'); checkerBg = bg;
+  }
+  x.fillStyle = checker; x.fillRect(r[0], r[1], r[2], r[3]);
+  var t = 'Your slides and/or shared screen will appear here', fs = Math.round(r[2] / 30);
+  x.font = '700 ' + fs + 'px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  var tw = x.measureText(t).width + fs * 1.6, th = fs * 2.2, cx = r[0] + r[2] / 2, cy = r[1] + r[3] / 2;
+  x.fillStyle = 'rgba(15,23,51,.82)'; x.beginPath(); x.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2); x.fill();
+  x.fillStyle = '#ffffff'; x.fillText(t, cx, cy);
+}
+
 function draw() {
   x.fillStyle = bg; x.fillRect(0, 0, W, H);
   if (!geo) return;
@@ -54,6 +74,7 @@ function draw() {
   if (source === 'screen' && f) contain(f, f.displayWidth, f.displayHeight, r);
   else if (source === 'slides' && slide) x.drawImage(slide, r[0] + (r[2] - slide.width) / 2, r[1] + (r[3] - slide.height) / 2);
   else if (source === 'none' && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
+  else if (!rec) empty(r);   // nothing in the window yet: the placeholder, in the preview only
   x.restore();
   geo.cams.forEach(function (g, i) {
     var c = cams[i].frame, d = 2 * g[2] + 6;
