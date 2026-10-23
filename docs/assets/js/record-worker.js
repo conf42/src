@@ -53,7 +53,7 @@ function draw() {
   x.save(); x.beginPath(); x.rect(r[0], r[1], r[2], r[3]); x.clip();
   if (source === 'screen' && f) contain(f, f.displayWidth, f.displayHeight, r);
   else if (source === 'slides' && slide) x.drawImage(slide, r[0] + (r[2] - slide.width) / 2, r[1] + (r[3] - slide.height) / 2);
-  else if (!geo.cams.length && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
+  else if (source === 'none' && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
   x.restore();
   geo.cams.forEach(function (g, i) {
     var c = cams[i].frame, d = 2 * g[2] + 6;
@@ -137,11 +137,11 @@ var next = performance.now(), stat = { n: 0, busy: 0, at: performance.now() };
 })();
 
 // ── recording ──
-function pickVideo() {
+function pickVideo(bitrate) {
   var tries = [];
   ['avc1.640033', 'avc1.64002A', 'avc1.4D402A', 'avc1.42E02A'].forEach(function (codec) {   // High 5.1, High 4.2, Main 4.2, Baseline 4.2
     ['prefer-hardware', 'no-preference'].forEach(function (hw) {
-      tries.push({ codec: codec, width: W, height: H, bitrate: VBITRATE, framerate: FPS, bitrateMode: 'variable',
+      tries.push({ codec: codec, width: W, height: H, bitrate: bitrate || VBITRATE, framerate: FPS, bitrateMode: 'variable',
                    latencyMode: 'quality', hardwareAcceleration: hw, avc: { format: 'avc' } });
     });
   });
@@ -198,7 +198,7 @@ function start(m) {
   }).then(function (h) { return Promise.all([h[0].createSyncAccessHandle(), h[1].createSyncAccessHandle()]); })
     .then(function (s) { r.sync = s[0]; r.sync.truncate(0); r.metaH = s[1]; }, function (e) { post({ type: 'warn', what: 'opfs', message: e.message }); });
   var desk = m.handle ? m.handle.createWritable().then(function (w) { r.desk = w; }, function (e) { r.deskErr = e.message; post({ type: 'warn', what: 'disk', message: e.message }); }) : Promise.resolve();
-  Promise.all([opfs, desk, pickVideo()]).then(function (res) {
+  Promise.all([opfs, desk, pickVideo(m.vbitrate)]).then(function (res) {
     var vcfg = res[2];
     if (!vcfg) throw new Error('This browser cannot encode H.264 video.');
     r.venc = new VideoEncoder({ output: function (chunk, md) { r.muxer.addVideoChunk(chunk, md); }, error: function (e) { post({ type: 'error', message: 'video: ' + e.message }); } });
