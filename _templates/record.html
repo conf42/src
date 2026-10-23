@@ -97,6 +97,8 @@
       padding: 0 24px; cursor: pointer; }
     .seg button.on { color: #fff; background: #12805a; }
     .seg button.off { opacity: .35; cursor: not-allowed; }
+    .prog { height: 8px; margin-top: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
+    .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
     .mini { width: 90px; height: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .mini i, .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green) 0 70%, var(--amber) 70% 90%, var(--pink) 90%); transition: width .06s; }
     .rec { position: relative; font: inherit; font-weight: 800; font-size: 1.05rem; color: #fff; border: 0; cursor: pointer; border-radius: 999px;
@@ -237,7 +239,7 @@
             <div data-step="1" style="--c:var(--blue)">
               <div class="kicker">Step 1 of 3 · Microphone</div>
               <h2>Choose and test your microphone</h2>
-              <p class="lead">Good sound matters more than good video. Pick your microphone, then run the 5-second sound test to carry on.</p>
+              <p class="lead" id="mic-lead">Good sound matters more than good video. Pick your microphone, then run the 5-second sound test to carry on.</p>
               <div class="slot" data-ctl="mic"></div>
             </div>
             <div data-step="2" style="--c:var(--violet)" hidden>
@@ -560,7 +562,8 @@
       gate();
     }
     function ready(n) {
-      if (n === 1) return !!S.micTrack && !!S.verdict;   // the sound test is a must (Marek 2026-10-23)
+      // the sound test is a must the first time; a returning speaker may skip it (Marek 2026-10-23)
+      if (n === 1) return !!S.micTrack && (!!S.verdict || store.get('tested') === '1');
       if (n === 2) return S.camWanted === false || (S.camWanted === true && !!S.cam[0]);
       return S.mode === 'none' || (S.mode === 'slides' && !!S.pdf) || (S.mode === 'screen' && !!S.screenTrack) || (S.mode === 'both' && !!S.pdf && !!S.screenTrack);
     }
@@ -654,6 +657,7 @@
         }).catch(micError);
     }
     $('mic').addEventListener('change', openMic);
+    if (store.get('tested') === '1') $('mic-lead').textContent = 'Good sound matters more than good video. Pick your microphone. You’ve tested before, so the 5-second sound test is optional - but worth it in a new room.';
 
     // the level meters, and while recording the alarms: silence for 10 s, clipping
     var buf = new Float32Array(2048), silentFor = 0, lastLoud = 0;
@@ -681,8 +685,10 @@
       var btn = this, out = $('check-out'), lv = [], peak = 0, left = 5;
       var mr = new MediaRecorder(dest.stream), parts = [];
       btn.disabled = true; out.hidden = false; out.className = 'msg';
-      function say() { out.innerHTML = '<b>Talk now</b>, as you will in your talk… <b style="font-size:1.3em">' + left + '</b>'; }
+      function say() { $('check-n').textContent = left; }
+      out.innerHTML = '<b>Talk now</b>, as you will in your talk… <b id="check-n" style="font-size:1.3em"></b><div class="prog"><i id="check-p"></i></div>';
       say();
+      requestAnimationFrame(function () { requestAnimationFrame(function () { $('check-p').style.width = '100%'; }); });
       mr.ondataavailable = function (e) { parts.push(e.data); };
       mr.start();
       var t = setInterval(function () { var l = level(); lv.push(db(l.rms)); peak = Math.max(peak, l.peak); }, 50);
@@ -701,6 +707,7 @@
               : sp < -32 ? 'A little quiet - move closer to the microphone.'
               : 'Some background noise - a quieter room, or closed windows, would make it better.';
           } else { head = 'Audio clear, let’s record!'; cls = 'ok'; S.verdict = 'audio clear'; }
+          store.set('tested', '1');
           out.className = 'msg ' + cls;
           out.innerHTML = '<b>' + head + '</b>' + (tip ? '<br>' + tip : '') + '<br><span style="color:var(--muted)">Playing it back now.</span>';
           new Audio(URL.createObjectURL(new Blob(parts, { type: mr.mimeType }))).play();
