@@ -293,7 +293,7 @@ function start(m) {
           r.acodec = ac[1];
           r.metaTimer = setInterval(function () { meta(); if (r.sync) try { r.sync.flush(); } catch (e) {} }, 5000);
           meta();
-          post({ type: 'started', video: r.vcodec, audio: ac[1] + ' ' + Math.round(ac[0].bitrate / 1000) + 'k' });
+          post({ type: 'started', video: r.vcodec, hw: vcfg.hardwareAcceleration === 'prefer-hardware', audio: ac[1] + ' ' + Math.round(ac[0].bitrate / 1000) + 'k' });
         }).catch(function (e) { post({ type: 'error', message: e.message }); });
         d.close(); return;
       }
