@@ -72,7 +72,8 @@ function draw() {
   var r = geo.rect, f = scr.frame;
   x.save(); x.beginPath(); x.rect(r[0], r[1], r[2], r[3]); x.clip();
   if (source === 'screen' && f) contain(f, f.displayWidth, f.displayHeight, r);
-  else if (source === 'slides' && slide) x.drawImage(slide, r[0] + (r[2] - slide.width) / 2, r[1] + (r[3] - slide.height) / 2);
+  // on whole pixels: the page is rendered at exactly this size, and a half-pixel offset would resample (blur) it
+  else if (source === 'slides' && slide) x.drawImage(slide, Math.round(r[0] + (r[2] - slide.width) / 2), Math.round(r[1] + (r[3] - slide.height) / 2));
   else if (source === 'none' && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
   else if (!rec) empty(r);   // nothing in the window yet: the placeholder, in the preview only
   x.restore();
@@ -295,6 +296,8 @@ function stop(why) {
 self.onmessage = function (e) {
   var m = e.data;
   if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false });
+  // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
+  else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; } }
   else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; }
   else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; }
