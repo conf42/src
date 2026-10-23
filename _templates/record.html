@@ -101,9 +101,13 @@
     .prog i { display: block; height: 100%; width: 0; background: var(--blue); transition: width 5s linear; }
     .pause { font: inherit; font-weight: 800; font-size: 1.05rem; height: 52px; padding: 0 22px; border-radius: 999px; cursor: pointer;
       color: var(--text); background: var(--glass2); border: 1px solid var(--edge); white-space: nowrap; }
-    .pause:hover { border-color: var(--hi); }
+    .pause:hover:not(:disabled) { border-color: var(--hi); }
+    .pause:disabled { opacity: .45; cursor: not-allowed; }
     .pause.on { color: #fff; background: var(--green-btn); border-color: transparent; }
     .badge.paused i { background: var(--amber); }
+    .held { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .held span { font-size: 2rem; font-weight: 800; padding: 14px 30px; border-radius: 999px; background: rgba(10,14,35,.72); border: 1px solid var(--edge);
+      box-shadow: 0 10px 40px rgba(0,0,0,.4); }
     .badge.paused i, .rec.held::after { animation-play-state: paused; }
     .mini { width: 90px; height: 8px; border-radius: 4px; background: rgba(8,12,30,.6); overflow: hidden; }
     .mini i, .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green) 0 70%, var(--amber) 70% 90%, var(--pink) 90%); transition: width .06s; }
@@ -219,6 +223,7 @@
           <div class="glow" id="glow"></div>
           <div class="stage">
             <canvas id="pv" width="1280" height="720"></canvas>
+            <div class="held" id="held" hidden><span>Recording paused</span></div>
             <div class="count" id="count" hidden>3</div>
             <div class="badge" id="badge" hidden><i></i><span id="tc">0:00:00</span></div>
             <div class="tag" id="tag">This is exactly what <br>your recording will look like</div>
@@ -977,7 +982,7 @@
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
-        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; $('pause').hidden = false; pauseShown();
+        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked');
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
@@ -989,15 +994,30 @@
     // pause / resume: nothing is recorded while paused; slides and screen can still be changed
     function pauseShown() {
       $('pause').textContent = S.paused ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', S.paused);
-      $('badge').classList.toggle('paused', S.paused); $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
+      $('badge').classList.toggle('paused', S.paused); $('held').hidden = !S.paused; $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
       if (S.recording) status(S.paused ? '❚❚ Paused - nothing is being recorded. Press <b>Resume</b> to carry on.' : '● Recording. Press <b>Pause</b> for a break, <b>Stop</b> when you’re done.');
     }
     $('pause').addEventListener('click', function () {
       if (!S.recording || S.finishing) return;
-      S.paused = !S.paused; worker.postMessage({ type: S.paused ? 'pause' : 'resume' }); pauseShown(); this.blur();
+      this.blur();
+      if (!S.paused) {
+        // a 2nd pause within a minute of the last one (Marek 2026-10-23): ask them to go easy on it
+        var t0 = Date.now(); S.pauses = (S.pauses || []).filter(function (x) { return t0 - x < 60000; }).concat(t0);
+        if (S.pauses.length >= 2) toast('Please don’t spam pause/resume too hard, it might lead to recording bugging out!', 8000);
+        S.paused = true; worker.postMessage({ type: 'pause' }); pauseShown(); return;
+      }
+      // resuming: a 3-2-1 first, like the start (Marek 2026-10-23); still paused until it ends
+      var n = 3, el = $('count'), btns = [$('pause'), $('rec')];
+      btns.forEach(function (b) { b.disabled = true; }); $('held').hidden = true; el.hidden = false; el.textContent = n;
+      var t = setInterval(function () {
+        if (--n > 0) { el.textContent = n; return; }
+        clearInterval(t); el.hidden = true; btns.forEach(function (b) { b.disabled = false; });
+        if (!S.recording) return;
+        S.paused = false; worker.postMessage({ type: 'resume' }); pauseShown();
+      }, 1000);
     });
     function stopped() {
-      S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
+      S.recording = false; S.finishing = false; S.paused = false; $('pause').hidden = true; $('held').hidden = true; $('badge').classList.remove('paused'); $('rec').classList.remove('held');
       document.body.classList.remove('locked');
       $('rec').disabled = false; $('rec').classList.remove('live'); $('rec').textContent = 'Record';
       $('badge').hidden = true; $('glow').classList.remove('live');
