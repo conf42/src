@@ -17,6 +17,8 @@ import re
 import shutil
 import unicodedata
 
+from .shared import asset_version
+
 RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
 MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
          '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>')
@@ -183,6 +185,7 @@ def generate(env, context, base_folder):
     os.makedirs(folder, exist_ok=True)
     listed, over = [], []
     page = env.get_template("teasers.html")
+    overlays_v = asset_version(base_folder, "assets/js/overlays.js")
     events = context.get("events") or []
     up = upcoming(events)
     for event in up + past(events):
@@ -207,7 +210,7 @@ def generate(env, context, base_folder):
             ev["splash"] = ""
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
-            f.write(page.render(ev=ev, cards=[] if is_past else items, sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, **context))
+            f.write(page.render(ev=ev, cards=[] if is_past else items, sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, overlays_v=overlays_v, **context))
         with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
             f.write(MOVED % {"to": "../%s/teasers" % slug})
         if is_past:

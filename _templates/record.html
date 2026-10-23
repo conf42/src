@@ -1,0 +1,586 @@
+{# ── conf42.com/record (hidden speaker tool, Marek 2026-10-22): the talk recorder that replaces OBS. Pick the event and
+     the talk, allow the camera and microphone, load the PDF (or share a screen for a demo), record. The event's New
+     design overlay (assets/js/overlays.js, the teasers' Overlays tab) frames it: the camera in the circle, the slides in
+     the window; no camera or nothing in the window = the one big window (Marek 2026-10-22). The engine is
+     assets/js/record-worker.js (1080p60 H.264 + AAC MP4, written to the speaker's disk as it records, with a copy in
+     the browser's storage). Chrome and Edge only. Nothing is uploaded. Built by build/record.py. ── #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Conf42 recorder</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon/favicon-32x32.png">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Lato:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root { --accent: #5aa8ff; --bg: #0c0d12; --panel: #16181f; --line: #262935; --text: #eef0f6; --muted: #9aa0b2; --rec: #ff3b4e; --ok: #3fd18b; --warn: #ffb547; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Figtree', sans-serif; }
+    * { box-sizing: border-box; }
+    .wrap { max-width: 1500px; margin: 0 auto; padding: 18px 20px 28px; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    header img { height: 30px; }
+    header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+    header .sub { color: var(--muted); font-size: .9rem; margin-left: auto; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }
+    @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+    /* the stage: what the recording looks like, live */
+    .stage { position: relative; background: #000; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 9; border: 1px solid var(--line); }
+    .stage canvas { display: block; width: 100%; height: 100%; }
+    .count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12rem; font-weight: 800;
+      color: #fff; background: rgba(0,0,0,.45); text-shadow: 0 6px 40px rgba(0,0,0,.6); }
+    .count[hidden], [hidden] { display: none !important; }
+    .badge { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.6);
+      padding: 6px 12px; border-radius: 999px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .badge i { width: 12px; height: 12px; border-radius: 50%; background: var(--rec); animation: blink 1s infinite; }
+    @keyframes blink { 50% { opacity: .25; } }
+    /* the control bar under the stage */
+    .bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    .btn { font: inherit; font-weight: 700; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 12px;
+      padding: 12px 18px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .btn:hover:not(:disabled) { border-color: var(--accent); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn.big { font-size: 1.6rem; padding: 14px 26px; min-width: 84px; justify-content: center; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+    .btn.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .pos { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; font-size: 1.1rem; }
+    .nextpv { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .8rem; }
+    .nextpv canvas { width: 112px; height: 63px; border-radius: 6px; background: #000; border: 1px solid var(--line); }
+    .spacer { flex: 1; }
+    /* the record button: a red disc; while recording a spinning ring round it and the timecode */
+    .recbtn { position: relative; font: inherit; font-weight: 800; font-size: 1.1rem; border: 0; cursor: pointer; color: #fff; background: var(--rec);
+      border-radius: 999px; padding: 14px 26px 14px 54px; }
+    .recbtn::before { content: ''; position: absolute; left: 20px; top: 50%; width: 20px; height: 20px; margin-top: -10px; border-radius: 50%; background: #fff; }
+    .recbtn.live::before { border-radius: 4px; }
+    .recbtn.live::after { content: ''; position: absolute; left: 13px; top: 50%; width: 34px; height: 34px; margin-top: -17px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; animation: spin .9s linear infinite; }
+    .recbtn:disabled { opacity: .45; cursor: not-allowed; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* the setup column */
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+    .card + .card { margin-top: 12px; }
+    .card h2 { font-size: 1rem; margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+    .card h2 b { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #000; display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+    label { display: block; font-size: .8rem; color: var(--muted); margin: 10px 0 4px; font-weight: 600; }
+    select, input[type=text] { width: 100%; font: inherit; color: var(--text); background: #0f1117; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .seg { display: flex; gap: 6px; }
+    .seg .btn { flex: 1; justify-content: center; padding: 10px 8px; font-size: .9rem; }
+    .meter { height: 12px; border-radius: 6px; background: #0f1117; border: 1px solid var(--line); overflow: hidden; margin-top: 10px; }
+    .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ok) 0 70%, var(--warn) 70% 90%, var(--rec) 90%); transition: width .06s; }
+    .note { font-size: .82rem; color: var(--muted); line-height: 1.45; margin-top: 8px; }
+    .msg { font-size: .85rem; line-height: 1.45; margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #0f1117; border: 1px solid var(--line); }
+    .msg.ok { border-color: color-mix(in srgb, var(--ok) 60%, transparent); }
+    .msg.warn { border-color: color-mix(in srgb, var(--warn) 70%, transparent); }
+    .msg.bad { border-color: color-mix(in srgb, var(--rec) 70%, transparent); }
+    .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; color: var(--muted); font-size: .9rem; margin-top: 10px; }
+    .drop:hover, .drop.over { border-color: var(--accent); color: var(--text); }
+    .drop input { display: none; }
+    .locked .lockable { opacity: .5; pointer-events: none; }
+    .blocker { max-width: 640px; margin: 12vh auto; text-align: center; line-height: 1.6; }
+    .banner { background: var(--panel); border: 1px solid var(--warn); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #2a1216; border: 1px solid var(--rec); color: #fff;
+      padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 40px rgba(0,0,0,.5); z-index: 9; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <header>
+      <img src="./assets/conf42/CONF42_WHITE.png" alt="Conf42">
+      <h1>Record your talk</h1>
+      <span class="sub">No software to install. Everything stays on your computer.</span>
+    </header>
+    <div class="banner" id="recover" hidden>
+      <span id="recover-text"></span>
+      <button class="btn" id="recover-dl">Download it</button>
+      <button class="btn" id="recover-rm">Delete it</button>
+    </div>
+    <div class="grid">
+      <div>
+        <div class="stage">
+          <canvas id="pv" width="1920" height="1080"></canvas>
+          <div class="count" id="count" hidden>3</div>
+          <div class="badge" id="badge" hidden><i></i><span id="tc">0:00:00</span></div>
+        </div>
+        <div class="bar">
+          <button class="btn big" id="prev" title="Previous slide (←)" aria-label="Previous slide">◀</button>
+          <span class="pos" id="pos">–</span>
+          <button class="btn big" id="next" title="Next slide (→ or Space)" aria-label="Next slide">▶</button>
+          <span class="nextpv" id="nextpv" hidden>next <canvas id="thumb" width="224" height="126"></canvas></span>
+          <span class="spacer"></span>
+          <div class="seg" id="live-src" hidden>
+            <button class="btn" data-src="slides">Slides</button>
+            <button class="btn" data-src="screen">Screen</button>
+          </div>
+          <button class="recbtn" id="rec">Start recording</button>
+        </div>
+        <p class="note">Change slides with the ◀ ▶ buttons, the arrow keys, Space or your presentation clicker. You can record up to 2 hours.</p>
+      </div>
+      <div id="setup">
+        <div class="card lockable">
+          <h2><b>1</b> Your talk</h2>
+          <label for="ev">Conference</label>
+          <select id="ev"></select>
+          <label for="talk">Your talk</label>
+          <select id="talk"></select>
+          <div id="other-wrap" hidden>
+            <label for="other">Your full name</label>
+            <input type="text" id="other" placeholder="Firstname Lastname">
+          </div>
+          <p class="note">The file is named after you, as the Speaker Workspace needs it.</p>
+        </div>
+        <div class="card lockable">
+          <h2><b>2</b> Camera &amp; microphone</h2>
+          <button class="btn primary" id="allow">Allow camera &amp; microphone</button>
+          <div id="devs" hidden>
+            <label for="cam">Camera</label>
+            <select id="cam"></select>
+            <div id="cam2-wrap" hidden>
+              <label for="cam2">Second speaker's camera (only if you're in the same room)</label>
+              <select id="cam2"></select>
+            </div>
+            <label for="mic">Microphone</label>
+            <select id="mic"></select>
+            <div class="meter"><i id="lvl"></i></div>
+            <div class="msg warn" id="mic-warn" hidden>This looks like your computer's built-in microphone. A USB mic or a headset sounds much better - even a cheap one.</div>
+            <div class="msg warn" id="dark-warn" hidden>Your camera picture is dark. Put a lamp or a window in front of you (not behind).</div>
+            <button class="btn" id="check" style="margin-top:10px">Test my sound (10 s)</button>
+            <div class="msg" id="check-out" hidden></div>
+          </div>
+          <div class="msg bad" id="dev-err" hidden></div>
+        </div>
+        <div class="card">
+          <h2><b>3</b> In the big window</h2>
+          <div class="seg lockable" id="src">
+            <button class="btn on" data-src="slides">PDF slides</button>
+            <button class="btn" data-src="screen">Share screen</button>
+            <button class="btn" data-src="none">Nothing</button>
+          </div>
+          <div class="lockable">
+            <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf"><span id="drop-text"><b>Drop your PDF here</b> or click to choose it</span></label>
+          </div>
+          <button class="btn" id="share" style="margin-top:10px" hidden>Choose a screen or window</button>
+          <p class="note" id="src-note">Export your deck to PDF (PowerPoint, Keynote, Google Slides: File → Download / Export → PDF). Live demo? Pick "Share screen" - you can switch between slides and screen while recording.</p>
+        </div>
+        <div class="card">
+          <h2><b>4</b> Record</h2>
+          <p class="note" style="margin-top:0">When you press <b>Start recording</b>, choose where to save the video (your Desktop is best). It's written there as you record. Press <b>Stop</b> when you're done, then upload the file and your PDF to the Speaker Workspace.</p>
+          <div class="msg" id="status" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="blocker" id="blocker" hidden>
+    <img src="./assets/conf42/CONF42_WHITE.png" alt="Conf42" style="height:36px">
+    <h1>Please open this page in Google Chrome or Microsoft Edge</h1>
+    <p style="color:var(--muted)">The recorder needs Chrome or Edge on a laptop or desktop computer (Windows, Mac or Linux).</p>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <script type="application/json" id="rec-data">{{ rec_events|tojson }}</script>
+  <script src="./assets/js/overlays.js?v={{ rec_v['overlays'] }}"></script>
+  <script>
+  (function () {
+    'use strict';
+    var $ = function (id) { return document.getElementById(id); };
+    if (!('VideoEncoder' in window && 'AudioEncoder' in window && 'MediaStreamTrackProcessor' in window && 'showSaveFilePicker' in window)) {
+      $('app').hidden = true; $('blocker').hidden = false; return;
+    }
+    var EVENTS = JSON.parse($('rec-data').textContent);
+    var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/';
+    // the overlay's holes (overlays.js ovDrawNew): the slides' window and the camera circles, in 1920 x 1080 pixels
+    var GEOM = {
+      'default': { rect: [373.1, 203.75, 1532.9, 862.25], cams: [[188, 188, 159]] },
+      'co-talk': { rect: [336.66, 360.95, 1246.68, 701.25], cams: [[214.5, 214.5, 164.3], [1705.5, 214.5, 164.3]] },
+      'no-facecam': { rect: [84.87, 47.74, 1750.26, 984.52], cams: [] }
+    };
+    var store = { get: function (k) { try { return localStorage.getItem('c42rec.' + k); } catch (e) { return null; } },
+                  set: function (k, v) { try { localStorage.setItem('c42rec.' + k, v); } catch (e) {} } };
+    var worker = new Worker('./assets/js/record-worker.js?v={{ rec_v["record-worker"] }}');
+    var pv = $('pv').getContext('bitmaprenderer');
+    var S = { ev: null, talk: null, kind: null, src: 'slides', cam: [null, null], micTrack: null, screenTrack: null,
+              pdf: null, page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null };
+
+    function toast(t, ms) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { el.hidden = true; }, ms || 5000); }
+    function status(t, cls) { var el = $('status'); el.hidden = !t; el.className = 'msg ' + (cls || ''); el.innerHTML = t || ''; }
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function hms(us) { var s = Math.floor(us / 1e6), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s %= 60; return h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s; }
+
+    // ── 1. the talk ──
+    EVENTS.forEach(function (e, i) { var o = document.createElement('option'); o.value = i; o.textContent = e.label + ' (' + e.date + ')'; $('ev').appendChild(o); });
+    function fillTalks() {
+      var t = $('talk'); t.innerHTML = '';
+      S.ev.talks.forEach(function (k, i) { var o = document.createElement('option'); o.value = i; o.textContent = k.names.join(' & ') + ' - ' + k.title; t.appendChild(o); });
+      var o = document.createElement('option'); o.value = 'other'; o.textContent = 'My talk isn’t listed'; t.appendChild(o);
+      var saved = store.get('talk:' + S.ev.slug); if (saved !== null && t.querySelector('option[value="' + saved + '"]')) t.value = saved;
+      pickTalk();
+    }
+    function pickTalk() {
+      var v = $('talk').value; store.set('talk:' + S.ev.slug, v);
+      S.talk = v === 'other' ? null : S.ev.talks[+v];
+      $('other-wrap').hidden = v !== 'other';
+      $('cam2-wrap').hidden = !(S.talk && S.talk.names.length > 1);
+      if ($('cam2-wrap').hidden && $('cam2').value) { $('cam2').value = ''; openCam(1); }
+      relayout();
+    }
+    function speaker() {
+      var n = S.talk ? S.talk.names.join(' & ') : $('other').value.trim();
+      return n.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    $('ev').addEventListener('change', function () {
+      S.ev = EVENTS[+$('ev').value]; store.set('ev', S.ev.slug);
+      document.documentElement.style.setProperty('--accent', S.ev.ov.pools[0]);
+      S.cache.clear(); fillTalks();
+    });
+    $('talk').addEventListener('change', pickTalk);
+
+    // ── the layout: the overlay that fits what the speaker has (Marek 2026-10-22: no camera or nothing in the window =
+    // the one big window; two cameras = co-talk) ──
+    function kindNow() {
+      if (!S.cam[0] || S.src === 'none') return 'no-facecam';
+      return S.cam[1] ? 'co-talk' : 'default';
+    }
+    function assets() {
+      if (S.assets) return S.assets;
+      function pic(src) { var im = new Image(); im.src = src; return new Promise(function (ok) { im.onload = im.onerror = function () { ok(im.naturalWidth ? im : null); }; }); }
+      return S.assets = Promise.all([document.fonts.load('700 32px Lato').catch(function () {}), pic('./assets/conf42/conf42_planet_white.png'), pic('./assets/conf42/conf42_sticker_2026.png')])
+        .then(function (r) { return { planet: r[1], sticker: r[2] && blend(r[2]) }; });
+    }
+    function relayout() {
+      if (!S.ev) return;
+      var kind = kindNow(), ev = S.ev;
+      worker.postMessage({ type: 'layout', geo: GEOM[kind], bg: ev.ov.pools[1] });
+      worker.postMessage({ type: 'source', source: S.src });
+      assets().then(function (a) {
+        if (ev !== S.ev) return;
+        var c = document.createElement('canvas'); ovDrawNew(c, kind, ev.ov, a);
+        return createImageBitmap(c).then(function (b) { worker.postMessage({ type: 'overlay', bitmap: b }, [b]); });
+      });
+      if (kind !== S.kind) { S.kind = kind; S.cache.clear(); showSlide(); }
+    }
+
+    // ── 2. camera and microphone ──
+    function fillDevs(list) {
+      function fill(sel, kind, none) {
+        var keep = sel.value || store.get(sel.id) || ''; sel.innerHTML = '';
+        if (none) { var o = document.createElement('option'); o.value = ''; o.textContent = none; sel.appendChild(o); }
+        list.filter(function (d) { return d.kind === kind; }).forEach(function (d, i) {
+          var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || (kind === 'videoinput' ? 'Camera ' : 'Microphone ') + (i + 1); sel.appendChild(o);
+        });
+        if (sel.querySelector('option[value="' + CSS.escape(keep) + '"]')) sel.value = keep;
+        else if (none && sel.id === 'cam' && sel.options.length > 1) sel.selectedIndex = 1;   // the first camera, not "No camera"
+      }
+      fill($('cam'), 'videoinput', 'No camera'); fill($('cam2'), 'videoinput', 'None'); fill($('mic'), 'audioinput');
+      if (!store.get('cam2')) $('cam2').value = '';
+    }
+    function devError(e) {
+      var t = e && e.name === 'NotAllowedError'
+        ? 'Chrome blocked the camera or microphone. Click the camera icon at the right end of the address bar, choose <b>Allow</b>, then reload this page.'
+        : e && e.name === 'NotFoundError' ? 'No camera or microphone was found. Plug one in and click Allow again.'
+        : e && e.name === 'NotReadableError' ? 'Another app (Zoom, Teams, Meet...) is using your camera or microphone. Close it and click Allow again.'
+        : 'Could not open the camera or microphone: ' + esc(e && e.message || e);
+      $('dev-err').innerHTML = t; $('dev-err').hidden = false;
+    }
+    $('allow').addEventListener('click', function () {
+      $('dev-err').hidden = true;
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .catch(function (e) { if (e.name === 'NotFoundError') return navigator.mediaDevices.getUserMedia({ audio: true }); throw e; })
+        .then(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); return navigator.mediaDevices.enumerateDevices(); })
+        .then(function (list) {
+          fillDevs(list); $('devs').hidden = false; $('allow').hidden = true;
+          return Promise.all([openCam(0), openCam(1), openMic()]);
+        }).catch(devError);
+    });
+    navigator.mediaDevices.addEventListener('devicechange', function () {
+      if ($('devs').hidden) return;
+      navigator.mediaDevices.enumerateDevices().then(fillDevs);
+    });
+    function openCam(slot) {
+      var sel = slot ? $('cam2') : $('cam'), id = sel.value;
+      store.set(sel.id, id);
+      if (S.cam[slot]) { S.cam[slot].stop(); S.cam[slot] = null; }
+      worker.postMessage({ type: 'cam', slot: slot, readable: null });
+      if (!id) { relayout(); return Promise.resolve(); }
+      return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } })
+        .then(function (s) {
+          var t = s.getVideoTracks()[0]; S.cam[slot] = t;
+          var r = new MediaStreamTrackProcessor({ track: t }).readable;
+          worker.postMessage({ type: 'cam', slot: slot, readable: r }, [r]);
+          relayout();
+        }).catch(devError);
+    }
+    $('cam').addEventListener('change', function () { openCam(0); });
+    $('cam2').addEventListener('change', function () { openCam(1); });
+
+    var AC = null, analyser = null, dest = null, micSrc = null;
+    function openMic() {
+      var id = $('mic').value; store.set('mic', id);
+      if (S.micStream) S.micStream.getTracks().forEach(function (t) { t.stop(); });
+      var label = ($('mic').selectedOptions[0] || {}).textContent || '';
+      $('mic-warn').hidden = !/built-?in|macbook|internal|default.*array|realtek|integrated|laptop/i.test(label);
+      // no auto gain (it pumps the level up and down) and no echo cancellation (no call to cancel; it makes voices
+      // sound robotic); a gentle noise suppression, then 80 Hz high-pass and a light compressor - Descript does the rest
+      return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: id }, echoCancellation: false, noiseSuppression: true, autoGainControl: false, channelCount: 1, sampleRate: 48000 } })
+        .then(function (s) {
+          S.micStream = s;
+          if (!AC) {
+            AC = new AudioContext({ sampleRate: 48000 });
+            var hp = AC.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 80;
+            var comp = AC.createDynamicsCompressor(); comp.threshold.value = -24; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = .005; comp.release.value = .2;
+            var gain = AC.createGain(); gain.gain.value = 1.4;
+            analyser = AC.createAnalyser(); analyser.fftSize = 2048;
+            dest = AC.createMediaStreamDestination(); dest.channelCount = 1;
+            hp.connect(comp); comp.connect(gain); gain.connect(dest); gain.connect(analyser);
+            AC.chain = hp;
+          }
+          if (micSrc) micSrc.disconnect();
+          micSrc = AC.createMediaStreamSource(s); micSrc.connect(AC.chain);
+          AC.resume();
+          S.micTrack = dest.stream.getAudioTracks()[0];
+        }).catch(devError);
+    }
+    $('mic').addEventListener('change', openMic);
+
+    // the level meter, and while recording the alarms: silence for 10 s, clipping
+    var buf = new Float32Array(2048), silentFor = 0, lastLoud = 0;
+    function level() {
+      if (!analyser) return { rms: 0, peak: 0 };
+      analyser.getFloatTimeDomainData(buf);
+      var s = 0, p = 0;
+      for (var i = 0; i < buf.length; i++) { var v = Math.abs(buf[i]); s += v * v; if (v > p) p = v; }
+      return { rms: Math.sqrt(s / buf.length), peak: p };
+    }
+    function db(v) { return 20 * Math.log10(Math.max(v, 1e-6)); }
+    setInterval(function () {
+      var l = level(), d = db(l.rms);
+      $('lvl').style.width = Math.max(0, Math.min(100, (d + 60) / 60 * 100)) + '%';
+      if (!S.recording) { silentFor = 0; return; }
+      silentFor = d < -55 ? silentFor + .1 : 0;
+      if (silentFor > 10 && silentFor < 10.15) toast('We can’t hear you - is the microphone muted or unplugged?', 6000);
+      if (l.peak > .99 && Date.now() - lastLoud > 15000) { lastLoud = Date.now(); toast('Too loud: move a little further from the microphone.'); }
+    }, 100);
+
+    $('check').addEventListener('click', function () {
+      if (!dest) return;
+      var btn = this, out = $('check-out'), floor = [], speech = [], peak = 0;
+      btn.disabled = true; out.hidden = false; out.className = 'msg'; out.textContent = 'Stay quiet for 3 seconds…';
+      var t = setInterval(function () { floor.push(db(level().rms)); }, 50);
+      setTimeout(function () {
+        clearInterval(t);
+        out.innerHTML = 'Now talk as you will in your talk, for 6 seconds…';
+        var mr = new MediaRecorder(dest.stream), parts = [];
+        mr.ondataavailable = function (e) { parts.push(e.data); };
+        mr.start();
+        t = setInterval(function () { var l = level(); speech.push(db(l.rms)); peak = Math.max(peak, l.peak); }, 50);
+        setTimeout(function () {
+          clearInterval(t); mr.stop();
+          mr.onstop = function () {
+            floor.sort(function (a, b) { return a - b; }); speech.sort(function (a, b) { return a - b; });
+            var nf = floor[Math.floor(floor.length / 2)] || -90, sp = speech[Math.floor(speech.length * .9)] || -90, verdict, cls;
+            if (peak > .99) { verdict = '🔴 Too loud - it distorts. Move back from the mic or turn its gain down.'; cls = 'bad'; }
+            else if (sp < -38) { verdict = '🔴 Too quiet. Get closer to the microphone (a hand’s width is ideal).'; cls = 'bad'; }
+            else if (nf > -48 || sp - nf < 20) { verdict = '🟡 Noisy room. Close windows and doors, switch off fans; a room with carpet, curtains and furniture echoes less.'; cls = 'warn'; }
+            else { verdict = '🟢 Sounds good!'; cls = 'ok'; }
+            out.className = 'msg ' + cls; out.innerHTML = verdict + '<br><span style="color:var(--muted)">Playing it back now.</span>';
+            var a = new Audio(URL.createObjectURL(new Blob(parts, { type: mr.mimeType }))); a.play();
+            btn.disabled = false;
+          };
+        }, 6000);
+      }, 3000);
+    });
+
+    worker.onmessage = function (e) {
+      var m = e.data;
+      if (m.type === 'preview') pv.transferFromImageBitmap(m.bitmap);
+      else if (m.type === 'light') { if (m.slot === 0) { S.dark = (S.dark || 0) * .7 + (m.luma < 55 ? .3 : 0); $('dark-warn').hidden = S.dark < .5; } }
+      else if (m.type === 'tick') $('tc').textContent = hms(m.us);
+      else if (m.type === 'started') { status('Recording… (' + esc(m.video) + ', ' + esc(m.audio) + ')'); }
+      else if (m.type === 'finishing') status('Finishing the file… don’t close the page.');
+      else if (m.type === 'warn') { if (m.what === 'disk') toast('Could not write to the file you picked - the recording is kept in the browser instead.', 8000); }
+      else if (m.type === 'error') { toast('Problem: ' + m.message, 10000); console.error('[recorder]', m.message); if (S.recording) stopped(); }
+      else if (m.type === 'done') done(m);
+    };
+
+    // ── 3. what goes in the window: the PDF's pages, a shared screen or window, or nothing ──
+    [].forEach.call(document.querySelectorAll('#src .btn'), function (b) {
+      b.addEventListener('click', function () { setSrc(b.dataset.src); if (b.dataset.src === 'screen' && !S.screenTrack) share(); });
+    });
+    [].forEach.call(document.querySelectorAll('#live-src .btn'), function (b) {
+      b.addEventListener('click', function () { setSrc(b.dataset.src); if (b.dataset.src === 'screen' && !S.screenTrack) share(); b.blur(); });
+    });
+    function setSrc(s) {
+      S.src = s;
+      [].forEach.call(document.querySelectorAll('#src .btn, #live-src .btn'), function (b) { b.classList.toggle('on', b.dataset.src === s); });
+      $('drop').parentNode.hidden = s !== 'slides';
+      $('share').hidden = s !== 'screen';
+      $('share').textContent = S.screenTrack ? 'Share a different screen or window' : 'Choose a screen or window';
+      relayout(); navState();
+    }
+    function share() {
+      return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
+                                                     selfBrowserSurface: 'exclude', surfaceSwitching: 'include', monitorTypeSurfaces: 'include' })
+        .then(function (s) {
+          if (S.screenTrack) S.screenTrack.stop();
+          var t = s.getVideoTracks()[0]; S.screenTrack = t;
+          t.addEventListener('ended', function () { if (S.screenTrack === t) { S.screenTrack = null; worker.postMessage({ type: 'screen', readable: null }); setSrc(S.pdf ? 'slides' : 'none'); } });   // the share ended: back to the slides, or the camera alone
+          var r = new MediaStreamTrackProcessor({ track: t }).readable;
+          worker.postMessage({ type: 'screen', readable: r }, [r]);
+          setSrc('screen');
+        }).catch(function () { if (!S.screenTrack) setSrc('slides'); });   // the picker was cancelled
+    }
+    $('share').addEventListener('click', share);
+
+    var pdfjsP = null;
+    function pdfjs() {
+      // pdf.js from cdnjs; its worker module through a same-origin blob (a cross-origin module can't be a worker itself)
+      return pdfjsP = pdfjsP || import(PDFJS + 'pdf.min.mjs').then(function (lib) {
+        var u = URL.createObjectURL(new Blob(['import "' + PDFJS + 'pdf.worker.min.mjs";'], { type: 'text/javascript' }));
+        lib.GlobalWorkerOptions.workerPort = new Worker(u, { type: 'module' });
+        return lib;
+      });
+    }
+    function loadPdf(file) {
+      if (!file) return;
+      $('drop-text').textContent = 'Opening ' + file.name + '…';
+      Promise.all([pdfjs(), file.arrayBuffer()]).then(function (r) { return r[0].getDocument({ data: r[1] }).promise; })
+        .then(function (doc) {
+          if (S.pdf) S.pdf.destroy();
+          S.pdf = doc; S.pages = doc.numPages; S.page = 1; S.cache.clear();
+          $('drop-text').innerHTML = '<b>' + esc(file.name) + '</b> - ' + doc.numPages + ' slides. Click to choose another.';
+          setSrc('slides'); showSlide();
+        }).catch(function (e) { $('drop-text').innerHTML = '<b>Could not open that PDF</b> (' + esc(e.message) + '). Try exporting it again.'; });
+    }
+    $('pdf').addEventListener('change', function () { loadPdf(this.files[0]); this.value = ''; });
+    ['dragenter', 'dragover'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.remove('over'); }); });
+    $('drop').addEventListener('drop', function (e) { loadPdf(e.dataTransfer.files[0]); });
+
+    function render(n) {
+      // page n at exactly the window's size (fitted, never stretched), cached: the current page and its neighbours
+      var key = S.kind + ':' + n;
+      if (S.cache.has(key)) return S.cache.get(key);
+      var r = GEOM[S.kind].rect, doc = S.pdf;
+      var p = doc.getPage(n).then(function (page) {
+        var vp = page.getViewport({ scale: 1 }), s = Math.min(Math.floor(r[2]) / vp.width, Math.floor(r[3]) / vp.height), v = page.getViewport({ scale: s });
+        var c = document.createElement('canvas'); c.width = Math.floor(v.width); c.height = Math.floor(v.height);
+        return page.render({ canvasContext: c.getContext('2d'), viewport: v }).promise.then(function () { return c; });
+      });
+      S.cache.set(key, p);
+      if (S.cache.size > 8) S.cache.delete(S.cache.keys().next().value);
+      return p;
+    }
+    function showSlide() {
+      navState();
+      if (!S.pdf || !S.kind) return;
+      var n = S.page;
+      render(n).then(function (c) {
+        if (n !== S.page) return;
+        createImageBitmap(c).then(function (b) { worker.postMessage({ type: 'slide', bitmap: b }, [b]); });
+      });
+      if (n < S.pages) render(n + 1).then(function (c) { if (n !== S.page) return; var t = $('thumb').getContext('2d'); t.fillStyle = '#000'; t.fillRect(0, 0, 224, 126); var s = Math.min(224 / c.width, 126 / c.height); t.drawImage(c, (224 - c.width * s) / 2, (126 - c.height * s) / 2, c.width * s, c.height * s); });
+      if (n > 1) render(n - 1);
+    }
+    function navState() {
+      var on = S.src === 'slides' && !!S.pdf;
+      $('pos').textContent = on ? S.page + ' / ' + S.pages : '–';
+      $('prev').disabled = !on || S.page <= 1; $('next').disabled = !on || S.page >= S.pages;
+      $('nextpv').hidden = !on || S.page >= S.pages;
+    }
+    function go(d) { if (!S.pdf || S.src !== 'slides') return; var n = Math.max(1, Math.min(S.pages, S.page + d)); if (n !== S.page) { S.page = n; showSlide(); } }
+    $('prev').addEventListener('click', function () { go(-1); this.blur(); });
+    $('next').addEventListener('click', function () { go(1); this.blur(); });
+    document.addEventListener('keydown', function (e) {
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'select' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n'].indexOf(e.key) >= 0) { e.preventDefault(); go(1); }   // clickers send PageDown / PageUp
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p'].indexOf(e.key) >= 0) { e.preventDefault(); go(-1); }
+    });
+
+    // ── 4. recording ──
+    var wake = null;
+    function lockWake() { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
+    document.addEventListener('visibilitychange', function () { if (S.recording && document.visibilityState === 'visible') lockWake(); });
+    window.addEventListener('beforeunload', function (e) { if (S.recording || S.finishing) { e.preventDefault(); e.returnValue = ''; } });
+
+    $('rec').addEventListener('click', function () {
+      this.blur();   // Space is the next slide, not this button
+      if (S.recording) { worker.postMessage({ type: 'stop' }); S.recording = false; S.finishing = true; $('rec').disabled = true; return; }
+      var name = speaker();
+      if (!name) { toast('Pick your talk (or type your name) first.'); return; }
+      if (!S.micTrack) { toast('Click “Allow camera & microphone” first.'); return; }
+      if (S.src === 'slides' && !S.pdf) { toast('Load your PDF first - or pick “Share screen” or “Nothing”.'); return; }
+      if (S.src === 'screen' && !S.screenTrack) { toast('Choose the screen or window to share first.'); return; }
+      if (kindNow() === 'no-facecam' && S.src === 'none' && !S.cam[0]) { toast('Pick a camera, or something for the window.'); return; }
+      // the picker first, while the click still counts as the user's: the file is written there as it records
+      window.showSaveFilePicker({ suggestedName: name + '.mp4', startIn: 'desktop', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
+        .then(function (h) { countdown(h, name); })
+        .catch(function (e) { if (e.name !== 'AbortError') countdown(null, name); });
+    });
+    function countdown(handle, name) {
+      var n = 3, el = $('count');
+      $('rec').disabled = true; el.hidden = false; el.textContent = n;
+      var t = setInterval(function () {
+        if (--n > 0) { el.textContent = n; return; }
+        clearInterval(t); el.hidden = true;
+        S.recMic = S.micTrack.clone();
+        var r = new MediaStreamTrackProcessor({ track: S.recMic }).readable;
+        worker.postMessage({ type: 'start', name: name, handle: handle, audio: r }, [r]);
+        S.recording = true; S.file = name + '.mp4';
+        $('setup').classList.add('locked');
+        [].forEach.call(document.querySelectorAll('.lockable select, .lockable input, .lockable button'), function (x) { x.disabled = true; });
+        $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
+        $('badge').hidden = false; $('tc').textContent = '0:00:00';
+        $('live-src').hidden = false;
+        status(handle ? 'Recording to <b>' + esc(handle.name) + '</b>…' : 'Recording in the browser…');
+        lockWake();
+      }, 1000);
+    }
+    function stopped() {
+      S.recording = false; S.finishing = false;
+      $('setup').classList.remove('locked');
+      [].forEach.call(document.querySelectorAll('.lockable select, .lockable input, .lockable button'), function (x) { x.disabled = false; });
+      $('rec').disabled = false; $('rec').classList.remove('live'); $('rec').textContent = 'Start recording';
+      $('badge').hidden = true; $('live-src').hidden = true;
+      if (S.recMic) { S.recMic.stop(); S.recMic = null; }
+      if (wake) { wake.release().catch(function () {}); wake = null; }
+    }
+    function done(m) {
+      stopped();
+      var len = hms(m.seconds * 1e6), mb = (m.bytes / 1048576).toFixed(0) + ' MB';
+      var lim = m.why === 'limit' ? 'You reached the 2-hour limit. ' : '';
+      if (m.onDisk) status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + '). Upload it and your PDF to the Speaker Workspace, then reply to our email. Thank you!', 'ok');
+      else if (m.inBrowser) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + '). <button class="btn primary" id="dl">Download ' + esc(S.file) + '</button>', 'ok'); $('dl').addEventListener('click', function () { downloadSaved(S.file); }); }
+      else status('Something went wrong saving the recording: ' + esc(m.diskError || 'unknown error'), 'bad');
+    }
+
+    // a recording that didn't make it to the disk (a crash, a closed tab, a refused file) stays in the browser's own
+    // storage until the next recording: offered back here
+    function opfsFile() { return navigator.storage.getDirectory().then(function (d) { return d.getFileHandle('c42-recording.mp4').then(function (h) { return h.getFile(); }); }); }
+    function downloadSaved(name) {
+      opfsFile().then(function (f) {
+        var u = URL.createObjectURL(f), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 120000);
+      }).catch(function (e) { toast('Could not read the recording: ' + e.message); });
+    }
+    navigator.storage.getDirectory().then(function (d) {
+      return d.getFileHandle('c42-recording.json').then(function (h) { return h.getFile(); }).then(function (f) { return f.text(); })
+        .then(function (t) { return Promise.all([JSON.parse(t || '{}'), opfsFile()]); });
+    }).then(function (r) {
+      var m = r[0], f = r[1];
+      if (!f.size || m.onDisk) return;
+      $('recover-text').innerHTML = 'There’s a recording of <b>' + esc(m.name || 'your talk') + '</b> (' + hms((m.seconds || 0) * 1e6) + ', ' + new Date(m.started).toLocaleString() + ') that wasn’t saved to your computer.';
+      $('recover').hidden = false;
+      $('recover-dl').onclick = function () { downloadSaved((m.name || 'recording') + '.mp4'); };
+      $('recover-rm').onclick = function () {
+        navigator.storage.getDirectory().then(function (d) { return Promise.all([d.removeEntry('c42-recording.mp4'), d.removeEntry('c42-recording.json')]); })
+          .catch(function () {}).then(function () { $('recover').hidden = true; });
+      };
+    }).catch(function () {});
+
+    // start: the soonest event (or the one picked last time)
+    var savedEv = store.get('ev'), at = Math.max(0, EVENTS.findIndex(function (e) { return e.slug === savedEv; }));
+    if (EVENTS.length) { $('ev').value = at; $('ev').dispatchEvent(new Event('change')); }
+    else status('There are no upcoming events to record for.', 'warn');
+    setSrc('slides');
+  })();
+  </script>
+</body>
+</html>
