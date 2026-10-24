@@ -145,7 +145,7 @@ function tick() {
   if (!!rec !== wasRec) { wasRec = !!rec; dirty = true; }   // the empty window's placeholder is the preview's only
   var held = !!(rec && rec.paused), encoding = !!(rec && rec.muxer && !rec.stopping && !held);
   // paused, or a card over the page (the welcome card, Marek 2026-10-23): the preview soft and dark, at 10 fps
-  var soft = held || dim, showing = dx && visible && frameNo % (soft ? 6 : previewEvery) === 0;
+  var soft = held || dim, showing = dx && visible && frameNo % (soft ? 6 : rec && rec.half ? 4 : previewEvery) === 0;   // saver: preview at 15 fps
   // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is absorbed);
   // only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out. A laptop
   // that can't keep up gets saver mode (the page decides, Marek 2026-10-23): the file stays 60 fps at full size and
@@ -336,7 +336,9 @@ function stop(why) {
 
 self.onmessage = function (e) {
   var m = e.data;
-  if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false });
+  // desynchronized: the preview goes to the screen without waiting on the page's compositor frame (like OBS, the preview
+  // is a side output that never holds up the recording)
+  if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false, desynchronized: true });
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
