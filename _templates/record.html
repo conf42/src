@@ -588,8 +588,8 @@
   <div class="blocker" id="blocker" hidden>
     <div>
       <img src="./assets/conf42/CONF42_WHITE.png" alt="Conf42" style="height:34px">
-      <h1>This only works in Google Chrome and Microsoft Edge</h1>
-      <p id="blocker-why">Please change your browser: open this page in Chrome or Edge on a laptop or desktop computer (Windows, Mac or Linux).</p>
+      <h1>This works in Chrome, Edge, Brave, Opera GX and Vivaldi</h1>
+      <p id="blocker-why">Please change your browser: open this page in Chrome, Edge, Brave, Opera GX or Vivaldi on a laptop or desktop computer (Windows, Mac or Linux).</p>
       <div class="get">
         <a class="btn go" style="--c:var(--hi)" href="https://www.google.com/chrome/" target="_blank" rel="noopener">Get Chrome</a>
         <a class="btn" href="https://www.microsoft.com/edge/download" target="_blank" rel="noopener">Get Edge</a>
@@ -605,14 +605,17 @@
     var $ = function (id) { return document.getElementById(id); };
     var all = function (sel) { return [].slice.call(document.querySelectorAll(sel)); };
 
-    // the browser lock (Marek 2026-10-22): Chrome and Edge only. A browser without the recording features (Safari,
-    // Firefox, phones) is locked out; another Chromium (Brave, Opera, Vivaldi, Arc...) has them but is untested, so
-    // it gets the same screen with a "try anyway" link
+    // the browser lock (Marek 2026-10-22, widened 2026-10-23): a browser without the recording features (Safari,
+    // Firefox, phones) is locked out; another Chromium (Arc, Yandex...) has them but is untested, so it gets the same
+    // screen with a "try anyway" link
     var ua = navigator.userAgent, uad = navigator.userAgentData;
     var brands = uad && uad.brands ? uad.brands.map(function (b) { return b.brand; }).join('|') : '';
-    var capable = 'VideoEncoder' in window && 'AudioEncoder' in window && 'MediaStreamTrackProcessor' in window && 'showSaveFilePicker' in window
+    // the file picker is not a must (Marek 2026-10-23: Brave, DuckDuckGo on Windows have none): without it the recording
+    // goes to the browser's own storage and downloads at Stop
+    var capable = 'VideoEncoder' in window && 'AudioEncoder' in window && 'MediaStreamTrackProcessor' in window
       && 'OffscreenCanvas' in window && !(uad ? uad.mobile : /Mobi|Android|iPhone|iPad/.test(ua));
-    var official = /Google Chrome|Microsoft Edge/.test(brands) && !navigator.brave && !/OPR\/|Vivaldi|YaBrowser|SamsungBrowser|Arc\//.test(ua);
+    // supported (Marek 2026-10-23): Chrome, Edge, Brave, Opera / Opera GX, Vivaldi; other Chromium browsers get "try anyway"
+    var official = (/Google Chrome|Microsoft Edge|Opera|Brave/.test(brands) || !!navigator.brave || /OPR\/|Vivaldi/.test(ua)) && !/YaBrowser|SamsungBrowser|Arc\//.test(ua);
     if (!capable || !official) {
       $('app').hidden = true; $('blocker').hidden = false;
       if (capable) {
@@ -691,7 +694,7 @@
         if (S.finishing) return 'Saving your video - a few seconds.';
         if (S.recording) return 'Stop: ends the recording and finishes the file.';
         var miss = !ready(1) ? 'the camera step' : !ready(2) ? 'the microphone step' : !ready(3) ? 'what you’re sharing' : '';
-        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : 'Record: pick where to save the video, then a 3-2-1. Press again to stop.';
+        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showSaveFilePicker ? 'Record: pick where to save the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop - the video downloads then.';
       },
       pause: function () { return S.paused ? 'Resume: a 3-2-1, then the recording carries on where it stopped.' : 'A break: nothing is recorded while paused. Resume counts 3-2-1 first.'; },
       next: function () {   // the guide's Next / Finish setup, greyed out until the step is done
@@ -921,6 +924,9 @@
       return S.mode === 'none' || ((S.mode === 'both' || S.mode === 'window') && (!!S.pdf || !!S.screenTrack));
     }
     // the computer, checked (what a page can see): cores, memory, power, disk, a hardware video encoder, the CPU's strain
+    if (!window.showSaveFilePicker) {   // no picker: say where the video goes instead
+      $('status').innerHTML = $('status').innerHTML.replace(/You’ll choose where to save[^<]*|You'll choose where to save[^<]*/, 'Your video is kept in the browser while you record and downloads when you press <b>Stop</b>.');
+    }
     function syscheck() {
       var rows = [], done = 0, total = 6, got = {};
       function row(i, level, name, text) {
@@ -936,10 +942,12 @@
         }
       }
       ['Processor', 'Memory', 'Power', 'Disk space', 'Video encoder', 'Current load'].forEach(function (n, i) { row(i, 'wait', n, 'checking…'); });
+      var brave = !!navigator.brave, gx = /Opera GX/.test(brands), rough = brave ? ' (roughly: Brave hides exact numbers)' : '';
+      if (gx) { total++; row(6, 'wait', 'Opera GX', 'checking…'); row(6, 1, 'Opera GX', 'turn off GX Control\u2019s RAM and CPU limiters while you record'); }
       var cores = navigator.hardwareConcurrency || 0;
-      row(0, cores >= 8 ? 0 : cores >= 4 ? 1 : 2, 'Processor', cores ? cores + ' cores' + (cores >= 8 ? '' : cores >= 4 ? ' - fine, close other apps' : ' - may struggle') : 'unknown');
+      row(0, cores >= 8 ? 0 : cores >= 4 ? 1 : 2, 'Processor', cores ? cores + ' cores' + (cores >= 8 ? '' : cores >= 4 ? ' - fine, close other apps' : ' - may struggle') + rough : 'unknown');
       var gb = navigator.deviceMemory || 0;
-      row(1, !gb || gb >= 8 ? 0 : gb >= 4 ? 1 : 2, 'Memory', gb ? (gb >= 8 ? '8 GB or more' : gb + ' GB' + (gb >= 4 ? ' - close other apps' : ' - may struggle')) : 'unknown');
+      row(1, !gb || gb >= 8 ? 0 : gb >= 4 ? 1 : 2, 'Memory', gb ? (gb >= 8 ? '8 GB or more' : gb + ' GB' + (gb >= 4 ? ' - close other apps' : ' - may struggle')) + rough : 'unknown');
       (navigator.getBattery ? navigator.getBattery() : Promise.reject()).then(function (b) {
         var desk = b.charging && b.level === 1 && !b.chargingTime;
         row(2, b.charging ? 0 : 1, 'Power', desk ? 'plugged in' : b.charging ? 'charging, ' + Math.round(b.level * 100) + '%' : 'on battery, ' + Math.round(b.level * 100) + '% - plug in your charger');
@@ -1538,6 +1546,7 @@
         if ($('wizard').hidden) guide();
         goStep(missing); return;
       }
+      if (!window.showSaveFilePicker) { countdown(null, name); return; }   // no picker: into the browser, downloaded at Stop
       // the picker first, while the click still counts as the user's: the file is written there as it records
       window.showSaveFilePicker({ suggestedName: name + '.mp4', startIn: 'desktop', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
         .then(function (h) { countdown(h, name); })
@@ -1605,6 +1614,7 @@
       var len = hms(m.seconds * 1e6), mb = (m.bytes / 1048576).toFixed(0) + ' MB';
       var lim = m.why === 'limit' ? 'You reached the 2-hour limit. ' : '';
       if (m.onDisk) status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + '). Upload it and your PDF to the Speaker Workspace, then reply to our email. Thank you!', 'ok');
+      else if (m.inBrowser && !window.showSaveFilePicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now. Upload it to the drive, then reply to our email. <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
       else if (m.inBrowser) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + '). <button class="btn go" id="dl" style="margin-top:8px">Download ' + esc(S.file) + '</button>', 'ok'); $('dl').addEventListener('click', function () { downloadSaved(S.file); }); }
       else status('Something went wrong saving the recording: ' + esc(m.diskError || 'unknown error'), 'bad');
     }
