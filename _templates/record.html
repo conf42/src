@@ -482,7 +482,7 @@
             <button data-tip="Add or change your slides, share a screen, or change the layout. Some of it locks while you record."><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg><span><b>Sharing stuff</b><em id="sum-win">-</em></span><i>Change</i></button>
             <div class="body slot" data-ctl="win" hidden></div>
           </div>
-          <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose where to save the video (your Desktop is best); it's written there as you record.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br>You can pause your recording to take a break, and resume it later. Make sure to click <b>Stop</b> once you’re done - pausing doesn’t save anything.<br><br>Good luck!</div>
+          <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose a folder for the video (your Desktop is best); it's written there as you record, with a safety copy every minute in case your computer dies.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br>You can pause your recording to take a break, and resume it later. Make sure to click <b>Stop</b> once you’re done - pausing doesn’t save anything.<br><br>Good luck!</div>
           <div class="hud" id="hud" hidden><h3>Ship systems <b id="hud-all">All in check</b></h3><div class="dials" id="dials"></div></div>
         </div>
       </aside>
@@ -712,7 +712,7 @@
         if (S.finishing) return 'Saving your video - a few seconds.';
         if (S.recording) return 'Stop: ends the recording and finishes the file.';
         var miss = !ready(1) ? 'the camera step' : !ready(2) ? 'the microphone step' : !ready(3) ? 'what you’re sharing' : '';
-        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showSaveFilePicker ? 'Record: pick where to save the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop - the video downloads then.';
+        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showDirectoryPicker ? 'Record: pick a folder for the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop - the video downloads then.';
       },
       pause: function () { return S.paused ? 'Resume: a 3-2-1, then the recording carries on where it stopped.' : 'A break: nothing is recorded while paused. Resume counts 3-2-1 first.'; },
       next: function () {   // the guide's Next / Finish setup, greyed out until the step is done
@@ -946,7 +946,7 @@
       return S.mode === 'none' || ((S.mode === 'both' || S.mode === 'window') && (!!S.pdf || !!S.screenTrack));
     }
     // the computer, checked (what a page can see): cores, memory, power, disk, a hardware video encoder, the CPU's strain
-    if (!window.showSaveFilePicker) {   // no picker: say where the video goes instead
+    if (!window.showDirectoryPicker) {   // no picker: say where the video goes instead
       $('status').innerHTML = $('status').innerHTML.replace(/You’ll choose where to save[^<]*|You'll choose where to save[^<]*/, 'Your video is kept in the browser while you record and downloads when you press <b>Stop</b>.');
     }
     function syscheck() {
@@ -1568,13 +1568,15 @@
         if ($('wizard').hidden) guide();
         goStep(missing); return;
       }
-      if (!window.showSaveFilePicker) { countdown(null, name); return; }   // no picker: into the browser, downloaded at Stop
-      // the picker first, while the click still counts as the user's: the file is written there as it records
-      window.showSaveFilePicker({ suggestedName: name + '.mp4', startIn: 'desktop', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
-        .then(function (h) { countdown(h, name); })
+      if (!window.showDirectoryPicker) { countdown(null, name); return; }   // no picker: into the browser, downloaded at Stop
+      // a folder first, while the click still counts as the user's (Marek 2026-10-24): "<Name>.mp4" is written there as it
+      // records, plus a "<Name> - safety copy" folder with a finished part every minute (record-worker.js split) that
+      // survives a dead laptop or a closed tab; a clean Stop deletes the safety copy
+      window.showDirectoryPicker({ id: 'c42-record', mode: 'readwrite', startIn: 'desktop' })
+        .then(function (d) { countdown(d, name); })
         .catch(function (e) { if (e.name !== 'AbortError') countdown(null, name); });
     });
-    function countdown(handle, name) {
+    function countdown(folder, name) {
       if (!$('wizard').hidden) studio();
       var n = 3, el = $('count');
       $('rec').disabled = true; el.hidden = false; $('count-n').textContent = n;
@@ -1586,14 +1588,14 @@
         var r = new MediaStreamTrackProcessor({ track: S.recMic }).readable;
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
-        worker.postMessage({ type: 'start', name: name, handle: handle, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
+        worker.postMessage({ type: 'start', name: name, folder: folder, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
         S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
         $('badge').hidden = false; $('tc').textContent = '0:00:00'; $('glow').classList.add('live');
-        status(handle ? '● Recording to <b>' + esc(handle.name) + '</b>. Press <b>Stop</b> when you’re done.' : '● Recording in the browser. Press <b>Stop</b> when you’re done.');
+        status(folder ? '● Recording into your <b>' + esc(folder.name) + '</b> folder. Press <b>Stop</b> when you’re done.' : '● Recording in the browser. Press <b>Stop</b> when you’re done.');
         lockWake();
       }, 1000);
     }
@@ -1635,10 +1637,12 @@
       stopped();
       var len = hms(m.seconds * 1e6), mb = (m.bytes / 1048576).toFixed(0) + ' MB';
       var lim = m.why === 'limit' ? 'You reached the 2-hour limit. ' : '';
+      if (m.file) S.file = m.file;   // "Name (2).mp4" when the folder already had one
       if (m.onDisk) status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + '). Upload it and your PDF to the Speaker Workspace, then reply to our email. Thank you!', 'ok');
-      else if (m.inBrowser && !window.showSaveFilePicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now. Upload it to the drive, then reply to our email. <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
+      else if (m.inBrowser && !window.showDirectoryPicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now. Upload it to the drive, then reply to our email. <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
       else if (m.inBrowser) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + '). <button class="btn go" id="dl" style="margin-top:8px">Download ' + esc(S.file) + '</button>', 'ok'); $('dl').addEventListener('click', function () { downloadSaved(S.file); }); }
       else status('Something went wrong saving the recording: ' + esc(m.diskError || 'unknown error'), 'bad');
+      if (!m.onDisk && m.partsKept) status($('status').innerHTML + '<br><br>Your folder also has <b>' + esc(m.partsKept) + '</b>: the recording in 1-minute parts.', $('status').className.replace('msg', '').trim());
     }
 
     // a recording that didn't make it to the disk (a crash, a closed tab, a refused file) stays in the browser's own
