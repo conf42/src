@@ -499,7 +499,7 @@
             <button data-tip="Add or change your slides, share a screen or pick another layout. Some of this locks while you record."><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></svg><span><b>Sharing stuff</b><em id="sum-win">-</em></span><i>Change</i></button>
             <div class="body slot" data-ctl="win" hidden></div>
           </div>
-          <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose a folder for the video - make a new one on your Desktop (Chrome won't use the Desktop itself). It's written there as you record, with a safety copy every minute in case your computer dies.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br>You can pause your recording to take a break, and resume it later. Make sure to click <b>Stop</b> once you’re done - pausing doesn’t save anything.<br><br>Good luck!</div>
+          <div class="msg" id="status">Press <b>Record</b> when you're ready!<br><br>You'll choose where to save the video (your Desktop is best). It's written there as you record and saved every minute, so even if your computer dies, you keep what you've recorded.<br><br>Change slides with ◀ ▶, the arrow keys, Space or a clicker.<br><br>You can record up to 2 hours.<br><br>You can pause your recording to take a break, and resume it later. Make sure to click <b>Stop</b> once you’re done - pausing doesn’t save anything.<br><br>Good luck!</div>
           <div class="hud" id="hud" hidden><h3>Ship systems <b id="hud-all">All in check</b></h3><div class="dials" id="dials"></div></div>
         </div>
       </aside>
@@ -732,7 +732,7 @@
         if (S.finishing) return 'Saving your video - this takes a few seconds.';
         if (S.recording) return 'Stop: ends the recording and finishes the file.';
         var miss = !ready(1) ? 'the camera step' : !ready(2) ? 'the microphone step' : !ready(3) ? 'what you’re sharing' : '';
-        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showDirectoryPicker ? 'Record: pick a folder for the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop, and the video downloads.';
+        return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showSaveFilePicker ? 'Record: choose where to save the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop, and the video downloads.';
       },
       pause: function () { return S.paused ? 'Resume: a 3-2-1, then the recording picks up where it stopped.' : 'Take a break: nothing is recorded while you’re paused. Resuming counts 3-2-1 first.'; },
       next: function () {   // the guide's Next / Finish setup, greyed out until the step is done
@@ -976,7 +976,7 @@
       return S.mode === 'none' || ((S.mode === 'both' || S.mode === 'window') && (!!S.pdf || !!S.screenTrack));
     }
     // the computer, checked (what a page can see): cores, memory, power, disk, a hardware video encoder, the CPU's strain
-    if (!window.showDirectoryPicker) {   // no picker: say where the video goes instead
+    if (!window.showSaveFilePicker) {   // no picker: say where the video goes instead
       $('status').innerHTML = $('status').innerHTML.replace(/You’ll choose where to save[^<]*|You'll choose where to save[^<]*/, 'Your video is kept in the browser while you record and downloads when you press <b>Stop</b>.');
     }
     function syscheck() {
@@ -1698,25 +1698,12 @@
         if ($('wizard').hidden) guide();
         goStep(missing); return;
       }
-      if (!window.showDirectoryPicker) { countdown(null, name); return; }   // no picker: into the browser, downloaded at Stop
-      // a folder first, while the click still counts as the user's (Marek 2026-10-24): "<Name>.mp4" is written there as it
-      // records, plus a "<Name> - safety copy" folder with a finished part every minute (record-worker.js split) that
-      // survives a dead laptop or a closed tab; a clean Stop deletes the safety copy
-      // Chrome won't give a website the Desktop itself ("contains system files"), only a folder in it (bug 2026-10-24):
-      // the corgi says so while the dialog is open; cancelling offers the plain Save dialog (one file, no safety copy)
-      say('Choose a folder for your video. Chrome won\u2019t let websites use the Desktop itself, so make a new folder there (e.g. \u201cConf42 talk\u201d) and pick that.', 20000);
-      window.showDirectoryPicker({ id: 'c42-record', mode: 'readwrite', startIn: 'desktop' })
-        .then(function (d) { hush(); countdown(d, name); })
-        .catch(function (e) {
-          if (e.name !== 'AbortError') { hush(); countdown(null, name); return; }
-          say('No folder picked. Press <b>Record</b> to try again, or <a id="single">save it as a single file instead</a> (no safety copy).', 20000);
-        });
-    });
-    $('bubble').addEventListener('click', function (e) {
-      if (e.target.id !== 'single') return;
-      hush();
-      window.showSaveFilePicker({ suggestedName: speaker() + '.mp4', startIn: 'desktop', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
-        .then(function (h) { countdown(h, speaker()); }).catch(function () {});
+      if (!window.showSaveFilePicker) { countdown(null, name); return; }   // no picker (Brave): into the browser, downloaded at Stop
+      // the Save dialog first, while the click still counts as the user's (Desktop allowed - a folder picker isn't, Chrome
+      // calls the Desktop "system files"); the worker writes the file as it records and makes it real every minute
+      window.showSaveFilePicker({ suggestedName: name + '.mp4', startIn: 'desktop', id: 'c42-record', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
+        .then(function (h) { countdown(h, name); })
+        .catch(function (e) { if (e.name !== 'AbortError') countdown(null, name); });
     });
     function countdown(target, name) {   // a folder (file + safety copy), a single file, or nothing (the browser keeps it)
       var folder = target && target.kind === 'directory' ? target : null, file = target && target.kind === 'file' ? target : null;
@@ -1732,6 +1719,7 @@
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
         if (folder) { S.recE = { id: Date.now(), name: name, folder: folder, file: name + '.mp4', parts: name + ' - safety copy', started: Date.now(), status: 'recording' }; recPut(S.recE); }
+        if (file) { S.recE = { id: Date.now(), name: name, fileH: file, file: file.name, started: Date.now(), status: 'recording' }; recPut(S.recE); }
         worker.postMessage({ type: 'start', name: name, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
         S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
@@ -1785,7 +1773,7 @@
       if (m.file) S.file = m.file;   // "Name (2).mp4" when the folder already had one
       if (S.recE) { S.recE.seconds = m.seconds; S.recE.bytes = m.bytes; S.recE.status = m.onDisk ? 'saved' : 'interrupted'; recPut(S.recE); S.recE = null; }
       if (m.onDisk) status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + '). Upload it and your PDF to the Speaker Workspace, then reply to our email. Thank you!', 'ok');
-      else if (m.inBrowser && !window.showDirectoryPicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now. Upload it to the drive, then reply to our email. <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
+      else if (m.inBrowser && !window.showSaveFilePicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now. Upload it to the drive, then reply to our email. <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
       else if (m.inBrowser) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + '). <button class="btn go" id="dl" style="margin-top:8px">Download ' + esc(S.file) + '</button>', 'ok'); $('dl').addEventListener('click', function () { downloadSaved(S.file); }); }
       else status('Something went wrong saving the recording: ' + esc(m.diskError || 'unknown error'), 'bad');
       if (!m.onDisk && m.partsKept) status($('status').innerHTML + '<br><br>Your folder also has <b>' + esc(m.partsKept) + '</b>: the recording in 1-minute parts.', $('status').className.replace('msg', '').trim());
@@ -1840,6 +1828,15 @@
         });
     }
     function check(e, ask) {
+      if (e.fileH) {   // a single file (the Save dialog): it's there or it isn't; saved every minute, so it plays as it is
+        if (S.recE && S.recE.id === e.id) return Promise.resolve({ e: e, st: 'now' });
+        return e.fileH.queryPermission({ mode: 'read' }).then(function (p) {
+          return p === 'granted' ? p : ask ? e.fileH.requestPermission({ mode: 'read' }) : p;
+        }).then(function (p) {
+          if (p !== 'granted') return { e: e, st: 'locked' };
+          return e.fileH.getFile().then(function (f) { return f.size ? { e: e, st: e.status === 'saved' ? 'saved' : 'partial', size: f.size } : { e: e, st: 'gone' }; }, function () { return { e: e, st: 'gone' }; });
+        }).catch(function () { return { e: e, st: 'locked' }; });
+      }
       if (!e.folder || !e.folder.queryPermission) return Promise.resolve({ e: e, st: 'locked' });
       return e.folder.queryPermission({ mode: 'readwrite' }).then(function (p) {
         if (p === 'granted') return inspect(e);
@@ -1867,10 +1864,11 @@
           var h = '<h3>Your recordings</h3>';
           if (!rows.length && !backup) h += '<div class="note">No recordings yet. Each one you make shows up here, with where it was saved.</div>';
           rows.forEach(function (r, i) {
-            var e = r.e, where = esc((e.folder && e.folder.name) || 'your folder') + ' › ' + esc(e.file);
+            var e = r.e, where = e.fileH ? esc(e.file) + ' - where you saved it (usually your Desktop)' : esc((e.folder && e.folder.name) || 'your folder') + ' › ' + esc(e.file);
             var meta = when(e.started) + (e.seconds ? ' · ' + hms(e.seconds * 1e6) : '');
             if (r.st === 'now') h += '<div class="it"><b>● Recording now</b><small>' + where + '</small></div>';
-            else if (r.st === 'locked') h += '<div class="it"><b>' + esc(e.file) + '</b><small>' + meta + ' · in your <b>' + esc((e.folder && e.folder.name) || '') + '</b> folder</small><div class="acts"><button data-a="allow">Check if it\u2019s still there</button></div></div>';
+            else if (r.st === 'partial') h += '<div class="it warn"><b>⚠ Interrupted: ' + esc(e.file) + '</b><small>' + meta + ' · ' + (r.size / 1048576).toFixed(0) + ' MB saved - it plays up to where it stopped</small><small>📁 ' + where + '</small><div class="acts"><button data-a="copy" data-i="' + i + '">Download a copy</button></div></div>';
+            else if (r.st === 'locked') h += '<div class="it"><b>' + esc(e.file) + '</b><small>' + meta + (e.folder ? ' · in your <b>' + esc(e.folder.name) + '</b> folder' : '') + '</small><div class="acts"><button data-a="allow">Check if it\u2019s still there</button></div></div>';
             else if (r.st === 'saved') h += '<div class="it"><b>✓ ' + esc(e.file) + '</b><small>' + meta + ' · ' + (r.size / 1048576).toFixed(0) + ' MB</small><small>📁 ' + where + ' - open that folder in Finder / File Explorer</small><div class="acts"><button data-a="copy" data-i="' + i + '">Download a copy</button>' + (r.parts ? '<button data-a="del" data-i="' + i + '">Delete safety copy</button>' : '') + '</div></div>';
             else h += '<div class="it warn"><b>⚠ Interrupted: ' + esc(e.file) + '</b><small>' + meta + ' · ' + r.parts.length + ' minute' + (r.parts.length > 1 ? 's' : '') + ' kept in 📁 ' + esc((e.folder && e.folder.name) || '') + ' › ' + esc(e.parts) + '</small><div class="acts"><button data-a="rebuild" data-i="' + i + '">Rebuild the video</button><button data-a="del" data-i="' + i + '">Delete safety copy</button></div></div>';
           });
@@ -1878,7 +1876,7 @@
           if (gone.length) h += '<div class="note">' + gone.length + ' recording' + (gone.length > 1 ? 's' : '') + ' moved or binned - cleaned from this list.</div>';
           h += '<div class="note">A web page can\u2019t open Finder or File Explorer: open the folder shown above yourself.</div>';
           el.innerHTML = h; el.rows = rows;
-          $('recs-dot').hidden = !rows.some(function (r) { return r.st === 'interrupted'; }) && !backup;
+          $('recs-dot').hidden = !rows.some(function (r) { return r.st === 'interrupted' || r.st === 'partial'; }) && !backup;
         });
       });
     }
@@ -1905,7 +1903,7 @@
       var r = ($('recs').rows || [])[+b.dataset.i], a = b.dataset.a;
       if (a === 'allow') recsRender(true);
       else if (a === 'rebuild') { b.disabled = true; rebuild(r); }
-      else if (a === 'copy') r.e.folder.getFileHandle(r.e.file).then(function (h) { return h.getFile(); }).then(function (f) {
+      else if (a === 'copy') (r.e.fileH ? r.e.fileH.getFile() : r.e.folder.getFileHandle(r.e.file).then(function (h) { return h.getFile(); })).then(function (f) {
         var u = URL.createObjectURL(f), l = document.createElement('a'); l.href = u; l.download = r.e.file; document.body.appendChild(l); l.click(); l.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 120000);
       });
       else if (a === 'del' || a === 'brm') {   // twice: the first click only asks
