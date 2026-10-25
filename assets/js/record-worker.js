@@ -202,7 +202,7 @@ function tick() {
   if (fresh || showing) render();   // not recording: drawn only for the preview, at its 30 fps
   if (encoding) {
     if (due) {
-      if (rec.venc.encodeQueueSize < 10) {
+      if (rec.venc.state === 'configured' && rec.venc.encodeQueueSize < 10) {   // a failed encoder: its rebuild is on the way
         var ts = { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) }, vf;
         if (fresh && (cvChanged || !rec.lastVf)) {
           vf = new VideoFrame(cv, ts); cvChanged = false;
@@ -246,7 +246,7 @@ function tick() {
 var next = performance.now(), stat = { n: 0, busy: 0, at: performance.now() };
 (function loop() {
   var t = performance.now();
-  try { tick(); } catch (e) { post({ type: 'error', message: 'frame: ' + e.message }); }
+  try { tick(); } catch (e) { var et = Date.now(); if (et - (loop.errAt || 0) > 10000) { loop.errAt = et; post({ type: 'error', message: 'frame: ' + e.message }); } }   // once in 10 s, not 60 a second
   stat.n++; stat.busy += performance.now() - t;
   if (t - stat.at > 2000) { post({ type: 'stats', fps: stat.n * 1000 / (t - stat.at), busy: stat.busy / stat.n }); stat = { n: 0, busy: 0, at: t }; }
   next += 1000 / FPS;
@@ -404,8 +404,11 @@ function start(m) {
   Promise.all([opfs, desk, pickVideo(m.vbitrate)]).then(function (res) {
     var vcfg = res[2];
     if (!vcfg) throw new Error('This browser cannot encode H.264 video.');
-    r.venc = new VideoEncoder({ output: function (chunk, md) { r.muxer.addVideoChunk(chunk, md); }, error: function (e) { post({ type: 'error', message: 'video: ' + e.message }); } });
-    r.venc.configure(vcfg);
+    r.vRebuild = function () {
+      r.venc = new VideoEncoder({ output: function (chunk, md) { r.muxer.addVideoChunk(chunk, md); }, error: function (e) { trouble(r, 'video', e, r.vRebuild); } });
+      r.venc.configure(vcfg); r.lastKey = -1;   // a new encoder starts on a keyframe
+    };
+    r.vRebuild();
     r.vcodec = vcfg.codec;
     var first = true;
     r.audio = feed(m.audio, function (d) {
@@ -416,8 +419,11 @@ function start(m) {
         var rate = d.sampleRate;
         pickAudio(rate).then(function (ac) {
           if (!ac) throw new Error('This browser cannot encode the sound (AAC or Opus).');
-          r.aenc = new AudioEncoder({ output: function (chunk, md) { r.muxer.addAudioChunk(chunk, md); }, error: function (e) { post({ type: 'error', message: 'audio: ' + e.message }); } });
-          r.aenc.configure(ac[0]);
+          r.aRebuild = function () {
+            r.aenc = new AudioEncoder({ output: function (chunk, md) { r.muxer.addAudioChunk(chunk, md); }, error: function (e) { trouble(r, 'audio', e, r.aRebuild); } });
+            r.aenc.configure(ac[0]);
+          };
+          r.aRebuild();
           r.muxer = new Mp4Muxer.Muxer({
             target: new Mp4Muxer.StreamTarget({ onData: write }),
             video: { codec: 'avc', width: W, height: H, frameRate: FPS },
@@ -428,16 +434,37 @@ function start(m) {
           r.metaTimer = setInterval(function () { meta(); if (r.sync) try { r.sync.flush(); } catch (e) {} }, 5000);
           meta();
           post({ type: 'started', file: r.fileName || '', parts: r.partsName || '', video: r.vcodec, hw: vcfg.hardwareAcceleration === 'prefer-hardware', audio: ac[1] + ' ' + Math.round(ac[0].bitrate / 1000) + 'k' });
-        }).catch(function (e) { post({ type: 'error', message: e.message }); });
+        }).catch(function (e) { post({ type: 'error', message: e.message }); abort(r); });
         d.close(); return;
       }
       if (!r.muxer || r.paused) { d.close(); return; }   // paused: the sound isn't counted, so the timeline just continues
       var a = mono(d), rate2 = d.sampleRate;
       d.close();
       heard(r.samples * 1e6 / rate2);
-      r.aenc.encode(a); a.close();
+      if (r.aenc.state === 'configured') r.aenc.encode(a);   // a failed encoder: a moment of silence until its rebuild
+      a.close();
     });
-  }).catch(function (e) { post({ type: 'error', message: e.message }); rec = null; });
+  }).catch(function (e) { post({ type: 'error', message: e.message }); abort(r); });
+}
+
+// an encoder that fails mid-talk (Marek 2026-10-25: a 25-minute test lost the whole file to one AAC "Encoding error"):
+// a new one takes over and the recording carries on - a blip of silence, or a few frames. Only an encoder that keeps
+// failing ends the recording, and then properly: the file is finished with everything so far
+function trouble(r, what, e, rebuild) {
+  if (rec !== r || r.stopping) return;
+  r.fails = (r.fails || 0) + 1;
+  if (r.fails <= 5) try { rebuild(); post({ type: 'warn', what: what }); return; } catch (x) {}
+  post({ type: 'error', message: what + ': ' + e.message, finishing: true });
+  stop('error');
+}
+// it never got going: nothing to save, the page goes back to Record
+function abort(r) {
+  if (rec !== r) return;
+  rec = null;
+  if (r.audio) try { r.audio.stop(); } catch (e) {}
+  [r.venc, r.aenc].forEach(function (x) { if (x && x.state !== 'closed') try { x.close(); } catch (e) {} });
+  clearInterval(r.metaTimer);
+  post({ type: 'aborted' });
 }
 
 function stop(why) {
