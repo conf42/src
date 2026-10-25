@@ -40,10 +40,12 @@ function feed(readable, put) {
 var cams = [{ feed: null, frame: null, zoom: 1 }, { feed: null, frame: null, zoom: 1 }], scr = { feed: null, frame: null };
 function setFrame(slot) { return function (f) { if (slot.frame) slot.frame.close(); slot.frame = f; slot.fresh = true; }; }
 
-function cover(src, sw, sh, dx, dy, dw, dh, up, zoom) {
-  // src scaled to fill dx,dy,dw,dh, cropped centred (up: a little nearer the top, where the face usually is); zoom > 1 crops in
-  var s = Math.max(dw / sw, dh / sh) * (zoom || 1), cw = dw / s, ch = dh / s;
-  x.drawImage(src, (sw - cw) / 2, (sh - ch) * (up ? .4 : .5), cw, ch, dx, dy, dw, dh);
+function cover(src, sw, sh, dx, dy, dw, dh, up, zoom, pan) {
+  // src scaled to fill dx,dy,dw,dh, cropped centred (up: a little nearer the top, where the face usually is); zoom > 1 crops in,
+  // and then the speaker may drag the crop around (pan, -1..1 each way; Marek 2026-10-24) - only when zoomed
+  var s = Math.max(dw / sw, dh / sh) * (zoom || 1), cw = dw / s, ch = dh / s, fx = .5, fy = up ? .4 : .5;
+  if (pan && zoom > 1) { fx = Math.max(0, Math.min(1, fx + pan[0] / 2)); fy = Math.max(0, Math.min(1, fy + pan[1] / 2)); }
+  x.drawImage(src, (sw - cw) * fx, (sh - ch) * fy, cw, ch, dx, dy, dw, dh);
 }
 function contain(src, sw, sh, r) {
   var s = Math.min(r[2] / sw, r[3] / sh), w = sw * s, h = sh * s;
@@ -78,7 +80,7 @@ function draw() {
   if (source === 'screen' && f) contain(f, f.displayWidth, f.displayHeight, r);
   // on whole pixels: the page is rendered at exactly this size, and a half-pixel offset would resample (blur) it
   else if (source === 'slides' && slide) x.drawImage(slide, Math.round(r[0] + (r[2] - slide.width) / 2), Math.round(r[1] + (r[3] - slide.height) / 2));
-  else if (source === 'none' && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom); }   // no slides: the camera alone in the big window
+  else if (source === 'none' && cams[0].frame) { var c = cams[0].frame; cover(c, c.displayWidth, c.displayHeight, r[0], r[1], r[2], r[3], true, cams[0].zoom, cams[0].pan); }   // no slides: the camera alone in the big window
   else if (!rec) empty(r);   // nothing in the window yet: the placeholder, in the preview only
   x.restore();
   geo.cams.forEach(function (g, i) {
@@ -86,7 +88,7 @@ function draw() {
     if (!c) return;
     // clipped to the circle: the square around it reaches into the slides' window in co-talk (Marek 2026-10-23)
     x.save(); x.beginPath(); x.arc(g[0], g[1], d / 2, 0, 2 * Math.PI); x.clip();
-    cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom);
+    cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom, cams[i].pan);
     x.restore();
   });
   if (overlay) x.drawImage(overlay, 0, 0);
@@ -422,6 +424,7 @@ self.onmessage = function (e) {
   else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; dirty = true; }
   else if (m.type === 'source') { if (source !== m.source) dirty = true; source = m.source; }
   else if (m.type === 'zoom') { cams[m.slot].zoom = m.zoom; cams[m.slot].fresh = true; }
+  else if (m.type === 'pan') { cams[m.slot].pan = [m.x, m.y]; cams[m.slot].fresh = true; }
   else if (m.type === 'cam') {
     var s = cams[m.slot];
     if (s.feed) s.feed.stop();

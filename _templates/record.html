@@ -746,7 +746,7 @@
       },
       prev: function () { return !S.pdf ? 'Add your slides PDF in Setup to use this.' : S.page <= 1 ? 'You’re on the first slide.' : 'Previous slide. The ← key works too.'; },
       nexts: function () { return !S.pdf ? 'Add your slides PDF in Setup to use this.' : S.page >= S.pages ? 'That’s the last slide.' : 'Next slide. The → key, Space and most clickers work too.'; },
-      zoom: function () { return S.recording ? 'Zoom is locked while recording - set it before you press Record.' : 'Zoom in on the face (up to 50 %). It locks while you record.'; },
+      zoom: function () { return S.recording ? 'Zoom is locked while recording - set it before you press Record.' : 'Zoom in on the face (up to 50 %). Zoomed in, drag the picture in the preview to re-centre it (double-click: back to the middle). It locks while you record.'; },
       level: function () { return 'Your microphone level: it should jump when you talk and fall back when you stop. Always at the top? Too loud. Barely moving? Too quiet.'; },
       badge: function () { return S.paused ? 'Paused - the time stands still until you resume.' : 'How long you’ve been recording. It stops by itself at 2 hours.'; },
       drop: function () { return S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (PowerPoint, Keynote, Google Slides: File → Export / Download as PDF). Click or drop it here.'; }
@@ -1311,6 +1311,43 @@
       $('zoom' + i).addEventListener('input', function () { zoom(i); });
       $('zoom' + i).value = store.get('zoom2.' + i) || 0; zoom(i);
     });
+    // zoomed in, the camera's picture can be dragged in the preview to re-centre the face (Marek 2026-10-24): in its
+    // circle, or the whole window when it's just the camera. Not at 0 % (nothing to move), not while recording (like zoom)
+    var PAN = [0, 1].map(function (i) { var v = (store.get('pan2.' + i) || '0,0').split(',').map(Number); worker.postMessage({ type: 'pan', slot: i, x: v[0], y: v[1] }); return v; });
+    function camAt(e) {
+      var b = $('pv').getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 1920, y = (e.clientY - b.top) / b.height * 1080, G = GEOM[S.kind];
+      if (!G) return null;
+      if (S.kind === 'no-facecam' && S.src === 'none') {
+        var q = G.rect; return x >= q[0] && x <= q[0] + q[2] && y >= q[1] && y <= q[1] + q[3] ? { i: 0, w: q[2] * b.width / 1920, h: q[3] * b.width / 1920 } : null;
+      }
+      for (var i = 0; i < G.cams.length; i++) { var g = G.cams[i]; if (Math.hypot(x - g[0], y - g[1]) <= g[2] + 3) return { i: i, w: 2 * g[2] * b.width / 1920, h: 2 * g[2] * b.width / 1920 }; }
+      return null;
+    }
+    function canPan(i) { return !S.recording && !!S.cam[i] && +$('zoom' + i).value > 0; }
+    var drag = null;
+    $('pv').addEventListener('pointermove', function (e) {
+      if (!drag) { var c = camAt(e); this.style.cursor = c && canPan(c.i) ? 'grab' : ''; return; }
+      // how far the zoomed picture reaches past its circle / window each way, on screen (a 16:9 camera, as the worker crops
+      // it): the face then follows the pointer 1:1
+      var Z = 1 + +$('zoom' + drag.i).value / 100, sc = Math.max(drag.w / 16, drag.h / 9) * Z, ox = Math.max(8, 16 * sc - drag.w), oy = Math.max(8, 9 * sc - drag.h);
+      var k = function (v) { return Math.max(-1, Math.min(1, v)); };
+      PAN[drag.i] = [k(drag.p0[0] - 2 * (e.clientX - drag.x0) / ox), k(drag.p0[1] - 2 * (e.clientY - drag.y0) / oy)];   // the face follows the pointer
+      worker.postMessage({ type: 'pan', slot: drag.i, x: PAN[drag.i][0], y: PAN[drag.i][1] });
+    });
+    $('pv').addEventListener('pointerdown', function (e) {
+      var c = camAt(e);
+      if (!c || !canPan(c.i) || e.button !== 0) return;
+      e.preventDefault(); drag = { i: c.i, w: c.w, h: c.h, x0: e.clientX, y0: e.clientY, p0: PAN[c.i].slice() };
+      try { this.setPointerCapture(e.pointerId); } catch (er) {}
+      this.style.cursor = 'grabbing';
+    });
+    function dragEnd() { if (!drag) return; store.set('pan2.' + drag.i, PAN[drag.i].map(function (v) { return v.toFixed(3); }).join(',')); drag = null; $('pv').style.cursor = ''; }
+    $('pv').addEventListener('pointerup', dragEnd); $('pv').addEventListener('pointercancel', dragEnd);
+    $('pv').addEventListener('dblclick', function (e) {   // double-click: back to the middle
+      var c = camAt(e); if (!c || !canPan(c.i)) return;
+      PAN[c.i] = [0, 0]; store.set('pan2.' + c.i, '0,0'); worker.postMessage({ type: 'pan', slot: c.i, x: 0, y: 0 });
+    });
+
     // alone or with a co-presenter in the room: the 2nd camera only when asked for, never remembered
     function setDuo(on) {
       S.duo = on;
