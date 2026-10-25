@@ -159,6 +159,8 @@
       height: 52px; padding: 0 26px 0 52px; background: linear-gradient(135deg, var(--pink), #ff3b4e); box-shadow: 0 8px 28px rgba(255,59,78,.45); white-space: nowrap; }
     .rec::before { content: ''; position: absolute; left: 20px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: #fff; }
     .rec.live { padding-left: 60px; }
+    /* greyed while it can't start (Marek 2026-10-25) - still clickable, to say what's missing */
+    .rec.off:not(.live) { filter: grayscale(1) brightness(.7); opacity: .6; box-shadow: none; }
     .rec.live::before { left: 26px; width: 14px; height: 14px; margin-top: -7px; border-radius: 3px; }   /* centred in the ring */
     .rec.live::after { content: ''; position: absolute; left: 17px; top: 50%; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%;
       box-sizing: border-box; border: 3px solid rgba(255,255,255,.3); border-top-color: #fff; animation: spin .9s linear infinite; }
@@ -213,12 +215,9 @@
       animation: petheart 1.1s ease-out forwards; }
     @keyframes petheart { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(var(--x1), -10px) scale(1.1); }
       100% { opacity: 0; transform: translate(var(--x2), -46px) scale(.7) rotate(var(--r)); } }
-    /* while recording (OBS-style: nothing decorative competes with the recording), the corgi's idle loops stop - it sits
-       still with its eyes open; talking, petting and alerts still animate (Marek 2026-10-24) */
-    body.locked .corgi:not(.talk):not(.pet) { animation: none; }
-    body.locked .corgi.talk { animation: none; }   /* recording (Marek 2026-10-25): it talks without hopping - less to catch the eye */
-    body.locked .corgi:not(.pet) .iris, body.locked .corgi:not(.pet):not(.sleep) .lid, body.locked .corgi:not(.pet):not(.sleep) .lash,
-    body.locked .corgi .heart, body.locked .corgi .zzz i { animation: none; }
+    /* recording (Marek 2026-10-25): it keeps breathing, blinking and looking around, but talks without the hop - less to
+       catch the eye */
+    body.locked .corgi.talk { animation: breathe 3.4s ease-in-out infinite; }
     .corgi.wake { animation: wakeup .85s cubic-bezier(.3,1.5,.5,1); }
     .corgi.wake .lid { animation: none; transform: scaleY(0); } .corgi.wake .iris { animation: none; transform: scale(1.12); transform-origin: center; transform-box: fill-box; }
     @keyframes wakeup { 0% { transform: scale(1.04, .94); } 25% { transform: translateY(-10px) scale(.95, 1.07) rotate(-4deg); } 45% { transform: translateY(0) rotate(3deg); }
@@ -830,7 +829,7 @@
       var base = parseFloat(getComputedStyle(t).fontSize);
       while (t.scrollHeight > t.clientHeight + 1 && f > .72) { f -= .04; t.style.fontSize = (base * f) + 'px'; }
     }
-    function hush() { if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); return; } $('bubble').hidden = true; $('corgi').classList.remove('talk'); nap(); }
+    function hush() { if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); return; } say.cur = null; $('bubble').hidden = true; $('corgi').classList.remove('talk'); nap(); }
     // 30 s without a word, it falls asleep; anything it says wakes it (while a bubble is up it stays awake)
     // petting: pointer down on the corgi, then it follows the rubbing; hearts pop as you go
     (function () {
@@ -1240,7 +1239,7 @@
           }
           if (micSrc) micSrc.disconnect();
           micSrc = AC.createMediaStreamSource(s); micSrc.connect(AC.chain);
-          AC.resume(); deadFor = 1.3;   // a new microphone: heard within 0.2 s, or it counts as dead
+          AC.resume(); deadFor = 0; S.micAt = performance.now(); mShown = mPk = -90;   // a new microphone: 1.5 s to start (Bluetooth is slow), the meter from silence
           S.micTrack = dest.stream.getAudioTracks()[0];
           summaries();
         }).catch(micError);
@@ -1257,7 +1256,7 @@
       for (var i = 0; i < buf.length; i++) { var v = Math.abs(buf[i]); s += v * v; if (v > p) p = v; }
       return { rms: Math.sqrt(s / buf.length), peak: p };
     }
-    function db(v) { return 20 * Math.log10(Math.max(v, 1e-6)); }
+    function db(v) { return isFinite(v) ? 20 * Math.log10(Math.max(v, 1e-6)) : -120; }
     // the meters, snappy like OBS (Marek 2026-10-24: people tap their laptop to see it's working): every screen frame, the
     // last ~16 ms of sound only (a tap is a few ms), shown at once and falling back ~20 dB a second; the white peak mark
     // is held 1 s. (It was 10 times a second, averaged over 43 ms, with an animated bar - easily 150 ms behind)
@@ -1268,7 +1267,9 @@
       analyser.getFloatTimeDomainData(mBuf);
       var s2 = 0, p = 0;
       for (var i = 2048 - 768; i < 2048; i++) { var v = Math.abs(mBuf[i]); s2 += v * v; if (v > p) p = v; }
-      var d = db(Math.sqrt(s2 / 768)), pk = db(p), dt = mT ? Math.min(.1, (t - mT) / 1000) : 0; mT = t;
+      // the first 0.4 s of a newly picked microphone is skipped (Marek 2026-10-25: a switch could pin the meter full
+      // for a while), and a broken reading counts as silence
+      var fresh = t - (S.micAt || -1e9) < 400, d = fresh ? -90 : db(Math.sqrt(s2 / 768)), pk = fresh ? -90 : db(p), dt = mT ? Math.min(.1, (t - mT) / 1000) : 0; mT = t;
       mShown = d > mShown ? d : Math.max(d, mShown - 20 * dt);
       if (d > -18 && $('corgi').classList.contains('sleep')) { nap(); say('Whoa, I\u2019m up!', 3000); }   // the meter's yellow zone or above wakes it (Marek 2026-10-24)
       if (pk >= mPk || t - mPkAt > 1000) { if (pk >= mPk) { mPk = pk; mPkAt = t; } else mPk = Math.max(pk, mPk - 15 * dt); }
@@ -1281,6 +1282,7 @@
     // digital silence. 1.5 s of it and the mic counts as dead: no Record, no Resume, no Next in the setup, the Microphone
     // row stays open and the corgi says so, in red, until a microphone with any sound is picked. Recording when it goes
     // dead (unplugged, Bluetooth gone): paused at once
+    setInterval(function () { $('rec').classList.toggle('off', !S.recording && !S.finishing && (!speaker() || micDead() || !ready(1) || !ready(2) || !ready(3))); }, 250);
     var MIC_DEAD = 'No sound from your microphone! Pick one that works - you can’t record without your voice.', deadFor = 0;
     S.micLive = false;
     function micDead() { return !!S.micTrack && !S.micLive; }
