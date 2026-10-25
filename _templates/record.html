@@ -887,6 +887,7 @@
       if (!speaker()) { $('name').classList.add('need'); $('name').focus(); return; }
       fullName();
       $('who-bar').appendChild($('ev')); $('who-bar').appendChild($('name')); $('hello').hidden = true; dimmed(false);
+      if (S.step === 0) setTimeout(sysTalk, 600);
     }
     $('hello-go').addEventListener('click', helloGo);
     $('ev').addEventListener('change', function () {
@@ -968,45 +969,64 @@
       $('status').innerHTML = $('status').innerHTML.replace(/You’ll choose where to save[^<]*|You'll choose where to save[^<]*/, 'Your video is kept in the browser while you record and downloads when you press <b>Stop</b>.');
     }
     function syscheck() {
-      var rows = [], done = 0, total = 6, got = {};
-      function row(i, level, name, text) {
+      var rows = [], done = 0, total = 6, got = {}; S.sysTips = [];
+      function row(i, level, name, text, tip) {
         if (level !== 'wait') { if (got[i]) return; got[i] = 1; }   // once each (the load reading has a fallback timer)
-        rows[i] = '<div class="' + (level === 'wait' ? 'wait' : 'l' + level) + '"><i></i><b>' + name + '</b><span>' + text + '</span></div>';
+        if (level > 0 && tip) S.sysTips[i] = { level: level, text: tip };   // space corgi goes through these (Marek 2026-10-24)
+        rows[i] = '<div class="' + (level === 'wait' ? 'wait' : 'l' + level) + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '><i></i><b>' + name + '</b><span>' + text + '</span></div>';
         $('sys').innerHTML = rows.join('');
         if (level !== 'wait' && ++done === total) {
           var worst = Math.max.apply(null, $('sys').innerHTML.match(/class="l(\d)/g).map(function (x) { return +x.slice(-1); }));
           var v = $('sys-verdict'); v.hidden = false; v.className = 'msg ' + (worst ? 'warn' : 'ok');
           v.innerHTML = worst > 1 ? '<b>It could struggle right now</b> - sort out the orange line above first, then you\u2019re good to start.'
             : worst ? '<b>Should work</b> - have a look at the yellow line above before a long recording.' : '<b>You\u2019re good to go!</b> This computer has what it takes.';
-          if (worst && S.step === 0) say(v.innerHTML.replace(' above', ' in the check under the intro'), 10000, 'warn');   // the list may sit below the fold
+          sysTalk();
         }
       }
       ['Processor', 'Memory', 'Power', 'Disk space', 'Video encoder', 'Current load'].forEach(function (n, i) { row(i, 'wait', n, 'checking…'); });
       var brave = !!navigator.brave, gx = /Opera GX/.test(brands), rough = brave ? ' (roughly: Brave hides exact numbers)' : '';
-      if (gx) { total++; row(6, 'wait', 'Opera GX', 'checking…'); row(6, 1, 'Opera GX', 'turn off GX Control\u2019s RAM and CPU limiters while you record'); }
+      if (gx) { total++; row(6, 'wait', 'Opera GX', 'checking…'); row(6, 1, 'Opera GX', 'turn off GX Control\u2019s RAM and CPU limiters while you record', 'Opera GX can limit how much memory and processor a tab gets (GX Control). Switch those limiters off while you record, or the video may stutter.'); }
       var cores = navigator.hardwareConcurrency || 0;
-      row(0, cores >= 8 ? 0 : cores >= 4 ? 1 : 2, 'Processor', cores ? cores + ' cores' + (cores >= 8 ? '' : cores >= 4 ? ' - fine, close other apps' : ' - may struggle') + rough : 'unknown');
+      row(0, cores >= 8 ? 0 : cores >= 4 ? 1 : 2, 'Processor', cores ? cores + ' cores' + (cores >= 8 ? '' : cores >= 4 ? ' - fine, close other apps' : ' - may struggle') + rough : 'unknown',
+        cores && cores < 8 ? 'This computer has ' + cores + ' processor cores - ' + (cores >= 4 ? 'enough, but close other apps and browser tabs before you record.' : 'it may struggle: close everything else, and keep slides simple.') : '');
       var gb = navigator.deviceMemory || 0;
-      row(1, !gb || gb >= 8 ? 0 : gb >= 4 ? 1 : 2, 'Memory', gb ? (gb >= 8 ? '8 GB or more' : gb + ' GB' + (gb >= 4 ? ' - close other apps' : ' - may struggle')) + rough : 'unknown');
+      row(1, !gb || gb >= 8 ? 0 : gb >= 4 ? 1 : 2, 'Memory', gb ? (gb >= 8 ? '8 GB or more' : gb + ' GB' + (gb >= 4 ? ' - close other apps' : ' - may struggle')) + rough : 'unknown',
+        gb && gb < 8 ? 'Only ' + gb + ' GB of memory - close other apps and browser tabs so the recording has room.' : '');
       (navigator.getBattery ? navigator.getBattery() : Promise.reject()).then(function (b) {
         var desk = b.charging && b.level === 1 && !b.chargingTime;
-        row(2, b.charging ? 0 : 1, 'Power', desk ? 'plugged in' : b.charging ? 'charging, ' + Math.round(b.level * 100) + '%' : 'on battery, ' + Math.round(b.level * 100) + '% - plug in your charger');
+        row(2, b.charging ? 0 : 1, 'Power', desk ? 'plugged in' : b.charging ? 'charging, ' + Math.round(b.level * 100) + '%' : 'on battery, ' + Math.round(b.level * 100) + '% - plug in your charger',
+          b.charging ? '' : 'You\u2019re on battery (' + Math.round(b.level * 100) + '%). Plug in your charger: recording takes a lot of power, and a laptop going to sleep ends the recording.');
       }).catch(function () { row(2, 0, 'Power', 'no battery reading'); });
       (navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : Promise.reject()).then(function (e) {
         var free = Math.max(0, e.quota - e.usage), hrs = free / 2.5e9;
-        row(3, hrs >= 2 ? 0 : hrs >= 1 ? 1 : 2, 'Disk space', (free / 1e9).toFixed(0) + ' GB free - ' + (hrs >= 10 ? 'plenty' : hrs.toFixed(1) + ' h of video'));
+        row(3, hrs >= 2 ? 0 : hrs >= 1 ? 1 : 2, 'Disk space', (free / 1e9).toFixed(0) + ' GB free - ' + (hrs >= 10 ? 'plenty' : hrs.toFixed(1) + ' h of video'),
+          hrs < 2 ? 'Only room for about ' + hrs.toFixed(1) + ' hours of video. Free up some disk space if your talk is long, or record it in parts.' : '');
       }).catch(function () { row(3, 1, 'Disk space', 'no reading'); });
       VideoEncoder.isConfigSupported({ codec: 'avc1.640033', width: 1920, height: 1080, framerate: 60, bitrate: 2500000, hardwareAcceleration: 'prefer-hardware' })
-        .then(function (r) { row(4, r.supported ? 0 : 1, 'Video encoder', r.supported ? 'built-in chip - light work' : 'software only - heavier, close other apps'); })
-        .catch(function () { row(4, 1, 'Video encoder', 'software only - heavier, close other apps'); });
+        .then(function (r) { row(4, r.supported ? 0 : 1, 'Video encoder', r.supported ? 'built-in chip - light work' : 'software only - heavier, close other apps',
+          r.supported ? '' : 'This computer has no video chip Chrome can use, so recording is heavier work. Close other apps, and plug in your charger.'); })
+        .catch(function () { row(4, 1, 'Video encoder', 'software only - heavier, close other apps', 'This computer has no video chip Chrome can use, so recording is heavier work. Close other apps, and plug in your charger.'); });
       if (window.PressureObserver) try {
         var po = new PressureObserver(function (rs) {
           var st = rs[rs.length - 1].state; po.disconnect(); clearTimeout(po.t);
-          row(5, st === 'critical' ? 2 : st === 'serious' ? 1 : 0, 'Current load', { nominal: 'calm', fair: 'normal', serious: 'busy - close other apps', critical: 'very busy - close other apps' }[st]);
+          row(5, st === 'critical' ? 2 : st === 'serious' ? 1 : 0, 'Current load', { nominal: 'calm', fair: 'normal', serious: 'busy - close other apps', critical: 'very busy - close other apps' }[st],
+            st === 'critical' ? 'Your computer is very busy right now. Close other apps (and anything running in the background), then check again with Setup.'
+              : st === 'serious' ? 'Your computer is quite busy right now - closing other apps will help the recording run smoothly.' : '');
         });
         po.observe('cpu', { sampleInterval: 1000 }).catch(function () { row(5, 0, 'Current load', 'no reading'); });
         po.t = setTimeout(function () { po.disconnect(); row(5, 0, 'Current load', 'no reading'); }, 4000);
       } catch (e) { row(5, 0, 'Current load', 'no reading'); } else row(5, 0, 'Current load', 'no reading');
+    }
+    // space corgi talks through every yellow / orange line, one after another (orange first), while the intro is on screen
+    function sysTalk() {
+      clearTimeout(sysTalk.t);
+      var list = (S.sysTips || []).filter(Boolean).sort(function (a, b) { return b.level - a.level; });
+      if (!list.length || S.step !== 0 || !$('hello').hidden || $('wizard').hidden) return;
+      (function next(i) {
+        if (i >= list.length || S.step !== 0) return;
+        say(esc(list[i].text), 8000, 'warn');
+        sysTalk.t = setTimeout(function () { next(i + 1); }, 8500);
+      })(0);
     }
     function gate() { $('nextstep').disabled = !ready(S.step); }
     $('back').addEventListener('click', function () { goStep(S.step - 1); });
