@@ -336,6 +336,8 @@
     .juicy:hover, .juicy.over { filter: brightness(1.08); box-shadow: 0 10px 30px color-mix(in srgb, var(--j2) 55%, transparent); }
     .juicy:active { transform: scale(.98); }
     .juicy input { display: none; }
+    /* sharing: a red Stop takes the right fifth of the share button (Marek 2026-10-24) */
+    .share-row { display: flex; gap: 8px; } .share-row #share { flex: 1; min-width: 0; } .share-row #share-stop { flex: 0 0 20%; padding-left: 0; padding-right: 0; }
     .juicy span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .drop { display: block; border: 2px dashed var(--edge); border-radius: 12px; padding: 14px; text-align: center; cursor: pointer; color: var(--muted);
       font-size: .86rem; margin-top: 12px; line-height: 1.45; }
@@ -594,7 +596,10 @@
       <!-- easy setup (Marek 2026-10-23): the deck and the screen first, two bright buttons; then the layout -->
       <div class="easy">
         <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf"><span id="drop-text">Add your slides in .pdf</span></label>
-        <button class="juicy" id="share" style="--j1:#ff7aa2;--j2:#ff3b7e" data-tip="For a demo: share a screen, window or browser tab, and switch between it and your slides while you record.">Choose a screen/window to share</button>
+        <div class="share-row">
+          <button class="juicy" id="share" style="--j1:#ff7aa2;--j2:#ff3b7e" data-tip="For a demo: share a screen, window or browser tab, and switch between it and your slides while you record.">Choose a screen/window to share</button>
+          <button class="juicy" id="share-stop" style="--j1:#ff5a5f;--j2:#d91f3a" data-tip="Stop sharing your screen." hidden>Stop</button>
+        </div>
       </div>
       <div class="cards">
         <button class="card wide" data-mode="both" id="mode-both" data-tip="The usual choice: you in the circle, your slides or screen in the window - switch with Slides / Screen / Me."><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3.2"/><rect x="9" y="8" width="13" height="9" rx="1.6"/><path d="M15.5 17v3M12.5 20h6"/></svg><b>Camera + slides + screen share</b><small>You in the circle; your slides and a shared screen in the window - switch between them while you record.</small></button>
@@ -1605,6 +1610,7 @@
       if (S.screenTrack && S.screenTrack.applyConstraints) S.screenTrack.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: s === 'screen' ? 30 : 5 } }).catch(function () {});   // (all of them: applyConstraints replaces the set)
       all('#live-src button').forEach(function (b) { b.classList.toggle('on', b.dataset.src === s); });
       $('share').textContent = S.screenTrack ? '\u2713 Sharing - choose another screen/window' : 'Choose a screen/window to share';
+      $('share-stop').hidden = !S.screenTrack;
       relayout(); navState();
     }
     // sharing doesn't take the speaker away from the studio (Marek 2026-10-23), unless they tick "jump to it" first:
@@ -1617,6 +1623,12 @@
         : kind === 'window' ? 'Sharing a window. To jump there, press <b>' + (mac ? '\u2318 Cmd + Tab' : 'Alt + Tab') + '</b>.'
         : 'Sharing your whole screen - everything on it is recorded whenever you switch to Screen.', 12000);
     }
+    function shareEnded(t) {   // the share ended: back to the slides, or the camera alone
+      if (S.screenTrack !== t) return;
+      S.screenTrack = null; worker.postMessage({ type: 'screen', readable: null });
+      setSrc(S.mode === 'none' ? 'none' : 'slides'); summaries();
+    }
+    $('share-stop').addEventListener('click', function () { var t = S.screenTrack; if (t) { t.stop(); shareEnded(t); } this.blur(); });   // stop() alone fires no "ended"
     function share() {
       var cc = window.CaptureController ? new CaptureController() : null;
       return navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false,
@@ -1627,11 +1639,8 @@
           if (cc && t.getSettings().displaySurface !== 'monitor') try { cc.setFocusBehavior($('jump').checked ? 'focus-captured-surface' : 'focus-capturing-application'); } catch (e) {}
           if (S.screenTrack) S.screenTrack.stop();
           S.screenTrack = t; shareNote(t);
-          t.addEventListener('ended', function () {   // the share ended: back to the slides, or the camera alone
-            if (S.screenTrack !== t) return;
-            S.screenTrack = null; worker.postMessage({ type: 'screen', readable: null }); 
-            setSrc(S.mode === 'none' ? 'none' : 'slides');
-          });
+          t.addEventListener('ended', function () { shareEnded(t); });   // ended from Chrome's bar
+
           var r = new MediaStreamTrackProcessor({ track: t }).readable;
           worker.postMessage({ type: 'screen', readable: r }, [r]);
           setSrc('screen');
