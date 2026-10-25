@@ -268,6 +268,18 @@ function write(data, pos) {
       .catch(function (e) { if (!rec.deskErr) { rec.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: rec.deskErr }); } });
   }
   if (rec.split) split(rec.split, data);
+  if (rec.handle && !rec.deskErr && Date.now() - rec.commitAt > Math.max(60000, rec.bytes / 15e6 * 1000)) commit(rec);
+}
+// the file on the speaker's disk, made real every minute (Marek 2026-10-24, after the Desktop-folder dead end): Chrome
+// only puts a file in place when it's closed, so it's closed and reopened (keeping what's there) - a dead laptop or a
+// closed tab still leaves a playable fragmented MP4 up to the last minute. Reopening copies the file once, so with a big
+// file it's done less often (every size / 15 MB/s seconds: 1 GB -> about a minute)
+function commit(r) {
+  r.commitAt = Date.now();
+  r.deskChain = r.deskChain.then(function () { return r.desk.close(); })
+    .then(function () { return r.handle.createWritable({ keepExistingData: true }); })
+    .then(function (w) { r.desk = w; r.commits = (r.commits || 0) + 1; })
+    .catch(function (e) { if (!r.deskErr) { r.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: r.deskErr }); } });
 }
 
 // ── the safety copy in the speaker's folder (Marek 2026-10-24, like OBS's fragmented MP4): Chrome only puts the main file
@@ -366,7 +378,7 @@ function start(m) {
     return x[1].getFileHandle('READ ME.txt', { create: true }).then(function (h) { return h.createWritable(); })
       .then(function (w) { return w.write(README).then(function () { return w.close(); }); }).catch(function () {});
   }, deskErr)
-    : m.handle ? m.handle.createWritable().then(function (w) { r.desk = w; }, deskErr) : Promise.resolve();
+    : m.handle ? m.handle.createWritable().then(function (w) { r.desk = w; r.handle = m.handle; r.commitAt = Date.now(); }, deskErr) : Promise.resolve();
   Promise.all([opfs, desk, pickVideo(m.vbitrate)]).then(function (res) {
     var vcfg = res[2];
     if (!vcfg) throw new Error('This browser cannot encode H.264 video.');
