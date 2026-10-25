@@ -504,7 +504,7 @@
             <div data-step="2" style="--c:var(--blue)" hidden>
               <div class="kicker">Step 3 of 4 · Microphone</div>
               <h2>Choose and test your microphone</h2>
-              <p class="lead" id="mic-lead">Good sound matters more than good video. Pick your microphone, then run the 5-second sound test to carry on.</p>
+              <p class="lead" id="mic-lead">Good sound matters more than good video. Pick your microphone, then run the 5-second sound test to carry on. A microphone that picks up no sound can’t be used - a video without your voice is no use.</p>
               <div class="slot" data-ctl="mic"></div>
             </div>
             <div data-step="3" style="--c:var(--green)" hidden>
@@ -585,8 +585,9 @@
       <button class="btn go wide" id="allow-mic">Allow microphone</button>
       <div id="mic-on" hidden>
         <label class="l" for="mic">Microphone</label>
-        <select id="mic" data-tip="The microphone you’ll speak into. A headset or USB mic beats a laptop’s built-in one."></select>
+        <select id="mic" data-tip="The microphone you’ll speak into. It has to pick up sound - with no signal, you can’t record. A headset or USB mic beats a laptop’s built-in one."></select>
         <div class="meter" data-tip="@level"><i id="lvl"></i></div>
+        <div class="msg bad" id="mic-dead" hidden>No sound is coming from this microphone. Pick one that works - recording stays off until I can hear it.</div>
         <div class="msg" id="raw-note">Record the microphone <b>RAW</b>, with no third-party cleaning filters. Pure, lossless signal allows us to enhance your voice in post.</div>
         <button class="btn wide" id="check" style="margin-top:12px" data-tip="Talk for 5 seconds, then hear it played back - just as viewers will.">Test my sound (5 seconds)</button>
         <div class="msg" id="check-out" hidden></div>
@@ -779,11 +780,12 @@
       rec: function () {
         if (S.finishing) return 'Saving your video - this takes a few seconds.';
         if (S.recording) return 'Stop: ends the recording and finishes the file.';
+        if (S.micTrack && !S.micLive) return 'Recording is off: no sound from your microphone. Pick one that works in Setup → Microphone.';
         var miss = !ready(1) ? 'the camera step' : !ready(2) ? 'the microphone step' : !ready(3) ? 'what you’re sharing' : '';
         return miss ? 'Finish the setup first: ' + miss + ' isn’t done yet.' : window.showSaveFilePicker ? 'Record: choose where to save the video, then a 3-2-1. Press again to stop.' : 'Record: a 3-2-1, then you’re on. Press again to stop, and the video downloads.';
       },
       jump: function () { return jumpHow(); },
-      pause: function () { return S.paused ? 'Resume: a 3-2-1, then the recording picks up where it stopped.' : 'Take a break: nothing is recorded while you’re paused. Resuming counts 3-2-1 first.'; },
+      pause: function () { return S.paused && !S.micLive ? 'Resume is off: no sound from your microphone. Pick one that works first.' : S.paused ? 'Resume: a 3-2-1, then the recording picks up where it stopped.' : 'Take a break: nothing is recorded while you’re paused. Resuming counts 3-2-1 first.'; },
       next: function () {   // the guide's Next / Finish setup, greyed out until the step is done
         if (S.step === 0) {   // the first step: why the button is green / orange / red - and that it never stops them
           if (!S.sysVerdict) return 'Still checking this computer - feel free to carry on.';
@@ -795,13 +797,13 @@
         }
         if (!$('nextstep').disabled) return S.step === 3 ? 'All set: this opens the studio, and your choices are remembered for next time.' : 'On to the next step.';
         if (S.step === 1) return S.camWanted ? 'Waiting for your camera - if Chrome asks, click Allow.' : 'Choose “Yes, show me” or “Only my voice” first.';
-        if (S.step === 2) return !S.micTrack ? 'Allow the microphone first.' : 'Run the 5-second sound test first - it’s a must the first time.';
+        if (S.step === 2) return !S.micTrack ? 'Allow the microphone first.' : !S.micLive ? 'No sound from this microphone - pick one that works first.' : 'Run the 5-second sound test first - it’s a must the first time.';
         return !S.mode ? 'Choose a layout first.' : 'Add your slides in .pdf or share a screen first, or choose “Just me”.';
       },
       prev: function () { return !S.pdf ? 'Add your slides in .pdf in Setup to use this.' : S.page <= 1 ? 'You’re on the first slide.' : 'Previous slide. The ← key works too.'; },
       nexts: function () { return !S.pdf ? 'Add your slides in .pdf in Setup to use this.' : S.page >= S.pages ? 'That’s the last slide.' : 'Next slide. The → key, Space and most clickers work too.'; },
       zoom: function () { return S.recording && !S.paused ? 'Zoom is locked while you record - pause to change it.' : 'Zoom in on the face, up to 50 %. Zoomed in, drag the picture to re-centre it; double-click resets it.'; },
-      level: function () { return 'Your mic level: it should jump when you talk. Always at the top? Too loud. Barely moving? Too quiet.'; },
+      level: function () { return S.micTrack && !S.micLive ? 'No signal at all from this microphone - pick another one. You can’t record without your voice.' : 'Your mic level: it should jump when you talk. Always at the top? Too loud. Barely moving? Too quiet.'; },
       badge: function () { return S.paused ? 'Paused - the clock stands still until you resume.' : 'How long you’ve been recording. It stops by itself at 2 hours.'; },
       drop: function () { return S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (File → Export / Download as PDF in PowerPoint, Keynote or Google Slides). Click or drop it here.'; }
     };
@@ -812,7 +814,7 @@
       var base = parseFloat(getComputedStyle(t).fontSize);
       while (t.scrollHeight > t.clientHeight + 1 && f > .72) { f -= .04; t.style.fontSize = (base * f) + 'px'; }
     }
-    function hush() { $('bubble').hidden = true; $('corgi').classList.remove('talk'); nap(); }
+    function hush() { if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); return; } $('bubble').hidden = true; $('corgi').classList.remove('talk'); nap(); }
     // 30 s without a word, it falls asleep; anything it says wakes it (while a bubble is up it stays awake)
     // petting: pointer down on the corgi, then it follows the rubbing; hearts pop as you go
     (function () {
@@ -1030,7 +1032,7 @@
       if (n === 0) return true;   // the intro: read, then on
       // the sound test is a must the first time; a returning speaker may skip it (Marek 2026-10-23)
       if (n === 1) return S.camWanted === false || (S.camWanted === true && !!S.cam[0]);
-      if (n === 2) return !!S.micTrack && (!!S.verdict || store.get('tested') === '1');
+      if (n === 2) return !!S.micTrack && S.micLive && (!!S.verdict || store.get('tested') === '1');
       return S.mode === 'none' || ((S.mode === 'both' || S.mode === 'window') && (!!S.pdf || !!S.screenTrack));
     }
     // the computer, checked (what a page can see): cores, memory, power, disk, a hardware video encoder, the CPU's strain
@@ -1136,6 +1138,7 @@
     all('#studio .row > button').forEach(function (b) {
       b.addEventListener('click', function () {
         var body = b.nextElementSibling, open = body.hidden;
+        if (micDead() && !micRow().nextElementSibling.hidden) { say(MIC_DEAD, 864e5, 'bad'); return; }   // stays open until a mic works
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         all('#studio .row > button i').forEach(function (i) { i.textContent = 'Change'; });
         body.hidden = !open;
@@ -1219,13 +1222,13 @@
           }
           if (micSrc) micSrc.disconnect();
           micSrc = AC.createMediaStreamSource(s); micSrc.connect(AC.chain);
-          AC.resume();
+          AC.resume(); deadFor = 1.3;   // a new microphone: heard within 0.2 s, or it counts as dead
           S.micTrack = dest.stream.getAudioTracks()[0];
           summaries();
         }).catch(micError);
     }
     $('mic').addEventListener('change', function () { store.set('mic.picked', this.value); openMic(); });
-    if (store.get('tested') === '1') $('mic-lead').textContent = 'Good sound matters more than good video. Pick your microphone. You’ve tested before, so the 5-second sound test is optional - but worth it in a new room.';
+    if (store.get('tested') === '1') $('mic-lead').textContent = 'Good sound matters more than good video. Pick your microphone. You’ve tested before, so the 5-second sound test is optional - but worth it in a new room. A microphone that picks up no sound can’t be used.';
 
     // the level meters, and while recording the alarms: silence for 10 s, clipping
     var buf = new Float32Array(2048), silentFor = 0, lastLoud = 0;
@@ -1255,6 +1258,31 @@
       $('lvl').style.width = w; $('vu-cover').style.left = w;
       $('vu-peak').style.left = Math.max(0, Math.min(100, (mPk + 60) / 60 * 100)) + '%';
     })();
+    // no signal, no recording (Marek 2026-10-25: "a video without voice is rubbish"). A working microphone always gives
+    // something - room hiss sits well above -80 dB even with the 60 Hz high-pass; a muted, broken or wrong input gives
+    // digital silence. 1.5 s of it and the mic counts as dead: no Record, no Resume, no Next in the setup, the Microphone
+    // row stays open and the corgi says so, in red, until a microphone with any sound is picked. Recording when it goes
+    // dead (unplugged, Bluetooth gone): paused at once
+    var MIC_DEAD = 'No sound from your microphone! Pick one that works - you can’t record without your voice.', deadFor = 0;
+    S.micLive = false;
+    function micDead() { return !!S.micTrack && !S.micLive; }
+    function micRow() { return $('sum-mic').closest('button'); }
+    function micRowOpen() { var b = micRow(); if (!$('studio').hidden && b.nextElementSibling.hidden) b.click(); }
+    function micLiveShown() {
+      var dead = micDead();
+      $('mic-dead').hidden = !dead; gate();
+      if (dead) {
+        say(MIC_DEAD, 864e5, 'bad');
+        if (S.recording && !S.paused && !S.finishing) $('pause').click();   // paused, so nothing silent is recorded
+        micRowOpen();
+      } else if (say.cur && say.cur.html === MIC_DEAD) hush();
+    }
+    setInterval(function () {
+      if (AC && AC.state !== 'running') return;   // not started yet (no click on the page so far): no reading, no verdict
+      var ok = !!S.micTrack && !!analyser;
+      if (ok) { deadFor = level().peak > 1e-4 ? 0 : deadFor + .1; ok = deadFor < 1.5; }
+      if (ok !== S.micLive) { S.micLive = ok; micLiveShown(); }
+    }, 100);
     setInterval(function () {   // the checks while recording: silence, too loud
       var l = level(), d = db(l.rms);
       if (!S.recording || S.paused) { silentFor = 0; return; }
@@ -1800,6 +1828,7 @@
       if (S.recording) { worker.postMessage({ type: 'stop' }); S.recording = false; S.finishing = true; $('rec').disabled = true; $('pause').hidden = true; return; }
       var name = speaker();
       if (!name) { hello(); return; }
+      if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); if ($('wizard').hidden) micRowOpen(); return; }
       var missing = !ready(1) ? 1 : !ready(2) ? 2 : !ready(3) ? 3 : 0;
       if (missing) {
         toast(['', 'Choose whether to appear on camera first.', 'Set up your microphone first.', 'Choose what you\u2019re sharing first.'][missing]);
@@ -1862,6 +1891,7 @@
         if (S.pauses.length >= 3) say('Please don’t spam Pause / Resume - it can glitch your video.', 9000, 'bad');
         S.paused = true; worker.postMessage({ type: 'pause' }); pauseShown(); return;
       }
+      if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); micRowOpen(); return; }
       // resuming: a 3-2-1 first, like the start (Marek 2026-10-23); still paused until it ends
       var n = 3, el = $('count'), btns = [$('pause'), $('rec')];
       btns.forEach(function (b) { b.disabled = true; }); $('held').hidden = true; el.hidden = false; $('count-n').textContent = n;
@@ -1869,6 +1899,7 @@
         if (--n > 0) { $('count-n').textContent = n; replay($('count-n')); return; }
         clearInterval(t); el.hidden = true; btns.forEach(function (b) { b.disabled = false; });
         if (!S.recording) return;
+        if (micDead()) { pauseShown(); return; }   // went dead during the 3-2-1: still paused
         S.paused = false; worker.postMessage({ type: 'resume' }); pauseShown();
       }, 1000);
     });
