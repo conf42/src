@@ -445,7 +445,6 @@
                 <p>Below is a quick check of this computer. Green is good, yellow is worth a look.</p>
               </div>
               <div class="sys" id="sys"></div>
-              <div class="msg" id="sys-verdict" hidden></div>
             </div>
             <div data-step="1" style="--c:var(--violet)">
               <div class="kicker">Step 2 of 4 · Camera</div>
@@ -724,6 +723,12 @@
       },
       pause: function () { return S.paused ? 'Resume: a 3-2-1, then the recording carries on where it stopped.' : 'A break: nothing is recorded while paused. Resume counts 3-2-1 first.'; },
       next: function () {   // the guide's Next / Finish setup, greyed out until the step is done
+        if (S.step === 0) {   // the first step: why the button is green / orange / red - and that it never stops them
+          if (!S.sysVerdict) return 'Still checking this computer - you can carry on anyway.';
+          var v = VERDICT[S.sysVerdict], ls = (S.sysTips || []).filter(Boolean).sort(function (a, b) { return b.level - a.level; });
+          return S.sysVerdict === 'green' ? v[2] + (ls.length ? ' One small thing: ' + ls[0].text : '')
+            : v[2] + ls.map(function (t) { return t.text.split(/[.:]\s/)[0].replace(/\.$/, ''); }).join('; ') + '. You can still start - fixing these first gives a smoother video.';
+        }
         if (!$('nextstep').disabled) return S.step === 3 ? 'All set: this opens the studio. Your choices are remembered for next time.' : 'On to the next step.';
         if (S.step === 1) return S.camWanted ? 'Waiting for your camera - if Chrome asks, click Allow.' : 'Choose “Yes, show me” or “Only my voice” first.';
         if (S.step === 2) return !S.micTrack ? 'Allow the microphone first.' : 'Run the 5-second sound test first - the first time it’s a must.';
@@ -945,6 +950,7 @@
       $('foot').style.setProperty('--c', st.style.getPropertyValue('--c'));
       $('back').hidden = n === 0;
       $('nextstep').textContent = n === 0 ? 'OK, that works!' : n === 3 ? 'Finish setup' : 'Next';
+      verdict();
       gate(); micTip();
     }
     function ready(n) {
@@ -966,11 +972,11 @@
         rows[i] = '<div class="' + (level === 'wait' ? 'wait' : 'l' + level) + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '><i></i><b>' + name + '</b><span>' + text + '</span></div>';
         $('sys').innerHTML = rows.join('');
         if (level !== 'wait' && ++done === total) {
-          var worst = Math.max.apply(null, $('sys').innerHTML.match(/class="l(\d)/g).map(function (x) { return +x.slice(-1); }));
-          var v = $('sys-verdict'); v.hidden = false; v.className = 'msg ' + (worst ? 'warn' : 'ok');
-          v.innerHTML = worst > 1 ? '<b>It could struggle right now</b> - sort out the orange line above first, then you\u2019re good to start.'
-            : worst ? '<b>Should work</b> - have a look at the yellow line above before a long recording.' : '<b>You\u2019re good to go!</b> This computer has what it takes.';
-          sysTalk();
+          // the verdict lives on the button now (Marek 2026-10-24): green / orange / red, never locked - it keeps the
+          // speaker up to speed; hovering it, space corgi says why
+          var ls = (S.sysTips || []).filter(Boolean), orange = ls.filter(function (t) { return t.level > 1; }).length, yellow = ls.length - orange;
+          S.sysVerdict = orange ? 'red' : yellow > 1 ? 'orange' : 'green';
+          verdict(); sysTalk();
         }
       }
       ['Processor', 'Memory', 'Power', 'Disk space', 'Video encoder', 'Current load'].forEach(function (n, i) { row(i, 'wait', n, 'checking…'); });
@@ -1006,6 +1012,18 @@
         po.observe('cpu', { sampleInterval: 1000 }).catch(function () { row(5, 0, 'Current load', 'no reading'); });
         po.t = setTimeout(function () { po.disconnect(); row(5, 0, 'Current load', 'no reading'); }, 4000);
       } catch (e) { row(5, 0, 'Current load', 'no reading'); } else row(5, 0, 'Current load', 'no reading');
+    }
+    var VERDICT = {
+      green: ['Everything in check, let\u2019s start!', '#12805a', 'This computer has what it takes - go ahead.'],
+      orange: ['Should still work fine - let\u2019s start', '#b8641c', 'A few things to keep an eye on: '],
+      red: ['Better fix the health checks first', '#a83242', 'This could struggle right now: ']
+    };
+    function verdict() {   // the guide's first button, by the check's outcome; other steps keep their own colour
+      var b = $('nextstep'), v = S.step === 0 && S.sysVerdict && VERDICT[S.sysVerdict];
+      b.style.removeProperty('--btn');
+      if (S.step !== 0) return;
+      if (!v) { b.textContent = 'OK, that works!'; return; }
+      b.textContent = v[0]; b.style.setProperty('--btn', v[1]);
     }
     // space corgi talks through every yellow / orange line, one after another (orange first), while the intro is on screen
     function sysTalk() {
@@ -1099,7 +1117,7 @@
       var id = $('mic').value;
       if (S.micStream) S.micStream.getTracks().forEach(function (t) { t.stop(); });
       S.micBuiltin = /built-?in|macbook|internal|default.*array|realtek|integrated|laptop/i.test(label($('mic'))) ? id : ''; micTip();
-      S.verdict = ''; $('check-out').hidden = true; $('check').textContent = 'Test my sound (5 seconds)';
+      S.verdict = ''; $('check-out').hidden = true; $('check').textContent = 'Test my sound (5 seconds)'; checkLook();
       // the sound as clean as the microphone gives it (Marek 2026-10-22: the most important bit, don't squash it): no auto
       // gain, no echo cancellation, no noise suppression, no compressor - only a 60 Hz high-pass for desk thumps and
       // rumble. Descript's Studio Sound and the factory's loudness pass do the rest, from untouched audio
@@ -1157,6 +1175,13 @@
       a.play().catch(function () {});
     }
     $('ctl-mic').addEventListener('click', function (e) { if (e.target.id === 'replay' && S.testUrl) { playTest(); e.target.blur(); } });
+    // the sound test button: green while it's a must (the first time), the usual colour on later runs (Marek 2026-10-24)
+    function checkLook() {
+      var must = store.get('tested') !== '1' && !S.verdict, b = $('check');
+      b.classList.toggle('go', must);
+      if (must) { b.style.setProperty('--btn', 'var(--green-btn)'); b.style.setProperty('--btn-text', '#fff'); }
+      else { b.style.removeProperty('--btn'); b.style.removeProperty('--btn-text'); }
+    }
     $('check').addEventListener('click', function () {
       if (!dest) return;
       var btn = this, out = $('check-out'), lv = [], peak = 0, left = 5;
@@ -1185,7 +1210,7 @@
               : sp < -32 ? 'A little quiet - move closer to the microphone.'
               : 'Some background noise - a quieter room, or closed windows, would make it better.';
           } else { head = 'Audio clear, let’s record!'; cls = 'ok'; S.verdict = 'audio clear'; }
-          store.set('tested', '1');
+          store.set('tested', '1'); checkLook();
           out.className = 'msg ' + cls;
           out.innerHTML = '<b>' + head + '</b> <span style="color:var(--muted)" id="check-pl">· playing it back now</span>' +
             '<button class="ghost" id="replay" style="display:block;margin-top:8px;padding:6px 10px;font-size:.8rem" data-tip="Hear the 5 seconds again, as viewers will.">▶ Play back the test again</button>';
