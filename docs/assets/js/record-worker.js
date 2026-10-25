@@ -65,13 +65,16 @@ function tint(hex, w) {   // the conference colour, w of the way to white
   var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex) || [0, '88', '99', 'bb'];
   return 'rgb(' + [1, 2, 3].map(function (i) { var v = parseInt(m[i], 16); return Math.round(v + (255 - v) * w); }).join(',') + ')';
 }
-function empty(r) {
+function checkers() {
   if (!checker || checkerBg !== bg) {   // tinted with the conference's colour (Marek 2026-10-23)
     var c = new OffscreenCanvas(80, 80), g = c.getContext('2d');
     g.fillStyle = tint(bg, .82); g.fillRect(0, 0, 80, 80); g.fillStyle = tint(bg, .68); g.fillRect(0, 0, 40, 40); g.fillRect(40, 40, 40, 40);
     checker = x.createPattern(c, 'repeat'); checkerBg = bg;
   }
-  x.fillStyle = checker; x.fillRect(r[0], r[1], r[2], r[3]);
+  return checker;
+}
+function empty(r) {
+  x.fillStyle = checkers(); x.fillRect(r[0], r[1], r[2], r[3]);
   // what's missing, by the side picked (Marek 2026-10-24)
   var t = source === 'screen' ? 'Your shared screen will appear here' : source === 'none' ? (noCam ? 'Allow camera in step 2 to see yourself here' : 'Your camera will appear here') : 'Your slides will appear here', fs = Math.round(r[2] / 30);
   x.font = '700 ' + fs + 'px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -93,7 +96,10 @@ function draw() {
   x.restore();
   geo.cams.forEach(function (g, i) {
     var c = cams[i].frame, d = 2 * g[2] + 6;
-    if (!c) return;
+    if (!c) {   // no camera picture yet (first visit, still opening): the same grid as the empty window, in the preview only
+      if (!rec) { x.save(); x.beginPath(); x.arc(g[0], g[1], d / 2, 0, 2 * Math.PI); x.clip(); x.fillStyle = checkers(); x.fillRect(g[0] - d / 2, g[1] - d / 2, d, d); x.restore(); }
+      return;
+    }
     // clipped to the circle: the square around it reaches into the slides' window in co-talk (Marek 2026-10-23)
     x.save(); x.beginPath(); x.arc(g[0], g[1], d / 2, 0, 2 * Math.PI); x.clip();
     cover(c, c.displayWidth, c.displayHeight, g[0] - d / 2, g[1] - d / 2, d, d, true, cams[i].zoom, cams[i].pan);
