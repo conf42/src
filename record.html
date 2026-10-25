@@ -296,6 +296,11 @@
     .dot .hist u { flex: none; width: 4px; height: 4px; border-radius: 50%; background: rgba(146,181,242,.12); }
     .dot .hist u.l0 { background: #4fd1a1; } .dot .hist u.l1 { background: #f5d547; } .dot .hist u.l2 { background: #ff9a3c; } .dot .hist u.l3 { background: #ff4f61; }
     .dot.l3 > i { animation: glow 1s ease-in-out infinite alternate; }
+    /* the first 30 s (Marek 2026-10-25): every laptop stumbles while the encoder warms up, so no readings yet -
+       "Launching", then the systems come up one by one */
+    .hud.go h3 b { color: #8fb4ff; animation: blink 1.2s ease-in-out infinite; }
+    .dials.launch .dot { display: none; }
+    .dials.reveal .dot { animation: rise .45s cubic-bezier(.3,.7,.2,1) both; animation-delay: calc(var(--i) * .4s); }
     @media (max-height: 900px) { .dot em { display: none; } .dot > i { grid-row: 1; margin-top: 0; align-self: center; } .hud { padding: 10px 12px 8px; } }
     @keyframes glow { from { filter: none; } to { filter: drop-shadow(0 0 8px #ff4f61) brightness(1.15); } }
     /* big choice cards (camera yes/no, what fills the window) */
@@ -730,6 +735,7 @@
       if (kind === 'tip') return;   // stays while the pointer is on the thing
       ms = ms || Math.max(6000, n * 75); say.cur.until = Date.now() + ms; say.t = setTimeout(hush, ms);
     }
+    [].forEach.call(document.querySelectorAll('#studio .row'), function (r) { r.dataset.tip = '@locked'; });
     // hover tips (Marek 2026-10-23): the corgi explains the less obvious controls, after a short rest of the pointer
     var tipAt = null, tipT, tipXY = null, tipRaf = 0;
     document.addEventListener('mousemove', function (e) { tipXY = [e.clientX, e.clientY]; if (!tipRaf) tipRaf = requestAnimationFrame(tipCheck); }, { passive: true });
@@ -749,6 +755,8 @@
     }
     // the tips that depend on the moment: why a button is greyed out, what it does right now
     var TIPS = {
+      // the setup rows greyed out while recording (Marek 2026-10-25): their buttons ignore the pointer, so the row answers
+      locked: function () { return document.body.classList.contains('locked') ? 'Can’t change settings while the recording is running.' : ''; },
       src: function (el) {   // a greyed-out side of Slides / Screen / Me: what's missing, and where it's set up (Marek 2026-10-23)
         var k = el.dataset.src, guide = !$('wizard').hidden;
         return k === 'slides' ? 'No slides provided: ' + (guide ? 'finish the setup to add your slides.' : 'add them in Setup → Sharing stuff.')
@@ -1450,10 +1458,10 @@
       ['cpu', 'CPU', 'How strained the whole computer is, every app included. While your frames stay at 60, the video is fine.'],
       ['mem', 'Memory', 'The memory this tab uses. It should stay roughly level during a long recording.'],
       ['disk', 'Disk', 'Free disk space, as recording time left (the video plus its backup copy in the browser).'],
-      ['enc', 'Encoder', 'Frames waiting for the video encoder. It should stay near zero.'],
+      ['enc', 'Encoder', 'The video encoder turning frames into your file. In check means it keeps up easily.'],
       ['io', 'Writing', 'Video waiting to be written to your file. It should stay near zero.']];
     $('dials').innerHTML = DIALS.map(function (d) {
-      return '<div class="dot" id="d-' + d[0] + '" data-tip="' + d[2] + '"><i></i><b>' + d[1] + '<small>…</small></b><div class="hist">' + new Array(31).join('<u></u>') + '</div><span>-</span><em>…</em></div>';
+      return '<div class="dot" id="d-' + d[0] + '" style="--i:' + DIALS.indexOf(d) + '" data-tip="' + d[2] + '"><i></i><b>' + d[1] + '<small>…</small></b><div class="hist">' + new Array(31).join('<u></u>') + '</div><span>-</span><em>…</em></div>';
     }).join('');
     var H = null;
     function dial(k, level, value, word, detail) {   // level 0 green, 1 yellow, 2 orange, 3 red, 'na' no reading
@@ -1470,6 +1478,7 @@
         H.po = new PressureObserver(function (rs) { H.cpu = rs[rs.length - 1].state; });
         H.po.observe('cpu', { sampleInterval: 2000 }).catch(function () {});
       } catch (e) {}
+      $('hud').className = 'hud go'; $('hud-all').textContent = 'Launching…'; $('dials').className = 'dials launch';
       $('hud').hidden = false; hudDisk(); H.diskT = setInterval(hudDisk, 10000);
     }
     function hudStop() { if (!H) return; if (H.po) try { H.po.disconnect(); } catch (e) {} clearInterval(H.diskT); H = null; $('hud').hidden = true; }
@@ -1478,12 +1487,13 @@
       if (!H) return;
       var t = performance.now(), dt = (t - H.t) / 1000;
       if (dt < 1) return;   // once a second
+      var launching = m.us < 30e6;
       if (!S.paused) {
         H.fps = Math.min(60, (m.frames - H.frames) / dt);
         // a laptop that can't keep up (Marek 2026-10-23: ThinkPads and the like): under 50 fps, or the CPU at Chrome's
         // top pressure level ("critical" - the nearest to 85 %+), for a minute straight -> saver mode for the rest of the
         // recording: still a 60 fps file at full resolution and sharpness, every other frame drawn. One way only
-        if (H.target === 60) {
+        if (H.target === 60 && !launching) {
           H.slow = H.fps < 50 ? H.slow + dt : 0; H.hot = H.cpu === 'critical' ? H.hot + dt : 0;
           if (H.slow >= 60 || H.hot >= 60) {
             H.target = 30; H.drops = []; worker.postMessage({ type: 'saver' });
@@ -1495,6 +1505,8 @@
       }
       H.t = t; H.frames = m.frames; H.dropped = m.dropped; H.bytes = m.bytes;
       H.drops = H.drops.filter(function (d) { return t - d[0] < 10000; });
+      if (launching) { H.drops = []; return; }   // warm-up drops never count
+      if ($('dials').className !== 'dials reveal') $('dials').className = 'dials reveal';
       var drop10 = H.drops.reduce(function (a, d) { return a + d[1]; }, 0), st = [];
       function lv(x, a, b, c) { return x >= c ? 3 : x >= b ? 2 : x >= a ? 1 : 0; }
       var fmt = function (b) { return b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : Math.round(b / 1e6) + ' MB'; };
@@ -1516,8 +1528,9 @@
         st.push(dial('disk', hrs < .25 ? 3 : hrs < .5 ? 2 : 0, fmt(free) + ' free', hrs < .25 ? 'Almost full' : hrs < .5 ? Math.round(hrs * 60) + ' min left' : 'In check',
           (hrs < 10 ? Math.round(hrs * 60) + ' min' : Math.round(hrs) + ' h') + ' left · ' + fmt(m.bytes) + ' so far (+ backup copy)'));
       } else st.push(dial('disk', 'na', '–', 'No reading', ''));
-      st.push(dial('enc', lv(m.queue, 3, 5, 7), m.queue + ' waiting', m.queue > 6 ? 'Backed up' : m.queue > 2 ? 'Busy' : 'In check',
-        (H.codec ? (H.hw ? 'hardware' : 'software') + ' H.264 · ' : '') + '1920×1080 · 60 fps · ' + (H.rate * 8 / 1e6).toFixed(1) + ' Mbit/s'));
+      // the reading is the video's bitrate, not the queue (Marek 2026-10-25: "1 waiting" sounded like something stuck)
+      st.push(dial('enc', lv(m.queue, 3, 5, 7), (m.us ? m.bytes * 8 / m.us : 0).toFixed(1) + ' Mbit/s', m.queue > 6 ? 'Backed up' : m.queue > 2 ? 'Busy' : 'In check',
+        (H.codec ? (H.hw ? 'hardware' : 'software') + ' H.264 · ' : '') + '1920×1080 · 60 fps' + (m.queue > 2 ? ' · ' + m.queue + ' frames queued' : '')));
       var mb = m.backlog / 1048576;
       st.push(dial('io', lv(mb, 8, 32, 64), (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' MB waiting', mb > 64 ? 'Falling behind' : mb > 8 ? 'Busy' : 'In check',
         fmt(m.bytes - m.backlog) + ' written to ' + (S.file || 'your file')));
