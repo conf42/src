@@ -65,7 +65,8 @@ function empty(r) {
     checker = x.createPattern(c, 'repeat'); checkerBg = bg;
   }
   x.fillStyle = checker; x.fillRect(r[0], r[1], r[2], r[3]);
-  var t = 'Your slides and/or shared screen will appear here', fs = Math.round(r[2] / 30);
+  // what's missing, by the side picked (Marek 2026-10-24)
+  var t = source === 'screen' ? 'Your shared screen will appear here' : source === 'none' ? 'Your camera will appear here' : 'Your slides will appear here', fs = Math.round(r[2] / 30);
   x.font = '700 ' + fs + 'px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   var tw = x.measureText(t).width + fs * 1.6, th = fs * 2.2, cx = r[0] + r[2] / 2, cy = r[1] + r[3] / 2;
   x.fillStyle = 'rgba(15,23,51,.82)'; x.beginPath(); x.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2); x.fill();
