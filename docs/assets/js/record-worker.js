@@ -22,6 +22,9 @@ var frameNo = 0, previewEvery = 2, dx = null, visible = true;
 // a new camera or screen picture repaints just its own box, anything else (layout, overlay, slide, source) the whole
 // frame. A frame with nothing new isn't drawn at all - the encoder gets the same canvas again
 var dirty = true, wasRec = false, pvStale = true, wasHeld = false, dim = false;
+// the preview gets only what changed too (Marek 2026-10-24, "run on a potato"): the boxes painted since its last copy -
+// a camera frame is its circle, ~6 % of the picture - unless the whole frame changed, it was resized, shown again or blurred
+var pvFull = true, pvBoxes = [];
 // a frame with nothing new isn't copied again either (Marek 2026-10-24: "deck-only could be 15 fps"): the encoder gets the
 // last picture once more, stamped for its slot - the file stays a true 60 fps, and any change (a slide, the camera, a
 // shared screen) is in the very next frame. A still deck costs one copy per change, a 30 fps camera every other frame
@@ -98,19 +101,20 @@ function draw() {
   });
   if (overlay) x.drawImage(overlay, 0, 0);
 }
-function paint(b) {   // the whole frame, within box b only (a rectangle clip: the GPU touches just those pixels)
+function paint(b) {
+  if (pvBoxes.length > 24) { pvBoxes = []; pvFull = true; }   // a long time without a preview copy: the next one is a full one   // the whole frame, within box b only (a rectangle clip: the GPU touches just those pixels)
   x.save(); x.beginPath(); x.rect(b[0], b[1], b[2], b[3]); x.clip(); draw(); x.restore();
 }
 function box(l, t, w, h) { var a = Math.floor(l) - 2, b = Math.floor(t) - 2; return [a, b, Math.ceil(l + w) + 2 - a, Math.ceil(t + h) + 2 - b]; }
 function render() {
-  if (dirty || !geo) { draw(); dirty = false; pvStale = cvChanged = true; }
+  if (dirty || !geo) { draw(); dirty = false; pvStale = cvChanged = pvFull = true; }
   else {
     var r = geo.rect;
-    if ((source === 'screen' && scr.fresh) || (source === 'none' && cams[0].fresh)) { paint(box(r[0], r[1], r[2], r[3])); pvStale = cvChanged = true; }
+    if ((source === 'screen' && scr.fresh) || (source === 'none' && cams[0].fresh)) { var b0 = box(r[0], r[1], r[2], r[3]); paint(b0); pvBoxes.push(b0); pvStale = cvChanged = true; }
     geo.cams.forEach(function (g, i) {
       if (!cams[i].fresh) return;
       var d = 2 * g[2] + 6;
-      paint(box(g[0] - d / 2, g[1] - d / 2, d, d)); pvStale = cvChanged = true;
+      var b1 = box(g[0] - d / 2, g[1] - d / 2, d, d); paint(b1); pvBoxes.push(b1); pvStale = cvChanged = true;
     });
   }
   scr.fresh = cams[0].fresh = cams[1].fresh = false;
@@ -212,13 +216,18 @@ function tick() {
   // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
   // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
   // not drawn while the page is hidden (a demo in another window) or when nothing changed since the last one
-  if (soft !== wasHeld) { wasHeld = soft; pvStale = true; }
+  if (soft !== wasHeld) { wasHeld = soft; pvStale = pvFull = true; }
   if (showing && pvStale) {
     pvStale = false;
     var pw = dx.canvas.width, ph = dx.canvas.height, o = soft ? 24 : 0;   // blurred: drawn a little larger, or its edges fade
     dx.filter = soft ? 'blur(10px)' : 'none';
     dx.imageSmoothingQuality = pw < W ? 'high' : 'low';   // shrunk (a small or non-Retina screen): the slides' text stays clean
-    dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
+    if (soft || pvFull || !pvBoxes.length) dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
+    else pvBoxes.forEach(function (b) {   // each changed box, 8 px wider all round so its resampled edge lands on unchanged picture
+      var k = pw / W, x0 = Math.max(0, b[0] - 8), y0 = Math.max(0, b[1] - 8), x1 = Math.min(W, b[0] + b[2] + 8), y1 = Math.min(H, b[1] + b[3] + 8);
+      dx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k);
+    });
+    pvFull = false; pvBoxes = [];
     if (soft) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,' + (dim ? .5 : .3) + ')'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
   if (frameNo % FPS === 0 && !rec) brightness();
@@ -274,7 +283,7 @@ function write(data, pos) {
       .catch(function (e) { if (!rec.deskErr) { rec.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: rec.deskErr }); } });
   }
   if (rec.split) split(rec.split, data);
-  if (rec.handle && !rec.deskErr && Date.now() - rec.commitAt > Math.max(60000, rec.bytes / 15e6 * 1000)) commit(rec);
+  if (rec.handle && !rec.deskErr && Date.now() - rec.commitAt > Math.max(60000, rec.bytes / 15e6 * 1000, (rec.commitMs || 0) * 20)) commit(rec);
 }
 // the file on the speaker's disk, made real every minute (Marek 2026-10-24, after the Desktop-folder dead end): Chrome
 // only puts a file in place when it's closed, so it's closed and reopened (keeping what's there) - a dead laptop or a
@@ -282,9 +291,10 @@ function write(data, pos) {
 // file it's done less often (every size / 15 MB/s seconds: 1 GB -> about a minute)
 function commit(r) {
   r.commitAt = Date.now();
-  r.deskChain = r.deskChain.then(function () { return r.desk.close(); })
+  var t0;
+  r.deskChain = r.deskChain.then(function () { t0 = performance.now(); return r.desk.close(); })
     .then(function () { return r.handle.createWritable({ keepExistingData: true }); })
-    .then(function (w) { r.desk = w; r.commits = (r.commits || 0) + 1; })
+    .then(function (w) { r.desk = w; r.commits = (r.commits || 0) + 1; r.commitMs = performance.now() - t0; })   // a slow disk: saves spaced out (20x their time)
     .catch(function (e) { if (!r.deskErr) { r.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: r.deskErr }); } });
 }
 
@@ -461,11 +471,11 @@ self.onmessage = function (e) {
   // is a side output that never holds up the recording)
   if (m.type === 'display') dx = m.canvas.getContext('2d', { alpha: false, desynchronized: true });
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
-  else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvStale = true; } }
+  else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvFull = true; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
   // saver mode for the rest of the recording (new pictures 30 times a second, the file still 60 fps), from a keyframe
   else if (m.type === 'saver' && rec) { rec.half = true; rec.lastKey = -KEY_EVERY; }
-  else if (m.type === 'visible') { visible = m.on; pvStale = true; }
+  else if (m.type === 'visible') { visible = m.on; pvStale = pvFull = true; }
   else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; dirty = true; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; dirty = true; }
   else if (m.type === 'slide') { if (slide) slide.close(); slide = m.bitmap; dirty = true; }
