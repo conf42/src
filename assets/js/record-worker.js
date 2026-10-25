@@ -236,6 +236,64 @@ function write(data, pos) {
       .then(function () { r.backlog -= copy.byteLength; }, function (e) { r.backlog -= copy.byteLength; throw e; })
       .catch(function (e) { if (!rec.deskErr) { rec.deskErr = e.message || String(e); post({ type: 'warn', what: 'disk', message: rec.deskErr }); } });
   }
+  if (rec.split) split(rec.split, data);
+}
+
+// ── the safety copy in the speaker's folder (Marek 2026-10-24, like OBS's fragmented MP4): Chrome only puts the main file
+// in place when it's closed at Stop, so a dead laptop or a closed tab would leave nothing in the folder. Next to it, a
+// "<Name> - safety copy" folder gets a part every minute, each one closed (= on disk for good) and playable on its own:
+// the MP4's header (ftyp + moov) and then that minute's fragments (moof + mdat). The stream is fragmented MP4 written
+// front to back, so its top-level boxes are read as they go past. A clean Stop deletes the folder
+var PART_MS = 60000;
+var README = 'If your recording was interrupted, this folder holds it in 1-minute parts - each one plays on its own.\n' +
+  'Send all of them to the Conf42 team, or open the speaker studio again in the same browser: it offers the full recording back.\n' +
+  'If the main folder also has a file ending in .crswap (left by Chrome after a crash), rename it to .mp4: it may hold the whole recording.\n' +
+  'When a recording ends normally (Stop), this folder is deleted by itself.\n';
+function split(s, data) {
+  var i = 0;
+  while (i < data.length) {
+    if (s.left === 0) {   // a box header, possibly across two chunks
+      var take = Math.min(8 - s.hdrN, data.length - i);
+      s.hdr.set(data.subarray(i, i + take), s.hdrN); s.hdrN += take; i += take;
+      if (s.hdrN < 8) break;
+      s.hdrN = 0;
+      var size = new DataView(s.hdr.buffer).getUint32(0), type = String.fromCharCode(s.hdr[4], s.hdr[5], s.hdr[6], s.hdr[7]);
+      s.left = size - 8;
+      if (type === 'moof') { s.header = false; if (!s.part || Date.now() - s.partAt >= PART_MS) nextPart(s); }
+      if (type === 'mfra') s.done = true;   // the closing index: the main file's, not the parts'
+      emit(s, s.hdr.slice());
+    } else {
+      var n = Math.min(s.left, data.length - i);
+      emit(s, data.slice(i, i + n)); s.left -= n; i += n;
+    }
+  }
+}
+function emit(s, bytes) {
+  if (s.done) return;
+  if (s.header) { s.init.push(bytes); return; }
+  s.chain = s.chain.then(function () { return s.part && s.part.write(bytes); }).catch(function () {});
+}
+function nextPart(s) {
+  var old = s.part, name = 'part ' + String(++s.n).padStart(3, '0') + '.mp4';
+  s.partAt = Date.now();
+  s.chain = s.chain.then(function () { return old && old.close(); })   // the minute just finished is now on disk for good
+    .then(function () { return s.dir.getFileHandle(name, { create: true }); })
+    .then(function (h) { return h.createWritable(); })
+    .then(function (w) { s.part = w; return s.init.reduce(function (p, b) { return p.then(function () { return w.write(b); }); }, Promise.resolve()); })
+    .catch(function () {});
+  s.part = s.part || true;   // (a placeholder until the file is open: the next moof doesn't start another part)
+}
+function finishParts(s, keep, folder, name) {
+  if (!s) return Promise.resolve();
+  return s.chain.then(function () { return s.part && s.part.close && s.part.close(); }).catch(function () {})
+    .then(function () { return keep ? null : folder.removeEntry(name, { recursive: true }); }).catch(function () {});
+}
+function freeName(folder, base) {   // never over an earlier recording: "Name.mp4", "Name (2).mp4"...
+  var n = 1;
+  return (function next() {
+    var f = base + (n > 1 ? ' (' + n + ')' : '');
+    return folder.getFileHandle(f + '.mp4').then(function () { n++; return next(); }, function () { return f; });
+  })();
 }
 function meta(extra) {
   if (!rec.metaH) return;
@@ -266,7 +324,18 @@ function start(m) {
     return Promise.all([dir.getFileHandle(OPFS_MP4, { create: true }), dir.getFileHandle(OPFS_META, { create: true })]);
   }).then(function (h) { return Promise.all([h[0].createSyncAccessHandle(), h[1].createSyncAccessHandle()]); })
     .then(function (s) { r.sync = s[0]; r.sync.truncate(0); r.metaH = s[1]; }, function (e) { post({ type: 'warn', what: 'opfs', message: e.message }); });
-  var desk = m.handle ? m.handle.createWritable().then(function (w) { r.desk = w; }, function (e) { r.deskErr = e.message; post({ type: 'warn', what: 'disk', message: e.message }); }) : Promise.resolve();
+  var deskErr = function (e) { r.deskErr = e.message; post({ type: 'warn', what: 'disk', message: e.message }); };
+  var desk = m.folder ? freeName(m.folder, m.name).then(function (base) {   // a folder: the file + its safety copy
+    r.folder = m.folder; r.fileName = base + '.mp4'; r.partsName = base + ' - safety copy';
+    return Promise.all([m.folder.getFileHandle(r.fileName, { create: true }).then(function (h) { return h.createWritable(); }),
+                        m.folder.getDirectoryHandle(r.partsName, { create: true })]);
+  }).then(function (x) {
+    r.desk = x[0];
+    r.split = { dir: x[1], init: [], header: true, hdr: new Uint8Array(8), hdrN: 0, left: 0, n: 0, part: null, partAt: 0, chain: Promise.resolve(), done: false };
+    return x[1].getFileHandle('READ ME.txt', { create: true }).then(function (h) { return h.createWritable(); })
+      .then(function (w) { return w.write(README).then(function () { return w.close(); }); }).catch(function () {});
+  }, deskErr)
+    : m.handle ? m.handle.createWritable().then(function (w) { r.desk = w; }, deskErr) : Promise.resolve();
   Promise.all([opfs, desk, pickVideo(m.vbitrate)]).then(function (res) {
     var vcfg = res[2];
     if (!vcfg) throw new Error('This browser cannot encode H.264 video.');
@@ -322,11 +391,14 @@ function stop(why) {
     .then(function () {
       var onDisk = !!r.desk && !r.deskErr;
       meta({ finished: true, seconds: Math.round(seconds), onDisk: onDisk });
+      return finishParts(r.split, !onDisk, r.folder, r.partsName).then(function () { return onDisk; });
+    })
+    .then(function (onDisk) {
       try { if (r.sync) { r.sync.flush(); r.sync.close(); } } catch (e) {}
       try { if (r.metaH) r.metaH.close(); } catch (e) {}
       var clean = onDisk && r.dir ? Promise.all([r.dir.removeEntry(OPFS_MP4), r.dir.removeEntry(OPFS_META)]).catch(function () {}) : Promise.resolve();
       return clean.then(function () {
-        post({ type: 'done', why: why || 'stop', seconds: seconds, bytes: r.bytes, onDisk: onDisk, diskError: r.deskErr || '',
+        post({ type: 'done', why: why || 'stop', seconds: seconds, bytes: r.bytes, onDisk: onDisk, diskError: r.deskErr || '', file: r.fileName || '', partsKept: !onDisk && !!r.split ? r.partsName : '',
                inBrowser: !onDisk && !!r.sync && !r.syncErr, dropped: r.dropped, frames: r.frames, video: r.vcodec, audio: r.acodec });
       });
     })
