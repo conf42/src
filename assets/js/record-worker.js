@@ -28,7 +28,7 @@ var pvFull = true, pvBoxes = [];
 // a frame with nothing new isn't copied again either (Marek 2026-10-24: "deck-only could be 15 fps"): the encoder gets the
 // last picture once more, stamped for its slot - the file stays a true 60 fps, and any change (a slide, the camera, a
 // shared screen) is in the very next frame. A still deck costs one copy per change, a 30 fps camera every other frame
-var cvChanged = true;
+var cvChanged = true, noCam = false;   // "Only my voice" picked: the empty Me side says where to turn the camera on
 var rec = null;
 
 function post(m, t) { self.postMessage(m, t || []); }
@@ -73,7 +73,7 @@ function empty(r) {
   }
   x.fillStyle = checker; x.fillRect(r[0], r[1], r[2], r[3]);
   // what's missing, by the side picked (Marek 2026-10-24)
-  var t = source === 'screen' ? 'Your shared screen will appear here' : source === 'none' ? 'Your camera will appear here' : 'Your slides will appear here', fs = Math.round(r[2] / 30);
+  var t = source === 'screen' ? 'Your shared screen will appear here' : source === 'none' ? (noCam ? 'Allow camera in step 2 to see yourself here' : 'Your camera will appear here') : 'Your slides will appear here', fs = Math.round(r[2] / 30);
   x.font = '700 ' + fs + 'px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   var tw = x.measureText(t).width + fs * 1.6, th = fs * 2.2, cx = r[0] + r[2] / 2, cy = r[1] + r[3] / 2;
   x.fillStyle = 'rgba(15,23,51,.82)'; x.beginPath(); x.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2); x.fill();
@@ -473,6 +473,7 @@ self.onmessage = function (e) {
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvFull = true; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
+  else if (m.type === 'nocam') { if (noCam !== m.on) dirty = true; noCam = m.on; }
   // saver mode for the rest of the recording (new pictures 30 times a second, the file still 60 fps), from a keyframe
   else if (m.type === 'saver' && rec) { rec.half = true; rec.lastKey = -KEY_EVERY; }
   else if (m.type === 'visible') { visible = m.on; pvStale = pvFull = true; }
