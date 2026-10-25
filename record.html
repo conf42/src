@@ -136,9 +136,9 @@
     .vuwrap svg { flex: none; width: 20px; height: 20px; fill: var(--muted); }
     .vuwrap svg .w { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
     .vu { flex: 1; position: relative; height: 10px; border-radius: 5px; overflow: hidden; background: linear-gradient(90deg, #4fd1a1 0 70%, #ffb547 70% 90%, #ff5e7e 90%); }
-    .vu b { position: absolute; top: 0; bottom: 0; right: 0; left: 0; background: rgba(10,14,34,.86); transition: left .08s linear; }
-    .vu u { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; left: 0; background: #fff; opacity: .9; transition: left .1s linear; }
-    .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green) 0 70%, var(--amber) 70% 90%, var(--pink) 90%); transition: width .06s; }
+    .vu b { position: absolute; top: 0; bottom: 0; right: 0; left: 0; background: rgba(10,14,34,.86); }
+    .vu u { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; left: 0; background: #fff; opacity: .9; }
+    .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green) 0 70%, var(--amber) 70% 90%, var(--pink) 90%); }
     .rec { position: relative; font: inherit; font-weight: 800; font-size: 1.05rem; color: #fff; border: 0; cursor: pointer; border-radius: 999px;
       height: 52px; padding: 0 26px 0 52px; background: linear-gradient(135deg, var(--pink), #ff3b4e); box-shadow: 0 8px 28px rgba(255,59,78,.45); white-space: nowrap; }
     .rec::before { content: ''; position: absolute; left: 20px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border-radius: 50%; background: #fff; }
@@ -1152,13 +1152,25 @@
       return { rms: Math.sqrt(s / buf.length), peak: p };
     }
     function db(v) { return 20 * Math.log10(Math.max(v, 1e-6)); }
-    setInterval(function () {
-      var l = level(), d = db(l.rms), w = Math.max(0, Math.min(100, (d + 60) / 60 * 100)) + '%';
+    // the meters, snappy like OBS (Marek 2026-10-24: people tap their laptop to see it's working): every screen frame, the
+    // last ~16 ms of sound only (a tap is a few ms), shown at once and falling back ~20 dB a second; the white peak mark
+    // is held 1 s. (It was 10 times a second, averaged over 43 ms, with an animated bar - easily 150 ms behind)
+    var mBuf = new Float32Array(2048), mShown = -90, mT = 0, mPk = -90, mPkAt = 0;
+    (function meter(t) {
+      requestAnimationFrame(meter);
+      if (!analyser) return;
+      analyser.getFloatTimeDomainData(mBuf);
+      var s2 = 0, p = 0;
+      for (var i = 2048 - 768; i < 2048; i++) { var v = Math.abs(mBuf[i]); s2 += v * v; if (v > p) p = v; }
+      var d = db(Math.sqrt(s2 / 768)), pk = db(p), dt = mT ? Math.min(.1, (t - mT) / 1000) : 0; mT = t;
+      mShown = d > mShown ? d : Math.max(d, mShown - 20 * dt);
+      if (pk >= mPk || t - mPkAt > 1000) { if (pk >= mPk) { mPk = pk; mPkAt = t; } else mPk = Math.max(pk, mPk - 15 * dt); }
+      var w = Math.max(0, Math.min(100, (mShown + 60) / 60 * 100)) + '%';
       $('lvl').style.width = w; $('vu-cover').style.left = w;
-      // the peak: held 1 s, then falling back 1.5 dB a tick
-      var pk = db(l.peak), t = Date.now();
-      if (pk >= (S.pk || -99) || t - (S.pkAt || 0) > 1000) { if (pk >= (S.pk || -99)) { S.pk = pk; S.pkAt = t; } else S.pk = Math.max(pk, S.pk - 1.5); }
-      $('vu-peak').style.left = Math.max(0, Math.min(100, (S.pk + 60) / 60 * 100)) + '%';
+      $('vu-peak').style.left = Math.max(0, Math.min(100, (mPk + 60) / 60 * 100)) + '%';
+    })();
+    setInterval(function () {   // the checks while recording: silence, too loud
+      var l = level(), d = db(l.rms);
       if (!S.recording || S.paused) { silentFor = 0; return; }
       silentFor = d < -55 ? silentFor + .1 : 0;
       if (silentFor > 10 && silentFor < 10.15) toast('We can’t hear you - is the microphone muted or unplugged?', 6000, 'bad');
