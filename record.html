@@ -1435,13 +1435,17 @@
       closeCam(slot); S.same = 0; sameShown();
       if (!id || (slot && !S.duo)) { relayout(); return Promise.resolve(); }
       var seq = S.openSeq[slot] = (S.openSeq[slot] || 0) + 1;
-      return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } })
+      // the capture size is set here, once (Marek 2026-10-25): changing it on each Slides/Screen <-> Me switch made webcams
+      // blink, as most restart the sensor for a new size. The main camera 1080p (it can fill the window), the co-talk
+      // camera 720p (it's only ever the circle, 324 px)
+      var hi = slot ? 720 : 1080;
+      return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: hi * 16 / 9 }, height: { ideal: hi }, frameRate: { ideal: 30 } } })
         .then(function (s) {
           var t = s.getVideoTracks()[0];
           // overtaken (another camera picked, Voice only, a 2nd click): this one isn't wanted any more
           if (seq !== S.openSeq[slot] || !S.camWanted || (slot && !S.duo)) { t.stop(); return; }
           if (S.cam[slot]) S.cam[slot].stop();
-          S.cam[slot] = t; camRes();
+          S.cam[slot] = t;
           var r = new MediaStreamTrackProcessor({ track: t }).readable;
           worker.postMessage({ type: 'cam', slot: slot, readable: r }, [r]);
           relayout();
@@ -1679,19 +1683,8 @@
     }
     window.addEventListener('resize', knob);
     if (document.fonts) document.fonts.ready.then(knob);
-    // the camera's capture size by its job (Marek 2026-10-24): 720p is plenty for the circle (324 px, still twice over at
-    // 50 % zoom) and much lighter for cheap webcams; 1080p when it fills the window (Me / Just me). The newest frame stays on
-    // screen while the camera switches, so at worst the face holds still for a moment
-    function camRes() {
-      [0, 1].forEach(function (i) {
-        var t = S.cam[i]; if (!t || !t.applyConstraints) return;
-        var big = i === 0 && S.src === 'none' && S.mode !== 'window', want = big ? 1080 : 720;
-        if (t.res === want) return; t.res = want;
-        t.applyConstraints({ width: { ideal: want * 16 / 9 }, height: { ideal: want }, frameRate: { ideal: 30 } }).catch(function () {});
-      });
-    }
     function setSrc(s) {
-      S.src = s; camRes();
+      S.src = s;
       // a shared screen that isn't showing is captured at 5 frames a second instead of 30 (Marek 2026-10-24: run on a
       // potato) - back to 30 the moment Screen is picked; the worker shows the newest frame it has meanwhile
       if (S.screenTrack && S.screenTrack.applyConstraints) S.screenTrack.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: s === 'screen' ? 30 : 5 } }).catch(function () {});   // (all of them: applyConstraints replaces the set)
