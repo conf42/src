@@ -189,8 +189,9 @@ function heard(us) {
 function tick() {
   if (!!rec !== wasRec) { wasRec = !!rec; dirty = true; }   // the empty window's placeholder is the preview's only
   var held = !!(rec && rec.paused), encoding = !!(rec && rec.muxer && !rec.stopping && !held);
-  // paused, or a card over the page (the welcome card, Marek 2026-10-23): the preview soft and dark, at 10 fps
-  var soft = held || dim, showing = dx && visible && frameNo % (soft ? 6 : rec && rec.half ? 4 : previewEvery) === 0;   // saver: preview at 15 fps
+  // a card over the page (the welcome card, Marek 2026-10-23): the preview soft and dark, at 10 fps. Paused stays sharp
+  // and live (Marek 2026-10-25): the speaker may be changing the setup and wants to see it
+  var soft = dim, showing = dx && visible && frameNo % (soft ? 6 : rec && rec.half ? 4 : previewEvery) === 0;   // saver: preview at 15 fps
   // on the 60 fps grid: frame n at n/60 s of the clock. Each tick fills the next slot (the timer's jitter is absorbed);
   // only when the loop is more than 3 frames behind (a stalled machine) are the slots in between left out. A laptop
   // that can't keep up gets saver mode (the page decides, Marek 2026-10-23): the file stays 60 fps at full size and
@@ -220,7 +221,6 @@ function tick() {
   }
   // the page's preview: its canvas was handed over to this worker, so the page itself does nothing per frame (posting
   // frames to the page to draw froze Chrome next to a painted backdrop, 2026-10-22)
-  // paused: the preview blurred (only the preview - nothing is being recorded), and drawn at 10 fps to spare the machine
   // not drawn while the page is hidden (a demo in another window) or when nothing changed since the last one
   if (soft !== wasHeld) { wasHeld = soft; pvStale = pvFull = true; }
   if (showing && pvStale) {
