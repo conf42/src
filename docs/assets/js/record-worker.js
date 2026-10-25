@@ -22,6 +22,10 @@ var frameNo = 0, previewEvery = 2, dx = null, visible = true;
 // a new camera or screen picture repaints just its own box, anything else (layout, overlay, slide, source) the whole
 // frame. A frame with nothing new isn't drawn at all - the encoder gets the same canvas again
 var dirty = true, wasRec = false, pvStale = true, wasHeld = false, dim = false;
+// a frame with nothing new isn't copied again either (Marek 2026-10-24: "deck-only could be 15 fps"): the encoder gets the
+// last picture once more, stamped for its slot - the file stays a true 60 fps, and any change (a slide, the camera, a
+// shared screen) is in the very next frame. A still deck costs one copy per change, a 30 fps camera every other frame
+var cvChanged = true;
 var rec = null;
 
 function post(m, t) { self.postMessage(m, t || []); }
@@ -99,14 +103,14 @@ function paint(b) {   // the whole frame, within box b only (a rectangle clip: t
 }
 function box(l, t, w, h) { var a = Math.floor(l) - 2, b = Math.floor(t) - 2; return [a, b, Math.ceil(l + w) + 2 - a, Math.ceil(t + h) + 2 - b]; }
 function render() {
-  if (dirty || !geo) { draw(); dirty = false; pvStale = true; }
+  if (dirty || !geo) { draw(); dirty = false; pvStale = cvChanged = true; }
   else {
     var r = geo.rect;
-    if ((source === 'screen' && scr.fresh) || (source === 'none' && cams[0].fresh)) { paint(box(r[0], r[1], r[2], r[3])); pvStale = true; }
+    if ((source === 'screen' && scr.fresh) || (source === 'none' && cams[0].fresh)) { paint(box(r[0], r[1], r[2], r[3])); pvStale = cvChanged = true; }
     geo.cams.forEach(function (g, i) {
       if (!cams[i].fresh) return;
       var d = 2 * g[2] + 6;
-      paint(box(g[0] - d / 2, g[1] - d / 2, d, d)); pvStale = true;
+      paint(box(g[0] - d / 2, g[1] - d / 2, d, d)); pvStale = cvChanged = true;
     });
   }
   scr.fresh = cams[0].fresh = cams[1].fresh = false;
@@ -190,10 +194,11 @@ function tick() {
     if (due) {
       if (rec.venc.encodeQueueSize < 10) {
         var ts = { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) }, vf;
-        if (fresh) {
-          vf = new VideoFrame(cv, ts);
-          if (rec.half) { if (rec.lastVf) rec.lastVf.close(); rec.lastVf = vf.clone(); }
-        } else vf = new VideoFrame(rec.lastVf, ts);   // saver mode: the last picture, stamped for this slot
+        if (fresh && (cvChanged || !rec.lastVf)) {
+          vf = new VideoFrame(cv, ts); cvChanged = false;
+          if (rec.lastVf) rec.lastVf.close(); rec.lastVf = vf.clone();
+          rec.copies = (rec.copies || 0) + 1;
+        } else vf = new VideoFrame(rec.lastVf, ts);   // unchanged (or saver mode's in-between slot): the last picture again
         rec.venc.encode(vf, { keyFrame: n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0 });
         if (n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0) rec.lastKey = n;
         vf.close(); rec.frames++;
@@ -220,7 +225,7 @@ function tick() {
   if (frameNo % 15 === 0 && !rec) shake();   // setup only, like the darkness check   // the dark / same-person hints are setup's; a recording skips the read-back
   // with what the page's health dials need (Marek 2026-10-23): frames made and dropped, the encoder's queue, the disk's backlog
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped, frames: rec.frames,
-                                         queue: rec.venc ? rec.venc.encodeQueueSize : 0, backlog: rec.backlog || 0 });
+                                         queue: rec.venc ? rec.venc.encodeQueueSize : 0, backlog: rec.backlog || 0, copies: rec.copies || 0 });
   frameNo++;
 }
 var next = performance.now(), stat = { n: 0, busy: 0, at: performance.now() };
