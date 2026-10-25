@@ -141,8 +141,10 @@
     .held { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; pointer-events: none; }
     .held p { margin: 0; text-align: center; font-weight: 700; line-height: 1.4; padding: 10px 20px; border-radius: 14px; color: #fff;
       background: #3a1424; border: 1px solid var(--pink); box-shadow: 0 10px 40px rgba(0,0,0,.4); animation: rise .3s cubic-bezier(.3,.7,.2,1); }
-    .held span { font-size: 2rem; font-weight: 800; padding: 14px 30px; border-radius: 999px; background: rgba(10,14,35,.72); border: 1px solid var(--edge);
-      box-shadow: 0 10px 40px rgba(0,0,0,.4); }
+    /* paused (Marek 2026-10-25): the preview stays sharp; the pill glows blue, breathing */
+    .held span { font-size: 2rem; font-weight: 800; padding: 14px 30px; border-radius: 999px; background: rgba(10,14,35,.82); border: 1px solid #6ea8ff;
+      box-shadow: 0 10px 40px rgba(0,0,0,.4), 0 0 24px rgba(80,150,255,.55); animation: heldglow 1.8s ease-in-out infinite alternate; }
+    @keyframes heldglow { from { box-shadow: 0 10px 40px rgba(0,0,0,.4), 0 0 14px rgba(80,150,255,.35); } to { box-shadow: 0 10px 40px rgba(0,0,0,.4), 0 0 46px 6px rgba(80,150,255,.8); } }
     .badge.paused i, .rec.held::after { animation-play-state: paused; }
     /* the microphone level, the preview's full width (Marek 2026-10-23: more precise): fixed colour zones on a dB scale
        (-60 to 0; green to -18, amber to -6, red above), the dark cover drawn back to the level, a white peak marker held a moment */
@@ -340,9 +342,9 @@
     .x2.same span { display: block; }
     .x2.same i { animation: blink 1s infinite; }
     .locked .x2 { display: none; }
-    /* the zoom is set before recording (Marek 2026-10-23): greyed out while it runs, blurred with the preview when paused */
-    .locked .zoom { opacity: .4; pointer-events: none; transition: opacity .25s ease, filter .25s ease; }
-    .locked.held-on .zoom { filter: blur(4px); }
+    /* the zoom is set before recording (Marek 2026-10-23): greyed out while it runs - and free again while paused, with the
+       rest of the setup (Marek 2026-10-25) */
+    .locked:not(.held-on) .zoom { opacity: .4; pointer-events: none; transition: opacity .25s ease; }
     .card small { color: var(--muted); font-size: .76rem; line-height: 1.35; }
     .easy { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .juicy { display: flex; align-items: center; justify-content: center; text-align: center; font: inherit; font-weight: 800; font-size: 1rem; color: #fff;
@@ -373,7 +375,7 @@
     .row > button i { font-style: normal; color: var(--c); font-size: .8rem; font-weight: 700; }
     .row .body { padding: 0 14px 14px; }
     .row:has(.body:not([hidden])) { border-color: color-mix(in srgb, var(--c) 60%, transparent); }
-    .locked .row > button { pointer-events: none; opacity: .55; }
+    .locked:not(.held-on) .row > button { pointer-events: none; opacity: .55; }
     .locked .talkpick, .locked #guide { pointer-events: none; opacity: .55; }
     .banner { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 5; background: #2a2140; border: 1px solid var(--amber); border-radius: 14px;
       padding: 10px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 12px 40px rgba(0,0,0,.5); font-size: .88rem; }
@@ -766,7 +768,7 @@
     // the tips that depend on the moment: why a button is greyed out, what it does right now
     var TIPS = {
       // the setup rows greyed out while recording (Marek 2026-10-25): their buttons ignore the pointer, so the row answers
-      locked: function () { return document.body.classList.contains('locked') ? 'Can’t change settings while the recording is running.' : ''; },
+      locked: function () { var c = document.body.classList; return c.contains('locked') && !c.contains('held-on') ? 'Can’t change settings while the recording is running - pause to change them.' : ''; },
       src: function (el) {   // a greyed-out side of Slides / Screen / Me: what's missing, and where it's set up (Marek 2026-10-23)
         var k = el.dataset.src, guide = !$('wizard').hidden;
         return k === 'slides' ? 'No slides provided: ' + (guide ? 'finish the setup to add your slides.' : 'add them in Setup → Sharing stuff.')
@@ -797,7 +799,7 @@
       },
       prev: function () { return !S.pdf ? 'Add your slides in .pdf in Setup to use this.' : S.page <= 1 ? 'You’re on the first slide.' : 'Previous slide. The ← key works too.'; },
       nexts: function () { return !S.pdf ? 'Add your slides in .pdf in Setup to use this.' : S.page >= S.pages ? 'That’s the last slide.' : 'Next slide. The → key, Space and most clickers work too.'; },
-      zoom: function () { return S.recording ? 'Zoom is locked while you record - set it before you press Record.' : 'Zoom in on the face, up to 50 %. Zoomed in, drag the picture to re-centre it; double-click resets it.'; },
+      zoom: function () { return S.recording && !S.paused ? 'Zoom is locked while you record - pause to change it.' : 'Zoom in on the face, up to 50 %. Zoomed in, drag the picture to re-centre it; double-click resets it.'; },
       level: function () { return 'Your mic level: it should jump when you talk. Always at the top? Too loud. Barely moving? Too quiet.'; },
       badge: function () { return S.paused ? 'Paused - the clock stands still until you resume.' : 'How long you’ve been recording. It stops by itself at 2 hours.'; },
       drop: function () { return S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (File → Export / Download as PDF in PowerPoint, Keynote or Google Slides). Click or drop it here.'; }
@@ -844,7 +846,7 @@
       if (c.classList.contains('sleep')) { c.classList.remove('wake'); void c.offsetWidth; c.classList.add('wake'); setTimeout(function () { c.classList.remove('wake'); }, 900); }   // a stretch and a startled hop
       c.classList.remove('sleep'); clearTimeout(nap.t); clearInterval(dream.t);
       if ($('bubble').classList.contains('thought')) $('bubble').hidden = true;   // awake: the dream is gone
-      nap.t = setTimeout(function () { if ($('bubble').hidden) { $('corgi').classList.add('sleep'); dream(); dream.t = setInterval(dream, 20000); } else nap(); }, 30000);
+      nap.t = setTimeout(function () { if (S.recording) nap(); else if ($('bubble').hidden) { $('corgi').classList.add('sleep'); dream(); dream.t = setInterval(dream, 20000); } else nap(); }, 30000);
     }
     // a dog fact every 20 seconds while it sleeps, all of them in a shuffled order before any comes back (Marek 2026-10-23)
     var FACTS = ["Toto, Dorothy’s male dog in <i>The Wizard of Oz</i>, was played by a female Cairn terrier named Terry.", "Lassie, a female character, was first played by a male collie named Pal.", "Rin Tin Tin was a puppy rescued in France by US soldier Lee Duncan in World War I, before film fame.", "Asta, the terrier in <i>The Thin Man</i>, was played by a dog actor named Skippy.", "Buddy from <i>Air Bud</i> really could knock basketballs into a hoop with his muzzle.", "Twenty-two Labradors played Marley in <i>Marley & Me</i>, covering different ages and scenes.", "Uggie from <i>The Artist</i> won the 2011 Palm Dog, a Cannes award for canine acting.", "Monte, who played Tramp in Disney’s 2019 <i>Lady and the Tramp</i>, was a rescue dog.", "In the 2019 <i>Lady and the Tramp</i>, the spaghetti was liquorice soaked in chicken broth.", "Peggy Lee voiced Darling, Peg and the Siamese cats in the original <i>Lady and the Tramp</i>.", "<i>One Hundred and One Dalmatians</i> used xerography to copy drawings onto cels - handy for all those spots.", "Disney counted 6,469,952 spots across <i>One Hundred and One Dalmatians</i>.", "Bob Peterson voiced Dug in <i>Up</i> - and co-wrote and co-directed the film.", "Michael J. Fox voiced Chance, the excitable bulldog in <i>Homeward Bound</i>.", "John Travolta voiced Bolt, the TV-star dog who believes his superpowers are real.", "The famously drooling dog in <i>Turner & Hooch</i> is a Dogue de Bordeaux.", "Tim Burton’s 2012 <i>Frankenweenie</i> grew out of his own 1984 live-action short.", "Chaser, a border collie, learned the names of over 1,000 objects.", "Rico, a border collie, could pick out a new toy by name through elimination.", "Scientists trained dogs to lie still, awake, in MRI scanners - no sedation needed.", "Some dogs value their owner’s praise as much as food - or even more.", "Familiar human smells light up the reward circuits in dogs’ brains.", "Trained dogs can smell the difference in our sweat and breath when we’re stressed.", "Eye contact between dogs and their owners raises oxytocin, the bonding hormone.", "A dog’s “guilty look” is more about being scolded than about having done anything wrong.", "Dogs’ noses can sense weak radiant heat, finding warm objects without touching them.", "Dogs don’t see in black and white: they see blues and yellows, just differently from us.", "Each nostril smells separately, so dogs can tell which direction a smell comes from.", "A dog’s sniff uses special airflow to carry smells to its scent-detecting tissue.", "Dogs sweat through their paw pads, but panting does most of the cooling.", "Dogs can be left-pawed or right-pawed, favouring one paw for particular tasks.", "Dogs have REM sleep and very likely dream - though nobody knows what about.", "A wagging tail doesn’t always mean a happy dog - it depends on the rest of its body language.", "Dogs’ brains can tell a familiar language from an unfamiliar one.", "Living alongside humans, dogs evolved to digest starchy food.", "“Puppy-dog eyes” come from raising the inner eyebrows, making the eyes look bigger.", "Young puppies can follow human pointing without training - partly thanks to genetics.", "Dogs have an extra scent organ, the vomeronasal organ, for animal chemical signals.", "Laika was the first animal to orbit Earth, aboard Sputnik 2 in 1957, but she didn’t survive.", "Belka and Strelka orbited Earth 18 times in 1960 and came home safely."], factsLeft = [];   // shortened to fit 3 lines (Marek 2026-10-23)
@@ -1414,7 +1416,7 @@
       for (var i = 0; i < G.cams.length; i++) { var g = G.cams[i]; if (Math.hypot(x - g[0], y - g[1]) <= g[2] + 3) return { i: i, w: 2 * g[2] * b.width / 1920, h: 2 * g[2] * b.width / 1920 }; }
       return null;
     }
-    function canPan(i) { return !S.recording && !!S.cam[i] && +$('zoom' + i).value > 0; }
+    function canPan(i) { return (!S.recording || S.paused) && !!S.cam[i] && +$('zoom' + i).value > 0; }
     var drag = null;
     $('pv').addEventListener('pointermove', function (e) {
       if (!drag) { var c = camAt(e); this.style.cursor = c && canPan(c.i) ? 'grab' : ''; return; }
@@ -1824,6 +1826,8 @@
         if (file) { S.recE = { id: Date.now(), name: name, fileH: file, file: file.name, started: Date.now(), status: 'recording' }; recPut(S.recE); }
         worker.postMessage({ type: 'start', name: name, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
+        // the corgi stays awake while recording (Marek 2026-10-25: dog trivia distracts the speaker): woken quietly, no hop
+        var cg = $('corgi'); if (cg.classList.contains('sleep')) { cg.classList.remove('sleep'); clearInterval(dream.t); if ($('bubble').classList.contains('thought')) $('bubble').hidden = true; }
         S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
@@ -1838,7 +1842,11 @@
     var TITLE = document.title;
     function pauseShown() {
       $('pause').textContent = S.paused ? 'Resume' : 'Pause'; $('pause').classList.toggle('on', S.paused);
-      $('badge').classList.toggle('paused', S.paused); $('held').hidden = !S.paused; document.body.classList.toggle('held-on', S.paused); $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
+      $('badge').classList.toggle('paused', S.paused); $('held').hidden = !S.paused; document.body.classList.toggle('held-on', S.paused);
+      // paused: the setup is open again (Marek 2026-10-25) - camera, mic, sharing, zoom. Recording again: locked, and an
+      // open setup row folds away
+      if (S.recording) { $('zoom0').disabled = $('zoom1').disabled = !S.paused;
+        if (!S.paused) { all('#studio .row .body').forEach(function (x) { x.hidden = true; }); all('#studio .row > button i').forEach(function (i) { i.textContent = 'Change'; }); } } $('rec').classList.toggle('held', S.paused); $('glow').classList.toggle('live', S.recording && !S.paused);
       if (S.recording) status(S.paused ? '❚❚ Paused - nothing is being recorded. Press <b>Resume</b> to carry on.' : '● Recording. Press <b>Pause</b> for a break, <b>Stop</b> when you’re done.');
     }
     $('pause').addEventListener('click', function () {
