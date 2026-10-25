@@ -125,6 +125,34 @@ function brightness() {
   // two 32 x 18 grey pictures, 1 = the same picture
   if (sigs[0] && sigs[1]) post({ type: 'alike', r: corr(sigs[0], sigs[1]) });
 }
+// a shaky camera (Marek 2026-10-24: "put the laptop on a more stable surface"): the whole picture moving back and forth,
+// not just the speaker. 4 times a second a 64 x 36 grey copy is matched against the last one for the shift (up to 3 px
+// each way) that lines them up best; a shaky camera keeps finding small shifts that flip direction, while a person
+// moving in front of a still background lines up best at no shift
+var SW = 64, SH = 36, shk = new OffscreenCanvas(SW, SH), sx = shk.getContext('2d', { willReadFrequently: true }), shkPrev = null, shkLog = [], shkOn = false;
+function shake() {
+  var f = cams[0].frame;
+  if (!f) { shkPrev = null; shkLog = []; return; }
+  sx.drawImage(f, 0, 0, SW, SH);
+  var p = sx.getImageData(0, 0, SW, SH).data, g = new Float32Array(SW * SH);
+  for (var i = 0; i < g.length; i++) g[i] = .3 * p[i * 4] + .59 * p[i * 4 + 1] + .11 * p[i * 4 + 2];
+  if (shkPrev) {
+    var best = 1e9, bx = 0, by = 0, zero = 0;
+    for (var dy = -3; dy <= 3; dy++) for (var dx = -3; dx <= 3; dx++) {
+      var e = 0, n = 0;
+      for (var y = 4; y < SH - 4; y++) for (var x = 4; x < SW - 4; x++) { e += Math.abs(g[y * SW + x] - shkPrev[(y + dy) * SW + x + dx]); n++; }
+      e /= n; if (!dx && !dy) zero = e;
+      if (e < best) { best = e; bx = dx; by = dy; }
+    }
+    var moved = (bx || by) && best < zero * .8 && zero > 2;   // clearly better lined up somewhere else: the whole picture moved
+    shkLog.push(moved ? [bx, by] : null); if (shkLog.length > 12) shkLog.shift();
+    var hits = shkLog.filter(Boolean), flips = 0;
+    for (var k = 1; k < hits.length; k++) if (hits[k][0] * hits[k - 1][0] < 0 || hits[k][1] * hits[k - 1][1] < 0) flips++;
+    var on = hits.length >= 5 && flips >= 2;   // over the last 3 s: moving often, and back and forth
+    if (on !== shkOn) { shkOn = on; post({ type: 'shaky', on: on }); }
+  }
+  shkPrev = g;
+}
 function corr(a, b) {
   var n = a.length, ma = 0, mb = 0, sab = 0, saa = 0, sbb = 0, i;
   for (i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
@@ -187,7 +215,8 @@ function tick() {
     dx.drawImage(cv, -o, -o * ph / pw, pw + 2 * o, ph + 2 * o * ph / pw);
     if (soft) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,' + (dim ? .5 : .3) + ')'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
-  if (frameNo % FPS === 0 && !rec) brightness();   // the dark / same-person hints are setup's; a recording skips the read-back
+  if (frameNo % FPS === 0 && !rec) brightness();
+  if (frameNo % 15 === 0 && !rec) shake();   // setup only, like the darkness check   // the dark / same-person hints are setup's; a recording skips the read-back
   // with what the page's health dials need (Marek 2026-10-23): frames made and dropped, the encoder's queue, the disk's backlog
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped, frames: rec.frames,
                                          queue: rec.venc ? rec.venc.encodeQueueSize : 0, backlog: rec.backlog || 0 });
