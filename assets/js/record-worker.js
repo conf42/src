@@ -25,9 +25,13 @@ var dirty = true, wasRec = false, pvStale = true, wasHeld = false, dim = false;
 // the preview gets only what changed too (Marek 2026-10-24, "run on a potato"): the boxes painted since its last copy -
 // a camera frame is its circle, ~6 % of the picture - unless the whole frame changed, it was resized, shown again or blurred
 var pvFull = true, pvBoxes = [];
-// a frame with nothing new isn't copied again either (Marek 2026-10-24: "deck-only could be 15 fps"): the encoder gets the
-// last picture once more, stamped for its slot - the file stays a true 60 fps, and any change (a slide, the camera, a
-// shared screen) is in the very next frame. A still deck costs one copy per change, a 30 fps camera every other frame
+// a frame with nothing new isn't copied again either (Marek 2026-10-24: "deck-only could be 15 fps"): with a video chip
+// the encoder gets the last picture once more, stamped for its slot (next to free there), so the file is a true 60 fps.
+// Without one, or once saver mode is on, it's lean (Marek 2026-10-26, "the most potato hardware in the galaxy"): an
+// unchanged slot isn't encoded at all, the last frame in the file just lasts until the next change (MP4 frames each
+// carry their own length). Every change still lands in its own 1/60 s slot, at full size and sharpness; a still slide
+// costs a keyframe every 2 s, a 30 fps camera 30 frames a second. Without a video chip: 87 % -> 63 % CPU. The one catch:
+// tools guess such a file's frame rate from its frames, so one with a 30 fps camera reads as 30 fps
 var cvChanged = true, noCam = false;   // "Only my voice" picked: the empty Me side says where to turn the camera on
 var rec = null;
 
@@ -203,18 +207,20 @@ function tick() {
   if (fresh || showing) render();   // not recording: drawn only for the preview, at its 30 fps
   if (encoding) {
     if (due) {
-      if (rec.venc.state === 'configured' && rec.venc.encodeQueueSize < 10) {   // a failed encoder: its rebuild is on the way
+      var key = n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0, changed = fresh && (cvChanged || !rec.lastVf);
+      if (rec.lean && !changed && !key) rec.frames++;   // lean: nothing new, the frame before covers this slot too
+      else if (rec.venc.state === 'configured' && rec.venc.encodeQueueSize < 10) {   // a failed encoder: its rebuild is on the way
         var ts = { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) }, vf;
-        if (fresh && (cvChanged || !rec.lastVf)) {
+        if (changed) {
           vf = new VideoFrame(cv, ts); cvChanged = false;
           if (rec.lastVf) rec.lastVf.close(); rec.lastVf = vf.clone();
           rec.copies = (rec.copies || 0) + 1;
         } else vf = new VideoFrame(rec.lastVf, ts);   // unchanged (or saver mode's in-between slot): the last picture again
-        rec.venc.encode(vf, { keyFrame: n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0 });
-        if (n - rec.lastKey >= KEY_EVERY || rec.lastKey < 0) rec.lastKey = n;
-        vf.close(); rec.frames++;
-        rec.dropped += Math.max(0, n - rec.lastN - 1);
+        rec.venc.encode(vf, { keyFrame: key });
+        if (key) rec.lastKey = n;
+        vf.close(); rec.frames++; rec.lastEnc = n;
       } else rec.dropped++;
+      rec.dropped += Math.max(0, n - rec.lastN - 1);
       rec.lastN = n;
     }
     if (now() >= MAX_US) stop('limit');
@@ -381,7 +387,7 @@ function mono(d) {
 
 function start(m) {
   if (rec) return;
-  rec = { name: m.name, started: new Date().toISOString(), frames: 0, dropped: 0, bytes: 0, lastN: -1, lastKey: -1, samples: 0,
+  rec = { name: m.name, started: new Date().toISOString(), frames: 0, dropped: 0, bytes: 0, lastN: -1, lastKey: -1, lastEnc: -1, samples: 0,
           w0: 0, off: 0, deskChain: Promise.resolve(), desk: null, sync: null, metaH: null, muxer: null };
   var r = rec;
   var opfs = navigator.storage.getDirectory().then(function (dir) {
@@ -404,6 +410,7 @@ function start(m) {
   Promise.all([opfs, desk, pickVideo(m.vbitrate)]).then(function (res) {
     var vcfg = res[2];
     if (!vcfg) throw new Error('This browser cannot encode H.264 video.');
+    r.lean = vcfg.hardwareAcceleration !== 'prefer-hardware';   // no video chip: unchanged slots aren't encoded
     r.vRebuild = function () {
       r.venc = new VideoEncoder({ output: function (chunk, md) { r.muxer.addVideoChunk(chunk, md); }, error: function (e) { trouble(r, 'video', e, r.vRebuild); } });
       r.venc.configure(vcfg); r.lastKey = -1;   // a new encoder starts on a keyframe
@@ -419,7 +426,11 @@ function start(m) {
         var rate = d.sampleRate;
         pickAudio(rate).then(function (ac) {
           if (!ac) throw new Error('This browser cannot encode the sound (AAC or Opus).');
-          r.aRebuild = function () {
+          r.aRebuild = function (again) {
+            // failing again within the minute: one step down in bitrate (320k -> 256k ...), the AAC encoder's top rates
+            // being the likeliest to trip
+            var i = ABITRATES.indexOf(ac[0].bitrate);
+            if (again && ac[1] === 'aac' && i >= 0 && i < ABITRATES.length - 1) ac[0] = Object.assign({}, ac[0], { bitrate: ABITRATES[i + 1] });
             r.aenc = new AudioEncoder({ output: function (chunk, md) { r.muxer.addAudioChunk(chunk, md); }, error: function (e) { trouble(r, 'audio', e, r.aRebuild); } });
             r.aenc.configure(ac[0]);
           };
@@ -452,8 +463,20 @@ function start(m) {
 // failing ends the recording, and then properly: the file is finished with everything so far
 function trouble(r, what, e, rebuild) {
   if (rec !== r || r.stopping) return;
-  r.fails = (r.fails || 0) + 1;
-  if (r.fails <= 5) try { rebuild(); post({ type: 'warn', what: what }); return; } catch (x) {}
+  // up to 5 restarts in any minute, not 5 per recording (a 2-hour talk with a hiccup now and then keeps going), spaced
+  // out - 0, 0.25, 1, 2, 4 s - so a moment of a busy machine (2026-10-26: the audio encoder failing 5 times in 20 ms
+  // at the start, under load) doesn't use them all up at once. Meanwhile the slots go by: a moment of silence, or of
+  // the same picture
+  var t = Date.now(), k = what === 'audio' ? 'aFails' : 'vFails';
+  r[k] = (r[k] || []).filter(function (x) { return t - x < 60000; }); r[k].push(t);
+  var n = r[k].length;
+  if (n <= 5) {
+    setTimeout(function () {
+      if (rec !== r || r.stopping) return;
+      try { rebuild(n > 1); } catch (x) { trouble(r, what, x, rebuild); }
+    }, [0, 250, 1000, 2000, 4000][n - 1]);
+    post({ type: 'warn', what: what }); return;
+  }
   post({ type: 'error', message: what + ': ' + e.message, finishing: true });
   stop('error');
 }
@@ -471,6 +494,12 @@ function stop(why) {
   var r = rec;
   if (!r || r.stopping) return;
   r.stopping = true;
+  // the last picture once more, in the last slot: a recording that ends on a still slide (nothing new for a while)
+  // would otherwise end at its last change
+  if (r.lastVf && r.lastN > r.lastEnc && r.venc && r.venc.state === 'configured') try {
+    var end = new VideoFrame(r.lastVf, { timestamp: Math.round(r.lastN * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+    r.venc.encode(end, { keyFrame: false }); end.close();
+  } catch (e) {}
   if (r.lastVf) { r.lastVf.close(); r.lastVf = null; }
   if (r.audio) r.audio.stop();
   clearInterval(r.metaTimer);
@@ -507,8 +536,8 @@ self.onmessage = function (e) {
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvFull = true; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
   else if (m.type === 'nocam') { if (noCam !== m.on) dirty = true; noCam = m.on; }
-  // saver mode for the rest of the recording (new pictures 30 times a second, the file still 60 fps), from a keyframe
-  else if (m.type === 'saver' && rec) { rec.half = true; rec.lastKey = -KEY_EVERY; }
+  // saver mode for the rest of the recording (new pictures 30 times a second, lean: unchanged slots not encoded), from a keyframe
+  else if (m.type === 'saver' && rec) { rec.half = rec.lean = true; rec.lastKey = -KEY_EVERY; }
   else if (m.type === 'visible') { visible = m.on; pvStale = pvFull = true; }
   else if (m.type === 'layout') { geo = m.geo; bg = m.bg || bg; dirty = true; }
   else if (m.type === 'overlay') { if (overlay) overlay.close(); overlay = m.bitmap; dirty = true; }
