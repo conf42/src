@@ -128,9 +128,19 @@ def thumbnails(event, items):
     title doesn't matter here: the thumbnail is the speaker alone, on its topic's sky). Remix re-runs talks whose videos
     already have thumbnails, so it gets them for its keynotes only."""
     remix = (event.get("name") or "").strip().lower() == "remix"
-    return dict(talks=[dict(file=c["file"][:-4] + "-thumbnail.png", photo=c["photo"], name=c["name"], i=c["i"],
-                            search=c["search"], first=c["first"], last=c["last"])   # the tab sorts and searches by itself (past events have no cards)
-                       for c in items if c["photo"] and (c["keynote"] or not remix)])
+    # saved as the factory names the talk's video and deck (Marek 2026-10-26): "<Name1>[ & <Name2>] - Conf42 <Event> <Year>.png";
+    # the file stays at its URL-safe path, only the download name changes
+    tail = " - Conf42 %s %s" % (event.get("name"), str(event.get("date"))[:4])
+    talks, used = [], {}
+    for c in items:
+        if not c["photo"] or not (c["keynote"] or not remix):
+            continue
+        dl = re.sub(r'[\\/:*?"<>|]+', " ", c["name"]).strip() + tail
+        used[dl] = used.get(dl, 0) + 1
+        talks.append(dict(file=c["file"][:-4] + "-thumbnail.png", dl=dl + (" (%d)" % used[dl] if used[dl] > 1 else "") + ".png",
+                          photo=c["photo"], name=c["name"], i=c["i"],
+                          search=c["search"], first=c["first"], last=c["last"]))   # the tab sorts and searches by itself (past events have no cards)
+    return dict(talks=talks)
 
 
 def overlays(event, ev):
