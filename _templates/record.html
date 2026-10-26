@@ -748,7 +748,10 @@
     // a hidden page (the speaker is in their demo) has no preview to draw
     document.addEventListener('visibilitychange', function () { worker.postMessage({ type: 'visible', on: document.visibilityState === 'visible' }); });
     var S = { ev: null, talk: null, kind: null, camWanted: null, mode: null, src: 'none', cam: [null, null], micTrack: null, screenTrack: null,
-              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '', openSeq: [] };
+              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '', openSeq: [], camFps: [], dim30: [], dimL: [] };
+    // a video chip Chrome can encode with: the cameras then run at 60 fps (openCam)
+    S.hwEnc = ('VideoEncoder' in window ? VideoEncoder.isConfigSupported({ codec: 'avc1.640033', width: 1920, height: 1080, framerate: 60, bitrate: 2500000, hardwareAcceleration: 'prefer-hardware' })
+      .then(function (r) { return !!r.supported; }, function () { return false; }) : Promise.resolve(false));
 
     function replay(el) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }   // the entrance again (a new count)
     // the corgi speaks (Marek 2026-10-23): a bubble, the mouth moving for about as long as the words take to read out
@@ -1449,11 +1452,18 @@
       if (!id || (slot && !S.duo)) { relayout(); return Promise.resolve(); }
       var seq = S.openSeq[slot] = (S.openSeq[slot] || 0) + 1;
       // the capture size is set here, once (Marek 2026-10-25): changing it on each Slides/Screen <-> Me switch made webcams
-      // blink, as most restart the sensor for a new size. The main camera 1080p (it can fill the window), the co-talk
-      // camera 720p (it's only ever the circle, 324 px)
-      var hi = slot ? 720 : 1080;
-      return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: hi * 16 / 9 }, height: { ideal: hi }, frameRate: { ideal: 30 } } })
+      // blink, as most restart the sensor for a new size. 720p (Marek 2026-10-26): the circle is 324 px, and the full
+      // window is fine a touch softer. 60 fps where Chrome has a video chip to encode with - a snappier face in the 60 fps
+      // file, at about the pixels a second of 1080p30; most webcams do 720p60, the rest give their 30. Without the chip
+      // (a potato) 30 fps: a 60 fps camera there costs more than the machine has. And 30 fps in a dim room: at 60 a
+      // webcam has 1/60 s to expose each frame, and some get darker and grainier rather than slow down
+      return S.hwEnc.then(function (hw) {
+        if (seq !== S.openSeq[slot]) return null;
+        var fps = hw && S.dim30[slot] !== id ? 60 : 30; S.camFps[slot] = fps;
+        return navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: fps } } });
+      })
         .then(function (s) {
+          if (!s) return;
           var t = s.getVideoTracks()[0];
           // overtaken (another camera picked, Voice only, a 2nd click): this one isn't wanted any more
           if (seq !== S.openSeq[slot] || !S.camWanted || (slot && !S.duo)) { t.stop(); return; }
@@ -1628,7 +1638,13 @@
     worker.onmessage = function (e) {
       var m = e.data;
       if (m.type === 'alike') { S.same = m.r > .8 ? Math.min((S.same || 0) + 1, 5) : 0; sameShown(); }
-      else if (m.type === 'light') { if (m.slot === 0) { S.dark = (S.dark || 0) * .7 + (m.luma < 55 ? .3 : 0);
+      else if (m.type === 'light') {
+        // a dim room at 60 fps: the camera reopened at 30, once, still in setup (the worker reads the light only then)
+        S.dimL[m.slot] = (S.dimL[m.slot] || 0) * .7 + (m.luma < 70 ? .3 : 0);
+        if (S.dimL[m.slot] >= .5 && S.camFps[m.slot] === 60 && S.cam[m.slot] && !S.recording) {
+          S.dim30[m.slot] = (m.slot ? $('cam2') : $('cam')).value; S.dimL[m.slot] = 0; openCam(m.slot);
+        }
+        if (m.slot === 0) { S.dark = (S.dark || 0) * .7 + (m.luma < 55 ? .3 : 0);
         var dark = S.dark >= .5 && !!S.cam[0];
         if (dark && !S.darkSaid && Date.now() - (S.darkAt || 0) > 60000) { S.darkAt = Date.now(); say('Your video looks quite dark - try leaving the basement! Or put a lamp or a window in front of you, not behind you.', 9000, 'warn'); }
         S.darkSaid = dark; } }
