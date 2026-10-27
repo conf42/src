@@ -68,6 +68,8 @@ on the list.
 
 ## Changelog
 
+- **2026-10-27** - Drive check no longer flags a talk as "newer video" when it is the very upload the talk was
+  made from (a pass done in another time zone made it look newer).
 - **2026-10-17** - When the disk is low, Claude offers to clean up junk and cache files and shows you what first.
 - **2026-10-17** - Each event gets its own Desktop folder named after the conference (`video factory - Conf42 Prompt
   Engineering 2026`).
