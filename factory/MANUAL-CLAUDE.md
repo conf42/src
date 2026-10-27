@@ -43,6 +43,7 @@ works the same way.
 | Unmatched files | Claude asks you which speaker a file belongs to | It renames it and runs it. |
 | Check | *"What needs my attention?"* | Talks with QA or health flags (loudness, too much cut, setup the speaker talks over), talks that **need a new video** (no or muted sound - not sent to Descript), failed talks, and the **no video yet** follow-up list. Watch the flagged ones. |
 | New upload | *"Some speakers uploaded new versions - check the Drive again."* | Claude fetches the folder again; re-uploaded talks are done again from scratch. |
+| New folder | *"Activate the factory again for Prompt Engineering 2026: <new Drive link>"* | Claude switches the event to the new folder. Files it already has (same size) are not downloaded again and finished talks are not redone; only new or re-uploaded videos run. Claude checks every finished talk is still in the new folder - the old folder is no longer watched. |
 | Slides | *"Prepare the slides."* | Decks matched, converted to PDF, renamed for the site, compressed. |
 | YouTube | *"Write the YouTube items."* | Titles, descriptions and chapters, ready to paste. Thumbnails: conf42.com/<event>/teasers#thumbnails. You upload. |
 
@@ -68,6 +69,7 @@ on the list.
 
 ## Changelog
 
+- **2026-10-27** - A new Drive link for a running event switches its folder without redoing finished talks.
 - **2026-10-27** - Drive check no longer flags a talk as "newer video" when it is the very upload the talk was
   made from (a pass done in another time zone made it look newer).
 - **2026-10-17** - When the disk is low, Claude offers to clean up junk and cache files and shows you what first.
