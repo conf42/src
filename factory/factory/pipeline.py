@@ -232,6 +232,11 @@ class Run:
                 rep["new"].append({"speakers": key, "file": name, "uploaded": up})
                 continue
             last = mine.get("finished") or mine.get("matched_at")
+            # the very upload this talk was made from (same Drive id + stamp, fetched before the pass): local naive
+            # times from another time zone would otherwise make it look newer
+            seen = self.state.get("drive_fetched", {}).get(f.get("id")) or {}
+            if last and seen.get("uploaded") == up and (seen.get("fetched") or seen.get("seen") or "~") <= last:
+                last = None
             last_utc = datetime.datetime.fromisoformat(last).astimezone(datetime.timezone.utc).isoformat() if last else ""
             with self.lock:
                 mine["drive"] = {"id": f.get("id"), "file": name, "uploaded": up, "size": f.get("fileSize")}
