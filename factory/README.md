@@ -18,6 +18,13 @@ Per talk:
    end - clicking around, the desktop before the slides, "stop sharing" - is cut off, up to 2 min at each end, unless
    the speaker talks over it (then it is only flagged). The cut is one encode from the original file
    (`mp4/<speakers>.health.mp4`). Settings: `health_*`.
+   Before that, the source is rendered to a lean MP4. A **conf42.com/record** recording is a fragmented MP4 (it stays
+   playable if the laptop dies), and Descript's import rejects it as "invalid or unsupported media content"
+   (Mohit Upadhyay 2026-10-26, Kevin Brown 2026-10-28). It is already lean, so when the render is not smaller it is
+   **rewrapped** into a plain MP4 instead (`media.remux`, no re-encode, under a second). A speaker who sends only the
+   recorder's `<Name> - safety copy/part 001.mp4 …` folder (a recording that never reached Stop) gets the parts joined
+   into `<Name> (recovered).mp4`, the way the recorder's Rebuild button does it; when `<Name>.mp4` is there too, the
+   parts are not downloaded.
 3. **Upload** to one Descript project per event, named from `settings.yml` (`Conf42 DevSecOps 2026`), one composition per talk.
 4. **Edit** with Descript's AI editor: Studio Sound 80%, limiter, volume 300%, filler words removed, word gaps over 2s cut to 1s.
 5. **Publish** (unlisted) at the largest size not above the source or `max_resolution`, and **download** the MP4.

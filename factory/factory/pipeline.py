@@ -27,6 +27,8 @@ from .descript import Descript
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
+SAFETY_COPY = re.compile(r"(?:^|/)([^/]+) - safety copy/$")   # conf42.com/record's 1-minute parts of a recording
+SAFETY_PART = re.compile(r"^part \d+\.mp4$", re.I)
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
 STEPS = ["render", "health", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
 class HealthBlocked(RuntimeError):
@@ -271,8 +273,13 @@ class Run:
                 if os.path.isfile(f) and not f.endswith(".part"):
                     have.add(os.path.getsize(f))
         listing, got = [], []
+        safety = {}                                      # name -> its "<name> - safety copy" parts (conf42.com/record)
         for f in drive.list_folder(fid):
             name = f["title"]
+            m = SAFETY_COPY.search(f.get("folder") or "")
+            if m and SAFETY_PART.match(name):
+                safety.setdefault(m.group(1), []).append(f)
+                continue
             if not name.lower().endswith(VIDEO_EXT + SLIDE_EXT):
                 continue                                 # Google Vids projects, docs, images
             try:
@@ -292,6 +299,7 @@ class Run:
             dest = os.path.join(ddir, os.path.basename(name))
             drive.download(f["id"], dest, size, self.note)
             fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "fetched": now(), "pending": True}
+        got += self.drive_safety_copies(drive, ddir, safety, listing, fetched)
         # everything downloaded and not yet handed to a run (also from a fetch whose run never got to it)
         for v in fetched.values():
             p = os.path.join(ddir, os.path.basename(v["file"]))
@@ -302,6 +310,42 @@ class Run:
         self.note("Drive: %d files in the folder, %d downloaded, %d talks up to date, %d newer, %d new"
                   % (len(listing), len(got), rep["same"], len(rep["newer"]), len(rep["new"])))
         return got
+
+    def drive_safety_copies(self, drive, ddir, safety, listing, fetched):
+        """A conf42.com/record recording that never reached Stop (dead laptop, closed tab) leaves "<Name> - safety
+        copy/part 001.mp4 …" next to it, one part a minute. When a speaker sends that folder and no "<Name>.mp4", the
+        parts are joined the way the recorder's own Rebuild does it (the first in full, the rest from their first moof)
+        into "<Name> (recovered).mp4", which then runs like any upload. Returns the rebuilt files."""
+        mains = {os.path.splitext(x["title"])[0].strip().lower() for x in listing if x["title"].lower().endswith(VIDEO_EXT)}
+        out = []
+        for who, parts in sorted(safety.items()):
+            if who.strip().lower() in mains:
+                continue                                 # the main file is saved every minute too: it is the one to use
+            pdir = os.path.join(ddir, who + " - safety copy")
+            os.makedirs(pdir, exist_ok=True)
+            new = False
+            for f in sorted(parts, key=lambda f: f["title"]):
+                try:
+                    size, up = drive.head(f["id"])
+                except Exception as e:                   # noqa: BLE001
+                    self.note("Drive: %s/%s skipped (%s)" % (who, f["title"], e))
+                    continue
+                p, old = os.path.join(pdir, f["title"]), fetched.get(f["id"])
+                if old and old.get("size") == size and old.get("uploaded") == up and os.path.exists(p):
+                    continue
+                self.note("Drive: downloading %s - safety copy/%s (%.0f MB)" % (who, f["title"], size / 1e6))
+                drive.download(f["id"], p, size, self.note)
+                fetched[f["id"]] = {"file": who + " - safety copy/" + f["title"], "size": size, "uploaded": up,
+                                    "fetched": now()}
+                new = True
+            dest = os.path.join(ddir, who + " (recovered).mp4")
+            paths = sorted(glob.glob(os.path.join(pdir, "part *.mp4")))
+            if paths and (new or not os.path.exists(dest)):
+                media.join_parts(paths, dest)
+                self.note("Drive: %s sent only the recorder's safety copy - %d parts joined into %s"
+                          % (who, len(paths), os.path.basename(dest)))
+                out.append(dest)
+        return out
 
     # ---- 1. collect: unzip Drive downloads, split videos and slides ----------------------
     def collect(self, sources):

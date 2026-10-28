@@ -69,8 +69,10 @@ on the list.
 
 ## Changelog
 
-- **2026-10-28** - Videos from browser recorders (fragmented MP4, which Descript rejects) are always sent as the
-  factory's own render, so they no longer fail at the upload.
+- **2026-10-28** - Videos from conf42.com/record (fragmented MP4, which Descript's import rejects) are rewrapped into a
+  plain MP4 before the upload - no re-encode, same quality and size - so they no longer fail at the upload.
+- **2026-10-28** - A speaker who sends only the recorder's "safety copy" folder (a recording that never reached Stop)
+  gets the parts joined into one video, which runs like any upload.
 - **2026-10-27** - A new Drive link for a running event switches its folder without redoing finished talks.
 - **2026-10-27** - Drive check no longer flags a talk as "newer video" when it is the very upload the talk was
   made from (a pass done in another time zone made it look newer).
