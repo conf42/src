@@ -740,7 +740,8 @@ class Run:
             os.makedirs(os.path.dirname(lean), exist_ok=True)
             used = media.render(src, lean, on_progress=lambda label, percent=None: self.set(
                 key, "render", "running", label=label, percent=percent))
-            self.set(key, "render", "done", file=os.path.basename(used),
+            # "source" when the render was not smaller: the source may be named like the lean file ("Kevin Brown.mp4")
+            self.set(key, "render", "done", file=os.path.basename(used) if used != src else "source",
                      note="%.0f MB -> %.0f MB" % (os.path.getsize(src) / 1e6, os.path.getsize(used) / 1e6))
 
     def render_scheduler(self, need, slots, pool):
