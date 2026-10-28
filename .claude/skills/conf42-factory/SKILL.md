@@ -70,6 +70,12 @@ Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `red
 - "EDITS PAUSED": look at the edit report in `state.json` (`talks.<name>.steps.edit.report`) and the talk in Descript
   before `unpause` - an edit cost too much or mentioned other talks.
 - 402 from Descript = out of credits/minutes: tell the person; nothing is paid twice after a top-up.
+- Recorder and factory work as one (conf42.com/record, `_templates/record.html` + `docs/assets/js/record-worker.js`):
+  its files are fragmented MP4 named `<Name>.mp4` / `<Name> (2).mp4` / `<Name> (recovered).mp4`, mono AAC, 1080p60.
+  Descript's API import rejects fragmented MP4, so the factory rewraps them (no re-encode) - never upload one as it is.
+  A `<Name> - safety copy/` folder of `part NNN.mp4` is joined by the factory when no `<Name>.mp4` came. If you change
+  the recorder's container, file names or safety copy, change `factory/media.py` (`fragmented`, `remux`, `join_parts`)
+  and `pipeline.drive_safety_copies` in the same commit, and the other way round.
 - One computer per event (the app claims it through `_db/factory.json`); `--force` only when the person says the other
   computer is off.
 - Never put a Descript token or password in a file, commit or the chat. Don't delete work files without asking.

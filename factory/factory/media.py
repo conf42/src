@@ -34,7 +34,8 @@ def probe(path):
 def render(src, dst, max_short_side=1080, cq=21, on_progress=None, start=None, end=None, af=None, force=False):
     """Re-encode a source video to a lean H.264/AAC MP4 before the upload (camera .mov files are huge for no gain):
     GPU (NVENC) when there is one, else libx264; short side capped at max_short_side, audio kept at 48 kHz 192k so
-    Studio Sound still gets a clean signal. Returns dst, or src when the render would not be smaller.
+    Studio Sound still gets a clean signal. Returns dst, or src when the render would not be smaller
+    (a fragmented browser recording is then rewrapped into dst instead, see fragmented()).
     start / end / af: the health check's fixes (seconds kept, an audio filter), applied in the same single encode;
     force: always write dst (a fixed file is needed even when it is not smaller)."""
     info = probe(src)
@@ -72,16 +73,50 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None, start=None, e
             os.remove(part)
     else:
         raise RuntimeError("render to mp4 failed: " + err[-300:])
-    if not force and os.path.getsize(part) >= os.path.getsize(src) and not fragmented(src):
+    if not force and os.path.getsize(part) >= os.path.getsize(src):
         os.remove(part)
+        if fragmented(src):                          # a browser recording: rewrapped, the picture and sound untouched
+            return remux(src, dst)
         return src
+    os.replace(part, dst)
+    return dst
+
+
+def remux(src, dst):
+    """Rewrap a video into a plain MP4 (one moov, at the front) with no re-encode. Returns dst."""
+    part = "%s.%d.part.mp4" % (dst, os.getpid())
+    r = run([tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-map", "0:v:0", "-map", "0:a:0?",
+             "-c", "copy", "-movflags", "+faststart", part])
+    bad = verify(part, probe(src)["duration"]) if r.returncode == 0 else r.stderr[-300:]
+    if bad:
+        if os.path.exists(part):
+            os.remove(part)
+        raise RuntimeError("rewrap to a plain mp4 failed: " + bad)
+    os.replace(part, dst)
+    return dst
+
+
+def join_parts(paths, dst):
+    """conf42.com/record's safety-copy parts back into one fragmented MP4, exactly like its Rebuild button: each part
+    is the header (ftyp + moov) and a minute of fragments, so the first goes in full and the rest from their first
+    moof on. render() rewraps the result into a plain MP4 for Descript."""
+    part = "%s.%d.part.mp4" % (dst, os.getpid())
+    with open(part, "wb") as out:
+        for i, p in enumerate(paths):
+            with open(p, "rb") as f:
+                data = f.read()
+            off = 0
+            while i and off + 8 <= len(data) and data[off + 4:off + 8] != b"moof":
+                off += int.from_bytes(data[off:off + 4], "big") or len(data)
+            out.write(data[off:])
     os.replace(part, dst)
     return dst
 
 
 def fragmented(path):
     """True for a fragmented MP4 (moof boxes, as browser recorders write it): Descript rejects those as "invalid or
-    unsupported media content", so such a source is always uploaded as the render, even when that is not smaller."""
+    unsupported media content" (conf42.com/record files: Mohit Upadhyay 2026-10-26, Kevin Brown 2026-10-28, both fine
+    once rewrapped), so render() never hands one back as it is."""
     try:
         with open(path, "rb") as f:
             while True:

@@ -168,6 +168,8 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 
 ## Changelog
 
+- **2026-10-28** - Videos from conf42.com/record are rewrapped into a plain MP4 before the upload (Descript rejects
+  the recorder's crash-safe format otherwise); a speaker's "safety copy" folder is joined into one video.
 - **2026-10-17** - One folder per event on the Desktop, named after the conference: `video factory - Conf42 Prompt
   Engineering 2026`, with its own `final videos for YouTube/`.
 - **2026-10-17** - Starting the app while an older copy is still running replaces that copy (jobs already
