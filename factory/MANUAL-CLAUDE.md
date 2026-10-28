@@ -69,6 +69,8 @@ on the list.
 
 ## Changelog
 
+- **2026-10-28** - Videos from browser recorders (fragmented MP4, which Descript rejects) are always sent as the
+  factory's own render, so they no longer fail at the upload.
 - **2026-10-27** - A new Drive link for a running event switches its folder without redoing finished talks.
 - **2026-10-27** - Drive check no longer flags a talk as "newer video" when it is the very upload the talk was
   made from (a pass done in another time zone made it look newer).

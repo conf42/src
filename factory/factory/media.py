@@ -72,11 +72,37 @@ def render(src, dst, max_short_side=1080, cq=21, on_progress=None, start=None, e
             os.remove(part)
     else:
         raise RuntimeError("render to mp4 failed: " + err[-300:])
-    if not force and os.path.getsize(part) >= os.path.getsize(src):
+    if not force and os.path.getsize(part) >= os.path.getsize(src) and not fragmented(src):
         os.remove(part)
         return src
     os.replace(part, dst)
     return dst
+
+
+def fragmented(path):
+    """True for a fragmented MP4 (moof boxes, as browser recorders write it): Descript rejects those as "invalid or
+    unsupported media content", so such a source is always uploaded as the render, even when that is not smaller."""
+    try:
+        with open(path, "rb") as f:
+            while True:
+                head = f.read(8)
+                if len(head) < 8:
+                    return False
+                size, kind = int.from_bytes(head[:4], "big"), head[4:]
+                if kind in (b"moof", b"mvex"):
+                    return True
+                if kind == b"moov":                   # mvex sits inside moov: look there before skipping it
+                    if size == 1:
+                        size = int.from_bytes(f.read(8), "big") - 8
+                    body = f.read(size - 8)
+                    return b"mvex" in body
+                if size == 1:
+                    size = int.from_bytes(f.read(8), "big") - 8
+                elif size == 0:
+                    return False
+                f.seek(size - 8, 1)
+    except OSError:
+        return False
 
 
 def verify(path, expected_seconds=None):
