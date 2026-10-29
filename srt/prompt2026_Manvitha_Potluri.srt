@@ -1,0 +1,1539 @@
+1
+00:00:00,300 --> 00:00:01,902
+Hi, everyone, and thanks for joining.
+
+2
+00:00:02,199 --> 00:00:05,239
+I'm Anvita Patluri, a DevOps cloud
+solutions architect at Twenty-Four
+
+3
+00:00:05,241 --> 00:00:10,477
+Seven Systems, where I spend most
+of my time on AWS, Kubernetes, and
+
+4
+00:00:10,483 --> 00:00:14,019
+more and more on putting AI agents
+safely into cloud operations.
+
+5
+00:00:15,022 --> 00:00:18,698
+This talk is about a mistake
+I see in almost every LLM
+
+6
+00:00:18,788 --> 00:00:19,976
+application that I review.
+
+7
+00:00:20,416 --> 00:00:23,724
+One guardrail sitting in front of
+the model and doing all the work.
+
+8
+00:00:24,669 --> 00:00:25,925
+It looks fine in a demo.
+
+9
+00:00:25,962 --> 00:00:29,849
+It passes all the obvious tests,
+and then someone rephrases an
+
+10
+00:00:29,849 --> 00:00:34,809
+attack, encodes it, or spreads it
+across a few turns of conversation,
+
+11
+00:00:35,301 --> 00:00:36,741
+and it passes right through it.
+
+12
+00:00:37,382 --> 00:00:42,075
+Over the next twenty minutes, I'll
+show you what exactly happened when I
+
+13
+00:00:42,075 --> 00:00:47,164
+measured that properly with three ninety
+prompts, fifteen attack categories,
+
+14
+00:00:47,497 --> 00:00:49,483
+and four detection approaches.
+
+15
+00:00:50,223 --> 00:00:54,325
+I'll show you the pattern that
+fixed most of it, a second
+
+16
+00:00:54,332 --> 00:00:57,717
+independent detection layer that
+looks at the whole conversation.
+
+17
+00:00:58,298 --> 00:01:03,705
+And I'll be honest about an evaluation
+mistake that I made along the way because
+
+18
+00:01:03,791 --> 00:01:05,720
+that has taught me more than the…
+
+19
+00:01:05,958 --> 00:01:07,050
+what the results did.
+
+20
+00:01:07,725 --> 00:01:09,208
+So let's start with the problem.
+
+21
+00:01:10,208 --> 00:01:11,468
+Here's the typical setup.
+
+22
+00:01:12,083 --> 00:01:16,899
+You put AWS Bedrock guardrails or
+a content filter or a line in the
+
+23
+00:01:16,899 --> 00:01:18,545
+system prompt in front of the model.
+
+24
+00:01:19,498 --> 00:01:25,251
+Every incoming message gets checked
+if it contains a banned topic, a known
+
+25
+00:01:25,272 --> 00:01:27,400
+attack phrase, or any personal data.
+
+26
+00:01:28,399 --> 00:01:32,562
+That works for one class of attacks,
+the ones that announce themselves,
+
+27
+00:01:32,687 --> 00:01:37,230
+like ignore your previous instructions,
+and it gets caught in plain sight.
+
+28
+00:01:37,433 --> 00:01:40,169
+But look at what the filter can't see.
+
+29
+00:01:40,818 --> 00:01:43,194
+It evaluates the current
+message in isolation.
+
+30
+00:01:43,582 --> 00:01:49,068
+If an attacker spreads intent over
+four turns instead of one, each
+
+31
+00:01:49,093 --> 00:01:50,905
+turn looks harmless on its own.
+
+32
+00:01:51,563 --> 00:01:55,086
+If the attack is sitting inside
+a document, your RAG might plan
+
+33
+00:01:55,090 --> 00:02:00,732
+retrieved, the user has never typed
+it, so the filter never inspects it.
+
+34
+00:02:01,870 --> 00:02:06,858
+And the reason this survives in production
+is that it looks fine in testing.
+
+35
+00:02:07,226 --> 00:02:09,785
+The attacks we write
+for demos are obvious.
+
+36
+00:02:10,189 --> 00:02:16,629
+Real attackers rephrase, they encode
+it into base 64 or any other language.
+
+37
+00:02:17,259 --> 00:02:20,510
+They wrap the request in
+hypothetical and keep them
+
+38
+00:02:20,567 --> 00:02:23,117
+turning with something that works.
+
+39
+00:02:23,516 --> 00:02:26,594
+So I wanted numbers, not intuition.
+
+40
+00:02:27,671 --> 00:02:30,766
+How much does a single
+layer actually catch?
+
+41
+00:02:32,170 --> 00:02:37,840
+Right So here's a test set with
+three ninety prompts in total.
+
+42
+00:02:38,832 --> 00:02:41,113
+One seventy two are single turn attacks.
+
+43
+00:02:42,092 --> 00:02:45,942
+One message trying to get the
+model to do something it shouldn't.
+
+44
+00:02:46,743 --> 00:02:51,705
+Eighteen are multi-turn sequences where
+the attack only becomes visible when
+
+45
+00:02:51,705 --> 00:02:56,807
+you read several turns together, and two
+hundred are completely legitimate prompts.
+
+46
+00:02:57,208 --> 00:03:00,605
+This part matters, and
+most people skip it.
+
+47
+00:03:01,389 --> 00:03:06,438
+A guardrail that blocks everything has
+a perfect detection rate and is useless.
+
+48
+00:03:07,067 --> 00:03:11,631
+The legitimate prompts tell you how
+often you'd be blocking real users.
+
+49
+00:03:13,295 --> 00:03:16,891
+I ran all of it through
+four detection approaches.
+
+50
+00:03:17,426 --> 00:03:23,033
+First, the keyword-based
+approach, which is what a standard
+
+51
+00:03:23,034 --> 00:03:24,446
+single layer setup gives you.
+
+52
+00:03:24,956 --> 00:03:31,776
+Second, a Nemo style rule base
+that tracks dialogue but needs
+
+53
+00:03:31,776 --> 00:03:33,467
+rules written per pattern.
+
+54
+00:03:34,239 --> 00:03:38,094
+Third, a perplexity-based
+detector, which flags text that
+
+55
+00:03:38,094 --> 00:03:39,717
+looks strategically strange.
+
+56
+00:03:40,899 --> 00:03:46,507
+And a fourth, a semantic intent classifier
+that reads a conversation and judges
+
+57
+00:03:46,720 --> 00:03:48,692
+what the user is actually trying to do.
+
+58
+00:03:49,683 --> 00:03:53,346
+The data set and the code are
+open source, and I'll share the
+
+59
+00:03:53,346 --> 00:03:57,904
+link at the end so you can re-run
+this against your own guardrails
+
+60
+00:03:58,904 --> 00:04:04,235
+So, the attacks span 15 categories
+based on the OWASP Top 10 for LLM
+
+61
+00:04:04,270 --> 00:04:07,186
+applications and wider threat taxonomies.
+
+62
+00:04:08,691 --> 00:04:12,196
+Some are the classics:
+instruction override, persona
+
+63
+00:04:12,196 --> 00:04:14,134
+hijacking, system override.
+
+64
+00:04:14,706 --> 00:04:19,466
+Some hide attack, like encoding
+and obfuscation, multi-language
+
+65
+00:04:19,490 --> 00:04:21,269
+attacks, or code injection.
+
+66
+00:04:22,060 --> 00:04:27,390
+Some never ask directly, hypothetical
+framing, authority claims, social
+
+67
+00:04:27,391 --> 00:04:32,443
+engineering, and some only work
+overtime, incremental escalations,
+
+68
+00:04:32,488 --> 00:04:36,310
+and context manipulations, where
+each step looks reasonable.
+
+69
+00:04:38,285 --> 00:04:40,838
+The threat model was
+deliberately realistic.
+
+70
+00:04:41,434 --> 00:04:44,010
+The attacker has access
+to the public interface.
+
+71
+00:04:45,091 --> 00:04:49,067
+They don't know the model ways
+or the guardrail configuration,
+
+72
+00:04:49,428 --> 00:04:51,147
+but they can see outputs.
+
+73
+00:04:51,400 --> 00:04:55,249
+They can try again, and they
+know filtering is in place.
+
+74
+00:04:55,715 --> 00:04:59,830
+So that the last point is important.
+
+75
+00:05:00,574 --> 00:05:05,204
+An attacker who knows there's a keyword
+filter will simply avoid the keywords.
+
+76
+00:05:05,549 --> 00:05:07,927
+So how did the four approaches do?
+
+77
+00:05:08,927 --> 00:05:12,830
+Here are the results across
+all one ninety attack prompts.
+
+78
+00:05:13,249 --> 00:05:17,733
+The one seventy-two single turn
+plus eighteen multi-turn sequences.
+
+79
+00:05:18,866 --> 00:05:19,859
+Keyword filtering.
+
+80
+00:05:20,260 --> 00:05:25,025
+The standard single layer detected
+twenty-two point six percent with
+
+81
+00:05:25,081 --> 00:05:27,651
+F1 of zero point three six eight.
+
+82
+00:05:28,885 --> 00:05:35,196
+The Nemo-style rule baseline did about
+the same, twenty-one point six percent.
+
+83
+00:05:35,623 --> 00:05:39,237
+That's not a criticism of
+rule-based, dialog management.
+
+84
+00:05:39,768 --> 00:05:41,723
+It is a property of their approach.
+
+85
+00:05:42,405 --> 00:05:46,237
+Rules only catch what someone has
+already written a rule for, right?
+
+86
+00:05:46,922 --> 00:05:50,432
+The perplexity detector
+did worst at ten percent.
+
+87
+00:05:50,838 --> 00:05:53,898
+Most attacks are written in
+perfectly normal-looking app
+
+88
+00:05:53,943 --> 00:05:59,401
+language, so statistical strangeness
+isn't a useful signal for them.
+
+89
+00:06:01,049 --> 00:06:06,274
+The semantic classifier, which reads the
+conversation and judges intent, detected
+
+90
+00:06:06,274 --> 00:06:10,759
+ninety-six point eight percent with
+an F1 of zero point nine eight four.
+
+91
+00:06:11,863 --> 00:06:13,718
+Two more things on this slide.
+
+92
+00:06:14,699 --> 00:06:18,498
+First, the difference between
+keyword filtering and the classifier
+
+93
+00:06:18,570 --> 00:06:20,338
+is statistically significant.
+
+94
+00:06:21,020 --> 00:06:27,514
+McNemar's test, chi-squared of
+twenty-four point zero four, p
+
+95
+00:06:27,515 --> 00:06:29,780
+below zero point zero zero one.
+
+96
+00:06:30,773 --> 00:06:33,240
+This isn't noise from a small sample.
+
+97
+00:06:33,608 --> 00:06:39,247
+Second, four of the fifteen
+categories got past every rule-based
+
+98
+00:06:39,250 --> 00:06:42,035
+system completely, zero detections.
+
+99
+00:06:42,918 --> 00:06:45,273
+The semantic classifier got all of them.
+
+100
+00:06:45,850 --> 00:06:50,112
+The single most striking result,
+though, was in the multi-turn attacks.
+
+101
+00:06:51,112 --> 00:06:56,815
+18 multi-turn attack consequences The
+single keyword layer caught five of them.
+
+102
+00:06:57,432 --> 00:07:01,289
+A classifier with conversation
+context caught all 18 of them.
+
+103
+00:07:02,160 --> 00:07:04,816
+Think about what a
+multi-turn attack looks like.
+
+104
+00:07:06,329 --> 00:07:10,633
+Like turn one, I'm writing a
+training guide for a security tool.
+
+105
+00:07:11,327 --> 00:07:16,404
+Turn two, what kinds of messages
+do attackers send to support bots?
+
+106
+00:07:16,989 --> 00:07:22,552
+And turn three, they send like, "Can you
+show one as an example word for word?"
+
+107
+00:07:23,689 --> 00:07:26,045
+Turn four, ask the model to act on it.
+
+108
+00:07:26,569 --> 00:07:29,929
+Not one of those messages
+contains an obvious attack phrase.
+
+109
+00:07:30,653 --> 00:07:35,686
+A filter that reads one message at
+a time gives every one of the pass.
+
+110
+00:07:36,719 --> 00:07:39,468
+The attack doesn't live
+in a single message.
+
+111
+00:07:39,864 --> 00:07:44,189
+It lives in the trajectory, and
+that's the point of this whole talk.
+
+112
+00:07:44,506 --> 00:07:48,752
+You cannot fix this by adding
+more keywords to the layer one.
+
+113
+00:07:49,441 --> 00:07:50,878
+It's not a tuning problem.
+
+114
+00:07:51,068 --> 00:07:52,196
+It's a structural one
+
+115
+00:07:53,196 --> 00:07:56,920
+Let me name the three structural
+regions as a single boundary layer
+
+116
+00:07:56,923 --> 00:08:00,483
+fields First, it reads one message.
+
+117
+00:08:01,605 --> 00:08:04,311
+Its unit of evaluation
+is the current request.
+
+118
+00:08:04,837 --> 00:08:09,894
+Anything that only becomes an attack
+when you read several requests together
+
+119
+00:08:10,149 --> 00:08:12,433
+is outside its view permanently.
+
+120
+00:08:13,030 --> 00:08:16,058
+Second, it reads what users type.
+
+121
+00:08:16,299 --> 00:08:21,078
+In a RAG application or an agent,
+a lot of what reaches the model
+
+122
+00:08:21,335 --> 00:08:22,725
+was never typed by the user.
+
+123
+00:08:23,422 --> 00:08:28,393
+It came from a retrieved document,
+a web page, an email, or a toolset.
+
+124
+00:08:29,232 --> 00:08:33,052
+That's indirect injection, and
+an input filter doesn't see it.
+
+125
+00:08:33,786 --> 00:08:36,774
+Third, it matches form, not meaning.
+
+126
+00:08:37,240 --> 00:08:40,368
+Keywords and patterns describe
+what an attack looks like.
+
+127
+00:08:40,832 --> 00:08:43,101
+Attackers control what it looks like.
+
+128
+00:08:43,555 --> 00:08:48,902
+Translate it, Base64 encode it, put
+it in a story, and the form changes
+
+129
+00:08:49,202 --> 00:08:50,623
+while the goal stays the same.
+
+130
+00:08:51,619 --> 00:08:54,650
+None of these are fixed by better rules.
+
+131
+00:08:55,348 --> 00:08:58,995
+They're fixed by adding a
+different kind of check, one that
+
+132
+00:08:58,998 --> 00:09:01,540
+looks at the content and intent.
+
+133
+00:09:02,311 --> 00:09:03,966
+That's a dual detection pattern
+
+134
+00:09:04,967 --> 00:09:05,885
+Here's the architecture.
+
+135
+00:09:06,724 --> 00:09:07,996
+It's deliberately simple.
+
+136
+00:09:09,634 --> 00:09:13,339
+Layer one stays exactly where it was.
+
+137
+00:09:13,723 --> 00:09:18,114
+AWS Bedrock Guardrails and its
+standard configuration, content
+
+138
+00:09:18,117 --> 00:09:23,116
+filtering, PI detection, denied
+topics, grounding checks.
+
+139
+00:09:23,934 --> 00:09:29,284
+It's fast, typically under a hundred
+milliseconds, and it reliably catches
+
+140
+00:09:29,284 --> 00:09:31,196
+the attack that announces themselves.
+
+141
+00:09:31,831 --> 00:09:32,847
+You don't throw it away.
+
+142
+00:09:32,933 --> 00:09:35,353
+It's your cheap first line.
+
+143
+00:09:36,104 --> 00:09:39,949
+Layer two It runs after layer one passes.
+
+144
+00:09:40,111 --> 00:09:41,960
+It's a semantic intent classifier.
+
+145
+00:09:42,393 --> 00:09:45,966
+Instead of the single message,
+it receives the current message
+
+146
+00:09:46,064 --> 00:09:48,053
+and recent conversation history.
+
+147
+00:09:48,849 --> 00:09:55,794
+And it asks a different question, not does
+this contain something bad, but what is
+
+148
+00:09:55,794 --> 00:09:58,128
+this user trying to get the model to do?
+
+149
+00:09:59,206 --> 00:10:03,149
+The primary model is only
+invoked if both layers pass.
+
+150
+00:10:04,781 --> 00:10:06,393
+Two design choices matter here.
+
+151
+00:10:06,761 --> 00:10:08,895
+First, the layers are independent.
+
+152
+00:10:09,140 --> 00:10:13,606
+They use different methods, so they
+fail in different ways, and each
+
+153
+00:10:13,609 --> 00:10:15,275
+covers the other's blind spots.
+
+154
+00:10:16,037 --> 00:10:20,776
+If there were two keywords list, you
+just have one bigger keyword list.
+
+155
+00:10:21,694 --> 00:10:26,753
+Second, every decision from both
+layers goes to an audit log and
+
+156
+00:10:26,754 --> 00:10:31,636
+DynamoDB, where something gets
+blocked or worse, gets through.
+
+157
+00:10:32,241 --> 00:10:36,003
+You need not be able to
+reconstruct exactly what and why
+
+158
+00:10:37,003 --> 00:10:41,052
+Let's look into layer two The
+input is the current message
+
+159
+00:10:41,234 --> 00:10:43,325
+plus up to five prior turns.
+
+160
+00:10:43,778 --> 00:10:47,007
+Five is enough to see an
+escalation forming without
+
+161
+00:10:47,037 --> 00:10:48,902
+making every call expensive.
+
+162
+00:10:49,907 --> 00:10:54,617
+The classifier itself is a fast,
+low-cost model with a structured prompt.
+
+163
+00:10:55,056 --> 00:10:56,395
+It is not your main model.
+
+164
+00:10:57,037 --> 00:11:00,903
+You don't want your expensive model
+doing security triage on every
+
+165
+00:11:00,906 --> 00:11:06,238
+request, and you don't want the
+thing being attacked to also be the
+
+166
+00:11:06,242 --> 00:11:08,019
+thing judging the attack, right?
+
+167
+00:11:08,467 --> 00:11:14,816
+So the output is a structured
+JSON verdict, a risk level, low,
+
+168
+00:11:14,820 --> 00:11:20,104
+medium, high, and the attack type
+it thinks it's seen, a confidence
+
+169
+00:11:20,108 --> 00:11:22,020
+score, and a short reasoning string.
+
+170
+00:11:22,476 --> 00:11:26,478
+The example on the right is
+illustrative, but that's the shape.
+
+171
+00:11:27,728 --> 00:11:29,181
+Why structure, right?
+
+172
+00:11:29,707 --> 00:11:30,801
+We have three reasons.
+
+173
+00:11:31,793 --> 00:11:34,986
+You can make decisions in
+code instead of parsing pros.
+
+174
+00:11:35,792 --> 00:11:37,984
+You can log it and analyze it later.
+
+175
+00:11:38,537 --> 00:11:42,498
+And the attack type, the reasoning
+make the audit trail useful to a
+
+176
+00:11:42,499 --> 00:11:44,837
+human who has to review a block.
+
+177
+00:11:45,816 --> 00:11:51,225
+Of high verdict blocks, the request
+before the primary model is called.
+
+178
+00:11:51,960 --> 00:11:57,495
+The threshold is configurable, and
+in the evaluation, I ran an ablation
+
+179
+00:11:57,757 --> 00:12:02,714
+across five confidence thresholds
+to choose the operating point.
+
+180
+00:12:03,268 --> 00:12:05,663
+So we'll come back to that
+trade-off in a minute.
+
+181
+00:12:06,223 --> 00:12:10,228
+First, let's see how the two layers
+work together on real requests.
+
+182
+00:12:11,228 --> 00:12:14,557
+Let me walk you through four
+example requests and follow
+
+183
+00:12:14,617 --> 00:12:16,259
+each one through both layers.
+
+184
+00:12:16,799 --> 00:12:22,205
+these are illustrations of how the pattern
+behaves, not individual measured results.
+
+185
+00:12:22,843 --> 00:12:27,896
+First, a direct instruction override,
+the kind everyone tests, like
+
+186
+00:12:28,115 --> 00:12:29,794
+ignore your previous instructions.
+
+187
+00:12:30,605 --> 00:12:33,614
+Layer one recognizes it and
+blocks it in milliseconds.
+
+188
+00:12:34,001 --> 00:12:37,111
+Layer two never runs, and
+the model is never called.
+
+189
+00:12:37,976 --> 00:12:41,104
+That's layer one doing
+exactly its job cheaply.
+
+190
+00:12:41,882 --> 00:12:46,064
+Second, the same attack, but encoded.
+
+191
+00:12:46,582 --> 00:12:51,724
+For example, in Base６４ or any other
+language, layer one sees nothing
+
+192
+00:12:51,742 --> 00:12:53,599
+it recognizes, so it passes.
+
+193
+00:12:54,378 --> 00:12:59,637
+Layer two reads the intent, returns high
+risk with an attack type of encoded or
+
+194
+00:12:59,684 --> 00:13:02,160
+obfuscated, and the request is blocked.
+
+195
+00:13:03,622 --> 00:13:07,260
+The reasoning field in the audit
+log tells the reviewer why.
+
+196
+00:13:08,736 --> 00:13:11,138
+Third, a four-turn escalation.
+
+197
+00:13:11,773 --> 00:13:16,727
+Each message on its own looks harmless,
+so layer one passes every one.
+
+198
+00:13:17,003 --> 00:13:22,855
+Layer two reads the conversation, sees
+the risk rise by turn low, low, medium,
+
+199
+00:13:23,377 --> 00:13:25,219
+and then high on the fourth turn.
+
+200
+00:13:26,175 --> 00:13:29,860
+When the request really
+actually lands, it's blocked.
+
+201
+00:13:31,315 --> 00:13:34,426
+And fourth, the case people forget.
+
+202
+00:13:34,924 --> 00:13:38,845
+A legitimate question from a
+security engineer asking how to
+
+203
+00:13:38,845 --> 00:13:40,971
+defend against prompt injection.
+
+204
+00:13:41,965 --> 00:13:45,192
+Both layers pass it and
+layer two rates it low risk.
+
+205
+00:13:45,716 --> 00:13:47,140
+It's allowed through.
+
+206
+00:13:48,128 --> 00:13:53,067
+This matters because a guardrail that
+blocked this question is one your…
+
+207
+00:13:53,204 --> 00:13:55,955
+one of your users will
+learn to work around it.
+
+208
+00:13:56,765 --> 00:14:00,662
+In every case, both layers
+write their decision and
+
+209
+00:14:00,663 --> 00:14:02,296
+their reason to the audit log.
+
+210
+00:14:03,296 --> 00:14:09,853
+Here are the raw counts because percentage
+can hide things The keyword layer
+
+211
+00:14:10,606 --> 00:14:16,781
+alone caught 43 of the 190 attacks,
+missed 147, and raised one false
+
+212
+00:14:16,786 --> 00:14:19,274
+alarm on the 200 legitimate prompts.
+
+213
+00:14:19,631 --> 00:14:24,622
+With the semantic layer, 184
+caught, six missed, and zero false
+
+214
+00:14:24,625 --> 00:14:26,155
+alarms on the legitimate set.
+
+215
+00:14:26,931 --> 00:14:31,746
+I want to stay on false alarms for
+a moment because security teams
+
+216
+00:14:31,747 --> 00:14:33,886
+tend to treat them as a minor cost.
+
+217
+00:14:34,162 --> 00:14:34,941
+They aren't.
+
+218
+00:14:35,464 --> 00:14:39,101
+if guardrails blocks a support
+agent asking a normal question,
+
+219
+00:14:39,459 --> 00:14:40,548
+three things can happen.
+
+220
+00:14:41,716 --> 00:14:45,669
+The user is frustrated, someone
+files a t-ticket to loosen the
+
+221
+00:14:45,670 --> 00:14:50,708
+rules, and eventually a team builds
+a path around the guardrail entirely.
+
+222
+00:14:51,143 --> 00:14:54,843
+Over-blocking quietly destroys the
+protection you were trying to add.
+
+223
+00:14:55,956 --> 00:14:59,292
+So treat the threshold
+as a measured decision.
+
+224
+00:15:00,030 --> 00:15:05,289
+I swept five confidence thresholds and
+plotted detection against five positives
+
+225
+00:15:06,759 --> 00:15:09,371
+that picked the operating point as falses.
+
+226
+00:15:09,728 --> 00:15:12,654
+Your right point depends
+on your application.
+
+227
+00:15:13,158 --> 00:15:17,334
+A coding assistant and a banking
+chatbot should not use the same one.
+
+228
+00:15:18,741 --> 00:15:20,585
+And note the six misses.
+
+229
+00:15:22,019 --> 00:15:24,765
+Ninety-six point eight
+percent is not hundred.
+
+230
+00:15:25,336 --> 00:15:28,259
+Layer two reduces the
+risk, it doesn't remove it.
+
+231
+00:15:29,069 --> 00:15:33,080
+That's why for agents I add
+more layers, which I'll get.
+
+232
+00:15:33,787 --> 00:15:39,776
+But first, the part of this project I'm
+least proud of and most glad I caught
+
+233
+00:15:40,776 --> 00:15:41,690
+Here's a mistake.
+
+234
+00:15:42,460 --> 00:15:47,240
+During one of my guardrail evaluations
+on Live Bedrock, I ran the test set
+
+235
+00:15:47,645 --> 00:15:49,253
+and the results file looked fine.
+
+236
+00:15:49,810 --> 00:15:53,061
+Every prompt had a row,
+every row had a response.
+
+237
+00:15:53,425 --> 00:15:54,221
+Nothing crashed.
+
+238
+00:15:55,040 --> 00:15:59,246
+When I actually opened the
+responses, they weren't model output.
+
+239
+00:16:00,024 --> 00:16:03,445
+There were throttling exceptions,
+errors from the Bedrock API.
+
+240
+00:16:04,145 --> 00:16:09,673
+I'd hit rate limits, and my harness
+had dutifully recorded the error
+
+241
+00:16:09,676 --> 00:16:11,428
+text as if it were the answer.
+
+242
+00:16:12,580 --> 00:16:15,791
+That's dangerous in a specific
+way for guardrail testing.
+
+243
+00:16:16,435 --> 00:16:21,410
+Depending on how you score, an error
+can look like a block, which makes
+
+244
+00:16:21,411 --> 00:16:23,928
+your guardrail look better than it is.
+
+245
+00:16:24,618 --> 00:16:28,606
+Or it can look like a pass,
+which makes it look worse.
+
+246
+00:16:29,086 --> 00:16:33,474
+Either way, the numbers are meaningless,
+and they look completely plausible.
+
+247
+00:16:34,719 --> 00:16:35,976
+How I caught it, right?
+
+248
+00:16:36,350 --> 00:16:40,792
+I read a sample of the raw responses
+instead of only reading the summary.
+
+249
+00:16:41,366 --> 00:16:41,843
+That's it.
+
+250
+00:16:42,557 --> 00:16:43,387
+No clever tool.
+
+251
+00:16:44,368 --> 00:16:50,088
+What I did about it is that I threw
+out those results, rebuilt the Bedrock
+
+252
+00:16:50,090 --> 00:16:55,291
+infrastructure with a fresh guardrail,
+and re-ran those evaluations from scratch.
+
+253
+00:16:55,957 --> 00:16:59,253
+The results I report from the
+work come from the verified
+
+254
+00:16:59,257 --> 00:17:00,946
+results, not the broken one.
+
+255
+00:17:02,573 --> 00:17:06,869
+I'm telling you this because
+I don't think I'm unusual.
+
+256
+00:17:07,485 --> 00:17:13,542
+Most LLM evaluation harnesses I've seen
+would make the same mistake silently.
+
+257
+00:17:14,542 --> 00:17:19,407
+So here's a checklist I now use for
+any guardrail or LLM evaluation.
+
+258
+00:17:20,035 --> 00:17:22,215
+One, type every response.
+
+259
+00:17:22,655 --> 00:17:26,074
+A result should be, one
+of few explicit states.
+
+260
+00:17:26,196 --> 00:17:31,649
+The model answered, the guardrail
+blocked, or the call errored, and those
+
+261
+00:17:31,840 --> 00:17:33,866
+must never collapse into one field.
+
+262
+00:17:34,418 --> 00:17:38,682
+If you store the error message in the
+same column as the model's answer, you
+
+263
+00:17:38,682 --> 00:17:40,857
+will eventually score it as an answer.
+
+264
+00:17:42,039 --> 00:17:44,941
+Two, fail the run on errors.
+
+265
+00:17:45,464 --> 00:17:46,797
+Set a small error budget.
+
+266
+00:17:47,379 --> 00:17:51,615
+If more calls than the
+fail, the run is invalid.
+
+267
+00:17:52,369 --> 00:17:52,815
+Full stop.
+
+268
+00:17:53,202 --> 00:17:53,811
+No report.
+
+269
+00:17:54,579 --> 00:17:58,041
+Try throttle calls with
+exponential backoff.
+
+270
+00:17:58,251 --> 00:18:02,431
+But if they keep failing, stop
+rather than produce numbers.
+
+271
+00:18:02,670 --> 00:18:02,899
+Right?
+
+272
+00:18:03,607 --> 00:18:06,518
+Number three, redraw samples.
+
+273
+00:18:06,845 --> 00:18:12,572
+Before you trust any summary, open real
+responses, a few from every category.
+
+274
+00:18:13,026 --> 00:18:16,126
+It takes ten minutes and
+is the step that saved me.
+
+275
+00:18:17,786 --> 00:18:20,179
+Four, include legitimate prompts.
+
+276
+00:18:20,724 --> 00:18:27,044
+Always run a benign set along the attacks
+and report false alarms next to detection.
+
+277
+00:18:28,407 --> 00:18:33,100
+A single detection number without a
+false positive number is not a result.
+
+278
+00:18:34,114 --> 00:18:35,893
+None of this is sophisticated.
+
+279
+00:18:36,190 --> 00:18:36,967
+That's the point.
+
+280
+00:18:37,757 --> 00:18:42,425
+These are the boring checks that make
+the interesting numbers trustworthy.
+
+281
+00:18:43,425 --> 00:18:45,347
+Everything so far is about the chat.
+
+282
+00:18:45,739 --> 00:18:49,562
+The worst outcome is the model
+saying something it shouldn't.
+
+283
+00:18:50,317 --> 00:18:54,427
+With agents, the worst outcome
+is a model doing something it
+
+284
+00:18:54,429 --> 00:18:58,582
+shouldn't, like deleting a resource
+or scaling a cluster to zero.
+
+285
+00:18:59,248 --> 00:19:03,464
+So for agentic systems on Bedrock,
+I use a five-layer architecture.
+
+286
+00:19:03,747 --> 00:19:07,995
+The first two layers, input
+validation and adversarial detection,
+
+287
+00:19:08,345 --> 00:19:12,430
+follow the same idea as a dual
+detection pattern you've just seen.
+
+288
+00:19:13,052 --> 00:19:15,018
+Layer three is tool authorization.
+
+289
+00:19:15,229 --> 00:19:21,363
+Every tool call is classified as routine,
+destructive, or denied before it executes.
+
+290
+00:19:22,059 --> 00:19:26,149
+And layer four checks the output
+and the model's confidence.
+
+291
+00:19:27,011 --> 00:19:31,872
+With layer five is a human approval
+gate for high-risk actions.
+
+292
+00:19:32,234 --> 00:19:36,377
+The agent can propose deleting
+something, a person has to approve it.
+
+293
+00:19:38,076 --> 00:19:41,760
+The numbers on the right are from
+a separate evaluation of that
+
+294
+00:19:41,762 --> 00:19:48,392
+five-layer architecture on live AWS
+infrastructure, not the 390 prompt set.
+
+295
+00:19:48,781 --> 00:19:52,639
+ninety-four percent overall accuracy
+with a six percent false positive
+
+296
+00:19:52,642 --> 00:19:57,050
+rate, zero false positives on harmful
+requests, hundred percent adversarial
+
+297
+00:19:57,051 --> 00:20:01,265
+detection, and seven point six
+times latency reduction against the
+
+298
+00:20:01,265 --> 00:20:06,607
+baseline, about one point eight seconds
+versus thirteen point nine seconds.
+
+299
+00:20:07,612 --> 00:20:13,148
+The zero false negatives is the number I
+care about most of-- most for the agents.
+
+300
+00:20:13,660 --> 00:20:15,889
+In chat, a miss is embarrassing.
+
+301
+00:20:17,099 --> 00:20:19,678
+In operations, a miss can be an outage
+
+302
+00:20:20,678 --> 00:20:22,549
+Let me leave you with four things.
+
+303
+00:20:24,409 --> 00:20:27,088
+One, keep your boundary filter.
+
+304
+00:20:27,265 --> 00:20:30,068
+It's cheap, and it catches
+the obvious attacks.
+
+305
+00:20:30,994 --> 00:20:31,951
+Judge's intent.
+
+306
+00:20:32,820 --> 00:20:37,694
+Then but add a second independent
+check that reads the conversation.
+
+307
+00:20:39,225 --> 00:20:43,533
+The key word is independent, a different
+method, so it fails differently.
+
+308
+00:20:44,615 --> 00:20:47,102
+Two, change what you test with.
+
+309
+00:20:47,722 --> 00:20:53,952
+If your guardrail test set is only
+single obvious English language attacks,
+
+310
+00:20:54,681 --> 00:20:59,815
+you're mostly measuring the easy fifth
+that a single layer already catches.
+
+311
+00:21:00,793 --> 00:21:05,950
+Add multi-turn consequences, encode
+attacks, and indirect injection
+
+312
+00:21:05,956 --> 00:21:07,247
+through retrieved content.
+
+313
+00:21:08,519 --> 00:21:14,288
+Three, always report false alarms
+next to detection using a legitimate
+
+314
+00:21:14,602 --> 00:21:19,519
+real prompt and choosing your blocking
+threshold by measuring and not guessing.
+
+315
+00:21:20,467 --> 00:21:23,758
+Four, make your evaluation
+harness fail loudly.
+
+316
+00:21:24,341 --> 00:21:26,033
+Separate errors from answers.
+
+317
+00:21:26,479 --> 00:21:31,132
+Invalidate turns with too many
+errors, and redraw samples
+
+318
+00:21:31,203 --> 00:21:32,890
+before you believe any summary.
+
+319
+00:21:34,102 --> 00:21:38,394
+It's the cheapest step in this list
+and is the one that saved my results.
+
+320
+00:21:39,394 --> 00:21:40,360
+That's everything.
+
+321
+00:21:40,559 --> 00:21:44,355
+The code and the full three 90
+prompt annotated data set are
+
+322
+00:21:44,394 --> 00:21:46,795
+open source under Apache 2.0
+
+323
+00:21:47,283 --> 00:21:50,824
+at the first link, so you can
+run the same tests again on
+
+324
+00:21:50,824 --> 00:21:52,309
+your own guardrails and compare.
+
+325
+00:21:53,350 --> 00:21:57,579
+The second repository has the five-layer
+architecture, and the guardrail
+
+326
+00:21:57,631 --> 00:22:02,054
+is also available as Terraform
+module on the HashiCorp registry.
+
+327
+00:22:02,793 --> 00:22:07,244
+If you want the longer write-up of
+the agent layers, there's an article
+
+328
+00:22:07,789 --> 00:22:12,169
+on DZone called Five Layers Between
+Your AI Agent and a Production Outage.
+
+329
+00:22:13,195 --> 00:22:19,744
+I'd love to hear what you find when you
+test on your own setup, especially if your
+
+330
+00:22:19,745 --> 00:22:21,618
+numbers look very different from mine.
+
+331
+00:22:22,937 --> 00:22:28,913
+Connect with me on LinkedIn or
+find me on CON forty-two Discord.
+
+332
+00:22:29,898 --> 00:22:34,199
+Thank you for watching, and enjoy the
+rest of CON forty-two Prompt Engineering.
+
+333
+00:22:34,874 --> 00:22:35,244
+Thank you.
