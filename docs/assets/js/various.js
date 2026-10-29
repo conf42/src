@@ -3107,7 +3107,51 @@ function phoneJunk(form) {
     }
     return null;
 }
+// ---- Newsletter form: email typos and throwaway inboxes -----------------------------------
+// From the 2026-10-29 list scan: typo'd domains (gmqil.com, gmailc.com, 90gmail.com) never get the
+// confirmation email, so those people are lost; throwaway inboxes (mailinator, sharklasers) are junk.
+var _mailHosts = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com", "rediffmail.com", "protonmail.com"];
+var _realLookalikes = { "ymail.com": 1, "mail.com": 1, "email.com": 1, "gmx.com": 1, "hotmail.co.uk": 1, "yahoo.co.uk": 1, "yahoo.co.in": 1, "outlook.in": 1, "hotmail.it": 1, "hotmail.fr": 1, "hotmail.es": 1, "hotmail.de": 1, "yahoo.ca": 1, "yahoo.fr": 1, "yahoo.de": 1, "yahoo.es": 1, "yahoo.it": 1, "hotmail.ca": 1, "outlook.de": 1, "outlook.fr": 1, "outlook.es": 1, "outlook.it": 1 };
+var _throwaway = /(^|\.)(mailinator|sharklasers|guerrillamail|guerrillamailblock|grr|yopmail|10minutemail|temp-?mail|tempmail\w*|trashmail|dispostable|getnada|maildrop|mailnesia|fakeinbox|throwawaymail|mohmal|emailondeck|spam4|mintemail|mailcatch|tempinbox|burnermail|moakt|tmpmail|1secmail|emailfake|whwow|tutoreve)\.[a-z.]+$/;
+function editDistance1(a, b) {          // true when a and b differ by one insert, delete or substitution
+    if (Math.abs(a.length - b.length) > 1 || a === b) return false;
+    var i = 0, j = 0, edits = 0;
+    while (i < a.length && j < b.length) {
+        if (a.charAt(i) === b.charAt(j)) { i++; j++; continue; }
+        if (++edits > 1) return false;
+        if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+    }
+    return edits + (a.length - i) + (b.length - j) <= 1;
+}
+function swapped(a, b) {                 // "gmial" vs "gmail": two neighbouring letters swapped
+    if (a.length !== b.length || a === b) return false;
+    for (var i = 0; i < a.length - 1; i++) {
+        if (a.charAt(i) !== b.charAt(i)) return a.charAt(i) === b.charAt(i + 1) && a.charAt(i + 1) === b.charAt(i) && a.slice(i + 2) === b.slice(i + 2);
+    }
+    return false;
+}
+function emailProblem(form) {
+    var el = form.querySelector("#field_0");
+    if (!el) return null;
+    var v = el.value.trim().toLowerCase(), at = v.lastIndexOf("@");
+    if (at < 1) return null;                                    // the browser's own type=email check handles this
+    var local = v.slice(0, at), dom = v.slice(at + 1);
+    if (_throwaway.test(dom)) return { field: el, message: "Please use your own email address, not a temporary inbox." };
+    if (/\.(con|cmo|cpm|ocm|comm|om|vom|xom)$/.test(dom)) return { field: el, message: "Please check your email address, did you mean " + local + "@" + dom.replace(/\.[a-z]+$/, ".com") + "?" };
+    if (_realLookalikes[dom] || _mailHosts.indexOf(dom) >= 0) return null;
+    for (var i = 0; i < _mailHosts.length; i++) {
+        var h = _mailHosts[i], name = h.split(".")[0];
+        var typo = editDistance1(dom, h) ||                                         // gmqil.com, gmailc.com
+                   dom === name + ".co" || dom === name + ".cm" ||                             // gmail.co, gmail.cm
+                   (dom.length > h.length && dom.slice(-h.length) === h && !/\./.test(dom.slice(0, -h.length))) ||   // 90gmail.com
+                   (editDistance1(dom.split(".")[0], name) || swapped(dom.split(".")[0], name)) && /^[a-z0-9-]+\.com$/.test(dom) && name.length >= 5;   // gmal.com, gmial.com, hotmial.com
+        if (typo) return { field: el, message: "Please check your email address, did you mean " + local + "@" + h + "?" };
+    }
+    return null;
+}
 function validateHumanFields(form) {
+    var mailProblem = emailProblem(form);
+    if (mailProblem) return mailProblem;
     var checks = [["field_1", "name"], ["field_2", "name"], ["field_5", "text"], ["field_4", "text"]];
     for (var i = 0; i < checks.length; i++) {
         var el = form.querySelector("#" + checks[i][0]);
