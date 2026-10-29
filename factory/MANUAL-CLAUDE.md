@@ -52,6 +52,7 @@ works the same way.
 - *"Retry Emmy Eide."* / *"Redo Girish Konda with his current video."*
 - *"Edits are paused - what happened?"* - Claude reads the edit report and tells you what to check in Descript.
 - *"Publish the status."* - updates the Factory logs tab of this page.
+- *"Proofread the transcripts of DevOps 2026."* - Claude checks the event's transcripts on the site again and fixes misheard words.
 - *"Which talks still have no video, and how many days are left?"*
 
 ## 4. What Claude won't do on its own
@@ -69,6 +70,8 @@ on the list.
 
 ## Changelog
 
+- **2026-10-29** - Transcripts are proofread before they ship: glossary fixes plus Claude reading each talk in context.
+  Ask *"Proofread the transcripts of Feature Flags 2026"* to redo the ones already on the site.
 - **2026-10-29** - Finished talks ship by themselves: transcript and slides go to the site at the end of every run
   (a deck that comes later goes with the next run). Ask *"Ship the transcripts and slides"* to do it right away.
 - **2026-10-29** - YouTube titles name the event the way earlier editions did on YouTube, in words: `Conf42 Prompt

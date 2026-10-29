@@ -5,7 +5,7 @@
 Conf42 talk videos, from the Google Drive download to finished, YouTube-ready files on the Desktop:
 
 ```
-Drive zips  ->  unzip + match to speakers  ->  Descript (upload, AI edit, publish)  ->  MP4 + SRT  ->  loudness  ->  QA
+Drive zips  ->  unzip + match to speakers  ->  Descript (upload, AI edit, publish)  ->  MP4 + SRT  ->  proofread  ->  loudness  ->  QA
 ```
 
 Per talk:
@@ -29,6 +29,14 @@ Per talk:
 4. **Edit** with Descript's AI editor: Studio Sound 80%, limiter, volume 300%, filler words removed, word gaps over 2s cut to 1s.
 5. **Publish** (unlisted) at the largest size not above the source or `max_resolution`, and **download** the MP4.
 6. **SRT** transcript, named `<short_url>_<Name1>.srt`, which is what the site expects in `src/srt/`.
+6b. **Proofread** (Marek 2026-10-29): Descript knows no software engineering ("CON forty-two", "future flags" in a
+   feature flags talk, "L LMS"). `glossary.yml` fixes the sure-fire ones, then Claude (Claude Code CLI, `claude -p`, no
+   tools, the machine's login - no API key) reads the transcript with the talk's title, abstract, keywords and speakers
+   and returns misheard words only as `{cue, from, to}`; a fix whose words aren't in that cue is dropped, and only cue
+   text changes, never timings. Descript's original: `srt/descript/`, the fixes: `srt/proofread/<file>.json`. Without
+   the CLI the glossary fixes stand and the step is "partial"; `ship` proofreads every finished talk that missed it (or
+   got glossary only) before copying. `python -m factory proofread <short_url> ["<speaker>"]` does the transcripts
+   already in `src/srt/` and commits them. Settings: `proofread_*`. Code: `factory/proofread.py`.
 7. **Loudness**: ffmpeg measures each video and sets it to YouTube's level (-14 LUFS, true peak -1.5 dB).
    The video stream is copied, so there's no quality loss. In the same pass the video is **trimmed to the speech**:
    it starts 0.3 s before the first word and ends 1 s after the last one (from the transcript). The SRT and the

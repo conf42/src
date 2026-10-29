@@ -285,6 +285,9 @@ def doctor(cfg, repo, check_descript=True):
         "reinstall LibreOffice: winget install --force TheDocumentFoundation.LibreOffice" if os.name == "nt" else
         "brew reinstall --cask libreoffice" if sys.platform == "darwin" else "reinstall libreoffice")
     add("PPTX decks -> PDF", ok, detail, fix, required=False)
+    cl = shutil.which("claude")                         # the proofread step's contextual pass (glossary works without)
+    add("Claude Code (transcript proofread)", bool(cl), cl or "not found - transcripts get the glossary fixes only",
+        "install Claude Code (https://claude.com/claude-code) and sign in once", required=False)
     root = work_root(cfg)
     try:
         os.makedirs(root, exist_ok=True)

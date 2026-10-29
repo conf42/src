@@ -21,7 +21,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # src/factory
 sys.path.insert(0, HERE)
-from factory import app, events, machine, media, pipeline, slides  # noqa: E402
+from factory import app, events, machine, media, pipeline, proofread, slides  # noqa: E402
 
 FAILED = []
 
@@ -162,6 +162,23 @@ def main():
         check("unknown names are never guessed", miss is None, why)
     except Exception as ex:
         check("speaker matching", False, ex)
+
+    # 7b. transcript proofread, glossary only (Claude is not called here): text fixed, timings and cues untouched
+    try:
+        srt = ("1\n00:00:00,500 --> 00:00:02,000\nWelcome to CON forty-two\nFuture Flags twenty twenty-six.\n\n"
+               "2\n00:00:02,100 --> 00:00:04,000\nL LMS and future flags, see conf42.com\n")
+        path = os.path.join(tempfile.mkdtemp(), "featureflags2026_Test.srt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(srt)
+        rep = proofread.proofread_file(path, {"event": "Conf42 Feature Flags 2026"}, {}, use_claude=False)
+        got = open(path, encoding="utf-8").read()
+        want = srt.replace("CON forty-two", "Conf42").replace("Future Flags", "Feature Flags") \
+                  .replace("L LMS", "LLMs").replace("future flags", "feature flags")
+        check("transcript proofread (glossary)", got == want and len(rep["fixes"]) == 4, "%d fixes" % len(rep["fixes"]))
+        lines = proofread._replace(["Welcome to CON forty-two", "Future Flags"], "CON forty-two Future Flags", "Conf42 Feature Flags")
+        check("proofread keeps the cue's line break", lines == ["Welcome to Conf42", "Feature Flags"], lines)
+    except Exception as ex:
+        check("transcript proofread (glossary)", False, ex)
 
     # 8. GPU scheduler inputs
     g = media.gpu_status()

@@ -23,7 +23,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 import requests
 import yaml
 
-from . import events, machine, media, youtube
+from . import events, machine, media, proofread, youtube
 from . import slides as slides_mod
 from .descript import Descript
 
@@ -32,7 +32,7 @@ VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi")
 SAFETY_COPY = re.compile(r"(?:^|/)([^/]+) - safety copy/$")   # conf42.com/record's 1-minute parts of a recording
 SAFETY_PART = re.compile(r"^part \d+\.mp4$", re.I)
 SLIDE_EXT = (".pdf", ".pptx", ".ppt", ".key", ".odp")
-STEPS = ["render", "health", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]
+STEPS = ["render", "health", "upload", "edit", "publish", "download", "srt", "proofread", "chapters", "loudness", "qa"]
 class HealthBlocked(RuntimeError):
     """The video is not good enough for a conference talk (no sound, muted, almost no sound): never uploaded."""
 
@@ -423,6 +423,7 @@ class Run:
         if str(self.cfg.get("ship", True)).lower() in ("false", "0", "no"):
             return out
         done = {k: t for k, t in self.state["talks"].items() if t.get("finished")}
+        self.proofread_finished(done)                  # nothing goes to the site unproofread (Marek 2026-10-29)
         jobs = []
         site_srt = os.path.join(events.REPO, "srt")
         if os.path.isdir(site_srt):
@@ -462,6 +463,46 @@ class Run:
             self.note("shipped %d %s to the site%s" % (len(new), label, "" if r.returncode == 0
                                                          else " (commit made, push failed: %s)" % r.stderr[-200:]))
         return out
+
+    # ---- proofread: Descript's transcript, checked for software-engineering words (Marek 2026-10-29) ----------
+    def srt_path(self, t):
+        return os.path.join(self.srt_dir, ("%s_%s.srt" % (self.ev["short_url"], t["name1"])).replace(" ", "_"))
+
+    def proofread_step(self, key, srt_path):
+        """Glossary + Claude fix the misheard words in the talk's transcript (see proofread.py). The Descript original
+        is kept in srt/descript/, the fixes go to srt/proofread/<file>.json. Never fails the talk: without Claude the
+        glossary fixes stand and the step is "partial" - ship tries Claude again."""
+        t = self.talk(key)
+        self.set(key, "proofread", "running", label="Claude reads the transcript")
+        keep = os.path.join(self.srt_dir, "descript", os.path.basename(srt_path))
+        if not os.path.exists(keep):
+            os.makedirs(os.path.dirname(keep), exist_ok=True)
+            shutil.copy2(srt_path, keep)
+        row = next((x for x in events.talks(self.ev) if x["speakers"] == key or x["name1"] == t["name1"]), None)
+        rep = proofread.proofread_file(srt_path, proofread.talk_context(self.ev, row), self.cfg)
+        os.makedirs(os.path.join(self.srt_dir, "proofread"), exist_ok=True)
+        with open(os.path.join(self.srt_dir, "proofread", os.path.basename(srt_path) + ".json"), "w", encoding="utf-8") as f:
+            json.dump(rep, f, indent=1, ensure_ascii=False)
+        note = "%d fixes (%d glossary, %d Claude)" % (len(rep["fixes"]), rep["glossary"], rep["claude"])
+        if rep["partial"]:
+            note += " - glossary only: %s" % (rep["error"] or "Claude off in settings")
+        self.set(key, "proofread", "done", fixes=len(rep["fixes"]), partial=rep["partial"], note=note)
+        return rep
+
+    def proofread_finished(self, done):
+        """Finished talks whose transcript was never proofread (finished before 2026-10-29) or only by the glossary:
+        proofread now, a few at a time, before ship copies them."""
+        todo = [k for k, t in done.items() if os.path.exists(self.srt_path(t))
+                and ((t["steps"].get("proofread") or {}).get("status") != "done" or t["steps"]["proofread"].get("partial"))]
+        if not todo:
+            return
+        def one(k):
+            try:
+                self.proofread_step(k, self.srt_path(self.talk(k)))
+            except Exception as ex:
+                self.set(k, "proofread", "failed", error=str(ex)[:300])
+        with ThreadPoolExecutor(int(self.cfg.get("proofread_parallel", 4))) as pool:
+            list(pool.map(one, todo))
 
     def slides(self, talk_list=None):
         """Decks: match, one per talk, convert to PDF, rename for the site, compress under the limit (see slides.py).
@@ -606,7 +647,11 @@ class Run:
                 self.set(key, "srt", "running")
                 with open(srt_path, "wb") as f:
                     f.write(d.srt(pid, cid))
+                os.makedirs(os.path.join(self.srt_dir, "descript"), exist_ok=True)   # Descript's own, before proofread
+                shutil.copy2(srt_path, os.path.join(self.srt_dir, "descript", os.path.basename(srt_path)))
                 self.set(key, "srt", "done", file=os.path.basename(srt_path))
+            if not done("proofread"):
+                self.proofread_step(key, srt_path)
             if not done("chapters"):
                 self.chapters_step(key, d)
             if not done("loudness"):
@@ -816,7 +861,7 @@ class Run:
             if cid not in t["broken_compositions"]:
                 t["broken_compositions"].append(cid)
             t["composition_id"] = None
-            for step in ("upload", "edit", "publish", "download", "srt", "loudness", "qa"):
+            for step in ("upload", "edit", "publish", "download", "srt", "proofread", "loudness", "qa"):
                 t["steps"].pop(step, None)
             if (t["steps"].get("render") or {}).get("note", "").startswith("not needed"):
                 t["steps"].pop("render", None)
@@ -1032,6 +1077,54 @@ class Run:
                 json.dump(self.state, f, indent=1, ensure_ascii=False)
             os.replace(tmp, self.state_path)
         self.publish(force=True)
+
+
+def proofread_site(short_url, only=None, push=True, log=print):
+    """Proofread the transcripts an event already has on the site (src/srt/<short_url>_*.srt), in place, then commit
+    and push the changed ones - for talks shipped before the proofread step existed, or by hand. The fixes are listed
+    in _db/factory_runs/<short_url>/proofread.json. Returns that report."""
+    cfg, ev = settings(), events.event(short_url)
+    site_srt = os.path.join(events.REPO, "srt")
+    talk_list = events.talks(ev)
+    rows = {("%s_%s" % (short_url, t["name1"])).replace(" ", "_"): t for t in talk_list}
+    files = sorted(glob.glob(os.path.join(site_srt, short_url + "_*.srt")))
+    if only:
+        files = [f for f in files if only.replace(" ", "_").lower() in os.path.basename(f).lower()]
+
+    def row(path):                                  # file names can be cut short: "Alagar_Raja_Govindasa"
+        stem = os.path.splitext(os.path.basename(path))[0]
+        return rows.get(stem) or next((t for k, t in rows.items() if k.startswith(stem) or stem.startswith(k)), None)
+
+    def one(path):
+        r = proofread.proofread_file(path, proofread.talk_context(ev, row(path)), cfg)
+        log("  %-55s %2d fixes (%d glossary, %d Claude)%s" % (r["file"], len(r["fixes"]), r["glossary"], r["claude"],
+                                                             " PARTIAL: " + str(r["error"]) if r["partial"] else ""))
+        return r
+
+    log("%s: proofreading %d transcripts" % (ev["title"], len(files)))
+    with ThreadPoolExecutor(int(cfg.get("proofread_parallel", 4))) as pool:
+        reps = list(pool.map(one, files))
+    dest = os.path.join(REPO_RUNS, short_url, "proofread.json")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    old = {}
+    if os.path.exists(dest):
+        with open(dest, encoding="utf-8") as f:
+            old = {r["file"]: r for r in json.load(f)}
+    old.update({r["file"]: dict(r, at=now()) for r in reps})
+    with open(dest, "w", encoding="utf-8") as f:
+        json.dump(sorted(old.values(), key=lambda r: r["file"]), f, indent=1, ensure_ascii=False)
+    git = lambda *a: subprocess.run(["git", "-C", events.REPO] + list(a), capture_output=True, text=True, timeout=300)
+    changed = [l[3:] for l in git("status", "--porcelain", "--", "srt", os.path.relpath(dest, events.REPO)).stdout.splitlines()
+               if l[3:].startswith("srt/" + short_url + "_") or l[3:].endswith("proofread.json")]
+    if push and changed:
+        git("add", *changed)
+        git("commit", "-q", "-m", "%s: transcripts proofread (%d fixes in %d files, factory)" % (
+            ev["title"], sum(len(r["fixes"]) for r in reps), sum(1 for r in reps if r["fixes"])))
+        git("pull", "--rebase", "--autostash", "-q")
+        if git("push", "-q").returncode != 0:
+            git("pull", "--rebase", "--autostash", "-q")
+            git("push", "-q")
+    return reps
 
 
 def _srt_time(s):

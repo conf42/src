@@ -5,6 +5,9 @@
   python -m factory slides <short_url> [zip/folder ...]   decks only: unzip, match, PDF, rename, compress < 5 MB
   python -m factory ship   <short_url>                    finished talks' transcripts + decks to the site now (every
                                                           run does it at the end; settings ship: false turns it off)
+  python -m factory proofread <short_url> ["<speaker>"] [--no-push]  proofread the event's transcripts already on the
+                                                          site (src/srt): glossary + Claude fix misheard words, then commit
+                                                          + push (new talks get it in every run, before ship)
   python -m factory status <short_url>                    progress summary
   python -m factory chapters <short_url>                  YouTube titles + descriptions + chapters -> <event>/YouTube items.txt
   python -m factory retry  <short_url> "<speaker(s)>"     retry one talk from its failed step
@@ -102,6 +105,13 @@ def main(argv):
     if cmd == "serve":
         from . import app
         app.serve()
+        return
+    if cmd == "proofread":                               # transcripts already on the site (Marek 2026-10-29)
+        push = "--no-push" not in argv
+        argv = [a for a in argv if a != "--no-push"]
+        reps = pipeline.proofread_site(argv[1], argv[2] if len(argv) > 2 else None, push=push)
+        print("%d fixes in %d of %d transcripts, %d partial" % (sum(len(r["fixes"]) for r in reps),
+              sum(1 for r in reps if r["fixes"]), len(reps), sum(1 for r in reps if r["partial"])))
         return
     run = pipeline.Run(argv[1])
     if cmd == "slides":

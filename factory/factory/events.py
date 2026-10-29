@@ -45,7 +45,10 @@ def talks(ev):
     for r in rows:
         n1, n2 = (r.get("Name1") or "").strip(), (r.get("Name2") or "").strip()
         if n1:
-            out.append({"name1": n1, "name2": n2, "speakers": n1 + (" & " + n2 if n2 else ""), "title": r.get("Title", "")})
+            out.append({"name1": n1, "name2": n2, "speakers": n1 + (" & " + n2 if n2 else ""), "title": r.get("Title", ""),
+                        "abstract": r.get("Abstract", ""), "keywords": r.get("Keywords", ""),
+                        "job1": r.get("JobTitle1", ""), "company1": r.get("Company1", ""),
+                        "job2": r.get("JobTitle2", ""), "company2": r.get("Company2", "")})
     return out
 
 
