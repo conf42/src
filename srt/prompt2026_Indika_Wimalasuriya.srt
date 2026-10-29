@@ -1,0 +1,1999 @@
+1
+00:00:00,300 --> 00:00:05,243
+Hello, everyone, and welcome
+to CON42 Prompt Engineering.
+
+2
+00:00:05,736 --> 00:00:11,748
+My name is Indika Vimalasuriya, and today
+I'm going to walk you through about how
+
+3
+00:00:11,748 --> 00:00:17,191
+we can observe AWS Agent Core with Datadog
+
+4
+00:00:18,191 --> 00:00:18,890
+Here's the plan.
+
+5
+00:00:19,431 --> 00:00:23,748
+We'll follow one agent, a real
+ins- insurance assistant running
+
+6
+00:00:23,750 --> 00:00:29,816
+on Amazon Bedrock Code, and watch
+how Datadog turns its telemetry
+
+7
+00:00:29,816 --> 00:00:31,331
+into a single operational view
+
+8
+00:00:32,331 --> 00:00:36,555
+By the end, I want you to leave with
+two things: a reference architecture
+
+9
+00:00:36,874 --> 00:00:42,887
+you can copy and a SRE way of
+thinking about agents in production
+
+10
+00:00:43,887 --> 00:00:45,540
+So we'll cover four parts.
+
+11
+00:00:45,919 --> 00:00:54,579
+First, why agents break monitoring and
+anatomy changes, what health even means.
+
+12
+00:00:55,251 --> 00:00:59,725
+Second, the architecture,
+AgentCore, Bedrock, and the
+
+13
+00:00:59,754 --> 00:01:02,649
+tools all observed by Datadog.
+
+14
+00:01:04,278 --> 00:01:09,228
+I'll show you exactly how telemetry
+gets in, including the parts that didn't
+
+15
+00:01:09,231 --> 00:01:11,719
+work the first time when I did this POC.
+
+16
+00:01:12,358 --> 00:01:19,486
+Third, one trace, one view, how AP- APM,
+LLM observability, infrastructure, and
+
+17
+00:01:19,492 --> 00:01:22,182
+logs come together for a single request.
+
+18
+00:01:22,782 --> 00:01:28,010
+That's where we'll try to
+show something on live.
+
+19
+00:01:29,214 --> 00:01:34,220
+And fourth, operating at scale,
+how cost, guardrails, Quill
+
+20
+00:01:34,225 --> 00:01:36,198
+Switch, and SLOs come together.
+
+21
+00:01:36,930 --> 00:01:41,745
+The goal is to move from deploying
+agents to operating them reliably.
+
+22
+00:01:42,814 --> 00:01:45,538
+So let's start with the why part first
+
+23
+00:01:46,538 --> 00:01:48,243
+So why agents break monitoring?
+
+24
+00:01:49,728 --> 00:01:52,736
+Agents don't just run, they act.
+
+25
+00:01:53,797 --> 00:01:58,524
+For twenty years, our first monitoring
+question has been, "Is it running?"
+
+26
+00:01:59,371 --> 00:02:04,210
+And for a normal service, that
+question gets you most of the way.
+
+27
+00:02:05,794 --> 00:02:07,024
+But agents are different.
+
+28
+00:02:07,838 --> 00:02:10,215
+An agent doesn't just respond.
+
+29
+00:02:10,805 --> 00:02:16,086
+It reasons over data, decides
+which tool to call, read the
+
+30
+00:02:16,086 --> 00:02:18,490
+result, and act on the world.
+
+31
+00:02:20,339 --> 00:02:23,067
+Look at the loop on the right.
+
+32
+00:02:24,072 --> 00:02:29,990
+Reason, call to tool, observe, act,
+and then maybe go around again.
+
+33
+00:02:30,870 --> 00:02:33,747
+The keyword is non-deterministic.
+
+34
+00:02:34,464 --> 00:02:40,637
+The same question can take two steps today
+and maybe seven stop-- steps tomorrow.
+
+35
+00:02:41,598 --> 00:02:45,413
+So is it running is no longer
+the interesting question.
+
+36
+00:02:47,146 --> 00:02:52,212
+The question that matter now
+are on the left or the right?
+
+37
+00:02:52,880 --> 00:02:53,891
+What it is doing?
+
+38
+00:02:54,605 --> 00:02:55,993
+Which tool is it invoking?
+
+39
+00:02:56,664 --> 00:02:58,903
+And are those the right ones?
+
+40
+00:02:59,572 --> 00:03:01,030
+How are the models behaving?
+
+41
+00:03:01,480 --> 00:03:07,621
+Latency, errors, throttling, stop
+reasons, and what does each interaction
+
+42
+00:03:07,791 --> 00:03:13,487
+cost Traditional monitoring answers
+the first question well, but it
+
+43
+00:03:13,510 --> 00:03:15,492
+barely touches the other four
+
+44
+00:03:16,492 --> 00:03:22,850
+Here's what that looks like in real life
+So you have the dashboard at 3:00 a.m.
+
+45
+00:03:23,562 --> 00:03:28,992
+P95 latency is fine, error rate is 0.2%,
+
+46
+00:03:29,385 --> 00:03:32,783
+Lambda is healthy, CPU is at 34%.
+
+47
+00:03:33,365 --> 00:03:35,468
+Everything looks solid green.
+
+48
+00:03:37,288 --> 00:03:40,365
+Now look at what's actually
+happening underneath.
+
+49
+00:03:41,014 --> 00:03:44,969
+The agent is looping, calling
+the same tool again and again.
+
+50
+00:03:45,709 --> 00:03:50,005
+It's passing hallucinated
+parameters, a perfect valid
+
+51
+00:03:50,012 --> 00:03:52,234
+call with the wrong arguments.
+
+52
+00:03:53,124 --> 00:03:57,250
+The conversation is drifting slowly,
+moving away from what the user asked.
+
+53
+00:03:58,274 --> 00:04:04,773
+Tokens are burning, and you will
+find out a $2,000 bill, not an alert.
+
+54
+00:04:05,905 --> 00:04:10,520
+And worst of all, the agent
+takes misaligned action.
+
+55
+00:04:11,438 --> 00:04:14,033
+It succeed, but it does the wrong thing.
+
+56
+00:04:15,033 --> 00:04:19,629
+None of these five raise
+traditional alert, not a single one
+
+57
+00:04:20,629 --> 00:04:25,136
+Health infrastructure is not the
+same as a healthy agent behavior
+
+58
+00:04:26,136 --> 00:04:27,836
+So what do we capture instead?
+
+59
+00:04:28,661 --> 00:04:33,748
+Metrics, logs, and traces
+still matter, but agents need
+
+60
+00:04:34,152 --> 00:04:36,031
+six additional signals now.
+
+61
+00:04:36,896 --> 00:04:39,407
+One, the agent decision trace.
+
+62
+00:04:40,544 --> 00:04:43,264
+Why did the agent choose this next step?
+
+63
+00:04:44,316 --> 00:04:46,727
+Two, tooling location spans.
+
+64
+00:04:47,452 --> 00:04:52,275
+Every external call with its
+latency, inputs, and outputs.
+
+65
+00:04:53,293 --> 00:04:57,268
+Three, token cost telemetry.
+
+66
+00:04:57,886 --> 00:05:03,272
+Prompt and completion tokens, and
+the cost of every step And then
+
+67
+00:05:03,673 --> 00:05:09,576
+model behavior signals, stop reasons,
+errors, throttles, and safety events.
+
+68
+00:05:10,675 --> 00:05:14,062
+The fifth one is model behavior signals
+
+69
+00:05:15,062 --> 00:05:16,720
+The session and memory state.
+
+70
+00:05:17,491 --> 00:05:19,527
+What does the agent remember right now?
+
+71
+00:05:19,778 --> 00:05:22,603
+Which is a very important
+questions to answer.
+
+72
+00:05:24,068 --> 00:05:26,527
+And finally, the guardrail evaluations.
+
+73
+00:05:27,351 --> 00:05:30,102
+Did the safety check fire, and why?
+
+74
+00:05:31,096 --> 00:05:36,333
+The good news is Datadog LLM
+observability models most of these
+
+75
+00:05:36,374 --> 00:05:41,830
+as spans, the same mental model you
+already use for distributed tracing.
+
+76
+00:05:42,952 --> 00:05:48,272
+And let me show you how we get
+them out from AWS Agent Core
+
+77
+00:05:49,272 --> 00:05:50,572
+The reference architecture.
+
+78
+00:05:51,354 --> 00:05:58,173
+So this is the architecture exactly
+I built for today's demo A user
+
+79
+00:05:58,173 --> 00:06:00,207
+open the chat app in a browser.
+
+80
+00:06:01,038 --> 00:06:05,039
+That page carries Datadog Real
+User Monitoring, so we see the
+
+81
+00:06:05,040 --> 00:06:06,860
+user's side of every request.
+
+82
+00:06:08,139 --> 00:06:13,238
+The browser can't satisf- safe--
+can't safely sign AWS requests
+
+83
+00:06:13,250 --> 00:06:20,778
+itself, so it calls API gateway and
+a small Lambda proxy That Lambda hold
+
+84
+00:06:21,771 --> 00:06:24,160
+IAM permission to invoke the agent.
+
+85
+00:06:25,689 --> 00:06:30,461
+The agent itself lives on AWS
+Bedrock Agent Core runtime.
+
+86
+00:06:31,102 --> 00:06:39,972
+It's built with Strand's Agent SDK and has
+six tools: a policy lookup, claim status,
+
+87
+00:06:40,597 --> 00:06:46,204
+filling a claim, policy holder lookup,
+weather risk, and a repair cost estimator
+
+88
+00:06:47,204 --> 00:06:50,717
+The tool runs in process as plain Python.
+
+89
+00:06:51,952 --> 00:06:55,259
+Here the model used is Claude Sonnet 4.4
+
+90
+00:06:55,259 --> 00:06:55,866
+on Bedrock.
+
+91
+00:06:57,000 --> 00:06:59,200
+And there's one more piece on the, on the
+
+92
+00:07:00,200 --> 00:07:01,030
+on this as well.
+
+93
+00:07:02,981 --> 00:07:10,496
+An SSM parameter that access our queue
+switch And just hold your thought
+
+94
+00:07:10,501 --> 00:07:13,329
+for a moment about the kill switch.
+
+95
+00:07:13,392 --> 00:07:14,329
+We'll come back to it.
+
+96
+00:07:15,575 --> 00:07:20,367
+Now the bottom half, the agent
+sends open telemetry traces and
+
+97
+00:07:20,367 --> 00:07:22,730
+logs straight to Datadog intake.
+
+98
+00:07:23,554 --> 00:07:26,435
+There's no collector and no
+Datadog agent in the path.
+
+99
+00:07:27,168 --> 00:07:31,143
+The Lambda proxy is covered by
+Datadog Lambda extension, traces,
+
+100
+00:07:31,173 --> 00:07:35,911
+logs, and Lambda metrics, and the web
+service covered by a regular Datadog
+
+101
+00:07:35,911 --> 00:07:38,858
+agent, including NGINX metrics.
+
+102
+00:07:40,014 --> 00:07:45,077
+The results, APM, LLM
+observability, infrastructure,
+
+103
+00:07:45,236 --> 00:07:47,750
+and logs all from one stack
+
+104
+00:07:48,750 --> 00:07:53,345
+This slide is one which I wish
+someone had shown me before I started.
+
+105
+00:07:54,258 --> 00:07:54,921
+Three steps.
+
+106
+00:07:55,353 --> 00:07:59,185
+Step one: keep Agent
+Core's OpenTelemetry on.
+
+107
+00:08:00,022 --> 00:08:07,073
+Agent Core instruments your agent through
+ADOT, the AWS distro for OpenTelemetry.
+
+108
+00:08:07,919 --> 00:08:11,504
+By default, it's what we're going to use.
+
+109
+00:08:12,499 --> 00:08:13,386
+And don't fight it.
+
+110
+00:08:14,243 --> 00:08:18,289
+I left it running and added
+Datadog exporter next to it in
+
+111
+00:08:18,290 --> 00:08:20,574
+few lines of my Python code.
+
+112
+00:08:21,814 --> 00:08:26,742
+Step two, send OTLP straight to Datadog.
+
+113
+00:08:27,344 --> 00:08:32,878
+The exporter posts spans
+to otlp.datadoghq.com
+
+114
+00:08:33,878 --> 00:08:41,892
+as the endpoint with a header
+that says DD-OTLP-source=llmobs.
+
+115
+00:08:42,892 --> 00:08:44,112
+No collector to run.
+
+116
+00:08:45,377 --> 00:08:48,534
+And step three, opt
+into LLM observability.
+
+117
+00:08:48,874 --> 00:08:58,221
+Tag your spans with DD_LLMOBS_Enable,
+and then make it equal to and
+
+118
+00:08:58,236 --> 00:09:00,824
+emit GenAI semantic conventions.
+
+119
+00:09:02,040 --> 00:09:05,048
+So this require version one
+point three seven or later.
+
+120
+00:09:06,019 --> 00:09:09,751
+That's what the first
+line in the code box does.
+
+121
+00:09:11,314 --> 00:09:17,866
+Now look at the heads-up box, because
+this is where I kind of lost few hours.
+
+122
+00:09:18,177 --> 00:09:24,133
+First, I tried obvious route, setting the
+standard OTL exporter environment variable
+
+123
+00:09:24,161 --> 00:09:29,387
+on agent code and Datadog answered
+with four zero threes all the time.
+
+124
+00:09:30,154 --> 00:09:33,598
+Registering the exporter in
+code is what finally worked.
+
+125
+00:09:35,262 --> 00:09:44,025
+Second, without DD_LLMOBS_Enable,
+everything shows up in APM and
+
+126
+00:09:44,027 --> 00:09:46,447
+nothing shows up in LLM observability.
+
+127
+00:09:47,460 --> 00:09:52,153
+Your traces looks perfect and
+the AI view still stays empty.
+
+128
+00:09:53,377 --> 00:10:00,213
+And finally, ML_app name comes from
+the root span service name, not from
+
+129
+00:10:00,213 --> 00:10:05,860
+the, the LLMOBS_ML_app variable.
+
+130
+00:10:07,032 --> 00:10:10,166
+So don't panic if your app
+shows up under a different name
+
+131
+00:10:11,166 --> 00:10:14,626
+So next, let's look at
+a-anatomy of an agent trace.
+
+132
+00:10:15,726 --> 00:10:17,777
+This is kind of not an illustration.
+
+133
+00:10:18,118 --> 00:10:22,099
+This is a real trace from a demo
+agent, but I simplified it so that
+
+134
+00:10:22,749 --> 00:10:25,280
+you are able to get more out of this.
+
+135
+00:10:26,119 --> 00:10:31,474
+The user asked: How much would it
+cost to repair a dented bumper?
+
+136
+00:10:32,474 --> 00:10:33,398
+Read it from the top.
+
+137
+00:10:34,500 --> 00:10:39,809
+The whole agent run invoke_agent
+took around 6,000 milliseconds.
+
+138
+00:10:40,447 --> 00:10:47,896
+Inside it, first LLM call It
+takes around 1,900 milliseconds
+
+139
+00:10:48,403 --> 00:10:51,682
+and close to about 2,500 tokens.
+
+140
+00:10:51,950 --> 00:10:57,657
+In 34 out and it finishes with tools_use.
+
+141
+00:10:58,208 --> 00:10:59,955
+The model decides to call a tool.
+
+142
+00:11:01,354 --> 00:11:07,003
+The tool estimates_repair_cost
+come back in 30 milliseconds
+
+143
+00:11:07,254 --> 00:11:08,488
+with service unavailable.
+
+144
+00:11:09,114 --> 00:11:09,660
+It fail.
+
+145
+00:11:10,956 --> 00:11:14,593
+The second LLM call reads that
+failure and decides to retry.
+
+146
+00:11:15,210 --> 00:11:20,081
+Then the same tool runs again in under
+millisecond, and this time it succeed.
+
+147
+00:11:21,075 --> 00:11:25,737
+The third LLM call writes the
+answer and finish the loop.
+
+148
+00:11:26,905 --> 00:11:28,032
+Two things to notice.
+
+149
+00:11:28,304 --> 00:11:31,825
+One, almost all six second
+is the model thinking.
+
+150
+00:11:33,278 --> 00:11:35,223
+The tools take milliseconds.
+
+151
+00:11:36,151 --> 00:11:40,612
+If you want to make this agent faster,
+the tools are not where you look.
+
+152
+00:11:42,094 --> 00:11:46,540
+Second, you can see the agent
+recover, a failed tool call, a
+
+153
+00:11:46,540 --> 00:11:48,425
+decision to retry, a success.
+
+154
+00:11:49,166 --> 00:11:55,780
+Without this trace, you will see is one
+request that took six seconds and worked
+
+155
+00:11:56,780 --> 00:11:58,872
+So now we have the data.
+
+156
+00:11:59,792 --> 00:12:01,264
+What do we actually do with it?
+
+157
+00:12:02,648 --> 00:12:05,117
+Each Datadog view answers one question.
+
+158
+00:12:06,013 --> 00:12:10,495
+APM answers, where did the
+request spend its time?
+
+159
+00:12:11,227 --> 00:12:16,606
+The service map, latency, and errors from
+the Lambda proxy all the way to the agent.
+
+160
+00:12:17,763 --> 00:12:21,120
+LLM observability answers,
+what did the agent decide?
+
+161
+00:12:21,784 --> 00:12:27,542
+Agent tool L-LLM spans with the
+prompts, the tokens, and the cost.
+
+162
+00:12:29,209 --> 00:12:32,943
+The infrastructure monitoring
+answers, is the platform healthy?
+
+163
+00:12:33,584 --> 00:12:39,780
+The EC2 host, NGINX, Lambda metrics,
+and real user session from RAM.
+
+164
+00:12:41,115 --> 00:12:44,390
+And logs answer, what
+was the exact failure?
+
+165
+00:12:44,888 --> 00:12:51,465
+Application logs linked to the traces,
+so the context is the one click away
+
+166
+00:12:52,465 --> 00:12:54,994
+The magic is the bar at the bottom.
+
+167
+00:12:55,551 --> 00:13:00,080
+Shared trace IDs plus consistent
+service environment and version
+
+168
+00:13:00,081 --> 00:13:02,745
+tags tie all four views together.
+
+169
+00:13:03,291 --> 00:13:09,524
+That mean you can pivot from an agent
+span to the Lambda span, to host, to the
+
+170
+00:13:09,524 --> 00:13:15,048
+exact log line without switching tools
+and without copying IDs between tabs
+
+171
+00:13:16,048 --> 00:13:18,424
+So here's what we are about what.
+
+172
+00:13:19,220 --> 00:13:23,617
+A user in a browser talks to an
+insurance assistant agent built
+
+173
+00:13:23,659 --> 00:13:26,694
+with Strand on Agent core runtime.
+
+174
+00:13:27,268 --> 00:13:29,939
+The agent calls Claude 4.5
+
+175
+00:13:30,189 --> 00:13:34,332
+on the Bedrock and uses six
+Python tools over policies,
+
+176
+00:13:34,621 --> 00:13:36,299
+claim, and some mock services.
+
+177
+00:13:37,073 --> 00:13:41,252
+Everything flows into Datadog,
+APM, LLM observability,
+
+178
+00:13:41,331 --> 00:13:42,834
+infrastructure, logs, and RUM.
+
+179
+00:13:43,731 --> 00:13:45,897
+As we go, watch the four things.
+
+180
+00:13:47,009 --> 00:13:53,220
+One, single requests expanding into
+multi-step reasoning and tool calls.
+
+181
+00:13:53,899 --> 00:13:58,640
+Two, parent and child spans
+across APM and LLM observability.
+
+182
+00:13:59,716 --> 00:14:04,993
+And three, token cost
+adding up u- per session.
+
+183
+00:14:05,728 --> 00:14:09,023
+And finally, what the agent
+does when a tool call fails
+
+184
+00:14:10,023 --> 00:14:14,647
+Now we are in Datadog console, and
+
+185
+00:14:14,656 --> 00:14:17,019
+this is our insurance agent.
+
+186
+00:14:18,019 --> 00:14:18,306
+Right.
+
+187
+00:14:19,010 --> 00:14:23,129
+So let me just run some prompt here.
+
+188
+00:14:23,908 --> 00:14:27,193
+So let's ask a question like flood claim
+
+189
+00:14:28,193 --> 00:14:34,717
+So our agent will take some
+time to go through it and answer
+
+190
+00:14:35,717 --> 00:14:37,898
+So here we got an answer now.
+
+191
+00:14:38,719 --> 00:14:39,822
+Says, Mr.
+
+192
+00:14:39,826 --> 00:14:42,722
+Chaminda Ratnayake, flood damage call.
+
+193
+00:14:44,281 --> 00:14:49,447
+Let's go to our AI observability
+
+194
+00:14:50,447 --> 00:14:57,838
+Let me filter it for past 15 minutes or
+probably I'll make it la-like past one day
+
+195
+00:14:58,838 --> 00:15:00,530
+So this is our application
+
+196
+00:15:01,530 --> 00:15:05,618
+The last call I did as is
+not Come in here, right?
+
+197
+00:15:05,635 --> 00:15:08,655
+So we'll wait for probably, few seconds
+
+198
+00:15:09,655 --> 00:15:13,646
+Okay, so now we are able to
+see the, trace start appearing.
+
+199
+00:15:13,996 --> 00:15:15,097
+You can see it here
+
+200
+00:15:16,097 --> 00:15:20,864
+So let me just filter for past one day
+
+201
+00:15:21,864 --> 00:15:22,877
+Last one week
+
+202
+00:15:23,877 --> 00:15:31,432
+So how it look like it, we, we are able
+to see the traces coming here, right?
+
+203
+00:15:32,030 --> 00:15:39,749
+And with-- once I, with the Datadog,
+I'm able to see any errors, and I'm
+
+204
+00:15:40,048 --> 00:15:43,904
+able to see some of the, the metrics
+
+205
+00:15:44,904 --> 00:15:49,507
+Like total cost, the token
+being used, cost per request
+
+206
+00:15:50,507 --> 00:15:56,423
+And some of the, the
+calls it has done as well.
+
+207
+00:15:58,126 --> 00:16:00,239
+Input tokens and all the metrics.
+
+208
+00:16:00,251 --> 00:16:02,582
+So everything is now in one place.
+
+209
+00:16:02,590 --> 00:16:09,212
+So I can see, the, the six calls
+which I mentioned to you, right?
+
+210
+00:16:09,533 --> 00:16:13,762
+It's about estimating co- the
+repair cost, lookup policy, check
+
+211
+00:16:13,848 --> 00:16:16,914
+claim status, and all those stuff
+
+212
+00:16:17,914 --> 00:16:25,394
+So with Datadog, once we integrate
+LLM observability, you get entire this
+
+213
+00:16:25,489 --> 00:16:33,180
+set of things visible so that you are
+able to kind of go and look at things
+
+214
+00:16:34,180 --> 00:16:40,286
+So here, if you look at that question we
+answer, which is about home STDD four,
+
+215
+00:16:40,296 --> 00:16:42,636
+which is kind of that, identification.
+
+216
+00:16:43,175 --> 00:16:47,908
+So we again look at, trace
+it back in our LLM calls.
+
+217
+00:16:48,888 --> 00:16:53,585
+I'm able to see the relevant
+logs which are related to this.
+
+218
+00:16:53,608 --> 00:16:59,684
+So it's says that there was a, a
+found credential attempt to instrument
+
+219
+00:16:59,711 --> 00:17:07,316
+while read, creating a Strand Metrics
+client, guardrails, and invocation.
+
+220
+00:17:08,077 --> 00:17:08,309
+Okay?
+
+221
+00:17:08,562 --> 00:17:12,757
+So we are able to see these calls as well.
+
+222
+00:17:12,773 --> 00:17:16,953
+So this is, everything is
+inside the Strand agent.
+
+223
+00:17:17,551 --> 00:17:23,843
+So we have the execution
+call, and we are able to see
+
+224
+00:17:24,843 --> 00:17:26,086
+The spans as well.
+
+225
+00:17:26,397 --> 00:17:29,769
+So this is related to this form std four
+
+226
+00:17:30,769 --> 00:17:36,742
+So the policy holder call,
+and this is about, check
+
+227
+00:17:36,757 --> 00:17:38,357
+whether there's a weather risk.
+
+228
+00:17:38,560 --> 00:17:45,496
+So all the tool calls which is being
+made, the file claim, and others as well.
+
+229
+00:17:45,961 --> 00:17:51,779
+So the, good news is now we are
+able to go and look at this in
+
+230
+00:17:51,780 --> 00:17:55,612
+a very nice structured, format.
+
+231
+00:17:55,874 --> 00:17:58,609
+And if I want, I can go into APM as well
+
+232
+00:17:59,609 --> 00:18:05,642
+And from here, we are able to
+see the APM view of this process.
+
+233
+00:18:06,233 --> 00:18:13,771
+So we'll able to see the Bedrock runtime,
+our agent, and the SSM calls as well
+
+234
+00:18:14,771 --> 00:18:19,438
+Look at it from a
+waterfall approach as well.
+
+235
+00:18:20,413 --> 00:18:22,816
+And let me, go and do, another call
+
+236
+00:18:23,816 --> 00:18:27,106
+A repair cost for a dent bumper
+
+237
+00:18:28,106 --> 00:18:31,140
+So we send the questions
+to our insurance agent.
+
+238
+00:18:31,903 --> 00:18:38,545
+Let's wait until it come back with a
+response So here we got the response now.
+
+239
+00:18:39,135 --> 00:18:43,709
+So it state the estimated repair
+cost for dent bumper is, 95 USD.
+
+240
+00:18:44,577 --> 00:18:49,839
+So I'm able to go to AI observability,
+so we can look at the traces.
+
+241
+00:18:51,073 --> 00:18:55,693
+Okay Here we can see the traces
+
+242
+00:18:56,693 --> 00:19:00,903
+The estimated bumper question
+and the output there.
+
+243
+00:19:00,917 --> 00:19:02,877
+So it's there.
+
+244
+00:19:03,162 --> 00:19:06,111
+So it, it just gives us
+a full visibility, right?
+
+245
+00:19:06,111 --> 00:19:11,270
+Like with the, controlling it to
+the, correlating with logs as well.
+
+246
+00:19:11,450 --> 00:19:11,685
+But…
+
+247
+00:19:11,705 --> 00:19:18,659
+And if I go to the trace section here
+again, I'll have to have that full
+
+248
+00:19:18,680 --> 00:19:22,259
+visibility view of what has happened.
+
+249
+00:19:22,675 --> 00:19:28,767
+And not only that, I'll able to correlate
+that with infrastructure, metrics,
+
+250
+00:19:28,769 --> 00:19:31,962
+logs and traces and everything as well.
+
+251
+00:19:33,953 --> 00:19:36,230
+So let's also look at another one.
+
+252
+00:19:36,566 --> 00:19:40,961
+So here we are supposed to loop
+five times, then, you know, we
+
+253
+00:19:41,058 --> 00:19:45,392
+kill the quiz switch, get involved.
+
+254
+00:19:45,882 --> 00:19:51,972
+So status claim of C reference
+
+255
+00:19:52,972 --> 00:20:01,855
+So we got the data here, and if you go to
+APM, we are able to see the invocations.
+
+256
+00:20:03,356 --> 00:20:06,782
+So there's, invocations
+happening related to this.
+
+257
+00:20:07,017 --> 00:20:16,032
+So we are having, six, the five times,
+then we will see the quill switch, right?
+
+258
+00:20:16,111 --> 00:20:17,676
+Otherwise, what will happen is the…
+
+259
+00:20:17,717 --> 00:20:20,374
+this will go through a continuous loop.
+
+260
+00:20:22,316 --> 00:20:26,002
+Now let's look at this
+call in detail, right?
+
+261
+00:20:26,640 --> 00:20:28,747
+So we have this appearing here.
+
+262
+00:20:29,669 --> 00:20:33,608
+So you are able to see
+there's multiple calls, right?
+
+263
+00:20:33,620 --> 00:20:36,761
+So we have that, the chat request
+
+264
+00:20:37,761 --> 00:20:37,771
+And
+
+265
+00:20:38,771 --> 00:20:44,041
+So what we see is, so it goes
+through, so the claim is not
+
+266
+00:20:44,053 --> 00:20:47,229
+there But the retry is happening.
+
+267
+00:20:48,987 --> 00:20:53,763
+If you can see, claim status
+is continuously retry.
+
+268
+00:20:54,965 --> 00:20:55,542
+True, right?
+
+269
+00:20:55,547 --> 00:21:00,591
+So it's goes through again, and it's
+goes through another cycle of retry
+
+270
+00:21:01,591 --> 00:21:04,402
+And another cycle here also retry true
+
+271
+00:21:05,402 --> 00:21:13,795
+And then finally, we have a quill switch
+where we make the retry false so that we
+
+272
+00:21:13,796 --> 00:21:16,151
+stop the agent goes through in this loop
+
+273
+00:21:17,151 --> 00:21:22,053
+And then we'll also do another
+one where we try to, do a prompt
+
+274
+00:21:22,355 --> 00:21:26,862
+which tool raises an exception
+and which agent recover itself.
+
+275
+00:21:28,821 --> 00:21:30,093
+Let me put it here.
+
+276
+00:21:31,102 --> 00:21:34,207
+Let's wait until our agent
+provide the response.
+
+277
+00:21:35,968 --> 00:21:39,454
+So we got the response from our agent.
+
+278
+00:21:41,386 --> 00:21:44,199
+Okay, I'm unable to access
+the policyholder information.
+
+279
+00:21:44,214 --> 00:21:47,492
+There was error right now due
+to system connection issue.
+
+280
+00:21:47,570 --> 00:21:51,691
+Please try again moment or contact a
+human agent for immediate assistance.
+
+281
+00:21:52,437 --> 00:21:57,937
+So when you look at the traces, you
+would see there was a, a error happen
+
+282
+00:21:58,937 --> 00:21:59,317
+Nein.
+
+283
+00:21:59,677 --> 00:22:00,217
+So hier
+
+284
+00:22:01,217 --> 00:22:07,784
+But it has recovered and it's kind
+of able to manage it way through So
+
+285
+00:22:07,785 --> 00:22:13,044
+here, if you start digging deep, you
+will identify and what was there?
+
+286
+00:22:13,177 --> 00:22:16,967
+There was a connection error,
+policyholder database unreachable
+
+287
+00:22:16,994 --> 00:22:20,392
+while looking up for this ERR500.
+
+288
+00:22:21,547 --> 00:22:24,212
+There was outage simulation, right?
+
+289
+00:22:24,299 --> 00:22:28,074
+So all those details will be
+available during a troubleshooting
+
+290
+00:22:29,074 --> 00:22:33,124
+And finally, let's simulate
+another error and close our demo.
+
+291
+00:22:33,594 --> 00:22:33,778
+Right?
+
+292
+00:22:35,699 --> 00:22:42,860
+So we kind of asked about something
+which agents hit a exception or error,
+
+293
+00:22:44,055 --> 00:22:46,456
+and let me go to the traces first
+
+294
+00:22:47,456 --> 00:22:51,018
+SSI still loading, so we'll give a minute.
+
+295
+00:22:51,490 --> 00:22:53,210
+Yeah, so it is start appear now.
+
+296
+00:22:53,245 --> 00:22:55,958
+So you can see there's
+invocation exception.
+
+297
+00:22:56,862 --> 00:22:59,598
+We can go deep, deep and see.
+
+298
+00:23:00,284 --> 00:23:02,163
+We are able to see the error
+
+299
+00:23:03,163 --> 00:23:09,300
+And even now we can investigate
+with BuildCI Let's ask Bits and see
+
+300
+00:23:09,864 --> 00:23:12,275
+what see it's able to come up with
+
+301
+00:23:13,275 --> 00:23:15,262
+So it's fetching the faces now
+
+302
+00:23:16,262 --> 00:23:21,853
+Let me pause for a moment and we'll come
+back again It, it came up, looks like,
+
+303
+00:23:21,859 --> 00:23:26,851
+you know, I'll have to add the repository,
+but if I add the repository, it's able to
+
+304
+00:23:27,169 --> 00:23:31,886
+work on its magic, go and identify where
+in that code which is running, right?
+
+305
+00:23:32,227 --> 00:23:39,034
+So those are some of the important
+things, you know, which we can do, right?
+
+306
+00:23:39,679 --> 00:23:44,144
+And here again, like, you know, if I
+go to the, all the LLM observability,
+
+307
+00:23:44,270 --> 00:23:48,999
+AI observability traces, I'm
+able to see those errors as well
+
+308
+00:23:49,999 --> 00:23:51,796
+So this was the previous error.
+
+309
+00:23:52,023 --> 00:23:56,614
+It take little bit of time to appear
+some of those things in the log, so
+
+310
+00:23:56,614 --> 00:23:59,005
+we'll have to be little patience as well.
+
+311
+00:24:00,019 --> 00:24:03,842
+Okay, so that's kind of like very
+high level what I was planning
+
+312
+00:24:03,843 --> 00:24:08,804
+to demo, and let's move on with
+our rest of the presentation.
+
+313
+00:24:10,067 --> 00:24:17,798
+So what we learn bringing this to, try
+to understand about what are the things
+
+314
+00:24:17,806 --> 00:24:19,284
+we know, which we were trying to achieve.
+
+315
+00:24:19,865 --> 00:24:22,908
+So building this taught
+me four things, right?
+
+316
+00:24:23,326 --> 00:24:29,169
+The first one, environmental variables
+alone got a four-not four zero three.
+
+317
+00:24:29,555 --> 00:24:34,304
+The standabout hotel settings on
+agent co were rejected by Datadog.
+
+318
+00:24:35,092 --> 00:24:38,441
+So registering the export in
+code, I was able to fix it.
+
+319
+00:24:39,426 --> 00:24:42,516
+Second, LLM observability is opt-in.
+
+320
+00:24:43,351 --> 00:24:49,533
+Without the configuration variable
+settings on enable on span, your traces
+
+321
+00:24:49,533 --> 00:24:53,523
+show up in APM, but never as agent runs.
+
+322
+00:24:54,495 --> 00:24:57,854
+I started an empty screen for
+a while before I found that.
+
+323
+00:24:59,577 --> 00:25:02,538
+And then third one, soft
+failures look green.
+
+324
+00:25:03,180 --> 00:25:06,717
+Escalations and suspension
+returns a status, not an
+
+325
+00:25:06,717 --> 00:25:08,765
+error, so nothing ever pages.
+
+326
+00:25:09,414 --> 00:25:13,014
+So if you want an alert, you
+have to decide what count
+
+327
+00:25:13,022 --> 00:25:14,808
+as a failure and emit it.
+
+328
+00:25:15,523 --> 00:25:18,987
+And finally, loop burns tokens silently.
+
+329
+00:25:19,412 --> 00:25:21,441
+The raw loop raised zero errors.
+
+330
+00:25:22,310 --> 00:25:26,006
+Only the tool call rate and
+the token count gave it away
+
+331
+00:25:27,006 --> 00:25:32,374
+If the dim of the part of the
+investigations, what we're trying
+
+332
+00:25:32,374 --> 00:25:38,128
+to achieve was how we can get these
+important metrics, the traceability
+
+333
+00:25:38,227 --> 00:25:42,919
+and other things into Datadog, so
+that we have one place where we can
+
+334
+00:25:42,919 --> 00:25:45,119
+go and drill and investigate things
+
+335
+00:25:46,119 --> 00:25:49,467
+So let's turn what we just
+saw into a repeatable method.
+
+336
+00:25:50,178 --> 00:25:55,399
+When a tool call goes wrong, you just
+want the same f- four steps every time.
+
+337
+00:25:55,781 --> 00:26:01,469
+Step one, get the signal, a monitor
+on tool errors or error rate page
+
+338
+00:26:01,922 --> 00:26:03,771
+you with the affected service.
+
+339
+00:26:04,775 --> 00:26:06,690
+Second, open the trace.
+
+340
+00:26:06,978 --> 00:26:12,126
+LLM observability shows the
+agent run step by step with the
+
+341
+00:26:12,126 --> 00:26:14,020
+input and output of each step.
+
+342
+00:26:15,452 --> 00:26:20,753
+And step three, find the tool span,
+spot the failed or unexpected call,
+
+343
+00:26:21,191 --> 00:26:23,185
+its arguments and its duration.
+
+344
+00:26:24,191 --> 00:26:26,792
+And finally, pivot to the cause.
+
+345
+00:26:26,930 --> 00:26:30,564
+Jump to the downstream APM span,
+the infrastructure metrics,
+
+346
+00:26:30,845 --> 00:26:32,647
+and the logs for that trace.
+
+347
+00:26:34,330 --> 00:26:37,197
+Notice the two, the boxes in the…
+
+348
+00:26:37,683 --> 00:26:38,945
+I have put at the bottom.
+
+349
+00:26:39,512 --> 00:26:41,583
+Failed calls are loud.
+
+350
+00:26:41,897 --> 00:26:47,737
+An error status, a timeout, throttling,
+malformed output that trigger retries.
+
+351
+00:26:48,331 --> 00:26:49,328
+Those you will catch.
+
+352
+00:26:50,617 --> 00:26:52,315
+Unexpected calls are quiet.
+
+353
+00:26:52,892 --> 00:26:58,535
+The wrong tool for user's intent,
+hallucinated or out-of-range parameters,
+
+354
+00:26:58,932 --> 00:27:00,960
+the same tool called again and again.
+
+355
+00:27:01,405 --> 00:27:05,534
+Those only show up when you can
+actually read the agent's trace
+
+356
+00:27:06,534 --> 00:27:08,127
+And that's one of the demo item
+
+357
+00:27:09,127 --> 00:27:10,418
+Now cost.
+
+358
+00:27:11,277 --> 00:27:14,173
+So this is a illustration,
+but the shape is real.
+
+359
+00:27:14,806 --> 00:27:20,013
+Most sessions sit at about 3,000
+tokens, then session nine and
+
+360
+00:27:20,017 --> 00:27:23,580
+ten jump to 15,000 and 22,000.
+
+361
+00:27:24,904 --> 00:27:25,987
+That's a runaway loop.
+
+362
+00:27:26,833 --> 00:27:31,103
+And here's the uncomfortable part:
+a runaway loop never raise an error.
+
+363
+00:27:31,732 --> 00:27:36,337
+The only place it shows up, it's tokens
+per session leaving the baseline.
+
+364
+00:27:36,996 --> 00:27:41,304
+So three practices: track tokens
+per session, both input and
+
+365
+00:27:41,312 --> 00:27:44,225
+output by agent, model, and tool.
+
+366
+00:27:45,391 --> 00:27:49,066
+Attribute the agent, tag by
+agent, team, environment, so
+
+367
+00:27:49,066 --> 00:27:51,131
+you know who's spending what.
+
+368
+00:27:52,132 --> 00:27:55,710
+And alert on the rate of
+change, not a fixed number.
+
+369
+00:27:56,484 --> 00:28:02,331
+An anomaly monitor catches a loop
+long before the actual invoice does
+
+370
+00:28:03,331 --> 00:28:05,234
+So what are the operational guardrails?
+
+371
+00:28:06,474 --> 00:28:11,376
+The detection without action
+is just a prettier dashboard.
+
+372
+00:28:11,881 --> 00:28:14,895
+So here's the loop that
+turns detection into action.
+
+373
+00:28:15,916 --> 00:28:18,216
+Agents run on production traffic.
+
+374
+00:28:18,734 --> 00:28:21,969
+Telemetry flows out as
+spans, metrics and logs.
+
+375
+00:28:22,838 --> 00:28:25,737
+Monitors apply thresholds
+and anomaly detection.
+
+376
+00:28:26,319 --> 00:28:32,262
+If something's wrong, they page on
+call and trip the circuit breaker.
+
+377
+00:28:33,952 --> 00:28:35,725
+What should be the monitors watch?
+
+378
+00:28:36,681 --> 00:28:44,005
+Cost per session, tool call rates, burst
+or repeated of the same tool, error
+
+379
+00:28:44,096 --> 00:28:46,343
+and throttle rate across the model.
+
+380
+00:28:46,810 --> 00:28:51,797
+The tools downstream services and
+guardrails hits a sudden spike
+
+381
+00:28:51,861 --> 00:28:55,926
+or silent drops, which can mean
+a guardrail has stopped working
+
+382
+00:28:56,926 --> 00:28:58,420
+In the demo, this was real.
+
+383
+00:28:58,711 --> 00:29:03,910
+An alarm on tool call rate more than four
+calls a minute invokes a Lambda that flip
+
+384
+00:29:03,954 --> 00:29:06,912
+SSM parameter from the architecture slide.
+
+385
+00:29:07,497 --> 00:29:12,480
+Every tool checks it, and for 90
+seconds, every tool return suspense
+
+386
+00:29:13,480 --> 00:29:17,097
+To owner's limits, it's
+global, so it pause every
+
+387
+00:29:17,097 --> 00:29:19,256
+user, not just one who trigger.
+
+388
+00:29:19,964 --> 00:29:23,246
+And because the alarm evaluate
+once a minute, it stop the next
+
+389
+00:29:23,247 --> 00:29:25,570
+turn, not the one that tripped it.
+
+390
+00:29:26,494 --> 00:29:31,209
+The golden rule, build the kill switch
+before the agent goes into production
+
+391
+00:29:32,209 --> 00:29:37,762
+Finally, treat the agent like any
+other service with SLIs and SLOs
+
+392
+00:29:39,152 --> 00:29:40,581
+and five reliability questions.
+
+393
+00:29:41,296 --> 00:29:42,737
+Does the agent finish the job?
+
+394
+00:29:43,422 --> 00:29:47,530
+Me-measure task success, no
+error, guardrails passed.
+
+395
+00:29:48,352 --> 00:29:50,443
+For example, ninety-nine
+percent of sessions.
+
+396
+00:29:51,417 --> 00:29:52,332
+Is it fast enough?
+
+397
+00:29:52,874 --> 00:29:55,414
+P95 end-to-end latency per session.
+
+398
+00:29:56,023 --> 00:29:58,097
+For example, under five seconds.
+
+399
+00:29:58,875 --> 00:30:04,591
+And remember the trace from our previous
+slide that time is mostly the model.
+
+400
+00:30:06,116 --> 00:30:07,546
+Do its tools behave?
+
+401
+00:30:08,284 --> 00:30:10,869
+Tool call error rate
+and calls per session.
+
+402
+00:30:11,932 --> 00:30:13,189
+Errors under one percent.
+
+403
+00:30:14,276 --> 00:30:15,965
+Is, is spend under control?
+
+404
+00:30:16,394 --> 00:30:20,345
+Tokens, cost per session
+within twice the baseline.
+
+405
+00:30:21,178 --> 00:30:22,399
+Are guardrails working?
+
+406
+00:30:23,036 --> 00:30:25,188
+Guardrail trigger and block rate.
+
+407
+00:30:25,608 --> 00:30:28,189
+Alert on deviation in either direction.
+
+408
+00:30:29,139 --> 00:30:34,140
+These targets are example, turn them
+to your workload and alert on error
+
+409
+00:30:34,155 --> 00:30:36,971
+budget burn rate, not singly spikes
+
+410
+00:30:37,971 --> 00:30:42,586
+Four lessons that keep repeating across
+enterprise deployments, which I have seen.
+
+411
+00:30:43,590 --> 00:30:45,097
+Instrument before you deploy.
+
+412
+00:30:46,097 --> 00:30:49,726
+Retrofitting telemetry after
+an incident means flying blind
+
+413
+00:30:50,055 --> 00:30:52,175
+exactly when you need data most.
+
+414
+00:30:53,119 --> 00:30:55,114
+Propagate trace context early.
+
+415
+00:30:55,892 --> 00:31:01,363
+Multi-agent systems and tool hops
+only stitch into one trace if the
+
+416
+00:31:01,366 --> 00:31:03,380
+contract travels with every call.
+
+417
+00:31:05,224 --> 00:31:06,790
+Observe the guard rates too.
+
+418
+00:31:07,487 --> 00:31:12,113
+A misconfigured guard rate is
+invisible unless its decisions
+
+419
+00:31:12,115 --> 00:31:13,552
+are recorded as telemetry.
+
+420
+00:31:14,260 --> 00:31:19,269
+That's why the escalation in the demo is
+a span attribute, not just a log line.
+
+421
+00:31:20,220 --> 00:31:23,273
+And treat tokens as a production metric.
+
+422
+00:31:23,834 --> 00:31:28,137
+Unmonitored token burn can
+break the business case long
+
+423
+00:31:28,140 --> 00:31:29,544
+before it break the service
+
+424
+00:31:30,544 --> 00:31:36,241
+So moving to key takeaways, let
+me leave you with four takeaways.
+
+425
+00:31:37,187 --> 00:31:42,311
+One, agent fail in ways
+classic monitoring cannot see.
+
+426
+00:31:42,973 --> 00:31:49,780
+Loops, bad tool calls, and cost spikes all
+happen while your dashboards stay green.
+
+427
+00:31:50,810 --> 00:31:55,820
+Second, Agentic omits telemetry
+and Datadog correlate it with
+
+428
+00:31:55,867 --> 00:31:57,962
+APM logs and infrastructure.
+
+429
+00:31:58,616 --> 00:32:03,154
+Remember these three steps:
+keep ADOT on, export in code,
+
+430
+00:32:03,428 --> 00:32:09,217
+and open with DD_LLMops_enable.
+
+431
+00:32:10,879 --> 00:32:15,835
+And third point, LLM observability
+turns each request into readable
+
+432
+00:32:15,894 --> 00:32:18,886
+trace of decisions, tools and tokens.
+
+433
+00:32:20,025 --> 00:32:25,458
+You saw an agent fail, decide to
+retry and recover all in one trace.
+
+434
+00:32:26,898 --> 00:32:32,045
+And finally, operate with SLOs,
+anomaly monitors, and kill switch,
+
+435
+00:32:33,038 --> 00:32:37,350
+and build them before go live,
+not after the first incident
+
+436
+00:32:38,350 --> 00:32:39,343
+That's it from me.
+
+437
+00:32:39,728 --> 00:32:41,803
+Thank you so much for your time.
+
+438
+00:32:42,009 --> 00:32:48,649
+I hope this helps you take your agents
+from it works on my laptop to we know
+
+439
+00:32:48,703 --> 00:32:52,396
+exactly what it does in production.
+
+440
+00:32:53,692 --> 00:32:56,250
+Enjoy, enjoy the rest of the conference.
+
+441
+00:32:57,102 --> 00:32:57,967
+Thank you everyone
