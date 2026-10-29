@@ -3034,6 +3034,9 @@ function junkReason(value, kind) {
         if (cjk && letters < 1) return "short";
     }
     if (/(.)\1{3,}/.test(v)) return "repeat";                               // "aaaa", "----"
+    if (/^[xz]+$/i.test(v.replace(/[\s.\-_]/g, "")) && v.length >= 2) return "placeholder";   // "xx", "x x", "zzz" (Marek 2026-10-29)
+    if (/^(test(ing)?|asdf?g?|qwerty|abc|xyz|dummy|null|nil|unknown)$/i.test(v)) return "placeholder";
+    if (kind !== "name" && /^(n\s*[\/.\\-]?\s*a\.?|none|nothing|no|nope|not applicable)$/i.test(v)) return "placeholder";   // "Na", "N/A" as company / title
     if (/https?:|www\.|\.(com|net|org|io|ru|xyz)\b/i.test(v)) return "url";
     if (/[<>{}\[\]\\|^~`]/.test(v)) return "symbols";                       // markup / shell junk
     if (kind === "name" && /\d/.test(v)) return "digits";                   // digits are fine in companies ("3M", "Web3")
@@ -3044,7 +3047,7 @@ var junkMessages = {
     field_1: "Please enter your first name.",
     field_2: "Please enter your last name.",
     field_5: "Please enter your job title, e.g. Software Engineer.",
-    field_4: "Please enter your company or university name."
+    field_4: "Please enter your company or university name (or Independent)."
 };
 // ---- Newsletter form: phone is required and must look like a real number -------------------
 // People were registering with no phone, or "+91 99999900000". Checks: a known dialling code, a
