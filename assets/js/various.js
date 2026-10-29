@@ -2921,7 +2921,14 @@ function getCountry() {
 		return null;
 	}
 
-	const _country = timezones[timezone].c[0];
+	// Old names ("Asia/Calcutta", "Asia/Saigon") are aliases without a country: follow `a` to the canonical
+	// zone. Without this getCountry() threw for many Indian visitors, so TZ, country and dial code stayed empty.
+	let zone = timezones[timezone];
+	for (let hops = 0; zone && !zone.c && zone.a && hops < 3; hops++) zone = timezones[zone.a];
+	if (!zone || !zone.c) {
+		return null;
+	}
+	const _country = zone.c[0];
 	const country = countries[_country];
 	return {
         code: _country,
@@ -3022,6 +3029,13 @@ Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form')
 // letters), and explains exactly which field to fix. Aimed at "T", "asdfgh", "<script>", URLs.
 var _letterRe;
 try { _letterRe = new RegExp("\\p{L}", "gu"); } catch (e) { _letterRe = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ֐-ۿऀ-ॿ぀-ヿ一-鿿가-힯]/g; }
+function gibberishWord(w) {
+    if (w.length < 8 || !/^[A-Za-z]+$/.test(w) || (w.match(/[a-z][A-Z]/g) || []).length < 2) return false;
+    var parts = w.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z])([A-Z][a-z])/g, "$1 $2").split(" ");
+    return !parts.every(function (p) {
+        return /^[A-Z]+$/.test(p) || (/^[A-Z][a-z]+$/.test(p) && /[aeiouy]/i.test(p) && !/[^aeiouy]{5}/i.test(p));
+    });
+}
 function junkReason(value, kind) {
     var v = (value || "").trim();
     var letters = (v.match(_letterRe) || []).length;
@@ -3036,7 +3050,11 @@ function junkReason(value, kind) {
     if (/(.)\1{3,}/.test(v)) return "repeat";                               // "aaaa", "----"
     if (/^[xz]+$/i.test(v.replace(/[\s.\-_]/g, "")) && v.length >= 2) return "placeholder";   // "xx", "x x", "zzz" (Marek 2026-10-29)
     if (/^(test(ing)?|asdf?g?|qwerty|abc|xyz|dummy|null|nil|unknown)$/i.test(v)) return "placeholder";
-    if (kind !== "name" && /^(n\s*[\/.\\-]?\s*a\.?|none|nothing|no|nope|not applicable)$/i.test(v)) return "placeholder";   // "Na", "N/A" as company / title
+    if (kind !== "name" && /^(n\s*[\/.\\-]?\s*a\.?|none|nothing|no|nope|not applicable|undisclosed|not disclosed|confidential|private|secret|prefer not to say|anonymous)$/i.test(v)) return "placeholder";   // "Na", "N/A", "Undisclosed" as company / title
+    // Bot gibberish posted straight to EmailOctopus: "HhMfoolnpjvEtj", "xQaCAQNbpiydq", "GfWFMUbWBTOAe".
+    // Words with 2+ inner capitals are split at each capital; real camel case ("DevSecOps", "GitHubActions",
+    // "OpenAI") splits into word-like pieces (capital + a vowel, no 5-consonant run) or acronyms.
+    if (v.split(/\s+/).some(gibberishWord)) return "mash";
     if (/https?:|www\.|\.(com|net|org|io|ru|xyz)\b/i.test(v)) return "url";
     if (/[<>{}\[\]\\|^~`]/.test(v)) return "symbols";                       // markup / shell junk
     if (kind === "name" && /\d/.test(v)) return "digits";                   // digits are fine in companies ("3M", "Web3")
@@ -3102,6 +3120,9 @@ function validateHumanFields(form) {
         var a = f.value.trim().toLowerCase(), b = l.value.trim().toLowerCase(), d = c.value.trim().toLowerCase();
         if (a && a === b && b === d) return { field: c, message: "Please check your name and company, they look identical." };
     }
+    var jt = form.querySelector("#field_5");
+    if (jt && c && jt.value.trim() && jt.value.trim().toLowerCase() === c.value.trim().toLowerCase())
+        return { field: jt, message: "Please check your job title and company, they look identical." };   // "CS" / "CS"
     return null;
 }
 
@@ -3247,15 +3268,26 @@ function updateCountry() {
 }
 
 function suggestCountry(){
-    const $country = getCountry();
-    document.querySelector(`#tz-country`).value = $country.name;
-    var opts = document.getElementById('country-source').options;
-    for(var i = 0; i < opts.length; i++) {
-        var a = opts[i].text.toLowerCase();
-        var b = $country.name.toLowerCase();
-        if (a.includes(b) || b.includes(a)){
-            opts[i].selected = true;
-            return;
+    let $country = null;
+    try { $country = getCountry(); } catch (e) { $country = null; }
+    const tz = document.querySelector(`#tz-country`), select = document.getElementById('country-source');
+    if (!$country || !$country.name || !tz || !select) return;
+    tz.value = $country.name;
+    var opts = select.options;
+    var b = $country.name.toLowerCase();
+    // Exact name first, then the same ISO code ("Viet Nam"), and only then a loose match: the loose match
+    // alone picked "British Indian Ocean Territory" (+246) for every visitor in India.
+    var passes = [
+        function (a) { return a === b; },
+        function (a, text) { return $country.code && countryCodeForName(text) === $country.code; },
+        function (a) { return a && (a.includes(b) || b.includes(a)); }
+    ];
+    for (var p = 0; p < passes.length; p++) {
+        for (var i = 0; i < opts.length; i++) {
+            if (passes[p](opts[i].text.trim().toLowerCase(), opts[i].text.trim())) {
+                opts[i].selected = true;
+                return;
+            }
         }
     }
 }
