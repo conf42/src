@@ -7,11 +7,13 @@ can be stopped and restarted at any time: finished steps are skipped and a faile
 Steps per talk: match -> probe -> upload -> edit -> publish -> download -> srt -> loudness -> qa
 """
 import datetime
+import filecmp
 import glob
 import json
 import re
 import os
 import shutil
+import subprocess
 import threading
 import time
 import traceback
@@ -411,6 +413,55 @@ class Run:
                                             "matched": why, "matched_at": now(), "steps": {}, "current": None, "error": None,
                                             "sizes_seen": [os.path.getsize(os.path.join(self.inp, canonical))]}
             self.save()
+
+    def ship(self):
+        """Every finished talk goes to the site by itself (Marek 2026-10-29): its transcript to src/srt/ and its deck
+        to conf42/static/slides/ (the repo next to src), committed and pushed. The site links both by name, so nothing
+        else is needed. Only what is new or changed is copied; a talk that is not finished ships nothing. Off with
+        settings `ship: false`. Returns {"srt": [...], "slides": [...]}."""
+        out = {"srt": [], "slides": []}
+        if str(self.cfg.get("ship", True)).lower() in ("false", "0", "no"):
+            return out
+        done = {k: t for k, t in self.state["talks"].items() if t.get("finished")}
+        jobs = []
+        site_srt = os.path.join(events.REPO, "srt")
+        if os.path.isdir(site_srt):
+            files = [os.path.join(self.srt_dir, ("%s_%s.srt" % (self.ev["short_url"], t["name1"])).replace(" ", "_"))
+                     for t in done.values()]
+            jobs.append(("srt", events.REPO, site_srt, files, "transcripts"))
+        elif done:
+            self.note("transcripts not shipped: this checkout has no srt/ (git sparse-checkout add srt)")
+        static = os.path.join(os.path.dirname(events.REPO), "static")
+        if os.path.isdir(os.path.join(static, "slides")):
+            files = [os.path.join(self.slides_dir, "%s - %s.pdf" % (k, self.ev["title"])) for k in done]
+            jobs.append(("slides", static, os.path.join(static, "slides"), files, "slides"))
+        elif done:
+            self.note("slides not shipped: no conf42/static repo next to this one")
+        git = lambda repo, *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, timeout=300)
+        for kind, repo, dest, files, label in jobs:
+            new = []
+            for f in files:
+                if not os.path.exists(f):
+                    continue
+                to = os.path.join(dest, os.path.basename(f))
+                if os.path.exists(to) and filecmp.cmp(f, to, shallow=False):
+                    continue
+                shutil.copy2(f, to)
+                new.append(to)
+            if not new:
+                continue
+            git(repo, "pull", "--rebase", "--autostash", "-q")
+            git(repo, "add", *[os.path.relpath(x, repo) for x in new])
+            git(repo, "commit", "-q", "-m", "%s: %s (%d file%s, factory)" % (self.ev["title"], label, len(new),
+                                                                          "" if len(new) == 1 else "s"))
+            r = git(repo, "push", "-q")
+            if r.returncode != 0:                      # one retry after a fresh rebase (GitHub resets now and then)
+                git(repo, "pull", "--rebase", "--autostash", "-q")
+                r = git(repo, "push", "-q")
+            out[kind] = [os.path.basename(x) for x in new]
+            self.note("shipped %d %s to the site%s" % (len(new), label, "" if r.returncode == 0
+                                                         else " (commit made, push failed: %s)" % r.stderr[-200:]))
+        return out
 
     def slides(self, talk_list=None):
         """Decks: match, one per talk, convert to PDF, rename for the site, compress under the limit (see slides.py).
@@ -969,6 +1020,10 @@ class Run:
             self.chapters_pass()
         except Exception as ex:
             self.note("chapters pass failed: %s" % ex)
+        try:
+            self.ship()
+        except Exception as ex:
+            self.note("shipping transcripts / slides failed: %s" % ex)
         self.note("run finished")
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}

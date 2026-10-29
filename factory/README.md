@@ -91,6 +91,15 @@ A run can be stopped and started again at any time. Finished steps are skipped, 
   **Claude:** when Marek shares an event's Drive folder link (or says "activate the factory"), run `drive <short_url> <link>`.
   Never download through a browser.
 
+## Shipping to the site
+
+Every run ends with `ship` (also `python -m factory ship <short_url>`): each **finished** talk's transcript goes to
+`src/srt/<short_url>_<Name1>.srt` and its deck to `conf42/static/slides/<Speakers> - Conf42 <Event> <Year>.pdf` (the
+repo next to `src`), committed and pushed - only new or changed files. The site links both by name, no CSV edit needed.
+Decks come down from the Drive folder with the videos; a deck for a talk that is not finished waits, and one that
+arrives after its talk finished goes out with the next run (Marek 2026-10-29). `ship: false` in settings.yml turns it
+off. A slim clone needs `git sparse-checkout add srt` for the transcripts.
+
 ## Slides
 
 Decks from the Drive download are matched to talks like the videos, then:
