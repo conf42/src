@@ -115,7 +115,8 @@ compressed under 5 MB. They are in the event folder's `slides/`. Only decks: `py
 ### Step 5 - YouTube
 
 The app's **YouTube items** button (or `python -m factory chapters <short_url>`) writes `YouTube items.txt` in the
-event folder: per talk the **title** (`<short title> | <speakers> | Conf42 <CODE><YEAR>`, at most 100 characters) and
+event folder: per talk the **title** (`<short title> | <speakers> | Conf42 <Event> <YEAR>`, at most 100 characters; the event named the way earlier
+editions' YouTube titles did it, e.g. `Conf42 Prompt 2026`) and
 the **description** (abstract link, event, CFP, Discord, chapters). The thumbnails are on the event's teasers page:
 `conf42.com/<event>/teasers#thumbnails`.
 
@@ -168,6 +169,8 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 
 ## Changelog
 
+- **2026-10-29** - YouTube titles name the event the way earlier editions did on YouTube, in words: `Conf42 Prompt
+  2026`, `Conf42 Platform Eng. 2026`, `Conf42 DevSecOps 2026` - no more `PE2026` / `DSO2026`.
 - **2026-10-28** - Videos from conf42.com/record are rewrapped into a plain MP4 before the upload (Descript rejects
   the recorder's crash-safe format otherwise); a speaker's "safety copy" folder is joined into one video.
 - **2026-10-17** - One folder per event on the Desktop, named after the conference: `video factory - Conf42 Prompt

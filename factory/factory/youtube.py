@@ -1,6 +1,6 @@
 """YouTube-ready blocks for <event>/chapters.txt: a title of at most 100 characters and the description.
 
-    <short title> | <Speaker(s)> | Conf42 <CODE><YEAR>          e.g. "... | Ananda Kumar Dey | Conf42 DSO2026"
+    <short title> | <Speaker(s)> | Conf42 <Event> <YEAR>        e.g. "... | Ananda Kumar Dey | Conf42 Prompt 2026"
 
     Read the abstract ➤ https://www.conf42.com/<talk page>
     Other sessions at this event ➤ https://www.conf42.com/<event short_url>
@@ -11,10 +11,12 @@
     0:00 ...
 
 The short title is written by Descript's AI editor in the same job as the chapters (or by hand in state.json,
-talks.<speakers>.yt_title); shorten_title() is only the fallback. Links, the event code and the limit live in
+talks.<speakers>.yt_title); shorten_title() is only the fallback. Links, event-name overrides and the limit live in
 settings.yml (youtube:).
 """
+import collections
 import csv
+import os
 import re
 import string
 
@@ -51,23 +53,60 @@ def talk_page(ev, row):
     return url[:100]
 
 
-def event_code(ev, cfg):
-    """DevSecOps -> DSO: settings youtube.event_codes first, else the capitals of a CamelCase name, else initials."""
+VIDEO_STATS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "_db", "video_stats.csv")
+PAST = re.compile(r"\|\s*Conf42\s+(.+?)\s+(20\d\d)\s*$")
+
+
+def past_names(path=VIDEO_STATS):
+    """How our YouTube titles named each event before: {"Prompt": {"2024": 8}, "PE": {"2024": 3}, ...}, from the
+    channel's export in src/_db/video_stats.csv (the "Video title" column)."""
+    out = collections.defaultdict(collections.Counter)
+    try:
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            for r in csv.DictReader(f):
+                m = PAST.search(r.get("Video title") or "")
+                if m:
+                    out[m.group(1)][m.group(2)] += 1
+    except OSError:
+        pass
+    return out
+
+
+def _words(s):
+    return [w for w in re.split(r"[\s/&.-]+", s.lower()) if w]
+
+
+def _initials(name):
+    return "".join(w[0] for w in _words(name) if w[0].isalnum())
+
+
+def event_code(ev, cfg, history=None):
+    """The event's name in the title, the way earlier editions wrote it on YouTube (Marek 2026-10-29: "Conf42 Prompt
+    2026", never "Conf42 PE 2026"): settings youtube.event_codes first; else the name past titles used most for this
+    event - words over acronyms (Prompt Engineering -> Prompt, Platform Engineering -> Platform Eng.); else the full
+    name. An acronym only when the past titles never used words, or the name already is one (SRE, DevSecOps)."""
     codes = ((cfg.get("youtube") or {}).get("event_codes") or {})
     if ev["name"] in codes:
         return str(codes[ev["name"]])
     name = re.sub(r"\(.*?\)", "", ev["name"]).strip()
-    caps = re.findall(r"[A-Z]", name)
-    words = [w for w in re.split(r"[\s/&-]+", name) if w]
-    if len(words) == 1 and len(caps) >= 2:
-        return "".join(caps)
-    if len(words) >= 2:
-        return "".join(w[0].upper() for w in words if w[0].isalnum())
-    return name.replace(" ", "")
+    short = [x.strip().lower() for x in re.findall(r"\((.*?)\)", ev["name"])]   # "Large Language Models (LLMs)"
+    full = _words(name)
+    words, acronyms = [], []
+    for past, years in (past_names() if history is None else history).items():
+        pw, n, last = _words(past), sum(years.values()), max(years)
+        # "Prompt", "Platform Eng.", "Chaos Engr": each word starts the event's word in that place
+        # (a one-word name only as itself: "ML" is not MLOps; a cut word keeps 3+ letters)
+        if past.lower() in short or pw and len(pw) <= len(full) and (len(full) > 1 or pw == full) and \
+                all(w == f or (len(w) >= 3 and f.startswith(w)) for w, f in zip(pw, full)):
+            words.append((n, last, past))
+        elif len(full) > 1 and past.lower() == _initials(name):
+            acronyms.append((n, last, past))
+    pick = max(words or acronyms or [(0, "", name)])
+    return pick[2]
 
 
 def suffix(ev, cfg, speakers):
-    return " | %s | Conf42 %s%s" % (speakers, event_code(ev, cfg), ev["year"])
+    return " | %s | Conf42 %s %s" % (speakers, event_code(ev, cfg), ev["year"])
 
 
 def budget(ev, cfg, speakers):
