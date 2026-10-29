@@ -169,6 +169,8 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 
 ## Changelog
 
+- **2026-10-29** - Finished talks ship by themselves: transcript and slides go to the site at the end of every run
+  (a deck that comes later goes with the next run).
 - **2026-10-29** - YouTube titles name the event the way earlier editions did on YouTube, in words: `Conf42 Prompt
   2026`, `Conf42 Platform Eng. 2026`, `Conf42 DevSecOps 2026` - no more `PE2026` / `DSO2026`.
 - **2026-10-28** - Videos from conf42.com/record are rewrapped into a plain MP4 before the upload (Descript rejects

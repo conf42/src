@@ -3,6 +3,8 @@
   python -m factory match  <short_url> [zip/folder ...]   unzip + match videos to speakers, print the table
   python -m factory run    <short_url> [zip/folder ...]   the whole pipeline (resumes where it stopped)
   python -m factory slides <short_url> [zip/folder ...]   decks only: unzip, match, PDF, rename, compress < 5 MB
+  python -m factory ship   <short_url>                    finished talks' transcripts + decks to the site now (every
+                                                          run does it at the end; settings ship: false turns it off)
   python -m factory status <short_url>                    progress summary
   python -m factory chapters <short_url>                  YouTube titles + descriptions + chapters -> <event>/YouTube items.txt
   python -m factory retry  <short_url> "<speaker(s)>"     retry one talk from its failed step
@@ -105,6 +107,9 @@ def main(argv):
     if cmd == "slides":
         run.collect(argv[2:])
         print(json.dumps(run.slides(), indent=1, ensure_ascii=False))
+        return
+    if cmd == "ship":                                    # finished talks' transcripts + decks to the site, now
+        print(json.dumps(run.ship(), indent=1, ensure_ascii=False))
         return
     if cmd == "drive":                                   # the Drive folder in place of a zip, then the whole run
         argv = [argv[0], argv[1]] + run.drive_fetch(argv[2] if len(argv) > 2 else None)

@@ -80,6 +80,9 @@ Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `red
   (`_db/video_stats.csv`, the channel export), words over acronyms: `Conf42 Prompt 2026`, never `PE2026` (Marek
   2026-10-29). A one-off name goes in settings.yml `youtube.event_codes`. Before a new event's first YouTube items,
   check the name `youtube.event_code` picks; refresh the export (YouTube Studio -> Analytics -> Content) if it is old.
+- Transcripts and decks of finished talks ship to the site by themselves at the end of every run (`ship`:
+  `src/srt/`, `conf42/static/slides/`, commit + push). "Ship the transcripts/slides" = `ship <short_url>`. Report what
+  shipped; a talk not finished ships nothing.
 - One computer per event (the app claims it through `_db/factory.json`); `--force` only when the person says the other
   computer is off.
 - Never put a Descript token or password in a file, commit or the chat. Don't delete work files without asking.
