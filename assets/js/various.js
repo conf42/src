@@ -3046,12 +3046,54 @@ var junkMessages = {
     field_5: "Please enter your job title, e.g. Software Engineer.",
     field_4: "Please enter your company or university name."
 };
+// ---- Newsletter form: phone is required and must look like a real number -------------------
+// People were registering with no phone, or "+91 99999900000". Checks: a known dialling code, a
+// sane length (strict for India and +1, the bulk of sign-ups), and no filler patterns
+// (same digit 6+ times, 3 or fewer distinct digits, 12345678 / 98765432 runs).
+var _knownDial = {};
+for (var _dc in dialCodes) _knownDial[dialCodes[_dc].slice(1)] = true;
+function splitPhone(code, num) {
+    // A number typed with its own "+" carries its code: take the longest known prefix (codes are 1-3 digits).
+    if (num.charAt(0) === "+") {
+        var all = num.replace(/\D/g, "");
+        for (var k = 3; k >= 1; k--) if (_knownDial[all.slice(0, k)]) return { cc: all.slice(0, k), nat: all.slice(k) };
+        return { cc: null, nat: all };
+    }
+    var cc = code.replace(/\D/g, "");
+    return { cc: _knownDial[cc] ? cc : null, nat: num.replace(/\D/g, "") };
+}
+function phoneJunk(form) {
+    var codeEl = form.querySelector('#phone-code'), numEl = form.querySelector('#phone-number');
+    if (!numEl) return null;
+    var num = numEl.value.trim(), code = codeEl ? codeEl.value.trim() : "";
+    var bad = { field: numEl, message: "Please enter your real phone number, including the country code." };
+    if (!num) return { field: numEl, message: "Please enter your phone number." };
+    if (/[^\d\s()+.\-\/]/.test(num) || /\+/.test(num.slice(1))) return bad;      // letters, or "+" in the middle
+    var p = splitPhone(code, num);
+    if (!p.cc) return { field: (num.charAt(0) === "+" || !codeEl) ? numEl : codeEl, message: "Please enter a valid country dialling code, e.g. +44." };
+    var nat = p.nat;
+    if (p.cc !== "39") nat = nat.replace(/^0/, "");                                // trunk "0" (kept in Italy, where it is part of the number)
+    if (nat.indexOf(p.cc) === 0 && (p.cc + nat).length > 13 && nat.length - p.cc.length >= 6) nat = nat.slice(p.cc.length);   // code typed twice
+    if (p.cc === "91" && !/^[6-9]\d{9}$/.test(nat)) return { field: numEl, message: "Please enter your 10-digit mobile number." };
+    if (p.cc === "1" && !/^[2-9]\d{2}[2-9]\d{6}$/.test(nat)) return { field: numEl, message: "Please enter your 10-digit phone number." };
+    if (nat.length < 6 || (p.cc + nat).length > 15) return bad;
+    if (/(\d)\1{5,}/.test(nat)) return bad;                                       // 9999990000
+    var distinct = {}; for (var i = 0; i < nat.length; i++) distinct[nat.charAt(i)] = true;
+    if (Object.keys(distinct).length <= 3) return bad;                              // 9090909090, 1212121212
+    for (var j = 0; j + 8 <= nat.length; j++) {                                     // 1234567890, 9876543210
+        var run = nat.substr(j, 8);
+        if ("01234567890123456789".indexOf(run) >= 0 || "98765432109876543210".indexOf(run) >= 0) return bad;
+    }
+    return null;
+}
 function validateHumanFields(form) {
     var checks = [["field_1", "name"], ["field_2", "name"], ["field_5", "text"], ["field_4", "text"]];
     for (var i = 0; i < checks.length; i++) {
         var el = form.querySelector("#" + checks[i][0]);
         if (el && junkReason(el.value, checks[i][1])) return { field: el, message: junkMessages[checks[i][0]] };
     }
+    var phoneProblem = phoneJunk(form);
+    if (phoneProblem) return phoneProblem;
     var f = form.querySelector("#field_1"), l = form.querySelector("#field_2"), c = form.querySelector("#field_4");
     if (f && l && c) {
         var a = f.value.trim().toLowerCase(), b = l.value.trim().toLowerCase(), d = c.value.trim().toLowerCase();
