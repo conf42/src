@@ -69,6 +69,8 @@ on the list.
 
 ## Changelog
 
+- **2026-10-29** - YouTube titles name the event the way earlier editions did on YouTube, in words: `Conf42 Prompt
+  2026` rather than `Conf42 PE2026`.
 - **2026-10-28** - Videos from conf42.com/record (fragmented MP4, which Descript's import rejects) are rewrapped into a
   plain MP4 before the upload - no re-encode, same quality and size - so they no longer fail at the upload.
 - **2026-10-28** - A speaker who sends only the recorder's "safety copy" folder (a recording that never reached Stop)
