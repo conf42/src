@@ -3130,23 +3130,39 @@ function swapped(a, b) {                 // "gmial" vs "gmail": two neighbouring
     }
     return false;
 }
-function emailProblem(form) {
-    var el = form.querySelector("#field_0");
-    if (!el) return null;
-    var v = el.value.trim().toLowerCase(), at = v.lastIndexOf("@");
-    if (at < 1) return null;                                    // the browser's own type=email check handles this
-    var local = v.slice(0, at), dom = v.slice(at + 1);
-    if (_throwaway.test(dom)) return { field: el, message: "Please use your own email address, not a temporary inbox." };
-    if (/\.(con|cmo|cpm|ocm|comm|om|vom|xom)$/.test(dom)) return { field: el, message: "Please check your email address, did you mean " + local + "@" + dom.replace(/\.[a-z]+$/, ".com") + "?" };
-    if (_realLookalikes[dom] || _mailHosts.indexOf(dom) >= 0) return null;
+// The corrected domain for a typo'd webmail domain ("gmqil.com" -> "gmail.com"), or null when it looks fine.
+// Marek 2026-10-29: correct these silently instead of asking the visitor.
+function fixedEmailDomain(dom) {
+    var tld = dom.match(/^(.+)\.(con|cmo|cpm|ocm|comm|vom|xom)$/);             // anything.con -> anything.com
+    if (tld) dom = tld[1] + ".com";
+    if (_realLookalikes[dom] || _mailHosts.indexOf(dom) >= 0) return tld ? dom : null;
     for (var i = 0; i < _mailHosts.length; i++) {
         var h = _mailHosts[i], name = h.split(".")[0];
         var typo = editDistance1(dom, h) ||                                         // gmqil.com, gmailc.com
                    dom === name + ".co" || dom === name + ".cm" ||                             // gmail.co, gmail.cm
                    (dom.length > h.length && dom.slice(-h.length) === h && !/\./.test(dom.slice(0, -h.length))) ||   // 90gmail.com
                    (editDistance1(dom.split(".")[0], name) || swapped(dom.split(".")[0], name)) && /^[a-z0-9-]+\.com$/.test(dom) && name.length >= 5;   // gmal.com, gmial.com, hotmial.com
-        if (typo) return { field: el, message: "Please check your email address, did you mean " + local + "@" + h + "?" };
+        if (typo) return h;
     }
+    return tld ? dom : null;
+}
+function fixEmailField(el) {
+    if (!el) return;
+    var v = el.value.trim(), at = v.lastIndexOf("@");
+    if (at < 1) return;
+    var fixed = fixedEmailDomain(v.slice(at + 1).toLowerCase());
+    if (fixed) el.value = v.slice(0, at) + "@" + fixed;
+}
+Array.prototype.forEach.call(document.querySelectorAll('form.emailoctopus-form #field_0'), function (el) {
+    el.addEventListener('blur', function () { fixEmailField(el); });              // the visitor sees the fix before submitting
+});
+function emailProblem(form) {
+    var el = form.querySelector("#field_0");
+    if (!el) return null;
+    fixEmailField(el);                                          // also on submit (autofill, Enter without leaving the box)
+    var v = el.value.trim().toLowerCase(), at = v.lastIndexOf("@");
+    if (at < 1) return null;                                    // the browser's own type=email check handles this
+    if (_throwaway.test(v.slice(at + 1))) return { field: el, message: "Please use your own email address, not a temporary inbox." };
     return null;
 }
 function validateHumanFields(form) {
