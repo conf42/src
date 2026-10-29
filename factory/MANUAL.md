@@ -72,7 +72,7 @@ No Drive link? Download the folder as zip(s) and use the app (step 2) or
 
 In the app, pick the event. You see:
 
-- every talk with its steps - **render → upload → edit → publish → download → srt → chapters → loudness → QA** - and
+- every talk with its steps - **render → upload → edit → publish → download → srt → proofread → chapters → loudness → QA** - and
     what it is doing right now ("uploading 45% of 1.2 GB", "Descript is busy, waiting in line");
 
 - **NOT MATCHED** files - videos whose name matches no speaker. Rename the file to the speaker's name as on the site
@@ -106,6 +106,14 @@ When a talk shows **QA** done, look at its flags:
 
 The finished videos are in the event's folder, `Desktop/video factory - <event>/final videos for YouTube/`, named
 `<speakers> - Conf42 <Event> <Year>.mp4`. Subtitles are in the event folder's `srt/`.
+
+**Transcripts are proofread before they go to the site.** Descript transcribes well but knows nothing about software
+engineering: "CON forty-two" for Conf42, "future flags" in a feature flags talk, "L LMS". The **proofread** step fixes
+that: first a short list of sure-fire fixes (`factory/glossary.yml` - add a line when the same mistake shows up twice),
+then Claude reads the whole transcript with the talk's title, abstract and speakers and fixes misheard words only
+(never the speaker's grammar, never the timing). Each fix is listed in `srt/proofread/`, and Descript's original stays
+in `srt/descript/`. It needs Claude Code on the computer (the **With Claude** tab's setup); without it only the list
+is applied, the step shows "glossary only", and the next run tries Claude again before shipping.
 
 ### Step 4 - Slides
 
@@ -158,7 +166,7 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 |---|---|
 | `in/` | the speakers' videos, renamed to the speakers |
 | `out/_descript/` | Descript's downloads (not for YouTube) |
-| `srt/` | subtitles, named for the site |
+| `srt/` | subtitles, named for the site, proofread (`descript/`: Descript's originals, `proofread/`: every fix) |
 | `slides/` | decks ready for the site |
 | `YouTube items.txt` | titles, descriptions, chapters |
 | `state.json` | progress of every step |
@@ -169,6 +177,9 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 
 ## Changelog
 
+- **2026-10-29** - Transcripts are proofread between Descript and the site: a glossary of sure-fire fixes plus Claude
+  reading each talk in context ("future flags" -> feature flags, "CON forty-two" -> Conf42). New **Proofread** step on
+  the dashboard; all 2026 transcripts already on the site were proofread once.
 - **2026-10-29** - Finished talks ship by themselves: transcript and slides go to the site at the end of every run
   (a deck that comes later goes with the next run).
 - **2026-10-29** - YouTube titles name the event the way earlier editions did on YouTube, in words: `Conf42 Prompt

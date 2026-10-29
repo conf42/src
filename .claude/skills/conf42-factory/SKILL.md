@@ -83,6 +83,12 @@ Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `red
 - Transcripts and decks of finished talks ship to the site by themselves at the end of every run (`ship`:
   `src/srt/`, `conf42/static/slides/`, commit + push). "Ship the transcripts/slides" = `ship <short_url>`. Report what
   shipped; a talk not finished ships nothing.
+- Transcripts are proofread before they ship (Marek 2026-10-29): Descript's SRT -> `proofread` step (glossary.yml, then
+  `claude -p` reads the talk with its title/abstract/speakers and returns misheard words only; cue text only, never
+  timings) -> ship. `ship` proofreads any finished talk that missed it or got "glossary only". "Proofread the
+  transcripts of <event>" = `proofread <short_url> ["<speaker>"]` on the files already in `src/srt/` (commits + pushes;
+  fixes in `_db/factory_runs/<short_url>/proofread.json`). Report the fixes count and anything PARTIAL. A mistake seen
+  twice across talks goes into `factory/glossary.yml`.
 - One computer per event (the app claims it through `_db/factory.json`); `--force` only when the person says the other
   computer is off.
 - Never put a Descript token or password in a file, commit or the chat. Don't delete work files without asking.
