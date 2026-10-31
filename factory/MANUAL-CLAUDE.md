@@ -70,6 +70,8 @@ on the list.
 
 ## Changelog
 
+- **2026-10-31** - Talks dropped from the event CSV come back from its git history while their video exists
+  (matching, YouTube items, transcript, deck) - the video outranks the spreadsheet; never ask for the sheet to be fixed.
 - **2026-10-29** - Transcripts are proofread before they ship: glossary fixes plus Claude reading each talk in context.
   Ask *"Proofread the transcripts of Feature Flags 2026"* to redo the ones already on the site.
 - **2026-10-29** - Finished talks ship by themselves: transcript and slides go to the site at the end of every run
