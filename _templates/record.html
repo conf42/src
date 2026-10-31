@@ -94,6 +94,11 @@
     .zoom input { flex: 1; min-width: 0; margin: 0; accent-color: var(--violet); }
     .zoom output { min-width: 30px; text-align: right; }
     .stage canvas { display: block; width: 100%; height: 100%; }
+    /* the speaker's notes (Marek 2026-10-31): a plain dark strip over the bottom fifth of the slides, in the preview only -
+       it's the page, not the engine's canvas, so it never reaches the video. A long note scrolls inside the strip */
+    .notes { position: absolute; box-sizing: border-box; overflow: auto; padding: .7em 1.1em; border-radius: 0 0 10px 10px;
+      background: rgba(10,14,35,.85); color: var(--text); line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere;
+      font-size: calc(var(--pvw, 1000px) * var(--nz, .0145)); scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.3) transparent; }
     .count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11rem; font-weight: 800;
       background: rgba(10,14,35,.5); text-shadow: 0 8px 40px rgba(0,0,0,.6); }
     .badge { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.6);
@@ -361,6 +366,7 @@
     .juicy:hover, .juicy.over { filter: brightness(1.08); box-shadow: 0 10px 30px color-mix(in srgb, var(--j2) 55%, transparent); }
     .juicy:active { transform: scale(.98); }
     .juicy input { display: none; }
+    .easy .hint { margin: -4px 2px 0; font-size: .8rem; color: var(--muted); line-height: 1.45; }
     /* sharing: a red Stop takes the right fifth of the share button (Marek 2026-10-24) */
     .share-row { display: flex; gap: 8px; } .share-row #share { flex: 1; min-width: 0; } .share-row #share-stop { flex: 0 0 20%; padding-left: 0; padding-right: 0; }
     .juicy span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -429,7 +435,7 @@
       .thumb { display: none; }
       .bar { gap: 6px; padding: 8px; }
       .nav { width: 46px; font-size: 1.15rem; } .pos { min-width: 54px; font-size: .9rem; }
-      .seg button { padding: 0 14px; font-size: .95rem; } .pause { padding: 0 16px; font-size: .95rem; }
+      .seg button { padding: 0 14px; font-size: .95rem; } .pause { padding: 0 16px; font-size: .95rem; } #notes-btn, #notes-aa { padding: 0 12px; }
       .rec { padding: 0 18px 0 42px; font-size: .95rem; } .rec::before { left: 16px; width: 16px; height: 16px; margin-top: -8px; }
     }
     @container left (max-width: 640px) { .seg button { padding: 0 10px; } .pos { min-width: 44px; } #jump-btn { padding: 0 12px; } }
@@ -468,6 +474,7 @@
           <button class="x2" id="cam2-x" data-tip="Remove the 2nd speaker’s camera and go back to one circle." aria-label="Remove the 2nd speaker's camera" hidden><span>Same person twice? Remove</span><i>✕</i></button>
           <label class="zoom" id="zoom-box0" data-tip="@zoom" hidden><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg><input type="range" id="zoom0" min="0" max="50" step="1" value="0" aria-label="Camera zoom"><output id="zoom-v0">0%</output></label>
           <label class="zoom" id="zoom-box1" data-tip="@zoom" hidden><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/></svg><input type="range" id="zoom1" min="0" max="50" step="1" value="0" aria-label="Second camera zoom"><output id="zoom-v1">0%</output></label>
+          <div class="notes" id="notes" hidden></div>
           </div>
         </div>
         <div class="vuwrap" data-tip="@level"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path class="w" d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><div class="vu"><b id="vu-cover"></b><u id="vu-peak"></u></div></div>
@@ -476,6 +483,8 @@
           <span class="pos" id="pos" data-tip="The slide you’re on, out of how many.">–</span>
           <button class="nav" id="next" aria-label="Next slide" data-tip="@nexts">▶</button>
           <canvas class="thumb" id="thumb" width="184" height="104" data-tip="The next slide, so you know what’s coming." style="visibility:hidden"></canvas>
+          <button class="pause on" id="notes-btn" data-tip="Show or hide your speaker notes. Only you see them - they're never in the video." hidden>Notes</button>
+          <button class="pause" id="notes-aa" data-tip="Your notes' text size: small, medium, large." aria-label="Notes text size" hidden>Aa</button>
           <span class="spacer"></span>
           <button class="pause" id="jump-btn" data-tip="@jump" hidden>Go to shared ↗</button><div class="seg" id="live-src"><i class="knob" id="knob"></i><button data-src="slides">Slides</button><button data-src="screen">Screen</button><button data-src="none">Me</button></div>
           <button class="pause" id="pause" data-tip="@pause" hidden>Pause</button>
@@ -621,7 +630,8 @@
     <div id="ctl-win" style="--c:var(--green)">
       <!-- easy setup (Marek 2026-10-23): the deck and the screen first, two bright buttons; then the layout -->
       <div class="easy">
-        <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf"><span id="drop-text">Add your slides in .pdf</span></label>
+        <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf,.pptx" multiple><span id="drop-text">Add your slides in .pdf</span></label>
+        <div class="hint">Want your speaker notes? Pick your .pptx together with the PDF.</div>
         <div class="share-row">
           <button class="juicy" id="share" style="--j1:#ff7aa2;--j2:#ff3b7e" data-tip="For a demo: share a screen, window or browser tab, and switch between it and your slides while you record.">Choose a screen/window to share</button>
           <button class="juicy" id="share-stop" style="--j1:#ff5a5f;--j2:#d91f3a" data-tip="Stop sharing your screen." hidden>Stop</button>
@@ -748,7 +758,7 @@
     // a hidden page (the speaker is in their demo) has no preview to draw
     document.addEventListener('visibilitychange', function () { worker.postMessage({ type: 'visible', on: document.visibilityState === 'visible' }); });
     var S = { ev: null, talk: null, kind: null, camWanted: null, mode: null, src: 'none', cam: [null, null], micTrack: null, screenTrack: null,
-              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), recording: false, finishing: false, assets: null, step: 1, verdict: '', openSeq: [], camFps: [], dim30: [], dimL: [] };
+              pdf: null, pdfName: '', page: 1, pages: 0, cache: new Map(), notesRaw: null, notesName: '', notes: null, notesOn: store.get('notes-on') !== '0', notesSz: +(store.get('notes-sz') || 1) % 3, recording: false, finishing: false, assets: null, step: 1, verdict: '', openSeq: [], camFps: [], dim30: [], dimL: [] };
     // a video chip Chrome can encode with: the cameras then run at 60 fps (openCam)
     S.hwEnc = ('VideoEncoder' in window ? VideoEncoder.isConfigSupported({ codec: 'avc1.640033', width: 1920, height: 1080, framerate: 60, bitrate: 2500000, hardwareAcceleration: 'prefer-hardware' })
       .then(function (r) { return !!r.supported; }, function () { return false; }) : Promise.resolve(false));
@@ -824,7 +834,7 @@
       zoom: function () { return S.recording && !S.paused ? 'Zoom is locked while you record - pause to change it.' : 'Zoom in on the face, up to 50 %. Zoomed in, drag the picture to re-centre it; double-click resets it.'; },
       level: function () { return S.micTrack && !S.micLive ? 'No signal at all from this microphone - pick another one. You can’t record without your voice.' : 'Your mic level: it should jump when you talk. Always at the top? Too loud. Barely moving? Too quiet.'; },
       badge: function () { return S.paused ? 'Paused - the clock stands still until you resume.' : 'How long you’ve been recording. It stops by itself at 2 hours.'; },
-      drop: function () { return S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (File → Export / Download as PDF in PowerPoint, Keynote or Google Slides). Click or drop it here.'; }
+      drop: function () { return (S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (File → Export / Download as PDF in PowerPoint, Keynote or Google Slides). Click or drop it here.') + ' Add the .pptx too (Keynote, Google Slides and Canva can export one) and your speaker notes show under each slide.'; }
     };
     // every message fits the bubble whole (Marek 2026-10-24: no "…"): the text shrinks a step at a time if it has to
     function fitBubble() {
@@ -1779,11 +1789,90 @@
         .then(function (doc) {
           if (S.pdf) S.pdf.destroy();
           S.pdf = doc; S.pdfName = file.name; S.pages = doc.numPages; S.page = 1; S.cache.clear();
-          $('drop-text').textContent = '\u2713 ' + doc.numPages + ' slides \u00b7 ' + file.name; 
+          mapNotes(); dropText();
           setSrc('slides'); showSlide(); summaries();
         }).catch(function (e) { $('drop-text').textContent = 'Could not open that PDF - export it again and pick it here'; toast('I couldn’t open that PDF: ' + e.message, 8000, 'bad'); });
     }
-    $('pdf').addEventListener('change', function () { loadPdf(this.files[0]); this.value = ''; });
+    // the deck and its notes in one go (Marek 2026-10-31): the PDF is what's shown, the .pptx only gives the notes
+    function loadFiles(list) {
+      var fs = [].slice.call(list || []), pdf = null, pptx = null;
+      fs.forEach(function (f) { if (/\.pptx$/i.test(f.name)) pptx = f; else if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') pdf = f; });
+      if (!pdf && !pptx) { if (fs.length) toast(/\.(ppt|key|odp)$/i.test(fs[0].name) ? 'Save that as .pptx for your notes, and as PDF for your slides.' : 'That isn\u2019t a PDF - export your slides as PDF and pick it here.', 8000, 'warn'); return; }
+      if (pdf && !pptx) S.notesRaw = null;   // a new deck on its own: the old deck's notes would be wrong
+      if (pptx) readPptx(pptx).then(function (raw) {
+        S.notesRaw = raw; S.notesName = pptx.name; mapNotes(); dropText(); navState();
+        if (!pdf && !S.pdf) toast('Got your notes - now add the same deck as PDF.', 8000);
+      }).catch(function () { toast('I couldn\u2019t read the notes in ' + pptx.name + ' - save it again as .pptx and pick it with your PDF.', 8000, 'warn'); });
+      if (pdf) loadPdf(pdf); else { mapNotes(); dropText(); }
+    }
+    function dropText() {
+      var t = $('drop-text');
+      if (S.pdf) t.textContent = '\u2713 ' + S.pages + ' slides' + (S.notes ? ' \u00b7 ' + S.notes.filter(Boolean).length + ' with notes' : '') + ' \u00b7 ' + S.pdfName;
+      else if (S.notesRaw) t.textContent = '\u2713 Notes from ' + S.notesName + ' - now the PDF';
+    }
+    // one note per PDF page. PowerPoint leaves hidden slides out of its PDF, so those are dropped when that makes the counts match
+    function mapNotes() {
+      var raw = S.notesRaw; S.notes = null;
+      if (!raw || !S.pdf) return;
+      var shown = raw.filter(function (n) { return !n.hidden; }), use = raw.length !== S.pages && shown.length === S.pages ? shown : raw;
+      S.notes = use.map(function (n) { return n.text; });
+      if (!S.notes.some(Boolean)) { S.notes = null; toast('That .pptx has no speaker notes in it.', 6000, 'warn'); return; }
+      if (use.length !== S.pages) toast('Your PDF has ' + S.pages + ' slides, the .pptx ' + use.length + ' - some notes may be on the wrong slide. Export both again from the same deck.', 10000, 'warn');
+    }
+    // a .pptx is a zip of XML: the zip's directory, then DecompressionStream for the few files we need (no library)
+    function unzip(buf) {
+      var v = new DataView(buf), e = buf.byteLength - 22, out = {}, dec = new TextDecoder();
+      while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--;
+      if (e < 0) throw new Error('not a zip');
+      for (var i = 0, n = v.getUint16(e + 10, true), p = v.getUint32(e + 16, true); i < n; i++) {
+        var nl = v.getUint16(p + 28, true);
+        out[dec.decode(new Uint8Array(buf, p + 46, nl))] = { m: v.getUint16(p + 10, true), size: v.getUint32(p + 20, true), off: v.getUint32(p + 42, true) };
+        p += 46 + nl + v.getUint16(p + 30, true) + v.getUint16(p + 32, true);
+      }
+      return function (name) {
+        var z = out[name]; if (!z) return Promise.resolve(null);
+        var data = new Uint8Array(buf, z.off + 30 + v.getUint16(z.off + 26, true) + v.getUint16(z.off + 28, true), z.size);
+        var text = z.m === 0 ? Promise.resolve(dec.decode(data)) : new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+        return text.then(function (t) { return new DOMParser().parseFromString(t, 'application/xml'); });
+      };
+    }
+    var NS_P = 'http://schemas.openxmlformats.org/presentationml/2006/main', NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main',
+        NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    function readPptx(file) {
+      function rels(d) { var m = {}; [].forEach.call(d ? d.getElementsByTagName('Relationship') : [], function (r) { m[r.getAttribute('Id')] = r; }); return m; }
+      function path(base, t) {   // a relationship's target, relative to its part's folder ("../notesSlides/notesSlide1.xml") or absolute
+        var parts = (t.charAt(0) === '/' ? t.slice(1) : base + t).split('/'), out = [];
+        parts.forEach(function (x) { if (x === '..') out.pop(); else if (x !== '.') out.push(x); });
+        return out.join('/');
+      }
+      function text(d) {   // the notes box (the "body" placeholder); not the slide picture, the slide number or a header/footer
+        if (!d) return '';
+        var sps = [].slice.call(d.getElementsByTagNameNS(NS_P, 'sp')), type = function (sp) { var ph = sp.getElementsByTagNameNS(NS_P, 'ph')[0]; return ph ? ph.getAttribute('type') || 'body' : ''; };
+        var body = sps.filter(function (sp) { return type(sp) === 'body'; });
+        if (!body.length) body = sps.filter(function (sp) { return ['sldImg', 'sldNum', 'hdr', 'ftr', 'dt'].indexOf(type(sp)) < 0; });
+        var lines = [];
+        body.forEach(function (sp) { [].forEach.call(sp.getElementsByTagNameNS(NS_A, 'p'), function (p) {
+          var l = ''; [].forEach.call(p.getElementsByTagNameNS(NS_A, '*'), function (x) { if (x.localName === 't') l += x.textContent; else if (x.localName === 'br') l += '\n'; });
+          lines.push(l);
+        }); });
+        return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+      }
+      return file.arrayBuffer().then(function (buf) {
+        var get = unzip(buf);
+        return Promise.all([get('ppt/presentation.xml'), get('ppt/_rels/presentation.xml.rels')]).then(function (r) {
+          var pr = rels(r[1]);
+          return Promise.all([].map.call(r[0].getElementsByTagNameNS(NS_P, 'sldId'), function (s) {
+            var slide = path('ppt/', pr[s.getAttributeNS(NS_R, 'id')].getAttribute('Target')), base = slide.replace(/[^/]+$/, '');
+            return Promise.all([get(slide), get(base + '_rels/' + slide.slice(base.length) + '.rels')]).then(function (x) {
+              var hidden = !!x[0] && x[0].documentElement.getAttribute('show') === '0', n = null, sr = rels(x[1]);
+              Object.keys(sr).forEach(function (k) { if (/\/notesSlide$/.test(sr[k].getAttribute('Type'))) n = sr[k].getAttribute('Target'); });
+              return (n ? get(path(base, n)) : Promise.resolve(null)).then(function (d) { return { text: text(d), hidden: hidden }; });
+            });
+          }));
+        });
+      });
+    }
+    $('pdf').addEventListener('change', function () { loadFiles(this.files); this.value = ''; });
     // a Google Slides link (Marek 2026-10-22): Google won't hand the deck to another site, but the speaker's own browser,
     // signed in to their Google account, can download it as a PDF (private decks too) - then they pick that file
     function gsId() { var m = /docs\.google\.com\/presentation\/(?:u\/\d+\/)?d\/([\w-]{20,})/.exec($('gs-url').value); return m && m[1]; }
@@ -1794,12 +1883,12 @@
       $('gs-pick').classList.add('go'); $('gs-pick').style.setProperty('--c', 'var(--green)');
     });
     $('gs-pick').addEventListener('click', function () {
-      window.showOpenFilePicker({ startIn: 'downloads', types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] })
-        .then(function (h) { return h[0].getFile(); }).then(loadPdf).catch(function () {});
+      window.showOpenFilePicker({ startIn: 'downloads', multiple: true, types: [{ description: 'PDF, plus the .pptx for your notes', accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'] } }] })
+        .then(function (h) { return Promise.all(h.map(function (x) { return x.getFile(); })); }).then(loadFiles).catch(function () {});
     });
     ['dragenter', 'dragover'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.add('over'); }); });
     ['dragleave', 'drop'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.remove('over'); }); });
-    $('drop').addEventListener('drop', function (e) { needWindow(); loadPdf(e.dataTransfer.files[0]); });
+    $('drop').addEventListener('drop', function (e) { needWindow(); loadFiles(e.dataTransfer.files); });
 
     function render(n) {
       // page n at exactly the window's size (fitted, never stretched), cached: the current page and its neighbours
@@ -1837,7 +1926,23 @@
       $('pos').textContent = on ? S.page + ' / ' + S.pages : '–';
       $('prev').disabled = !on || S.page <= 1; $('next').disabled = !on || S.page >= S.pages;
       $('thumb').style.visibility = !on || S.page >= S.pages ? 'hidden' : '';
+      showNotes();
     }
+    // the note for this slide, over the bottom fifth of the slides' window (GEOM), only on Slides
+    function showNotes() {
+      var has = !!(S.notes && S.pdf && S.src === 'slides' && S.kind), t = has ? S.notes[S.page - 1] || '' : '', el = $('notes');
+      $('notes-btn').hidden = $('notes-aa').hidden = !has;
+      $('notes-btn').classList.toggle('on', S.notesOn);
+      el.hidden = !(has && S.notesOn && t);
+      if (el.hidden) return;
+      var r = GEOM[S.kind].rect;
+      el.style.left = r[0] / 19.2 + '%'; el.style.width = r[2] / 19.2 + '%'; el.style.top = (r[1] + r[3] * .8) / 10.8 + '%'; el.style.height = r[3] * .2 / 10.8 + '%';
+      el.style.setProperty('--nz', NOTES_SZ[S.notesSz]);
+      if (el.textContent !== t) { el.textContent = t; el.scrollTop = 0; }
+    }
+    var NOTES_SZ = [.011, .0145, .019];   // small / medium / large, of the preview's width
+    $('notes-btn').addEventListener('click', function () { S.notesOn = !S.notesOn; store.set('notes-on', S.notesOn ? '1' : '0'); showNotes(); this.blur(); });
+    $('notes-aa').addEventListener('click', function () { S.notesSz = (S.notesSz + 1) % 3; store.set('notes-sz', S.notesSz); showNotes(); this.blur(); });
     function go(d) { if (!S.pdf || S.src !== 'slides') return; var n = Math.max(1, Math.min(S.pages, S.page + d)); if (n !== S.page) { S.page = n; showSlide(); } }
     $('prev').addEventListener('click', function () { go(-1); this.blur(); });
     $('next').addEventListener('click', function () { go(1); this.blur(); });
