@@ -177,6 +177,9 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 
 ## Changelog
 
+- **2026-10-31** - A talk dropped from the event spreadsheet keeps everything once its video exists: a late upload
+  still matches, and it gets its YouTube items, transcript and slides like any other talk. The video counts more
+  than the spreadsheet. (No talk page on the site for it, so its YouTube description has no "Read the abstract" link.)
 - **2026-10-29** - Transcripts are proofread between Descript and the site: a glossary of sure-fire fixes plus Claude
   reading each talk in context ("future flags" -> feature flags, "CON forty-two" -> Conf42). New **Proofread** step on
   the dashboard; all 2026 transcripts already on the site were proofread once.
