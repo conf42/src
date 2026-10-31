@@ -3,6 +3,7 @@
 // links don't allow other sites. Only decks shared "Anyone with the link": the fetch here is anonymous (no token), so
 // nothing that is private to this account can ever come out of it.
 //
+// Lives in mark@sreday.com (project "conf42 record - Slides link"), never the personal gmail.
 // Deploy once: script.google.com -> New project -> paste this file -> Deploy -> New deployment -> Web app,
 //   Execute as: Me, Who has access: Anyone -> Deploy -> copy the ".../exec" URL into SLIDES_LINK in
 //   _templates/record.html. A changed script needs Deploy -> Manage deployments -> edit -> New version (same URL).
