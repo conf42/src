@@ -377,7 +377,7 @@ class Run:
     def match(self):
         talk_list = events.talks(self.ev)
         with self.lock:
-            self.state["talks_in_csv"] = [t["speakers"] for t in talk_list]
+            self.state["talks_in_csv"] = [t["speakers"] for t in talk_list if not t.get("banished")]
             self.state["unmatched"] = []
             for path in sorted(glob.glob(os.path.join(self.inp, "*"))):
                 if not path.lower().endswith(VIDEO_EXT):
@@ -837,7 +837,8 @@ class Run:
             t = self.state["talks"].get(r["speakers"])
             ch = ((t or {}).get("steps", {}).get("chapters") or {}).get("chapters") if t else None
             if not ch:
-                missing.append(r["speakers"])
+                if t or not r["banished"]:              # a banished talk without a video is simply gone
+                    missing.append(r["speakers"])
                 continue
             title, lines = youtube.block(self.ev, self.cfg, r, ch, t.get("yt_title"))
             ready += 1

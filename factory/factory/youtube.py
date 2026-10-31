@@ -24,16 +24,12 @@ NOISE = re.compile(r"\s+(Talk Type or Format:?|Talk type:?|Format:?)\s*$", re.I)
 
 
 def talk_rows(ev):
-    """The event CSV rows with the fields the site uses for the talk page address."""
-    with open(ev["db_path"], encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
-    out = []
-    for r in rows:
-        n1, n2 = (r.get("Name1") or "").strip(), (r.get("Name2") or "").strip()
-        if n1:
-            out.append({"speakers": n1 + (" & " + n2 if n2 else ""), "Name1": n1, "Name2": n2,
-                        "Keywords": (r.get("Keywords") or "").strip(), "title": clean_title(r.get("Title") or "")})
-    return out
+    """The event's talks (banished ones included, see events.talks) with the fields the site uses for the talk page
+    address."""
+    from . import events
+    return [{"speakers": t["speakers"], "Name1": t["name1"], "Name2": t["name2"],
+             "Keywords": (t["keywords"] or "").strip(), "title": clean_title(t["title"] or ""),
+             "banished": t.get("banished", False)} for t in events.talks(ev)]
 
 
 def clean_title(t):
@@ -143,8 +139,7 @@ def block(ev, cfg, row, chapters, written=None):
     yt = cfg.get("youtube") or {}
     base = str(yt.get("site") or "https://www.conf42.com/").rstrip("/") + "/"
     title = title_for(ev, cfg, row, written)
-    lines = [title, "",
-             "Read the abstract ➤ " + base + talk_page(ev, row),
+    lines = [title, ""] + ([] if row.get("banished") else ["Read the abstract ➤ " + base + talk_page(ev, row)]) + [
              "Other sessions at this event ➤ " + base + ev["short_url"],
              "Apply to speak ➤ " + str(yt.get("apply_url") or "https://cfp.ninja/?q=conf42&status=open"),
              "Join Discord ➤ " + str(yt.get("discord_url") or "https://discord.gg/yQneDJdJGV"),

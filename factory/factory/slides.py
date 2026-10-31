@@ -164,5 +164,5 @@ def prepare(slides_dir, ev, talk_list, max_mb=5):
                     report["compressed"].append("%s %.1f -> %.1f MB" % (name, c[0], c[1]))
             except Exception as ex:
                 report["errors"].append("%s: %s" % (speakers, ex))
-    report["missing"] = [t["speakers"] for t in talk_list if t["speakers"] not in report["decks"]]
+    report["missing"] = [t["speakers"] for t in talk_list if t["speakers"] not in report["decks"] and not t.get("banished")]
     return report
