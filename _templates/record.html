@@ -685,9 +685,9 @@
     <div id="ctl-win" style="--c:var(--green)">
       <!-- easy setup (Marek 2026-10-23): the deck and the screen first, two bright buttons; then the layout -->
       <div class="easy">
-        <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf,.pptx" multiple><span id="drop-text">Add your slides in .pdf</span></label>
+        <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf,.pptx,.ppt,.odp,.key" multiple><span id="drop-text">Add your slides: PDF or PowerPoint</span></label>
         <div id="gs" hidden>
-          <div class="gs-row"><input type="text" id="gs-url" placeholder="…or paste a Google Slides link" aria-label="Google Slides link">
+          <div class="gs-row"><input type="text" id="gs-url" placeholder="…or paste a link: Google Slides, OneDrive, Dropbox, Drive" aria-label="A link to your deck">
             <button class="btn go" id="gs-get" disabled style="--btn:var(--blue)" data-tip="@gsget">Get my slides</button></div>
           <div id="gs-go" hidden style="display:flex;gap:8px;margin-top:8px">
             <button class="btn" id="gs-dl" style="flex:1">1. Download it as PDF</button>
@@ -892,8 +892,8 @@
       zoom: function () { return S.recording && !S.paused ? 'Zoom is locked while you record - pause to change it.' : 'Zoom in on the face, up to 50 %. Zoomed in, drag the picture to re-centre it; double-click resets it.'; },
       level: function () { return S.micTrack && !S.micLive ? 'No signal at all from this microphone - pick another one. You can’t record without your voice.' : 'Your mic level: it should jump when you talk. Always at the top? Too loud. Barely moving? Too quiet.'; },
       badge: function () { return S.paused ? 'Paused - the clock stands still until you resume.' : 'How long you’ve been recording. It stops by itself at 2 hours.'; },
-      gsget: function () { return gsLabel() === 'Refresh slides' ? 'Fetches your deck and its notes from the link again - after you change something in Google Slides.' : 'Brings in your slides and their speaker notes. The deck has to be shared as “Anyone with the link”.'; },
-      drop: function () { if (S.linkId) return 'Your slides came from the Google Slides link - use Refresh slides to update them. Clear the link to add a PDF instead.'; return (S.pdf ? 'Click to choose another PDF, or drop one here.' : 'Your slides as a PDF (File → Export / Download as PDF in PowerPoint, Keynote or Google Slides). Click or drop it here.') + ' Add the .pptx too (Keynote, Google Slides and Canva can export one) and your speaker notes show above your slides, close to the camera.'; }
+      gsget: function () { return gsLabel() === 'Refresh slides' ? 'Fetches your deck and its notes from the link again - after you change something in it.' : 'Brings in your slides and their speaker notes from Google Slides, or a PowerPoint / PDF on OneDrive, Dropbox or Google Drive. Share it as “Anyone with the link”.'; },
+      drop: function () { if (S.linkId) return 'Your slides came from the link - use Refresh slides to update them. Clear the link to add a file instead.'; return (S.pdf ? 'Click to choose another deck, or drop one here.' : 'Your PowerPoint (.pptx) - or a PDF of your slides. Click or drop it here.') + ' A PDF together with its .pptx is best: the exact look, and your speaker notes above the slides. Keynote, Canva, Pitch, Figma: export PDF + PowerPoint.'; }
     };
     // every message fits the bubble whole (Marek 2026-10-24: no "…"): the text shrinks a step at a time if it has to
     function fitBubble() {
@@ -1850,23 +1850,76 @@
           S.pdf = doc; S.pdfName = file.name; S.pages = doc.numPages; S.page = keep ? Math.min(S.page, doc.numPages) || 1 : 1; S.cache.clear();
           mapNotes(); dropText();
           setSrc('slides'); showSlide(); summaries();
-        }).catch(function (e) { $('drop-text').textContent = 'Could not open that PDF - export it again and pick it here'; toast('I couldn’t open that PDF: ' + e.message, 8000, 'bad'); });
+          if (S.converted) { S.converted = false; say('Your PowerPoint is in! Google converted it, so check the slides look right - fonts can differ. For the exact look: <b>File → Export → PDF</b> in PowerPoint, and add it with the .pptx.', 15000); }
+          // tall pages: "Notes Pages" or a handout, not the slides (Marek 2026-10-31)
+          doc.getPage(1).then(function (pg) { var v = pg.getViewport({ scale: 1 }); if (v.width < v.height) say('That PDF has tall pages - notes pages or a handout? Export the <b>slides</b> as PDF (PowerPoint: File → Export → PDF, Options → Publish what: Slides).', 20000, 'warn'); });
+        }).catch(function (e) {
+          $('drop-text').textContent = 'Could not open that PDF - export it again and pick it here';
+          if (e.name === 'PasswordException') say('That PDF has a password. Export it again without one and add it here.', 15000, 'warn');
+          else toast('I couldn’t open that PDF: ' + e.message, 8000, 'bad');
+        });
     }
     // the deck and its notes in one go (Marek 2026-10-31): the PDF is what's shown, the .pptx only gives the notes
     function loadFiles(list, keep) {
       var fs = [].slice.call(list || []), pdf = null, pptx = null;
-      fs.forEach(function (f) { if (/\.pptx$/i.test(f.name)) pptx = f; else if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') pdf = f; });
-      if (!pdf && !pptx) { if (fs.length) toast(/\.(ppt|key|odp)$/i.test(fs[0].name) ? 'Save that as .pptx for your notes, and as PDF for your slides.' : 'That isn\u2019t a PDF - export your slides as PDF and pick it here.', 8000, 'warn'); return; }
+      var office = null, key = null;
+      fs.forEach(function (f) {
+        if (/\.pptx$/i.test(f.name)) pptx = f; else if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') pdf = f;
+        else if (/\.(ppt|odp)$/i.test(f.name)) office = f; else if (/\.key$/i.test(f.name)) key = f;
+      });
+      if (!pdf && !pptx && !office) { if (key) deckTrouble('keynote'); else if (fs.length) toast('That isn\u2019t a deck - add your PowerPoint (.pptx) or a PDF of your slides.', 8000, 'warn'); return; }
+      // a PowerPoint on its own (Marek 2026-10-31): Google turns it into the PDF that's shown - unless it only brings
+      // the notes for the PDF already in (the same number of slides)
+      if (!pdf && (office || pptx)) {
+        if (office || !S.pdf) return convertDeck(office || pptx, keep);
+        return readPptx(pptx).then(function (raw) {
+          var shown = raw.filter(function (n) { return !n.hidden; }).length;
+          if (raw.length !== S.pages && shown !== S.pages) return convertDeck(pptx, keep);
+          S.notesRaw = raw; S.notesName = pptx.name; mapNotes(); dropText(); navState();
+        }).catch(function () { convertDeck(pptx, keep); });
+      }
       if (pdf && !pptx) S.notesRaw = null;   // a new deck on its own: the old deck's notes would be wrong
       if (pptx) readPptx(pptx).then(function (raw) {
         S.notesRaw = raw; S.notesName = pptx.name; mapNotes(); dropText(); navState();
-        if (!pdf && !S.pdf) toast('Got your notes - now add the same deck as PDF.', 8000);
       }).catch(function () { toast('I couldn\u2019t read the notes in ' + pptx.name + ' - save it again as .pptx and pick it with your PDF.', 8000, 'warn'); });
       if (pdf) loadPdf(pdf, keep); else { mapNotes(); dropText(); }
     }
+    function b64File(name, data) {
+      return fetch('data:application/octet-stream;base64,' + data).then(function (r) { return r.blob(); }).then(function (bl) {
+        return new File([bl], name, { type: /\.pdf$/i.test(name) ? 'application/pdf' : bl.type });
+      });
+    }
+    // a PowerPoint / .odp the speaker picked -> PDF, through the helper (Google Slides converts it, for seconds)
+    function convertDeck(file, keep) {
+      if (!SLIDES_LINK) return toast('Export your deck as PDF too, and add the PDF with the .pptx.', 8000, 'warn');
+      if (file.size > 36 * 1024 * 1024) return deckTrouble('too big');
+      needWindow(); $('drop-text').textContent = 'Turning ' + file.name + ' into slides…';
+      say('Turning your PowerPoint into slides - about half a minute.', 40000);
+      new Promise(function (ok, no) { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(',')[1]); }; r.onerror = no; r.readAsDataURL(file); })
+        .then(function (b64) { return fetch(SLIDES_LINK + '?f=convert&name=' + encodeURIComponent(file.name), { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: b64 }); })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (j.error) throw new Error(j.error);
+          return Promise.all(j.files.map(function (f) { return b64File(f.name, f.data); }));
+        })
+        .then(function (got) {
+          S.converted = true;
+          loadFiles(/\.pptx$/i.test(file.name) ? got.concat(file) : got, keep);
+        })
+        .catch(function (e) { dropText(); deckTrouble(e.message, 'file'); });
+    }
+    // what went wrong with a deck, said by the corgi with what to do instead
+    function deckTrouble(why, from) {
+      var exp = 'export a PDF (PowerPoint: <b>File → Export → PDF</b>) and add it with the .pptx.';
+      if (why === 'keynote') return say('Keynote files can’t be read here. In Keynote: <b>File → Export To → PDF</b>, then <b>File → Export To → PowerPoint</b> (for your notes), and add both.', 20000, 'warn');
+      if (why === 'too big') return say('That deck is too big to convert here (videos inside?). Please ' + exp, 20000, 'warn');
+      if (why === 'private' || why === 'not found') return say('I can’t open that link. Share the file as <b>Anyone with the link</b> (OneDrive: <b>Share → Anyone</b>; Dropbox: <b>Share → Copy link</b>), then click <b>Get my slides</b> again. Or ' + exp, 20000, 'warn');
+      if (why === 'not a deck') return say('That link isn’t a deck - link your PowerPoint (.pptx) or a PDF.', 12000, 'warn');
+      say('I couldn’t ' + (from === 'link' ? 'get that deck' : 'convert that deck') + ' (' + esc(why) + '). Try again, or ' + exp, 15000, 'warn');
+    }
     function dropText() {
       var t = $('drop-text');
-      if (!S.pdf && !S.notesRaw) t.textContent = 'Add your slides in .pdf';
+      if (!S.pdf && !S.notesRaw) t.textContent = 'Add your slides: PDF or PowerPoint';
       if (S.pdf) t.textContent = '\u2713 ' + S.pages + ' slides' + (S.notes ? ' \u00b7 ' + S.notes.filter(Boolean).length + ' with notes' : '') + ' \u00b7 ' + S.pdfName;
       else if (S.notesRaw) t.textContent = '\u2713 Notes from ' + S.notesName + ' - now the PDF';
     }
@@ -1950,42 +2003,55 @@
     var SLIDES_LINK = 'https://script.google.com/macros/s/AKfycbzj1mO86bvRcE7VX3F7pX4umDuGVS7wGyMGCP2ygH5NO_E5pVOqoBo_o-3cbzZkDp84IA/exec';   // mark@sreday.com, "conf42 record - Slides link"; empty = the link box stays hidden
     $('gs').hidden = !SLIDES_LINK;
     function gsId() { var m = /docs\.google\.com\/presentation\/(?:u\/\d+\/)?d\/([\w-]{20,})/.exec($('gs-url').value); return m && m[1]; }
+    // a deck file shared by link (Marek 2026-10-31: PowerPoint and the rest, not only Google Slides) - the helper knows
+    // these hosts; a PDF comes back as it is, a PowerPoint as PDF + .pptx
+    function fileLink() {
+      var u = $('gs-url').value.trim();
+      return /^https:\/\/((drive|docs)\.google\.com\/(file\/d\/|open\?id=|uc\?)|(www\.)?dropbox\.com\/(s|scl)\/|1drv\.ms\/|onedrive\.live\.com\/)/.test(u) && !gsId() ? u : null;
+    }
+    function linkKey() { return gsId() || fileLink(); }
     // the deck came from the link (Marek 2026-10-31): the PDF option greys out and the button turns into Refresh slides;
     // clearing the link (or another deck's link) frees the PDF option again
-    function gsLabel() { return S.linkId && gsId() === S.linkId ? 'Refresh slides' : 'Get my slides'; }
+    function gsLabel() { return S.linkId && linkKey() === S.linkId ? 'Refresh slides' : 'Get my slides'; }
     function gsState() {
-      var linked = !!S.linkId && gsId() === S.linkId;
+      var linked = !!S.linkId && linkKey() === S.linkId;
       $('drop').classList.toggle('off', linked); $('pdf').disabled = linked;
       if ($('gs-get').textContent !== 'Getting it…') $('gs-get').textContent = gsLabel();
     }
     $('gs-url').addEventListener('input', function () {
-      $('gs-get').disabled = !gsId(); $('gs-go').hidden = true;
-      if (S.linkId && gsId() !== S.linkId) S.linkId = null;
+      $('gs-get').disabled = !linkKey(); $('gs-go').hidden = true;
+      if (S.linkId && linkKey() !== S.linkId) S.linkId = null;
       gsState();
     });
-    $('gs-url').addEventListener('keydown', function (e) { if (e.key === 'Enter' && gsId()) $('gs-get').click(); });
+    $('gs-url').addEventListener('keydown', function (e) { if (e.key === 'Enter' && linkKey()) $('gs-get').click(); });
     $('gs-get').addEventListener('click', function () {
-      var id = gsId(), b = this; if (!id) return;
-      needWindow(); b.disabled = true; b.textContent = 'Getting it…'; $('drop-text').textContent = 'Getting your slides from Google Slides…'; say('Fetching your deck and its notes from Google - a big deck takes about half a minute.', 30000);
+      var id = gsId(), url = fileLink(), key = id || url, b = this; if (!key) return;
+      needWindow(); b.disabled = true; b.textContent = 'Getting it…'; $('drop-text').textContent = 'Getting your slides from the link…'; say('Fetching your deck and its notes - a big deck takes about half a minute.', 30000);
       function one(f) {
         return fetch(SLIDES_LINK + '?id=' + id + '&f=' + f).then(function (r) { return r.json(); }).then(function (j) {
           if (j.error) throw new Error(j.error);
-          return fetch('data:application/octet-stream;base64,' + j.data).then(function (r) { return r.blob(); }).then(function (bl) { return new File([bl], j.name, { type: bl.type }); });
+          return b64File(j.name, j.data);
         });
       }
-      Promise.all([one('pdf'), one('pptx').catch(function () { return null; })])   // no notes is fine
-        .then(function (fs) {
-          var again = S.linkId === id;
-          $('gs-go').hidden = true; say((again ? 'Refreshed your slides' : 'Got your slides') + (fs[1] ? ' and your speaker notes' : '') + '!', 6000);
-          S.linkId = id; loadFiles(fs.filter(Boolean), again);
+      var got = id ? Promise.all([one('pdf'), one('pptx').catch(function () { return null; })])   // no notes is fine
+        : fetch(SLIDES_LINK + '?url=' + encodeURIComponent(url)).then(function (r) { return r.json(); }).then(function (j) {
+            if (j.error) throw new Error(j.error);
+            S.converted = !!j.converted;
+            return Promise.all(j.files.map(function (f) { return b64File(f.name, f.data); }));
+          });
+      got.then(function (fs) {
+          var again = S.linkId === key;
+          $('gs-go').hidden = true; say((again ? 'Refreshed your slides' : 'Got your slides') + (fs.filter(Boolean).length > 1 ? ' and your speaker notes' : '') + '!', 6000);
+          S.linkId = key; loadFiles(fs.filter(Boolean), again);
         })
         .catch(function (e) {
           dropText();
+          if (!id) return deckTrouble(e.message, 'link');
           // Google answers a private deck with its sign-in page, sometimes a 404: the same advice for both
           if (e.message === 'private' || e.message === 'not found') { $('gs-go').hidden = false; say('I can’t open that deck. Check the link, and in Google Slides: <b>Share → General access → Anyone with the link</b>, then click <b>Get my slides</b> again. Or use the two buttons below.', 20000, 'warn'); }
           else toast('I couldn’t get that deck (' + e.message + '). Try again, or export it as PDF and add it above.', 10000, 'warn');
         })
-        .then(function () { b.disabled = !gsId(); b.textContent = gsLabel(); gsState(); });
+        .then(function () { b.disabled = !linkKey(); b.textContent = gsLabel(); gsState(); });
     });
     $('gs-dl').addEventListener('click', function () {
       var id = gsId(); if (!id) return;
@@ -1993,7 +2059,7 @@
       $('gs-pick').classList.add('go'); $('gs-pick').style.setProperty('--c', 'var(--green)');
     });
     $('gs-pick').addEventListener('click', function () {
-      window.showOpenFilePicker({ startIn: 'downloads', multiple: true, types: [{ description: 'PDF, plus the .pptx for your notes', accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'] } }] })
+      window.showOpenFilePicker({ startIn: 'downloads', multiple: true, types: [{ description: 'PDF, plus the .pptx for your notes', accept: { 'application/pdf': ['.pdf'], 'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'], 'application/vnd.ms-powerpoint': ['.ppt'], 'application/vnd.oasis.opendocument.presentation': ['.odp'] } }] })
         .then(function (h) { return Promise.all(h.map(function (x) { return x.getFile(); })); }).then(function (fs) { S.linkId = null; gsState(); loadFiles(fs); }).catch(function () {});
     });
     ['dragenter', 'dragover'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.add('over'); }); });
