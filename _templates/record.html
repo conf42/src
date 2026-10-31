@@ -394,6 +394,8 @@
     .juicy:hover, .juicy.over { filter: brightness(1.08); box-shadow: 0 10px 30px color-mix(in srgb, var(--j2) 55%, transparent); }
     .juicy:active { transform: scale(.98); }
     .juicy input { display: none; }
+    .gs-row { display: flex; gap: 8px; } .gs-row input { flex: 1; min-width: 0; } .gs-row .btn { white-space: nowrap; }
+    .gs-row .btn:disabled { opacity: .45; cursor: not-allowed; }
     .easy .hint { margin: -4px 2px 0; font-size: .8rem; color: var(--muted); line-height: 1.45; text-align: center; }
     /* the speaker-notes hint folded into a dark green pill between the slides and the screen share (Marek 2026-10-31) */
     .notes-pill { align-self: center; font: inherit; font-weight: 800; font-size: .8rem; color: #c9f5e2; background: #0d4a35; border: 1px solid #1d7a57;
@@ -596,7 +598,7 @@
         <!-- the corgi: every tip and warning comes out of its mouth (Marek 2026-10-23) -->
         <div class="buddy" id="buddy">
           <div class="bubble" id="bubble" role="status" aria-live="polite" hidden><span id="bubble-t"></span></div>
-          <span>Tips pop up here.<br>Point at anything to ask space corgi what it does!</span>
+          <span>Point at anything to ask space corgi what it does!<br>Tips pop up here. Please pet the corgi.</span>
           <div class="corgi" id="corgi" data-tip="Click and hold to pet space corgi, then rub!"><div>
             <img src="./assets/conf42/404_corgi.png" alt="" draggable="false">
             <svg class="face" viewBox="0 0 467 720" aria-hidden="true">
@@ -669,6 +671,14 @@
       <!-- easy setup (Marek 2026-10-23): the deck and the screen first, two bright buttons; then the layout -->
       <div class="easy">
         <label class="juicy" id="drop" style="--j1:#ffa94d;--j2:#ff6b1a" data-tip="@drop"><input type="file" id="pdf" accept="application/pdf,.pdf,.pptx" multiple><span id="drop-text">Add your slides in .pdf</span></label>
+        <div id="gs" hidden>
+          <div class="gs-row"><input type="text" id="gs-url" placeholder="…or paste a Google Slides link" aria-label="Google Slides link">
+            <button class="btn go" id="gs-get" disabled data-tip="Brings in your slides and their speaker notes. The deck has to be shared as “Anyone with the link”.">Get my slides</button></div>
+          <div id="gs-go" hidden style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="gs-dl" style="flex:1">1. Download it as PDF</button>
+            <button class="btn" id="gs-pick" style="flex:1">2. Pick the PDF</button>
+          </div>
+        </div>
         <button class="notes-pill" id="notes-pill" aria-expanded="false" data-tip="How to see your speaker notes while you record.">Speaker notes <i>▾</i></button>
         <div class="hint" id="notes-hint" hidden>Speaker notes: pick your .pptx file together with the PDF!</div>
         <div class="share-row">
@@ -680,13 +690,6 @@
         <button class="card wide" data-mode="both" id="mode-both" data-tip="The usual choice: you in the circle, your slides or screen in the window - switch with Slides / Screen / Me."><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3.2"/><rect x="9" y="8" width="13" height="9" rx="1.6"/><path d="M15.5 17v3M12.5 20h6"/></svg><b>Camera + slides + screen share</b><small>You in the circle; your slides and a shared screen in the window - switch between them while you record.</small></button>
         <button class="card" data-mode="window" data-tip="No circle: your slides or screen fill the video. Fine for a pure demo, but people like to see a face."><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4M6 8h7M6 11h10"/></svg><b>Just slides / screen</b><small>Your slides or shared screen fill the whole video.</small></button>
         <button class="card" data-mode="none" id="mode-none" data-tip="Just your camera, filling the video - for a talk without slides, like a story or an interview."><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><b>Just me</b><small>Your camera fills the whole video.</small></button>
-      </div>
-      <div id="gs" hidden>
-        <input type="text" id="gs-url" placeholder="…or paste a Google Slides link" aria-label="Google Slides link" style="margin-top:10px">
-        <div id="gs-go" hidden style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn" id="gs-dl" style="flex:1">1. Download it as PDF</button>
-          <button class="btn" id="gs-pick" style="flex:1">2. Pick the PDF</button>
-        </div>
       </div>
       <label class="tick" id="jump-wrap" hidden><input type="checkbox" id="jump"> Jump to that window or tab once it's shared</label>
     </div>
@@ -1925,10 +1928,33 @@
     }
     $('pdf').addEventListener('change', function () { loadFiles(this.files); this.value = ''; });
     $('notes-pill').addEventListener('click', function () { var h = $('notes-hint'); h.hidden = !h.hidden; this.setAttribute('aria-expanded', String(!h.hidden)); this.blur(); });
-    // a Google Slides link (Marek 2026-10-22): Google won't hand the deck to another site, but the speaker's own browser,
-    // signed in to their Google account, can download it as a PDF (private decks too) - then they pick that file
+    // a Google Slides link (Marek 2026-10-31): one link + one click. Google won't hand the deck to another site, so a small
+    // Apps Script of ours (apps-script/record-slides-link.gs) fetches the PDF and the .pptx (the notes) - decks shared
+    // "Anyone with the link" only. A private deck: the old way, the speaker's own browser downloads the PDF, they pick it
+    var SLIDES_LINK = '';   // the Apps Script web app's /exec URL; empty = the link box stays hidden
+    $('gs').hidden = !SLIDES_LINK;
     function gsId() { var m = /docs\.google\.com\/presentation\/(?:u\/\d+\/)?d\/([\w-]{20,})/.exec($('gs-url').value); return m && m[1]; }
-    $('gs-url').addEventListener('input', function () { $('gs-go').hidden = !gsId(); });
+    $('gs-url').addEventListener('input', function () { $('gs-get').disabled = !gsId(); $('gs-go').hidden = true; });
+    $('gs-url').addEventListener('keydown', function (e) { if (e.key === 'Enter' && gsId()) $('gs-get').click(); });
+    $('gs-get').addEventListener('click', function () {
+      var id = gsId(), b = this; if (!id) return;
+      needWindow(); b.disabled = true; b.textContent = 'Getting it…'; $('drop-text').textContent = 'Getting your slides from Google Slides…';
+      function one(f) {
+        return fetch(SLIDES_LINK + '?id=' + id + '&f=' + f).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.error) throw new Error(j.error);
+          return fetch('data:application/octet-stream;base64,' + j.data).then(function (r) { return r.blob(); }).then(function (bl) { return new File([bl], j.name, { type: bl.type }); });
+        });
+      }
+      Promise.all([one('pdf'), one('pptx').catch(function () { return null; })])   // no notes is fine
+        .then(function (fs) { $('gs-go').hidden = true; say('Got your slides' + (fs[1] ? ' and your speaker notes' : '') + '!', 6000); loadFiles(fs.filter(Boolean)); })
+        .catch(function (e) {
+          dropText();
+          // Google answers a private deck with its sign-in page, sometimes a 404: the same advice for both
+          if (e.message === 'private' || e.message === 'not found') { $('gs-go').hidden = false; say('I can’t open that deck. Check the link, and in Google Slides: <b>Share → General access → Anyone with the link</b>, then click <b>Get my slides</b> again. Or use the two buttons below.', 20000, 'warn'); }
+          else toast('I couldn’t get that deck (' + e.message + '). Try again, or export it as PDF and add it above.', 10000, 'warn');
+        })
+        .then(function () { b.disabled = !gsId(); b.textContent = 'Get my slides'; });
+    });
     $('gs-dl').addEventListener('click', function () {
       var id = gsId(); if (!id) return;
       window.open('https://docs.google.com/presentation/d/' + id + '/export/pdf', '_blank', 'noopener');
