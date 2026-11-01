@@ -162,9 +162,13 @@
     .cr-nocov { aspect-ratio: 1 / 1; border: 2px dashed #cfcfd6; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #888; font-size: .8rem; }
     /* Thumbnails tab (Marek 2026-10-12): the YouTube thumbnails build/youtube_thumbnails.py draws after the deploy, the
        same search and sort as the teasers */
-    #th-sec, #th-all { display: none; }
+    #th-sec, #th-all, #th-purged { display: none; }
     body.th-mode #th-sec { display: grid; }
     body.th-mode #th-all { display: inline-flex; }
+    body.th-mode #th-purged { display: block; }
+    /* purged talks (Marek 2026-11-01): off the CSV now, but they may come back - folded under the current thumbnails */
+    #th-purged-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+    #th-purged .th-frame { opacity: .8; }
     body.th-mode #tz-pool, body.th-mode #tz-none, body.th-mode #tz-all, body.th-mode #tz-count { display: none !important; }
     #th-sec { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
     .th-slot { position: relative; }
@@ -222,7 +226,7 @@
       {% if not past %}<button type="button" role="tab" data-tab="tz" aria-selected="true">Talk teasers</button>{% endif %}
       {% if ev.splash %}<button type="button" role="tab" data-tab="gn" aria-selected="false">Generic</button>{% endif %}
       {% if not past %}<button type="button" role="tab" data-tab="cr" aria-selected="false">Carousel</button>{% endif %}
-      {% if th.talks %}<button type="button" role="tab" data-tab="th" aria-selected="false">Thumbnails</button>{% endif %}
+      {% if th.talks or th.purged %}<button type="button" role="tab" data-tab="th" aria-selected="false">Thumbnails</button>{% endif %}
       <button type="button" role="tab" data-tab="ov" aria-selected="false">Overlays</button>
       <span class="tz-ink"></span>
     </div>
@@ -234,7 +238,7 @@
         <button type="button" data-sort="last" aria-pressed="false">Last name</button>
       </div>
       <button class="tz-btn" type="button" id="tz-all">Download all</button>
-      {% if th.talks %}<button class="tz-btn" type="button" id="th-all">Download all</button>{% endif %}
+      {% if th.talks or th.purged %}<button class="tz-btn" type="button" id="th-all">Download all</button>{% endif %}
       <span class="tz-count" id="tz-count"></span>
     </div>
     <p class="tz-empty" id="tz-none" hidden>No talk matches.</p>
@@ -322,7 +326,12 @@
         <b class="gn-cap">Splash art <span style="font-weight:400;color:#888">{{ ev.splash_size }}, as it is</span></b>
       </div>{% endif %}
     </div>{% endif %}
-    {% if th.talks %}<div id="th-sec"></div>
+    {% if th.talks or th.purged %}<div id="th-sec"></div>
+    {% if th.purged %}<details class="ov-legacy" id="th-purged">
+      <summary><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>Purged ({{ th.purged|length }})</summary>
+      <div class="ov-bar"><span class="tz-count">talks taken off the lineup since - kept here in case they come back</span></div>
+      <div id="th-purged-grid"></div>
+    </details>{% endif %}
     <script type="application/json" id="th-data">{{ th|tojson }}</script>{% endif %}
     <div id="ov-sec">
       <h3 class="ov-h">New design</h3>
@@ -769,8 +778,9 @@
       });
       // 6. Thumbnails (Marek 2026-10-12): conf42-<event>-<speaker>-thumbnail.png, drawn by build/youtube_thumbnails.py after the
       // deploy; until then the tile shows the headshot faded with a note. Follows the teasers' search and sort.
-      var thData = document.getElementById('th-data'), thSec = document.getElementById('th-sec'), thItems = [];
-      if (thData) JSON.parse(thData.textContent).talks.forEach(function (t) {
+      var thData = document.getElementById('th-data'), thSec = document.getElementById('th-sec'), thItems = [], thGone = [];
+      var thPurged = document.getElementById('th-purged-grid');
+      function thTile(list) { return function (t) {
         var el = document.createElement('div');
         el.className = 'th-slot';
         el.innerHTML = '<div class="th-frame"><img class="th-ph" alt=""><img class="th-pv" alt="' + esc(t.name) + '" loading="lazy" decoding="async" src="' + esc(t.file.replace(/\.png$/, '.webp')) + '"><span class="th-wait">Being drawn - check back in a few minutes</span></div>'
@@ -779,19 +789,29 @@
         var pv = el.querySelector('.th-pv');
         pv.onload = function () { el.classList.add('th-ok'); };
         pv.onerror = function () { el.classList.add('th-none'); el.querySelector('.th-ph').src = t.photo; };   // not drawn yet: the headshot, faded
-        thItems.push({ el: el, t: t });
-      });
-      function thRender() {
-        if (!thSec) return;
+        list.push({ el: el, t: t });
+      }; }
+      if (thData) {
+        var thAll = JSON.parse(thData.textContent);
+        thAll.talks.forEach(thTile(thItems));
+        (thAll.purged || []).forEach(thTile(thGone));   // their own tiles, under the fold: never in Download all
+      }
+      function thSorted(list, into) {
         var shown = 0;
-        thItems.slice().sort(function (a, b) {                                     // the teasers' order and search, from its own data
+        list.slice().sort(function (a, b) {                                        // the teasers' order and search, from its own data
           if (sortBy === 'web') return a.t.i - b.t.i;
           return a.t[sortBy].localeCompare(b.t[sortBy]) || a.t.i - b.t.i;
         }).forEach(function (x) {
           x.el.hidden = !!q && x.t.search.indexOf(q) < 0;
           if (!x.el.hidden) shown++;
-          thSec.appendChild(x.el);
+          into.appendChild(x.el);
         });
+        return shown;
+      }
+      function thRender() {
+        if (!thSec) return;
+        var shown = thSorted(thItems, thSec);
+        if (thPurged) thSorted(thGone, thPurged);
         var b = document.getElementById('th-all');
         b.disabled = !shown; b.textContent = q ? 'Download these ' + shown : 'Download all';
       }
