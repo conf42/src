@@ -230,7 +230,14 @@ def thumbnails(event, items, gone=()):
                               search=c["search"], first=c["first"], last=c["last"]))   # the tab sorts and searches by itself (past events have no cards)
         return talks
     # purged talks (Marek 2026-11-01): kept, folded under the current ones, in case they come back
-    return dict(talks=tiles(items), purged=tiles(cards(event, gone)) if gone else [])
+    return dict(talks=tiles(items), purged=tiles(purged_cards(event, items, gone)))
+
+
+def purged_cards(event, items, gone):
+    """The purged talks' cards, alphabetical (Marek 2026-11-01: the sort buttons don't move them; back in the CSV, a talk
+    simply is a current one again). A file name a current card already has is skipped."""
+    files = {c["file"] for c in items}
+    return sorted((c for c in cards(event, gone) if c["file"] not in files), key=lambda c: (c["name"].lower(), c["i"]))
 
 
 def overlays(event, ev):
@@ -313,7 +320,7 @@ def generate(env, context, base_folder):
             ev["splash"] = ""
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
-            f.write(page.render(ev=ev, cards=[] if is_past else items, sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, overlays_v=overlays_v, **context))
+            f.write(page.render(ev=ev, cards=[] if is_past else items, purged=[] if is_past else purged_cards(event, items, gone), sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, overlays_v=overlays_v, **context))
         with open(os.path.join(folder, slug + ".html"), "w", encoding="utf-8") as f:
             f.write(MOVED % {"to": "../%s/teasers" % slug})
         if is_past:
