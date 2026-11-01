@@ -298,7 +298,7 @@ def main():
         if not m:
             continue
         data = json.loads(m.group(1))
-        talks = data.get("talks") or []
+        talks = (data.get("talks") or []) + (data.get("purged") or [])   # purged talks keep theirs (Marek 2026-11-01)
         with ThreadPoolExecutor(max_workers=8) as pool:
             list(pool.map(photo, [t["photo"] for t in talks]))
         keyed, ev_sky, n_drawn, n_left = {}, False, 0, 0

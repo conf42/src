@@ -10,14 +10,20 @@ The PNGs (conf42-<event>-<speaker>.png, next to the page in docs/<event>/) are d
 headless Chrome (#sheet-<start>-<count>); until one exists the page draws that card in the browser (html-to-image).
 """
 import colorsys
+import csv
 import datetime
 import glob
+import io
+import json
 import os
 import re
 import shutil
+import subprocess
 import unicodedata
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
-from .shared import asset_version
+from .shared import asset_version, make_remote_address
 
 RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
 MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
@@ -83,9 +89,10 @@ def _event_name(event):
     return re.sub(r"\s*\([^)]*\)\s*$", "", event.get("name", "")).strip()   # "Site Reliability Engineering (SRE)" -> without the acronym
 
 
-def cards(event):
-    """The event's talks in website order (keynotes, then the rest as in the sheet), each with what its card shows."""
-    talks = [t for t in event.get("talks_raw", []) if (t.get("Name1") or "").strip()]
+def cards(event, rows=None):
+    """The event's talks in website order (keynotes, then the rest as in the sheet), each with what its card shows.
+    rows: other talk rows than the CSV's (the purged ones)."""
+    talks = [t for t in (event.get("talks_raw", []) if rows is None else rows) if (t.get("Name1") or "").strip()]
     talks = [t for t in talks if (t.get("Featured") or "").lower() == "yes"] + [t for t in talks if (t.get("Featured") or "").lower() != "yes"]
     slug, out, used = event["short_url"].replace(".html", ""), [], {}
     for i, t in enumerate(talks):
@@ -123,7 +130,83 @@ def _splash(event, base_folder):
     return "../" + (jpg if os.path.isfile(os.path.join(base_folder, jpg)) else p)
 
 
-def thumbnails(event, items):
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GH_REPO = "conf42/src"
+
+
+def _git(*a):
+    return subprocess.run(["git", "-C", REPO] + list(a), capture_output=True, timeout=120)
+
+
+def csv_history(paths):
+    """{path: [every committed version of the CSV, newest first, as text]} (Marek 2026-11-01, for the purged talks).
+    From the local git history; CI's checkout is shallow (the full history is ~16 GB), so there one GraphQL query lists
+    every CSV's commits and the versions come from raw.githubusercontent.com. Empty when neither works - never fails the build."""
+    paths = sorted({os.path.relpath(os.path.join(REPO, p), REPO).replace(os.sep, "/") for p in paths if p})
+    out = {p: [] for p in paths}
+    try:
+        if _git("rev-parse", "--is-shallow-repository").stdout.decode().strip() == "false":
+            for p in paths:
+                for h in _git("log", "--format=%H", "--", p).stdout.decode().split():
+                    r = _git("show", "%s:%s" % (h, p))
+                    if r.returncode == 0:
+                        out[p].append(r.stdout.decode("utf-8-sig", "replace"))
+            return out
+        token = os.environ.get("GITHUB_TOKEN")
+        if not token or not paths:
+            return out
+        q = "{ repository(owner: \"%s\", name: \"%s\") { object(expression: \"HEAD\") { ... on Commit { %s } } } }" % (
+            GH_REPO.split("/")[0], GH_REPO.split("/")[1],
+            " ".join('f%d: history(path: "%s", first: 100) { nodes { oid } }' % (i, p) for i, p in enumerate(paths)))
+        req = urllib.request.Request("https://api.github.com/graphql", data=json.dumps({"query": q}).encode(),
+                                     headers={"Authorization": "bearer " + token, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            hist = json.load(r)["data"]["repository"]["object"]
+        jobs = [(p, n["oid"]) for i, p in enumerate(paths) for n in (hist.get("f%d" % i) or {}).get("nodes", [])]
+
+        def raw(job):
+            try:
+                with urllib.request.urlopen("https://raw.githubusercontent.com/%s/%s/%s" % (GH_REPO, job[1], job[0]), timeout=30) as r:
+                    return r.read().decode("utf-8-sig", "replace")
+            except Exception:
+                return None
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            for (p, _), text in zip(jobs, pool.map(raw, jobs)):
+                if text is not None:
+                    out[p].append(text)
+    except Exception as x:
+        print("WARN teasers: no CSV history (%s), no purged thumbnails this run" % x)
+    return out
+
+
+def _norm(s):
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z]+", " ", s).strip()
+
+
+def purged(event, versions):
+    """Talks in an earlier version of the event's CSV that are not in the current one (Marek 2026-11-01: they may come
+    back, so their thumbnails stay). The newest version of each row wins. A speaker still on the lineup under another
+    spelling, or a talk with the same title, is not purged."""
+    current = event.get("talks_raw") or []
+    names = {_norm(t.get("Name%d" % k)) for t in current for k in (1, 2)} - {""}
+    titles = {_norm(t.get("Title")) for t in current} - {""}
+    out, seen = [], set()
+    for text in versions:
+        for r in csv.DictReader(io.StringIO(text)):
+            r = {k: v.strip() if isinstance(v, str) else v for k, v in r.items() if k}
+            n = _norm(r.get("Name1"))
+            if not n or n in seen or _norm(r.get("Title")) in titles - {"tbd", "tba"} \
+                    or any(re.search("(^| )%s( |$)" % re.escape(n), x) or re.search("(^| )%s( |$)" % re.escape(x), n) for x in names):
+                continue
+            seen.add(n)
+            if r.get("Picture") and "/" not in r["Picture"]:   # as generate.py points the CSV's own talks at conf42/static
+                r["Picture"] = make_remote_address("headshots", r["Picture"])
+            out.append(r)
+    return out
+
+
+def thumbnails(event, items, gone=()):
     """What build/youtube_thumbnails.py needs for the Thumbnails tab (Marek 2026-10-12): every talk with a photo (a missing
     title doesn't matter here: the thumbnail is the speaker alone, on its topic's sky). Remix re-runs talks whose videos
     already have thumbnails, so it gets them for its keynotes only."""
@@ -131,16 +214,23 @@ def thumbnails(event, items):
     # saved as the factory names the talk's video and deck (Marek 2026-10-26): "<Name1>[ & <Name2>] - Conf42 <Event> <Year>.png";
     # the file stays at its URL-safe path, only the download name changes
     tail = " - Conf42 %s %s" % (event.get("name"), str(event.get("date"))[:4])
-    talks, used = [], {}
-    for c in items:
-        if not c["photo"] or not (c["keynote"] or not remix):
-            continue
-        dl = re.sub(r'[\\/:*?"<>|]+', " ", c["name"]).strip() + tail
-        used[dl] = used.get(dl, 0) + 1
-        talks.append(dict(file=c["file"][:-4] + "-thumbnail.png", dl=dl + (" (%d)" % used[dl] if used[dl] > 1 else "") + ".png",
-                          photo=c["photo"], name=c["name"], i=c["i"],
-                          search=c["search"], first=c["first"], last=c["last"]))   # the tab sorts and searches by itself (past events have no cards)
-    return dict(talks=talks)
+    used, files = {}, set()
+
+    def tiles(cs):
+        talks = []
+        for c in cs:
+            file = c["file"][:-4] + "-thumbnail.png"
+            if not c["photo"] or not (c["keynote"] or not remix) or file in files:
+                continue
+            files.add(file)
+            dl = re.sub(r'[\\/:*?"<>|]+', " ", c["name"]).strip() + tail
+            used[dl] = used.get(dl, 0) + 1
+            talks.append(dict(file=file, dl=dl + (" (%d)" % used[dl] if used[dl] > 1 else "") + ".png",
+                              photo=c["photo"], name=c["name"], i=c["i"],
+                              search=c["search"], first=c["first"], last=c["last"]))   # the tab sorts and searches by itself (past events have no cards)
+        return talks
+    # purged talks (Marek 2026-11-01): kept, folded under the current ones, in case they come back
+    return dict(talks=tiles(items), purged=tiles(cards(event, gone)) if gone else [])
 
 
 def overlays(event, ev):
@@ -198,9 +288,12 @@ def generate(env, context, base_folder):
     overlays_v = asset_version(base_folder, "assets/js/overlays.js")
     events = context.get("events") or []
     up = upcoming(events)
+    history = csv_history([str(e.get("db_path") or "") for e in up + past(events)])
     for event in up + past(events):
         is_past = event not in up
         items = cards(event)
+        p = os.path.relpath(os.path.join(REPO, str(event.get("db_path") or "")), REPO).replace(os.sep, "/")
+        gone = purged(event, history.get(p, [])) if event.get("db_path") else []
         if not items:
             continue
         slug = event["short_url"].replace(".html", "")
@@ -215,7 +308,7 @@ def generate(env, context, base_folder):
                 break
         ev["splash_full"] = "../" + p if p and os.path.isfile(os.path.join(base_folder, p)) else ""
         ev["splash_size"] = _size(os.path.join(base_folder, p)) if ev["splash_full"] else ""
-        th = thumbnails(event, items)
+        th = thumbnails(event, items, gone)
         if is_past:   # Thumbnails and Overlays only: no cards (so render_teasers.py draws nothing), no Generic, no Carousel
             ev["splash"] = ""
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
