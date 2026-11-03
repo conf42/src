@@ -158,6 +158,11 @@ def main():
         t = talks[len(talks) // 2]
         hit, why = events.match("%s Conf42 final version" % t["name1"], talks)
         check("speaker matching", hit and hit["speakers"] == t["speakers"], "%s -> %s (%s)" % (t["name1"], hit and hit["speakers"], evd["title"]))
+        long_ = [x for x in talks if len(x["name1"].split()) >= 3]
+        if long_:                                          # "Lucas Mazei" -> "Lucas Mateus Mazei Sobrinho"
+            w = long_[0]["name1"].split()
+            hit, why = events.match("%s %s.mp4" % (w[0], w[2]), talks)
+            check("short name finds the long one", hit and hit["speakers"] == long_[0]["speakers"], "%s %s -> %s (%s)" % (w[0], w[2], hit and hit["speakers"], why))
         miss, why = events.match("Somebody Unknown Zyx", talks)
         check("unknown names are never guessed", miss is None, why)
     except Exception as ex:

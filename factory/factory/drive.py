@@ -47,15 +47,25 @@ def list_folder(fid, depth=3, path=""):
     return out
 
 
+class NeedsSignIn(Exception):
+    """The file sits in a link-shared folder but its owner's Google Workspace blocks outside access (2026-11-03:
+    a launchdarkly.com speaker's video and deck). Drive answers with its sign-in page, not the file."""
+
+
 def head(fid, tries=3):
     """(size in bytes, upload time as ISO UTC) of a downloadable file; raises for Google-native files (Vids, Docs).
     Drive answers the odd 500 for a real file too, so it is asked up to three times."""
     for n in range(tries):
         try:
             with _open(DL % fid, "HEAD") as r:
+                if "accounts.google.com" in r.geturl() or (r.headers.get("Content-Type") or "").startswith("text/html"):
+                    raise NeedsSignIn("needs a Google sign-in (the owner's company blocks link sharing): download it "
+                                      "by hand in the browser, or ask the speaker to share it as 'anyone with the link'")
                 size = int(r.headers.get("Content-Length") or 0)
                 lm = r.headers.get("Last-Modified")
             break
+        except NeedsSignIn:
+            raise
         except Exception:                                # noqa: BLE001
             if n == tries - 1:
                 raise
