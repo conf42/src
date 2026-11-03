@@ -101,6 +101,33 @@ def now():
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+NEGATION = re.compile(r"(\b(not|never|only|without|untouched)\b|n't\b|\bno other\b|\bleft\b.*\balone\b)", re.I)
+
+
+def strayed_mentions(report, names):
+    """Other talks the edit report names in a sentence that is not a denial. The AI editor writes things like "I didn't
+    open, edit, or apply settings to the other composition, "Amith Reddy Ravuru"" - that is no stray edit."""
+    sents = [x for x in re.split(r"(?<=[.!?])\s+|\n+", report) if x.strip()]
+    return [n for n in names if any(n in x and not NEGATION.search(x) for x in sents)]
+
+
+def write_json(path, data, tries=10):
+    """Write via path.tmp and swap it in. On Windows the swap fails with "Access is denied" while another process has
+    the file open for a moment (the dashboard polling state.json, a status check): 2026-11-03 one talk's render failed
+    3 times on it. Retry for ~10 s before giving up."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=1, ensure_ascii=False)
+    for n in range(tries):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if n == tries - 1:
+                raise
+            time.sleep(0.2 * (n + 1))
+
+
 class Run:
     def __init__(self, short_url):
         self.cfg = settings()
@@ -139,10 +166,7 @@ class Run:
             self.state["updated"] = now()
             self.state["runner"] = {"pid": os.getpid(), "at": now(),     # heartbeat: the app shows whether a run is alive
                                     "machine": machine.machine_id(), "name": machine.machine_name(self.cfg)}
-            tmp = self.state_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.state, f, indent=1, ensure_ascii=False)
-            os.replace(tmp, self.state_path)
+            write_json(self.state_path, self.state)
 
     def note(self, msg):
         with self.lock:
@@ -252,6 +276,29 @@ class Run:
                     rep["same"] += 1
         self.save()
         return rep
+
+    def edited_lengths(self, d, pid, key):
+        """{composition name: duration} of the OTHER talks already edited, taken before an edit starts. Those must not
+        move; talks still waiting for their own edit may change legitimately (Descript queues one job per project)."""
+        try:
+            comps = d.project(pid).get("compositions", [])
+        except Exception:                                # noqa: BLE001 - the check is a guard, not a step
+            return {}
+        ts = self.state["talks"]
+        return {c.get("name"): c.get("duration") for c in comps
+                if c.get("name") != key and c.get("name") in ts
+                and (ts[c["name"]].get("steps", {}).get("edit") or {}).get("status") == "done"}
+
+    def changed_lengths(self, d, pid, before):
+        """The already-edited talks whose composition length moved during this edit (> 0.5 s): real evidence that the
+        AI editor strayed, unlike a name in its report (2026-11-03: "I didn't open ... Amith" paused a whole run)."""
+        if not before:
+            return []
+        try:
+            now_ = {c.get("name"): c.get("duration") for c in d.project(pid).get("compositions", [])}
+        except Exception:                                # noqa: BLE001
+            return []
+        return [k for k, v in before.items() if v and now_.get(k) and abs(now_[k] - v) > 0.5]
 
     def drive_fetch(self, link=None):
         """Pull the event's Drive upload folder (shared as "anyone with the link") straight from Drive: list it, download
@@ -603,7 +650,9 @@ class Run:
                 if not paid:
                     pr = d.project(pid)
                     comp = next((c for c in pr.get("compositions", []) if c["id"] == cid), {})
-                    media_len = ((pr.get("media_files") or {}).get(key) or {}).get("duration") or 0
+                    mfs = pr.get("media_files") or {}       # "<key>", or "<key>.mp4" / "<key> (upload 2).mp4" since 2026-11-03
+                    mf = mfs.get(key) or next((v for n, v in mfs.items() if n.startswith((key + ".", key + " ("))), None) or {}
+                    media_len = mf.get("duration") or 0
                     if comp and media_len and comp.get("duration", media_len) < media_len * 0.99:
                         paid = {"note": "composition already shorter than its media"}
                 if paid:
@@ -612,17 +661,20 @@ class Run:
                 if self.state.get("edits_paused"):          # an earlier edit cost too much: no more paid edits this run
                     raise RuntimeError("edits paused: " + self.state["edits_paused"])
                 self.set(key, "edit", "running")
+                before = self.edited_lengths(d, pid, key)
                 j = d.edit(pid, cid, cfg["edit_prompt"].format(composition=key, **cfg), on_progress=progress("edit"))
                 credits = float(j["result"].get("ai_credits_used") or 0)
                 self.record_edit(cid, key, credits)
                 self.set(key, "edit", "done", report=j["result"].get("agent_response", ""), credits=credits, job_id=j.get("job_id"))
                 cap = float(cfg.get("max_edit_credits") or 0)
                 report = str(j["result"].get("agent_response") or "")
-                others = [k for k in self.state["talks"] if k != key and k in report]
-                if re.search(r"\ball \d+ (clips|compositions)\b", report, re.I) or others:   # it strayed into other talks
+                others = strayed_mentions(report, [k for k in self.state["talks"] if k != key])
+                changed = self.changed_lengths(d, pid, before)
+                if re.search(r"\ball \d+ (clips|compositions)\b", report, re.I) or others or changed:   # it strayed into other talks
                     with self.lock:
-                        self.state["edits_paused"] = "%s's edit report mentions %s - the AI editor may have edited other talks; check it in Descript, then clear edits_paused in state.json" % (
-                            key, ", ".join(others) or "all clips")
+                        self.state["edits_paused"] = "%s's edit %s - the AI editor may have edited other talks; check it in Descript, then clear edits_paused in state.json" % (
+                            key, ("changed the length of " + ", ".join(changed)) if changed else
+                            ("report mentions " + (", ".join(others) or "all clips")))
                     self.note("EDITS PAUSED: " + self.state["edits_paused"])
                 elif cap and credits > cap:                 # an unusually expensive edit
                     with self.lock:
@@ -1073,10 +1125,7 @@ class Run:
         self.note("run finished")
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}
-            tmp = self.state_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self.state, f, indent=1, ensure_ascii=False)
-            os.replace(tmp, self.state_path)
+            write_json(self.state_path, self.state)
         self.publish(force=True)
 
 

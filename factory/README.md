@@ -98,6 +98,10 @@ A run can be stopped and started again at any time. Finished steps are skipped, 
   not downloaded again; Google Vids projects can't be downloaded and are skipped. Code: `factory/drive.py`.
   **Claude:** when Marek shares an event's Drive folder link (or says "activate the factory"), run `drive <short_url> <link>`.
   Never download through a browser.
+  A file whose owner's company blocks link sharing (a Google Workspace policy, e.g. a launchdarkly.com speaker on
+  2026-11-03) answers with Google's sign-in page even inside the shared folder, and doesn't show in the anonymous
+  listing. The fetch skips it with "needs a Google sign-in" (`drive.NeedsSignIn`); download it by hand while signed in
+  as the folder owner and pass the files to `match`/`run`, or ask the speaker to share them as "anyone with the link".
 
 ## Shipping to the site
 
@@ -126,6 +130,9 @@ names before it to finish uploading; one that fails drops out of the order inste
 Descript runs ONE job per project at a time; anything else gets 429 "A job is already running for this project". The client waits and retries for up to an hour, so talks simply take turns. An upload that died with a stopped run keeps its import job waiting forever and blocks the project: every run starts by cancelling those (`DELETE /jobs/<id>`).
 
 The edit prompt names the talk's composition (`{composition}`). Without that, "apply to all clips" made the AI editor re-edit every talk in the project (48 credits instead of ~8). As a safety net, an edit costing more than `max_edit_credits` pauses all further edits (`edits_paused` in state.json).
+Edits also pause when one strays into another talk: an already-edited talk's composition changed length during the edit (checked in Descript), or the edit report names another talk in a sentence that isn't a denial. Since 2026-11-03 "I didn't touch the other composition, X" no longer counts: that sentence paused a whole run for ~2.7 hours. Clear a pause with `python -m factory unpause <short_url>`.
+
+Uploads name the media file `<Speakers>.mp4` (with the real extension). Descript reads the file type from the text after the last dot, so "Sumeet L. Ram" was rejected six times as "invalid or unsupported media content" (2026-11-03).
 
 Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again

@@ -122,6 +122,11 @@ def match(filename, talk_list):
           if len(_norm(t["name1"]).split()) >= 2 and {_norm(t["name1"]).split()[0], _norm(t["name1"]).split()[-1]} <= words]
     if len(fl) == 1:
         return fl[0], "first + last name in file name"
+    # the other way round: every word of a 2+ word file name is in one speaker's longer name, e.g. "Lucas Mazei" ->
+    # "Lucas Mateus Mazei Sobrinho" (Platform Engineering 2026: 58% similar, so it sat unmatched)
+    sub = [t for t in talk_list if len(words) >= 2 and words <= set(_norm(t["name1"]).split())]
+    if len(sub) == 1:
+        return sub[0], "file name words all in the speaker's name"
     scored = sorted(((max(difflib.SequenceMatcher(None, stem, _norm(t["speakers"])).ratio(),
                           difflib.SequenceMatcher(None, stem, _norm(t["name1"])).ratio()), t) for t in talk_list),
                     key=lambda x: -x[0])
