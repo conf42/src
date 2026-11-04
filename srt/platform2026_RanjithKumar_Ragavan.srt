@@ -1,0 +1,1437 @@
+1
+00:00:00,300 --> 00:00:05,274
+Hello everyone, and welcome to
+Conf42 Platform Engineering 2026.
+
+2
+00:00:05,432 --> 00:00:07,004
+my name is Ranjith Kumar Ragavan.
+
+3
+00:00:07,610 --> 00:00:10,958
+I'm a member of technical staff
+at T-Mobile, where I lead mobile
+
+4
+00:00:10,968 --> 00:00:13,503
+architecture for our flagship app, T-Life.
+
+5
+00:00:14,442 --> 00:00:18,775
+Today, I want to talk about a side of a
+platform engineering that does not get
+
+6
+00:00:18,791 --> 00:00:21,805
+talked about enough: mobile as a platform.
+
+7
+00:00:22,966 --> 00:00:27,421
+Spec-specifically, I will share how
+five autonomous engineering teams
+
+8
+00:00:28,002 --> 00:00:32,948
+ship code into one single mobile app
+serving fifty-three million active users
+
+9
+00:00:33,510 --> 00:00:37,467
+without breaking each other's builds
+and without slowing each other down.
+
+10
+00:00:38,396 --> 00:00:42,490
+When most people hear platform
+engineering, they think about the cloud.
+
+11
+00:00:42,837 --> 00:00:47,084
+They think about Kubernetes,
+Docker containers, microservices,
+
+12
+00:00:47,112 --> 00:00:48,352
+and back-end pipelines.
+
+13
+00:00:49,510 --> 00:00:53,638
+In the back-end world, giving five
+teams independence is straightforward.
+
+14
+00:00:54,190 --> 00:00:58,762
+Each team gets its own repo, its own
+services, and its own deployment.
+
+15
+00:00:59,516 --> 00:01:04,124
+If the payment back-end breaks on
+Tuesday's morning, the loyalty back-end
+
+16
+00:01:04,124 --> 00:01:06,031
+can still deploy on Tuesday's afternoon.
+
+17
+00:01:07,021 --> 00:01:08,584
+Mobile is completely different.
+
+18
+00:01:09,296 --> 00:01:14,175
+On Android and iOS, Apple and
+Google only let you ship one
+
+19
+00:01:14,186 --> 00:01:15,813
+single binary to the App Store.
+
+20
+00:01:16,808 --> 00:01:21,514
+Every line of code, every single
+team has to compile together, link
+
+21
+00:01:21,514 --> 00:01:25,304
+together, and run inside exact
+same app on a customer's phone.
+
+22
+00:01:26,318 --> 00:01:29,815
+Over the next thirty minutes, I'll
+walk you through the exact five-step
+
+23
+00:01:29,823 --> 00:01:34,540
+playbook we used to turn a giant
+mobile code base into a single,
+
+24
+00:01:35,006 --> 00:01:37,387
+clean self-service internal platform
+
+25
+00:01:38,387 --> 00:01:40,735
+Look at the tangled
+network cable on the slide.
+
+26
+00:01:41,868 --> 00:01:47,366
+This is exactly what a growing mobile
+app feels when, multiple team works on a
+
+27
+00:01:47,373 --> 00:01:49,763
+single code base without clear boundaries.
+
+28
+00:01:51,217 --> 00:01:55,685
+A few years ago, big companies used
+to build separate apps for everything.
+
+29
+00:01:56,168 --> 00:02:00,624
+You had one app to pay your bill, another
+app to-- for accuse just rewards, another
+
+30
+00:02:00,637 --> 00:02:02,666
+app to manage your home internet routers.
+
+31
+00:02:03,430 --> 00:02:07,321
+Customer hated jumping between
+five different apps, so we
+
+32
+00:02:07,321 --> 00:02:10,927
+brought together into a one
+unified super app called T-Life.
+
+33
+00:02:11,906 --> 00:02:15,240
+Great for the customers and a huge
+challenge for the engineering.
+
+34
+00:02:15,489 --> 00:02:20,199
+Suddenly we had one binary, five
+teams, and infinite complexities.
+
+35
+00:02:21,158 --> 00:02:25,181
+Without a platform layer,
+everything was tightly connected.
+
+36
+00:02:25,752 --> 00:02:29,780
+A loyalty team needs to know if the
+user was logged in, so they directly
+
+37
+00:02:29,780 --> 00:02:31,778
+import code into their account team.
+
+38
+00:02:32,521 --> 00:02:36,817
+The IoT team need to trigger a
+payment flow, so they re-reach or
+
+39
+00:02:36,839 --> 00:02:38,416
+directly into the payment code.
+
+40
+00:02:39,363 --> 00:02:42,960
+Shared folders turn into a giant
+junk drawers where everyone
+
+41
+00:02:42,965 --> 00:02:44,286
+dump their helper classes.
+
+42
+00:02:45,134 --> 00:02:46,312
+What happened as a result?
+
+43
+00:02:46,555 --> 00:02:49,461
+Cascading build failures
+and release bottlenecks.
+
+44
+00:02:50,335 --> 00:02:53,887
+If a developer on the payment
+team changed one shared file, the
+
+45
+00:02:53,888 --> 00:02:55,867
+loyalty team code stopped compiling.
+
+46
+00:02:56,593 --> 00:03:00,840
+One broken test blocked all fifty-plus
+engineers at the exact same time.
+
+47
+00:03:01,552 --> 00:03:04,578
+We knew we couldn't fix
+this with more meetings.
+
+48
+00:03:05,185 --> 00:03:07,102
+We had to fix this with an architecture
+
+49
+00:03:08,102 --> 00:03:12,923
+Before we look at how we fixed it, look
+at the numbers on the slide so you can
+
+50
+00:03:12,936 --> 00:03:15,250
+see the scale we deal with every day.
+
+51
+00:03:16,179 --> 00:03:19,578
+Fifty-three million active
+users on the T-Life app.
+
+52
+00:03:19,766 --> 00:03:24,861
+At this scale, even a tiny point
+one person bug hits tens and
+
+53
+00:03:24,867 --> 00:03:26,551
+thousands of customers immediately.
+
+54
+00:03:27,381 --> 00:03:33,333
+And on T-Mobile Tuesdays, millions
+of people open the app at the
+
+55
+00:03:33,334 --> 00:03:35,129
+same exact time to claim rewards.
+
+56
+00:03:36,198 --> 00:03:39,976
+Fifty-plus mobile engineers
+across Android and iOS working
+
+57
+00:03:39,979 --> 00:03:41,656
+in a code base every single day.
+
+58
+00:03:42,445 --> 00:03:46,230
+Five engineering parts, five
+independent product team, each with
+
+59
+00:03:46,230 --> 00:03:47,857
+their own roadmap and deadlines.
+
+60
+00:03:47,968 --> 00:03:51,255
+Hit ninety-nine point
+nine crash-free rate.
+
+61
+00:03:51,327 --> 00:03:52,369
+This is our golden rule.
+
+62
+00:03:53,321 --> 00:03:57,913
+We have to let team ship fast while
+keeping the app rock solid at ninety-nine
+
+63
+00:03:57,917 --> 00:03:59,440
+point nine crash-free session.
+
+64
+00:04:00,405 --> 00:04:04,244
+Let's look at the next slide to see
+how this five team actually build.
+
+65
+00:04:05,244 --> 00:04:09,710
+So we organized our team so that each
+pod operates like an independent startups
+
+66
+00:04:09,746 --> 00:04:11,617
+with full ownership over their domain.
+
+67
+00:04:12,267 --> 00:04:16,420
+For example, account pod
+owns login security, user
+
+68
+00:04:16,455 --> 00:04:17,813
+profile, and authentication.
+
+69
+00:04:18,589 --> 00:04:22,914
+Payment pod owns billing, auto pay
+credits, and one-time payments.
+
+70
+00:04:23,514 --> 00:04:28,382
+Loyalty pod owns T-Mobile Tuesday's
+rewards and customers perks, and an
+
+71
+00:04:28,390 --> 00:04:34,990
+IoT pod owns connected devices, 5G
+home internet, and smart device setups.
+
+72
+00:04:35,763 --> 00:04:41,886
+And we have like bedrock core shell pod
+owns app navigation, depends injection,
+
+73
+00:04:42,587 --> 00:04:44,286
+analytics, and stat infrastructure.
+
+74
+00:04:45,408 --> 00:04:49,212
+Notice the difference between these
+four different teams and the fifth team.
+
+75
+00:04:49,844 --> 00:04:56,054
+The first four teams, account, payment,
+loyalty, and IoT are feature teams.
+
+76
+00:04:56,242 --> 00:04:58,283
+Their customers is the T-Mobile users.
+
+77
+00:04:58,893 --> 00:05:03,029
+The fifth team, the core shell,
+is our internal platform team.
+
+78
+00:05:03,656 --> 00:05:08,184
+Their customer is the other four
+engineering teams So that's brings to
+
+79
+00:05:08,184 --> 00:05:13,204
+us to the first chapter, treating the
+app shell as the internal platform.
+
+80
+00:05:13,445 --> 00:05:15,558
+Look at the concrete
+foundation on the slide.
+
+81
+00:05:16,401 --> 00:05:20,334
+Before we build a skyscraper, you
+pour a strong level foundation.
+
+82
+00:05:21,206 --> 00:05:26,115
+In most mobile app, the main app model
+and the app shell is treated like a public
+
+83
+00:05:26,129 --> 00:05:28,113
+park where everyone dumps their code.
+
+84
+00:05:28,771 --> 00:05:33,618
+When our team wants to launch a new
+screen or initialize an SDK as a startup,
+
+85
+00:05:34,351 --> 00:05:36,246
+they edit the central app file directly.
+
+86
+00:05:36,616 --> 00:05:37,879
+We stopped doing that.
+
+87
+00:05:37,950 --> 00:05:40,042
+We drew a strict line
+around the core shell.
+
+88
+00:05:40,963 --> 00:05:43,354
+Think of the core shell like
+the operating system on your
+
+89
+00:05:43,356 --> 00:05:45,624
+laptop or like a cloud platform.
+
+90
+00:05:46,309 --> 00:05:48,480
+Its job is not to hold business logic.
+
+91
+00:05:48,669 --> 00:05:53,178
+Its job is to provide a safe
+and stable foundation, handling
+
+92
+00:05:53,187 --> 00:05:57,206
+login tokens, networking,
+navigation, and crash reporting.
+
+93
+00:05:57,688 --> 00:06:01,359
+So the feature teams can simply
+plug in their own model in and
+
+94
+00:06:01,360 --> 00:06:02,768
+focus on building products.
+
+95
+00:06:03,768 --> 00:06:06,250
+Let's see how these changes
+works in day-to-day work
+
+96
+00:06:07,250 --> 00:06:09,880
+So this slide shows
+the core mindset shift.
+
+97
+00:06:10,364 --> 00:06:12,859
+The shift is conceptual
+before it's technical.
+
+98
+00:06:13,203 --> 00:06:16,349
+Look at the, the left side,
+traditional mobile app.
+
+99
+00:06:16,949 --> 00:06:20,043
+Everyone works in a shared
+code base with no contracts.
+
+100
+00:06:20,295 --> 00:06:23,050
+Everything compiles in
+one slow monolith build.
+
+101
+00:06:23,564 --> 00:06:24,717
+One team blocks all.
+
+102
+00:06:24,773 --> 00:06:28,450
+If a team breaks the build, everything,
+everything, and everyone stops working.
+
+103
+00:06:29,435 --> 00:06:32,240
+Now look at the right side,
+platform-first mobile.
+
+104
+00:06:32,925 --> 00:06:36,703
+Every module communicates through
+versioned contracts.
+
+105
+00:06:37,050 --> 00:06:41,385
+Every team runs isolated builds,
+feature plugin through self-service
+
+106
+00:06:41,390 --> 00:06:45,512
+injection, and most importantly,
+team ships independently.
+
+107
+00:06:46,469 --> 00:06:51,505
+And if you can look at the bottom of
+the slide, the app shell stops being
+
+108
+00:06:51,507 --> 00:06:55,355
+a shared code, become an internal
+platform with explicit guarantees.
+
+109
+00:06:55,469 --> 00:07:00,599
+Just like, like cloud platform exposing
+unstable APIs to product team, module
+
+110
+00:07:00,755 --> 00:07:04,750
+teams can become consumers of the
+product, not contractors to the monolith.
+
+111
+00:07:06,387 --> 00:07:11,098
+When a loyalty developer opens their
+laptop in the morning, they don't want
+
+112
+00:07:11,106 --> 00:07:13,306
+to compile the payment or IoT code.
+
+113
+00:07:13,846 --> 00:07:16,445
+They treat the code shell
+and other modules just like
+
+114
+00:07:16,445 --> 00:07:17,903
+a clean and external API.
+
+115
+00:07:18,773 --> 00:07:22,889
+How do we actually build those clean
+APIs that's inside a mobile app?
+
+116
+00:07:23,889 --> 00:07:28,066
+Welcome to the chapter two,
+Versioned Interface Contract.
+
+117
+00:07:28,760 --> 00:07:33,033
+In a real super app, teams should,
+should need to talk to each other.
+
+118
+00:07:33,113 --> 00:07:37,467
+For example, when the consumers or
+customers is setting up routers in
+
+119
+00:07:37,468 --> 00:07:43,800
+the IoT features need to pay a fee
+activation, or IoT model needs to open
+
+120
+00:07:43,802 --> 00:07:48,841
+the payment screens, or when a loyalty
+shows Tuesday's rewards, it need to ask
+
+121
+00:07:48,872 --> 00:07:50,682
+account models for the user profile.
+
+122
+00:07:51,636 --> 00:07:54,894
+In the old world, the loyalty
+team could directly import
+
+123
+00:07:55,045 --> 00:07:56,830
+account team's internal classes.
+
+124
+00:07:57,193 --> 00:08:00,308
+The moment you do that, those
+two teams are glued together.
+
+125
+00:08:00,941 --> 00:08:05,189
+To break that glue, we introduce
+versions interface contract.
+
+126
+00:08:06,101 --> 00:08:10,700
+Let's look at the next
+slide to see how that works.
+
+127
+00:08:11,514 --> 00:08:15,556
+In this slide, you can see the three
+simple rules that makes our contract work.
+
+128
+00:08:16,363 --> 00:08:17,236
+Typed interface.
+
+129
+00:08:17,820 --> 00:08:20,197
+Splitting API from implementations.
+
+130
+00:08:20,380 --> 00:08:25,572
+Every team splits their module in two
+parts: a tiny contract module, the public
+
+131
+00:08:25,577 --> 00:08:30,532
+API, a private implementations where
+actual screens and business logics live.
+
+132
+00:08:31,331 --> 00:08:35,205
+The contract module only contains a
+simple interface and a data module.
+
+133
+00:08:35,768 --> 00:08:38,737
+No UI, no databases or no heavy logic.
+
+134
+00:08:39,274 --> 00:08:42,997
+Because it is pure interfaces, it
+compiles in less than a second.
+
+135
+00:08:43,951 --> 00:08:48,985
+And here's our number one rule:
+teams are only allowed to depend on
+
+136
+00:08:49,010 --> 00:08:52,838
+other teams' contract modules, never
+on their implementation modules.
+
+137
+00:08:54,149 --> 00:08:56,649
+The second part to this
+one is semantic version.
+
+138
+00:08:57,832 --> 00:09:01,614
+Second, we versions our every
+contract using a semantic versions.
+
+139
+00:09:01,876 --> 00:09:06,325
+If the account teams add a new helper
+method that doesn't break anything,
+
+140
+00:09:06,881 --> 00:09:10,759
+they bump their minor versions,
+nobody else has to touch their code.
+
+141
+00:09:11,484 --> 00:09:15,495
+If they need to make a breaking
+change, they cannot just delete the old
+
+142
+00:09:15,502 --> 00:09:18,110
+method or break all other four teams.
+
+143
+00:09:18,794 --> 00:09:23,457
+They mark the old method as deprecated,
+release a new version of the contract, and
+
+144
+00:09:23,466 --> 00:09:26,270
+give other teams time to migrate smoothly.
+
+145
+00:09:27,342 --> 00:09:30,233
+The third part is like
+consumers independence.
+
+146
+00:09:30,776 --> 00:09:35,714
+Because other teams only depends on
+your public interface, your team can
+
+147
+00:09:35,895 --> 00:09:40,890
+completely rewrite your internal code,
+upgrade your databases, or redesign
+
+148
+00:09:40,890 --> 00:09:44,896
+your UI screens without asking or
+notifying any other team, as long
+
+149
+00:09:44,898 --> 00:09:46,253
+as the contract stays the same.
+
+150
+00:09:46,973 --> 00:09:50,315
+Let's move on to the next slide to
+see how this speed up our builds.
+
+151
+00:09:51,315 --> 00:09:55,293
+Look at the factory floor on the
+slide and notice how this isn't
+
+152
+00:09:55,337 --> 00:09:57,488
+just one single conveyor belt.
+
+153
+00:09:57,967 --> 00:10:01,319
+There are multiple parallel
+assembly lines running side by side.
+
+154
+00:10:01,918 --> 00:10:05,848
+If one station pauses to fix a
+part, the other lines keep moving.
+
+155
+00:10:06,442 --> 00:10:11,200
+Once we separate our code base using
+thin interface contract, we were
+
+156
+00:10:11,204 --> 00:10:16,237
+able to stop running one giant,
+slow builds for every pull request.
+
+157
+00:10:16,271 --> 00:10:19,686
+Instead, we give every team their
+own independent build pipeline.
+
+158
+00:10:20,379 --> 00:10:22,780
+Let's look at the next slide
+to see how the code change
+
+159
+00:10:22,791 --> 00:10:24,739
+moves through this pipeline.
+
+160
+00:10:25,739 --> 00:10:29,263
+Isolations, one team
+failure from everyone else.
+
+161
+00:10:29,831 --> 00:10:31,116
+How we can isolate it?
+
+162
+00:10:31,684 --> 00:10:37,395
+else build modules, validate
+gate, and contract integration.
+
+163
+00:10:37,972 --> 00:10:39,831
+Look at the five step at the bottom right.
+
+164
+00:10:39,831 --> 00:10:45,626
+So module, build, validate,
+gate, contract integration.
+
+165
+00:10:46,737 --> 00:10:50,657
+In this traditional mobile app, a single
+broken import in the payment model
+
+166
+00:10:50,828 --> 00:10:52,823
+stop the entire release for everyone.
+
+167
+00:10:53,152 --> 00:10:55,891
+Here is how our independent
+pipeline prevents that.
+
+168
+00:10:56,300 --> 00:10:56,787
+Module.
+
+169
+00:10:57,657 --> 00:11:01,221
+A developer on the payments team
+open a pull request inside a
+
+170
+00:11:01,221 --> 00:11:03,106
+payment implementation module.
+
+171
+00:11:03,774 --> 00:11:04,214
+Build.
+
+172
+00:11:04,340 --> 00:11:08,606
+Our CI system sees that only payment
+changed, so it does not compile a
+
+173
+00:11:08,610 --> 00:11:11,421
+loyalty or IoT or account module.
+
+174
+00:11:11,848 --> 00:11:15,852
+It only compiles a payment against a
+tiny pre-build interface contracts.
+
+175
+00:11:16,424 --> 00:11:18,977
+Instead of waiting thirty minutes
+for a build, the developer gets a
+
+176
+00:11:18,977 --> 00:11:20,516
+feedback in a couple of minutes.
+
+177
+00:11:21,671 --> 00:11:22,847
+Third part, validate.
+
+178
+00:11:23,399 --> 00:11:26,881
+A pipeline runs unit test, UI
+test, and code quality checks
+
+179
+00:11:26,924 --> 00:11:28,229
+just for the payment module.
+
+180
+00:11:29,102 --> 00:11:29,490
+Gate.
+
+181
+00:11:29,826 --> 00:11:34,539
+Before that code is allowed into
+multiple main app assemblies, it
+
+182
+00:11:34,539 --> 00:11:36,611
+just pass an automated quality gate.
+
+183
+00:11:37,167 --> 00:11:41,174
+This gate checks that all test
+passes and that public contract
+
+184
+00:11:41,174 --> 00:11:42,753
+was not accidentally broken.
+
+185
+00:11:43,763 --> 00:11:46,694
+Contract integration, the final one.
+
+186
+00:11:46,922 --> 00:11:51,645
+Only when the payment module passes
+the gate does it new versions get
+
+187
+00:11:51,648 --> 00:11:53,586
+promoted to the final app integration.
+
+188
+00:11:54,174 --> 00:11:56,792
+What happens if the payment
+build fails at the gate?
+
+189
+00:11:57,045 --> 00:11:58,492
+Nothing happens to anyone else.
+
+190
+00:11:58,967 --> 00:12:03,393
+Loyalty, IoT, and account keep
+building and shipping using various
+
+191
+00:12:03,407 --> 00:12:05,299
+workings version for payments.
+
+192
+00:12:07,173 --> 00:12:09,244
+And look at the bold
+result on the slide, right?
+
+193
+00:12:09,438 --> 00:12:14,368
+Result, zero cross-team build regression
+sustained across all five parts.
+
+194
+00:12:14,920 --> 00:12:19,857
+One team's broken build never blocks
+another team's green deployments This
+
+195
+00:12:19,871 --> 00:12:24,587
+brings to our natural question to our
+chapter four, modular feature injection.
+
+196
+00:12:25,405 --> 00:12:29,419
+If the feature shell doesn't import
+a feature model and the feature model
+
+197
+00:12:29,427 --> 00:12:33,205
+doesn't import each other, how does
+the app actually comes together when
+
+198
+00:12:33,210 --> 00:12:35,019
+the user opens it on their phone?
+
+199
+00:12:35,769 --> 00:12:39,280
+Look at the electric plu-
+plug and the wal- wall socket.
+
+200
+00:12:40,032 --> 00:12:43,628
+When electricians wires an house,
+they don't need to know if you're
+
+201
+00:12:43,631 --> 00:12:47,200
+going to plug in a coffee maker,
+a television or a phone charger.
+
+202
+00:12:47,766 --> 00:12:49,782
+They just install a standard wall socket.
+
+203
+00:12:49,938 --> 00:12:54,031
+Any device with standard two-prong
+plug can plug in and work.
+
+204
+00:12:54,836 --> 00:13:00,082
+We build that exact same plug-in
+socket system inside our mobile app
+
+205
+00:13:00,099 --> 00:13:02,864
+using an modular feature injection.
+
+206
+00:13:03,887 --> 00:13:05,702
+Let's see in next slide how that works
+
+207
+00:13:06,702 --> 00:13:11,604
+This slide shows how any features
+team can plug in brand new screen or
+
+208
+00:13:11,611 --> 00:13:16,520
+a feature into an mo-- into an app in
+three steps without changing a single
+
+209
+00:13:16,520 --> 00:13:17,904
+line of code in their core shell.
+
+210
+00:13:18,544 --> 00:13:20,289
+The step one, register.
+
+211
+00:13:21,011 --> 00:13:25,285
+Every feature model has a small
+registration file where it says,
+
+212
+00:13:25,365 --> 00:13:27,775
+"Hey, platform, I'm the payment model.
+
+213
+00:13:27,942 --> 00:13:31,472
+Here are the screens and deep
+link URLs I handle, and here are
+
+214
+00:13:31,476 --> 00:13:33,272
+the platform services I need."
+
+215
+00:13:34,056 --> 00:13:35,688
+Step two, inject.
+
+216
+00:13:36,331 --> 00:13:40,335
+When the customer opens a T-Life app on
+their phone, the core shell automatically
+
+217
+00:13:40,345 --> 00:13:45,638
+scans the in-injection registry,
+discovers all registered features, and
+
+218
+00:13:45,638 --> 00:13:47,739
+connects them on the fly at runtime.
+
+219
+00:13:48,287 --> 00:13:51,128
+So a user taps the pay
+bill on the home screen.
+
+220
+00:13:51,428 --> 00:13:55,595
+The home screen does not know-- need to
+know anything about the payment code.
+
+221
+00:13:56,062 --> 00:13:59,281
+It simply sends a message to
+the shell saying, "Open the
+
+222
+00:13:59,281 --> 00:14:00,657
+router for the bill pay."
+
+223
+00:14:01,166 --> 00:14:04,304
+The shell looks up the route
+for the registry and open the
+
+224
+00:14:04,304 --> 00:14:05,639
+payment screen seamlessly.
+
+225
+00:14:06,778 --> 00:14:07,870
+The step three, ship.
+
+226
+00:14:08,814 --> 00:14:13,801
+Because this whole process is hundred
+percent self-service, feature teams
+
+227
+00:14:13,820 --> 00:14:17,421
+never have to wait for the core
+shell team to write up their screens.
+
+228
+00:14:17,496 --> 00:14:21,895
+They register their feature, wrap
+it in the remote feature flags, and
+
+229
+00:14:21,895 --> 00:14:23,338
+release it on their own schedule.
+
+230
+00:14:24,355 --> 00:14:26,630
+Let's move to next slide
+to see our final chapter.
+
+231
+00:14:27,630 --> 00:14:29,059
+Governance and state pattern.
+
+232
+00:14:29,872 --> 00:14:32,477
+Look at the air traffic
+control on this slide.
+
+233
+00:14:32,601 --> 00:14:37,270
+When you have five autonomous teams
+shipping fast in, into a mobile app
+
+234
+00:14:37,805 --> 00:14:41,745
+with fifty-thir-fifty-three million
+active users, how do you keep everything
+
+235
+00:14:41,747 --> 00:14:43,564
+safe, consistent, and crash free?
+
+236
+00:14:44,766 --> 00:14:47,093
+There are two big risks
+when team moves fast.
+
+237
+00:14:47,398 --> 00:14:51,877
+First, under tight deadlines, developer
+might accidentally bypass the rule
+
+238
+00:14:51,900 --> 00:14:53,394
+and import code they shouldn't.
+
+239
+00:14:54,121 --> 00:14:58,545
+Second, even if the code imports are
+clean, if two models mess with the shared
+
+240
+00:14:58,547 --> 00:15:03,505
+memory and a glob-global data runtime,
+the app can still freeze or crash.
+
+241
+00:15:04,101 --> 00:15:07,840
+Let's look at the next slide,
+how we can protect the platform
+
+242
+00:15:07,842 --> 00:15:09,442
+without slowing teams down
+
+243
+00:15:10,442 --> 00:15:14,188
+This slide shows the two ways we
+can protect stability, automated
+
+244
+00:15:14,188 --> 00:15:16,440
+governance and the reactive state.
+
+245
+00:15:17,574 --> 00:15:19,396
+Let's see like in governance model.
+
+246
+00:15:19,987 --> 00:15:25,088
+Nobody likes to slow architecture review
+boards where you have to wait for two
+
+247
+00:15:25,089 --> 00:15:27,366
+weeks or for the permission to merge code.
+
+248
+00:15:27,759 --> 00:15:28,715
+Our rule is simple.
+
+249
+00:15:29,246 --> 00:15:33,173
+The shell team owns the platform contract
+and without blocking team velocity.
+
+250
+00:15:33,872 --> 00:15:38,772
+Instead of slow meetings, we use
+three lightweight tools: an RFC
+
+251
+00:15:38,772 --> 00:15:40,843
+process for contract changes.
+
+252
+00:15:41,024 --> 00:15:45,422
+If you change code inside your own
+module, you need zero outside approvals.
+
+253
+00:15:46,142 --> 00:15:50,242
+You only write a short RFC document if you
+want to change a shared public contract.
+
+254
+00:15:50,996 --> 00:15:52,277
+Automated lint rules.
+
+255
+00:15:53,110 --> 00:15:56,012
+We don't rely on humans catching
+mistake in code reviews.
+
+256
+00:15:56,062 --> 00:15:59,802
+If your developer in loyalty
+accidentally tried to import a private
+
+257
+00:15:59,809 --> 00:16:04,097
+code from payment, our automated
+linter catches it in two seconds and
+
+258
+00:16:04,097 --> 00:16:05,870
+stop the pull request automatically.
+
+259
+00:16:06,868 --> 00:16:08,071
+Shared ADR log.
+
+260
+00:16:08,690 --> 00:16:13,205
+We keep a simple log for architectural
+design records right in the repo, so
+
+261
+00:16:13,207 --> 00:16:15,748
+every engineers knows why our rules exist.
+
+262
+00:16:16,822 --> 00:16:19,062
+The second part of this
+one is a reactive state.
+
+263
+00:16:19,533 --> 00:16:23,191
+On the right side, if you see the, we
+protect the app at runtime using a clean
+
+264
+00:16:23,192 --> 00:16:26,518
+state patterns, MVI and MVVM patterns.
+
+265
+00:16:27,448 --> 00:16:30,091
+So unidirectional state flow.
+
+266
+00:16:30,186 --> 00:16:35,768
+Inside our every module, data flows in one
+clear direction, makes bug easy to trace.
+
+267
+00:16:36,416 --> 00:16:39,081
+Shared event bus, never direct calls.
+
+268
+00:16:39,593 --> 00:16:43,251
+When a user logs out an account
+module, account module doesn't reach to
+
+269
+00:16:43,251 --> 00:16:45,048
+payment or loyalty to clear the data.
+
+270
+00:16:45,884 --> 00:16:50,969
+Instead, account publish a simple user
+logged out event to a shared event bus.
+
+271
+00:16:51,045 --> 00:16:53,553
+Every module clean up its own data safely.
+
+272
+00:16:54,469 --> 00:16:56,485
+State scope to module's life cycle.
+
+273
+00:16:56,752 --> 00:17:01,286
+As soon as user closes the IoT screen,
+all other memory used by the IoT
+
+274
+00:17:01,294 --> 00:17:02,788
+module is immediately cleared out.
+
+275
+00:17:03,541 --> 00:17:06,658
+This is how we clean memory
+usage and maintain ninety-nine
+
+276
+00:17:06,661 --> 00:17:08,292
+point nine crash-free sessions.
+
+277
+00:17:09,521 --> 00:17:11,501
+This bring to the--
+that to the next slide.
+
+278
+00:17:13,046 --> 00:17:14,586
+So what do you take back to your team?
+
+279
+00:17:15,586 --> 00:17:20,742
+If you're scaling a large mobile app
+or building an internal platform for
+
+280
+00:17:20,742 --> 00:17:24,334
+your developer, here are the five
+takeaways in this slide that you can
+
+281
+00:17:24,335 --> 00:17:26,263
+start using, using it right away.
+
+282
+00:17:27,284 --> 00:17:29,338
+First one, define your shell contract.
+
+283
+00:17:29,549 --> 00:17:32,237
+Stop treating your core
+app as a shared bucket.
+
+284
+00:17:32,646 --> 00:17:37,551
+Then turn your app shell into an internal
+platform with clear and versioned API.
+
+285
+00:17:38,253 --> 00:17:39,562
+Isolate build pipeline.
+
+286
+00:17:39,580 --> 00:17:41,735
+Let every module build and test their own.
+
+287
+00:17:41,865 --> 00:17:45,513
+One team's red builds should never
+block another team's green deploy.
+
+288
+00:17:46,322 --> 00:17:48,397
+Build a feature injection registry.
+
+289
+00:17:48,987 --> 00:17:52,956
+View feature teams as self-service
+plug-and-play socket, way
+
+290
+00:17:52,957 --> 00:17:55,606
+to add new screens without
+touching in core shell code.
+
+291
+00:17:56,360 --> 00:17:58,062
+Adopt reactive state boundaries.
+
+292
+00:17:58,099 --> 00:18:04,054
+Use MVI or MVVM with lifecycle scope
+state and event bus so modules never
+
+293
+00:18:04,088 --> 00:18:05,972
+corrupt each other's memory at runtime.
+
+294
+00:18:06,555 --> 00:18:08,535
+Govern through contracts, not control.
+
+295
+00:18:09,121 --> 00:18:14,333
+Use automated lint rules, simple RFCs to
+protect architecture instead of slowing
+
+296
+00:18:14,338 --> 00:18:19,811
+teams down with manual review committees
+Platform engineering is not just for
+
+297
+00:18:19,841 --> 00:18:22,018
+cloud servers and back-end infrastructure.
+
+298
+00:18:22,298 --> 00:18:26,535
+Whenever you build clean boundaries,
+self-serve tools, and automated
+
+299
+00:18:26,554 --> 00:18:31,436
+guardrails, that helps engineering
+ships scalably and safely.
+
+300
+00:18:32,029 --> 00:18:33,904
+That is the mobile platform engineering.
+
+301
+00:18:34,016 --> 00:18:38,006
+By treating our mobile apps as
+a platform, five autonomous team
+
+302
+00:18:38,252 --> 00:18:43,428
+and four fifty-plus engineers able
+to ship features continuously.
+
+303
+00:18:43,771 --> 00:18:47,545
+Close to fifty-three, fifty-three
+million users and zero cross-team
+
+304
+00:18:47,557 --> 00:18:52,390
+builds regression, and ninety-nine
+point nine crash feast stability.
+
+305
+00:18:53,406 --> 00:18:57,042
+Thank you so much for watching my
+talk, at Conf42 Platform
+
+306
+00:18:57,071 --> 00:18:58,521
+Engineering twenty twenty-six.
+
+307
+00:18:58,843 --> 00:19:00,189
+I would like to stay connected.
+
+308
+00:19:00,225 --> 00:19:04,037
+Please reach out to me on LinkedIn
+if you want to talk about, mobile
+
+309
+00:19:04,038 --> 00:19:06,330
+architecture, super apps, or on-device AI.
+
+310
+00:19:06,963 --> 00:19:09,411
+Thank you again, and enjoy
+rest of the conference.

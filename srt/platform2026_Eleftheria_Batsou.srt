@@ -1,0 +1,934 @@
+1
+00:00:00,665 --> 00:00:04,642
+Hi everyone, and welcome to
+Conf42 Platform Engineering.
+
+2
+00:00:04,726 --> 00:00:08,472
+I am Eleftheria Batsou, Developer
+Advocate at Uptime Robot.
+
+3
+00:00:08,927 --> 00:00:12,600
+I work on the monitor side
+of the things people ship.
+
+4
+00:00:13,130 --> 00:00:18,436
+This talk is called Monitoring is
+Still the One Thing Nobody Automated.
+
+5
+00:00:18,486 --> 00:00:21,903
+It's a lightning talk, so
+I'll keep it practical.
+
+6
+00:00:21,975 --> 00:00:28,344
+We will look at why monitoring keeps
+failing off the golden path, how to
+
+7
+00:00:28,344 --> 00:00:33,445
+put it back as a deploy step from the
+command line, the small details that bite
+
+8
+00:00:33,445 --> 00:00:38,842
+you the first time, and when you should
+reach for something else than the CLI.
+
+9
+00:00:39,442 --> 00:00:45,516
+The examples come from Uptime Robot
+because that's what I work on every day.
+
+10
+00:00:45,775 --> 00:00:51,494
+But the argument is about where monitoring
+sits in your platform workflow, and
+
+11
+00:00:51,526 --> 00:00:58,917
+that applies whatever tool you're
+using Okay, so let's get started.
+
+12
+00:01:00,036 --> 00:01:05,151
+And let's start with the golden path
+most platform teams have already built.
+
+13
+00:01:05,623 --> 00:01:10,347
+You run one command, and you
+get a repo from a template.
+
+14
+00:01:10,714 --> 00:01:12,712
+CI and CD come with it.
+
+15
+00:01:13,068 --> 00:01:14,435
+Secrets get injected.
+
+16
+00:01:14,483 --> 00:01:16,359
+Infrastructure is code.
+
+17
+00:01:16,691 --> 00:01:20,417
+Logs and dashboards are
+wired up automatically.
+
+18
+00:01:20,657 --> 00:01:21,989
+All of it is a default.
+
+19
+00:01:22,340 --> 00:01:24,673
+Nobody has to remember anything.
+
+20
+00:01:25,599 --> 00:01:32,755
+Then the service goes live, and monitoring
+gets set up by a human, later, by
+
+21
+00:01:32,771 --> 00:01:35,951
+hand in a web UI, if anyone remembers.
+
+22
+00:01:36,481 --> 00:01:39,632
+That last box is what this talk is about.
+
+23
+00:01:39,690 --> 00:01:44,782
+it's the only step on this path that still
+depends on memory instead of defaults.
+
+24
+00:01:46,208 --> 00:01:50,544
+In production, that gap
+shows up in three ways.
+
+25
+00:01:50,690 --> 00:01:52,562
+First, no monitor at all.
+
+26
+00:01:52,625 --> 00:01:56,589
+The service runs for months,
+and the first alert you get is a
+
+27
+00:01:56,591 --> 00:01:58,466
+support ticket from a customer.
+
+28
+00:01:59,342 --> 00:02:01,135
+Second, the wrong monitor.
+
+29
+00:02:01,473 --> 00:02:06,314
+Someone did add a check, but it hits
+the marketing homepage instead of the
+
+30
+00:02:06,315 --> 00:02:13,496
+service's health endpoint, or it alerts
+a person who left the team last spring.
+
+31
+00:02:13,847 --> 00:02:16,839
+It's green, but it isn't
+telling you anything.
+
+32
+00:02:17,550 --> 00:02:19,592
+Third, orphaned monitors.
+
+33
+00:02:19,762 --> 00:02:24,649
+The service was renamed or retired,
+and the monitor is still there.
+
+34
+00:02:24,998 --> 00:02:30,019
+Either it alerts about nothing,
+or it quietly checks a URL that
+
+35
+00:02:30,031 --> 00:02:31,866
+now belongs to something else.
+
+36
+00:02:32,539 --> 00:02:38,098
+Three different symptoms, one
+root cause, and that root cause
+
+37
+00:02:38,116 --> 00:02:40,194
+is not a tooling problem.
+
+38
+00:02:40,262 --> 00:02:44,349
+Every monitoring tool out there
+can check an HTTP endpoint.
+
+39
+00:02:45,855 --> 00:02:46,647
+Excuse me.
+
+40
+00:02:47,382 --> 00:02:48,757
+It's a workflow problem.
+
+41
+00:02:48,985 --> 00:02:54,418
+Monitoring sits outside the golden path,
+so it depends on discipline instead
+
+42
+00:02:54,418 --> 00:02:59,633
+of defaults, and discipline doesn't
+scale with the number of services.
+
+43
+00:02:59,976 --> 00:03:05,194
+If your platform creates 50 services
+a year, you need 50 separate acts
+
+44
+00:03:05,226 --> 00:03:11,071
+of remembering, or you need one
+default So the fix is simple to say.
+
+45
+00:03:11,536 --> 00:03:13,818
+Move monitoring inside the deploy.
+
+46
+00:03:14,190 --> 00:03:19,351
+Build, test, deploy, then the step
+that re-registers the monitor,
+
+47
+00:03:19,392 --> 00:03:22,916
+and the step that confirms the
+service is actually reporting up.
+
+48
+00:03:23,493 --> 00:03:27,214
+The deploy isn't done until
+the service is being watched.
+
+49
+00:03:27,839 --> 00:03:30,005
+That's a nice side effect.
+
+50
+00:03:30,173 --> 00:03:34,678
+The monitor is now created by the
+same pipeline that already knows
+
+51
+00:03:34,680 --> 00:03:39,853
+the service's name, its URL, its
+owning team, and its environment.
+
+52
+00:03:39,943 --> 00:03:44,395
+Everything a human would have to
+copy into a web form is already
+
+53
+00:03:44,395 --> 00:03:46,368
+sitting there as a variable.
+
+54
+00:03:47,820 --> 00:03:52,005
+At Uptime Robot, we shipped an
+official command line tool for this.
+
+55
+00:03:52,118 --> 00:03:53,106
+It's open source.
+
+56
+00:03:53,137 --> 00:04:00,095
+It's on NPM as Uptime Robot/CLI,
+and it talks to our V3 API.
+
+57
+00:04:00,599 --> 00:04:03,659
+You install it with NPM on your laptop.
+
+58
+00:04:03,690 --> 00:04:08,399
+Uptime Robot auth login stores your key
+in the operating system's key chain.
+
+59
+00:04:08,698 --> 00:04:10,198
+In CI, you don't log in.
+
+60
+00:04:10,236 --> 00:04:14,796
+You set up the Uptime
+Robot_API_key environment
+
+61
+00:04:14,799 --> 00:04:17,149
+variables from your secret store.
+
+62
+00:04:17,349 --> 00:04:21,549
+Creating a monitor is then one
+command, the monitor type, a name,
+
+63
+00:04:21,595 --> 00:04:24,205
+a URL, an interval, and a timeout.
+
+64
+00:04:24,583 --> 00:04:26,807
+Keep an eye on that timeout flag.
+
+65
+00:04:26,823 --> 00:04:33,586
+We'll come back to it And, yes,
+here's actually the part I like most.
+
+66
+00:04:33,672 --> 00:04:40,104
+Add dry dash run to any create command,
+and the CLI compiles and validates
+
+67
+00:04:40,123 --> 00:04:44,429
+the request without authenticating
+and without touching the network.
+
+68
+00:04:44,828 --> 00:04:50,480
+On the right side, it prints the
+exact post to v3/monitors and the body
+
+69
+00:04:50,480 --> 00:04:55,316
+it would send, the name, interval,
+URL, timeout, the HTTP method,
+
+70
+00:04:55,389 --> 00:04:58,052
+the tags, and the alert contacts.
+
+71
+00:04:58,400 --> 00:05:03,579
+And actually, let me
+show you on my screen.
+
+72
+00:05:03,579 --> 00:05:05,490
+Let me change.
+
+73
+00:05:05,543 --> 00:05:06,013
+Okay.
+
+74
+00:05:06,403 --> 00:05:08,939
+So let's actually do a very short demo.
+
+75
+00:05:08,939 --> 00:05:14,569
+Here you can already see the monitors
+that I've been watching in Uptime Robot.
+
+76
+00:05:14,629 --> 00:05:19,524
+I am currently on our CLI,
+and here is the result.
+
+77
+00:05:20,175 --> 00:05:24,958
+Because it needs no credential, you
+can run this in a pull request check.
+
+78
+00:05:25,048 --> 00:05:29,188
+A services monitoring config gets
+validated before a merge, the same
+
+79
+00:05:29,188 --> 00:05:31,325
+way you would lint a Docker file.
+
+80
+00:05:31,733 --> 00:05:36,286
+If the request is wrong, for example,
+if I leave it out the timeout, it
+
+81
+00:05:36,291 --> 00:05:40,398
+exits with code two and tells you
+exactly which fields are missing.
+
+82
+00:05:40,503 --> 00:05:42,203
+So yeah, that was it.
+
+83
+00:05:42,675 --> 00:05:46,237
+Let's continue back to the slides.
+
+84
+00:05:46,273 --> 00:05:48,039
+Let's change slide.
+
+85
+00:05:48,059 --> 00:05:48,667
+Great.
+
+86
+00:05:49,541 --> 00:05:52,225
+So what goes into that command?
+
+87
+00:05:52,237 --> 00:05:55,302
+This is where a platform
+team should be opinionated.
+
+88
+00:05:55,707 --> 00:05:59,731
+On the left is what belongs
+in the template, decided
+
+89
+00:05:59,744 --> 00:06:01,595
+once by the platform team.
+
+90
+00:06:01,981 --> 00:06:06,596
+The check interval for each tier,
+the timeout, the HTTP method.
+
+91
+00:06:06,991 --> 00:06:11,974
+I would default to GET, and I'll
+explain why in a minute, which response
+
+92
+00:06:11,979 --> 00:06:18,088
+codes count as success, SSL and domain
+expiry reminders, the tag convention,
+
+93
+00:06:18,105 --> 00:06:20,770
+and how alert contacts map to teams.
+
+94
+00:06:21,315 --> 00:06:26,719
+On the right side is what genuinely
+varies per service, and it should
+
+95
+00:06:26,774 --> 00:06:32,056
+come from the service's own metadata,
+its name and environment, its health
+
+96
+00:06:32,065 --> 00:06:37,244
+endpoint, its owning team, its tier,
+and for scheduled job, the schedule.
+
+97
+00:06:37,634 --> 00:06:42,048
+A simple rule, if you find yourself
+copying the same value into every
+
+98
+00:06:42,048 --> 00:06:45,989
+service's config, it belongs to the left.
+
+99
+00:06:46,112 --> 00:06:53,659
+Now, deploys run more than once, so this
+tab has to be safe to run again and again.
+
+100
+00:06:54,167 --> 00:06:56,630
+Two facts about the CLI matter here.
+
+101
+00:06:56,691 --> 00:07:02,448
+It retries reads, but it deliberately
+never retries, post, patch, or delete,
+
+102
+00:07:02,775 --> 00:07:05,379
+and there is no built-in upsert.
+
+103
+00:07:05,680 --> 00:07:10,683
+So if your pipeline calls create on
+every deploy, you get a brand-new
+
+104
+00:07:10,684 --> 00:07:13,216
+duplicate monitor on every deploy.
+
+105
+00:07:13,666 --> 00:07:16,153
+The pattern on the left fixes that.
+
+106
+00:07:16,485 --> 00:07:18,305
+Look the monitor up first.
+
+107
+00:07:18,375 --> 00:07:22,433
+The list command can filter by
+name, URL, tags, and status.
+
+108
+00:07:22,797 --> 00:07:24,607
+Create it only if it's missing.
+
+109
+00:07:24,697 --> 00:07:26,991
+Otherwise, update it in place.
+
+110
+00:07:27,498 --> 00:07:32,916
+One small catch, the name filter is
+the partial match, so match the exact
+
+111
+00:07:32,916 --> 00:07:40,945
+name yourself like the AWK line does
+here, and use a predictable unique name.
+
+112
+00:07:41,236 --> 00:07:44,235
+I like service name plus environment.
+
+113
+00:07:45,034 --> 00:07:48,416
+And here are the four details
+that bite people the first
+
+114
+00:07:48,428 --> 00:07:51,794
+time Credentials is number one.
+
+115
+00:07:52,195 --> 00:07:55,279
+Creating monitors need your main API key.
+
+116
+00:07:55,319 --> 00:07:59,842
+A read-only key is great for dashboards
+and reports, but it can't create anything.
+
+117
+00:08:00,112 --> 00:08:04,180
+You get a 403 and exit code
+five, so keep two keys and give
+
+118
+00:08:04,205 --> 00:08:06,030
+the pipeline the right one.
+
+119
+00:08:06,612 --> 00:08:08,156
+Then required flags.
+
+120
+00:08:08,340 --> 00:08:12,588
+For HTTP monitors, interval
+and timeout are both required.
+
+121
+00:08:13,118 --> 00:08:15,077
+Everyone forgets timeout.
+
+122
+00:08:15,128 --> 00:08:19,179
+the CLI fails fast with a clear
+message, which is exactly why
+
+123
+00:08:19,190 --> 00:08:21,638
+the dry run belongs in CI.
+
+124
+00:08:22,420 --> 00:08:23,668
+Then plan limits.
+
+125
+00:08:23,752 --> 00:08:26,793
+The minimum check interval
+depends on your plan.
+
+126
+00:08:27,100 --> 00:08:31,183
+On the free plan, it's five minutes,
+so a template that hard-codes 30
+
+127
+00:08:31,185 --> 00:08:33,687
+seconds will fail for every team.
+
+128
+00:08:34,254 --> 00:08:35,264
+And defaults.
+
+129
+00:08:35,282 --> 00:08:39,295
+If you don't pass a method, HTTP
+monitors send a HEAD request.
+
+130
+00:08:39,626 --> 00:08:42,671
+Plan your framework's route
+HEAD differently from GET.
+
+131
+00:08:43,098 --> 00:08:48,377
+Pass Dashdash method GET expli-
+ex- sorry, explicitly, and check
+
+132
+00:08:48,391 --> 00:08:50,946
+what your users actually hit.
+
+133
+00:08:51,225 --> 00:08:55,569
+Because this runs in a pipeline,
+exit codes matter, and the
+
+134
+00:08:55,573 --> 00:08:57,999
+CLI gives you distinct ones.
+
+135
+00:08:58,380 --> 00:09:00,593
+Exit two is invalid input.
+
+136
+00:09:00,666 --> 00:09:03,960
+That's a config bug, so fail the build.
+
+137
+00:09:04,346 --> 00:09:08,326
+Four and five are authentication
+and permission, a wrong key
+
+138
+00:09:08,352 --> 00:09:09,823
+or the wrong type of key.
+
+139
+00:09:10,214 --> 00:09:14,057
+Seven is a rate limiting, which
+is safe to retry with backoff,
+
+140
+00:09:14,401 --> 00:09:16,397
+and eight is a conflict.
+
+141
+00:09:16,910 --> 00:09:22,561
+Errors come out in standard error
+JSON, so your pipeline can parse
+
+142
+00:09:22,576 --> 00:09:24,572
+them instead of scraping text.
+
+143
+00:09:25,110 --> 00:09:29,698
+my recommendation, block the deploy
+and config errors because those mean
+
+144
+00:09:29,710 --> 00:09:31,837
+the service will ship unmonitored.
+
+145
+00:09:32,271 --> 00:09:36,228
+But don't block a release just
+because a third-party API is
+
+146
+00:09:36,448 --> 00:09:38,098
+briefly rate limiting you.
+
+147
+00:09:38,700 --> 00:09:41,528
+Warn, retry, and follow up.
+
+148
+00:09:41,785 --> 00:09:43,791
+Not everything has a URL.
+
+149
+00:09:43,853 --> 00:09:48,387
+Cron jobs, queue workers, nightly
+exports, you can't ping them,
+
+150
+00:09:48,781 --> 00:09:51,041
+so you flip the direction.
+
+151
+00:09:51,148 --> 00:09:54,093
+A heartbeat monitor
+gives you a unique URL.
+
+152
+00:09:54,445 --> 00:09:57,183
+The job calls it every time it finishes.
+
+153
+00:09:57,249 --> 00:10:01,347
+If that call doesn't arrive
+within the interval plus a
+
+154
+00:10:01,349 --> 00:10:03,400
+grace period, you get alerted.
+
+155
+00:10:03,810 --> 00:10:08,194
+The create command has the same shape
+as before, just with a grace period.
+
+156
+00:10:08,790 --> 00:10:14,766
+One detail, the CLI redacts the
+heartbeat URL in its output by default
+
+157
+00:10:15,103 --> 00:10:17,218
+because it's effectively a secret.
+
+158
+00:10:17,816 --> 00:10:24,043
+Only use Dashdash reveal dash secrets
+in the one pipeline step that writes it
+
+159
+00:10:24,058 --> 00:10:27,361
+into the job secret store, nothing else.
+
+160
+00:10:28,388 --> 00:10:33,190
+And I mentioned I would be honest about
+whether a CLI is the wrong answer.
+
+161
+00:10:33,551 --> 00:10:37,375
+A CLI in the pipeline is
+great for per-service monitors
+
+162
+00:10:37,375 --> 00:10:39,065
+created alongside a deploy.
+
+163
+00:10:39,712 --> 00:10:45,731
+But if you want your whole fleet's
+monitoring defined as desired state
+
+164
+00:10:45,997 --> 00:10:51,709
+with drift detection and code review,
+that's what declarative tools are for.
+
+165
+00:10:51,778 --> 00:10:56,950
+If you have AI agents investigating
+incidents, an MCP server is a better
+
+166
+00:10:56,965 --> 00:10:59,580
+interface than having them shell out.
+
+167
+00:11:00,026 --> 00:11:03,721
+And Uptime Robot has also an MCP.
+
+168
+00:11:04,250 --> 00:11:08,689
+And for figuring out an incident
+at 3:00 AM, a human in the
+
+169
+00:11:08,689 --> 00:11:10,609
+dashboard beats any command.
+
+170
+00:11:11,105 --> 00:11:15,067
+Whatever you choose, pick one
+source of truth per monitor.
+
+171
+00:11:15,502 --> 00:11:19,712
+The fastest way to get drift is a
+pipeline that creates monitors which
+
+172
+00:11:19,728 --> 00:11:23,351
+people then edit by hand in the UI.
+
+173
+00:11:24,527 --> 00:11:29,705
+Finally, the monitoring you genuinely
+can't template because it depends
+
+174
+00:11:29,734 --> 00:11:31,851
+on things your service doesn't own.
+
+175
+00:11:32,547 --> 00:11:34,133
+Third-party dependencies.
+
+176
+00:11:34,804 --> 00:11:36,818
+Monitoring them is the easy part.
+
+177
+00:11:36,851 --> 00:11:42,417
+Uptime Robot already tracks
+the status of more than 6.3K+
+
+178
+00:11:42,736 --> 00:11:44,207
+third-party services.
+
+179
+00:11:44,586 --> 00:11:49,874
+What a template can't know is which
+of those your service depends on.
+
+180
+00:11:50,274 --> 00:11:54,857
+Nothing in the repo says,
+checkout needs Stripe and SendGrid.
+
+181
+00:11:55,263 --> 00:11:58,067
+Someone who knows the
+service has to pick them.
+
+182
+00:11:58,765 --> 00:12:02,098
+Secondly, user journeys
+that cross services.
+
+183
+00:12:02,628 --> 00:12:05,926
+Checkout only works if four services work.
+
+184
+00:12:06,819 --> 00:12:07,880
+Alert routing.
+
+185
+00:12:08,571 --> 00:12:12,113
+Who gets woken up depends
+on people, rotations, and
+
+186
+00:12:12,114 --> 00:12:14,981
+escalation policies, not on code.
+
+187
+00:12:15,542 --> 00:12:16,638
+And thresholds.
+
+188
+00:12:17,244 --> 00:12:22,345
+A sensible response to a response time
+threshold needs real traffic, and a
+
+189
+00:12:22,346 --> 00:12:25,035
+brand-new service doesn't have any yet.
+
+190
+00:12:25,637 --> 00:12:28,927
+The template gets you a
+solid baseline on day one.
+
+191
+00:12:29,309 --> 00:12:33,372
+This need a human, and that's
+fine, just make them a conscious
+
+192
+00:12:33,372 --> 00:12:35,671
+decision, not a forgotten one.
+
+193
+00:12:36,013 --> 00:12:40,755
+And, to sum up, putting monitoring
+on the golden path as a deploy
+
+194
+00:12:40,763 --> 00:12:45,964
+step, template the policy, and let
+each service supply its identity.
+
+195
+00:12:46,323 --> 00:12:51,531
+Make the step safe to rerun with the
+right key and explicit flags, and keep
+
+196
+00:12:51,544 --> 00:12:53,945
+humans for the things you don't own.
+
+197
+00:12:54,731 --> 00:12:58,628
+Do that, and new services
+arrive already being watched.
+
+198
+00:12:59,024 --> 00:12:59,767
+Thank you.
+
+199
+00:12:59,816 --> 00:13:01,855
+thank you so much for attending my talk.
+
+200
+00:13:01,917 --> 00:13:08,293
+The CLI is open source on GitHub at
+Uptime Robot slash Uptime Robot CLI.
+
+201
+00:13:08,663 --> 00:13:10,494
+So take a look at the README.
+
+202
+00:13:10,531 --> 00:13:13,802
+That's where all the examples
+in this talk came from.
+
+203
+00:13:14,171 --> 00:13:19,131
+I would love to hear how your team
+handles this or how it doesn't, and
+
+204
+00:13:19,131 --> 00:13:21,036
+enjoy the rest of the conferences.
+
+205
+00:13:21,087 --> 00:13:22,848
+I'll be around for questions.
+

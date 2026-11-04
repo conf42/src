@@ -1,0 +1,890 @@
+1
+00:00:00,300 --> 00:00:05,134
+I'm Sujan Challa, a senior software
+engineer in CTV advertising space.
+
+2
+00:00:05,728 --> 00:00:11,029
+I design, build, and operate the
+real-time decision system that
+
+3
+00:00:11,047 --> 00:00:13,032
+choose, like which ad you see.
+
+4
+00:00:13,985 --> 00:00:18,834
+This talk is about, what platform
+engineering looks like, when the latency
+
+5
+00:00:19,091 --> 00:00:22,735
+budget is not a guideline but a hard wall.
+
+6
+00:00:23,496 --> 00:00:28,103
+A real-time bidding auction that clears
+like end-to-end in about a hundred
+
+7
+00:00:28,103 --> 00:00:30,949
+milliseconds, millions of times a day.
+
+8
+00:00:31,536 --> 00:00:35,482
+I'll walk through the constraints,
+in the order they forced themselves
+
+9
+00:00:35,483 --> 00:00:39,794
+on us because, that's the honest
+way this architecture was built.
+
+10
+00:00:40,344 --> 00:00:42,767
+One deadline, one force move at a time.
+
+11
+00:00:43,767 --> 00:00:45,594
+Quick context, before the case study.
+
+12
+00:00:45,656 --> 00:00:49,408
+Like, what does the team behind
+a system like this actually own?
+
+13
+00:00:49,961 --> 00:00:51,750
+The slide, says it in one line.
+
+14
+00:00:52,008 --> 00:00:56,542
+My job turns business goals into
+a reliable, decision system.
+
+15
+00:00:57,179 --> 00:01:00,977
+design the business says,
+maximize revenue, respond in
+
+16
+00:01:01,003 --> 00:01:05,416
+100 milliseconds, respect user
+privacy, don't break the product.
+
+17
+00:01:05,506 --> 00:01:10,933
+We translate that into service boundaries,
+data contracts, and, latency budgets.
+
+18
+00:01:11,634 --> 00:01:17,448
+Build the part you would expect,
+like Go services, CI/CD pipeline, ML
+
+19
+00:01:17,448 --> 00:01:22,219
+serving paths, APIs, and integrations
+with, TV apps and our partners.
+
+20
+00:01:23,519 --> 00:01:24,166
+Operate.
+
+21
+00:01:24,644 --> 00:01:30,311
+After launch, we own the latency
+graphs, release safety, observability,
+
+22
+00:01:30,319 --> 00:01:33,101
+incidents, and technical debt ledger.
+
+23
+00:01:33,565 --> 00:01:36,673
+That's where the platform
+engineering earns its name.
+
+24
+00:01:37,525 --> 00:01:39,362
+And the last is collaborate.
+
+25
+00:01:39,443 --> 00:01:41,039
+None of this is a solo work.
+
+26
+00:01:41,489 --> 00:01:46,070
+It, crosses product managers, data
+scientists and operations, client
+
+27
+00:01:46,074 --> 00:01:48,321
+teams, SREs, and partner engineers.
+
+28
+00:01:48,717 --> 00:01:52,456
+The architecture is half the job,
+and the half is in alignment,
+
+29
+00:01:52,790 --> 00:01:53,894
+within the other teams.
+
+30
+00:01:54,894 --> 00:01:56,767
+And none of it is a handoff.
+
+31
+00:01:56,860 --> 00:01:59,685
+Production software moves
+in a loop, like four steps.
+
+32
+00:02:00,279 --> 00:02:02,201
+step one, frame the outcome.
+
+33
+00:02:02,406 --> 00:02:07,168
+Product and engineering agree on the user
+value, the constraint, and the metric,
+
+34
+00:02:07,194 --> 00:02:12,958
+something like increase auction win rate,
+by 2% at, P99 under 100 milliseconds.
+
+35
+00:02:13,128 --> 00:02:14,006
+That's a framing.
+
+36
+00:02:14,814 --> 00:02:17,658
+Step two, make decision visible.
+
+37
+00:02:18,229 --> 00:02:22,500
+Architecture reviews and design
+docs force the trade-offs into the
+
+38
+00:02:22,577 --> 00:02:25,067
+open before anyone writes code.
+
+39
+00:02:26,793 --> 00:02:29,533
+Step three, deliver in small increments.
+
+40
+00:02:29,963 --> 00:02:34,532
+Backlogs, sprints, code reviews,
+automated tests, every increment
+
+41
+00:02:34,544 --> 00:02:36,527
+small enough, so we can roll back.
+
+42
+00:02:37,511 --> 00:02:40,026
+Step four, release with, guardrails.
+
+43
+00:02:40,549 --> 00:02:45,041
+Canary environments, metric
+gates, rollback paths, dashboards,
+
+44
+00:02:45,088 --> 00:02:48,688
+and then on-call feedback
+flows right back into step one.
+
+45
+00:02:49,156 --> 00:02:50,789
+Keep that loop in mind.
+
+46
+00:02:50,789 --> 00:02:56,736
+Like auction system I'm about to show you
+went through it dozens of times, and every
+
+47
+00:02:56,736 --> 00:02:59,374
+constraint in the talk arrived through it.
+
+48
+00:03:00,374 --> 00:03:02,868
+Now the case study one ad slot opens.
+
+49
+00:03:02,973 --> 00:03:06,815
+A website or an app offers a
+single impression for sale.
+
+50
+00:03:07,903 --> 00:03:12,505
+50 plus systems each decide
+what this user, this context
+
+51
+00:03:12,505 --> 00:03:15,152
+is worth, pick a price and bid.
+
+52
+00:03:15,794 --> 00:03:19,968
+The auction clears, the highest
+eligible bid wins the slot.
+
+53
+00:03:20,695 --> 00:03:26,027
+And the number that governs everything is
+like 100 milliseconds request to response.
+
+54
+00:03:26,074 --> 00:03:30,462
+An entire market clears before
+the page feels like loading
+
+55
+00:03:31,462 --> 00:03:34,326
+The 100 milliseconds is
+complete round, round trip.
+
+56
+00:03:34,896 --> 00:03:38,774
+The network eats part of it
+before any useful work begins.
+
+57
+00:03:39,317 --> 00:03:43,652
+The request and the bid cross the
+network before, useful work starts.
+
+58
+00:03:44,211 --> 00:03:49,570
+And the consequences, the governing
+rule of this whole talk, a lot-- a
+
+59
+00:03:49,580 --> 00:03:51,549
+late answer is not a slower answer.
+
+60
+00:03:51,549 --> 00:03:52,969
+It's a no answer.
+
+61
+00:03:53,607 --> 00:03:55,874
+The exchange closes the
+auction without you.
+
+62
+00:03:56,609 --> 00:04:01,926
+So the first design everyone sketches,
+add request, single server, database
+
+63
+00:04:01,926 --> 00:04:04,576
+lookup, bid is impossible here.
+
+64
+00:04:04,868 --> 00:04:10,527
+A database call per request multiplies
+load, and one slow dependency sets
+
+65
+00:04:10,529 --> 00:04:12,515
+the whole system latency flow.
+
+66
+00:04:13,097 --> 00:04:16,314
+The deadline forces the
+first architectural move
+
+67
+00:04:17,313 --> 00:04:22,280
+Move one, put a feature, feature
+cache in front of everything.
+
+68
+00:04:22,367 --> 00:04:26,945
+The bid request reads from the cache,
+and the decision happens from the memory.
+
+69
+00:04:27,422 --> 00:04:28,734
+What becomes fast?
+
+70
+00:04:28,817 --> 00:04:32,845
+User context, campaign, and
+model inputs come from memory
+
+71
+00:04:32,858 --> 00:04:34,471
+instead of a database round trip.
+
+72
+00:04:35,110 --> 00:04:36,807
+What becomes a trade-off?
+
+73
+00:04:36,871 --> 00:04:40,994
+The data may be slightly stale,
+so expiration, invalidation,
+
+74
+00:04:41,001 --> 00:04:45,258
+and source of truth recovery are
+designed, not improvi-improvised.
+
+75
+00:04:46,097 --> 00:04:51,283
+The architecture choice at the
+bottom reserve strict consistency
+
+76
+00:04:51,288 --> 00:04:54,872
+for the facts that truly require
+it, like, budget accounting.
+
+77
+00:04:55,312 --> 00:04:58,209
+Speed beats perfect
+freshness, on the live path
+
+78
+00:04:59,209 --> 00:05:02,329
+Move two, parallelize
+the independent waits.
+
+79
+00:05:02,716 --> 00:05:06,414
+The bidder fans out to user,
+budget, and model all at once.
+
+80
+00:05:06,841 --> 00:05:11,493
+The slowest bounded lookup sets the
+join time, not the sum of every lookup.
+
+81
+00:05:12,404 --> 00:05:16,716
+The third move is to
+scale replicas, not state.
+
+82
+00:05:17,118 --> 00:05:20,272
+A router sends the request to
+any healthy bidder instance.
+
+83
+00:05:20,837 --> 00:05:23,591
+Regions add capacity near demand.
+
+84
+00:05:23,779 --> 00:05:28,134
+Any healthy instance can serve any
+request, so the capacity is added
+
+85
+00:05:28,135 --> 00:05:30,810
+as replicas, not, desi-- redesigns.
+
+86
+00:05:31,490 --> 00:05:34,079
+Generalize this for your own platform.
+
+87
+00:05:34,099 --> 00:05:38,969
+Under a strict budget, every synchronous
+hop is a purchase made with milliseconds.
+
+88
+00:05:39,788 --> 00:05:44,246
+Precomputation and locality are
+how you stop paying your retail
+
+89
+00:05:45,246 --> 00:05:48,396
+CTV ads a wrinkle web never had.
+
+90
+00:05:48,888 --> 00:05:50,239
+Ads arrive in pods.
+
+91
+00:05:50,336 --> 00:05:55,320
+A commercial break is several impressions
+that must be decided together.
+
+92
+00:05:56,040 --> 00:06:02,871
+Two car ads back-to-back or the same ad
+twice in one break is a failure the im-
+
+93
+00:06:02,994 --> 00:06:05,467
+per impression auction can't even see.
+
+94
+00:06:06,279 --> 00:06:10,266
+The auction core, though, only
+understands single impressions,
+
+95
+00:06:10,393 --> 00:06:15,033
+so the platform decomposes each
+pod into plain impressions.
+
+96
+00:06:15,489 --> 00:06:19,970
+The core understands, runs
+the auction, the reassemble…
+
+97
+00:06:20,690 --> 00:06:25,391
+then reassembles the pod itself,
+like assignment, deal tri- tiers,
+
+98
+00:06:25,757 --> 00:06:29,073
+competitive separation, and
+final assembly of the response.
+
+99
+00:06:29,850 --> 00:06:33,990
+The platform lesson: when a
+mature core can't express your
+
+100
+00:06:34,030 --> 00:06:36,010
+problem, don't fork the core.
+
+101
+00:06:36,571 --> 00:06:42,244
+Put a decomposition or reassembly layer
+at the edge and keep the core boring.
+
+102
+00:06:43,244 --> 00:06:48,520
+Decomposition gets the pod into the
+auction, but the rules that make a pod
+
+103
+00:06:48,586 --> 00:06:51,853
+correct live one level up at reassembly.
+
+104
+00:06:52,323 --> 00:06:56,638
+Because the spin impressions and
+a per-impression auction can't
+
+105
+00:06:56,664 --> 00:07:03,423
+see across its own boundary, deal
+opportunity assignment fills the
+
+106
+00:07:03,423 --> 00:07:06,112
+pod honoring deal tiers first.
+
+107
+00:07:06,590 --> 00:07:13,335
+Committed deals get what their tier
+promises, and the open auction competes
+
+108
+00:07:13,355 --> 00:07:15,358
+for the positions that are left.
+
+109
+00:07:15,885 --> 00:07:19,667
+A pod is one portfolio decision,
+not five independent ones.
+
+110
+00:07:21,452 --> 00:07:25,850
+Two car ads in one break is a failure
+the viewer notices, even if every
+
+111
+00:07:25,850 --> 00:07:27,405
+individual auction was correct.
+
+112
+00:07:27,908 --> 00:07:31,140
+So separation is enforced
+across the assembled pod.
+
+113
+00:07:31,421 --> 00:07:34,452
+The pod is a unit of
+correctness, not the slot.
+
+114
+00:07:35,508 --> 00:07:36,438
+Frequency control.
+
+115
+00:07:36,484 --> 00:07:40,970
+The same ad twice in one break or
+over and over across an evening
+
+116
+00:07:41,365 --> 00:07:42,829
+is the same class of failure.
+
+117
+00:07:43,123 --> 00:07:47,766
+Frequency state can't live inside
+a stateless per-impression core.
+
+118
+00:07:48,452 --> 00:07:55,168
+So cross-pod rule like it ride shared
+state at the edge layer, checked and
+
+119
+00:07:55,178 --> 00:07:57,433
+updated as each pod is assembled.
+
+120
+00:07:58,231 --> 00:08:04,984
+The pattern to steal: any rule that
+spans requests belongs at the layer
+
+121
+00:08:05,099 --> 00:08:07,415
+that can see the whole unit of work.
+
+122
+00:08:07,904 --> 00:08:13,205
+Push it down into the core, and core stops
+being boring and stops being reusable
+
+123
+00:08:14,205 --> 00:08:16,850
+Here is a full architecture in four lanes.
+
+124
+00:08:17,354 --> 00:08:21,931
+Top lane, the live auction,
+latency critical, the publisher
+
+125
+00:08:21,931 --> 00:08:24,104
+or app offers one impression.
+
+126
+00:08:24,542 --> 00:08:26,914
+The exchange fans out the request.
+
+127
+00:08:27,223 --> 00:08:32,244
+The geo edge and load balancer route
+to a healthy region, and the stateless
+
+128
+00:08:32,272 --> 00:08:35,031
+bidder fleet scores and returns a bid.
+
+129
+00:08:35,662 --> 00:08:41,190
+Inside that lane sits the bounded
+dependencies, the feature cache
+
+130
+00:08:41,203 --> 00:08:45,434
+for user, and context budget
+data for campaign availability.
+
+131
+00:08:46,114 --> 00:08:51,637
+The serving model with its pre-computed
+value, every parallel call stops
+
+132
+00:08:51,694 --> 00:08:56,910
+at its deadline, missing data falls
+back, and the lane ends in a bid or
+
+133
+00:08:56,915 --> 00:08:59,535
+a no bid returned before timeout.
+
+134
+00:09:00,328 --> 00:09:05,640
+Below that, the event stream
+asynchronously like every auction outcome,
+
+135
+00:09:06,095 --> 00:09:11,475
+win-loss impression goes through a
+pub/sub, which decouples downstream work
+
+136
+00:09:11,499 --> 00:09:14,609
+into logging, billing, and training data.
+
+137
+00:09:15,001 --> 00:09:17,484
+The live path never waits for any of it.
+
+138
+00:09:18,295 --> 00:09:24,189
+And the bottom lane of f-- offline
+learning compute heavy, the outcome
+
+139
+00:09:24,191 --> 00:09:26,444
+stores collects labeled results.
+
+140
+00:09:26,829 --> 00:09:31,489
+The training pipeline retrains outside
+the request path and published models
+
+141
+00:09:31,498 --> 00:09:33,560
+and features refresh the serving layer.
+
+142
+00:09:34,033 --> 00:09:38,537
+The learning loop improves the live
+path without ever standing in it.
+
+143
+00:09:39,537 --> 00:09:43,539
+How a single request moves through
+that live lane in four steps.
+
+144
+00:09:43,622 --> 00:09:49,212
+Once receive the request, parse the
+impression and start one shared deadline.
+
+145
+00:09:50,074 --> 00:09:55,436
+Second, fan out in parallel to multiple
+services like user context, campaign
+
+146
+00:09:55,440 --> 00:09:57,641
+budget, and model inputs fetched together.
+
+147
+00:09:58,726 --> 00:10:02,561
+Three, what-- join what is
+returned from the previous step.
+
+148
+00:10:02,946 --> 00:10:06,821
+Stop waiting for any-- when each
+sub-call reaches its timeout budget.
+
+149
+00:10:07,572 --> 00:10:09,470
+The last one, decide and respond.
+
+150
+00:10:09,479 --> 00:10:14,820
+Use the available signals to return a
+bid or no bid before the exchange closes.
+
+151
+00:10:15,828 --> 00:10:19,604
+And the failure table on
+the right is a real design.
+
+152
+00:10:20,411 --> 00:10:23,491
+Cache miss, read the source,
+then repopulate the cache.
+
+153
+00:10:24,204 --> 00:10:27,935
+Like a slow lookup, use the
+same default and continue.
+
+154
+00:10:28,595 --> 00:10:32,623
+Repeated failures, open the
+circuit and stop adding load.
+
+155
+00:10:33,748 --> 00:10:38,167
+The deadline is ex-exhausted, return
+no bid rather than a late response.
+
+156
+00:10:38,948 --> 00:10:41,689
+Timeouts are a design
+input, not an error case.
+
+157
+00:10:41,902 --> 00:10:44,863
+A missing signal is cheaper
+than a missed auction.
+
+158
+00:10:45,443 --> 00:10:49,953
+Degradation is deliberate, rehearsed,
+and observable, never accidental.
+
+159
+00:10:50,953 --> 00:10:54,520
+You keep healthy by watching
+the tail, not the average.
+
+160
+00:10:54,743 --> 00:10:59,151
+The average hides exactly the requests
+most likely to miss the auction.
+
+161
+00:10:59,181 --> 00:11:07,602
+P95, P99, P999 are the product metrics,
+but measurement itself spends the budget.
+
+162
+00:11:07,646 --> 00:11:12,460
+So observability is sampled,
+aggregated at the edge, and shipped
+
+163
+00:11:12,497 --> 00:11:14,408
+asynchronously on the event lane.
+
+164
+00:11:14,569 --> 00:11:15,977
+The live path emits.
+
+165
+00:11:16,361 --> 00:11:18,549
+It never waits to report.
+
+166
+00:11:19,243 --> 00:11:20,527
+Then the loop closes.
+
+167
+00:11:20,654 --> 00:11:23,161
+Every auction outcome is published.
+
+168
+00:11:23,644 --> 00:11:28,507
+Metrics and traces correlate,
+model, retrain offline, and
+
+169
+00:11:28,513 --> 00:11:31,647
+serving data refreshes safely.
+
+170
+00:11:31,861 --> 00:11:35,889
+Every release signals become
+the next architecture decision
+
+171
+00:11:36,889 --> 00:11:40,488
+Four lessons, and none of them
+are a tech, a tech specific.
+
+172
+00:11:40,747 --> 00:11:47,056
+One, given every dependency a deadline
+and a default, unbounded, unbounded
+
+173
+00:11:47,076 --> 00:11:50,161
+waits are how strict budget systems die.
+
+174
+00:11:51,107 --> 00:11:55,275
+Two, separate the deadline
+from the learning loop.
+
+175
+00:11:55,522 --> 00:11:59,967
+If a request path waits on training
+analytics or reporting, the
+
+176
+00:11:59,994 --> 00:12:02,798
+architecture, not the code, is the bug.
+
+177
+00:12:04,424 --> 00:12:10,238
+Three, design degradation as a feature
+with a owner, a metric, and a rehearsal,
+
+178
+00:12:10,238 --> 00:12:12,640
+not as an apology after an incident.
+
+179
+00:12:14,007 --> 00:12:18,189
+The last one, watch the tail and
+budget your observability like
+
+180
+00:12:18,189 --> 00:12:20,153
+your budget to your compute.
+
+181
+00:12:20,973 --> 00:12:25,535
+Any platform with a hard latency wall,
+payments, search recommendations,
+
+182
+00:12:26,232 --> 00:12:30,706
+converges on the same moves because
+the deadline doesn't negotiate.
+
+183
+00:12:31,706 --> 00:12:32,607
+That's a story.
+
+184
+00:12:32,841 --> 00:12:37,385
+One deadline, one naive design,
+and an architecture built
+
+185
+00:12:37,434 --> 00:12:38,782
+one constraint at a time.
+
+186
+00:12:39,358 --> 00:12:40,972
+Thank you for the time.
+
+187
+00:12:41,119 --> 00:12:42,164
+I'm Sujan Challa.
+
+188
+00:12:42,722 --> 00:12:46,754
+If you're fighting a latency
+wall of your own, I would
+
+189
+00:12:46,754 --> 00:12:49,027
+genuinely like to compare notes.
+
+190
+00:12:49,064 --> 00:12:54,456
+Find me in the, conference chat or
+connect with me, on the socials.
+
+191
+00:12:55,860 --> 00:13:01,399
+May your deadlines be a ho-- as honest
+as this one, and may you never pay
+
+192
+00:13:01,408 --> 00:13:03,312
+retail for the millisecond again.
+
+193
+00:13:04,052 --> 00:13:04,600
+Thank you.
