@@ -1,7 +1,6 @@
 # Postmortem: Conf42 Platform Engineering 2026, talk factory (2026-11-03)
 
-Status: **run still going** when this was written (restarted 23:09). Final numbers (finished talks, minutes cut, QA
-flags, credits) are added at the end of the run.
+Status: **finished**. All 24 talks were done at 00:58 on 2026-11-04. Transcripts and decks were shipped by hand at ~09:00 (finding 7).
 
 ## Summary
 
@@ -26,6 +25,8 @@ failed on a Windows file lock, and one video didn't match its speaker. All four 
 | 20:55 / 21:09 | First run, then the follow-up run, finished with everything else failed on the pause. |
 | ~23:05 | Marek: "are we doing?". Claude found the pause, confirmed from the report that it was a denial, cleared it (`unpause`), and restarted (23:09:51). |
 | ~23:20 | Marek: "take notes of these problems, and fix of course". |
+| 00:58:52 | 24/24 done. `shipping transcripts / slides failed: [WinError 2] The system cannot find the file specified`. |
+| next morning | Marek: "The transcripts and slides are uploaded?" No: 24 transcripts and 2 decks were in the repos but uncommitted. Claude fixed `ship` and shipped them (src 99d9ea6, static 1217f01 + 5430b2d). |
 
 ## What went well
 
@@ -80,11 +81,27 @@ failed on a Windows file lock, and one video didn't match its speaker. All four 
   HTML as the video. That is exactly what a plain curl did today.
 - **Fixed:** `drive.head` raises `NeedsSignIn` (sign-in redirect or text/html). `drive_fetch` already logs and skips it.
 
-## Numbers (so far)
+### 7. Transcripts never reached the site
+- At 20:55 the first run's `ship` copied files into `src/srt` / `static/slides`, then failed before its commit (the
+  WinError 2 above, same message at 00:58). Every later `ship` saw identical files already in place and skipped them
+  ("only new or changed"), so they stayed uncommitted forever. A rerun of `ship` returned `srt: []`.
+- **Fixed:** `ship` also ships target files that `git status` reports as untracked or changed. Proven live: 24
+  transcripts + 2 decks shipped. A failed ship now logs its traceback.
+- **Root cause of the WinError 2: not found.** It couldn't be reproduced by hand: `ship` ran clean, git is on the
+  detached process's PATH (the same run pushed the status page), and all 24 proofreads finished. Leading suspect: a
+  subprocess in `ship` or `proofread_finished` started from the hidden detached process. The traceback will show it
+  next time.
+
+## Numbers
 
 - Files: 24 videos (19.9 GB with the decks), 23 decks; 14 talks with no video yet.
-- Credits: Amith 7.7 + Attila 19.3 = 27.0 AI credits for 2 edits. (Attila's 19.3 is high for one talk: 2404 s talk, many
-  filler types. Below `max_edit_credits`.)
+- Output: 24 MP4s (`final videos for YouTube`), 24 SRTs, 23 decks. Loudness -14.6 to -14.0 LUFS.
+- Minutes: 557.5 -> 526.1 (31.4 min cut, 5.6%).
+- Credits: 247.3 AI credits for 24 edits (~10.3 per talk, in line with the skill's estimate). Attila's 19.3 was the
+  highest.
+- QA flags (check the start/end by eye): Denis Galkin, Scarlett Attensil, Lucas Mateus Mazei Sobrinho (picture
+  changes in the first seconds); Sergey Pronin 64 s, Vincenzo Santonastaso 76 s, Sumeet L. Ram 16 s of setup screen at
+  the start, and Madhu Chenna 20 s at the end, all with the speaker talking (not cut).
 - Time lost: ~2 h 43 min of a stopped factory (20:26 → 23:09); 6 wasted upload attempts (~20 min).
 
 ## Actions
@@ -96,6 +113,7 @@ failed on a Windows file lock, and one video didn't match its speaker. All four 
 | Media name with extension; media lookup accepts it | 2 |
 | `write_json` retries the state swap | 3 |
 | Short-name match rule + smoke test | 4 |
+| `ship` picks up identical-but-uncommitted files; logs the traceback | 7 |
 | Skill: `drive` first, current paths | 5 |
 | `drive.head` detects the sign-in page | 6 |
 | README: lessons in "Getting the files from Drive" and "Rate limits and credits" | all |
@@ -108,3 +126,5 @@ failed on a Windows file lock, and one video didn't match its speaker. All four 
 | Delete the 6 empty "Sumeet L. Ram" compositions in the Descript project (cosmetic) | Marek | 2 |
 | Leftover `mp4/Scarlett Attensil.mp4.2552.part.mp4` from a render that died with the first run: clean `*.part*` on run start | Claude | 3 |
 | Chase the 14 talks with no video | event team | - |
+| Find the WinError 2 in `ship` from the new traceback on the next run | Claude | 7 |
+| "the chapters job reported a change to the project" (Attila, Denis): check what changed. The final files can't be affected (chapters run after the download). It may be the same denial-text issue as finding 1 | Claude | 1 |
