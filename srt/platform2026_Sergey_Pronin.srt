@@ -1,0 +1,1855 @@
+1
+00:00:00,300 --> 00:00:01,155
+Hello, hello.
+
+2
+00:00:01,523 --> 00:00:07,126
+my name is Sergey, and, I am a founder
+at a company called Solanica, and
+
+3
+00:00:07,127 --> 00:00:13,565
+I'm also one of the maintainers of
+OpenEverest, a CNCF project to run
+
+4
+00:00:13,568 --> 00:00:17,464
+databases, storage, and now large
+language models on Kubernetes.
+
+5
+00:00:18,533 --> 00:00:25,997
+So, every second across all global
+users of ChatGPT, Claude, Gemini,
+
+6
+00:00:26,259 --> 00:00:30,514
+and other models, millions of
+tokens are generated every second.
+
+7
+00:00:31,317 --> 00:00:35,803
+And it seems that everyone's
+job today, at least in tech, is
+
+8
+00:00:35,806 --> 00:00:37,765
+to add to this pool of tokens.
+
+9
+00:00:38,268 --> 00:00:39,748
+And, I'm not an exception.
+
+10
+00:00:39,749 --> 00:00:41,369
+I use AI a lot.
+
+11
+00:00:41,904 --> 00:00:48,729
+But in this talk, I will tell you how we
+also decided to add model-as-a-service
+
+12
+00:00:48,737 --> 00:00:55,335
+capability into OpenEverest so
+that we can add more to this pool.
+
+13
+00:00:56,331 --> 00:00:58,357
+And this talk starts as a bad joke.
+
+14
+00:00:58,859 --> 00:01:05,317
+So platform engineer walks into a
+bar, and he wants what he always
+
+15
+00:01:05,320 --> 00:01:08,425
+wants, reproducible environment.
+
+16
+00:01:09,042 --> 00:01:13,278
+He wants same way of doing
+things every time for every team.
+
+17
+00:01:14,901 --> 00:01:17,225
+Then LLM walks in.
+
+18
+00:01:18,333 --> 00:01:23,986
+What it wants is fifty gigabytes of
+GPU memory, and it wants a GPU that
+
+19
+00:01:24,007 --> 00:01:30,020
+nobody else is already using And then
+Kubernetes walks in, and Kubernetes wants
+
+20
+00:01:30,097 --> 00:01:32,917
+everything to be an object or a resource.
+
+21
+00:01:33,269 --> 00:01:36,663
+You write down what you want,
+and the reconciler makes it true.
+
+22
+00:01:37,530 --> 00:01:42,022
+But nobody really gets what
+they want on the first try.
+
+23
+00:01:42,595 --> 00:01:48,813
+The rest of this talk is how we
+worked on this problem so that they
+
+24
+00:01:48,874 --> 00:01:52,002
+each get their order correctly.
+
+25
+00:01:53,001 --> 00:01:57,910
+So this is how it usually
+starts in a lot of companies.
+
+26
+00:01:57,924 --> 00:02:01,466
+There is a ticket being created
+somewhere in Jira or whatever service
+
+27
+00:02:01,467 --> 00:02:06,797
+desk program you're using that says,
+"We need to run LLMs on our cluster."
+
+28
+00:02:07,354 --> 00:02:11,450
+And the description is super vague,
+just figure it out, we just need it.
+
+29
+00:02:12,047 --> 00:02:16,923
+and, well, if you got this ticket,
+this talk is for you, and, I'll try
+
+30
+00:02:16,982 --> 00:02:23,034
+to help you out to navigate this
+uncertainty so the first question
+
+31
+00:02:23,037 --> 00:02:28,320
+usually that I get, okay, why would
+anyone want to run a model, themselves?
+
+32
+00:02:28,479 --> 00:02:32,596
+There are great companies
+like OpenAI and An- Anthropic.
+
+33
+00:02:33,009 --> 00:02:34,920
+Why just not use an API?
+
+34
+00:02:35,519 --> 00:02:39,869
+And there are three main reasons
+as I hear them all over again.
+
+35
+00:02:40,587 --> 00:02:42,023
+So first one is data.
+
+36
+00:02:42,972 --> 00:02:47,038
+Some companies are not allowed to
+send prompts and documents outside,
+
+37
+00:02:47,591 --> 00:02:51,165
+banks, healthcare, government,
+a lot of companies in Europe.
+
+38
+00:02:51,815 --> 00:02:53,543
+you just can't send your data out.
+
+39
+00:02:54,497 --> 00:02:57,436
+The second is the usual culprit, is money.
+
+40
+00:02:58,200 --> 00:03:03,089
+Paying per token is great when you start,
+when you're a startup or experimenting,
+
+41
+00:03:03,413 --> 00:03:09,324
+but when your volume is steady and high,
+running your own model gets cheaper.
+
+42
+00:03:10,115 --> 00:03:14,234
+And the third thing is obviously
+GPUs are already there.
+
+43
+00:03:14,324 --> 00:03:21,142
+And that's surprising actually 'cause
+I saw a bunch of companies that decided
+
+44
+00:03:21,150 --> 00:03:27,605
+to buy a lot of GPUs and then they
+just sit idle in their data centers,
+
+45
+00:03:27,615 --> 00:03:31,498
+but they know that they will figure
+out how to use those eventually
+
+46
+00:03:32,498 --> 00:03:37,521
+So what we're actually building in
+OpenEverest is that a model is a service.
+
+47
+00:03:37,534 --> 00:03:43,548
+So on the left, you have the people or
+the applications that need the model.
+
+48
+00:03:43,548 --> 00:03:47,241
+It can be a chat application,
+a search feature, someone's,
+
+49
+00:03:47,323 --> 00:03:49,136
+notebook or automation.
+
+50
+00:03:49,834 --> 00:03:56,487
+And, what they do, all of them, they
+call a single URL, which is OpenAI
+
+51
+00:03:56,509 --> 00:04:01,448
+compatible endpoint, and, they
+should not care where the model runs.
+
+52
+00:04:01,492 --> 00:04:04,062
+They just call it out and
+something should happen.
+
+53
+00:04:04,815 --> 00:04:09,329
+And behind that URL is where
+the platform really is.
+
+54
+00:04:09,653 --> 00:04:14,455
+It runs some, open source or open
+weight models like Qwen, Llama,
+
+55
+00:04:14,460 --> 00:04:16,896
+Mistral, whatever the teams need.
+
+56
+00:04:17,507 --> 00:04:20,650
+And this is model as a
+service in a nutshell.
+
+57
+00:04:20,698 --> 00:04:25,249
+And if it sounds like database as a
+service from ten years ago, that's
+
+58
+00:04:25,249 --> 00:04:27,630
+because it's kind of the same idea.
+
+59
+00:04:28,327 --> 00:04:34,004
+So let's figure it out step by step,
+the way you would do it after getting
+
+60
+00:04:34,016 --> 00:04:39,768
+that ticket, and we start from, from
+the very bottom, from the basics.
+
+61
+00:04:41,011 --> 00:04:42,551
+So what is a model?
+
+62
+00:04:43,244 --> 00:04:47,346
+the LLM goes first in our rounds
+and it says, "Before you run
+
+63
+00:04:47,346 --> 00:04:48,670
+me, understand what I am."
+
+64
+00:04:49,272 --> 00:04:54,632
+And a model is just files, right?
+
+65
+00:04:54,904 --> 00:04:59,900
+it sounds like magic, but for a platform
+engineer, it's something very boring.
+
+66
+00:05:00,016 --> 00:05:00,817
+It's files.
+
+67
+00:05:01,131 --> 00:05:04,082
+You go to Hugging Face, and
+model is a folder of files.
+
+68
+00:05:04,982 --> 00:05:09,619
+And inside of these files are
+numbers, a lot of numbers, like
+
+69
+00:05:09,626 --> 00:05:16,351
+Qwen thirteen B model, where
+fourteen B means billion numbers.
+
+70
+00:05:17,140 --> 00:05:20,719
+They were learned during training,
+and after that they never change.
+
+71
+00:05:20,745 --> 00:05:23,498
+We call them weights or parameters.
+
+72
+00:05:24,228 --> 00:05:30,366
+And if you run databases, think of
+it, as the data files of the database,
+
+73
+00:05:30,510 --> 00:05:36,472
+big, read only, and, really useless
+until something, loads them, right?
+
+74
+00:05:37,692 --> 00:05:41,166
+So what does the model
+do with these numbers?
+
+75
+00:05:41,193 --> 00:05:42,823
+You give it text.
+
+76
+00:05:43,215 --> 00:05:45,197
+Kubernetes is…
+
+77
+00:05:45,394 --> 00:05:48,048
+And the model pr- predicts
+the next piece of text.
+
+78
+00:05:48,389 --> 00:05:54,072
+Here, a, a token in that place,
+roughly three quarters of a word,
+
+79
+00:05:54,072 --> 00:05:55,593
+then it takes everything again.
+
+80
+00:05:55,950 --> 00:06:00,928
+now Kubernetes is a, and predicts
+the next token, container.
+
+81
+00:06:01,498 --> 00:06:05,670
+And again, the prediction is
+happening, orchestrator, one token
+
+82
+00:06:05,670 --> 00:06:08,709
+at a time until the answer is there.
+
+83
+00:06:08,776 --> 00:06:12,603
+That's why you see chatbots
+type the answers word by word.
+
+84
+00:06:13,422 --> 00:06:14,755
+and here's the important part.
+
+85
+00:06:15,297 --> 00:06:24,043
+every single token is math on all 14
+billion numbers, well, in a nutshell.
+
+86
+00:06:24,514 --> 00:06:28,063
+That's a lot of math, and it must be
+very fast, and that's why we need GPUs.
+
+87
+00:06:29,029 --> 00:06:30,666
+And remember two things from this slide.
+
+88
+00:06:30,677 --> 00:06:33,533
+First, the work is measured
+in tokens, in and out.
+
+89
+00:06:33,545 --> 00:06:37,022
+And the second, the first
+token takes the longest.
+
+90
+00:06:37,819 --> 00:06:39,307
+Both come back later.
+
+91
+00:06:40,892 --> 00:06:42,008
+so what is…
+
+92
+00:06:42,045 --> 00:06:43,782
+What does it take to serve a model?
+
+93
+00:06:44,116 --> 00:06:47,831
+You need the weights, the, the, the
+files that we just talked about.
+
+94
+00:06:48,479 --> 00:06:52,971
+You need the, what's called an
+inference engine, the program that
+
+95
+00:06:53,203 --> 00:06:55,190
+loads the weights and does the math.
+
+96
+00:06:55,246 --> 00:07:00,261
+we use vLLM as, I think, the most
+popular one in cloud native world.
+
+97
+00:07:00,974 --> 00:07:05,947
+and if the weights are the data
+files, vLLM is the database server.
+
+98
+00:07:06,387 --> 00:07:10,332
+It takes requests, it batches
+them together, it manages memory.
+
+99
+00:07:10,917 --> 00:07:16,636
+Then you need a GPU to run it
+on, graphical processing unit.
+
+100
+00:07:17,378 --> 00:07:23,889
+And what you get as an end result,
+you get HTTP endpoint, and, it's
+
+101
+00:07:23,900 --> 00:07:26,117
+a OpenAI-compatible endpoint.
+
+102
+00:07:26,580 --> 00:07:31,272
+And, good that vLLM actually speaks
+the OpenAI API out of the box,
+
+103
+00:07:31,579 --> 00:07:34,750
+so any OpenAI client just works.
+
+104
+00:07:34,768 --> 00:07:41,007
+You don't need to change anything Now, the
+one piece of math you need for the whole
+
+105
+00:07:41,007 --> 00:07:44,303
+talk, all weights must sit in GPU memory.
+
+106
+00:07:44,797 --> 00:07:50,502
+Each number takes two bytes, so
+parameters times two equals gigabytes.
+
+107
+00:07:50,699 --> 00:07:55,602
+For example, a four billion parameter
+model is about eight gigabytes of RAM.
+
+108
+00:07:56,302 --> 00:08:02,178
+Qwen 3, 14 billion is
+30, then 32 is 62 gigs.
+
+109
+00:08:02,341 --> 00:08:07,500
+Llama, which is 70 billion
+parameters, is 141 gigs, and it
+
+110
+00:08:07,500 --> 00:08:09,539
+doesn't even fit on this slide.
+
+111
+00:08:10,416 --> 00:08:20,614
+So now the GPUs, a 20 gigabyte card
+like we use, which is for, for our test,
+
+112
+00:08:20,632 --> 00:08:24,857
+which is RTX, 4000, it has just 20 gigs.
+
+113
+00:08:25,350 --> 00:08:30,598
+And even on 80 gigabyte card,
+which is usually H100, it
+
+114
+00:08:30,610 --> 00:08:32,575
+doesn't fit the 70 billion model.
+
+115
+00:08:32,704 --> 00:08:35,376
+So keep this rule in your
+head, parameters times two.
+
+116
+00:08:35,570 --> 00:08:38,013
+We'll need it both, on the next slides.
+
+117
+00:08:39,705 --> 00:08:44,413
+So what fills the GPU?
+
+118
+00:08:45,340 --> 00:08:49,572
+The model is 70 billion
+parameters, okay, or 14 billion
+
+119
+00:08:49,572 --> 00:08:52,235
+is 30 gigs, why it might not fit?
+
+120
+00:08:53,190 --> 00:08:57,134
+Well, the, the thing is that weights
+are not the only thing in memory.
+
+121
+00:08:57,893 --> 00:09:03,731
+Here is our 20 gigabyte card with a
+small four billion parameters model.
+
+122
+00:09:03,995 --> 00:09:10,344
+The weights take eight gigabytes, and
+the rest goes to the key value cache.
+
+123
+00:09:10,417 --> 00:09:13,244
+That's the memory of every
+conversation that's in progress,
+
+124
+00:09:13,244 --> 00:09:14,869
+what has been said so far.
+
+125
+00:09:15,091 --> 00:09:18,134
+Every open request takes a piece of it.
+
+126
+00:09:18,475 --> 00:09:24,242
+So database people, this is
+your buffer pool or work memory.
+
+127
+00:09:24,871 --> 00:09:28,967
+And, when it's full, new
+requests have to wait in a queue.
+
+128
+00:09:29,361 --> 00:09:33,667
+So the model fits is not the
+same as the model serves.
+
+129
+00:09:34,059 --> 00:09:37,463
+Free memory after the weights decide
+how many users you can serve at the
+
+130
+00:09:37,465 --> 00:09:45,650
+same time, so the queue is also the
+number we'll scale on later on So, okay,
+
+131
+00:09:45,653 --> 00:09:47,269
+let, let, let's get down to business.
+
+132
+00:09:47,271 --> 00:09:49,915
+Let's, see how easy day one is.
+
+133
+00:09:50,307 --> 00:09:55,437
+So on a single machine with a GPU, you
+just run vllm serve and the model name.
+
+134
+00:09:55,552 --> 00:09:58,189
+VLLM downloads the weights
+and starts a server.
+
+135
+00:09:59,037 --> 00:10:03,725
+Then you send a normal OpenAI
+style request with curl, and you
+
+136
+00:10:03,727 --> 00:10:05,208
+get an answer, and that's it.
+
+137
+00:10:05,266 --> 00:10:08,045
+On one machine, an LLM is one command.
+
+138
+00:10:08,061 --> 00:10:12,612
+Everything after that point is
+what it takes to turn this into
+
+139
+00:10:12,614 --> 00:10:14,756
+a service for a whole company.
+
+140
+00:10:16,282 --> 00:10:17,631
+So let's bring Kubernetes.
+
+141
+00:10:18,484 --> 00:10:22,593
+Kubernetes comes in and
+says, "Okay, nice command.
+
+142
+00:10:23,055 --> 00:10:25,757
+Now try and run it in my cluster."
+
+143
+00:10:26,618 --> 00:10:26,956
+Right?
+
+144
+00:10:26,989 --> 00:10:31,788
+And the naive way, the first
+thing that anyone does is, okay,
+
+145
+00:10:31,788 --> 00:10:33,464
+I'm gonna have just a deployment.
+
+146
+00:10:33,986 --> 00:10:38,464
+The image is vllm container.
+
+147
+00:10:38,490 --> 00:10:45,663
+The arguments are the model name, and
+one important line, nvidia.com/gpu1,
+
+148
+00:10:45,706 --> 00:10:51,639
+which means that we're going to use, GPU,
+in, that are available i- in the cluster.
+
+149
+00:10:51,665 --> 00:10:56,662
+And the scheduler then treats
+them, these workloads like, regular
+
+150
+00:10:56,676 --> 00:11:02,669
+containers, but it searches for GPU
+where to put it Okay, so you have it.
+
+151
+00:11:02,691 --> 00:11:04,066
+You have one GPU.
+
+152
+00:11:04,155 --> 00:11:09,459
+Now this pod lands on this GPU and
+nobody else does, so, that's it.
+
+153
+00:11:10,098 --> 00:11:13,010
+Kubernetes finds a node with
+a free GPU and starts a pod
+
+154
+00:11:13,011 --> 00:11:15,401
+with vLLM, and yeah, it works.
+
+155
+00:11:15,431 --> 00:11:20,649
+Honestly, that's, this is fine first
+day for every platform developer.
+
+156
+00:11:20,921 --> 00:11:23,042
+Okay, the experiment, succeeded.
+
+157
+00:11:23,904 --> 00:11:28,387
+Now, every platform
+developer goes into day two.
+
+158
+00:11:29,317 --> 00:11:33,917
+So pod restarts and it
+downloads the whole model again.
+
+159
+00:11:34,363 --> 00:11:38,216
+It takes, I don't know, sometimes
+15 minutes, sometimes an hour,
+
+160
+00:11:38,234 --> 00:11:39,570
+depending on the model size.
+
+161
+00:11:40,758 --> 00:11:44,751
+A new version of the model comes
+out and you roll it out by hand.
+
+162
+00:11:45,216 --> 00:11:48,391
+You need to change all your YAML
+manifests and roll them out.
+
+163
+00:11:49,382 --> 00:11:54,454
+every model needs its own flags, right?
+
+164
+00:11:54,694 --> 00:11:57,824
+For example, memory,
+context length, parallelism.
+
+165
+00:11:58,095 --> 00:12:01,303
+You keep them in your head or
+you calculate them somehow,
+
+166
+00:12:01,358 --> 00:12:02,742
+again, putting them in YAML.
+
+167
+00:12:04,256 --> 00:12:09,380
+The next team comes in and copies
+your YAML, changes three lines, and
+
+168
+00:12:09,380 --> 00:12:12,019
+now there are 10 copies to maintain.
+
+169
+00:12:12,075 --> 00:12:17,561
+Well, of course, if you have GitOps
+or some, Git framework or source code,
+
+170
+00:12:17,670 --> 00:12:19,283
+then you don't have this problem.
+
+171
+00:12:20,120 --> 00:12:23,956
+So overall, this sounds kind of
+familiar to me at least, 'cause I
+
+172
+00:12:23,964 --> 00:12:29,118
+was working on Database as a Service
+for quite some time, and this was
+
+173
+00:12:29,120 --> 00:12:31,060
+the problem like five, 10 years ago.
+
+174
+00:12:31,106 --> 00:12:36,088
+We all ran Postgres as a StatefulSet
+with a pile of YAML, and the answer was
+
+175
+00:12:36,201 --> 00:12:43,176
+operators, software that knows how to
+run the thing for you And, that's exactly
+
+176
+00:12:43,176 --> 00:12:46,735
+what's happening t- in today world of AI.
+
+177
+00:12:47,107 --> 00:12:50,917
+For models, the operator
+that's out there is KServe.
+
+178
+00:12:50,963 --> 00:12:56,546
+It's a popular open source project for
+running AI inference on Kubernetes.
+
+179
+00:12:56,922 --> 00:13:00,564
+You write one object, an
+LLM inference service.
+
+180
+00:13:00,981 --> 00:13:03,192
+This one is simplified on the screen.
+
+181
+00:13:03,581 --> 00:13:09,545
+Which model, how many GPUs, how many
+replicas, and KServe is doing what
+
+182
+00:13:09,700 --> 00:13:12,470
+every operator does, is just reconciles.
+
+183
+00:13:12,499 --> 00:13:15,266
+It watches that objects and
+keeps the world in line with it.
+
+184
+00:13:15,908 --> 00:13:21,910
+And the world is a pod with
+vLLM on a GPU, and if the pod
+
+185
+00:13:21,947 --> 00:13:23,840
+dies, KServe brings it back.
+
+186
+00:13:23,852 --> 00:13:26,239
+If you change the spec, it rolls it out.
+
+187
+00:13:26,470 --> 00:13:30,468
+The vLLM flags live in
+KServe, not in your, head.
+
+188
+00:13:31,562 --> 00:13:38,757
+So now Kubernetes got its object, one
+model running properly, but one model
+
+189
+00:13:38,773 --> 00:13:42,472
+for one team is not a platform yet.
+
+190
+00:13:44,103 --> 00:13:49,132
+So now the platform engineer comes
+into the bar, because the word got
+
+191
+00:13:49,132 --> 00:13:51,847
+out and other teams want models too.
+
+192
+00:13:52,959 --> 00:13:58,281
+So the first problem that we faced,
+or any platform engineer is going to
+
+193
+00:13:58,282 --> 00:14:02,491
+face, is, each model has its own URL.
+
+194
+00:14:02,949 --> 00:14:07,230
+Four models, four URLs, and every
+app needs to know all of them.
+
+195
+00:14:07,933 --> 00:14:09,307
+We want one endpoint.
+
+196
+00:14:09,832 --> 00:14:11,140
+So look at the request.
+
+197
+00:14:11,179 --> 00:14:18,000
+In the body, there is a field called
+model, and here it says Qwen13B
+
+198
+00:14:19,427 --> 00:14:22,070
+So we put an AI gateway in front.
+
+199
+00:14:22,439 --> 00:14:24,675
+We use Envoy AI gateway.
+
+200
+00:14:24,675 --> 00:14:27,738
+It's kind of standard, but there
+are a bunch of other solutions.
+
+201
+00:14:28,087 --> 00:14:33,957
+And the difference between AI gateway
+and the normal load balancer is that
+
+202
+00:14:33,983 --> 00:14:42,078
+AI gateway looks at the URL and,
+looks at the, data in this URL and
+
+203
+00:14:42,088 --> 00:14:47,607
+reads this model field, and then it
+routes the request to the right model.
+
+204
+00:14:47,729 --> 00:14:48,855
+Llama doesn't see it.
+
+205
+00:14:49,345 --> 00:14:54,883
+It's not the only jro- job of AI
+gateway, but it's kinda the basic
+
+206
+00:14:54,904 --> 00:14:57,246
+thing that any AI gateway should do.
+
+207
+00:14:57,256 --> 00:15:00,073
+Read this model field and
+route it to the correct model.
+
+208
+00:15:00,540 --> 00:15:04,106
+And for the client, nothing
+is custom, nothing is changes.
+
+209
+00:15:04,110 --> 00:15:06,455
+It's OpenAI SDK, right?
+
+210
+00:15:06,489 --> 00:15:13,094
+You only change the base URL, but
+inside you send the same requests.
+
+211
+00:15:13,461 --> 00:15:19,984
+For the world of databases, it's like a
+proxy, like a pgbouncer or ProxySQL, so
+
+212
+00:15:19,985 --> 00:15:25,317
+that you don't need to figure out where is
+your, secondary or primary, for example.
+
+213
+00:15:25,621 --> 00:15:30,770
+Or if you're sharding databases, you don't
+need to figure out where your data is.
+
+214
+00:15:31,119 --> 00:15:36,326
+Your, sharding proxy just routes it
+to the exact, node where the data
+
+215
+00:15:36,331 --> 00:15:45,893
+is another interesting thing that we
+faced is, the question, who is calling?
+
+216
+00:15:47,008 --> 00:15:56,198
+And the easy start is one API key
+for the model, and every app uses it.
+
+217
+00:15:56,214 --> 00:16:00,360
+So you deploy the model through
+your platform, and you have some API
+
+218
+00:16:00,368 --> 00:16:05,175
+key, you give it out to users, and
+then everyone is using this API key.
+
+219
+00:16:05,370 --> 00:16:11,034
+That's a shared admin password in the
+world of databases, and if it leaks in
+
+220
+00:16:11,034 --> 00:16:15,732
+the Slack channel, you need to rotate it
+and break everybody flows, and they need
+
+221
+00:16:15,732 --> 00:16:17,762
+to rotate it in their apps, and so on.
+
+222
+00:16:17,767 --> 00:16:24,728
+So that's not the good way to go, and,
+the usual approach is that either every
+
+223
+00:16:24,730 --> 00:16:28,028
+user or every app gets its own key.
+
+224
+00:16:28,029 --> 00:16:29,201
+Same as databases.
+
+225
+00:16:29,231 --> 00:16:33,167
+You, you don't give every
+app the Postgres superuser.
+
+226
+00:16:33,175 --> 00:16:35,270
+You create a user per application.
+
+227
+00:16:35,648 --> 00:16:40,619
+And each key lives in its own file,
+rotate one, and nobody else notice it.
+
+228
+00:16:40,906 --> 00:16:44,131
+Delete it, and only that app loses access.
+
+229
+00:16:44,516 --> 00:16:46,242
+So that's how it should be done.
+
+230
+00:16:46,253 --> 00:16:50,260
+That's how we did it in the platform,
+even not from the first iteration.
+
+231
+00:16:51,633 --> 00:16:55,478
+Another important thing
+for the platform is limits.
+
+232
+00:16:56,094 --> 00:17:01,784
+So remember that the work for,
+LLMs is measured in tokens.
+
+233
+00:17:02,261 --> 00:17:07,930
+So one request can be ten tokens or
+ten thousand, so counting requests
+
+234
+00:17:07,945 --> 00:17:11,132
+doesn't work, so we count tokens.
+
+235
+00:17:11,172 --> 00:17:16,209
+And here, each key gets three
+thousand tokens, per hour.
+
+236
+00:17:16,917 --> 00:17:19,496
+And the chat app used eighteen hundred.
+
+237
+00:17:19,602 --> 00:17:20,361
+It's fine.
+
+238
+00:17:20,454 --> 00:17:22,778
+The batch job used all three thousand.
+
+239
+00:17:22,934 --> 00:17:26,035
+So what's going to happen with the
+batch job when it tries to send
+
+240
+00:17:26,050 --> 00:17:31,830
+requests to a vLLM, or through
+to, through OpenAI endpoint?
+
+241
+00:17:31,838 --> 00:17:34,242
+It gets too many requests error.
+
+242
+00:17:34,740 --> 00:17:39,142
+And the chat apps continues
+working 'cause, it still has a
+
+243
+00:17:39,143 --> 00:17:41,374
+lot of tokens, in the bucket.
+
+244
+00:17:42,308 --> 00:17:48,053
+And the way we do it in the platform
+is that we are also looking at the
+
+245
+00:17:48,053 --> 00:17:56,067
+tokens on AI Gateway, and the gateway
+keeps the counters in Redis or, Valkey.
+
+246
+00:17:56,086 --> 00:17:59,971
+We, we have quite a big blog
+post about it, how to build this
+
+247
+00:18:00,058 --> 00:18:02,273
+architecture with Open Everest.
+
+248
+00:18:02,672 --> 00:18:04,047
+you can find it later.
+
+249
+00:18:05,608 --> 00:18:06,081
+Okay.
+
+250
+00:18:06,351 --> 00:18:11,381
+So- Now let's see what
+other problems do we have.
+
+251
+00:18:11,702 --> 00:18:18,041
+And, that is the kind of usual, remember
+I was talking about it, that models are
+
+252
+00:18:18,042 --> 00:18:24,812
+quite big, and, it's fine when you have
+just a small model that fits a single GPU.
+
+253
+00:18:25,255 --> 00:18:30,487
+But now a team wants a big one because
+they need to run some big experiment.
+
+254
+00:18:31,009 --> 00:18:41,505
+So let's say Qwen 3 14 billion parameters,
+it's not gonna fit our 20 GB card that
+
+255
+00:18:41,530 --> 00:18:44,116
+we are running, for our experiments.
+
+256
+00:18:44,772 --> 00:18:51,152
+So vLLM starts, tries to load the
+weights, and it dies with out of memory.
+
+257
+00:18:51,654 --> 00:18:55,198
+No amount of YAML fixes physics, right?
+
+258
+00:18:55,855 --> 00:19:02,763
+What you can do is you can buy bigger
+GPUs, or we can leverage the beauty of
+
+259
+00:19:02,773 --> 00:19:09,835
+Kubernetes that allows you to scale things
+horizontally and, What you need to know
+
+260
+00:19:09,860 --> 00:19:14,793
+is that model, remember, it's files.
+
+261
+00:19:14,910 --> 00:19:20,360
+But if you look a bit on a higher
+level, a model is a stack of layers.
+
+262
+00:19:20,969 --> 00:19:32,196
+So Qwen 30, 340B has 40 layers,
+and a token goes through layer
+
+263
+00:19:32,197 --> 00:19:35,235
+one, then two, and then to 40.
+
+264
+00:19:36,541 --> 00:19:46,042
+So what we can do, so we can put
+these layers on different nodes.
+
+265
+00:19:46,462 --> 00:19:51,832
+So each GPU is going to hold about ten
+gigabytes of weights, and the rest of
+
+266
+00:19:51,832 --> 00:19:54,681
+its memory goes to the key value cache.
+
+267
+00:19:55,523 --> 00:20:00,192
+and the way it works is that
+one pod is called the head.
+
+268
+00:20:00,726 --> 00:20:02,367
+It serves the API.
+
+269
+00:20:02,880 --> 00:20:05,310
+The other two are workers.
+
+270
+00:20:05,356 --> 00:20:08,366
+A request goes through
+all three, in order.
+
+271
+00:20:09,194 --> 00:20:13,116
+And the way it's called
+is pipeline parallelism.
+
+272
+00:20:13,809 --> 00:20:19,237
+For database people, again, it's a bit
+like sharding, except every request
+
+273
+00:20:19,258 --> 00:20:22,579
+visits every shard one after another.
+
+274
+00:20:22,981 --> 00:20:28,759
+VLLM does the math, and KServe runs
+the group of pods with Kubernetes
+
+275
+00:20:28,788 --> 00:20:31,001
+project called Leader Worker Set.
+
+276
+00:20:31,684 --> 00:20:33,807
+And for the client, nothing changes.
+
+277
+00:20:33,815 --> 00:20:36,464
+Same URL, same model, same key.
+
+278
+00:20:36,882 --> 00:20:41,500
+One catch, though, that these
+three pods are one model, so
+
+279
+00:20:41,500 --> 00:20:43,431
+they live and die together.
+
+280
+00:20:43,730 --> 00:20:47,263
+If one worker restarts,
+the whole group restarts.
+
+281
+00:20:47,542 --> 00:20:53,040
+And replicas, two doesn't add one
+GPU, it adds a second group of three.
+
+282
+00:20:53,230 --> 00:20:59,085
+So you would end up with, six pods,
+so you need actually six, GPUs.
+
+283
+00:20:59,450 --> 00:21:05,315
+But i-if you need resiliency,
+that's the way to go Okay.
+
+284
+00:21:05,589 --> 00:21:12,438
+So looks like we solved the
+problem with, running it at scale.
+
+285
+00:21:12,443 --> 00:21:14,090
+We solved the problem with keys.
+
+286
+00:21:14,092 --> 00:21:16,465
+We solved the problem with scalability.
+
+287
+00:21:16,979 --> 00:21:24,224
+so the next problem is who is
+paying for all of this, right?
+
+288
+00:21:24,987 --> 00:21:28,820
+And finance team asks
+a different question.
+
+289
+00:21:29,784 --> 00:21:33,641
+Like, okay, so looks like
+we bought a lot of GPUs.
+
+290
+00:21:34,341 --> 00:21:35,813
+What are we doing with those?
+
+291
+00:21:35,854 --> 00:21:37,187
+Who is using it, and so on.
+
+292
+00:21:37,190 --> 00:21:40,528
+So there is a lot of questions from
+finance, from legal, from other
+
+293
+00:21:40,528 --> 00:21:42,177
+teams, from other stakeholders.
+
+294
+00:21:42,805 --> 00:21:47,830
+So we need to answer these questions,
+in two different places actually.
+
+295
+00:21:48,523 --> 00:21:53,003
+So first one, is the
+model actually healthy?
+
+296
+00:21:53,585 --> 00:21:58,812
+so that's actually the question of Q&A
+is, like, is it really working, right?
+
+297
+00:21:59,379 --> 00:22:03,692
+So the metrics are coming from vLLM.
+
+298
+00:22:04,227 --> 00:22:07,449
+the two numbers I look at
+first, time to first token.
+
+299
+00:22:08,106 --> 00:22:11,807
+Remember that the first token
+is the slow one, and it's what
+
+300
+00:22:11,964 --> 00:22:15,467
+users feel, and requests waiting.
+
+301
+00:22:15,638 --> 00:22:18,694
+That's the queue for their
+key value cache slide.
+
+302
+00:22:18,714 --> 00:22:24,859
+So remember, it's queuing up and it
+slides to the left, so it's going out.
+
+303
+00:22:25,397 --> 00:22:31,244
+And if it grows, it means that GPU is
+full And then the second question is
+
+304
+00:22:31,244 --> 00:22:33,572
+who is using it or who is paying for it?
+
+305
+00:22:34,101 --> 00:22:35,566
+that comes from the gateway.
+
+306
+00:22:35,592 --> 00:22:42,041
+So we said that we count tokens per
+key, and we store it somewhere in
+
+307
+00:22:42,041 --> 00:22:44,724
+Redis or Valkey or tokens per model.
+
+308
+00:22:45,111 --> 00:22:51,062
+So both in-- go into the same
+Prometheus or Grafana dashboard, so
+
+309
+00:22:51,062 --> 00:22:54,173
+you can send all the metrics to those.
+
+310
+00:22:54,521 --> 00:22:59,624
+And, this is where one key per app
+actually pays off, 'cause every week
+
+311
+00:22:59,625 --> 00:23:02,454
+someone asks who used all the GPU.
+
+312
+00:23:02,492 --> 00:23:06,833
+Because every token at the gateway
+is tagged with a key, the answer
+
+313
+00:23:06,835 --> 00:23:12,606
+is one Prometheus query that,
+summarizes, tokens by key owner.
+
+314
+00:23:13,330 --> 00:23:17,271
+Now you can have that conversation
+with data and show it to finance that,
+
+315
+00:23:17,272 --> 00:23:22,968
+"Hey, Bill from, your team actually
+used all the tokens," and the here
+
+316
+00:23:22,968 --> 00:23:25,138
+was when, show the graph, and so on.
+
+317
+00:23:25,352 --> 00:23:31,607
+So what I'm saying here is that, the basic
+questions like, is it really working?
+
+318
+00:23:31,607 --> 00:23:33,557
+So ease of availability is there.
+
+319
+00:23:34,272 --> 00:23:40,119
+so for Kubernetes, for KServe,
+everything is coming quite nicely 'cause
+
+320
+00:23:40,126 --> 00:23:41,732
+you send the metrics to Prometheus.
+
+321
+00:23:41,734 --> 00:23:45,556
+You can configure your, alert manager
+to send the alerts, and so on.
+
+322
+00:23:45,951 --> 00:23:51,746
+And who is paying is, again, the metrics
+that you can store anywhere, again,
+
+323
+00:23:51,747 --> 00:23:55,671
+in Prometheus, or you can send them
+as logs somewhere into ClickHouse,
+
+324
+00:23:55,682 --> 00:24:00,182
+for example, and then provide some
+sophisticated, billing results.
+
+325
+00:24:01,164 --> 00:24:06,668
+but one important thing that we also
+faced, we were playing with, automated
+
+326
+00:24:06,677 --> 00:24:13,556
+scaling, so to scale, VLLM and, the
+model horizontally, automatically.
+
+327
+00:24:14,171 --> 00:24:20,549
+And usually when you do this
+in Kubernetes, you look at CPU.
+
+328
+00:24:20,690 --> 00:24:26,349
+And just remember, maybe it's obvious, but
+maybe it's not super obvious for everyone,
+
+329
+00:24:26,815 --> 00:24:29,401
+that CPU is usually idle for models.
+
+330
+00:24:29,402 --> 00:24:33,174
+What you need to look at is,
+GPU, and you need to use GPU,
+
+331
+00:24:33,461 --> 00:24:36,175
+utilization to scale, right?
+
+332
+00:24:36,338 --> 00:24:41,350
+In KServe, this is called a
+workload variant autoscaler.
+
+333
+00:24:41,747 --> 00:24:46,800
+You set minimum and maximum replicas,
+and it adds replicas when the, your
+
+334
+00:24:46,986 --> 00:24:51,717
+key value queue grows, and that's what
+we use in, OpenEverest to scale as
+
+335
+00:24:51,717 --> 00:24:58,253
+well but remember that scaling up an
+LLM is not like scaling up a web app.
+
+336
+00:24:58,530 --> 00:25:03,092
+traffic spike comes in and,
+the new pod gets scheduled.
+
+337
+00:25:03,099 --> 00:25:06,980
+It pulls the vLLM, image, which
+is already several gigabytes.
+
+338
+00:25:06,989 --> 00:25:11,801
+Then it downloads thirty gigabytes of
+weights, then it loads them into the GPU.
+
+339
+00:25:12,241 --> 00:25:16,215
+So that's actually not
+seconds, it's, minutes of time.
+
+340
+00:25:16,463 --> 00:25:20,559
+And by the time the replica is
+ready, the spike might be over.
+
+341
+00:25:20,797 --> 00:25:22,384
+So database people know this.
+
+342
+00:25:22,393 --> 00:25:26,184
+It's like adding a replica that
+has to restore a big backup first.
+
+343
+00:25:26,708 --> 00:25:32,756
+So keep the weights close on a volume
+in a cluster instead of Hugging Face.
+
+344
+00:25:33,150 --> 00:25:38,382
+There is also capability to cache
+models and, keep at least one replica
+
+345
+00:25:38,395 --> 00:25:40,888
+running if you have enough resources.
+
+346
+00:25:41,944 --> 00:25:43,682
+So let's look at what we just built.
+
+347
+00:25:43,760 --> 00:25:44,979
+Let's step back a bit.
+
+348
+00:25:45,840 --> 00:25:50,374
+so apps call one AI gateway.
+
+349
+00:25:50,598 --> 00:25:54,948
+The gateway checks the keys, counts
+tokens, and routes by model name.
+
+350
+00:25:55,273 --> 00:26:01,185
+Then we have KServe that runs the
+models, vLLM on GPU, sometimes one
+
+351
+00:26:01,187 --> 00:26:03,346
+pod, sometimes, a group of three.
+
+352
+00:26:03,869 --> 00:26:08,733
+And, under all of that, we have proper
+metrics, dashboards, and auto-scaling.
+
+353
+00:26:09,112 --> 00:26:12,202
+And that's a lot of moving
+parts, and you need all of it
+
+354
+00:26:12,295 --> 00:26:15,182
+for every team and every model.
+
+355
+00:26:15,191 --> 00:26:17,310
+That's what the platform looks like.
+
+356
+00:26:17,942 --> 00:26:20,744
+And, we've actually built this before.
+
+357
+00:26:20,745 --> 00:26:23,603
+I mean, we collectively
+in engineering world.
+
+358
+00:26:24,145 --> 00:26:28,957
+so if you run databases platform, you
+already know all these primitives.
+
+359
+00:26:28,966 --> 00:26:32,356
+So for weights, it's data files.
+
+360
+00:26:32,368 --> 00:26:35,314
+For vLLM, it's the database server.
+
+361
+00:26:35,324 --> 00:26:37,259
+KServe is the operator.
+
+362
+00:26:37,347 --> 00:26:39,076
+AI gateway is the proxy.
+
+363
+00:26:39,110 --> 00:26:40,933
+API key, database user.
+
+364
+00:26:41,313 --> 00:26:42,430
+what else do we have there?
+
+365
+00:26:42,433 --> 00:26:45,293
+Splitting across GPUs is sharding.
+
+366
+00:26:45,703 --> 00:26:49,896
+So different words, but
+the same platform problems.
+
+367
+00:26:50,559 --> 00:26:55,324
+And, For me, as a maintainer of
+OpenEverest, in OpenEverest we
+
+368
+00:26:55,324 --> 00:26:59,137
+have a notion called instance,
+and everything is an instance.
+
+369
+00:26:59,159 --> 00:27:03,207
+Postgres cluster is an instance,
+Mongo cluster, Milvus, ClickHouse,
+
+370
+00:27:03,220 --> 00:27:06,482
+whatever databases we support
+there, everything is an instance.
+
+371
+00:27:07,053 --> 00:27:13,746
+So we actually made a model an instance
+too, and, the KServe is plugged
+
+372
+00:27:13,747 --> 00:27:17,672
+in into OpenEverest as a provider,
+we call it providers there, and it
+
+373
+00:27:17,672 --> 00:27:22,469
+does everything from, that I was
+picking in this talk under the hood.
+
+374
+00:27:22,556 --> 00:27:28,906
+So KServe objects, gateway routes,
+keys, token limits, splitting across
+
+375
+00:27:28,907 --> 00:27:33,780
+nodes, monitoring, everything is in
+a single platform, through the same
+
+376
+00:27:33,785 --> 00:27:38,289
+UI, same API that we use for all
+the databases that we have in there.
+
+377
+00:27:38,606 --> 00:27:43,390
+You can use, YAML manifests or
+GitOps approach with creating the
+
+378
+00:27:43,422 --> 00:27:45,277
+custom resources in Kubernetes.
+
+379
+00:27:45,834 --> 00:27:53,625
+And, that's the reproducible environment
+that platform engineer, is asking for.
+
+380
+00:27:54,232 --> 00:27:57,284
+So let's go back to the BAR.
+
+381
+00:27:57,307 --> 00:28:03,587
+So the platform engineer
+asked for reproducibility.
+
+382
+00:28:04,070 --> 00:28:08,855
+So models are instances like databases,
+managed like databases with the
+
+383
+00:28:08,855 --> 00:28:11,688
+same UI, API, and access control.
+
+384
+00:28:12,200 --> 00:28:16,821
+as many GPUs for an LLM, so
+even when it doesn't fit on
+
+385
+00:28:16,823 --> 00:28:19,162
+one, we split it across nodes.
+
+386
+00:28:19,629 --> 00:28:24,013
+And for Kubernetes, everything is
+an object, and it reconciles with
+
+387
+00:28:24,032 --> 00:28:28,799
+KServe and other resources under
+the hood, AI gateways, and so on.
+
+388
+00:28:28,811 --> 00:28:31,725
+So everything works as expected.
+
+389
+00:28:33,528 --> 00:28:38,089
+So as a final thing, if you want
+to try it out, it's four steps.
+
+390
+00:28:38,089 --> 00:28:44,539
+You install OpenEverest on your Kubernetes
+cluster, you add the KServe provider,
+
+391
+00:28:44,854 --> 00:28:51,035
+and it installs KServe itself, then
+the Envoy gateway, Leader Worker Set.
+
+392
+00:28:51,443 --> 00:28:57,386
+Then you deploy model and then
+create a key for each application
+
+393
+00:28:57,386 --> 00:28:58,541
+if you need it, of course.
+
+394
+00:28:59,119 --> 00:29:03,637
+And everything is open source,
+and, we have a step-by-step guide
+
+395
+00:29:03,639 --> 00:29:08,922
+in our blog, and you can read
+all the blogs on OpenEverest.io
+
+396
+00:29:08,935 --> 00:29:12,327
+or get more information
+about OpenEverest there.
+
+397
+00:29:12,327 --> 00:29:15,315
+It's an open source CNCF product.
+
+398
+00:29:16,088 --> 00:29:22,068
+So if you try it and something breaks,
+I want to hear about it and, you can
+
+399
+00:29:22,068 --> 00:29:29,873
+find me in CNCF Slack channel or follow
+me on LinkedIn and we can talk there.
+
+400
+00:29:30,585 --> 00:29:32,773
+Thank you and appreciate your time.
