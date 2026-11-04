@@ -485,14 +485,22 @@ class Run:
             jobs.append(("slides", static, os.path.join(static, "slides"), files, "slides"))
         elif done:
             self.note("slides not shipped: no conf42/static repo next to this one")
-        git = lambda repo, *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, timeout=300)
+        git = lambda repo, *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, timeout=300,
+                                              encoding="utf-8", errors="replace")
         for kind, repo, dest, files, label in jobs:
             new = []
+            # files copied by an earlier ship whose commit never happened are identical but untracked: they ship too
+            # (2026-11-03: a ship that failed after copying left 24 transcripts uncommitted, and later ships skipped
+            # them as "already there")
+            st = git(repo, "status", "--porcelain", "--untracked-files=all", "--", os.path.relpath(dest, repo))
+            pending = {os.path.basename(l[3:].strip().strip('"')) for l in st.stdout.splitlines() if l.strip()}
             for f in files:
                 if not os.path.exists(f):
                     continue
                 to = os.path.join(dest, os.path.basename(f))
                 if os.path.exists(to) and filecmp.cmp(f, to, shallow=False):
+                    if os.path.basename(to) in pending:
+                        new.append(to)
                     continue
                 shutil.copy2(f, to)
                 new.append(to)
@@ -1120,8 +1128,10 @@ class Run:
             self.note("chapters pass failed: %s" % ex)
         try:
             self.ship()
-        except Exception as ex:
-            self.note("shipping transcripts / slides failed: %s" % ex)
+        except Exception as ex:                          # the whole traceback: "[WinError 2]" alone was not enough (2026-11-03)
+            import traceback
+            self.note("shipping transcripts / slides failed: %s | %s" % (ex, " / ".join(
+                traceback.format_exc().strip().splitlines()[-6:])))
         self.note("run finished")
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}
