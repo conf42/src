@@ -30,9 +30,9 @@ def _suffix(event):
     prefix = re.sub(r"_\d{4}\.csv$", "", os.path.basename(db))
     sheets = sorted(glob.glob(os.path.join("_db", prefix + "_*.csv")), reverse=True) if prefix else []
     for sheet in sheets:
-        import csv
+        from .shared import dict_reader
         with open(sheet, encoding="utf-8") as f:
-            found = collections.Counter(m.group(1).lower() for r in csv.DictReader(f)
+            found = collections.Counter(m.group(1).lower() for r in dict_reader(f)
                                         for m in [re.search(r"_([A-Za-z0-9]+)\.png$", (r.get("Picture") or "").strip())] if m)
         if found:
             return found.most_common(1)[0][0]

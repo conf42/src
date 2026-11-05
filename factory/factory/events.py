@@ -53,11 +53,19 @@ def talks(ev):
     current one dropped. A talk with a video keeps everything - matching, YouTube items, transcript, deck - whatever
     the spreadsheet says now (Marek 2026-10-31: "presence of the video has higher prio than the excel")."""
     with open(ev["db_path"], encoding="utf-8-sig", newline="") as f:
-        out = [_row(r) for r in csv.DictReader(f) if (r.get("Name1") or "").strip()]
+        out = [_row(r) for r in dict_reader(f) if (r.get("Name1") or "").strip()]
     return out + banished(ev, out)
 
 
 _history = {}
+
+
+def dict_reader(f):
+    """csv.DictReader that also reads a tab-separated sheet export saved as .csv (2026-11-05: PLATFORM_2026.csv came
+    in as TSV, every row read as one column and the build stopped on KeyError 'Name1'). f: an open file or StringIO."""
+    head = f.readline()
+    f.seek(0)
+    return csv.DictReader(f, delimiter="\t" if "\t" in head and "," not in head else ",")
 
 
 def _csv_history(path):
@@ -71,7 +79,7 @@ def _csv_history(path):
             for h in git("log", "--format=%H", "--", rel).stdout.decode().split():
                 r = git("show", "%s:%s" % (h, rel))
                 if r.returncode == 0:
-                    versions.append(list(csv.DictReader(io.StringIO(r.stdout.decode("utf-8-sig", "replace")))))
+                    versions.append(list(dict_reader(io.StringIO(r.stdout.decode("utf-8-sig", "replace")))))
         except (OSError, subprocess.SubprocessError):
             pass
         _history[key] = versions
