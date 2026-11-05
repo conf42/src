@@ -101,7 +101,6 @@ def get_enriched_metadata(base_folder):
         # (17:00 UTC on the event date, as the event page says), or at `release_at` from
         # metadata.yml. Pages built before then carry the content behind a wall that the
         # visitor's browser lifts at that moment (base.html), so no rebuild is needed.
-        # `videos_reveal_date` is no longer read.
         event["release_at"] = release_time(event)
         event["release_iso"] = event["release_at"].isoformat().replace("+00:00", "Z")
         event["released"] = datetime.datetime.now(datetime.timezone.utc) >= event["release_at"]
