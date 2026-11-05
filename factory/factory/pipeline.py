@@ -39,6 +39,7 @@ class HealthBlocked(RuntimeError):
 
 MIN_TALK_SECONDS = 30    # a composition shorter than this is a cut-off upload, not a talk
 REPO_RUNS = os.path.join(events.REPO, "_db", "factory_runs")   # per event state + YouTube items, and the ledger, in git
+LAUNCHES = "LAUNCHES.md"     # per event: a few lines per launch (which machine, what it did) - read it before a launch
 
 
 def sync_to_repo(short_url, work_dir):
@@ -64,6 +65,8 @@ def sync_to_repo(short_url, work_dir):
         paths.append(os.path.join(dest, "state.json"))
     except (OSError, ValueError):
         pass
+    if os.path.exists(os.path.join(dest, LAUNCHES)):   # written straight into the repo by Run.launch_log
+        paths.append(os.path.join(dest, LAUNCHES))
     items = os.path.join(work_dir, "YouTube items.txt")
     if os.path.exists(items):
         shutil.copyfile(items, os.path.join(dest, "YouTube items.txt"))
@@ -148,6 +151,7 @@ class Run:
         self.up_cv, self.up_order, self.up_settled = threading.Condition(), [], set()
         self.state = self._load()
         self.render_futures, self.render_locks = {}, {}
+        self.launch = {}                              # how this launch started, for LAUNCHES.md (cmd, sources, drive)
 
     # ---- state ---------------------------------------------------------------------------
     def _load(self):
@@ -321,6 +325,10 @@ class Run:
             for f in glob.glob(os.path.join(d, "*")):
                 if os.path.isfile(f) and not f.endswith(".part"):
                     have.add(os.path.getsize(f))
+        # and every video a finished pass was made from, wherever it ran: a fresh machine starting from the repo's state
+        # does not download the whole event again (2026-11-04: platform2026 ran on Windows, then Cynthia on the Mac)
+        for t in self.state["talks"].values():
+            have.update(t.get("sizes_seen") or [])
         listing, got = [], []
         safety = {}                                      # name -> its "<name> - safety copy" parts (conf42.com/record)
         for f in drive.list_folder(fid):
@@ -356,6 +364,9 @@ class Run:
                 got.append(p)
         self.save()
         rep = self.drive_check(listing)
+        self.launch["drive"] = "%d files, %d downloaded%s, %d up to date, %d newer, %d new" % (
+            len(listing), len(got), (" (%s)" % ", ".join(os.path.basename(p) for p in got)) if got else "",
+            rep["same"], len(rep["newer"]), len(rep["new"]))
         self.note("Drive: %d files in the folder, %d downloaded, %d talks up to date, %d newer, %d new"
                   % (len(listing), len(got), rep["same"], len(rep["newer"]), len(rep["new"])))
         return got
@@ -1069,8 +1080,9 @@ class Run:
             msg = ("%s is already being processed on %s (last seen %s). Stop it there first, or start this one with "
                    "--force if that machine is off." % (self.ev["title"], holder.get("name") or "another machine", holder.get("at")))
             self.note("NOT STARTED: " + msg)
+            self.launch_log([], started=now(), refused=msg)
             raise SystemExit(msg)
-        self.state["run_started"] = now()
+        self.state["run_started"] = started = now()
         self.save()
         self.publish(force=True)                     # claims the lock (and updates conf42.com/factory)
         keys = [k for k, t in self.state["talks"].items() if not t.get("finished") and (not only or k in only)]
@@ -1126,17 +1138,67 @@ class Run:
             self.chapters_pass()
         except Exception as ex:
             self.note("chapters pass failed: %s" % ex)
+        shipped = None
         try:
-            self.ship()
+            shipped = self.ship()
         except Exception as ex:                          # the whole traceback: "[WinError 2]" alone was not enough (2026-11-03)
             import traceback
             self.note("shipping transcripts / slides failed: %s | %s" % (ex, " / ".join(
                 traceback.format_exc().strip().splitlines()[-6:])))
         self.note("run finished")
+        self.launch_log(keys, started=started, shipped=shipped)
         with self.lock:
             self.state["runner"] = {"pid": None, "at": now(), "finished": True}
             write_json(self.state_path, self.state)
-        self.publish(force=True)
+        self.publish(force=True)                     # also commits LAUNCHES.md
+
+    def launch_log(self, keys, started, shipped=None, refused=None):
+        """A short entry per launch, newest first, in _db/factory_runs/<event>/LAUNCHES.md (Marek 2026-11-04: the event
+        ran on Windows, then on the Mac, and Claude had to piece together from Descript what was already done). Claude
+        reads it before every launch; it is in git, so both machines see it."""
+        try:
+            lines = ["## %s · %s · %s" % (started[:16].replace("T", " "), machine.machine_name(self.cfg),
+                                          self.launch.get("cmd") or "run")]
+            if self.launch.get("sources"):
+                lines.append("- sources: " + ", ".join(os.path.basename(x) for x in self.launch["sources"]))
+            if self.launch.get("drive"):
+                lines.append("- Drive: " + self.launch["drive"])
+            if refused:
+                lines.append("- NOT STARTED: " + refused)
+            else:
+                ts = self.state["talks"]
+                out = []
+                for k in keys:
+                    t = ts.get(k) or {}
+                    flags = (t["steps"].get("qa") or {}).get("flags") or [] if t.get("steps") else []
+                    out.append(k + (" - done" if t.get("finished") else " - FAILED: %s" % (t.get("error") or "unfinished"))
+                               + (" (flags: %s)" % ", ".join(map(str, flags)) if flags else ""))
+                lines.append("- processed: " + ("; ".join(out) if out else "nothing new"))
+                lines.append("- finished before, untouched: %d" % sum(1 for k, t in ts.items() if t.get("finished") and k not in keys))
+                if shipped is None:
+                    lines.append("- ship: FAILED (see state.json log)")
+                else:
+                    lines.append("- ship: %d transcripts, %d decks" % (len(shipped.get("srt", [])), len(shipped.get("slides", []))))
+                errs = [x.split("  ", 1)[-1] for x in self.state.get("log", []) if x[:19] >= started[:19]
+                        and any(w in x for w in ("failed", "FAILED", "paused", "could not"))]
+                if errs:
+                    lines.append("- problems: " + " | ".join(errs[-5:]))
+            if self.state.get("project_id"):
+                try:
+                    p = Descript().project(self.state["project_id"])
+                    lines.append("- Descript project %s: %d compositions, %d published" % (
+                        p.get("name") or self.state["project_id"], len(p.get("compositions", [])), len(p.get("publishes", []))))
+                except Exception as ex:                  # noqa: BLE001 - the log must never stop a run
+                    lines.append("- Descript project: not read (%s)" % ex)
+            dest = os.path.join(REPO_RUNS, self.ev["short_url"])
+            os.makedirs(dest, exist_ok=True)
+            path = os.path.join(dest, LAUNCHES)
+            old = open(path, encoding="utf-8").read().split("\n", 2)[-1].lstrip("\n") if os.path.exists(path) else ""
+            head = "# %s - factory launches (newest first, written by the factory)\n\n" % self.ev["title"]
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(head + "\n".join(lines) + "\n\n" + old)
+        except Exception as ex:                          # noqa: BLE001
+            self.note("launch log not written: %s" % ex)
 
 
 def proofread_site(short_url, only=None, push=True, log=print):
