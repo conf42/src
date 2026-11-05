@@ -39,6 +39,7 @@ works the same way.
 | Step | Say to Claude | What happens |
 |---|---|---|
 | Start | *"Activate the factory for Feature Flags 2026: https://drive.google.com/drive/folders/…"* | Claude fetches the Drive folder (only new or changed files), matches every video to its talk and starts the whole run in the background. |
+| Another computer ran it | *"Reactivate the factory for Cynthia: <Drive link>"* | Before anything starts, Claude reads the event's launch log (`_db/factory_runs/<event>/LAUNCHES.md`, written by the factory on every launch, on every computer) and the Descript project, and tells you what is already done. Finished talks are not downloaded again on the new computer. |
 | Watch | *"How is it going?"* - or open http://localhost:8042 | Per talk: render, upload, Descript edit, publish, download, subtitles, chapters, loudness, QA. |
 | Unmatched files | Claude asks you which speaker a file belongs to | It renames it and runs it. |
 | Check | *"What needs my attention?"* | Talks with QA or health flags (loudness, too much cut, setup the speaker talks over), talks that **need a new video** (no or muted sound - not sent to Descript), failed talks, and the **no video yet** follow-up list. Watch the flagged ones. |
@@ -70,6 +71,9 @@ on the list.
 
 ## Changelog
 
+- **2026-11-05** - Every launch writes a short entry to `_db/factory_runs/<event>/LAUNCHES.md` (machine, command,
+  Drive fetch, talks processed, ship result, Descript project count). Claude reads it plus the Descript project before
+  any launch. A computer picking up an event from another one skips the videos the finished talks were made from.
 - **2026-10-31** - Talks dropped from the event CSV come back from its git history while their video exists
   (matching, YouTube items, transcript, deck) - the video outranks the spreadsheet; never ask for the sheet to be fixed.
 - **2026-10-29** - Transcripts are proofread before they ship: glossary fixes plus Claude reading each talk in context.

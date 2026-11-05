@@ -121,10 +121,13 @@ def main(argv):
     if cmd == "ship":                                    # finished talks' transcripts + decks to the site, now
         print(json.dumps(run.ship(), indent=1, ensure_ascii=False))
         return
+    run.launch = {"cmd": " ".join(a for a in [cmd] + argv[1:2] if a)}
     if cmd == "drive":                                   # the Drive folder in place of a zip, then the whole run
         argv = [argv[0], argv[1]] + run.drive_fetch(argv[2] if len(argv) > 2 else None)
         cmd = "run"
     if cmd in ("match", "run"):
+        if cmd == "run" and run.launch["cmd"].startswith("run") and argv[2:]:
+            run.launch["sources"] = argv[2:]
         run.collect(argv[2:])
         run.match()
         table(run)

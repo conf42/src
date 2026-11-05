@@ -172,11 +172,18 @@ One folder per conference on the Desktop of the computer that runs the event, e.
 | `state.json` | progress of every step |
 | `final videos for YouTube/` | the finished videos of this event |
 
+In the conf42 repo, `_db/factory_runs/<event>/LAUNCHES.md` lists every launch of the event, newest first: which
+computer, what it fetched, which talks it did, what went to the site. Both computers write to it, so it shows what
+the other one did.
+
 
 ---
 
 ## Changelog
 
+- **2026-11-05** - **Launch log**: every run adds a few lines to `_db/factory_runs/<event>/LAUNCHES.md` - computer,
+  Drive fetch, talks done or failed, transcripts and decks shipped, the Descript project's size. When a second computer
+  picks up an event, it no longer downloads the videos of talks that are already finished.
 - **2026-10-31** - A talk dropped from the event spreadsheet keeps everything once its video exists: a late upload
   still matches, and it gets its YouTube items, transcript and slides like any other talk. The video counts more
   than the spreadsheet. (No talk page on the site for it, so its YouTube description has no "Read the abstract" link.)
