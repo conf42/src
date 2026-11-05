@@ -11,11 +11,19 @@ import requests
 BASE_STATIC_URL = "https://conf42.github.io/static"
 
 
+def dict_reader(f):
+    """csv.DictReader that also reads a tab-separated sheet export saved as .csv (2026-11-05: PLATFORM_2026.csv came
+    in as TSV, every row read as one column and the build stopped on KeyError 'Name1'). f: an open file or StringIO."""
+    head = f.readline()
+    f.seek(0)
+    return csv.DictReader(f, delimiter="\t" if "\t" in head and "," not in head else ",")
+
+
 def read_csv(path):
     """ Read the pre-process the CSV """
     items = []
     with open(path, 'r') as f:
-        reader = csv.DictReader(f)
+        reader = dict_reader(f)
         for item in reader:
             items.append(dict(item))
     return items

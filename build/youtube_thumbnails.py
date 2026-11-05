@@ -210,7 +210,8 @@ def recent_headshots(years=(2025, 2026, 2027)):
         if not m or int(m.group(1)) not in years:
             continue
         with open(f, encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
+            from .shared import dict_reader
+            for row in dict_reader(fh):
                 pic = (row.get("Picture") or "").strip()
                 s = re.search(r"_([A-Za-z0-9]+)\.png$", pic)
                 if s:

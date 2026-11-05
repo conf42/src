@@ -23,7 +23,7 @@ import unicodedata
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-from .shared import asset_version, make_remote_address
+from .shared import asset_version, dict_reader, make_remote_address
 
 RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
 MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
@@ -193,7 +193,7 @@ def purged(event, versions):
     titles = {_norm(t.get("Title")) for t in current} - {""}
     out, seen = [], set()
     for text in versions:
-        for r in csv.DictReader(io.StringIO(text)):
+        for r in dict_reader(io.StringIO(text)):
             r = {k: v.strip() if isinstance(v, str) else v for k, v in r.items() if k}
             n = _norm(r.get("Name1"))
             if not n or n in seen or _norm(r.get("Title")) in titles - {"tbd", "tba"} \
