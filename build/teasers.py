@@ -29,7 +29,28 @@ RAINBOW = ["#ff5e7e", "#ffb547", "#4fd1a1", "#5aa8ff", "#a57bff"]
 MOVED = ('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
          '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>')
 PAST_FROM = datetime.date(2026, 1, 1)
-TBD = re.compile(r"^\s*(tbd|tba|tbc|to be (announced|confirmed|decided))?\s*[.!]*\s*$", re.I)
+# a title that only says the talk isn't ready ("Coming Soon", "Title TBC", "Keynote - TBD", "???") greys the card out like a
+# missing one (Marek 2026-11-05): every piece between - | : / , ( ) must be one of these
+PLACEHOLDERS = {
+    "tbd", "tba", "tbc", "tbs", "tbh", "to be announced", "to be confirmed", "to be decided", "to be determined",
+    "to be defined", "to be revealed", "to be shared", "to be updated", "to be added", "to be finalised", "to be finalized",
+    "to come", "coming soon", "coming shortly", "soon", "announced soon", "announcing soon", "revealed soon", "reveal soon",
+    "more soon", "more to come", "details soon", "more details soon", "details to follow", "stay tuned", "watch this space",
+    "under wraps", "will be announced", "will be announced soon", "will be confirmed", "pending", "title pending",
+    "topic pending", "title tbd", "title tbc", "title tba", "talk tbd", "talk tbc", "talk tba", "topic tbd", "topic tbc",
+    "topic tba", "session tbd", "session tbc", "keynote tbd", "keynote tbc", "title coming soon", "talk title coming soon",
+    "topic coming soon", "talk coming soon", "session coming soon", "abstract coming soon", "title to be announced",
+    "title to be confirmed", "talk to be announced", "topic to be announced", "placeholder", "untitled", "untitled talk",
+    "no title", "title", "talk", "topic", "session", "keynote", "secret", "secret talk", "mystery talk", "surprise",
+    "surprise talk", "wip", "work in progress", "draft", "na", "none", "null", "xxx", "lorem ipsum", "later",
+}
+
+
+def placeholder_title(title):
+    s = re.sub(r"\bn/a\b", "na", (title or "").lower().replace("\u2019", "'"))
+    s = re.sub(r"[^\w\s'|:/,;()\[\]\u2013\u2014-]", " ", s)    # emoji, ?, !, ... and other decoration
+    parts = [re.sub(r"\s+", " ", p).strip(" '") for p in re.split(r"[-\u2013\u2014|:/,;()\[\]]+", s)]
+    return all(p in PLACEHOLDERS for p in parts if p)
 
 
 def _shade(c, l, s=None, dh=0.0):
@@ -101,7 +122,7 @@ def cards(event, rows=None):
         title = (t.get("Title") or "").strip()
         photo = t.get("Picture") or ""
         has_photo = bool(re.search(r"/headshots/.+\.(png|jpe?g|webp)$", photo, re.I))
-        missing = " and ".join(x for x, gone in (("photo", not has_photo), ("title", not title or TBD.match(title))) if gone)
+        missing = " and ".join(x for x, gone in (("photo", not has_photo), ("title", placeholder_title(title))) if gone)
         file = "conf42-%s-%s" % (slug, _slug(" ".join(n for n, _ in people)) or "talk")
         used[file] = used.get(file, 0) + 1
         if used[file] > 1:
