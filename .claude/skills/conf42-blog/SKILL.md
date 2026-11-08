@@ -1,0 +1,96 @@
+---
+name: conf42-blog
+description: Run the living Conf42 blog (conf42.com/blog, _db/blog.csv) - plan, write and publish the posts the repo calls for (talk previews, sponsored keynote posts, conference roundups, SREday/LLMday/PLATFORMday/PEC plugs, webinar recaps), retire posts whose talk was removed, enrich posts whose video/transcript arrived, mirror the CSV to the Excels_for_WWW "blog" tab. Use when Marek says "run blog maintenance", "update blog", "blog maintenance", "living blog", "blog posts for <event>", "write the roundup for <event>", or asks why a post is (not) on the blog.
+---
+
+# The living Conf42 blog - how Claude runs it
+
+The blog is a function of the repo. `build/blog.py` (every deploy, plus the 06:00 and 17:30 UTC crons) shows a row
+of `_db/blog.csv` only while its Status is empty/published, its Date is today or earlier (UTC), and its **Ref still
+resolves**: a talk deleted from the event CSV (a speaker asked to be taken down) takes its post off the site on the next
+build, even if the transcript was uploaded. Never fight that: no Ref edits to keep a post alive.
+
+`_db/blog.csv` in the repo is the master (Marek 2026-11-08: the opposite of the conference sheets). Claude edits it
+only through `python -m build.blog_plan add` and mirrors it to the Sheet afterwards. Publishing is autonomous - no
+approval round - so the linter and the rules below are the quality gate.
+
+## Paths
+
+Two machines, both valid: pick the column for the one you're on, never mix them.
+
+| Mac | Windows PC |
+|---|---|
+| `~/Documents/GitHub/conf42` | `Documents\GitHub\src` (the same conf42 repo, cloned as `src`) |
+| `~/Documents/GitHub/{website,llmday,platformday,2026.promptengineering.rocks}` | `Documents\GitHub\<same names>` |
+| `env/bin/python -m build.blog_plan ...` (from the repo root) | `$env:PYTHONUTF8=1; C:\Users\marek\AppData\Local\Programs\Python\Python312\python.exe -m build.blog_plan ...` (bare `python` is the Store stub) |
+| `blog/drafts/` (git-ignored) | `blog\drafts\` |
+
+The planner reads the four sister repos as siblings of the conf42 checkout; one that's missing just gets no plugs.
+
+## Post types (Ref -> what makes it exist)
+
+| Type | Ref | Date | What it is |
+|---|---|---|---|
+| `talk` | `talk:<event short_url>/<Name1>` | spread evenly up to the day before the event | 500-900 words: why the talk matters, its sharpest idea, who should watch, 2-3 related Conf42 talks. Links the talk page. Never pastes the transcript |
+| `sponsored` | `sponsor:<short_url>/<sponsor id>/<Name1>` | day 0 / -1,0 / round robin -1,0,+1 | Only sponsors who deliver a talk. Informative first: the problem, the approach, what the speaker showed. Ends with a "From <Sponsor>" links block (sponsors.csv url + subpages.csv links) |
+| `roundup` | `event:<short_url>` | event + 1 | The conference summary: themes with the talks that carried them (linked), sponsors who joined in (linked), the event page and playlist |
+| `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (PLATFORMday except London 2027 Q2): no code, "it's free, register" |
+| `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
+
+Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk -> headshot, roundup -> event
+splash, webinar -> its splash, plug -> the sister site's hero photo). The planner suggests an existing
+`<EVENT><YEAR>_<Sponsor>.png` for sponsored posts - use it when given. Never make new art.
+
+## The run ("run blog maintenance")
+
+1. `git pull --rebase` in conf42 and the four sister repos (stash local changes in conf42 first, pop after).
+2. `env/bin/python -m build.blog_plan plan > /tmp/plan.json` (also refreshes `_db/sister_events.json`). Read:
+   - `orphaned` -> `python -m build.blog_plan orphan` (sets Status=orphaned; the build already hides them).
+   - `due` -> write all of them (the next 7 days at minimum; future-dated rows are fine, they wait for their day).
+   - `enrich` -> the talk now has its video/transcript: add the embed link + 1-2 transcript-backed details, re-`add`
+     (Updated is set automatically).
+   - backfill: then `backfill_next` (roundups, sponsored, webinars of finished 2025+ events), then ONE event from
+     `backfill_talk_events` (newest first). Backfill keeps the planned historical dates, written timelessly.
+   - `crowded` dates: nudge new talk posts by a day if a date already holds 6+.
+3. For each post, read the real sources first (paths are in the plan item):
+   - talk row: Title, Abstract, bio (event CSV), Company, Keywords; transcript `assemblyai/<YouTubeId>.json` (`text`,
+     `summary`) or `srt/<short_url>_<Name1>.srt`.
+   - sponsored: also `_db/sponsors.csv`, `_db/subpages.csv`, the sponsor's URL.
+   - roundup: every talk of the event (titles, companies, summaries), `metadata.yml` sponsors + playlist_url.
+   - plug: the sister event's `metadata.yml` and `_db/talks.csv` (companies, titles, tracks); venue per
+     [[venue-company-hq]] ("X HQ"); Luma link `https://luma.com/event/<luma_evt>`.
+   - webinar: Drive connector on the **work account** (mark@sreday.com), folder `Snoop`, doc titled
+     `YYYY-MM-DD HH:MM · <title>` (summary, next steps, transcript); plus the WEBINARS.csv row. No doc yet -> skip,
+     the plan keeps listing it.
+4. Write each post as `blog/drafts/<ShortURL>.md` (front matter: Title, Description <=160 chars, Date, ShortURL
+   `YYYY-MM-DD-lowercase-words` matching Date, Type, Event, Ref, Sponsor (sponsored), Tags; then the Markdown body,
+   starting with prose - no `#` heading, the page prints the Title). URLs stay at the site root like the old posts
+   (the site uses relative asset paths; a /blog/ folder would break them).
+5. Plugs for paid events: Luma connector `list_coupons` on the event; if CONF42 is missing, `create_coupon` CONF42,
+   42% off. Free events: skip.
+6. `python -m build.blog_plan add blog/drafts/*.md`, then `python -m build.blog_plan lint` until it reports 0.
+7. `env/bin/python -m build.generate` once (no loops) and open one new post's HTML to eyeball title/meta.
+8. Commit (`_db/blog.csv`, `_db/sister_events.json`, `blog/CHANGELOG.md`) and push main directly.
+9. Mirror to the Sheet: `python -m build.blog_plan export /tmp/blog.json`, then Sheets connector `update_values` on
+   spreadsheet `1_-90A9g5_ACqeZl9bQuIHwfox2_-2gGh3cJMNjBrsHs`, tab `blog`, starting at `A1` (values only, never
+   formatting; clear rows below the new end if the CSV shrank). Cells over 50,000 chars: say so, don't truncate.
+10. Append a dated entry to `blog/CHANGELOG.md`: what was published/scheduled/orphaned/enriched, what's next.
+11. Tell Marek in a few lines: N posts written (by type), next due dates, anything skipped and why.
+
+## House voice (read `blog/STYLE.md` before writing - it has the good-vs-slop examples)
+
+Witty, nerdy, smart. A senior engineer telling a peer about a talk worth their evening. Lead with the most surprising
+concrete thing in the source. Full names: people, companies, tools, versions. One on-topic joke per section, max.
+Short paragraphs, plain verbs, real numbers only. Answer-first: the first two sentences say who, what, at which
+Conf42 event, and the takeaway (that's the passage search engines and AI answers quote).
+
+## Hard rules
+
+- Never invent a quote, number, feature, customer or result. Quotes are verbatim from the transcript/abstract (the
+  linter checks). No transcript yet? Write from the abstract and say "in the talk" without quoting.
+- Never touch rows dated before 2025 (the linter refuses).
+- Never edit the talk CSVs, metadata.yml lineups or WEBINARS.csv to make the blog work - report the data problem.
+- One post per Ref. A removed talk's post stays orphaned even if the speaker comes back under a new row: write fresh.
+- No doorway content: no per-city/per-keyword clones, no "Top 10" lists of the same talks.
+- Sponsored posts carry the sponsor's links but are not ads: no "best-in-class", no pricing claims.
+- PLATFORMday free events never mention a code; webinars never mention a code.

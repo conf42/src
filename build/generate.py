@@ -32,6 +32,7 @@ from .shared import (
     conventional_slides_name,
 )
 from .events import get_enriched_metadata
+from .blog import video_jsonld
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
@@ -50,10 +51,13 @@ def get_asset_version():
     except Exception:
         return str(int(time.time()))
 SITEMAP_URLS = []
+SITEMAP_LASTMOD = {}
 
-# store urls for the sitemap.xml
-def register_url(url):
+# store urls for the sitemap.xml (lastmod only where the date is real - blog posts; never "now" on every rebuild)
+def register_url(url, lastmod=None):
     SITEMAP_URLS.append(url)
+    if lastmod:
+        SITEMAP_LASTMOD[url] = lastmod
 
 print(DIVIDER)
 print("Loading the context")
@@ -341,7 +345,8 @@ for event in context.get("events"):
         # template the talk subpage
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
-            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, prev_talk=prev_talk, next_talk=next_talk, **context))
+            f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, prev_talk=prev_talk, next_talk=next_talk,
+                                    talk_video=video_jsonld(talk, event, get_canonical_url(talk.get("short_url"))) if event.get("released") else None, **context))
             register_url(talk.get("short_url").replace(".html",""))
         # template the secret talk subpage
         if event.get("secret_url"):
@@ -420,18 +425,14 @@ for podcast in podcasts:
 
 print(DIVIDER)
 print("Generating blog posts")
-try:
-    posts = sorted(read_csv("./_db/blog.csv"), key=lambda x: x.get("Date"), reverse=True)
-    context["posts"] = posts
-    print("Loaded %s posts" % len(posts))
-except Exception as e:
-    print("Couldn't read blog posts", e)
-# prepare the posts
-for post in posts:
-    post["Date"] = dateutil.parser.parse(post["Date"])
-    # the 500px JPEG of the splash (make jpeg) instead of the 1-1.5 MB PNG, like event cards
-    if post.get("ThumbnailPath"):
-        post["ThumbnailPath"] = pick_picture_file(BASE_FOLDER + "/", post["ThumbnailPath"])
+# the living blog (build/blog.py): only rows that are due, not hidden and whose Ref still exists in the repo
+from .blog import load_posts, write_feed, write_robots, write_llms, write_indexnow, FEED_FILE
+posts, blog_dropped = load_posts(context, BASE_FOLDER)
+context["posts"] = posts
+context["blog_feed"] = FEED_FILE
+print("Loaded %d posts, %d kept off the site" % (len(posts), len(blog_dropped)))
+for slug, reason in blog_dropped:
+    print("  blog: %s - %s" % (slug, reason))
 # template out the posts
 for post in posts:
     # just for dev experience - 2s vs 12s
@@ -443,8 +444,8 @@ for post in posts:
     print("Generating blog post subpage for", post.get("ShortURL"))
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, canonical=get_canonical_url(post.get("ShortURL")),  **context))
-        register_url(post.get("ShortURL").replace(".html",""))
+        f.write(template.render(post=post, canonical=post["canonical"],  **context))
+        register_url(post.get("ShortURL").replace(".html",""), lastmod=post["updated_iso"])
 
 # BRANDS (conf42.com/brands, Marek 2026-09-28): brands.yaml + live numbers from the sister sites (build/brands.py)
 print(DIVIDER)
@@ -555,7 +556,13 @@ print("Generating sitemap.xml with %d items" % len(SITEMAP_URLS))
 now = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
 with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
     template = env.get_template("sitemap.xml")
-    f.write(template.render(urls=SITEMAP_URLS, now=now))
+    f.write(template.render(urls=SITEMAP_URLS, lastmod=SITEMAP_LASTMOD, now=now))
+
+# BLOG FEED + robots.txt + llms.txt (build/blog.py)
+write_feed(posts, BASE_FOLDER, datetime.datetime.now(datetime.timezone.utc))
+write_robots(BASE_FOLDER)
+write_llms(context, posts, BASE_FOLDER)
+write_indexnow(posts, BASE_FOLDER)
 
 print(DIVIDER)
 print("Warnings")
