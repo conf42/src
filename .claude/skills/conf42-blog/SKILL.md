@@ -34,7 +34,7 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 | `talk` | `talk:<event short_url>/<Name1>` | spread evenly up to the day before the event | 500-900 words: why the talk matters, its sharpest idea, who should watch, 2-3 related Conf42 talks. Links the talk page. Never pastes the transcript |
 | `sponsored` | `sponsor:<short_url>/<sponsor id>/<Name1>` | day 0 / -1,0 / round robin -1,0,+1 | Only sponsors who deliver a talk. Informative first: the problem, the approach, what the speaker showed. Ends with a "From <Sponsor>" links block (sponsors.csv url + subpages.csv links) |
 | `roundup` | `event:<short_url>` | event + 1 | The conference summary: themes with the talks that carried them (linked), sponsors who joined in (linked), the event page and playlist |
-| `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (PLATFORMday except London 2027 Q2): no code, "it's free, register" |
+| `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (`registration_free: true` - Chennai, Warsaw 2027, Tel Aviv - and PLATFORMday except London 2027 Q2): no code, "it's free, register" |
 | `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
 
 Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk -> headshot, roundup -> event
@@ -93,4 +93,12 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
 - One post per Ref. A removed talk's post stays orphaned even if the speaker comes back under a new row: write fresh.
 - No doorway content: no per-city/per-keyword clones, no "Top 10" lists of the same talks.
 - Sponsored posts carry the sponsor's links but are not ads: no "best-in-class", no pricing claims.
-- PLATFORMday free events never mention a code; webinars never mention a code.
+- Free events (planner `paid: false`) never mention a code; webinars never mention a code.
+
+## Bible copies (Marek: "add your skills to the flows/bible religiously")
+
+- Every change to this skill or blog/STYLE.md: re-upload both to Drive `Claude (private)/skills/conf42-blog/`
+  (text/plain, disableConversionToGoogleType, fileSize must equal the local byte count, then trash the older copy).
+  The helpers (build/blog.py, build/blog_plan.py) live in the conf42 repo, which is their master.
+- Every run, new flow or new rule: one line in the flows scrapbook (Drive `Claude (private)/scrapbooks/flows-scrapbook.md`,
+  `YYYY-MM-DD | Conf42 blog | what | status`), new kinds of post into its playbook.
