@@ -111,7 +111,12 @@ def sister_events():
             domain = m.get("brand_domain") or ""
             hero = (m.get("hero_pictures") or [""])[0]
             talks_csv = os.path.join(os.path.dirname(meta), "_db", "talks.csv")
-            paid = folder in PAID_PLATFORMDAY if brand == "PLATFORMday" else True
+            # the sites' own rule: metadata registration_free wins (Chennai, Warsaw, Tel Aviv are free), else
+            # PLATFORMday is free and the rest are paid
+            if m.get("registration_free") is not None:
+                paid = not m["registration_free"]
+            else:
+                paid = brand != "PLATFORMday" or folder in PAID_PLATFORMDAY
             out.append(dict(
                 ref="sister:%s/%s" % (repo, folder), repo=repo, folder=folder, brand=m.get("brand_name") or brand,
                 date=date.isoformat(), date_string=m.get("date_string") or "", city=m.get("city_name") or "",
