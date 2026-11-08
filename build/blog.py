@@ -300,9 +300,10 @@ def write_feed(posts, base_folder, now):
 
 
 def write_robots(base_folder):
-    """robots.txt: everyone welcome (AI search crawlers named, so a later blanket rule can't shut them out by accident)."""
+    """robots.txt: everyone welcome, AI *search* crawlers named. Cloudflare prepends its managed block (content signals,
+    ai-train=no: ClaudeBot, GPTBot, Google-Extended... disallowed) - training bots are left to it, never re-allowed here."""
     lines = ["User-agent: *", "Allow: /", ""]
-    for bot in ("OAI-SearchBot", "ChatGPT-User", "PerplexityBot", "ClaudeBot", "Claude-SearchBot", "Google-Extended", "Bingbot"):
+    for bot in ("OAI-SearchBot", "ChatGPT-User", "PerplexityBot", "Perplexity-User", "Claude-SearchBot", "Claude-User", "Bingbot"):
         lines += ["User-agent: " + bot, "Allow: /", ""]
     lines.append("Sitemap: %ssitemap.xml" % SITE)
     with open(os.path.join(base_folder, "robots.txt"), "w") as f:
