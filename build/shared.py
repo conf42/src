@@ -119,7 +119,9 @@ def pick_picture_file(base, pic):
     return pic
 
 def get_canonical_url(page):
-    canonical = "https://conf42.com/{}".format(page.replace(".html",""))
+    # one host everywhere (sitemap, base_path and the deploy CNAME are www); the home page is the bare domain
+    page = page.replace(".html", "")
+    canonical = "https://www.conf42.com/{}".format("" if page == "index" else page)
     return canonical
 
 
