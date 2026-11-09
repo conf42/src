@@ -44,6 +44,7 @@ import json
 import os
 import re
 import subprocess
+import urllib.request
 import sys
 
 import yaml
@@ -125,11 +126,26 @@ def sister_events():
                 luma_url=("https://luma.com/event/" + m["luma_evt"]) if m.get("luma_evt") else "",
                 url="https://%s/%s" % (domain, folder) if domain else "", domain=domain, paid=paid,
                 code="CONF42" if paid else "",
-                image="https://%s/photos/%s" % (domain, hero.split("/")[-1]) if domain and hero else "",
+                image=(None if "/past/" in meta else _og_image("https://%s/%s/" % (domain, folder) if domain else ""))
+                      or ("https://%s/photos/%s" % (domain, hero.split("/")[-1]) if domain and hero else ""),
                 past="/past/" in meta, talks_csv=os.path.relpath(talks_csv, HERE) if os.path.exists(talks_csv) else "",
             ))
     out.sort(key=lambda e: (e["date"], e["ref"]))
     return out
+
+
+def _og_image(url):
+    """the event's own splash (Marek 2026-11-09: plugs show the sister event's splash, not a venue photo) - the og:image
+    its live page publishes; "" when the page can't be read"""
+    import urllib.request
+    if not url:
+        return ""
+    try:
+        html = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "conf42-blog"}), timeout=20).read().decode("utf-8", "replace")
+    except Exception:
+        return ""
+    m = re.search(r'<meta property="og:image" content="([^"]+)"', html)
+    return m.group(1) if m else ""
 
 
 def write_sister_json(events):
@@ -315,6 +331,14 @@ def plan(args):
             enrich.append(dict(ShortURL=r.get("ShortURL"), Ref=ref, youtube=talk.get("YouTube"),
                                transcripts=transcript_paths(event, talk)))
 
+    # one video linked from two talks = a copy-paste slip in the sheet (Marek fixes the sheet; never write from it)
+    by_video = collections.defaultdict(list)
+    for ev in ctx["events"]:
+        for t in ev.get("talks_raw") or []:
+            yid = re.split(r"[?&#]", (t.get("YouTube") or "").strip().split("/")[-1])[0]
+            if yid:
+                by_video[yid].append("%s/%s" % (ev.get("short_url", "").replace(".html", ""), t.get("Name1")))
+    shared_video = {y: who for y, who in by_video.items() if len({w.split("/", 1)[1] for w in who}) > 1}   # Remix re-airs: same speaker, fine
     per_day = collections.Counter([r.get("Date", "")[:10] for r in rows if r.get("Date", "") >= today.isoformat()] + [m["date"] for m in due])
     out = dict(
         today=today.isoformat(),
@@ -323,6 +347,7 @@ def plan(args):
         backfill_talk_events=talk_events,
         orphaned=orphaned,
         enrich=enrich,
+        shared_video=shared_video,
         crowded={d: n for d, n in sorted(per_day.items()) if n > MAX_PER_DAY},
         counts=dict(rows=len(rows), due=len(due), backfill_first=len(first),
                     backfill_talks=sum(e["count"] for e in talk_events), orphaned=len(orphaned), enrich=len(enrich)),
@@ -556,6 +581,20 @@ def add(args):
     write_blog_rows(rows)
 
 
+def replace(args):
+    """Status=replaced:<new ShortURL> on an older post the new one supersedes (Marek 2026-11-09: duplicates -> keep the
+    new post, purge the old). The old row stays for history; the build turns its URL into a redirect to the new post."""
+    rows = read_blog_rows()
+    by = {r.get("ShortURL"): r for r in rows}
+    for pair in args.pairs:
+        old, _, new = pair.partition("=")
+        if old not in by or new not in by:
+            raise SystemExit("unknown ShortURL in %r" % pair)
+        by[old]["Status"] = "replaced:" + new
+        print("replaced", old, "->", new)
+    write_blog_rows(rows)
+
+
 def release(args):
     """Status=queued holds a written post back (Marek 2026-11-09: big backfills go out over 2-3 days, not at once).
     Newest first: recent events are what readers (and crawlers) care about most."""
@@ -602,12 +641,34 @@ def orphan(args):
     for r in live:
         if id(r) not in why and any(m.group(1) in dead for m in YOUTUBE_IN_BODY.finditer(r.get("Body") or "")):
             why[id(r)] = "video deleted on YouTube"
+    # one video under two speakers' talks (a sheet slip): YouTube's title names the real speaker; the other post is held
+    # back (hidden, not orphaned - it comes back once the sheet has the right link)
+    by_video = collections.defaultdict(list)
+    for r in live:
+        if id(r) not in why:
+            ok, linked = resolver.resolve(r["Ref"])
+            yid = re.split(r"[?&#]", ((linked.get("talk") or {}).get("YouTubeId") or ""))[0]
+            if yid:
+                by_video[yid].append((r, linked["talk"].get("Name1") or ""))
+    held = []
+    for yid, posts in by_video.items():
+        if len({n for _, n in posts}) < 2:
+            continue
+        try:
+            title = json.load(urllib.request.urlopen("https://www.youtube.com/oembed?format=json&url=https://youtu.be/" + yid, timeout=20))["title"]
+        except Exception:
+            continue
+        for r, name in posts:
+            if _norm(name) not in _norm(title):
+                r["Status"] = "hidden"
+                held.append(r)
+                print("hidden", r.get("ShortURL"), r.get("Ref"), "- links %s, which is %r" % (yid, title))
     for r in live:
         if id(r) in why:
             r["Status"] = "orphaned"
             print("orphaned", r.get("ShortURL"), r.get("Ref"), "-", why[id(r)])
     write_blog_rows(rows)
-    print("%d row(s) orphaned (%d videos checked)" % (len(why), len(ids)))
+    print("%d row(s) orphaned, %d held for a wrong video link (%d videos checked)" % (len(why), len(held), len(ids)))
 
 
 def export(args):
@@ -635,6 +696,8 @@ def main():
     c.add_argument("drafts", nargs="+")
     c.add_argument("-v", "--verbose", action="store_true")
     sub.add_parser("orphan")
+    rp = sub.add_parser("replace")
+    rp.add_argument("pairs", nargs="+", help="OLD_SHORTURL=NEW_SHORTURL")
     rl = sub.add_parser("release")
     rl.add_argument("n", type=int)
     e = sub.add_parser("export")
@@ -651,7 +714,7 @@ def main():
     elif args.cmd == "check":
         sys.exit(check(args))
     else:
-        {"add": add, "orphan": orphan, "export": export, "release": release}[args.cmd](args)
+        {"add": add, "orphan": orphan, "export": export, "release": release, "replace": replace}[args.cmd](args)
 
 
 if __name__ == "__main__":
