@@ -6,6 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 N="${1:-450}"
 git pull --rebase --autostash -q
+env/bin/python -m build.blog_plan orphan | tail -1   # purged talks/videos never go out
 env/bin/python -m build.blog_plan release "$N" | tail -1
 git add _db/blog.csv
 git commit -qm "Blog: release $N queued posts" && git push -q

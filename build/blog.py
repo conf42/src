@@ -23,6 +23,7 @@ import dateutil.parser
 import markdown
 
 from .shared import make_remote_address, pick_picture_file, read_csv
+from .teasers import _slug as _teaser_slug
 
 SITE = "https://www.conf42.com/"
 BLOG_CSV = "./_db/blog.csv"
@@ -115,12 +116,36 @@ def _body(text):
     return _LEADING_H1.sub("", text or "", count=1).strip()
 
 
+def _youtube_id(talk):
+    """The video id without a share link's "?si=..." tail."""
+    return re.split(r"[?&#]", (talk or {}).get("YouTubeId") or "")[0]
+
+
+YOUTUBE_IN_BODY = re.compile(r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|live/))([\w-]{11})")
+
+
+def video_purged(post, linked):
+    """A talk whose video was out (the post links it) and whose YouTube cell is now empty: the speaker had the video taken
+    down, maybe years later, and the post goes with it (Marek 2026-11-09). A new link (re-upload) keeps the post."""
+    talk = linked.get("talk")
+    return bool(talk) and not _youtube_id(talk) and bool(YOUTUBE_IN_BODY.search(post.get("Body") or ""))
+
+
 def _image(post, linked, base_folder):
     """ThumbnailPath as given (local splash -> its 500px JPEG, or an absolute URL); empty -> from what the post is about."""
     path = (post.get("ThumbnailPath") or "").strip()
+    talk = linked.get("talk")
+    # a talk's post shows the talk's 16:9 YouTube thumbnail, never the headshot (Marek 2026-11-09): every talk on the blog has its video
+    if _youtube_id(talk):
+        return "https://i.ytimg.com/vi/%s/maxresdefault.jpg" % _youtube_id(talk)
+    # before the video is out: the same thumbnail as drawn on the event's teaser page (2026+ events have one)
+    event = linked.get("event")
+    if talk and event and str(event.get("date"))[:4] >= "2026" and "/headshots/" in (talk.get("Picture") or ""):
+        slug = event["short_url"].replace(".html", "")
+        names = " ".join((talk.get("Name%d" % k) or "").strip() for k in (1, 2)).strip()
+        return "https://www.conf42.com/%s/conf42-%s-%s-thumbnail.png" % (slug, slug, _teaser_slug(names))
     if path:
         return path if re.match(r"^https?://", path) else pick_picture_file(base_folder + "/", path)
-    talk, event = linked.get("talk"), linked.get("event")
     if talk and talk.get("Picture"):
         pic = talk["Picture"]   # generate.py has already made it a URL by the time posts load
         return pic if re.match(r"^https?://", pic) else make_remote_address("headshots", pic)
@@ -144,7 +169,7 @@ def _iso_duration(minutes):
 
 def video_jsonld(talk, event, url):
     """schema.org VideoObject for a talk with a YouTube video, or None."""
-    yid = (talk or {}).get("YouTubeId")
+    yid = _youtube_id(talk)
     if not yid:
         return None
     speakers = [n for n in ((talk.get("Name1") or "").strip(), (talk.get("Name2") or "").strip()) if n]
@@ -245,6 +270,9 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         ok, linked = resolver.resolve(post.get("Ref"))
         if not ok:
             dropped.append((slug, "Ref gone: %s" % post.get("Ref")))
+            continue
+        if video_purged(post, linked):
+            dropped.append((slug, "video purged: %s" % post.get("Ref")))
             continue
         try:
             updated = max(_date(post.get("Updated")) or date, date)

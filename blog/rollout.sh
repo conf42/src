@@ -12,6 +12,7 @@ N="${1:-72}"
 HOURS="${2:-4}"
 while :; do
     git pull --rebase --autostash -q
+    env/bin/python -m build.blog_plan orphan | tail -1   # purged talks/videos never go out
     LEFT=$(env/bin/python -m build.blog_plan release "$N" | tail -1)
     if git diff --quiet _db/blog.csv; then
         echo "$(date '+%F %T') nothing left to release"; break
