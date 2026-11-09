@@ -64,3 +64,12 @@ what's next.
 - Held (hidden) for a wrong video link in the sheet: platform2026 Sergey Pronin (links Shem Magnezi's),
   sre2026 Bhargavaram Potharaju (links Abhiram's), sre2025 Sujeeth Manchikanti (links Vishal Jaiswal's).
 
+
+## 2026-11-09 (evening) - wrong links fixed, search
+- Audit of every 2025+ talk link vs the event playlists/YouTube: 3 wrong links fixed in Excels_for_WWW + the CSVs
+  (Sergey Pronin, Bhargavaram Potharaju, Sujeeth Manchikanti); their posts link the right video and are back.
+- The 9 "wrong transcript" talks: transcripts match the published videos to the second (Descript agrees for the 2026
+  ones) - the speakers recorded a different talk than the sheet title. 8 posts written from the recordings (queued);
+  Krishna Rao Vemula Golang 2025 skipped: same recording as his SRE 2025 video.
+- Sandeep Gourneni (ML 2025): video gone; not among the channel's 3,849 public uploads. Post stays orphaned.
+- /blog search field (the conference pages' talk search).
