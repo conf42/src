@@ -47,3 +47,12 @@ what's next.
 - Speaker privacy: empty/non-employer Company1 is deliberate. 52 posts edited to drop employers named only in the
   recording and every "listed with"/"the CSV" phrasing; lint now rejects that phrasing.
 - 3 plugs unhidden: CONF42 is a calendar-level Luma coupon.
+
+## 2026-11-09 (midday) - cards + purged videos
+- Cards: 16:9 YouTube thumbnail for talk posts (teaser-page thumbnail before the video is out), never the headshot;
+  every card 16:9; "BLOG" pill; /blog = 4 a row, titles only.
+- Purged videos take their post: the build hides a talk whose YouTube link was emptied; `blog_plan orphan` also
+  checks every linked video on YouTube and orphans dead ones; rollout/release run it before each slice.
+- Orphaned: ml2025/llms-translate-cobol-humans-sign-off (Sandeep Gourneni, video gone from YouTube).
+- YouTube ids with a `?si=` share tail are cleaned in the build (one ML talk).
+

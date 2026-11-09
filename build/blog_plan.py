@@ -48,7 +48,7 @@ import sys
 
 import yaml
 
-from .blog import BLOG_CSV, SISTER_JSON, WEBINARS_CSV, Resolver, _norm
+from .blog import BLOG_CSV, SISTER_JSON, WEBINARS_CSV, YOUTUBE_IN_BODY, Resolver, _norm, video_purged
 from .shared import read_csv
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the conf42 repo
@@ -568,19 +568,46 @@ def release(args):
     print("queued left: %d" % max(0, len(queued) - args.n))
 
 
+def video_gone(yid):
+    """True when YouTube says the video doesn't exist (deleted or private); a network hiccup counts as alive."""
+    import urllib.error
+    import urllib.request
+    try:
+        urllib.request.urlopen("https://www.youtube.com/oembed?format=json&url=https://youtu.be/" + yid, timeout=20)
+        return False
+    except urllib.error.HTTPError as e:
+        return e.code in (401, 403, 404)
+    except Exception:
+        return False
+
+
 def orphan(args):
+    """Status=orphaned on rows whose Ref is gone, whose talk lost its YouTube link, or whose linked video YouTube no
+    longer has (purged videos take their post with them, Marek 2026-11-09)."""
+    import concurrent.futures
     ctx = load_context()
     resolver = Resolver(ctx["events"], ctx["sponsors"])
     rows = read_blog_rows()
-    n = 0
-    for r in rows:
-        ref = (r.get("Ref") or "").strip()
-        if ref and (r.get("Status") or "").lower() not in ("orphaned", "hidden") and not resolver.resolve(ref)[0]:
+    live = [r for r in rows if (r.get("Ref") or "").strip() and (r.get("Status") or "").lower() not in ("orphaned", "hidden")]
+    why = {}
+    for r in live:
+        ok, linked = resolver.resolve(r["Ref"])
+        if not ok:
+            why[id(r)] = "Ref gone"
+        elif video_purged(r, linked):
+            why[id(r)] = "video link removed"
+    ids = sorted({m.group(1) for r in live if id(r) not in why for m in YOUTUBE_IN_BODY.finditer(r.get("Body") or "")})
+    with concurrent.futures.ThreadPoolExecutor(24) as pool:
+        dead = {y for y, gone in zip(ids, pool.map(video_gone, ids)) if gone}
+    for r in live:
+        if id(r) not in why and any(m.group(1) in dead for m in YOUTUBE_IN_BODY.finditer(r.get("Body") or "")):
+            why[id(r)] = "video deleted on YouTube"
+    for r in live:
+        if id(r) in why:
             r["Status"] = "orphaned"
-            n += 1
-            print("orphaned", r.get("ShortURL"), ref)
+            print("orphaned", r.get("ShortURL"), r.get("Ref"), "-", why[id(r)])
     write_blog_rows(rows)
-    print("%d row(s) orphaned" % n)
+    print("%d row(s) orphaned (%d videos checked)" % (len(why), len(ids)))
 
 
 def export(args):

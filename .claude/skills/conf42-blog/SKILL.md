@@ -37,7 +37,8 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 | `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (`registration_free: true` - Chennai, Warsaw 2027, Tel Aviv - and PLATFORMday except London 2027 Q2): no code, "it's free, register" |
 | `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
 
-Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk -> headshot, roundup -> event
+Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk/sponsored -> the video's 16:9 YouTube
+thumbnail, before the video is out the teaser page's rendered thumbnail, never the headshot; roundup -> event
 splash, webinar -> its splash, plug -> the sister site's hero photo). The planner suggests an existing
 `<EVENT><YEAR>_<Sponsor>.png` for sponsored posts - use it when given. Never make new art.
 
@@ -45,7 +46,10 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
 
 1. `git pull --rebase` in conf42 and the four sister repos (stash local changes in conf42 first, pop after).
 2. `env/bin/python -m build.blog_plan plan > /tmp/plan.json` (also refreshes `_db/sister_events.json`). Read:
-   - `orphaned` -> `python -m build.blog_plan orphan` (sets Status=orphaned; the build already hides them).
+   - `orphaned` -> `python -m build.blog_plan orphan` (sets Status=orphaned; the build already hides them). Purged videos
+     go too (Marek 2026-11-09; speakers ask years later): `orphan` also orphans a talk whose YouTube cell was emptied
+     and any post whose linked video YouTube no longer has (oEmbed 404). Run it every maintenance run; the rollout
+     scripts run it before each slice. The build hides an emptied-link post on its own.
    - `due` -> write all of them (the next 7 days at minimum; future-dated rows are fine, they wait for their day).
    - `enrich` -> the talk now has its video/transcript: add the embed link + 1-2 transcript-backed details, re-`add`
      (Updated is set automatically).
@@ -128,3 +132,8 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
   The helpers (build/blog.py, build/blog_plan.py) live in the conf42 repo, which is their master.
 - Every run, new flow or new rule: one line in the flows scrapbook (Drive `Claude (private)/scrapbooks/flows-scrapbook.md`,
   `YYYY-MM-DD | Conf42 blog | what | status`), new kinds of post into its playbook.
+
+## /blog list
+
+Cards are 16:9, cropped to fill, with a "BLOG" pill in the corner; /blog shows 4 a row, picture + title only
+(Marek 2026-11-09). The home page keeps its 2 bigger cards.
