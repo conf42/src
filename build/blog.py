@@ -291,7 +291,30 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
             post["jsonld"] = _post_jsonld(post)
         visible.append(post)
     visible.sort(key=lambda p: (p["Date"], p.get("ShortURL") or ""), reverse=True)
+    for slug in spread_images(visible):
+        print("WARN blog: %s has the same picture as the post before it" % slug)
     return visible, dropped
+
+
+def spread_images(posts):
+    """No two cards in a row with the same picture (Marek 2026-11-09; a speaker back at the same event type a year
+    later may share one, never side by side): a repeat swaps with a later post of the same day - order within a day
+    means nothing. -> ShortURLs still repeating (none to swap with), for the build log."""
+    left = []
+    for i in range(1, len(posts)):
+        if posts[i].get("ThumbnailPath") != posts[i - 1].get("ThumbnailPath"):
+            continue
+        for j in range(i + 1, len(posts)):
+            if posts[j]["Date"] != posts[i]["Date"]:
+                break
+            if posts[j].get("ThumbnailPath") != posts[i - 1].get("ThumbnailPath"):
+                posts[i], posts[j] = posts[j], posts[i]
+                break
+        else:
+            left.append(posts[i].get("ShortURL"))
+        if posts[i].get("ThumbnailPath") == posts[i - 1].get("ThumbnailPath") and posts[i].get("ShortURL") not in left:
+            left.append(posts[i].get("ShortURL"))
+    return left
 
 
 def _rfc3339(iso_date):

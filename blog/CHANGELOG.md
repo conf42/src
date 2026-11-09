@@ -56,3 +56,11 @@ what's next.
 - Orphaned: ml2025/llms-translate-cobol-humans-sign-off (Sandeep Gourneni, video gone from YouTube).
 - YouTube ids with a `?si=` share tail are cleaned in the build (one ML talk).
 
+## 2026-11-09 (afternoon) - thumbnails, plugs, duplicates
+- YouTube thumbnails: cut shoulders carried on with LaMa (36 photos; hair keeps its fade). Only those redraw.
+- Plugs show the sister event's own splash (og:image), not a venue photo.
+- 21 Jan-2026 event overviews of 2025-26 events -> `replaced:` by their roundups (old URLs redirect).
+- No same picture on two cards in a row (build check + swap within a day).
+- Held (hidden) for a wrong video link in the sheet: platform2026 Sergey Pronin (links Shem Magnezi's),
+  sre2026 Bhargavaram Potharaju (links Abhiram's), sre2025 Sujeeth Manchikanti (links Vishal Jaiswal's).
+

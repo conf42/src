@@ -39,7 +39,8 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 
 Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk/sponsored -> the video's 16:9 YouTube
 thumbnail, before the video is out the teaser page's rendered thumbnail, never the headshot; roundup -> event
-splash, webinar -> its splash, plug -> the sister site's hero photo). The planner suggests an existing
+splash, webinar -> its splash, plug -> the sister event's own splash = the og:image of its live page, refreshed into
+`_db/sister_events.json` by every `plan`; hero photo only as a fallback). The planner suggests an existing
 `<EVENT><YEAR>_<Sponsor>.png` for sponsored posts - use it when given. Never make new art.
 
 ## The run ("run blog maintenance")
@@ -50,6 +51,10 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
      go too (Marek 2026-11-09; speakers ask years later): `orphan` also orphans a talk whose YouTube cell was emptied
      and any post whose linked video YouTube no longer has (oEmbed 404). Run it every maintenance run; the rollout
      scripts run it before each slice. The build hides an emptied-link post on its own.
+     The same sweep holds back (`hidden`) a post whose talk links ANOTHER speaker's video (sheet copy-paste slip;
+     YouTube's oEmbed title names the real speaker). `plan` lists such videos under `shared_video` (Remix re-airs by
+     the same speaker are fine). Tell Marek to fix the sheet; once the talk has its own video, check the post against
+     the right transcript, re-`add` it, and set its Status back to empty.
    - `due` -> write all of them (the next 7 days at minimum; future-dated rows are fine, they wait for their day).
    - `enrich` -> the talk now has its video/transcript: add the embed link + 1-2 transcript-backed details, re-`add`
      (Updated is set automatically).
@@ -120,6 +125,9 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
   it as a data problem.
 - A sponsored speaker with two similar talks at two events is normal (slow-producing sponsors): both posts stay.
 - Never edit the talk CSVs, metadata.yml lineups or WEBINARS.csv to make the blog work - report the data problem.
+- A new post that covers what an older one did (the Jan 2026 bulk event overviews vs the roundups): keep the new
+  one, `python -m build.blog_plan replace OLD=NEW` (Marek 2026-11-09). Status becomes `replaced:<NEW>`, the old URL
+  turns into a redirect to the new post, nothing else shows it. Done for the 21 overviews of 2025-26 events.
 - One post per Ref. A removed talk's post stays orphaned even if the speaker comes back under a new row: write fresh.
 - No doorway content: no per-city/per-keyword clones, no "Top 10" lists of the same talks.
 - Sponsored posts carry the sponsor's links but are not ads: no "best-in-class", no pricing claims.
@@ -136,4 +144,10 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
 ## /blog list
 
 Cards are 16:9, cropped to fill, with a "BLOG" pill in the corner; /blog shows 4 a row, picture + title only
-(Marek 2026-11-09). The home page keeps its 2 bigger cards.
+(Marek 2026-11-09). The home page keeps its 2 bigger cards. Never the same picture on two cards in a row: the build
+swaps a repeat with another post of the same day and logs "WARN blog: ... same picture" if it can't - fix those
+(a speaker back at the same event type a year later may share a thumbnail, just not side by side).
+
+YouTube thumbnails (build/youtube_thumbnails.py): a headshot whose body is cut by its own frame gets the cut
+clothes/shoulders carried on by LaMa (+ its matte for the outline); hair at the cut keeps the old fade (BiSeNet
+face parsing, 25%+ hair). Checked once per headshot (cuts.json in the cache), models only in the render job.
