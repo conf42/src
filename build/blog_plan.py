@@ -5,6 +5,7 @@
     python -m build.blog_plan add <draft.md>...       upsert drafts (front matter + Markdown body) into _db/blog.csv
     python -m build.blog_plan orphan                  set Status=orphaned on every row whose Ref is gone
     python -m build.blog_plan export <out.json>       the CSV as rows of values, for the Excels_for_WWW "blog" tab
+    python -m build.blog_plan release <N>             publish the N oldest Status=queued posts (Status -> empty)
 
 Drafts (blog/drafts/<ShortURL>.md, git-ignored) look like:
     ---
@@ -547,6 +548,17 @@ def add(args):
     write_blog_rows(rows)
 
 
+def release(args):
+    """Status=queued holds a written post back (Marek 2026-11-09: big backfills go out over 2-3 days, not at once)."""
+    rows = read_blog_rows()
+    queued = sorted([r for r in rows if (r.get("Status") or "").strip().lower() == "queued"], key=lambda r: r.get("Date") or "")
+    for r in queued[:args.n]:
+        r["Status"] = ""
+        print("released", r.get("ShortURL"))
+    write_blog_rows(rows)
+    print("queued left: %d" % max(0, len(queued) - args.n))
+
+
 def orphan(args):
     ctx = load_context()
     resolver = Resolver(ctx["events"], ctx["sponsors"])
@@ -587,6 +599,8 @@ def main():
     c.add_argument("drafts", nargs="+")
     c.add_argument("-v", "--verbose", action="store_true")
     sub.add_parser("orphan")
+    rl = sub.add_parser("release")
+    rl.add_argument("n", type=int)
     e = sub.add_parser("export")
     e.add_argument("out")
     args = ap.parse_args()
@@ -601,7 +615,7 @@ def main():
     elif args.cmd == "check":
         sys.exit(check(args))
     else:
-        {"add": add, "orphan": orphan, "export": export}[args.cmd](args)
+        {"add": add, "orphan": orphan, "export": export, "release": release}[args.cmd](args)
 
 
 if __name__ == "__main__":
