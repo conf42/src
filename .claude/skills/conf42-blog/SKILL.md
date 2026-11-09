@@ -64,16 +64,23 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
    - webinar: Drive connector on the **work account** (mark@sreday.com), folder `Snoop`, doc titled
      `YYYY-MM-DD HH:MM · <title>` (summary, next steps, transcript); plus the WEBINARS.csv row. No doc yet -> skip,
      the plan keeps listing it.
-4. Write each post as `blog/drafts/<ShortURL>.md` (front matter: Title, Description <=160 chars, Date, ShortURL
-   `YYYY-MM-DD-lowercase-words` matching Date, Type, Event, Ref, Sponsor (sponsored), Tags; then the Markdown body,
-   starting with prose - no `#` heading, the page prints the Title). URLs stay at the site root like the old posts
-   (the site uses relative asset paths; a /blog/ folder would break them).
-5. Plugs for paid events: Luma connector `list_coupons` on the event; if CONF42 is missing, `create_coupon` CONF42,
-   42% off. Free events: skip.
+4. Write each post as `blog/drafts/<ShortURL>.md` (front matter: Title, Description <=160 chars, Date, ShortURL,
+   Type, Event, Ref, Sponsor (sponsored), Tags; then the Markdown body, starting with prose - no `#` heading, the
+   page prints the Title). **ShortURL:** posts of an event (talk, sponsored, roundup) live under it -
+   `<event short_url>/lowercase-words` (conf42.com/prompt2026/agent-prompt-is-one-layer), Marek 2026-11-09: the
+   conference is always in the URL, so similar talks at two events (Remix re-airs, a sponsor's repeat talk) never
+   look like duplicates. The build writes `docs/<event>/<slug>.html` with `<base href="/">` and a redirect stub at the
+   old root URL `<Date>-<slug>`. Plugs and webinars (no Event) stay `YYYY-MM-DD-lowercase-words` at the root.
+5. Plugs for paid events: CONF42 (42% off) is a **calendar-level** Luma coupon (Marek 2026-11-09), valid on every
+   event of the calendar - `list_coupons` with the event's `calendar_id`, not just `event_id`. Only if it is missing
+   there: `create_coupon` CONF42, 42% off. Free events: skip.
 6. `python -m build.blog_plan check <drafts>` lints drafts in memory without touching the CSV - parallel writers
    (one sub-agent per batch, each told to run only `check`) use it. Then `python -m build.blog_plan add blog/drafts/*.md`
    and `python -m build.blog_plan lint` until it reports 0. The linter also rejects links to talks the repo no
    longer has: local `docs/` keeps pages of removed talks, so "the file exists" is not proof.
+   Big batches (backfills, dozens of posts at once): `add` them, then set `Status: queued` on the new rows - never
+   push hundreds of live posts in one go. Marek starts `caffeinate -i blog/rollout.sh` (72 newest every 4 h, ~3 days
+   for 1,300) or `blog/release.sh N` (`blog_plan release N`) when he wants them out. Google-safe = gradual.
 7. `env/bin/python -m build.generate` once (no loops) and open one new post's HTML to eyeball title/meta.
 8. Commit (`_db/blog.csv`, `_db/sister_events.json`, `blog/CHANGELOG.md`) and push main directly.
 9. Mirror to the Sheet: `python -m build.blog_plan export /tmp/blog.json`, then Sheets connector `update_values` on
@@ -104,6 +111,10 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
 - Transcript is a different talk than the CSV row (wrong srt/YouTube): skip that post and report it. Abstract
   promises more than the talk delivers: write from the transcript and say so.
 - Talk/sponsored posts end with `[Watch the talk on YouTube](<url>).` once the video exists (that clears `enrich`).
+- Company1 empty or holding a job title/university is deliberate (the speaker doesn't want the employer shown):
+  never name an employer from the transcript, never mention "the CSV"/"listed with" (lint rejects it), never report
+  it as a data problem.
+- A sponsored speaker with two similar talks at two events is normal (slow-producing sponsors): both posts stay.
 - Never edit the talk CSVs, metadata.yml lineups or WEBINARS.csv to make the blog work - report the data problem.
 - One post per Ref. A removed talk's post stays orphaned even if the speaker comes back under a new row: write fresh.
 - No doorway content: no per-city/per-keyword clones, no "Top 10" lists of the same talks.

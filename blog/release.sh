@@ -1,5 +1,5 @@
 #!/bin/sh
-# Publish the next N queued blog posts (oldest Date first) and push; the deploy puts them live.
+# Publish the next N queued blog posts (newest Date first) and push; the deploy puts them live.
 # Big backfills go out over 2-3 days instead of all at once (Marek 2026-11-09).
 #   blog/release.sh 450        (~1,300 queued -> three runs, e.g. one a day)
 set -e

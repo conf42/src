@@ -442,6 +442,14 @@ for post in posts:
     if post.get("ExternalURL"):
         continue
     print("Generating blog post subpage for", post.get("ShortURL"))
+    if "/" in post.get("ShortURL"):
+        # <event>/<slug> (Marek 2026-11-09); the old root URL <Date>-<slug> stays alive as a redirect stub
+        os.makedirs(os.path.dirname(BASE_FOLDER + "/" + post.get("ShortURL")), exist_ok=True)
+        _old = BASE_FOLDER + "/" + str(post.get("Date"))[:10] + "-" + post.get("ShortURL").split("/", 1)[1] + ".html"
+        with open(_old, "w") as f:
+            f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
+                    '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
+                    % {"to": post["canonical"]})
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
         f.write(template.render(post=post, canonical=post["canonical"],  **context))

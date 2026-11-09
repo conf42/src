@@ -37,3 +37,13 @@ what's next.
 - blog_plan: `plan --all` (items for every backfill event); the pre-2025 freeze now covers legacy rows only (no Ref) - DevOps 2025 talk posts dated Dec 2024 are typed rows and editable.
 - Data issues for Marek: scratchpad oddities list (wrong transcripts, copied abstracts, shifted ML 2026 keywords, shared YouTube ids, Company1 holding job titles/universities).
 - Next: MLOps 2026 roundup (Nov 20); 2027 plugs; Reliaburger webinar once a Snoop doc exists; 3 held plugs need CONF42 coupons.
+
+## 2026-11-09 (evening: hold + URLs + privacy)
+- Backfill held: 1,294 talk posts are `Status: queued` (live for ~1 h, then pulled). Marek rolls them out with
+  `caffeinate -i blog/rollout.sh` (72 newest every 4 h, ~3 days) or `blog/release.sh N` (`blog_plan release N`).
+- Event posts now live under their event: conf42.com/<event>/<slug> (1,441 rows moved, drafts too); the build writes a
+  redirect stub at each old root URL <Date>-<slug> and `<base href="/">` on nested pages. Plugs/webinars stay at root;
+  the 6 hand-written Harness recaps keep their URLs.
+- Speaker privacy: empty/non-employer Company1 is deliberate. 52 posts edited to drop employers named only in the
+  recording and every "listed with"/"the CSV" phrasing; lint now rejects that phrasing.
+- 3 plugs unhidden: CONF42 is a calendar-level Luma coupon.
