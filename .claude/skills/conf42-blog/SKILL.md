@@ -144,7 +144,9 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
 ## /blog list
 
 Cards are 16:9, cropped to fill, with a "BLOG" pill in the corner; /blog shows 4 a row, picture + title only
-(Marek 2026-11-09). The home page keeps its 2 bigger cards. Never the same picture on two cards in a row: the build
+(Marek 2026-11-09), under a search field that is the conference pages' talk search as it is (`.tk-search`, same
+fuzzy matching, "Search results, not all posts" panel; searches Title, Description, Tags, Event, Sponsor - so
+Description and Tags carry the speaker, company and topic words people type). The home page keeps its 2 bigger cards. Never the same picture on two cards in a row: the build
 swaps a repeat with another post of the same day and logs "WARN blog: ... same picture" if it can't - fix those
 (a speaker back at the same event type a year later may share a thumbnail, just not side by side).
 
