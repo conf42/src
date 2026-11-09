@@ -50,7 +50,9 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
    - `enrich` -> the talk now has its video/transcript: add the embed link + 1-2 transcript-backed details, re-`add`
      (Updated is set automatically).
    - backfill: then `backfill_next` (roundups, sponsored, webinars of finished 2025+ events), then ONE event from
-     `backfill_talk_events` (newest first; the first entry carries its `items`). Backfill keeps the planned historical dates, written timelessly.
+     `backfill_talk_events` (newest first; the first entry carries its `items`; `plan --all` gives items for every
+     event). Backfill keeps the planned historical dates, written timelessly. The 2025+ talk backfill was finished
+     on 2026-11-09; what `backfill_talk_events` still lists are deliberate skips (see blog/CHANGELOG.md).
    - `crowded` dates: nudge new talk posts by a day if a date already holds 6+.
 3. For each post, read the real sources first (paths are in the plan item):
    - talk row: Title, Abstract, bio (event CSV), Company, Keywords; transcript `assemblyai/<YouTubeId>.json` (`text`,
@@ -97,7 +99,11 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
   the coupon exists. Never publish a code that doesn't work.
 - Never invent a quote, number, feature, customer or result. Quotes are verbatim from the transcript/abstract (the
   linter checks). No transcript yet? Write from the abstract and say "in the talk" without quoting.
-- Never touch rows dated before 2025 (the linter refuses).
+- Never touch legacy rows dated before 2025 (no Ref; the linter refuses). Typed rows dated Dec 2024 (DevOps 2025
+  talk posts) are ours and editable.
+- Transcript is a different talk than the CSV row (wrong srt/YouTube): skip that post and report it. Abstract
+  promises more than the talk delivers: write from the transcript and say so.
+- Talk/sponsored posts end with `[Watch the talk on YouTube](<url>).` once the video exists (that clears `enrich`).
 - Never edit the talk CSVs, metadata.yml lineups or WEBINARS.csv to make the blog work - report the data problem.
 - One post per Ref. A removed talk's post stays orphaned even if the speaker comes back under a new row: write fresh.
 - No doorway content: no per-city/per-keyword clones, no "Top 10" lists of the same talks.
