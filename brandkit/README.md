@@ -1,8 +1,8 @@
-# Brand kit (conf42.com/media-kit and every site's /media-kit/)
+# Brand kit (conf42.com/mediakit and every site's /mediakit/)
 
 Built once on a Mac, committed as files, never in CI (Marek 2026-11-09: rebuild only when adding something).
 Output: `docs/assets/brandkit/` = the files + `brandkit.json` (every file: url, size, px, sha256, mime), `brandkit.md`, `llms.txt`.
-The page is `_templates/media-kit.html` here and `home/_templates/media-kit.html` in sreday (website), llmday, platformday,
+The page is `_templates/mediakit.html` here and `home/_templates/mediakit.html` in sreday (website), llmday, platformday,
 PEC and devopsnotdead; every teasers page's Media kit tab reads the same `brandkit.json`.
 
 Tools (all open source): potrace (one-colour logo vectors), vtracer (`pip install vtracer`, colour vectors of stickers, mascots,
