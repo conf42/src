@@ -32,6 +32,15 @@
           </div>
         </div> <!-- / .row -->
 
+        <!-- Post search (Marek 2026-11-09): the conference pages' talk search as it is (.tk-search, same fuzzy matching):
+             title, description, tags and event; matches sit on the pale panel headed "Search results, not all posts".
+             Never in the URL. -->
+        <div class="tk-search" role="search">
+          <input type="search" id="tk-q" placeholder="Search posts, speakers, topics, events" aria-label="Search posts, speakers, topics, events" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="tk-all" id="tk-all">
+        <div class="tk-res-note" id="tk-res-note" aria-live="polite" hidden><b>Search results, not all posts</b><span id="tk-res-n"></span></div>
         {# phones show the first 8 posts + a "show more" button (CSS in the MOBILE PASS block of various.css) #}
         <div class="row blog-list" id="blog-list">
 
@@ -47,8 +56,51 @@
           </div>
           {% endif %}
         </div> <!-- / .row -->
+        <p class="tk-res-none" id="tk-res-none" hidden>No post matches that search.</p>
+        </div> <!-- / .tk-all -->
 
       </div> <!-- / .container -->
     </section>
+    <script>
+    (function () {
+      var q = document.getElementById('tk-q'), all = document.getElementById('tk-all'), list = document.getElementById('blog-list');
+      if (!q || !all || !list) return;
+      var posts = [].slice.call(list.querySelectorAll('.bl-post')), more = list.querySelector('.blog-more-wrap'), wasOpen = false;
+      function fold(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }   // "garcia" finds "García"
+      posts.forEach(function (t) { t._q = fold(t.getAttribute('data-q')); t._w = t._q.split(/[^a-z0-9]+/).filter(Boolean); });
+      // slight typos, as on the conference pages: a typed word matches when it appears as is, or when a word of the post
+      // (or its start) is at most one letter off - missing, extra, swapped or different
+      function lev1(a, b) {
+        if (a === b) return true;
+        if (Math.abs(a.length - b.length) > 1) return false;
+        var i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++;
+        if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+        return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+      }
+      function wordClose(w, x) {
+        if (w.length < 4) return false;          // "ai", "k8s", "sre": exact only
+        return lev1(w, x) || lev1(w, x.slice(0, w.length)) || lev1(w, x.slice(0, w.length - 1)) || lev1(w, x.slice(0, w.length + 1));
+      }
+      function has(t, w) { return t._q.indexOf(w) >= 0 || t._w.some(function (x) { return wordClose(w, x); }); }
+      function run() {
+        var words = fold(q.value).split(/\s+/).filter(Boolean), on = words.length > 0, n = 0;
+        posts.forEach(function (t) {
+          var hit = !on || words.every(function (w) { return has(t, w); });
+          t.classList.toggle('tk-hide', !hit); if (on && hit) n++;
+        });
+        all.classList.toggle('tk-searching', on);
+        // phones: every match shows (no "show more" cut while searching); clearing restores the list as it was
+        if (on && !all._on) wasOpen = list.classList.contains('expanded');
+        list.classList.toggle('expanded', on || wasOpen);
+        if (more) more.classList.toggle('tk-hide', on);
+        all._on = on;
+        document.getElementById('tk-res-note').hidden = !on;
+        document.getElementById('tk-res-n').textContent = on ? n + (n === 1 ? ' post' : ' posts') + ' of ' + posts.length : '';
+        document.getElementById('tk-res-none').hidden = !on || n > 0;
+      }
+      q.addEventListener('input', run);
+      q.value = ''; run();   // a browser restoring the field on Back must not leave a filtered list behind
+    })();
+    </script>
 
 {% endblock %}
