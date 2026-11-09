@@ -15,24 +15,24 @@ def F(name):
     return os.path.join(FONTS, {'figtree': 'Figtree%5Bwght%5D.ttf', 'montserrat': 'Montserrat%5Bwght%5D.ttf', 'inter': 'Inter%5Bopsz,wght%5D.ttf'}[name])
 
 BRANDS = [
- dict(key='conf42', name='Conf42', color='#2c3fb0', ink='#0f1a3d', font='figtree', site='https://www.conf42.com/',
+ dict(key='conf42', name='Conf42', color='#335eea', ink='#0f1a3d', font='figtree', site='https://www.conf42.com/',
       tagline='We build online\ndev communities', spelling='Conf42 (capital C, no space)',
       about='Conf42 is where it started, online, in 2020: 30+ online conferences a year on everything from SRE and Kubernetes to Python, Rust and AI. Every talk is free on YouTube, with transcripts and slides at conf42.com.',
       logos=[dict(id='wordmark', label='Wordmark', mono='conf42', color_png=DB + '/_misc/conf42 dark blue.png', color_hex='#1d2a52'),
              dict(id='mark', label='Mark (42)', mono='conf42-mark', color_hex='#2c3fb0')],
-      sticker=GH + '/conf42/docs/assets/mediakit/conf42-sticker.png', avatar_from='mark',
+      sticker=GH + '/conf42/docs/assets/brandkit/conf42/stickers/conf42-sticker.png', avatar_from='mark',
       mascots=[('Corgi (404)', GH + '/conf42/docs/assets/conf42/404_corgi.png'), ('Bear with us', GH + '/conf42/docs/assets/conf42/bear_with_us.png')],
       art=[('Illustration, hero', GH + '/conf42/docs/assets/conf42/header_art_full.png'), ('Illustration, blog', GH + '/conf42/docs/assets/conf42/blog_art_full.png'),
            ('Illustration, podcast', GH + '/conf42/docs/assets/conf42/podcast_art_full.png'), ('Illustration, sponsors', GH + '/conf42/docs/assets/conf42/sponsors_art_full.png'),
-           ('Space banner', GH + '/conf42/docs/assets/mediakit/conf42-banner.png')]),
- dict(key='sreday', name='SREday', color='#7b3fe4', ink='#1d1240', font='montserrat', site='https://www.sreday.com/',
+           ('Space banner', GH + '/conf42/docs/assets/brandkit/conf42/artwork/conf42-space-banner.png')]),
+ dict(key='sreday', name='SREday', color='#713660', ink='#1d1240', font='montserrat', site='https://www.sreday.com/',
       tagline='SRE, DevOps & platform\nengineering, in person', spelling='SREday (SRE in capitals, day in lower case)',
       about='SREday is where Site Reliability Engineers, DevOps practitioners and cloud architects meet face to face: talks from people running production at scale, hosted in the offices of companies like Harness, ING and Google.',
       logos=[dict(id='logo', label='Logo', mono='sreday', color_hex='#7b3fe4')],
       sticker=GH + '/llmday/home/assets/images/sreday_sticker.png', avatar_from='sticker',
       mascots=[('Monkey', DB + '/_misc/SREday Monkey New.png'), ('Monkey (404)', GH + '/website/home/assets/images/404.png')],
       art=[('Logo, round', DB + '/SREday/sreday logo.png'), ('Logo, horizontal', DB + '/SREday/sreday logo horizontal.png'), ('Brand gradient', DB + '/SREday/sreday gradient.jpg')]),
- dict(key='llmday', name='LLMday', color='#1f9d6b', ink='#0c2b20', font='montserrat', site='https://www.llmday.com/',
+ dict(key='llmday', name='LLMday', color='#26986a', ink='#0c2b20', font='montserrat', site='https://www.llmday.com/',
       tagline='AI & LLM engineering,\nin person', spelling='LLMday (LLM in capitals, day in lower case)',
       about='LLMday brings AI engineers, ML engineers and data scientists together in person to share what actually works with LLMs and agents in production: evaluation, RAG, guardrails, cost and everything in between.',
       logos=[dict(id='logo', label='Logo', mono='llmday', color_png=DB + '/_misc/LLMDAY LOGO.png')],
@@ -46,7 +46,7 @@ BRANDS = [
       sticker=DB + '/_misc/PLATFORMday sticker.png', avatar_from='sticker',
       mascots=[('Baby platypus', DB + '/_misc/baby platypus.png'), ('Platypus', DB + '/_misc/PLATFORMday platypus.png'), ('Platypus (404)', GH + '/platformday/home/assets/images/404.png')],
       art=[]),
- dict(key='pec', name='Prompt Engineering Conference', short='PEC', color='#d9467a', ink='#1e1530', font='montserrat', site='https://promptengineering.rocks/',
+ dict(key='pec', name='Prompt Engineering Conference', short='PEC', color='#6b40d8', ink='#1e1530', font='montserrat', site='https://promptengineering.rocks/',
       tagline='The craft of prompting,\nagents & AI', spelling='Prompt Engineering Conference (short: PEC)',
       about='The Prompt Engineering Conference grew from its online beginnings in 2023 to a full day in London, co-located with LLMday London: the craft of prompting, agents and AI-assisted work.',
       logos=[dict(id='logo', label='Logo', svg_color=GH + '/2025.promptengineering.rocks/home/assets/images/logo-token.svg',
@@ -57,27 +57,27 @@ BRANDS = [
       tagline='DevOps is not dead.\nCome and see.', spelling='DevOps Not Dead (short: DND)',
       about='DevOps Not Dead is an in-person event series co-created with Harness: practitioners talking honestly about delivering software, in London and New York.',
       logos=[], sticker=GH + '/website/home/assets/sister dnd.png', avatar_from='sticker', mascots=[], art=[]),
- dict(key='reliaburger', name='Reliaburger', color='#a83b15', ink='#181b19', paper='#fff7ef', font='inter', site='https://reliaburger.com/', light=True,
+ dict(key='reliaburger', name='Reliaburger', color='#ea1e4e', ink='#181b19', paper='#fff7ef', font='inter', site='https://reliaburger.com/', light=True,
       tagline='One binary. A complete\ncontainer platform.', spelling='Reliaburger (one word)',
       about='Reliaburger is a container orchestrator in Rust by Miko Pawlikowski: one binary, a complete container platform, zero assembly. Source, design notes and a free book on GitHub.',
       logos=[], sticker=DB + '/_misc/clauding burger.png', avatar_from='sticker', flatten_white=True,
       mascots=[], art=[('Logo (v1)', GH + '/reliaburger/assets/images/reliaburger_logo_v1.jpg'), ('Burger', GH + '/reliaburger/docs/website/assets/burger-still.webp')]),
- dict(key='cfpninja', name='CFP Ninja', color='#c8262c', ink='#1c2a12', font='montserrat', site='https://cfp.ninja/',
+ dict(key='cfpninja', name='CFP Ninja', color='#a21e1e', ink='#1c2a12', font='montserrat', site='https://cfp.ninja/',
       tagline='Find a stage.\nSubmit once.', spelling='CFP Ninja (cfp.ninja as the address)',
       about='CFP Ninja is the open Call for Papers platform every Conf42, SREday and LLMday CFP runs on. Speakers find open calls and submit once; organisers review in one place.',
       logos=[dict(id='mark', label='Mark', mono='cfpninja-mark', color_png=DB + '/_misc/cfpninja MINI.png', multi=True)],
       sticker=DB + '/_misc/cfpninja bigga logo.png', avatar_from='sticker', mascots=[], art=[]),
- dict(key='certifiedfyi', name='Certified FYI', color='#22a339', ink='#1b1f23', paper='#f4f7f4', font='montserrat', site='https://certified.fyi/', light=True,
+ dict(key='certifiedfyi', name='Certified FYI', color='#158c0f', ink='#1b1f23', paper='#f4f7f4', font='montserrat', site='https://certified.fyi/', light=True,
       tagline='Verifiable certificates\nfor speakers & organisers', spelling='Certified FYI (certified.fyi as the address)',
       about='Certified FYI issues verifiable certificates of achievement: organisers issue them, speakers collect them on a public profile.',
       logos=[dict(id='logo', label='Logo', mono='certifiedfyi', color_png=DB + '/_misc/certified fyi.png', multi=True)],
       sticker=DB + '/_misc/certified fyi.png', avatar_from='mark-crop', mascots=[], art=[]),
- dict(key='badger', name='Badger', color='#f26b1d', ink='#151515', paper='#f6f4f1', font='montserrat', site='https://scan.sreday.com/', light=True,
+ dict(key='badger', name='Badger', color='#ea722a', ink='#151515', paper='#f6f4f1', font='montserrat', site='https://scan.sreday.com/', light=True,
       tagline='Event badges,\nprinted at the door', spelling='Badger (Snout by Badger for the lead scanner)',
       about='Badger prints attendee badges at the door of every SREday, LLMday and PLATFORMday; Snout by Badger is its sponsor lead scanner.',
-      logos=[dict(id='badger', label='Badger', mono='badger', color_png=GH + '/badger/scanner/assets/badger-logo.webp', multi=True),
-             dict(id='snout', label='Snout by Badger', mono='snout', color_png=GH + '/badger/scanner/assets/snout-logo.png', multi=True)],
-      sticker=GH + '/badger/scanner/assets/badger-logo.webp', avatar_from='badger-head', mascots=[], art=[]),
+      logos=[dict(id='badger', label='Badger', mono='badger', color_png=GH + '/badger/snout/assets/badger-logo.webp', multi=True),
+             dict(id='snout', label='Snout by Badger', mono='snout', color_png=GH + '/badger/snout/assets/snout-logo.png', multi=True)],
+      sticker=GH + '/badger/snout/assets/badger-logo.webp', avatar_from='badger-head', mascots=[], art=[]),
 ]
 
 # the social pictures (sizes from each platform's own help pages, 2026-11; LinkedIn's company cover is now 1512x256)
@@ -290,7 +290,7 @@ for b in BRANDS:
     elif b['avatar_from'] == 'pec-avatar':   # PEC's own avatar artwork, as it is
         av = trimmed(Image.open(GH + '/2025.promptengineering.rocks/home/assets/images/avatar.png'))
     elif b['avatar_from'] == 'badger-head':
-        av = trimmed(Image.open(GH + '/badger/scanner/assets/badger-head.png'))
+        av = trimmed(Image.open(GH + '/badger/snout/assets/badger-head.png'))
     elif b['avatar_from'] == 'mark-crop':   # certified.fyi: the shield alone (the left part of the logo, as drawn)
         im = trimmed(Image.open(b['logos'][0]['color_png'])); a = np.asarray(im)[..., 3] > 8
         cols = np.where(a[: int(im.height * .55)].any(axis=0))[0]; av = trimmed(im.crop((cols.min(), 0, cols.max() + 1, int(im.height * .58))))

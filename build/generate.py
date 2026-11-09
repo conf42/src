@@ -590,7 +590,8 @@ for w in get_warnings():
 # MEDIA KIT (Marek 2026-11-09): /mediakit/ - the whole family's media kit (logos, colours, banners, profile pictures, mascots,
 # animations, event splashes), the same page on every site with this brand first. Files + index live on
 # conf42.com/assets/brandkit/ (built once with conf42/brandkit/, never in CI).
-os.makedirs(BASE_FOLDER + "/mediakit", exist_ok=True)
-with open("_templates/mediakit.html", encoding="utf-8") as _mk_src, open(BASE_FOLDER + "/mediakit/index.html", "w", encoding="utf-8") as _mk_out:
-    _mk_out.write(_mk_src.read().replace("__HOME__", "conf42"))
-print("Writing out mediakit/index.html")
+os.makedirs(BASE_FOLDER + "/mediakit", exist_ok=True)   # base.html's links are relative: <base href="/"> keeps them right from /mediakit/
+_html = env.get_template("mediakit.html").render(page="mediakit.html", canonical="https://www.conf42.com/mediakit/", mk_home="conf42", **context)
+with open(BASE_FOLDER + "/mediakit/index.html", "w", encoding="utf-8") as f:
+    print("Writing out", f.name)
+    f.write(_html.replace("<head>", '<head>\n    <base href="/">', 1))
