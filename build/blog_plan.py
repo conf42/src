@@ -294,8 +294,10 @@ def plan(args):
     first = [m for ms in backlog.values() for m in ms if m["type"] in ("roundup", "sponsored", "webinar")]
     talk_events = [dict(event=k, count=len([m for m in ms if m["type"] == "talk"])) for k, ms in backlog.items()
                    if any(m["type"] == "talk" for m in ms)]
-    if talk_events:   # the next event to backfill comes with its items, the rest are counts
-        talk_events[0]["items"] = sorted([m for m in backlog[talk_events[0]["event"]] if m["type"] == "talk"], key=lambda m: m["date"])
+    for i, te in enumerate(talk_events):   # the next event to backfill comes with its items (--all: every event)
+        if i and not getattr(args, "all", False):
+            break
+        te["items"] = sorted([m for m in backlog[te["event"]] if m["type"] == "talk"], key=lambda m: m["date"])
 
     resolver = Resolver(ctx["events"], ctx["sponsors"])
     orphaned, enrich = [], []
@@ -576,6 +578,7 @@ def main():
     p = sub.add_parser("plan")
     p.add_argument("--from", dest="since", default="2025-01-01")
     p.add_argument("--today")
+    p.add_argument("--all", action="store_true", help="items for every backfill event, not just the next one")
     l = sub.add_parser("lint")
     l.add_argument("-v", "--verbose", action="store_true")
     a = sub.add_parser("add")
