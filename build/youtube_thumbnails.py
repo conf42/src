@@ -132,8 +132,6 @@ def key_out(img, plate=None):
     alpha = np.where(inside > 4, 1.0, np.where(outside > 4, 0.0, a))
     alpha = ndimage.gaussian_filter(alpha, .9)              # a soft, photographic edge
     alpha = np.where(inside > 6, 1.0, np.where(outside > 6, 0.0, alpha))
-    ramp = np.clip(np.minimum(np.arange(w), np.arange(w)[::-1]) / 24.0, 0, 1)
-    alpha = alpha * ramp[None, :]                           # shoulders cut by the photo's own frame fade out
     grey = (P.mean(2) - (1 - alpha) * B.mean(2)) / np.maximum(alpha, 1e-3)   # without the sky shining through
     grey = np.where(alpha > .98, P.mean(2), np.clip(grey, 0, 255))
     return P, grey, alpha, (outside > 5) & (a < .02)
@@ -152,7 +150,141 @@ def event_sky(keyed):
         return np.nanmedian(np.array(stack), 0)
 
 
-def draw(keyed, ev_sky, whole=False):
+def cut_sides(img):
+    """(left, right): does the person run into the photo's own frame there? Cheap (no keying, a few ms), so it can go into
+    the cache key: only photos with a cut get the shoulder extension and only they are redrawn for it, the rest keep
+    their cached thumbnails (Marek 2026-11-09: run only where a cutout is found, never a redraw-everything)."""
+    P = np.asarray(img.convert("RGB")).astype(float)
+    h = P.shape[0]
+    chroma = P - P.mean(2, keepdims=True)
+    top = chroma[: h // 2].reshape(-1, 3)
+    norm = np.linalg.norm(top, axis=1)
+    c = np.median(top[norm >= np.percentile(norm, 80)], 0)
+    if np.linalg.norm(c) < 8:
+        return False, False
+    p = (chroma * (c / np.linalg.norm(c))).sum(2)          # the sky's tint per pixel: ~0 on the grey person
+    def run(col):                                           # untinted rows up from the bottom edge
+        grey = ndimage.median_filter(col < 3, 5)
+        return np.argmin(grey[::-1]) if not grey.all() else h
+    return tuple(bool(run(p[:, x]) >= .06 * h) for x in (1, -2))
+
+
+SHOULDERS = "s1"             # in the cache key of cut photos only: bump to redraw just those
+
+
+MODELS = os.environ.get("MODELS_DIR", ".models")   # own CI cache, restored by the render job only (never the deploy)
+MODEL_URLS = {
+    "lama": "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx",            # LaMa inpainting (Apache-2.0), 208 MB
+    "faceparse": "https://github.com/yakhyo/face-parsing/releases/download/v0.0.1/resnet18.onnx",   # BiSeNet face parsing (MIT), 53 MB
+}
+_models = {}
+
+
+def model(name):
+    """an onnxruntime session (CPU), the file fetched once into the cache; None when it can't be had (the render job then
+    leaves cut shoulders with their fade - it never fails)"""
+    if name not in _models:
+        try:
+            import onnxruntime
+            f = os.path.join(MODELS, name + ".onnx")
+            if not os.path.exists(f):
+                os.makedirs(MODELS, exist_ok=True)
+                urllib.request.urlretrieve(MODEL_URLS[name], f + ".part")
+                os.replace(f + ".part", f)
+            _models[name] = onnxruntime.InferenceSession(f, providers=["CPUExecutionProvider"])
+        except Exception as e:
+            print("WARN youtube_thumbnails: no %s model (%s), cut shoulders keep their fade" % (name, e))
+            _models[name] = None
+    return _models[name]
+
+
+def not_hair(img, sides):
+    """sides minus those where the cut runs through hair (Marek 2026-11-09: long hair at the frame was fine with its
+    fade - only clothes and shoulders get extended). BiSeNet labels the pixels along each cut edge; 25%+ hair = leave it."""
+    net = model("faceparse") if any(sides) else None
+    if net is None:
+        return (False, False)
+    x = (np.asarray(img.convert("RGB").resize((512, 512), Image.BILINEAR)) / 255.0 - (.485, .456, .406)) / (.229, .224, .225)
+    lab = net.run(None, {"input": x.transpose(2, 0, 1)[None].astype(np.float32)})[0][0].argmax(0)
+    out = []
+    for side in (0, 1):
+        band = (lab[:, 2:20] if side == 0 else lab[:, -20:-2])
+        band = band[band != 0]                              # 0 = background
+        out.append(bool(sides[side] and len(band) and (band == 17).mean() < .25))   # 17 = hair
+    return tuple(out)
+
+
+def outpaint(P, sides):
+    """(P (h x w x 3 uint8) widened to 16:9 on its cut sides, px added left, px added right): LaMa paints what the
+    photo's frame cut off from the picture itself (Marek 2026-11-09: a real extension, never a drawn shape). Each side is
+    one square window (picture + the empty strip), so nothing is squeezed. The picture's own pixels are kept; only the
+    new strip (and the 4 frame columns under it) come from LaMa."""
+    h, w, _ = P.shape
+    pad = int(round((W * h / H - w) / 2))
+    net = model("lama") if pad > 0 and any(sides) else None
+    if net is None:
+        return P, 0, 0
+    lp, rp = (pad if sides[0] else 0), (pad if sides[1] else 0)
+    C = np.zeros((h, w + lp + rp, 3), np.uint8)
+    C[:, lp:lp + w] = P
+    for side in (0, 1):
+        if not sides[side]:
+            continue
+        x0 = 0 if side == 0 else max(0, C.shape[1] - h)     # an h x h window at that end
+        win = C[:, x0:x0 + h].copy()
+        mask = np.zeros(win.shape[:2], np.float32)
+        if side == 0:
+            mask[:, :lp + 4] = 1
+        else:
+            mask[:, win.shape[1] - rp - 4:] = 1
+        x = np.asarray(Image.fromarray(win).resize((512, 512), Image.LANCZOS)).astype(np.float32) / 255
+        m = (np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).resize((512, 512), Image.NEAREST)) > 127).astype(np.float32)
+        x = x * (1 - m[..., None])
+        out = net.run(None, {"image": x.transpose(2, 0, 1)[None], "mask": m[None, None]})[0][0]
+        out = np.clip(out.transpose(1, 2, 0), 0, 255).astype(np.uint8)
+        out = np.asarray(Image.fromarray(out).resize((win.shape[1], h), Image.LANCZOS))
+        C[:, x0:x0 + h] = np.where(mask[..., None] > 0, out, win)
+    return C, lp, rp
+
+
+def extended(head, plate, sides):
+    """(key_out-style tuple of the outpainted headshot, lp, rp). Two LaMa passes: the photo (the clothes' tones and
+    texture) and the person's own matte (the silhouette - keying LaMa's painted sky was noisy in the dark bottom); the
+    photo's part keeps the key made with its clean sky plate."""
+    img = Image.open(BytesIO(head))
+    own = key_out(img, plate)
+    if own[2] is None:
+        return own, 0, 0
+    P = np.asarray(img.convert("RGB"))
+    Pw, lp, rp = outpaint(P, sides)
+    if not (lp or rp):
+        return own, 0, 0
+    matte = np.repeat((own[2] * 255 + .5).astype(np.uint8)[..., None], 3, 2)
+    Mw = outpaint(matte, sides)[0].mean(2) / 255
+    w = P.shape[1]
+    body = ndimage.gaussian_filter((Mw > .5).astype(float), 3) > .5       # one clean outline
+    lab, n = ndimage.label(body)
+    if n:                                                   # only what stands on the bottom edge
+        body = np.isin(lab, [i for i in set(lab[-1]) if i])
+    alpha = ndimage.gaussian_filter(body.astype(float), 1.2)
+    grey = Pw.astype(float).mean(2)
+    sky = ~body
+    alpha[:, lp:lp + w], grey[:, lp:lp + w], sky[:, lp:lp + w] = own[2], own[1], own[3]
+    return (Pw.astype(float), grey, alpha, sky), lp, rp
+
+
+def edge_fade(alpha, lp, rp, w):
+    """the photo's own frame edges fade out (24 px) - except on a side LaMa extended, where the body simply carries on"""
+    ramp = np.ones(alpha.shape[1])
+    if not lp:
+        ramp[:24] = np.arange(24) / 24.0
+    if not rp:
+        ramp[lp + w - 24:lp + w] = np.arange(24)[::-1] / 24.0
+        ramp[lp + w:] = 0
+    return alpha * ramp[None, :]
+
+
+def draw(keyed, ev_sky, whole=False, lp=0, rp=0):
     """whole: ev_sky is the topic's clean sky, used as it is; otherwise this headshot's own sky where it shows, the
     event's elsewhere, the rest filled. Either way stretched to 16:9."""
     P, grey, alpha, sky = keyed
@@ -173,11 +305,12 @@ def draw(keyed, ev_sky, whole=False):
     if alpha is None:                                       # not keyable: the photo as it is, edges faded
         yy, xx = np.mgrid[0:h, 0:w]
         alpha = np.clip(np.minimum.reduce([xx, w - 1 - xx, yy * 4, (h - 1 - yy) * 4]) / 30.0, 0, 1)
+    alpha = edge_fade(alpha, lp, rp, w - lp - rp)
     fw = round(w * H / h)
     G = np.asarray(Image.fromarray(np.clip(grey + .5, 0, 255).astype(np.uint8)).resize((fw, H), Image.LANCZOS)).astype(float)
     A = np.asarray(Image.fromarray((alpha * 255 + .5).astype(np.uint8)).resize((fw, H), Image.LANCZOS)).astype(float)[..., None] / 255
     out = sky_img
-    x0 = (W - fw) // 2
+    x0 = int(round((W - (w - lp - rp) * H / h) / 2 - lp * H / h))   # the photo itself stays centred
     sx0, sx1 = max(0, -x0), fw - max(0, x0 + fw - W)        # a photo wider than 16:9 is cut at the sides
     region = out[:, max(0, x0):max(0, x0) + sx1 - sx0]
     out[:, max(0, x0):max(0, x0) + sx1 - sx0] = A[:, sx0:sx1] * G[:, sx0:sx1, None] + (1 - A[:, sx0:sx1]) * region
@@ -293,6 +426,11 @@ def main():
     out = os.environ.get("GITHUB_OUTPUT")
     drawn, reused, left, used = 0, 0, 0, set()
     os.makedirs(CACHE_DIR, exist_ok=True)
+    cuts_file = os.path.join(CACHE_DIR, "cuts.json")
+    try:
+        cuts = json.load(open(cuts_file))
+    except Exception:
+        cuts = {}
     for page in sorted(glob.glob(os.path.join(ROOT, "*", "teasers.html"))):
         here = os.path.dirname(page)
         m = DATA_RE.search(open(page, encoding="utf-8").read())
@@ -314,10 +452,25 @@ def main():
                 print("WARN youtube_thumbnails %s: %s could not be fetched" % (os.path.basename(here), t["photo"]))
                 continue
             sky_file = topic_sky_file(t["photo"])
-            key = hashlib.sha256(("%s|%s|" % (VERSION, sky_file and hashlib.sha256(open(sky_file, "rb").read()).hexdigest())).encode()
-                                 + hashlib.sha256(head).digest()).hexdigest()
+            hh = hashlib.sha256(head).hexdigest()
+            if hh in cuts:                                  # checked once per headshot (by the render job), then remembered
+                sides = tuple(cuts[hh])
+            else:
+                sides = cut_sides(Image.open(BytesIO(head)))   # cheap: is the body cut by the photo's frame at all
+                if any(sides) and not cached_only:         # then, once, no hair at the cut (the deploy never runs models)
+                    sides = not_hair(Image.open(BytesIO(head)), sides)
+                if not cached_only:
+                    cuts[hh] = list(sides)
+            plain = hashlib.sha256(("%s|%s|" % (VERSION, sky_file and hashlib.sha256(open(sky_file, "rb").read()).hexdigest())).encode()
+                                   + hashlib.sha256(head).digest()).hexdigest()
+            key = hashlib.sha256((plain + "|%s%d%d" % (SHOULDERS, *sides)).encode()).hexdigest() if any(sides) else plain
             used.add(key + ".png")
             cached, dest = os.path.join(CACHE_DIR, key + ".png"), os.path.join(here, t["file"])
+            if not os.path.exists(cached) and cached_only and os.path.exists(os.path.join(CACHE_DIR, plain + ".png")):
+                shutil.copyfile(os.path.join(CACHE_DIR, plain + ".png"), dest)   # the deploy keeps the old picture until
+                used.add(plain + ".png")                                          # the render job extends its shoulders
+                n_left += 1
+                continue
             if os.path.exists(cached):
                 shutil.copyfile(cached, dest)
                 os.utime(cached)
@@ -330,7 +483,11 @@ def main():
                 sky = topic_sky(t["photo"])
                 if sky is None and ev_sky is False:         # no topic sky: the event's own, from all its headshots
                     ev_sky = event_sky([analysed(x["photo"]) for x in talks if photo(x["photo"]) is not None])
-                draw(analysed(t["photo"]), sky if sky is not None else ev_sky, whole=sky is not None).save(dest, "PNG", optimize=True)
+                if sky is not None and any(sides):         # cut shoulders: LaMa carries them on
+                    k, lp, rp = extended(head, sky, sides)
+                    draw(k, sky, whole=True, lp=lp, rp=rp).save(dest, "PNG", optimize=True)
+                else:
+                    draw(analysed(t["photo"]), sky if sky is not None else ev_sky, whole=sky is not None).save(dest, "PNG", optimize=True)
                 shutil.copyfile(dest, cached)
                 n_drawn += 1
             except Exception as e:
@@ -338,6 +495,8 @@ def main():
         drawn, left = drawn + n_drawn, left + n_left
         print("youtube_thumbnails %s: %d talks, %d drawn, %d left for the render job"
               % (os.path.basename(here), len(talks), n_drawn, n_left))
+    with open(cuts_file, "w") as f:
+        json.dump(cuts, f)
     if "--prune" in sys.argv:
         cut, gone = time.time() - PRUNE_DAYS * 86400, 0
         for f in glob.glob(os.path.join(CACHE_DIR, "*.png")):
