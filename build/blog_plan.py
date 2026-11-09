@@ -5,7 +5,7 @@
     python -m build.blog_plan add <draft.md>...       upsert drafts (front matter + Markdown body) into _db/blog.csv
     python -m build.blog_plan orphan                  set Status=orphaned on every row whose Ref is gone
     python -m build.blog_plan export <out.json>       the CSV as rows of values, for the Excels_for_WWW "blog" tab
-    python -m build.blog_plan release <N>             publish the N oldest Status=queued posts (Status -> empty)
+    python -m build.blog_plan release <N>             publish the N newest Status=queued posts (Status -> empty)
 
 Drafts (blog/drafts/<ShortURL>.md, git-ignored) look like:
     ---
@@ -378,7 +378,7 @@ def lint_rows(rows, only=None, verbose=False):
 
     # legacy rows (before 2025) are frozen
     for key, r in old.items():
-        if r.get("Date", "") < "2025" and key not in {x.get("ShortURL") or x.get("Title") for x in rows}:
+        if r.get("Date", "") < "2025" and not (r.get("Ref") or "").strip() and key not in {x.get("ShortURL") or x.get("Title") for x in rows}:
             problems.append("%s: pre-2025 row deleted" % key)
     seen_slug, seen_ref = collections.Counter(), collections.Counter()
     for r in rows:
@@ -428,7 +428,12 @@ def lint_rows(rows, only=None, verbose=False):
             bad(r, "Title has leading/trailing whitespace")
         if len(r.get("Description") or "") > 170:
             bad(r, "Description over 170 chars (%d)" % len(r["Description"]))
-        if not re.match(r"^\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*$", r.get("ShortURL") or ""):
+        if (r.get("Event") or "").strip():
+            # posts of an event live under it (Marek 2026-11-09: the conference is always in the URL, so similar talks
+            # at two events - Remix re-airs, sponsors' repeat talks - never look like duplicates)
+            if not re.match(r"^%s/[a-z0-9]+(-[a-z0-9]+)*$" % re.escape(r["Event"].strip()), r.get("ShortURL") or ""):
+                bad(r, "ShortURL must be <Event>/lowercase-words (%s/...)" % r["Event"].strip())
+        elif not re.match(r"^\d{4}-\d{2}-\d{2}-[a-z0-9]+(-[a-z0-9]+)*$", r.get("ShortURL") or ""):
             bad(r, "ShortURL must be YYYY-MM-DD-lowercase-words")
         elif r["ShortURL"][:10] != (r.get("Date") or "")[:10]:
             bad(r, "ShortURL date differs from Date")
@@ -441,6 +446,9 @@ def lint_rows(rows, only=None, verbose=False):
             m = re.search(pat, body, re.I | re.M)
             if m:
                 bad(r, "slop phrase %r" % m.group(0))
+        m = re.search(r"\b(the CSV (says|lists|has|gives|row|entry)|in the CSV|CSV (row|listing)|listed (with|as|under) [A-Z])", body + " " + (r.get("Description") or ""))
+        if m:   # our data is not the story; an empty Company1 means the speaker keeps the employer private (Marek 2026-11-09)
+            bad(r, "talks about our data / the speaker's listing: %r" % m.group(0))
         if body.count("—") > max(2, n // 150):
             bad(r, "%d em dashes - write sentences" % body.count("—"))
         if re.match(r"^\s*#(?!#)", body):
@@ -549,9 +557,10 @@ def add(args):
 
 
 def release(args):
-    """Status=queued holds a written post back (Marek 2026-11-09: big backfills go out over 2-3 days, not at once)."""
+    """Status=queued holds a written post back (Marek 2026-11-09: big backfills go out over 2-3 days, not at once).
+    Newest first: recent events are what readers (and crawlers) care about most."""
     rows = read_blog_rows()
-    queued = sorted([r for r in rows if (r.get("Status") or "").strip().lower() == "queued"], key=lambda r: r.get("Date") or "")
+    queued = sorted([r for r in rows if (r.get("Status") or "").strip().lower() == "queued"], key=lambda r: r.get("Date") or "", reverse=True)
     for r in queued[:args.n]:
         r["Status"] = ""
         print("released", r.get("ShortURL"))
