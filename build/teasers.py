@@ -329,7 +329,7 @@ def generate(env, context, base_folder):
                   date_text="%s %d %d" % (event["date"].strftime("%b"), event["date"].day, event["date"].year), iso=event["date"].isoformat(),
                   date_long="%s %d %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year))   # no comma (Marek 2026-10-12)
         ev["splash"] = _splash(event, base_folder)
-        p = str(event.get("thumbnail_path") or "").lstrip("./")   # the splash art as it is, for the Generic tab's download:
+        p = str(event.get("thumbnail_path") or "").lstrip("./")   # the splash art as it is, for the Media kit tab's download:
         for ext in (".png", ".jpeg", ".webp"):                    # the original, not the 500 px .jpg the site shows (pick_picture_file)
             if os.path.isfile(os.path.join(base_folder, os.path.splitext(p)[0] + ext)):
                 p = os.path.splitext(p)[0] + ext
@@ -337,8 +337,8 @@ def generate(env, context, base_folder):
         ev["splash_full"] = "../" + p if p and os.path.isfile(os.path.join(base_folder, p)) else ""
         ev["splash_size"] = _size(os.path.join(base_folder, p)) if ev["splash_full"] else ""
         th = thumbnails(event, items, gone)
-        if is_past:   # Thumbnails and Overlays only: no cards (so render_teasers.py draws nothing), no Generic, no Carousel
-            ev["splash"] = ""
+        # a past event keeps Thumbnails, Overlays and the Media kit tab (its covers are drawn in the browser, so nothing for
+        # render_teasers.py); no talk cards, no Carousel (Marek 2026-11-09: the media kit stays after the conference)
         os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
         with open(os.path.join(base_folder, slug, "teasers.html"), "w", encoding="utf-8") as f:
             f.write(page.render(ev=ev, cards=[] if is_past else items, purged=[] if is_past else purged_cards(event, items, gone), sc=scheme(event), th=th, ov=overlays(event, ev), past=is_past, overlays_v=overlays_v, **context))
