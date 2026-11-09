@@ -29,3 +29,11 @@ what's next.
 - Still skipped: Reliaburger 0.2.0 webinar (no Snoop doc for 2026-10-28).
 - Data notes: Ravi Ray's Company1 in PROMPT_2026.csv is his job title; Sachin Gupta's YouTube link carries ?si=; Kevin Brown's talk is a short founder product demo (post says so).
 - Next: MLOps 2026 roundup (Nov 20); next backfill event from backfill_talk_events.
+
+## 2026-11-09 (full backfill, Marek: "ship everything now")
+- Talk-post backfill for every finished 2025+ event done in one go: ~1,290 talk posts across 32 events (108 writer batches, `plan --all`), all from the talk transcripts, written timelessly, historical dates. Lint 0.
+- Every talk/sponsored post with a video now ends with a "Watch the talk on YouTube" link (enrich queue 1,218 -> 6; the 6 are the hand-written Harness recaps, text untouched).
+- Skipped on purpose (transcript is a different talk than the CSV row): obs2026 Ravi Chandra; cloud2026 Elizabeth Fuentes Leone; sre2025 Sidhartha Velishala, Krishna Rao Vemula; golang2025 Krishna Rao Vemula; cloud2025 Sai Prakash Narasingu, Karthik Akinapelli; ce2025 Jaspreet Kumar; python2025 Sushil Prabhu Prabhakaran.
+- blog_plan: `plan --all` (items for every backfill event); the pre-2025 freeze now covers legacy rows only (no Ref) - DevOps 2025 talk posts dated Dec 2024 are typed rows and editable.
+- Data issues for Marek: scratchpad oddities list (wrong transcripts, copied abstracts, shifted ML 2026 keywords, shared YouTube ids, Company1 holding job titles/universities).
+- Next: MLOps 2026 roundup (Nov 20); 2027 plugs; Reliaburger webinar once a Snoop doc exists; 3 held plugs need CONF42 coupons.

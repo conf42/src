@@ -392,7 +392,7 @@ def lint_rows(rows, only=None, verbose=False):
         if only is not None and r.get("ShortURL") not in only:
             continue
         before = old.get(key)
-        if before and before.get("Date", "") < "2025":
+        if before and before.get("Date", "") < "2025" and not (before.get("Ref") or "").strip():
             if any((before.get(c) or "") != (r.get(c) or "") for c in COLUMNS[:7]):
                 bad(r, "pre-2025 row changed (leave the past ones as they are)")
             continue
@@ -531,8 +531,8 @@ def add(args):
         slug = new.get("ShortURL")
         old = by_slug.get(slug)
         if old:
-            if old.get("Date", "") < "2025":
-                raise SystemExit("%s: pre-2025 rows are frozen" % slug)
+            if old.get("Date", "") < "2025" and not (old.get("Ref") or "").strip():
+                raise SystemExit("%s: pre-2025 rows are frozen" % slug)   # legacy posts; typed rows (e.g. DevOps 2025 talks dated Dec 2024) stay editable
             changed = any((old.get(k) or "").strip() != (new.get(k) or "").strip() for k in ("Title", "Description", "Body", "ThumbnailPath"))
             if changed and old.get("Date", "")[:10] < today and "Updated" not in new:
                 new["Updated"] = today   # a real edit of a live post moves dateModified / sitemap lastmod
