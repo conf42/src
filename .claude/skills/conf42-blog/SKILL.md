@@ -77,6 +77,8 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
 9. Mirror to the Sheet: `python -m build.blog_plan export /tmp/blog.json`, then Sheets connector `update_values` on
    spreadsheet `1_-90A9g5_ACqeZl9bQuIHwfox2_-2gGh3cJMNjBrsHs`, tab `blog`, starting at `A1` (values only, never
    formatting; clear rows below the new end if the CSV shrank). Cells over 50,000 chars: say so, don't truncate.
+   Size: the export is ~1 MB (post bodies) and grows each run - too big to push through the connector by hand.
+   `=IMPORTDATA(raw CSV)` does NOT work (#REF!, quoted newlines). Until Marek picks a route, report it as pending.
 10. Append a dated entry to `blog/CHANGELOG.md`: what was published/scheduled/orphaned/enriched, what's next.
 11. Tell Marek in a few lines: N posts written (by type), next due dates, anything skipped and why.
 
@@ -93,7 +95,6 @@ Conf42 event, and the takeaway (that's the passage search engines and AI answers
   one. Give the old row its Type/Event/Ref/Sponsor and leave its text alone (lint then checks only its Ref).
 - Paid plug whose CONF42 coupon couldn't be created: add it with `Status: hidden` and tell Marek; flip to empty once
   the coupon exists. Never publish a code that doesn't work.
-
 - Never invent a quote, number, feature, customer or result. Quotes are verbatim from the transcript/abstract (the
   linter checks). No transcript yet? Write from the abstract and say "in the talk" without quoting.
 - Never touch rows dated before 2025 (the linter refuses).
