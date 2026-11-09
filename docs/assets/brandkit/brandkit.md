@@ -1,6 +1,6 @@
 # Conf42 family media kit
 
-Machine-readable index: https://www.conf42.com/assets/brandkit/brandkit.json (every file with url, size, px, sha256, mime).
+Machine-readable index: https://www.conf42.com/assets/brandkit/brandkit.json (every file with url, size, px, sha256, mime, alpha).
 
 ```sh
 # every SREday file
@@ -25,83 +25,176 @@ Name: Conf42 (capital C, no space). Website: https://www.conf42.com/
 
 ### Logos
 
-- [Wordmark, black (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.svg)
-- [Wordmark, black (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.pdf)
-- [Wordmark, black (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.eps)
-- [Wordmark, black (PNG, 2000x531)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.png)
-- [Wordmark, white (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.svg)
-- [Wordmark, white (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.pdf)
-- [Wordmark, white (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.eps)
-- [Wordmark, white (PNG, 2000x531)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.png)
-- [Wordmark, colour (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.svg)
-- [Wordmark, color (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.pdf)
-- [Wordmark, color (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.eps)
-- [Wordmark, colour (PNG, 2000x531)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.png)
-- [Wordmark on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-light.png)
-- [Wordmark on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-dark.png)
-- [Mark (42), black (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.svg)
-- [Mark (42), black (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.pdf)
-- [Mark (42), black (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.eps)
-- [Mark (42), black (PNG, 2000x2091)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.png)
-- [Mark (42), white (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.svg)
-- [Mark (42), white (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.pdf)
-- [Mark (42), white (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.eps)
-- [Mark (42), white (PNG, 2000x2091)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.png)
-- [Mark (42), colour (SVG)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.svg)
-- [Mark (42), color (PDF)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.pdf)
-- [Mark (42), color (EPS)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.eps)
-- [Mark (42), colour (PNG, 2000x2091)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.png)
-- [Mark (42) on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-light.png)
-- [Mark (42) on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-dark.png)
+- Wordmark in colour: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.png)
+- Mark (42) in colour: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.png)
+- Wordmark in black: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.png)
+- Mark (42) in black: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.png)
+- Wordmark in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.png)
+- Mark (42) in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.png)
+- Wordmark on a light background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-light.png)
+- Mark (42) on a light background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-light.png)
+- Wordmark on a dark background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-dark.png)
+- Mark (42) on a dark background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-dark.png)
+- Wordmark, original vector (Adobe Illustrator): [AI](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-original.ai)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/conf42/social/conf42-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/conf42/avatars/conf42-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/social/conf42-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 2000x2000)](https://www.conf42.com/assets/brandkit/conf42/stickers/conf42-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/conf42/stickers/conf42-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/stickers/conf42-sticker.svg)
 
-### Mascots
+### Mascots & pets
 
-- [Corgi (404) (PNG, 467x720)](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-corgi-404.png)
-- [Bear with us (PNG, 480x675)](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-bear-with-us.png)
+- Corgi (404): [PNG](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-corgi-404.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-corgi-404.svg)
+- Bear with us: [PNG](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-bear-with-us.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/mascots/conf42-bear-with-us.svg)
 
-### Artwork
+### Animations
 
-- [Illustration, hero (PNG, 7809x4076)](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-hero.png)
-- [Illustration, blog (PNG, 7470x4317)](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-blog.png)
-- [Illustration, podcast (PNG, 7854x4013)](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-podcast.png)
-- [Illustration, sponsors (PNG, 7516x3853)](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-sponsors.png)
-- [Space banner (PNG, 2550x1440)](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-space-banner.png)
+- Hero animation: [WEBP](https://www.conf42.com/assets/brandkit/conf42/animations/conf42-hero-animation.webp), [MP4](https://www.conf42.com/assets/brandkit/conf42/animations/conf42-hero-animation.mp4)
 
-### Colours
+### Illustrations
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/conf42/colours/conf42-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/conf42/colours/conf42-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/conf42/colours/conf42-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/conf42/colours/conf42-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/conf42/colours/conf42-tokens.json)
+- Illustration, hero: [PNG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-hero.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-hero.svg)
+- Illustration, blog: [PNG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-blog.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-blog.svg)
+- Illustration, podcast: [PNG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-podcast.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-podcast.svg)
+- Illustration, sponsors: [PNG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-sponsors.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-illustration-sponsors.svg)
+- Space banner: [PNG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-space-banner.png), [SVG](https://www.conf42.com/assets/brandkit/conf42/artwork/conf42-space-banner.svg)
 
-### Press
+### Event splashes
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/conf42/conf42-about.txt)
+- Conf42 AI Agents 2027: [PNG](https://www.conf42.com/assets/splash/AGENTS2027_Event_Splash.png)
+- Conf42 Chaos Engineering 2027: [PNG](https://www.conf42.com/assets/splash/CE2027_Event_Splash.png)
+- Conf42 Cloud Native 2027: [PNG](https://www.conf42.com/assets/splash/CLOUD2027_Event_Splash.png)
+- Conf42 Database DevOps 2027: [PNG](https://www.conf42.com/assets/splash/DBD2027_Event_Splash.png)
+- Conf42 DevOps 2027: [PNG](https://www.conf42.com/assets/splash/DEVOPS2027_Event_Splash.png)
+- Conf42 DevSecOps 2027: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2027_Event_Splash.png)
+- Conf42 Feature Flags 2027: [PNG](https://www.conf42.com/assets/splash/FEATUREFLAGS2027_Event_Splash.png)
+- Conf42 FinOps 2027: [PNG](https://www.conf42.com/assets/splash/FINOPS2027_Event_Splash.png)
+- Conf42 Golang 2027: [PNG](https://www.conf42.com/assets/splash/GOLANG2027_Event_Splash.png)
+- Conf42 Large Language Models (LLMs) 2027: [PNG](https://www.conf42.com/assets/splash/LLM2027_Event_Splash.png)
+- Conf42 MLOps 2027: [PNG](https://www.conf42.com/assets/splash/MLOPS2027_Event_Splash.png)
+- Conf42 Machine Learning 2027: [PNG](https://www.conf42.com/assets/splash/ML2027_Event_Splash.png)
+- Conf42 Observability 2027: [PNG](https://www.conf42.com/assets/splash/OBS2027_Event_Splash.png)
+- Conf42 Platform Engineering 2027: [PNG](https://www.conf42.com/assets/splash/PLATFORM2027_Event_Splash.png)
+- Conf42 Prompt Engineering 2027: [PNG](https://www.conf42.com/assets/splash/PROMPT2027_Event_Splash.png)
+- Conf42 Remix 2027: [PNG](https://www.conf42.com/assets/splash/REMIX2027_Event_Splash.png)
+- Conf42 Site Reliability Engineering (SRE) 2027: [PNG](https://www.conf42.com/assets/splash/SRE2027_Event_Splash.png)
+- Conf42 Tokenomics 2027: [PNG](https://www.conf42.com/assets/splash/TOKENOMICS2027_Event_Splash.png)
+- Conf42 AI Agents 2026: [PNG](https://www.conf42.com/assets/splash/AGENTS2026_Event_Splash.png)
+- Conf42 Chaos Engineering 2026: [PNG](https://www.conf42.com/assets/splash/CE2026_Event_Splash.png)
+- Conf42 Cloud Native 2026: [PNG](https://www.conf42.com/assets/splash/CLOUD2026_Event_Splash.png)
+- Conf42 Database DevOps 2026: [PNG](https://www.conf42.com/assets/splash/DBD2026_Event_Splash.png)
+- Conf42 DevOps 2026: [PNG](https://www.conf42.com/assets/splash/DEVOPS2026_Event_Splash.png)
+- Conf42 DevSecOps 2026: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2026_Event_Splash.png)
+- Conf42 Feature Flags 2026: [PNG](https://www.conf42.com/assets/splash/FEATUREFLAGS2026_Event_Splash.png)
+- Conf42 Golang 2026: [PNG](https://www.conf42.com/assets/splash/GOLANG2026_Event_Splash.png)
+- Conf42 Incident Management 2026: [PNG](https://www.conf42.com/assets/splash/INCIDENT2026_Event_Splash.png)
+- Conf42 Kube Native 2026: [PNG](https://www.conf42.com/assets/splash/KUBE2026_Event_Splash.png)
+- Conf42 Large Language Models (LLMs) 2026: [PNG](https://www.conf42.com/assets/splash/LLM2026_Event_Splash.png)
+- Conf42 MLOps 2026: [PNG](https://www.conf42.com/assets/splash/MLOPS2026_Event_Splash.png)
+- Conf42 Machine Learning 2026: [PNG](https://www.conf42.com/assets/splash/ML2026_Event_Splash.png)
+- Conf42 Observability 2026: [PNG](https://www.conf42.com/assets/splash/OBS2026_Event_Splash.png)
+- Conf42 Platform Engineering 2026: [PNG](https://www.conf42.com/assets/splash/PLATFORM2026_Event_Splash.png)
+- Conf42 Prompt Engineering 2026: [PNG](https://www.conf42.com/assets/splash/PROMPT2026_Event_Splash.png)
+- Conf42 Python 2026: [PNG](https://www.conf42.com/assets/splash/PYTHON2026_Event_Splash.png)
+- Conf42 Quantum Computing 2026: [PNG](https://www.conf42.com/assets/splash/QUANTUM2026_Event_Splash.png)
+- Conf42 Remix 2026: [PNG](https://www.conf42.com/assets/splash/REMIX2026_Event_Splash.png)
+- Conf42 Robotics 2026: [PNG](https://www.conf42.com/assets/splash/ROBOTICS2026_Event_Splash.png)
+- Conf42 Site Reliability Engineering (SRE) 2026: [PNG](https://www.conf42.com/assets/splash/SRE2026_Event_Splash.png)
+- Conf42 Chaos Engineering 2025: [PNG](https://www.conf42.com/assets/splash/CE2025_Event_Splash.png)
+- Conf42 Cloud Native 2025: [PNG](https://www.conf42.com/assets/splash/CLOUD2025_Event_Splash.png)
+- Conf42 DevOps 2025: [PNG](https://www.conf42.com/assets/splash/DEVOPS2025_Event_Splash.png)
+- Conf42 DevSecOps 2025: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2025_Event_Splash.png)
+- Conf42 Golang 2025: [PNG](https://www.conf42.com/assets/splash/GOLANG2025_Event_Splash.png)
+- Conf42 Incident Management 2025: [PNG](https://www.conf42.com/assets/splash/INCIDENT2025_Event_Splash.png)
+- Conf42 Internet of Things (IoT) 2025: [PNG](https://www.conf42.com/assets/splash/IOT2025_Event_Splash.png)
+- Conf42 JavaScript 2025: [PNG](https://www.conf42.com/assets/splash/JS2025_Event_Splash.png)
+- Conf42 Kube Native 2025: [PNG](https://www.conf42.com/assets/splash/KUBE2025_Event_Splash.png)
+- Conf42 Large Language Models (LLMs) 2025: [PNG](https://www.conf42.com/assets/splash/LLM2025_Event_Splash.png)
+- Conf42 MLOps 2025: [PNG](https://www.conf42.com/assets/splash/MLOPS2025_Event_Splash.png)
+- Conf42 Machine Learning 2025: [PNG](https://www.conf42.com/assets/splash/ML2025_Event_Splash.png)
+- Conf42 Observability 2025: [PNG](https://www.conf42.com/assets/splash/OBS2025_Event_Splash.png)
+- Conf42 Platform Engineering 2025: [PNG](https://www.conf42.com/assets/splash/PLATFORM2025_Event_Splash.png)
+- Conf42 Prompt Engineering 2025: [PNG](https://www.conf42.com/assets/splash/PROMPT2025_Event_Splash.png)
+- Conf42 Python 2025: [PNG](https://www.conf42.com/assets/splash/PYTHON2025_Event_Splash.png)
+- Conf42 Quantum Computing 2025: [PNG](https://www.conf42.com/assets/splash/QUANTUM2025_Event_Splash.png)
+- Conf42 Robotics 2025: [PNG](https://www.conf42.com/assets/splash/ROBOTICS2025_Event_Splash.png)
+- Conf42 Rustlang 2025: [PNG](https://www.conf42.com/assets/splash/RUST2025_Event_Splash.png)
+- Conf42 Site Reliability Engineering (SRE) 2025: [PNG](https://www.conf42.com/assets/splash/SRE2025_Event_Splash.png)
+- Conf42 Aiml 2024: [PNG](https://www.conf42.com/assets/splash/AIML2024_Event_Splash.png)
+- Conf42 Chaos Engineering 2024: [PNG](https://www.conf42.com/assets/splash/CE2024_Event_Splash.png)
+- Conf42 Cloud Native 2024: [PNG](https://www.conf42.com/assets/splash/CLOUD2024_Event_Splash.png)
+- Conf42 DevOps 2024: [PNG](https://www.conf42.com/assets/splash/DEVOPS2024_Event_Splash.png)
+- Conf42 DevSecOps 2024: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2024_Event_Splash.png)
+- Conf42 Golang 2024: [PNG](https://www.conf42.com/assets/splash/GOLANG2024_Event_Splash.png)
+- Conf42 Incident Management 2024: [PNG](https://www.conf42.com/assets/splash/INCIDENT2024_Event_Splash.png)
+- Conf42 Internet of Things (IoT) 2024: [PNG](https://www.conf42.com/assets/splash/IOT2024_Event_Splash.png)
+- Conf42 JavaScript 2024: [PNG](https://www.conf42.com/assets/splash/JS2024_Event_Splash.png)
+- Conf42 Kube Native 2024: [PNG](https://www.conf42.com/assets/splash/KUBE2024_Event_Splash.png)
+- Conf42 Large Language Models (LLMs) 2024: [PNG](https://www.conf42.com/assets/splash/LLM2024_Event_Splash.png)
+- Conf42 Machine Learning 2024: [PNG](https://www.conf42.com/assets/splash/ML2024_Event_Splash.png)
+- Conf42 Observability 2024: [PNG](https://www.conf42.com/assets/splash/OBS2024_Event_Splash.png)
+- Conf42 Platform Engineering 2024: [PNG](https://www.conf42.com/assets/splash/PLATFORM2024_Event_Splash.png)
+- Conf42 Prompt Engineering 2024: [PNG](https://www.conf42.com/assets/splash/PROMPT2024_Event_Splash.png)
+- Conf42 Python 2024: [PNG](https://www.conf42.com/assets/splash/PYTHON2024_Event_Splash.png)
+- Conf42 Quantum Computing 2024: [PNG](https://www.conf42.com/assets/splash/QUANTUM2024_Event_Splash.png)
+- Conf42 Rustlang 2024: [PNG](https://www.conf42.com/assets/splash/RUST2024_Event_Splash.png)
+- Conf42 Site Reliability Engineering (SRE) 2024: [PNG](https://www.conf42.com/assets/splash/SRE2024_Event_Splash.png)
+- Conf42 Chaos Engineering 2023: [PNG](https://www.conf42.com/assets/splash/CE2023_Event_Splash.png)
+- Conf42 Cloud Native 2023: [PNG](https://www.conf42.com/assets/splash/CLOUD2023_Event_Splash.png)
+- Conf42 DevOps 2023: [PNG](https://www.conf42.com/assets/splash/DEVOPS2023_Event_Splash.png)
+- Conf42 DevSecOps 2023: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2023_Event_Splash.png)
+- Conf42 Golang 2023: [PNG](https://www.conf42.com/assets/splash/GOLANG2023_Event_Splash.png)
+- Conf42 Incident Management 2023: [PNG](https://www.conf42.com/assets/splash/INCIDENT2023_Event_Splash.png)
+- Conf42 Internet of Things (IoT) 2023: [PNG](https://www.conf42.com/assets/splash/IOT2023_Event_Splash.png)
+- Conf42 JavaScript 2023: [PNG](https://www.conf42.com/assets/splash/JS2023_Event_Splash.png)
+- Conf42 Kube Native 2023: [PNG](https://www.conf42.com/assets/splash/KUBE2023_Event_Splash.png)
+- Conf42 Machine Learning 2023: [PNG](https://www.conf42.com/assets/splash/ML2023_Event_Splash.png)
+- Conf42 Mobile 2023: [PNG](https://www.conf42.com/assets/splash/MOBILE2023_Event_Splash.png)
+- Conf42 Observability 2023: [PNG](https://www.conf42.com/assets/splash/OBS2023_Event_Splash.png)
+- Conf42 Platform Engineering 2023: [PNG](https://www.conf42.com/assets/splash/PLATFORM2023_Event_Splash.png)
+- Conf42 Python 2023: [PNG](https://www.conf42.com/assets/splash/PYTHON2023_Event_Splash.png)
+- Conf42 Quantum Computing 2023: [PNG](https://www.conf42.com/assets/splash/QUANTUM2023_Event_Splash.png)
+- Conf42 Rustlang 2023: [PNG](https://www.conf42.com/assets/splash/RUST2023_Event_Splash.png)
+- Conf42 Site Reliability Engineering 2023: [PNG](https://www.conf42.com/assets/splash/SRE2023_Event_Splash.png)
+- Conf42 Web 3.0 2023: [PNG](https://www.conf42.com/assets/splash/WEB32023_Event_Splash.png)
+- Conf42 Chaos Engineering 2022: [PNG](https://www.conf42.com/assets/splash/CE2022_Event_Splash.png)
+- Conf42 Cloud Native 2022: [PNG](https://www.conf42.com/assets/splash/CLOUD2022_Event_Splash.png)
+- Conf42 DevSecOps 2022: [PNG](https://www.conf42.com/assets/splash/DEVSECOPS2022_Event_Splash.png)
+- Conf42 Golang 2022: [PNG](https://www.conf42.com/assets/splash/GOLANG2022_Event_Splash.png)
+- Conf42 Incident Management 2022: [PNG](https://www.conf42.com/assets/splash/INCIDENT2022_Event_Splash.png)
+- Conf42 JavaScript 2022: [PNG](https://www.conf42.com/assets/splash/JS2022_Event_Splash.png)
+- Conf42 Kube Native 2022: [PNG](https://www.conf42.com/assets/splash/KUBE2022_Event_Splash.png)
+- Conf42 Machine Learning 2022: [PNG](https://www.conf42.com/assets/splash/ML2022_Event_Splash.png)
+- Conf42 Mobile 2022: [PNG](https://www.conf42.com/assets/splash/MOBILE2022_Event_Splash.png)
+- Conf42 Python 2022: [PNG](https://www.conf42.com/assets/splash/PYTHON2022_Event_Splash.png)
+- Conf42 Quantum Computing 2022: [PNG](https://www.conf42.com/assets/splash/QUANTUM2022_Event_Splash.png)
+- Conf42 Rustlang 2022: [PNG](https://www.conf42.com/assets/splash/RUST2022_Event_Splash.png)
+- Conf42 Site Reliability Engineering 2022: [PNG](https://www.conf42.com/assets/splash/SRE2022_Event_Splash.png)
+- Conf42 Web 3.0 2022: [PNG](https://www.conf42.com/assets/splash/WEB32022_Event_Splash.png)
+- Conf42 JavaScript 2010: [PNG](https://www.conf42.com/assets/splash/JS2010_Event_Splash.png)
+
+### About text
+
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/conf42/conf42-about.txt)
 
 ## SREday
 
@@ -119,67 +212,103 @@ Name: SREday (SRE in capitals, day in lower case). Website: https://www.sreday.c
 
 ### Logos
 
-- [Logo, black (SVG)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.svg)
-- [Logo, black (PDF)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.pdf)
-- [Logo, black (EPS)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.eps)
-- [Logo, black (PNG, 2000x1966)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.png)
-- [Logo, white (SVG)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.svg)
-- [Logo, white (PDF)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.pdf)
-- [Logo, white (EPS)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.eps)
-- [Logo, white (PNG, 2000x1966)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.png)
-- [Logo, colour (SVG)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.svg)
-- [Logo, color (PDF)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.pdf)
-- [Logo, color (EPS)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.eps)
-- [Logo, colour (PNG, 2000x1966)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.png)
-- [Logo on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-light.png)
-- [Logo on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-dark.png)
+- Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.png)
+- Logo in black: [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.png)
+- Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.png)
+- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-light.png)
+- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/sreday/social/sreday-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/sreday/avatars/sreday-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/social/sreday-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 2000x2000)](https://www.conf42.com/assets/brandkit/sreday/stickers/sreday-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/sreday/stickers/sreday-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/stickers/sreday-sticker.svg)
 
-### Mascots
+### Mascots & pets
 
-- [Monkey (PNG, 2048x2048)](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey.png)
-- [Monkey (404) (PNG, 580x720)](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey-404.png)
+- Monkey: [PNG](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey.svg)
+- Monkey (404): [PNG](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey-404.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/mascots/sreday-monkey-404.svg)
 
-### Artwork
+### Animations
 
-- [Logo, round (PNG, 1500x1500)](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-round.png)
-- [Logo, horizontal (PNG, 1500x750)](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-horizontal.png)
-- [Brand gradient (JPG, 2848x4272)](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-brand-gradient.jpg)
+- Monkeys: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.mp4)
+- Monkey dance: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkey-dance.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkey-dance.mp4)
+- SRE monkeys: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-sre-monkeys.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-sre-monkeys.mp4)
 
-### Colours
+### Illustrations
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/sreday/colours/sreday-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/sreday/colours/sreday-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/sreday/colours/sreday-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/sreday/colours/sreday-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/sreday/colours/sreday-tokens.json)
+- Logo, round: [PNG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-round.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-round.svg)
+- Logo, horizontal: [PNG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-horizontal.png), [SVG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-logo-horizontal.svg)
+- Brand gradient: [JPG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-brand-gradient.jpg), [SVG](https://www.conf42.com/assets/brandkit/sreday/artwork/sreday-brand-gradient.svg)
 
-### Press
+### Event splashes
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/sreday/sreday-about.txt)
+- SREday Katowice 2027 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2027-katowice-q2.png)
+- SREday London 2027 Q1: [PNG](https://sreday.com/assets/images/events/sreday-2027-london-q1.png)
+- SREday Warsaw 2027 Q1: [PNG](https://sreday.com/assets/images/events/sreday-2027-warsaw-q1.png)
+- SREday Amsterdam 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-amsterdam-q4.png)
+- SREday Austin 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-austin-q2.png)
+- SREday Bangalore 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-bangalore-q2.png)
+- SREday Barcelona 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-barcelona-q2.png)
+- SREday Campinas 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-campinas-q4.png)
+- SREday Chennai 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-chennai-q4.png)
+- SREday Cologne 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-cologne-q2.png)
+- SREday Dallas 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-dallas-q4.png)
+- SREday Hyderabad 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-hyderabad-q2.png)
+- SREday Lisbon 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-lisbon-q2.png)
+- SREday London 2026 Q1: [PNG](https://sreday.com/assets/images/events/sreday-2026-london-q1.png)
+- SREday London 2026 Q3: [PNG](https://sreday.com/assets/images/events/sreday-2026-london-q3.png)
+- SREday Munich 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-munich-q2.png)
+- SREday NYC 2026 Q1: [PNG](https://sreday.com/assets/images/events/sreday-2026-nyc-q1.png)
+- SREday NYC 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-nyc-q2.png)
+- SREday NYC 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-nyc-q4.png)
+- SREday Paris 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-paris-q2.png)
+- SREday Sanfrancisco 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-sanfrancisco-q2.png)
+- SREday Sanfrancisco 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-sanfrancisco-q4.png)
+- SREday Seattle 2026 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2026-seattle-q2.png)
+- SREday Warsaw 2026 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2026-warsaw-q4.png)
+- SREday Amsterdam 2025 Q2: [PNG](https://sreday.com/assets/images/events/sreday-2025-amsterdam-q2.png)
+- SREday Amsterdam 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-amsterdam-q4.png)
+- SREday Campinas 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-campinas-q4.png)
+- SREday Chennai 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-chennai-q4.png)
+- SREday Cologne 2025 Q2: [JPEG](https://sreday.com/assets/images/events/sreday-2025-cologne-q2.jpeg)
+- SREday Cologne 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-cologne-q4.png)
+- SREday Lisbon 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-lisbon-q4.png)
+- SREday London 2025 Q1: [JPEG](https://sreday.com/assets/images/events/sreday-2025-london-q1.jpeg)
+- SREday London 2025 Q3: [PNG](https://sreday.com/assets/images/events/sreday-2025-london-q3.png)
+- SREday NYC 2025 Q1: [JPEG](https://sreday.com/assets/images/events/sreday-2025-nyc-q1.jpeg)
+- SREday Paris 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-paris-q4.png)
+- SREday Redmond 2025 Q2: [JPEG](https://sreday.com/assets/images/events/sreday-2025-redmond-q2.jpeg)
+- SREday Sanfrancisco 2025 Q2: [JPEG](https://sreday.com/assets/images/events/sreday-2025-sanfrancisco-q2.jpeg)
+- SREday Sanfrancisco 2025 Q4: [PNG](https://sreday.com/assets/images/events/sreday-2025-sanfrancisco-q4.png)
+- SREday Amsterdam 2024: [JPEG](https://sreday.com/assets/images/events/sreday-2024-amsterdam.jpeg)
+- SREday London 2024: [JPEG](https://sreday.com/assets/images/events/sreday-2024-london.jpeg)
+- SREday Sanfrancisco 2024: [JPEG](https://sreday.com/assets/images/events/sreday-2024-sanfrancisco.jpeg)
+- SREday Sanfrancisco 2024 Q4: [JPEG](https://sreday.com/assets/images/events/sreday-2024-sanfrancisco-q4.jpeg)
+- SREday London 2023: [JPEG](https://sreday.com/assets/images/events/sreday-2023-london.jpeg)
+- SREday London 2022: [JPEG](https://sreday.com/assets/images/events/sreday-2022-london.jpeg)
+
+### About text
+
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/sreday/sreday-about.txt)
 
 ## LLMday
 
@@ -197,66 +326,73 @@ Name: LLMday (LLM in capitals, day in lower case). Website: https://www.llmday.c
 
 ### Logos
 
-- [Logo, black (SVG)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.svg)
-- [Logo, black (PDF)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.pdf)
-- [Logo, black (EPS)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.eps)
-- [Logo, black (PNG, 2000x1654)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.png)
-- [Logo, white (SVG)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.svg)
-- [Logo, white (PDF)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.pdf)
-- [Logo, white (EPS)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.eps)
-- [Logo, white (PNG, 2000x1654)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.png)
-- [Logo, colour (SVG)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.svg)
-- [Logo, color (PDF)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.pdf)
-- [Logo, color (EPS)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.eps)
-- [Logo, colour (PNG, 2000x1654)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.png)
-- [Logo on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-light.png)
-- [Logo on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-dark.png)
+- Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.png)
+- Logo in black: [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.png)
+- Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.png)
+- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-light.png)
+- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/llmday/social/llmday-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/llmday/avatars/llmday-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/social/llmday-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 2000x2000)](https://www.conf42.com/assets/brandkit/llmday/stickers/llmday-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/llmday/stickers/llmday-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/stickers/llmday-sticker.svg)
 
-### Mascots
+### Mascots & pets
 
-- [Baby llama (PNG, 2048x2048)](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-baby-llama.png)
-- [Llama (PNG, 816x928)](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama.png)
-- [Llama (404) (PNG, 498x720)](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama-404.png)
+- Baby llama: [PNG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-baby-llama.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-baby-llama.svg)
+- Llama: [PNG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama.svg)
+- Llama (404): [PNG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama-404.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/mascots/llmday-llama-404.svg)
 
-### Artwork
+### Animations
 
-- [Brand gradient (PNG, 1024x1536)](https://www.conf42.com/assets/brandkit/llmday/artwork/llmday-brand-gradient.png)
+- Llama: [WEBP](https://www.conf42.com/assets/brandkit/llmday/animations/llmday-llama.webp), [MP4](https://www.conf42.com/assets/brandkit/llmday/animations/llmday-llama.mp4)
+- Llama conspiracy: [WEBP](https://www.conf42.com/assets/brandkit/llmday/animations/llmday-llama-conspiracy.webp), [MP4](https://www.conf42.com/assets/brandkit/llmday/animations/llmday-llama-conspiracy.mp4)
 
-### Colours
+### Illustrations
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/llmday/colours/llmday-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/llmday/colours/llmday-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/llmday/colours/llmday-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/llmday/colours/llmday-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/llmday/colours/llmday-tokens.json)
+- Brand gradient: [PNG](https://www.conf42.com/assets/brandkit/llmday/artwork/llmday-brand-gradient.png), [SVG](https://www.conf42.com/assets/brandkit/llmday/artwork/llmday-brand-gradient.svg)
 
-### Press
+### Event splashes
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/llmday/llmday-about.txt)
+- LLMday Austin 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-austin-q2.png)
+- LLMday Austin 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-austin-q4.png)
+- LLMday Bangalore 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-bangalore-q2.png)
+- LLMday Hamburg 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-hamburg-q2.png)
+- LLMday Hamburg 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-hamburg-q4.png)
+- LLMday Lisbon 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-lisbon-q2.png)
+- LLMday London 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-london-q2.png)
+- LLMday London 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-london-q4.png)
+- LLMday Montevideo 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-montevideo-q4.png)
+- LLMday NYC 2026 Q1: [PNG](https://llmday.com/assets/images/events/llmday-2026-nyc-q1.png)
+- LLMday NYC 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-nyc-q2.png)
+- LLMday NYC 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-nyc-q4.png)
+- LLMday San Francisco 2026 Q2: [PNG](https://llmday.com/assets/images/events/llmday-2026-san-francisco-q2.png)
+- LLMday San Francisco 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-san-francisco-q4.png)
+- LLMday Tel Aviv 2026 Q4: [PNG](https://llmday.com/assets/images/events/llmday-2026-tel-aviv-q4.png)
+- LLMday Warsaw 2026 Q1: [PNG](https://llmday.com/assets/images/events/llmday-2026-warsaw-q1.png)
+
+### About text
+
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/llmday/llmday-about.txt)
 
 ## PLATFORMday
 
@@ -274,62 +410,51 @@ Name: PLATFORMday (PLATFORM in capitals, day in lower case). Website: https://ww
 
 ### Logos
 
-- [Logo, black (SVG)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.svg)
-- [Logo, black (PDF)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.pdf)
-- [Logo, black (EPS)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.eps)
-- [Logo, black (PNG, 2000x1990)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.png)
-- [Logo, white (SVG)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.svg)
-- [Logo, white (PDF)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.pdf)
-- [Logo, white (EPS)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.eps)
-- [Logo, white (PNG, 2000x1990)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.png)
-- [Logo, colour (SVG)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.svg)
-- [Logo, color (PDF)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.pdf)
-- [Logo, color (EPS)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.eps)
-- [Logo, colour (PNG, 2000x1990)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.png)
-- [Logo on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-light.png)
-- [Logo on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-dark.png)
+- Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.png)
+- Logo in black: [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.png)
+- Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.png)
+- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-light.png)
+- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/platformday/social/platformday-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/platformday/avatars/platformday-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/social/platformday-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 4096x4096)](https://www.conf42.com/assets/brandkit/platformday/stickers/platformday-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/platformday/stickers/platformday-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/stickers/platformday-sticker.svg)
 
-### Mascots
+### Mascots & pets
 
-- [Baby platypus (PNG, 2048x2048)](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-baby-platypus.png)
-- [Platypus (PNG, 1080x1080)](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus.png)
-- [Platypus (404) (PNG, 585x720)](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus-404.png)
+- Baby platypus: [PNG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-baby-platypus.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-baby-platypus.svg)
+- Platypus: [PNG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus.svg)
+- Platypus (404): [PNG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus-404.png), [SVG](https://www.conf42.com/assets/brandkit/platformday/mascots/platformday-platypus-404.svg)
 
-### Colours
+### Event splashes
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/platformday/colours/platformday-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/platformday/colours/platformday-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/platformday/colours/platformday-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/platformday/colours/platformday-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/platformday/colours/platformday-tokens.json)
+- PLATFORMday London 2027 Q2: [PNG](https://platformday.com/assets/images/events/platformday-2027-london-q2.png)
+- PLATFORMday Austin 2026 Q4: [PNG](https://platformday.com/assets/images/events/platformday-2026-austin-q4.png)
+- PLATFORMday San Francisco 2026 Q4: [PNG](https://platformday.com/assets/images/events/platformday-2026-san-francisco-q4.png)
 
-### Press
+### About text
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/platformday/platformday-about.txt)
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/platformday/platformday-about.txt)
 
 ## Prompt Engineering Conference
 
@@ -347,110 +472,50 @@ Name: Prompt Engineering Conference (short: PEC). Website: https://promptenginee
 
 ### Logos
 
-- [Logo, black (SVG)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.svg)
-- [Logo, black (PDF)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.pdf)
-- [Logo, black (EPS)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.eps)
-- [Logo, black (PNG, 2000x734)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.png)
-- [Logo, white (SVG)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.svg)
-- [Logo, white (PDF)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.pdf)
-- [Logo, white (EPS)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.eps)
-- [Logo, white (PNG, 2000x729)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.png)
-- [Logo, colour (SVG)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.svg)
-- [Logo, color (PDF)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.pdf)
-- [Logo, color (EPS)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.eps)
-- [Logo, colour (PNG, 2000x766)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.png)
-- [Logo on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-light.png)
-- [Logo on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-dark.png)
+- Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.png)
+- Logo in black: [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.png)
+- Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.png)
+- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-light.png)
+- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/pec/social/pec-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/pec/social/pec-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/pec/social/pec-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/pec/social/pec-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/pec/social/pec-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/pec/social/pec-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/pec/social/pec-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/pec/avatars/pec-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/pec/social/pec-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/pec/social/pec-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Logo, original (PNG, 2229x918)](https://www.conf42.com/assets/brandkit/pec/stickers/pec-sticker.png)
+- Logo, original: [PNG](https://www.conf42.com/assets/brandkit/pec/stickers/pec-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/pec/stickers/pec-sticker.svg)
 
-### Mascots
+### Mascots & pets
 
-- [Avatar (PNG, 650x650)](https://www.conf42.com/assets/brandkit/pec/mascots/pec-avatar.png)
+- Avatar: [PNG](https://www.conf42.com/assets/brandkit/pec/mascots/pec-avatar.png), [SVG](https://www.conf42.com/assets/brandkit/pec/mascots/pec-avatar.svg)
 
-### Colours
+### Event splashes
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/pec/colours/pec-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/pec/colours/pec-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/pec/colours/pec-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/pec/colours/pec-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/pec/colours/pec-tokens.json)
+- Prompt Engineering Conference London 2026 Q4: [JPG](https://promptengineering.rocks/assets/images/events/pec-2026-london-q4.jpg)
+- Prompt Engineering Conference London 2025 Q4: [JPG](https://promptengineering.rocks/assets/images/events/pec-2025-london-q4.jpg)
+- Prompt Engineering Conference Online 2024: [JPG](https://promptengineering.rocks/assets/images/events/pec-2024-online.jpg)
+- Prompt Engineering Conference Online 2023: [JPG](https://promptengineering.rocks/assets/images/events/pec-2023-online.jpg)
 
-### Press
+### About text
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/pec/pec-about.txt)
-
-## DevOps Not Dead
-
-DevOps Not Dead is an in-person event series co-created with Harness: practitioners talking honestly about delivering software, in London and New York.
-
-Name: DevOps Not Dead (short: DND). Website: https://www.devopsnotdead.com/
-
-| Colour | HEX | RGB | CMYK |
-|---|---|---|---|
-| Primary | `#2E9AD8` | 46 154 216 | 79 29 0 15 |
-| Ink | `#14202B` | 20 32 43 | 53 26 0 83 |
-| Dark | `#12435F` | 18 67 95 | 81 29 0 63 |
-| Light | `#E1F0F9` | 225 240 249 | 10 4 0 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
-
-### Social
-
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/devopsnotdead/social/devopsnotdead-email-signature-1200x300.png)
-
-### Avatars
-
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/devopsnotdead/avatars/devopsnotdead-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/devopsnotdead/avatars/devopsnotdead-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/devopsnotdead/avatars/devopsnotdead-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/devopsnotdead/avatars/devopsnotdead-avatar-round-400.png)
-
-### Stickers
-
-- [Sticker (PNG, 7851x5441)](https://www.conf42.com/assets/brandkit/devopsnotdead/stickers/devopsnotdead-sticker.png)
-
-### Colours
-
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/devopsnotdead/colours/devopsnotdead-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/devopsnotdead/colours/devopsnotdead-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/devopsnotdead/colours/devopsnotdead-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/devopsnotdead/colours/devopsnotdead-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/devopsnotdead/colours/devopsnotdead-tokens.json)
-
-### Press
-
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/devopsnotdead/devopsnotdead-about.txt)
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/pec/pec-about.txt)
 
 ## Reliaburger
 
@@ -466,46 +531,55 @@ Name: Reliaburger (one word). Website: https://reliaburger.com/
 | Light | `#FBE7E0` | 251 231 224 | 0 8 11 2 |
 | Paper | `#FFF7EF` | 255 247 239 | 0 3 6 0 |
 
-### Social
+### Logos
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-email-signature-1200x300.png)
+- Burger logo in colour: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.svg)
+- Burger logo in black: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.eps)
+- Burger logo in white (for dark backgrounds): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.eps)
+- Burger logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-light.png)
+- Burger logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-dark.png)
+- Burger logo on yellow (original): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-yellow.png)
 
-### Avatars
+### Profile pictures
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-400.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/avatars/reliaburger-avatar-round-400.svg)
+
+### Banners & covers
+
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/social/reliaburger-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 2048x2048)](https://www.conf42.com/assets/brandkit/reliaburger/stickers/reliaburger-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/stickers/reliaburger-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/stickers/reliaburger-sticker.svg)
 
-### Artwork
+### Mascots & pets
 
-- [Logo (v1) (JPG, 1024x1024)](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-logo-v1.jpg)
-- [Burger (WEBP, 720x892)](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-burger.webp)
+- Capybara: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/mascots/reliaburger-capybara.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/mascots/reliaburger-capybara.svg)
 
-### Colours
+### Animations
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/reliaburger/colours/reliaburger-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/reliaburger/colours/reliaburger-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/reliaburger/colours/reliaburger-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/reliaburger/colours/reliaburger-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/reliaburger/colours/reliaburger-tokens.json)
+- Burger loop: [WEBP](https://www.conf42.com/assets/brandkit/reliaburger/animations/reliaburger-burger-loop.webp), [MP4](https://www.conf42.com/assets/brandkit/reliaburger/animations/reliaburger-burger-loop.mp4)
 
-### Press
+### Illustrations
 
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/reliaburger/reliaburger-about.txt)
+- Logo (v1): [JPG](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-logo-v1.jpg), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-logo-v1.svg)
+- Burger: [WEBP](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-burger.webp), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/artwork/reliaburger-burger.svg)
+
+### About text
+
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/reliaburger/reliaburger-about.txt)
 
 ## CFP Ninja
 
@@ -523,53 +597,39 @@ Name: CFP Ninja (cfp.ninja as the address). Website: https://cfp.ninja/
 
 ### Logos
 
-- [Mark, black (SVG)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.svg)
-- [Mark, black (PDF)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.pdf)
-- [Mark, black (EPS)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.eps)
-- [Mark, black (PNG, 2000x1296)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.png)
-- [Mark, white (SVG)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.svg)
-- [Mark, white (PDF)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.pdf)
-- [Mark, white (EPS)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.eps)
-- [Mark, white (PNG, 2000x1296)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.png)
-- [Mark, colour (PNG, 1331x861)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-color.png)
-- [Mark on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-light.png)
-- [Mark on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-dark.png)
+- Mark in colour: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-color.png)
+- Mark in black: [SVG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.png)
+- Mark in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.png)
+- Mark on a light background: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-light.png)
+- Mark on a dark background: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/cfpninja/avatars/cfpninja-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/social/cfpninja-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Sticker (PNG, 2048x1934)](https://www.conf42.com/assets/brandkit/cfpninja/stickers/cfpninja-sticker.png)
+- Sticker: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/stickers/cfpninja-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/cfpninja/stickers/cfpninja-sticker.svg)
 
-### Colours
+### About text
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/cfpninja/colours/cfpninja-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/cfpninja/colours/cfpninja-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/cfpninja/colours/cfpninja-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/cfpninja/colours/cfpninja-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/cfpninja/colours/cfpninja-tokens.json)
-
-### Press
-
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/cfpninja/cfpninja-about.txt)
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/cfpninja/cfpninja-about.txt)
 
 ## Certified FYI
 
@@ -587,53 +647,39 @@ Name: Certified FYI (certified.fyi as the address). Website: https://certified.f
 
 ### Logos
 
-- [Logo, black (SVG)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.svg)
-- [Logo, black (PDF)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.pdf)
-- [Logo, black (EPS)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.eps)
-- [Logo, black (PNG, 2000x1115)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.png)
-- [Logo, white (SVG)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.svg)
-- [Logo, white (PDF)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.pdf)
-- [Logo, white (EPS)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.eps)
-- [Logo, white (PNG, 2000x1115)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.png)
-- [Logo, colour (PNG, 1936x1079)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-color.png)
-- [Logo on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-light.png)
-- [Logo on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-dark.png)
+- Logo in colour: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-color.png)
+- Logo in black: [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.png)
+- Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.png)
+- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-light.png)
+- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/certifiedfyi/avatars/certifiedfyi-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/social/certifiedfyi-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Logo, original (PNG, 2214x1272)](https://www.conf42.com/assets/brandkit/certifiedfyi/stickers/certifiedfyi-sticker.png)
+- Logo, original: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/stickers/certifiedfyi-sticker.png), [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/stickers/certifiedfyi-sticker.svg)
 
-### Colours
+### About text
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/certifiedfyi/colours/certifiedfyi-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/certifiedfyi/colours/certifiedfyi-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/certifiedfyi/colours/certifiedfyi-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/certifiedfyi/colours/certifiedfyi-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/certifiedfyi/colours/certifiedfyi-tokens.json)
-
-### Press
-
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/certifiedfyi/certifiedfyi-about.txt)
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/certifiedfyi/certifiedfyi-about.txt)
 
 ## Badger
 
@@ -651,61 +697,41 @@ Name: Badger (Snout by Badger for the lead scanner). Website: https://scan.sreda
 
 ### Logos
 
-- [Badger, black (SVG)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.svg)
-- [Badger, black (PDF)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.pdf)
-- [Badger, black (EPS)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.eps)
-- [Badger, black (PNG, 2000x564)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.png)
-- [Badger, white (SVG)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.svg)
-- [Badger, white (PDF)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.pdf)
-- [Badger, white (EPS)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.eps)
-- [Badger, white (PNG, 2000x564)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.png)
-- [Badger, colour (PNG, 1565x440)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-color.png)
-- [Badger on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-light.png)
-- [Badger on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-dark.png)
-- [Snout by Badger, black (SVG)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.svg)
-- [Snout by Badger, black (PDF)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.pdf)
-- [Snout by Badger, black (EPS)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.eps)
-- [Snout by Badger, black (PNG, 2000x630)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.png)
-- [Snout by Badger, white (SVG)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.svg)
-- [Snout by Badger, white (PDF)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.pdf)
-- [Snout by Badger, white (EPS)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.eps)
-- [Snout by Badger, white (PNG, 2000x630)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.png)
-- [Snout by Badger, colour (PNG, 1245x393)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-color.png)
-- [Snout by Badger on light (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-light.png)
-- [Snout by Badger on dark (PNG, 2400x1350)](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-dark.png)
+- Badger in colour: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-color.png)
+- Snout by Badger in colour: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-color.png)
+- Badger in black: [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-black.png)
+- Snout by Badger in black: [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.png)
+- Badger in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.png)
+- Snout by Badger in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.png)
+- Badger on a light background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-light.png)
+- Snout by Badger on a light background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-light.png)
+- Badger on a dark background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-dark.png)
+- Snout by Badger on a dark background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-dark.png)
 
-### Social
+### Profile pictures
 
-- [LinkedIn company page cover (PNG, 1512x256)](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-1512x256.png)
-- [LinkedIn company page cover, sharp (6:1) (PNG, 4200x700)](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-hd-4200x700.png)
-- [LinkedIn profile banner (PNG, 1584x396)](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-profile-1584x396.png)
-- [X (Twitter) header (PNG, 1500x500)](https://www.conf42.com/assets/brandkit/badger/social/badger-x-header-1500x500.png)
-- [Bluesky banner (PNG, 3000x1000)](https://www.conf42.com/assets/brandkit/badger/social/badger-bluesky-banner-3000x1000.png)
-- [Facebook cover (PNG, 1640x624)](https://www.conf42.com/assets/brandkit/badger/social/badger-facebook-cover-1640x624.png)
-- [YouTube channel banner (PNG, 2560x1440)](https://www.conf42.com/assets/brandkit/badger/social/badger-youtube-banner-2560x1440.png)
-- [Link preview (Open Graph) (PNG, 1200x630)](https://www.conf42.com/assets/brandkit/badger/social/badger-og-image-1200x630.png)
-- [Zoom / Teams / Meet background (PNG, 1920x1080)](https://www.conf42.com/assets/brandkit/badger/social/badger-video-background-1920x1080.png)
-- [Email signature banner (PNG, 1200x300)](https://www.conf42.com/assets/brandkit/badger/social/badger-email-signature-1200x300.png)
+- Avatar, square, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-1000.png), [SVG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-1000.svg)
+- Avatar, square, 400 px: [PNG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-400.png), [SVG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-400.svg)
+- Avatar, round, 1000 px: [PNG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-1000.png), [SVG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-1000.svg)
+- Avatar, round, 400 px: [PNG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-400.png), [SVG](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-400.svg)
 
-### Avatars
+### Banners & covers
 
-- [Avatar, square, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-1000.png)
-- [Avatar, square, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-square-400.png)
-- [Avatar, round, 1000 px (PNG, 1000x1000)](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-1000.png)
-- [Avatar, round, 400 px (PNG, 400x400)](https://www.conf42.com/assets/brandkit/badger/avatars/badger-avatar-round-400.png)
+- LinkedIn company page cover: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-1512x256.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-1512x256.svg)
+- LinkedIn company page cover, sharp (6:1): [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-hd-4200x700.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-company-hd-4200x700.svg)
+- LinkedIn profile banner: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-profile-1584x396.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-linkedin-profile-1584x396.svg)
+- X (Twitter) header: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-x-header-1500x500.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-x-header-1500x500.svg)
+- Bluesky banner: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-bluesky-banner-3000x1000.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-bluesky-banner-3000x1000.svg)
+- Facebook cover: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-facebook-cover-1640x624.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-facebook-cover-1640x624.svg)
+- YouTube channel banner: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-youtube-banner-2560x1440.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-youtube-banner-2560x1440.svg)
+- Link preview (Open Graph): [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-og-image-1200x630.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-og-image-1200x630.svg)
+- Zoom / Teams / Meet background: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-video-background-1920x1080.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-video-background-1920x1080.svg)
+- Email signature banner: [PNG](https://www.conf42.com/assets/brandkit/badger/social/badger-email-signature-1200x300.png), [SVG](https://www.conf42.com/assets/brandkit/badger/social/badger-email-signature-1200x300.svg)
 
 ### Stickers
 
-- [Logo, original (WEBP, 1600x451)](https://www.conf42.com/assets/brandkit/badger/stickers/badger-sticker.webp)
+- Logo, original: [WEBP](https://www.conf42.com/assets/brandkit/badger/stickers/badger-sticker.webp), [SVG](https://www.conf42.com/assets/brandkit/badger/stickers/badger-sticker.svg)
 
-### Colours
+### About text
 
-- [Palette (PNG, 2000x700)](https://www.conf42.com/assets/brandkit/badger/colours/badger-palette.png)
-- [Palette, JSON (JSON)](https://www.conf42.com/assets/brandkit/badger/colours/badger-palette.json)
-- [Palette, CSS variables (CSS)](https://www.conf42.com/assets/brandkit/badger/colours/badger-palette.css)
-- [Palette, GIMP / Inkscape (GPL)](https://www.conf42.com/assets/brandkit/badger/colours/badger-palette.gpl)
-- [Design tokens (W3C) (JSON)](https://www.conf42.com/assets/brandkit/badger/colours/badger-tokens.json)
-
-### Press
-
-- [About text (boilerplate) (TXT)](https://www.conf42.com/assets/brandkit/badger/badger-about.txt)
+- About text (boilerplate): [TXT](https://www.conf42.com/assets/brandkit/badger/badger-about.txt)
