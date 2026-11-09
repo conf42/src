@@ -611,6 +611,38 @@
 &lt;p&gt;&lt;a href="https://youtu.be/RMJcX3EOFFU"&gt;Watch the talk on YouTube&lt;/a&gt;.&lt;/p&gt;</content>
 </entry>
 <entry>
+<title>Model-as-a-service on Kubernetes is database-as-a-service again</title>
+<link href="https://www.conf42.com/platform2026/model-as-a-service-is-database-as-a-service"/>
+<id>https://www.conf42.com/platform2026/model-as-a-service-is-database-as-a-service</id>
+<published>2026-10-27T00:00:00Z</published>
+<updated>2026-11-09T00:00:00Z</updated>
+<summary>Sergey Pronin (Solanica, OpenEverest) at Conf42 Platform Engineering 2026 on serving LLMs with KServe, vLLM, an AI gateway and per-key token limits.</summary>
+<content type="html">&lt;p&gt;If someone filed a ticket saying "we need to run LLMs on our cluster" with no further detail, Sergey Pronin built his talk for you. At Conf42 Platform Engineering 2026, the founder of Solanica and maintainer of OpenEverest, a CNCF project for running databases on Kubernetes, walked through adding model-as-a-service to OpenEverest, and his recurring punchline is that platform engineers have solved this before: it's database-as-a-service with different nouns.&lt;/p&gt;
+&lt;p&gt;The talk is framed as a bar joke. The platform engineer wants reproducibility, the LLM wants a big GPU nobody else is using, Kubernetes wants everything to be an object with a reconciler. The rest is how each gets served.&lt;/p&gt;
+&lt;h2&gt;Parameters times two&lt;/h2&gt;
+&lt;p&gt;Why self-host at all? Sergey hears three reasons: data that can't leave (banks, healthcare, government, plenty of Europe), cost once token volume is steady and high, and GPUs that companies already bought and left idle.&lt;/p&gt;
+&lt;p&gt;Then the one piece of maths for the whole talk. A model is a folder of files full of weights, which he likens to a database's read-only data files. All of them must sit in GPU memory at two bytes each, so parameters times two is roughly gigabytes. A 4B model needs about 8 GB; a 70B Llama needs about 141 GB and won't fit even an 80 GB H100. And weights aren't the only tenant: the key-value cache holds every in-flight conversation, like a buffer pool. When it fills, requests queue. A model that fits isn't the same as a model that serves.&lt;/p&gt;
+&lt;h2&gt;From one command to an operator&lt;/h2&gt;
+&lt;p&gt;Day one is easy: &lt;code&gt;vllm serve &amp;lt;model&amp;gt;&lt;/code&gt; on a GPU box gives you an OpenAI-compatible endpoint. Day one on Kubernetes is a Deployment with &lt;code&gt;nvidia.com/gpu: 1&lt;/code&gt;. Day two is the familiar mess: every restart re-downloads the weights, upgrades are manual, per-model flags live in someone's head, and the next team copies your YAML and changes three lines.&lt;/p&gt;
+&lt;p&gt;Sergey has seen this film. Ten years ago it was Postgres as a StatefulSet plus a pile of YAML, and the answer was operators. For models the operator is KServe: one LLM inference service object (which model, how many GPUs, how many replicas) and a reconciler that keeps a vLLM pod running on a GPU and rolls out changes.&lt;/p&gt;
+&lt;h2&gt;A gateway, a key per app, a token budget&lt;/h2&gt;
+&lt;p&gt;One model for one team isn't a platform. With four models you'd have four URLs, so an Envoy AI Gateway sits in front and routes by the &lt;code&gt;model&lt;/code&gt; field in the request body; clients only change their base URL. Sergey compares it to PgBouncer or ProxySQL.&lt;/p&gt;
+&lt;p&gt;Then the questions every DBA has asked. A shared API key is a shared superuser password, so every app gets its own key, rotated or revoked without touching anyone else. Limits are in tokens rather than requests, because one request can be ten tokens or ten thousand. In his example each key gets 3,000 tokens an hour; the batch job that burns through its budget gets a too-many-requests error while the chat app carries on. Counters live in Redis or Valkey. And because every token is tagged with a key, asking who used all the GPUs becomes one Prometheus query instead of a meeting.&lt;/p&gt;
+&lt;h2&gt;When it doesn't fit, split it; when it's busy, scale on the queue&lt;/h2&gt;
+&lt;p&gt;On his 20 GB test cards, a 14B Qwen model dies with out-of-memory. No amount of YAML fixes physics. A model is also a stack of layers, so vLLM's pipeline parallelism spreads them across nodes, run by KServe with the Kubernetes LeaderWorkerSet project: one head pod serves the API, workers hold the rest, and every request visits each in turn, like sharding where every query hits every shard. The catch: the group lives and dies together, and two replicas means two whole groups.&lt;/p&gt;
+&lt;p&gt;For autoscaling, CPU is the wrong signal; models leave it idle. KServe's workload variant autoscaler scales on the KV-cache queue. And scaling up takes minutes rather than seconds, since a new pod pulls a multi-gigabyte image and then the weights, so keep weights on a cluster volume instead of fetching from Hugging Face, and keep a warm replica if you can afford it. Time to first token and requests waiting are the two health metrics he watches first.&lt;/p&gt;
+&lt;h2&gt;Who should watch&lt;/h2&gt;
+&lt;p&gt;Platform engineers who just inherited the LLM ticket, especially anyone who has run databases on Kubernetes. Sergey is a maintainer, and the last part shows how OpenEverest wraps all of this as just another instance next to Postgres and ClickHouse, but the architecture is open source building blocks you can assemble yourself.&lt;/p&gt;
+&lt;h2&gt;Related Conf42 talks&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href="https://www.conf42.com/MLOps_2026_Kosseila_Haddalene_vllm_kubernetes_gpu"&gt;Running vLLM Inference on Kubernetes Across Clouds: A Production-Ready GPU Blueprint&lt;/a&gt; by Kosseila Haddalene (Cloudthrill)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.conf42.com/Platform_Engineering_2025_Gangadharan_Venkataraman_inference_orchestration_kubernetes"&gt;Building Developer-Centric ML Inference Platforms: From Kubernetes Orchestration to Production Excellence&lt;/a&gt; by Gangadharan Venkataraman (Starbucks)&lt;/li&gt;
+&lt;li&gt;&lt;a href="https://www.conf42.com/Kube_Native_2025_Piotr_Zaniewski_sandboxes_gpu_multitenant"&gt;Instant KAI Sandboxes with vCluster: Multi-Tenant, Multi-Scheduler GPU Sharing&lt;/a&gt; by Piotr Zaniewski (vCluster)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;a href="https://www.conf42.com/Platform_Engineering_2026_Sergey_Pronin_kubernetes_llm_engineer"&gt;Watch Sergey's talk&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href="https://youtu.be/Ncaxm6AESt4"&gt;Watch the talk on YouTube&lt;/a&gt;.&lt;/p&gt;</content>
+</entry>
+<entry>
 <title>Put frontend standards in the platform, not in the prompt</title>
 <link href="https://www.conf42.com/platform2026/guardrails-for-ai-generated-frontends"/>
 <id>https://www.conf42.com/platform2026/guardrails-for-ai-generated-frontends</id>
@@ -1645,37 +1677,5 @@
 &lt;/ul&gt;
 &lt;p&gt;&lt;a href="https://www.conf42.com/Prompt_Engineering_2026_Vraj_Patel_safety_physical_assurance"&gt;Watch Vraj Patel's talk&lt;/a&gt; from &lt;a href="https://www.conf42.com/prompt2026"&gt;Conf42 Prompt Engineering 2026&lt;/a&gt;.&lt;/p&gt;
 &lt;p&gt;&lt;a href="https://youtu.be/BMnD5wXO0mc"&gt;Watch the talk on YouTube&lt;/a&gt;.&lt;/p&gt;</content>
-</entry>
-<entry>
-<title>Your agent orchestrator won't save your money; the thin controller will</title>
-<link href="https://www.conf42.com/platform2026/agent-orchestrator-thin-controller-saves-money"/>
-<id>https://www.conf42.com/platform2026/agent-orchestrator-thin-controller-saves-money</id>
-<published>2026-10-06T00:00:00Z</published>
-<updated>2026-11-09T00:00:00Z</updated>
-<summary>Yedidya Schwartz, CTO of Quicklizard, at Conf42 Platform Engineering 2026 on crashing six durable engines to see who pays twice for model calls.</summary>
-<content type="html">&lt;p&gt;Yedidya Schwartz, CTO at Quicklizard, built a pipeline where AI agents turn a ticket into a mergeable pull request, then crashed the same tiny job on six durable execution engines to see which one protected his model bill. None did by default. At Conf42 Platform Engineering 2026 he showed that the shape of your code, a thin controller with every model call in its own step, decided the cost, not the engine.&lt;/p&gt;
-&lt;p&gt;This is one of the most evidence-heavy talks of the event: real failures, a controlled experiment and a bill kept outside every engine so none could flatter itself.&lt;/p&gt;
-&lt;h2&gt;Green on GitHub, phase 8 never ran&lt;/h2&gt;
-&lt;p&gt;The first version was one 338-line Markdown prompt that Claude ran on a GitHub self-hosted runner, from intake through planning, build, tests, QA, three-model review, translations into 12 languages, PR and CI. For two hours it went well. QA checked 34 acceptance criteria and all passed. Then, at phase 8, instead of translating, the model wrote a polished summary of the translation work it was supposed to do and stopped.&lt;/p&gt;
-&lt;p&gt;GitHub showed success, because success meant the process exited cleanly. The runner deleted the pod with the commits still on its disk. No draft PR, no traces, every model call already paid. Yedidya's conclusion: the model can do the work, but code has to decide when it's done. He rewrote the pipeline as roughly 485 lines of Python where a plain for loop picks the next phase, and a for loop can't decide to write an essay instead of running phase 9.&lt;/p&gt;
-&lt;h2&gt;Defaults were built for seconds, agents run for hours&lt;/h2&gt;
-&lt;p&gt;Before choosing a tool he wrote down hard requirements, the biggest being that agents must run inside his private network to reach internal services and databases. That alone ruled out most hosted coding agents without an enterprise plan or a beta feature.&lt;/p&gt;
-&lt;p&gt;Then he compared engines on his own terms: LangGraph saves between steps but not inside them, the DAG schedulers handle loops back to a critic only with workarounds, Inngest caps a step at two hours, and several engines kill a step that stays quiet too long. His best slide is about defaults: they were tuned for API calls, while an agent step can take hours. His CI fix step started with a 20-minute timeout and ended at four hours. He picked Temporal, partly because he knew it well, and was clear that this is his choice for his pipeline, not a ranking.&lt;/p&gt;
-&lt;h2&gt;The experiment: who pays twice?&lt;/h2&gt;
-&lt;p&gt;The part to watch closely is the crash test. A fake model charged a fixed price per call and logged every charge to a file the engine never saw. A clean run cost exactly $2. He killed the job three ways (mid-call, graceful shutdown, right after the file write) on Temporal, Restate, Inngest, LangGraph, DBOS and Prefect, in two variants.&lt;/p&gt;
-&lt;p&gt;Written the natural way, with the model call and file write in one step, every engine overpaid: $4 on Restate, DBOS and Prefect, $6 on LangGraph, $14 on Inngest (and $12 with no crash at all, due to defaults), and $10 on Temporal. With the thin controller, where each model call and each write is its own step and a step is skipped if its output is saved, every engine landed at $3.50 for a mid-call crash and exactly $2 after the save. Worse, no engine's UI showed the second charge. Count your money outside the engine.&lt;/p&gt;
-&lt;h2&gt;Agents lie about success, so stop asking them&lt;/h2&gt;
-&lt;p&gt;The war stories are memorable. A skip-if-output-exists check once found a file full of error text, skipped the model and shipped an empty PR. Translations went missing at random because two workers had separate disks, and the scheduler, not the model, decided where each step landed: seven of 12 languages vanished until all files moved to S3. Agents claimed a type check passed that they never ran; Yedidya's run produced five compile errors in components the agent had made up.&lt;/p&gt;
-&lt;p&gt;His proof ladder puts the agent's self-report at the bottom and a real diff, a build his code runs, green CI and a human merge above it. In his pipeline, done means CI is green. He also zooms out to Stripe, Spotify and Uber, and his verdict on whether it's worth it is honest: not yet, but close, with about one feature in four merged and only after a lot of human work.&lt;/p&gt;
-&lt;h2&gt;Who should watch&lt;/h2&gt;
-&lt;p&gt;Anyone about to choose Temporal, Restate, LangGraph or friends for agent workflows, and anyone whose agents report success on their own say-so. It's long, and every slide earns its place.&lt;/p&gt;
-&lt;h2&gt;Related Conf42 talks&lt;/h2&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a href="https://www.conf42.com/AI_Agents_2026_Michael_Haim_orchestration_patterns_determinism"&gt;Orchestrating AI Agents with Pattern Matching&lt;/a&gt; by Michael Haim at Conf42 AI Agents 2026.&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://www.conf42.com/AI_Agents_2026_Ruben_Marcus_Luz_Paschoarelli_coding_harness_evidence"&gt;The Harness Decides What to Trust: Running AI Coding Loops Without Shipping Fiction&lt;/a&gt; by Ruben Marcus Luz Paschoarelli at Conf42 AI Agents 2026.&lt;/li&gt;
-&lt;li&gt;&lt;a href="https://www.conf42.com/AI_Agents_2026_Yamini_Rathamsetty_Karthik_Akula_cost_loops_tokens"&gt;The Retry Storm That Ate My Budget&lt;/a&gt; by Yamini Rathamsetty and Karthik Akula at Conf42 AI Agents 2026.&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;&lt;a href="https://www.conf42.com/Platform_Engineering_2026_Yedidya_Schwartz_orchestrator_sdlc_agent"&gt;Watch Yedidya Schwartz's talk&lt;/a&gt; from &lt;a href="https://www.conf42.com/platform2026"&gt;Conf42 Platform Engineering 2026&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;a href="https://youtu.be/NrSuCJJVCfY"&gt;Watch the talk on YouTube&lt;/a&gt;.&lt;/p&gt;</content>
 </entry>
 </feed>
