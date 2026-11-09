@@ -17,24 +17,21 @@ Name: Conf42 (capital C, no space). Website: https://www.conf42.com/
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#2C3FB0` | 44 63 176 | 75 64 0 31 |
-| Ink | `#0F1A3D` | 15 26 61 | 75 57 0 76 |
-| Dark | `#16205A` | 22 32 90 | 76 64 0 65 |
-| Light | `#E2E6F8` | 226 230 248 | 9 7 0 3 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Blue | `#335EEA` | 51 94 234 | 78 60 0 8 |
+| Navy | `#1B2A4E` | 27 42 78 | 65 46 0 69 |
+| Midnight | `#161C2D` | 22 28 45 | 51 38 0 82 |
+| Sky | `#7EA2D2` | 126 162 210 | 40 23 0 18 |
+| Corgi | `#EA8A5A` | 234 138 90 | 0 41 62 8 |
+| Coral | `#DF4759` | 223 71 89 | 0 68 60 13 |
+| Mint | `#42BA96` | 66 186 150 | 65 0 19 27 |
+| Paper | `#F9FBFD` | 249 251 253 | 2 1 0 1 |
 
 ### Logos
 
-- Wordmark in colour: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-color.png)
-- Mark (42) in colour: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-color.png)
 - Wordmark in black: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-black.png)
 - Mark (42) in black: [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-black.png)
 - Wordmark in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-white.png)
 - Mark (42) in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-white.png)
-- Wordmark on a light background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-light.png)
-- Mark (42) on a light background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-light.png)
-- Wordmark on a dark background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-on-dark.png)
-- Mark (42) on a dark background: [PNG](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-mark-on-dark.png)
 - Wordmark, original vector (Adobe Illustrator): [AI](https://www.conf42.com/assets/brandkit/conf42/logos/conf42-wordmark-original.ai)
 
 ### Profile pictures
@@ -204,19 +201,20 @@ Name: SREday (SRE in capitals, day in lower case). Website: https://www.sreday.c
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#7B3FE4` | 123 63 228 | 46 72 0 11 |
-| Ink | `#1D1240` | 29 18 64 | 55 72 0 75 |
-| Dark | `#2D0E62` | 45 14 98 | 54 86 0 62 |
-| Light | `#E9E0FB` | 233 224 251 | 7 11 0 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Plum | `#713660` | 113 54 96 | 0 52 15 56 |
+| Sticker violet | `#5A4E72` | 90 78 114 | 21 32 0 55 |
+| Blue | `#098DCF` | 9 141 207 | 96 32 0 19 |
+| Coral | `#EC645E` | 236 100 94 | 0 58 60 7 |
+| Orchid | `#C46AA0` | 196 106 160 | 0 46 18 23 |
+| Monkey orange | `#EA9244` | 234 146 68 | 0 38 71 8 |
+| Ink | `#141C25` | 20 28 37 | 46 24 0 85 |
+| Mist | `#F0F6FA` | 240 246 250 | 4 2 0 2 |
 
 ### Logos
 
 - Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-color.png)
 - Logo in black: [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-black.png)
 - Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-white.png)
-- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-light.png)
-- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/sreday/logos/sreday-logo-on-dark.png)
 
 ### Profile pictures
 
@@ -249,9 +247,8 @@ Name: SREday (SRE in capitals, day in lower case). Website: https://www.sreday.c
 
 ### Animations
 
-- Monkeys: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.mp4)
+- Boardroom monkeys: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkeys.mp4)
 - Monkey dance: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkey-dance.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-monkey-dance.mp4)
-- SRE monkeys: [WEBP](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-sre-monkeys.webp), [MP4](https://www.conf42.com/assets/brandkit/sreday/animations/sreday-sre-monkeys.mp4)
 
 ### Illustrations
 
@@ -318,19 +315,21 @@ Name: LLMday (LLM in capitals, day in lower case). Website: https://www.llmday.c
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#1F9D6B` | 31 157 107 | 80 0 32 38 |
-| Ink | `#0C2B20` | 12 43 32 | 72 0 26 83 |
-| Dark | `#135E40` | 19 94 64 | 80 0 32 63 |
-| Light | `#E1F9F0` | 225 249 240 | 10 0 4 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Green | `#26986A` | 38 152 106 | 75 0 30 40 |
+| Leaf | `#4BCB81` | 75 203 129 | 63 0 36 20 |
+| Lime | `#8FDC6A` | 143 220 106 | 35 0 52 14 |
+| Teal | `#2EC4B6` | 46 196 182 | 77 0 7 23 |
+| Blue | `#098DCF` | 9 141 207 | 96 32 0 19 |
+| Coral | `#EC645E` | 236 100 94 | 0 58 60 7 |
+| Black | `#000000` | 0 0 0 | 0 0 0 100 |
+| Ink | `#141C25` | 20 28 37 | 46 24 0 85 |
+| Mist | `#F0F6FA` | 240 246 250 | 4 2 0 2 |
 
 ### Logos
 
 - Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-color.png)
 - Logo in black: [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-black.png)
 - Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-white.png)
-- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-light.png)
-- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/llmday/logos/llmday-logo-on-dark.png)
 
 ### Profile pictures
 
@@ -402,19 +401,22 @@ Name: PLATFORMday (PLATFORM in capitals, day in lower case). Website: https://ww
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#E2971D` | 226 151 29 | 0 33 87 11 |
-| Ink | `#2A1C06` | 42 28 6 | 0 33 86 84 |
-| Dark | `#62420E` | 98 66 14 | 0 33 86 62 |
-| Light | `#FBF0E0` | 251 240 224 | 0 4 11 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Orange | `#E2971D` | 226 151 29 | 0 33 87 11 |
+| Ember | `#D0562B` | 208 86 43 | 0 59 79 18 |
+| Sun | `#F5C84C` | 245 200 76 | 0 18 69 4 |
+| Platypus | `#7B5947` | 123 89 71 | 0 28 42 52 |
+| Slate | `#415B78` | 65 91 120 | 46 24 0 53 |
+| Blue | `#098DCF` | 9 141 207 | 96 32 0 19 |
+| Coral | `#EC645E` | 236 100 94 | 0 58 60 7 |
+| Black | `#000000` | 0 0 0 | 0 0 0 100 |
+| Ink | `#141C25` | 20 28 37 | 46 24 0 85 |
+| Mist | `#F0F6FA` | 240 246 250 | 4 2 0 2 |
 
 ### Logos
 
 - Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-color.png)
 - Logo in black: [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-black.png)
 - Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-white.png)
-- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-light.png)
-- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/platformday/logos/platformday-logo-on-dark.png)
 
 ### Profile pictures
 
@@ -464,19 +466,21 @@ Name: Prompt Engineering Conference (short: PEC). Website: https://promptenginee
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#D9467A` | 217 70 122 | 0 68 44 15 |
-| Ink | `#1E1530` | 30 21 48 | 37 56 0 81 |
-| Dark | `#5D132D` | 93 19 45 | 0 80 52 64 |
-| Light | `#F9E1EA` | 249 225 234 | 0 10 6 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Violet | `#6B40D8` | 107 64 216 | 50 70 0 15 |
+| Pink | `#E8507A` | 232 80 122 | 0 66 47 9 |
+| Amber | `#F5AD37` | 245 173 55 | 0 29 78 4 |
+| Red | `#EF4448` | 239 68 72 | 0 72 70 6 |
+| Sky | `#29B7EC` | 41 183 236 | 83 22 0 7 |
+| Green | `#6CDE7C` | 108 222 124 | 51 0 44 13 |
+| Teal | `#2BB3C0` | 43 179 192 | 78 7 0 25 |
+| Ink | `#141C25` | 20 28 37 | 46 24 0 85 |
+| Mist | `#F0F6FA` | 240 246 250 | 4 2 0 2 |
 
 ### Logos
 
 - Logo in colour: [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-color.png)
 - Logo in black: [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-black.png)
 - Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-white.png)
-- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-light.png)
-- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/pec/logos/pec-logo-on-dark.png)
 
 ### Profile pictures
 
@@ -525,20 +529,23 @@ Name: Reliaburger (one word). Website: https://reliaburger.com/
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#A83B15` | 168 59 21 | 0 65 87 34 |
+| Lettering pink | `#EA1E4E` | 234 30 78 | 0 87 67 8 |
+| Bun orange | `#F68A1E` | 246 138 30 | 0 44 88 4 |
+| Lettuce | `#5ABA42` | 90 186 66 | 52 0 65 27 |
+| Sauce | `#DE2A96` | 222 42 150 | 0 81 32 13 |
+| Patty | `#7E421E` | 126 66 30 | 0 48 76 51 |
+| Rust | `#A83B15` | 168 59 21 | 0 65 87 34 |
+| Peach | `#F49463` | 244 148 99 | 0 39 59 4 |
 | Ink | `#181B19` | 24 27 25 | 11 0 7 89 |
-| Dark | `#62240E` | 98 36 14 | 0 63 86 62 |
-| Light | `#FBE7E0` | 251 231 224 | 0 8 11 2 |
-| Paper | `#FFF7EF` | 255 247 239 | 0 3 6 0 |
+| Sage | `#E4E9E3` | 228 233 227 | 2 0 3 9 |
 
 ### Logos
 
-- Burger logo in colour: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.svg)
-- Burger logo in black: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.eps)
-- Burger logo in white (for dark backgrounds): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.eps)
-- Burger logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-light.png)
-- Burger logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-dark.png)
-- Burger logo on yellow (original): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-yellow.png)
+- Logo in colour: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-color.svg)
+- Logo in black: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-black.eps)
+- Logo in white (for dark backgrounds): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-white.eps)
+- Lettering (text only) in colour: [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-lettering.png), [SVG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-lettering.svg)
+- Logo on yellow (original): [PNG](https://www.conf42.com/assets/brandkit/reliaburger/logos/reliaburger-burger-logo-on-yellow.png)
 
 ### Profile pictures
 
@@ -589,19 +596,16 @@ Name: CFP Ninja (cfp.ninja as the address). Website: https://cfp.ninja/
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#C8262C` | 200 38 44 | 0 81 78 22 |
-| Ink | `#1C2A12` | 28 42 18 | 33 0 57 84 |
-| Dark | `#5E1215` | 94 18 21 | 0 81 78 63 |
-| Light | `#F9E1E2` | 249 225 226 | 0 10 9 2 |
-| Paper | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
+| Bandana red | `#A21E1E` | 162 30 30 | 0 81 81 36 |
+| Frog green | `#96BA4E` | 150 186 78 | 19 0 58 27 |
+| Moss | `#728A36` | 114 138 54 | 17 0 61 46 |
+| Laptop | `#4D5454` | 77 84 84 | 8 0 0 67 |
+| Cream | `#F6F5DD` | 246 245 221 | 0 0 10 4 |
+| Ink | `#000000` | 0 0 0 | 0 0 0 100 |
 
 ### Logos
 
 - Mark in colour: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-color.png)
-- Mark in black: [SVG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.svg), [PDF](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.eps), [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-black.png)
-- Mark in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.svg), [PDF](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.eps), [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-white.png)
-- Mark on a light background: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-light.png)
-- Mark on a dark background: [PNG](https://www.conf42.com/assets/brandkit/cfpninja/logos/cfpninja-mark-on-dark.png)
 
 ### Profile pictures
 
@@ -639,19 +643,15 @@ Name: Certified FYI (certified.fyi as the address). Website: https://certified.f
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#22A339` | 34 163 57 | 79 0 65 36 |
-| Ink | `#1B1F23` | 27 31 35 | 23 11 0 86 |
-| Dark | `#135D20` | 19 93 32 | 80 0 66 64 |
-| Light | `#E1F9E6` | 225 249 230 | 10 0 8 2 |
-| Paper | `#F4F7F4` | 244 247 244 | 1 0 1 3 |
+| Green | `#158C0F` | 21 140 15 | 85 0 89 45 |
+| Ink | `#151515` | 21 21 21 | 0 0 0 92 |
+| White | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
 
 ### Logos
 
 - Logo in colour: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-color.png)
 - Logo in black: [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.svg), [PDF](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.eps), [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-black.png)
 - Logo in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.svg), [PDF](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.eps), [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-white.png)
-- Logo on a light background: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-light.png)
-- Logo on a dark background: [PNG](https://www.conf42.com/assets/brandkit/certifiedfyi/logos/certifiedfyi-logo-on-dark.png)
 
 ### Profile pictures
 
@@ -689,11 +689,9 @@ Name: Badger (Snout by Badger for the lead scanner). Website: https://scan.sreda
 
 | Colour | HEX | RGB | CMYK |
 |---|---|---|---|
-| Primary | `#F26B1D` | 242 107 29 | 0 56 88 5 |
+| Orange | `#EA722A` | 234 114 42 | 0 51 82 8 |
 | Ink | `#151515` | 21 21 21 | 0 0 0 92 |
-| Dark | `#622D0E` | 98 45 14 | 0 54 86 62 |
-| Light | `#FBEAE0` | 251 234 224 | 0 7 11 2 |
-| Paper | `#F6F4F1` | 246 244 241 | 0 1 2 4 |
+| White | `#FFFFFF` | 255 255 255 | 0 0 0 0 |
 
 ### Logos
 
@@ -703,10 +701,6 @@ Name: Badger (Snout by Badger for the lead scanner). Website: https://scan.sreda
 - Snout by Badger in black: [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-black.png)
 - Badger in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-white.png)
 - Snout by Badger in white (for dark backgrounds): [SVG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.svg), [PDF](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.pdf), [EPS](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.eps), [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-white.png)
-- Badger on a light background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-light.png)
-- Snout by Badger on a light background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-light.png)
-- Badger on a dark background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-badger-on-dark.png)
-- Snout by Badger on a dark background: [PNG](https://www.conf42.com/assets/brandkit/badger/logos/badger-snout-on-dark.png)
 
 ### Profile pictures
 
