@@ -122,7 +122,8 @@ def _image(post, linked, base_folder):
         return path if re.match(r"^https?://", path) else pick_picture_file(base_folder + "/", path)
     talk, event = linked.get("talk"), linked.get("event")
     if talk and talk.get("Picture"):
-        return make_remote_address("headshots", talk["Picture"])
+        pic = talk["Picture"]   # generate.py has already made it a URL by the time posts load
+        return pic if re.match(r"^https?://", pic) else make_remote_address("headshots", pic)
     if event and event.get("thumbnail_path"):
         return event["thumbnail_path"]
     webinar = linked.get("webinar")

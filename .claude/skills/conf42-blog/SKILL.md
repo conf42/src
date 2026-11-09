@@ -50,7 +50,7 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
    - `enrich` -> the talk now has its video/transcript: add the embed link + 1-2 transcript-backed details, re-`add`
      (Updated is set automatically).
    - backfill: then `backfill_next` (roundups, sponsored, webinars of finished 2025+ events), then ONE event from
-     `backfill_talk_events` (newest first). Backfill keeps the planned historical dates, written timelessly.
+     `backfill_talk_events` (newest first; the first entry carries its `items`). Backfill keeps the planned historical dates, written timelessly.
    - `crowded` dates: nudge new talk posts by a day if a date already holds 6+.
 3. For each post, read the real sources first (paths are in the plan item):
    - talk row: Title, Abstract, bio (event CSV), Company, Keywords; transcript `assemblyai/<YouTubeId>.json` (`text`,
@@ -68,7 +68,10 @@ splash, webinar -> its splash, plug -> the sister site's hero photo). The planne
    (the site uses relative asset paths; a /blog/ folder would break them).
 5. Plugs for paid events: Luma connector `list_coupons` on the event; if CONF42 is missing, `create_coupon` CONF42,
    42% off. Free events: skip.
-6. `python -m build.blog_plan add blog/drafts/*.md`, then `python -m build.blog_plan lint` until it reports 0.
+6. `python -m build.blog_plan check <drafts>` lints drafts in memory without touching the CSV - parallel writers
+   (one sub-agent per batch, each told to run only `check`) use it. Then `python -m build.blog_plan add blog/drafts/*.md`
+   and `python -m build.blog_plan lint` until it reports 0. The linter also rejects links to talks the repo no
+   longer has: local `docs/` keeps pages of removed talks, so "the file exists" is not proof.
 7. `env/bin/python -m build.generate` once (no loops) and open one new post's HTML to eyeball title/meta.
 8. Commit (`_db/blog.csv`, `_db/sister_events.json`, `blog/CHANGELOG.md`) and push main directly.
 9. Mirror to the Sheet: `python -m build.blog_plan export /tmp/blog.json`, then Sheets connector `update_values` on
@@ -85,6 +88,11 @@ Short paragraphs, plain verbs, real numbers only. Answer-first: the first two se
 Conf42 event, and the takeaway (that's the passage search engines and AI answers quote).
 
 ## Hard rules
+
+- A hand-written 2025+ post already covering the same talk/event (the 2025-26 Harness recaps): don't write a second
+  one. Give the old row its Type/Event/Ref/Sponsor and leave its text alone (lint then checks only its Ref).
+- Paid plug whose CONF42 coupon couldn't be created: add it with `Status: hidden` and tell Marek; flip to empty once
+  the coupon exists. Never publish a code that doesn't work.
 
 - Never invent a quote, number, feature, customer or result. Quotes are verbatim from the transcript/abstract (the
   linter checks). No transcript yet? Write from the abstract and say "in the talk" without quoting.

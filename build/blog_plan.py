@@ -180,8 +180,10 @@ def sponsor_of(event, talk, sponsors_by_id):
 
 def splash_for_sponsor(event, sid, sponsors_by_id):
     name = re.sub(r"\W+", "", (sponsors_by_id.get(sid) or {}).get("name") or sid).lower()
-    for f in sorted(glob.glob("./docs/assets/splash/*%s*.png" % event.get("year"))):
-        if name and name in re.sub(r"\W+", "", os.path.basename(f)).lower():
+    # only this event's own sponsor splash (<EVENT><YEAR>_<Sponsor>.png); another event's would mislabel the post
+    for f in sorted(glob.glob("./docs/assets/splash/*_*.png")):
+        prefix, _, rest = os.path.basename(f)[:-4].partition("_")
+        if prefix.lower() == event.get("short_url", "").lower() and name and name == re.sub(r"\W+", "", rest).lower():
             return f.replace("./docs/", "./")
     return ""
 
@@ -292,6 +294,8 @@ def plan(args):
     first = [m for ms in backlog.values() for m in ms if m["type"] in ("roundup", "sponsored", "webinar")]
     talk_events = [dict(event=k, count=len([m for m in ms if m["type"] == "talk"])) for k, ms in backlog.items()
                    if any(m["type"] == "talk" for m in ms)]
+    if talk_events:   # the next event to backfill comes with its items, the rest are counts
+        talk_events[0]["items"] = sorted([m for m in backlog[talk_events[0]["event"]] if m["type"] == "talk"], key=lambda m: m["date"])
 
     resolver = Resolver(ctx["events"], ctx["sponsors"])
     orphaned, enrich = [], []
@@ -335,7 +339,26 @@ def _squash(s):
 
 
 def lint(args):
+    return lint_rows(read_blog_rows(), verbose=args.verbose)
+
+
+def check(args):
+    """lint drafts without touching _db/blog.csv (safe while other writers are busy)"""
     rows = read_blog_rows()
+    by_slug = {r.get("ShortURL"): i for i, r in enumerate(rows)}
+    only = set()
+    for path in args.drafts:
+        new = parse_draft(path)
+        new.setdefault("Author", "Conf42")
+        only.add(new.get("ShortURL"))
+        if new.get("ShortURL") in by_slug:
+            rows[by_slug[new["ShortURL"]]] = dict(rows[by_slug[new["ShortURL"]]], **new)
+        else:
+            rows.append(new)
+    return lint_rows(rows, only=only, verbose=args.verbose)
+
+
+def lint_rows(rows, only=None, verbose=False):
     try:
         old_text = subprocess.check_output(["git", "show", "HEAD:" + BLOG_CSV.lstrip("./")], cwd=HERE).decode()
         old = {r.get("ShortURL") or r.get("Title"): r for r in read_blog_rows(old_text)}
@@ -361,8 +384,11 @@ def lint(args):
             seen_ref[r["Ref"].strip()] += 1
     ctx = None
     sisters = None
+    talk_urls = None
     for r in rows:
         key = r.get("ShortURL") or r.get("Title")
+        if only is not None and r.get("ShortURL") not in only:
+            continue
         before = old.get(key)
         if before and before.get("Date", "") < "2025":
             if any((before.get(c) or "") != (r.get(c) or "") for c in COLUMNS[:7]):
@@ -370,6 +396,16 @@ def lint(args):
             continue
         if before and before == r:
             continue   # untouched since the last commit
+        if before and all((before.get(c) or "") == (r.get(c) or "") for c in COLUMNS[:7]):
+            # a hand-written post that only got its Type/Ref: the text stays as written, the Ref must resolve
+            if ctx is None:
+                ctx = load_context()
+                sisters = {s["ref"]: s for s in sister_events()}
+                resolver = Resolver(ctx["events"], ctx["sponsors"])
+                sponsors_by_id = {s["id"]: s for s in ctx["sponsors"]}
+            if (r.get("Ref") or "").strip() and not resolver.resolve(r["Ref"])[0]:
+                bad(r, "Ref does not resolve: %s" % r["Ref"])
+            continue
         if r.get("ShortURL") and seen_slug[r["ShortURL"]] > 1:
             bad(r, "duplicate ShortURL")
         if (r.get("Ref") or "").strip() and seen_ref[r["Ref"].strip()] > 1:
@@ -416,6 +452,12 @@ def lint(args):
         if not ok:
             bad(r, "Ref does not resolve: %s" % r.get("Ref"))
             continue
+        # talk links must point at talks the repo still has (docs/ keeps pages of removed talks locally)
+        if talk_urls is None:
+            talk_urls = {t["short_url"] for e in ctx["events"] for t in (e.get("talks_raw") or []) if t.get("short_url")}
+        for u in re.findall(r"conf42\.com/([A-Za-z0-9.\-]+_[A-Za-z0-9_.\-]+)", body):
+            if u not in talk_urls and not u.startswith(("speaker_", "assets")):
+                bad(r, "link to a talk that is not in the repo: /%s" % u)
         talk, event = linked.get("talk"), linked.get("event")
         if typ in ("talk", "sponsored") and talk and talk["short_url"] not in body:
             bad(r, "no link to the talk page /%s" % talk["short_url"])
@@ -447,7 +489,7 @@ def lint(args):
             for q in quotes:
                 if _squash(q) not in source:
                     bad(r, "quote not found in the transcript/abstract: %r" % q[:80])
-        if args.verbose:
+        if verbose:
             print("ok-checked", key, typ, n, "words")
     for p in problems:
         print(p)
@@ -538,6 +580,9 @@ def main():
     l.add_argument("-v", "--verbose", action="store_true")
     a = sub.add_parser("add")
     a.add_argument("drafts", nargs="+")
+    c = sub.add_parser("check")
+    c.add_argument("drafts", nargs="+")
+    c.add_argument("-v", "--verbose", action="store_true")
     sub.add_parser("orphan")
     e = sub.add_parser("export")
     e.add_argument("out")
@@ -550,6 +595,8 @@ def main():
         plan(args)
     elif args.cmd == "lint":
         sys.exit(lint(args))
+    elif args.cmd == "check":
+        sys.exit(check(args))
     else:
         {"add": add, "orphan": orphan, "export": export}[args.cmd](args)
 
