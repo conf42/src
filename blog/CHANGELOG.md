@@ -3,6 +3,12 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - Post page redesign ("Post A")
+- Post pages are the talk page's twin: hero in the event colour (navy without one) with Blog / event / read-time chips,
+  speaker card and byline; the art in a glass frame over the curve linking the talk; narrow reading column opened by
+  "In short"; sticky rail with contents (from the h2s), topic hubs and the talk; "More from <event>" frost cards.
+- The /blog index redesign is undecided (mockups Blog A-C on Marek's Desktop).
+
 ## 2026-11-10 - AI discoverability (GEO)
 - robots.txt allows every AI crawler incl. training bots; Cloudflare managed robots.txt / Block AI bots to be turned
   off by Marek in the dashboard.

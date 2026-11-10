@@ -454,6 +454,11 @@ for podcast in podcasts:
 print(DIVIDER)
 print("Generating blog posts")
 # template out the posts
+_posts_by_event = {}
+for _p in posts:
+    _e = (_p.get("linked") or {}).get("event")
+    if _e:
+        _posts_by_event.setdefault(id(_e), []).append(_p)
 for post in posts:
     # just for dev experience - 2s vs 12s
     if "quick" in sys.argv:
@@ -472,7 +477,10 @@ for post in posts:
                     % {"to": post["canonical"]})
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, canonical=post["canonical"], markdown_alt=post["canonical"] + ".md", **context))
+        # "More from <event>" under the post: the 3 newest other posts of its event (else the 3 newest posts)
+        _ev = (post.get("linked") or {}).get("event")
+        _related = [p for p in (_posts_by_event.get(id(_ev), []) if _ev else posts) if p is not post and not p.get("ExternalURL")][:3]
+        f.write(template.render(post=post, related=_related, canonical=post["canonical"], markdown_alt=post["canonical"] + ".md", **context))
         register_url(post.get("ShortURL").replace(".html",""), lastmod=post["updated_iso"])
 
 # replaced posts (Status replaced:<ShortURL>, Marek 2026-11-09): the old URL redirects to the post that superseded it
