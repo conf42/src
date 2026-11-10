@@ -158,8 +158,8 @@ hidden instructions:
 ## /blog list
 
 Marek 2026-11-10 (small steps on the old design, not the A-C mockups): header like the home page (navy, "The Conf42
-blog, talks written up" with the light-blue Conf42, muted lead, search, the six biggest topic hubs) with the three
-newest posts fanned out on the right. Posts are the event page's glass talk cards (`.tk-glass-scope`, tinted by the
+blog, talks written up" with the light-blue Conf42, muted lead, search, the six biggest topic hubs) with the blog
+illustration (assets/conf42/blog_art.png) on the right. Posts are the event page's glass talk cards (`.tk-glass-scope`, tinted by the
 event colour), 4 a row, picture + title + "Conf42 <Event> <event date>" (posts without an event: their date), no
 "BLOG" pill, grouped under month pills (phones: first two months until "Show older posts"). The search is the
 conference pages' talk search (`.tk-search`, fuzzy; searches Title, Description, Tags, Event, Sponsor - so
