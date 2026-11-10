@@ -3,6 +3,12 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - /blog refresh + agent-ready
+- /blog: home-style header with the three newest posts fanned out, glass talk cards tinted by event, no BLOG pill,
+  "Conf42 <Event> <date>" under each card, posts grouped by month.
+- blog.json + blog.md (every post with its Markdown twin, event, speakers, talk, video, topics); llms.txt links them.
+  "For developers & AI agents" command rows on /blog, as on the media kit.
+
 ## 2026-11-10 - Remix rule, post dateline, sticky talk card
 - Remix events get only the roundup + sponsored posts (they re-air earlier talks): plan skips Remix talk posts, lint
   rejects them, the 51 queued ones are Status skipped.
