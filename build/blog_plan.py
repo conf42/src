@@ -453,6 +453,10 @@ def lint_rows(rows, only=None, verbose=False):
             bad(r, "Title has leading/trailing whitespace")
         if len(r.get("Description") or "") > 170:
             bad(r, "Description over 170 chars (%d)" % len(r["Description"]))
+        if typ in ("talk", "sponsored") and "Conf42" not in (r.get("Description") or ""):
+            # the Description is the post's visible "In short" line, the passage AI answers quote: "<Speaker> at Conf42
+            # <Event> <Year> on ..." keeps the attribution in the quote (2026-11-10)
+            bad(r, "Description must say where the talk was: '<Speaker> at Conf42 <Event> <Year> on ...'")
         if (r.get("Event") or "").strip():
             # posts of an event live under it (Marek 2026-11-09: the conference is always in the URL, so similar talks
             # at two events - Remix re-airs, sponsors' repeat talks - never look like duplicates)

@@ -32,7 +32,7 @@ from .shared import (
     conventional_slides_name,
 )
 from .events import get_enriched_metadata
-from .blog import video_jsonld
+from .blog import video_jsonld, released_on, site_jsonld, speaker_jsonld, event_jsonld
 
 DIVIDER = "#"*80
 BASE_FOLDER = "./docs"
@@ -63,6 +63,7 @@ print(DIVIDER)
 print("Loading the context")
 context = get_enriched_metadata(BASE_FOLDER)
 context["asset_version"] = get_asset_version()
+context["site_jsonld"] = site_jsonld()
 context.update(load_webinars(BASE_FOLDER))
 print("Asset version:", context["asset_version"])
 
@@ -323,6 +324,31 @@ premieres.sort(key=lambda x:int(x.get("stats").get("Views")), reverse=True)
 print(f"Matched {len(premieres)} premieres to stats")
 
 
+# BLOG POSTS (loaded before the talk pages: a talk links its write-up)
+print(DIVIDER)
+print("Loading blog posts")
+# the living blog (build/blog.py): only rows that are due, not hidden and whose Ref still exists in the repo
+from .blog import load_posts, write_feed, write_robots, write_llms, write_indexnow, write_markdown, FEED_FILE
+posts, blog_dropped = load_posts(context, BASE_FOLDER)
+context["posts"] = posts
+context["blog_feed"] = FEED_FILE
+print("Loaded %d posts, %d kept off the site" % (len(posts), len(blog_dropped)))
+for slug, reason in blog_dropped:
+    print("  blog: %s - %s" % (slug, reason))
+# talk -> its newest post (talk or sponsored), for the talk page's "Read the write-up" link
+context["post_of_talk"] = {}
+for _p in posts:
+    _t = (_p.get("linked") or {}).get("talk")
+    if _t is not None and not _p.get("ExternalURL"):
+        context["post_of_talk"].setdefault(_t.get("short_url"), _p)
+
+
+# TOPIC HUBS (build/topics.py): which talks belong to which /topics/<slug>, before the talk pages link them
+from .topics import assign as assign_topics, generate as generate_topics
+topic_hubs = assign_topics(context)
+context["topic_hubs"] = topic_hubs
+
+
 # EVENT PAGES
 print(DIVIDER)
 print("Genearing events & talk pages")
@@ -346,8 +372,9 @@ for event in context.get("events"):
         with open(BASE_FOLDER + "/" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
             template = env.get_template("talk.html")
             f.write(template.render(event=event, canonical=get_canonical_url(talk.get("short_url")), talk=talk, prev_talk=prev_talk, next_talk=next_talk,
+                                    markdown_alt=get_canonical_url(talk.get("short_url")) + ".md" if (talk.get("Name1") or "").strip() else None,
                                     talk_video=video_jsonld(talk, event, get_canonical_url(talk.get("short_url"))) if event.get("released") else None, **context))
-            register_url(talk.get("short_url").replace(".html",""))
+            register_url(talk.get("short_url").replace(".html",""), lastmod=released_on(event))
         # template the secret talk subpage
         if event.get("secret_url"):
             with open(BASE_FOLDER + "/" + event.get("secret_url") + "_" + talk.get("short_url").replace(".html","")  + ".html", "w") as f:
@@ -357,8 +384,8 @@ for event in context.get("events"):
     # template the main event page
     with open(BASE_FOLDER + "/" + event.get("short_url").replace(".html","") + ".html", "w") as f:
         template = env.get_template("event.html")
-        f.write(template.render(event=event, canonical=get_canonical_url(event.get("short_url")), **context))
-        register_url(event.get("short_url").replace(".html",""))
+        f.write(template.render(event=event, canonical=get_canonical_url(event.get("short_url")), event_ld=event_jsonld(event), **context))
+        register_url(event.get("short_url").replace(".html",""), lastmod=released_on(event))
     # template the secret event page
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
@@ -373,8 +400,9 @@ for speaker, items in speakers.items():
     url = generate_speaker_url(speaker)
     with open(BASE_FOLDER + "/" + url  + ".html", "w") as f:
         template = env.get_template("speaker.html")
-        f.write(template.render(speaker=speaker, canonical=get_canonical_url(url), items=items, **context))
-        register_url(url)
+        f.write(template.render(speaker=speaker, canonical=get_canonical_url(url), items=items,
+                                speaker_ld=speaker_jsonld(speaker, items, get_canonical_url(url)), **context))
+        register_url(url, lastmod=max((d for d in (released_on(i["event"]) for i in items) if d), default=None))
 
 
 # PODCAST
@@ -425,14 +453,6 @@ for podcast in podcasts:
 
 print(DIVIDER)
 print("Generating blog posts")
-# the living blog (build/blog.py): only rows that are due, not hidden and whose Ref still exists in the repo
-from .blog import load_posts, write_feed, write_robots, write_llms, write_indexnow, FEED_FILE
-posts, blog_dropped = load_posts(context, BASE_FOLDER)
-context["posts"] = posts
-context["blog_feed"] = FEED_FILE
-print("Loaded %d posts, %d kept off the site" % (len(posts), len(blog_dropped)))
-for slug, reason in blog_dropped:
-    print("  blog: %s - %s" % (slug, reason))
 # template out the posts
 for post in posts:
     # just for dev experience - 2s vs 12s
@@ -452,7 +472,7 @@ for post in posts:
                     % {"to": post["canonical"]})
     with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
         template = env.get_template("blog_post.html")
-        f.write(template.render(post=post, canonical=post["canonical"],  **context))
+        f.write(template.render(post=post, canonical=post["canonical"], markdown_alt=post["canonical"] + ".md", **context))
         register_url(post.get("ShortURL").replace(".html",""), lastmod=post["updated_iso"])
 
 # replaced posts (Status replaced:<ShortURL>, Marek 2026-11-09): the old URL redirects to the post that superseded it
@@ -464,6 +484,10 @@ for _slug, _why in blog_dropped:
             f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
                     '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
                     % {"to": _live[_to]["canonical"]})
+
+# TOPIC HUB PAGES
+print(DIVIDER)
+generate_topics(env, context, topic_hubs, BASE_FOLDER, register_url)
 
 # BRANDS (conf42.com/brands, Marek 2026-09-28): brands.yaml + live numbers from the sister sites (build/brands.py)
 print(DIVIDER)
@@ -580,7 +604,8 @@ with open(BASE_FOLDER + "/sitemap.xml", "w") as f:
 write_feed(posts, BASE_FOLDER, datetime.datetime.now(datetime.timezone.utc))
 write_robots(BASE_FOLDER)
 write_llms(context, posts, BASE_FOLDER)
-write_indexnow(posts, BASE_FOLDER)
+write_markdown(context, posts, BASE_FOLDER)
+write_indexnow(posts, BASE_FOLDER, lastmod=SITEMAP_LASTMOD)
 
 print(DIVIDER)
 print("Warnings")

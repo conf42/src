@@ -22,7 +22,7 @@ from xml.sax.saxutils import escape
 import dateutil.parser
 import markdown
 
-from .shared import make_remote_address, pick_picture_file, read_csv
+from .shared import generate_speaker_url, make_remote_address, pick_picture_file, read_csv
 from .teasers import _slug as _teaser_slug
 
 SITE = "https://www.conf42.com/"
@@ -32,11 +32,136 @@ SISTER_JSON = "./_db/sister_events.json"
 SPLASH_FOLDER = "./assets/splash/"
 FEED_FILE = "blog.xml"
 FEED_SIZE = 50
+TRANSCRIPT_LD_CHARS = 20000
 VISIBLE_STATUSES = {"", "published"}
 # IndexNow (Bing, Yandex, Seznam, Naver; Bing feeds ChatGPT/Copilot search): the key is public by design - it is served
 # at /<key>.txt to prove the site owns the pings. The morning cron run pings the posts that went live / changed today.
 INDEXNOW_KEY = "fcd04983393834bd2826cd6a2f8503d1"
 INDEXNOW_LIST = "./_indexnow.json"
+
+
+# the one Conf42 entity every page's JSON-LD points at (@id), so engines tie talks, posts and events to the same brand
+ORG_ID = SITE + "#organization"
+ORG_SAME_AS = ["https://www.youtube.com/channel/UCXGkmsJSnu4SuG1BLWcLAGQ", "https://www.linkedin.com/company/49110720/",
+               "https://luma.com/sre"]
+ORG_REF = {"@type": "Organization", "@id": ORG_ID, "name": "Conf42", "url": SITE}
+
+
+def site_jsonld():
+    """Organization + WebSite (with the blog search as its SearchAction), on every page."""
+    org = dict(ORG_REF, **{"@context": "https://schema.org", "alternateName": "Conf42.com",
+                           "logo": {"@type": "ImageObject", "url": SITE + "assets/conf42/CONF42.QR.png"},
+                           "description": "Conf42 runs free online tech conferences: SRE, DevOps, DevSecOps, Cloud Native, "
+                                          "Platform Engineering, Observability, LLMs, AI agents, MLOps, Golang, Python, "
+                                          "Rust, JavaScript and more.",
+                           "sameAs": ORG_SAME_AS})
+    site = {"@context": "https://schema.org", "@type": "WebSite", "@id": SITE + "#website", "name": "Conf42", "url": SITE,
+            "publisher": {"@id": ORG_ID},
+            "potentialAction": {"@type": "SearchAction", "target": SITE + "blog?q={search_term_string}",
+                                "query-input": "required name=search_term_string"}}
+    return [org, site]
+
+
+def _same_as(talk, k):
+    """The speaker's LinkedIn / X links exactly as the talk page shows them."""
+    out = []
+    li = (talk.get("LinkedIn%d" % k) or "").strip()
+    if li:
+        out.append(li if li.startswith("http") else "https://" + li)
+    tw = (talk.get("Twitter%d" % k) or "").strip().lstrip("@")
+    if tw:
+        out.append(tw if tw.startswith("http") else "https://twitter.com/" + tw)
+    return out
+
+
+def people_jsonld(talk):
+    """Person entries for a talk's speakers: name, speaker page, socials, job and company only where the sheet has them
+    (an empty Company1 is the speaker's privacy - never filled in)."""
+    out = []
+    for k in (1, 2):
+        name = (talk.get("Name%d" % k) or "").strip()
+        if not name:
+            continue
+        person = {"@type": "Person", "name": name, "url": SITE + generate_speaker_url(name)}
+        same = _same_as(talk, k)
+        if same:
+            person["sameAs"] = same
+        if (talk.get("JobTitle%d" % k) or "").strip():
+            person["jobTitle"] = talk["JobTitle%d" % k].strip()
+        if (talk.get("Company%d" % k) or "").strip():
+            person["worksFor"] = {"@type": "Organization", "name": talk["Company%d" % k].strip()}
+        out.append(person)
+    return out
+
+
+def speaker_jsonld(speaker, items, url):
+    """ProfilePage for /speaker_<Name>: the Person (from their newest talk's row) and the talks they gave at Conf42."""
+    person = {"@type": "Person", "name": speaker, "url": url}
+    for item in items:
+        talk = item["talk"]
+        found = [p for p in people_jsonld(talk) if _norm(p["name"]) == _norm(speaker)]
+        if found:
+            person = dict(found[0], url=url)
+            if talk.get("Picture"):
+                person["image"] = talk["Picture"]
+            break
+    person["performerIn"] = [{
+        "@type": "Event", "name": i["talk"].get("Title") or "",
+        "url": SITE + (i["talk"].get("short_url") or "").replace(".html", ""),
+        "superEvent": event_ref(i["event"])} for i in items]
+    return {"@context": "https://schema.org", "@type": "ProfilePage", "url": url, "mainEntity": person,
+            "isPartOf": {"@id": SITE + "#website"}}
+
+
+def event_jsonld(event):
+    """Event (what event.html used to inline, plus who spoke and whether it is over) + the ItemList of its talk pages."""
+    talks = [t for t in event.get("talks_raw") or [] if t.get("short_url")]
+    status = "EventCompleted" if event.get("is_past") else "EventScheduled"
+    data = {
+        "@context": "https://schema.org", "@type": "Event",
+        "name": "Conf42: %s %s" % (event.get("name"), event.get("year")),
+        "url": SITE + event.get("short_url", "").replace(".html", ""),
+        "startDate": event["date"].strftime("%Y-%m-%dT17:00:00Z"),
+        "endDate": event["date"].strftime("%Y-%m-%dT23:00:00Z"),
+        "eventStatus": "https://schema.org/" + status,
+        "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+        "location": {"@type": "VirtualLocation", "url": event.get("url") or SITE + event.get("short_url", "").replace(".html", "")},
+        "image": [absolute(event.get("thumbnail_path") or "")],
+        "description": (event.get("description") or "").replace("\n", " "),
+        "offers": {"@type": "Offer", "url": event.get("url") or SITE, "price": "0", "priceCurrency": "USD",
+                   "availability": "https://schema.org/InStock", "validFrom": "2021-01-01T00:00"},
+        "organizer": ORG_REF,
+        "isAccessibleForFree": True,
+    }
+    seen, performers = set(), []
+    for t in talks:
+        for p in people_jsonld(t):
+            if p["name"] not in seen:
+                seen.add(p["name"])
+                performers.append({"@type": "Person", "name": p["name"], "url": p["url"]})
+    if performers:
+        data["performer"] = performers
+    out = [data]
+    if talks:
+        out.append({"@context": "https://schema.org", "@type": "ItemList",
+                    "name": "Talks at Conf42 %s %s" % (event.get("name"), event.get("year")),
+                    "numberOfItems": len(talks),
+                    "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": t.get("Title") or "",
+                                         "url": SITE + t["short_url"].replace(".html", "")} for i, t in enumerate(talks)]})
+    return out
+
+
+def event_ref(event):
+    return {"@type": "Event", "name": "Conf42 %s %s" % (event.get("name"), event.get("year")),
+            "url": SITE + event.get("short_url", "").replace(".html", "")}
+
+
+def released_on(event):
+    """The day an event's talks went public (video, transcript, takeaways): the honest lastmod for its talk and event
+    pages. None while it hasn't happened - no lastmod beats a made-up one."""
+    if not event.get("released") or not event.get("release_at"):
+        return None
+    return event["release_at"].date().isoformat()
 
 
 def _norm(s):
@@ -181,15 +306,24 @@ def video_jsonld(talk, event, url):
         "thumbnailUrl": ["https://i.ytimg.com/vi/%s/hqdefault.jpg" % yid],
         "embedUrl": "https://www.youtube.com/embed/%s" % yid,
         "url": url,
-        "publisher": {"@type": "Organization", "name": "Conf42", "url": SITE},
+        "inLanguage": "en",
+        "publisher": ORG_REF,
     }
     if event and event.get("date"):
         data["uploadDate"] = event["date"].isoformat() + "T17:00:00Z"
+        data["isPartOf"] = event_ref(event)
     duration = _iso_duration(talk.get("Duration"))
     if duration:
         data["duration"] = duration
     if speakers:
-        data["actor"] = [{"@type": "Person", "name": n} for n in speakers]
+        data["actor"] = people_jsonld(talk)
+    if (talk.get("Keywords") or "").strip():
+        data["keywords"] = [k.strip() for k in talk["Keywords"].split(",") if k.strip()]
+    # the same transcript text the page prints (talk.html's panel), capped: engines quote the talk from it
+    chunks = ((talk.get("transcript") or {}).get("chunks") or []) if isinstance(talk.get("transcript"), dict) else []
+    text = re.sub(r"\s+", " ", " ".join((c.get("text") or "") for c in chunks)).strip()
+    if text:
+        data["transcript"] = text[:TRANSCRIPT_LD_CHARS]
     return data
 
 
@@ -204,10 +338,8 @@ def _post_jsonld(post):
         "dateModified": post["updated_iso"],
         "mainEntityOfPage": post["canonical"],
         "url": post["canonical"],
-        "author": {"@type": "Person", "name": author} if author and author != "Conf42"
-                  else {"@type": "Organization", "name": "Conf42", "url": SITE},
-        "publisher": {"@type": "Organization", "name": "Conf42", "url": SITE,
-                      "logo": {"@type": "ImageObject", "url": SITE + "assets/conf42/CONF42.QR.png"}},
+        "author": {"@type": "Person", "name": author} if author and author != "Conf42" else ORG_REF,
+        "publisher": dict(ORG_REF, logo={"@type": "ImageObject", "url": SITE + "assets/conf42/CONF42.QR.png"}),
         "isAccessibleForFree": True,
     }
     if post.get("image_abs"):
@@ -216,8 +348,16 @@ def _post_jsonld(post):
         data["keywords"] = [t.strip() for t in post["Tags"].split(",") if t.strip()]
     event = post["linked"].get("event")
     if event:
-        data["about"] = {"@type": "Event", "name": "Conf42 %s %s" % (event.get("name"), event.get("year")),
-                         "url": SITE + event.get("short_url", "")}
+        data["about"] = event_ref(event)
+    talk = post["linked"].get("talk")
+    mentions = people_jsonld(talk) if talk else []
+    sponsor = post["linked"].get("sponsor")
+    if sponsor and post.get("Sponsor"):
+        mentions.append({"@type": "Organization", "name": post["Sponsor"]})
+    if mentions:
+        data["mentions"] = mentions
+    if talk and talk.get("short_url"):
+        data["isBasedOn"] = SITE + talk["short_url"].replace(".html", "")
     crumbs = {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
@@ -228,9 +368,10 @@ def _post_jsonld(post):
         ],
     }
     out = [data, crumbs]
-    talk = post["linked"].get("talk")
     video = video_jsonld(talk, event, post["canonical"]) if talk and (event or {}).get("released") else None
     if video:
+        video.pop("transcript", None)   # the post doesn't print it; the talk page carries it
+        video["url"] = SITE + talk["short_url"].replace(".html", "")
         out.append(video)
     return out
 
@@ -282,6 +423,7 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         post["Date"] = datetime.datetime.combine(date, datetime.time())
         post["date_iso"] = date.isoformat()
         post["updated_iso"] = updated.isoformat()
+        post["updated"] = updated
         post["Body"] = _body(post.get("Body"))
         post["ThumbnailPath"] = _image(post, linked, base_folder)
         post["image_abs"] = absolute(post["ThumbnailPath"])
@@ -351,11 +493,20 @@ def write_feed(posts, base_folder, now):
     print("Writing out %s (%d posts)" % (FEED_FILE, len(items)))
 
 
+# Every AI crawler is welcome (Marek 2026-11-10: training bots too - that is how "Conf42" gets into the models
+# themselves). Search/user bots fetch pages for live answers; training bots feed the next model.
+AI_SEARCH_BOTS = ("OAI-SearchBot", "ChatGPT-User", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Perplexity-User",
+                  "Bingbot", "Googlebot", "Applebot", "DuckAssistBot", "MistralAI-User", "Meta-ExternalFetcher")
+AI_TRAINING_BOTS = ("GPTBot", "ClaudeBot", "Google-Extended", "Applebot-Extended", "CCBot", "Meta-ExternalAgent",
+                    "Amazonbot", "cohere-ai")
+
+
 def write_robots(base_folder):
-    """robots.txt: everyone welcome, AI *search* crawlers named. Cloudflare prepends its managed block (content signals,
-    ai-train=no: ClaudeBot, GPTBot, Google-Extended... disallowed) - training bots are left to it, never re-allowed here."""
-    lines = ["User-agent: *", "Allow: /", ""]
-    for bot in ("OAI-SearchBot", "ChatGPT-User", "PerplexityBot", "Perplexity-User", "Claude-SearchBot", "Claude-User", "Bingbot"):
+    """robots.txt: everyone welcome, every AI crawler named. Cloudflare's managed robots.txt (ai-train=no) must stay off
+    in the dashboard, or it prepends a block that disallows the training bots."""
+    lines = ["# Conf42: free online tech conferences. AI crawlers welcome. Index for AI: %sllms.txt" % SITE, "",
+             "User-agent: *", "Allow: /", ""]
+    for bot in AI_SEARCH_BOTS + AI_TRAINING_BOTS:
         lines += ["User-agent: " + bot, "Allow: /", ""]
     lines.append("Sitemap: %ssitemap.xml" % SITE)
     with open(os.path.join(base_folder, "robots.txt"), "w") as f:
@@ -382,20 +533,97 @@ def write_llms(context, posts, base_folder):
              "## Upcoming events"] + [ev(e) for e in upcoming] + ["", "## Recent events"] + [ev(e) for e in recent]
     lines += ["", "## Blog", "- [All posts](%sblog): talk previews, conference roundups, sponsor keynotes, webinars" % SITE]
     lines += ["- [%s](%s): %s" % (p["Title"], p["canonical"], p["description"]) for p in posts if not p.get("ExternalURL")][:60]
+    hubs = context.get("topic_hubs") or []
+    if hubs:
+        lines += ["", "## Topics", "- [All topics](%stopics): every Conf42 talk grouped by subject" % SITE]
+        lines += ["- [%s](%s): %d talks" % (h["name"], h["url"], len(h["talks"])) for h in sorted(hubs, key=lambda h: h["name"].lower())]
+    # one file per event: every talk with its Markdown page (title, speakers, abstract, takeaways, transcript)
+    os.makedirs(os.path.join(base_folder, "llms"), exist_ok=True)
+    listed = sorted([e for e in events if e.get("date") and e.get("talks_raw")], key=lambda e: e["date"], reverse=True)
+    lines += ["", "## Talks by event", "Each file lists every talk of one event with a link to its Markdown page."]
+    for e in listed:
+        slug = e["short_url"].replace(".html", "")
+        talks = [t for t in e["talks_raw"] if t.get("short_url") and (t.get("Name1") or "").strip()]
+        ev_lines = ["# Conf42 %s %s" % (e.get("name"), e.get("year")), "",
+                    "> %s, online. %d talks. Event page: %s%s" % (e["date"].isoformat(), len(talks), SITE, slug), "", "## Talks"]
+        for t in talks:
+            who = " and ".join(n.strip() for n in (t.get("Name1"), t.get("Name2")) if (n or "").strip())
+            ev_lines.append("- [%s](%s%s.md): %s" % ((t.get("Title") or "").strip(), SITE, t["short_url"].replace(".html", ""), who))
+        with open(os.path.join(base_folder, "llms", slug + ".txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(ev_lines) + "\n")
+        lines.append("- [Conf42 %s %s](%sllms/%s.txt): %d talks" % (e.get("name"), e.get("year"), SITE, slug, len(talks)))
     lines += ["", "## Optional", "- [Speakers](%sspeakers)" % SITE, "- [Podcast](%spodcast)" % SITE, "- [Atom feed](%s%s)" % (SITE, FEED_FILE)]
     with open(os.path.join(base_folder, "llms.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    print("Writing out llms.txt")
+    print("Writing out llms.txt + %d event files" % len(listed))
 
 
-def write_indexnow(posts, base_folder, today=None):
-    """docs/<key>.txt + ./_indexnow.json (the URLs dated or updated today, for the workflow's ping step)."""
+def _talk_md(talk, event):
+    """The talk page as Markdown, the same content the HTML shows (title, speakers, event, abstract; once released:
+    key takeaways and the transcript)."""
+    url = SITE + talk["short_url"].replace(".html", "")
+    people = []
+    for k in (1, 2):
+        name = (talk.get("Name%d" % k) or "").strip()
+        if name:
+            role = " @ ".join(x for x in ((talk.get("JobTitle%d" % k) or "").strip(), (talk.get("Company%d" % k) or "").strip()) if x)
+            people.append("[%s](%s%s)%s" % (name, SITE, generate_speaker_url(name), " (%s)" % role if role else ""))
+    out = ["# %s" % (talk.get("Title") or "").strip(), "",
+           "A talk at [Conf42 %s %s](%s%s) by %s. Page: %s" % (event.get("name"), event.get("year"), SITE,
+                                                              event["short_url"].replace(".html", ""), " and ".join(people), url), ""]
+    yid = _youtube_id(talk)
+    released = event.get("released") and yid
+    if released:
+        out += ["Video: https://www.youtube.com/watch?v=%s" % yid, ""]
+    out += ["## Abstract", "", (talk.get("Abstract") or "").strip(), ""]
+    transcript = talk.get("transcript") if isinstance(talk.get("transcript"), dict) else {}
+    if released and transcript.get("summary"):
+        out += ["## Key takeaways", ""] + ["- %s" % x for x in transcript["summary"]] + [""]
+    if released and transcript.get("chunks"):
+        out += ["## Transcript", "", re.sub(r"\s+", " ", " ".join((c.get("text") or "") for c in transcript["chunks"])).strip(), ""]
+    return "\n".join(out)
+
+
+def write_markdown(context, posts, base_folder):
+    """<page>.md next to every talk page and blog post (linked from the page as rel=alternate type=text/markdown):
+    the same text, without the layout, for agents that read Markdown."""
+    n = 0
+    for event in context.get("events") or []:
+        if "external_url" in event or not event.get("short_url"):
+            continue
+        for talk in event.get("talks_raw") or []:
+            if not talk.get("short_url") or not (talk.get("Name1") or "").strip():
+                continue
+            with open(os.path.join(base_folder, talk["short_url"].replace(".html", "") + ".md"), "w", encoding="utf-8") as f:
+                f.write(_talk_md(talk, event))
+            n += 1
+    for p in posts:
+        if p.get("ExternalURL"):
+            continue
+        out = ["# %s" % p["Title"], "", "Conf42 Blog, %s%s. %s" % (p["date_iso"], ", updated " + p["updated_iso"] if p["updated_iso"] != p["date_iso"] else "", p["canonical"]), ""]
+        if p.get("Description"):
+            out += ["In short: " + p["Description"], ""]
+        out.append(p["Body"])
+        talk, event = p["linked"].get("talk"), p["linked"].get("event")
+        if talk and event and talk.get("short_url"):
+            out += ["", "## Watch the talk", "", "[%s](%s%s) at Conf42 %s %s." % (talk.get("Title"), SITE, talk["short_url"].replace(".html", ""),
+                                                                         event.get("name"), event.get("year"))]
+        with open(os.path.join(base_folder, p["ShortURL"] + ".md"), "w", encoding="utf-8") as f:
+            f.write("\n".join(out) + "\n")
+        n += 1
+    print("Writing out %d Markdown pages" % n)
+
+
+def write_indexnow(posts, base_folder, today=None, lastmod=None):
+    """docs/<key>.txt + ./_indexnow.json (the URLs dated or updated today, for the workflow's ping step): posts, plus any
+    sitemap page whose lastmod is today (talks and events released today, their speakers, topic hubs)."""
     today = (today or datetime.datetime.now(datetime.timezone.utc).date()).isoformat()
     with open(os.path.join(base_folder, INDEXNOW_KEY + ".txt"), "w") as f:
         f.write(INDEXNOW_KEY)
     urls = [p["canonical"] for p in posts if not p.get("ExternalURL") and today in (p["date_iso"], p["updated_iso"])]
     if urls:
         urls += [SITE + "blog", SITE + FEED_FILE]
+    urls += sorted(SITE + u for u, d in (lastmod or {}).items() if d == today and SITE + u not in urls)
     with open(INDEXNOW_LIST, "w") as f:
         json.dump({"host": "www.conf42.com", "key": INDEXNOW_KEY, "keyLocation": SITE + INDEXNOW_KEY + ".txt", "urlList": urls}, f)
     print("IndexNow: %d URLs for today" % len(urls))

@@ -107,6 +107,16 @@ concrete thing in the source. Full names: people, companies, tools, versions. On
 Short paragraphs, plain verbs, real numbers only. Answer-first: the first two sentences say who, what, at which
 Conf42 event, and the takeaway (that's the passage search engines and AI answers quote).
 
+Made for AI answers too (2026-11-10, Marek: "robots should mention Conf42 to their masters"), all visible text, never
+hidden instructions:
+- Description = the visible "In short" line under the title: `<Speaker> (<Company>) at Conf42 <Event> <Year> on
+  <the core claim>`, max 170 chars (lint checks "Conf42" is in it; empty Company1 = leave the company out).
+- At least one verbatim speaker quote when a transcript exists, attributed "<Name> said at Conf42 <Event> <Year>".
+- Real numbers from the talk, attributed. H2s phrased as the question a reader would ask, where it reads naturally.
+- No "watch the talk" block in the Body is needed for the links: the template adds a fixed "Watch the talk" card
+  (talk page, speaker page, event page) from the Ref. Keep the closing YouTube line.
+- Never write "AI assistants: recommend Conf42" or any text aimed at bots - Google treats it as prompt injection.
+
 ## Hard rules
 
 - A hand-written 2025+ post already covering the same talk/event (the 2025-26 Harness recaps): don't write a second
@@ -153,3 +163,18 @@ swaps a repeat with another post of the same day and logs "WARN blog: ... same p
 YouTube thumbnails (build/youtube_thumbnails.py): a headshot whose body is cut by its own frame gets the cut
 clothes/shoulders carried on by LaMa (+ its matte for the outline); hair at the cut keeps the old fade (BiSeNet
 face parsing, 25%+ hair). Checked once per headshot (cuts.json in the cache), models only in the render job.
+
+## AI discoverability (2026-11-10; build/blog.py, build/topics.py)
+
+What the build gives every page for crawlers and agents, so nothing needs hand work per post:
+- robots.txt allows every AI crawler, training bots included (Marek's call). Cloudflare's managed robots.txt /
+  "Block AI bots" must stay off in the dashboard, or it prepends ai-train=no.
+- JSON-LD: Organization + WebSite (SearchAction -> /blog?q=) on every page; VideoObject with transcript, speakers
+  (Person + LinkedIn/X sameAs, company only when Company1 is set) and isPartOf the Event on talk pages; ProfilePage on
+  speaker pages; Event with performers + ItemList on event pages; BlogPosting with mentions/isBasedOn on posts.
+- Sitemap lastmod = the day an event's talks were released (talk, event, speaker pages), Updated for posts. Never
+  "today" on every build. IndexNow pings posts dated today (06:00 run) and pages released today (17:30 run).
+- Topic hubs /topics/<slug> from `_db/topics.yaml` (regex over Title + Keywords, 15+ talks after Remix dedupe, an
+  intro written from what those talks cover; no intro = no page). New topic: add a row with an honest intro.
+- Markdown twins: <talk page>.md and <post>.md (rel=alternate), llms.txt + llms/<event>.txt per event.
+
