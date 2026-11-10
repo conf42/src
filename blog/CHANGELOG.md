@@ -3,6 +3,10 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - Agent commands folded into the footer
+- "For developers & AI agents" on /blog and every post is now a closed <details> at the foot of the footer, in the
+  footer's own style (was a dark band in the media kit's style).
+
 ## 2026-11-10 - Transcript first
 - Talk and sponsored posts only for talks whose transcript is uploaded: plan holds the rest under
   waiting_transcript. The 58 written from abstracts (54 live: 53 MLOps 2026, 1 SRE 2026; 4 queued) are now

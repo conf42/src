@@ -181,7 +181,9 @@ Post pages ("Post A", 2026-11-10): the talk page's twin - hero in the event colo
 <event date>", the art in a glass frame linking the talk, reading column with "In short", a rail (contents, topic
 hubs, "The talk" card that sticks under the navbar), "More from <event>" cards.
 
-"For developers & AI agents" under the list (`_blog_agents.html`, the media kit's command rows): blog.json (every post:
+"For developers & AI agents" (`_blog_agents.html`) is folded at the foot of the footer (base.html `footer_extra`
+block; Marek 2026-11-10: only agents need it, people unwrap it): a `<details>` opened by the footer's own white
+"Show more" button style, rows of label | command | Copy in the footer's greys. It lists blog.json (every post:
 Markdown URL, event, speakers, talk page, video once released, topic slugs), blog.md, llms.txt, the Atom feed and
 curl/jq one-liners on them. Every post ends with the same rows aimed at itself (`_post_agents.html`: its .md,
 its blog.json entry, the talk's .md with transcript, the speaker's / event's / topic's posts). New fields go into `write_blog_index` (build/blog.py) and, if useful, a new command row.
