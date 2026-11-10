@@ -3,6 +3,13 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - Remix rule, post dateline, sticky talk card
+- Remix events get only the roundup + sponsored posts (they re-air earlier talks): plan skips Remix talk posts, lint
+  rejects them, the 51 queued ones are Status skipped.
+- Post hero dateline is the event and its date ("Conf42 MLOps November 19 2026"); posts without an event show their
+  date. Post dates stay in the JSON-LD.
+- "The talk" card in the post rail sticks under the navbar.
+
 ## 2026-11-10 - Post page redesign ("Post A")
 - Post pages are the talk page's twin: hero in the event colour (navy without one) with Blog / event / read-time chips,
   speaker card and byline; the art in a glass frame over the curve linking the talk; narrow reading column opened by

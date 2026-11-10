@@ -37,6 +37,10 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 | `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (`registration_free: true` - Chennai, Warsaw 2027, Tel Aviv - and PLATFORMday except London 2027 Q2): no code, "it's free, register" |
 | `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
 
+**Remix = 2 posts, never talk posts** (Marek 2026-11-10): Remix only re-airs talks from earlier events, so a Remix
+event gets its `roundup` (about the conference) plus `sponsored` posts if any, and no `talk` posts. `plan` no longer
+proposes them, `lint` rejects them, and the 51 that were queued are `Status: skipped` (kept, never released).
+
 Images: leave `ThumbnailPath` empty and the build picks the right existing asset (talk/sponsored -> the video's 16:9 YouTube
 thumbnail, before the video is out the teaser page's rendered thumbnail, never the headshot; roundup -> event
 splash, webinar -> its splash, plug -> the sister event's own splash = the og:image of its live page, refreshed into

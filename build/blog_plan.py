@@ -251,6 +251,8 @@ def wanted_posts(ctx, sisters, since, today):
                              date=d + datetime.timedelta(days=offsets[i % len(offsets)]), sponsor=sid,
                              sponsor_name=s.get("name"), sponsor_url=s.get("url"),
                              image=splash_for_sponsor(event, sid, sponsors_by_id), sources=talk_brief(event, t)))
+        if is_remix(event):
+            continue   # Remix re-airs earlier talks (Marek 2026-11-10): only the roundup + sponsored posts, no talk posts
         start = d - datetime.timedelta(days=TALK_BACKFILL_DAYS) if d <= today else today
         dates = spread(len(plain), start, d - datetime.timedelta(days=1)) if plain else []
         for (t, _), date in zip(plain, dates):
@@ -284,6 +286,13 @@ def read_blog_rows(text=None):
         with open(BLOG_CSV, encoding="utf-8") as f:
             text = f.read()
     return list(csv.DictReader(io.StringIO(text)))
+
+
+def is_remix(event_or_ref):
+    """Remix events re-air talks from earlier events, so they get no talk posts (Marek 2026-11-10)."""
+    if isinstance(event_or_ref, dict):
+        return (event_or_ref.get("name") or "").strip().lower() == "remix"
+    return (event_or_ref or "").lower().startswith("talk:remix")
 
 
 def plan(args):
@@ -453,6 +462,8 @@ def lint_rows(rows, only=None, verbose=False):
             bad(r, "Title has leading/trailing whitespace")
         if len(r.get("Description") or "") > 170:
             bad(r, "Description over 170 chars (%d)" % len(r["Description"]))
+        if typ == "talk" and is_remix(r.get("Ref")) and (r.get("Status") or "").lower() != "skipped":
+            bad(r, "Remix re-airs talks: only the roundup and sponsored posts, no talk posts (Status skipped)")
         if typ in ("talk", "sponsored") and "Conf42" not in (r.get("Description") or ""):
             # the Description is the post's visible "In short" line, the passage AI answers quote: "<Speaker> at Conf42
             # <Event> <Year> on ..." keeps the attribution in the quote (2026-11-10)
