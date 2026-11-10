@@ -390,10 +390,16 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         return [], []
     resolver = Resolver(context.get("events") or [], context.get("sponsors") or [])
     visible, dropped = [], []
+    # a post replaced by one that is not out yet (queued, or dated later) stays up until its replacement is, then turns
+    # into the redirect (Marek 2026-11-10: the 2020-24 announcements give way to the new roundups as they roll out)
+    out_now = {(r.get("ShortURL") or "").strip() for r in rows if (r.get("Status") or "").strip().lower() in VISIBLE_STATUSES
+               and (r.get("Date") or "")[:10] <= today.isoformat()}
     for row in rows:
         post = {k: (v.strip() if isinstance(v, str) and k != "Body" else v) for k, v in row.items() if k}
         slug = post.get("ShortURL") or post.get("ExternalURL") or post.get("Title")
         status = (post.get("Status") or "").lower()
+        if status.startswith("replaced:") and status[len("replaced:"):] not in {s.lower() for s in out_now}:
+            status = ""
         if status not in VISIBLE_STATUSES:
             dropped.append((slug, "status " + status))
             continue
