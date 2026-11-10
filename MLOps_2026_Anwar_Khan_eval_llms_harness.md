@@ -1,0 +1,7 @@
+# Harness Engineering for Production LLMs: Eval-as-Code From Day One
+
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Anwar Khan](https://www.conf42.com/speaker_Anwar_Khan) (Senior Staff Software Engineer, Enterprise Architecture and AI @ John Deere). Page: https://www.conf42.com/MLOps_2026_Anwar_Khan_eval_llms_harness
+
+## Abstract
+
+An evaluation harness is the difference between an LLM application you can change with confidence and one that becomes a write-only system. Traditional MLOps has model metrics and a validation set. LLM systems have prompts, retrieval, tool calls, and a model you do not control, and the CI pipeline has to cover all of it.  This talk shows how to build reusable evaluation harnesses with lm-evaluation-harness, RAGAS, DeepEval, and Promptfoo: eval-as-code in CI, behavioral regression suites, faithfulness scorecards, and the operational practices that keep eval coverage growing as the application grows. We cover dataset versioning alongside prompt and code versions, what to gate a deploy on versus what to alert on, and how to catch the silent quality drops that follow a provider-side model upgrade.  Takeaways: A reusable harness pattern that works across RAG and agentic systems. CI integration patterns for LLM evaluation. What belongs in a deploy gate. Operational practices for keeping evals current as the system evolves.  Audience: ML and MLOps engineers, AI engineers, QA engineers. Level: Intermediate.

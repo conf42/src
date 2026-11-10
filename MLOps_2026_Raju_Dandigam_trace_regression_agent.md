@@ -1,0 +1,7 @@
+# From Agent Trace to Reproducible Regression Test
+
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Raju Dandigam](https://www.conf42.com/speaker_Raju_Dandigam) (Staff Software Engineer @ Navan). Page: https://www.conf42.com/MLOps_2026_Raju_Dandigam_trace_regression_agent
+
+## Abstract
+
+A TypeScript agent can produce the expected answer while skipping a required lookup, repeating a side effect, or recovering through an invalid path. Output evaluation alone does not explain which behavior needs a regression test. This practical session follows a deliberately broken agent through a local trace-to-test workflow: inspect the execution tree, isolate the relevant events, express a narrow behavioral invariant, and rerun a keyless fixture in CI. Attendees will learn how to check required dependencies and retry boundaries without asserting one exact path for every valid run, and how to retain a redacted failure artifact another engineer can review. The walkthrough distinguishes recorded tool success from observed task outcome, and explains why missing telemetry remains unknown rather than proof that an action never happened. Examples use Vitest/Jest and the free, MIT-licensed AgentInspect project maintained by the speaker. The method complements existing evaluation and production-observability systems; it is not a replacement for runtime authorization or a product sales pitch.

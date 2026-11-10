@@ -1,0 +1,7 @@
+# When Bad Data Reaches the Model: Engineering Data Quality Into MLOps at Healthcare Scale
+
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Saiteja Jonnalagadda](https://www.conf42.com/speaker_Saiteja_Jonnalagadda) (Senior Cloud Engineer @ CVS Health). Page: https://www.conf42.com/MLOps_2026_Saiteja_Jonnalagadda_healthcare_quality_data
+
+## Abstract
+
+Every machine learning system depends on the data feeding it, and in healthcare that data arrives messy, incomplete, and in enormous volume. A single mismatched record can send the wrong information to the wrong patient, so data quality is not a convenience. It is a safety requirement.  In this session I will walk through how my team built real time, cloud native pipelines that treat data quality, validation, and anomaly detection as core parts of the MLOps lifecycle rather than a cleanup step at the end. I will show the design choices that let these pipelines process millions of events a day without falling over, the checks that catch bad records before they ever reach a model, and the ways we measure quality once a system is running in production.  I will also be honest about the parts that did not go smoothly, the assumptions that broke under real load, and what I would build differently today. Attendees will leave with a practical framework for making data quality a central part of their own pipelines, whether they work in healthcare or any field where trust in the data matters.
