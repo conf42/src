@@ -65624,6 +65624,477 @@ Engineers planning a first extraction from a large monolith, and anyone who need
 
 [Watch the talk on YouTube](https://youtu.be/qisIalSZQSk).
 ",talk,devsecops2024,talk:devsecops2024/Daniil Koshelev,,Conf42,,queued,"microservices, monolith, architecture, migration, high-load"
+,Follow one packet from pod to pod and Kubernetes networking clicks,"Abdul Karim Memon (ReLambda) at Conf42 DevSecOps 2024 on pod IPs, CNI plugins, veth pairs, overlay networks and how services use iptables NAT",2024-11-11,devsecops2024/follow-a-packet-between-kubernetes-pods,,"Kubernetes doesn't hand out pod IPs. Something else does, and most people running clusters couldn't name it. At Conf42 DevSecOps 2024, Abdul Karim Memon, co-founder of ReLambda with more than a decade in DevOps and SRE, traces a single packet from one pod to another: on the same node, across nodes, through an overlay network and finally through a Service, where iptables quietly rewrites the destination.
+
+It's a 101 and says so in the title. If you've ever nodded along to the word CNI without being sure what it does, this is the talk that fills the gap.
+
+## Why does every pod get its own IP?
+
+Pods are the smallest deployable unit: one or more containers sharing a network and storage namespace, so they talk over localhost. They're atomic (if something breaks, the whole pod is replaced) and ephemeral, so a pod's IP is never permanent.
+
+Kubernetes uses an IP-per-pod model: every pod gets a unique address, and pods reach each other directly, without NAT inside the cluster. Abdul's example makes the payoff concrete. On one VM, a Python app in pod A and a Java app in pod C both listen on port 3000 with no conflict, something you can't do with two processes on a plain VM. Inside pod C, a Datadog agent scrapes the Java app at `localhost:3000/metrics` because the two containers share the namespace.
+
+## Who actually assigns the IP?
+
+Not Kubernetes. As Abdul said at Conf42 DevSecOps 2024, ""Kubernetes doesn't itself get involved in the IP address management"". His walk through pod creation:
+
+1. The scheduler places the pod on a node.
+2. The kubelet tells the container runtime (containerd in his example) to create it.
+3. containerd creates a sandbox and the pod's network namespace.
+4. It hands networking to a CNI plugin, which works with your networking solution (Flannel, Calico, the AWS VPC CNI) to assign an IP from the pool.
+5. A pause container is created to hold the network setup.
+6. The application containers start, sharing the pause container's IP.
+
+Delegating to CNI is what lets Kubernetes support so many networking options. On Amazon EKS, he notes, the VPC CNI add-on is the only officially supported plugin; Calico or Cilium will run but aren't supported.
+
+## How does a packet cross the node?
+
+Each pod's namespace is isolated, so traffic goes through the node's root namespace. Pods connect to it through virtual Ethernet (veth) pairs, which Abdul describes as pipes, and his reminder of why they come in twos: ""A pipe cannot have one end."" On the same node, the packet leaves pod A's `eth0`, goes through its veth pair to the bridge (`cbr0`), which acts as a virtual switch, recognises the destination veth and delivers it to pod B, with source and destination untouched.
+
+Across nodes, the bridge sees the destination isn't local and sends the packet out of the host. Getting it to the right node among possibly hundreds is the CNI plugin's job. On node 2 the bridge forwards it to the right veth pair, and pod C receives it.
+
+## When do you need an overlay network?
+
+When the pod IP range runs out, when you need traffic isolated for security or multi-tenancy, or when the physical network can't route pod-to-pod traffic. Flannel is his example. A `flannel0` device in each node's root namespace intercepts packets the bridge can't deliver locally, looks up which node hosts the destination pod in its mapping, and wraps the original packet in a new one addressed node to node. On arrival, the flannel device on node 2 unwraps it and it continues to pod C as usual. Weave, Calico and Cilium are named as other CNI plugins that support overlays.
+
+## What do Services do to the packet?
+
+Pod IPs change, so Services give a stable name and IP in front of a set of pods, picked by label selector and resolved by DNS. The interesting part is underneath. A packet addressed to a Service IP doesn't match anything on the bridge and heads for the default gateway, but iptables intercepts it first and performs DNAT, rewriting the destination to one of the backend pods. Conntrack remembers the connection, so on the way back iptables applies SNAT, rewriting the source so pod A believes it heard from the Service. That's load balancing without the client ever knowing the pod IPs.
+
+## Who should watch
+
+Developers and DevOps engineers who use Kubernetes daily but treat its network as a black box, and anyone about to debug their first pod-cannot-reach-service ticket. People who already know their CNI's datapath, or who run eBPF-based networking that replaces iptables, will find it basic.
+
+## Related Conf42 talks
+
+- Federica Ciuffo on [application networking in Kubernetes](https://www.conf42.com/Cloud_Native_2023_Federica_Ciuffo_application_networking_kubernetes) at Conf42 Cloud Native 2023.
+- Pranshu Srivastava on [Cilium and eBPF networking](https://www.conf42.com/Golang_2025_Pranshu_Srivastava_cilium_ebpf_networking) at Conf42 Golang 2025.
+- Shahar Azulay on [Kubernetes observability with eBPF](https://www.conf42.com/Cloud_Native_2023_Shahar_Azulay_kubernetes_observability_ebpf) at Conf42 Cloud Native 2023.
+
+[Watch Abdul Karim Memon's talk](https://www.conf42.com/DevSecOps_2024_Abdul_Karim_Memon_kubernetes_networking)
+
+[Watch the talk on YouTube](https://youtu.be/fNVAyIw5ohw).
+",talk,devsecops2024,talk:devsecops2024/Abdul Karim Memon,,Conf42,,queued,"kubernetes, networking, cni, iptables, containers"
+,"SecretOps, or how to stop asking Steve for the .env file","Nic Manoogian (Doppler) at Conf42 DevSecOps 2024 on SecretOps, a five-layer framework for storing, governing, syncing, rotating and auditing secrets",2024-11-10,devsecops2024/secretops-five-layers-past-the-env-file,,"Code has Git, compute has Kubernetes and Terraform, and secrets usually have a password manager and a person called Steve. At Conf42 DevSecOps 2024, Nic Manoogian, Head of Engineering at Doppler, proposes SecretOps: a layered framework for automating the secrets lifecycle, from a single source of truth up to rotation that no human ever sees. His test for where you stand: can you rotate a key today without fearing an outage?
+
+Nic is upfront that he demos Doppler throughout, and equally clear that he's selling the framework, not the product. The layers apply to whatever store you run.
+
+## Where are the secrets, and who has Steve's file?
+
+The talk is built around a story from his first job. He cloned a Python app, ran it, hit a missing Google Maps API key, and was sent to Steve for the `.env` file, which arrived over chat. Which values were Steve's own? Where would a new SendGrid key go, and how would it reach staging and production?
+
+That's the **storage** layer. Storage isn't just keeping secrets safe, it's centralising them so everyone knows where to find them and where to put new ones. The enemy is sprawl: the monolith's secrets in AWS Secrets Manager, CI's in GitHub Actions, overlap between them, and soon nobody can say what a rotation would break. In the demo, adding a key to dev immediately flags it as missing in staging and production, before the code that needs it ships.
+
+## Who gets access, and how do changes reach prod?
+
+**Governance** covers access rules, onboarding and offboarding: a new developer shouldn't need to find Steve, and a departing one should lose access at once. At Doppler, no developer has access to secrets in any production environment. Nic adds that not every org works that way and that the policy has downsides; the point is that your tooling should enforce whatever policy you pick.
+
+He also wants secrets tracked like Git: an audit log with before-and-after diffs and a one-click rollback when someone typos the database password. He calls this table stakes. For production changes without production access, he shows change requests: a developer proposes values for dev, staging and production, sees the diffs for environments they can read but not for production, and approvers sign off per environment before anyone applies it. File-a-ticket-with-ops, made self-service.
+
+## Getting secrets to where they run
+
+**Orchestration** is where the earlier layers stop being a fancy password manager. Back at that first job, Steve copied values into 1Password and then SSHed into servers to update a `secrets.json`, and they had downtime from copy-paste errors and forgotten updates. Doppler's model is hub and spoke: one source of truth, synced to the native consumer. The CLI for a developer running locally, an operator syncing into Kubernetes secrets, Parameter Store or Secrets Manager for AWS Lambda. Optionally, the Kubernetes operator or webhooks redeploy workloads when a secret changes, which pairs well with change requests: propose, approve, deploy when ready.
+
+## Rotation you can actually turn on
+
+The **lifecycle** layer is the one Nic and Steve never reached. They talked about rotating keys but never did it, because some service somewhere had the old one in `secrets.json`. As Nic put it at Conf42 DevSecOps 2024, ""you really don't want to be in a position where you're choosing between security posture and risking your uptime."" With orchestration in place, rotation is just issuing a new key and saving it. He goes one step further with an integration that issues and revokes Twilio API keys on a 30-day policy, with manual rotation for emergencies, so that no human has ever handled or seen the value.
+
+## Why should reads be audited too?
+
+The last layer is **observability**, and it holds his sharpest line: ""A secret is basically just a vulnerability"". Every time one crosses the wire, the chance of a leak goes up, so a secret read matters as much as a write. With reads logged, you can answer what a departing engineer has seen, or whether a key is safe to revoke. His leak walkthrough: find a database password in the wild, search for where it's stored, check who read the current version, and get a short list, himself plus the sync bots pushing the value into Azure Key Vault and AWS Secrets Manager. With 30-day rotation, that list stays short.
+
+## Who should watch
+
+Platform and security engineers whose secrets live in three stores and a Slack thread, and teams that want a vocabulary for planning secrets work. If you already run central storage with automated rotation and read auditing, it will mostly confirm your setup.
+
+## Related Conf42 talks
+
+- Dewan Ahmed on [blocking secret commits with Gitleaks](https://www.conf42.com/DevSecOps_2024_Dewan_Ahmed_securing_gitleaks_repos_secret), from the same event.
+- Rosemary Wang on [secrets handling](https://www.conf42.com/Cloud_Native_2025_Rosemary_Wang_secrets_handling_security) at Conf42 Cloud Native 2025.
+- Jeroen Willemsen on [secrets management](https://www.conf42.com/DevSecOps_2021_Jeroen_Willemsen_secretsmanagement) at Conf42 DevSecOps 2021.
+
+[Watch Nic Manoogian's talk](https://www.conf42.com/DevSecOps_2024_Nic_Manoogian_secretops_automation_workflows)
+
+[Watch the talk on YouTube](https://youtu.be/rWoNKcoEQdo).
+",talk,devsecops2024,talk:devsecops2024/Nic Manoogian,,Conf42,,queued,"secrets, secretops, secret-rotation, devsecops, access-control"
+,"Hyperautomation puts RPA, ML and process mining on the SAP MRP run","Karthiksai Chenna (Rich Products) at Conf42 DevSecOps 2024 on hyperautomation in SAP production planning with RPA, AI, ML and process mining",2024-11-10,devsecops2024/hyperautomation-for-sap-production-planning,,"In most factories the MRP run and the maintenance schedule are still where people spend their time copying data and stopping the line. At Conf42 DevSecOps 2024, Karthiksai Chenna of Rich Products, a senior SAP delivery lead with 15 years in supply chain digitalisation, makes the case for hyperautomation in SAP Production Planning (SAP PP): combining robotic process automation, AI, machine learning and process mining so planning runs with far less manual work and far fewer surprises.
+
+It's a short, figure-heavy overview pitched at manufacturing and SAP people, with one anonymised case study. There's no SAP configuration or code on screen.
+
+## What is hyperautomation, exactly?
+
+His definition opens the talk: ""Hyperautomation is more than just process automation."" It layers four technologies, each with its own job and the figure he attaches to it:
+
+- **RPA** handles repetitive, rule-based work such as data entry and order processing, up to 70% faster, with far fewer human errors.
+- **AI** turns production data into predictive insight, forecasting demand with up to 95% accuracy.
+- **ML** adapts production schedules as requirements change, improving efficiency by around 20%.
+- **Process mining** finds the bottlenecks in workflows, cutting production cycle times by up to 15%.
+
+For scale he cites Gartner's prediction of an $860 billion market for hyperautomation-enabling software by 2025, followed by his own aside: ""860 billion is too much.""
+
+## Why forecasting sits at the centre
+
+Karthiksai keeps returning to forecasting, because in manufacturing that's where demand comes from. Sales produces the forecast and hands the demand to manufacturing leads, who pass it to the floor. Better forecasts ripple down: his figures are forecast accuracy up 15 to 40%, inventory down 15 to 25%, lead times cut by 25 to 40% and resource utilisation up 20 to 30%. With IoT devices and analytics watching the line, he cites downtime falling by 25 to 45% and detection and response times halving.
+
+## Where does it touch SAP PP directly?
+
+The material requirements planning run. MRP works out how much material each finished good needs so you don't run short mid-production, and he describes RPA automating MRP runs, reducing manual data handling by 70% and errors by 90%. AI takes over the maintenance calendar. Today, plants on eight- or twelve-hour shifts schedule maintenance windows, stop the line, and review the downtime in their TPM meetings afterwards; predictive maintenance aims to schedule it before anything fails. ML adds adaptive scheduling and anomaly detection, and process mining feeds continuous improvement.
+
+## The automotive case study
+
+A leading automotive manufacturer, unnamed, struggled with a complex production ecosystem, resource management and on-time delivery. It used RPA to automate scheduling, AI for predictive maintenance with 90% accuracy in predicting equipment failures, ML to optimise schedules from historical data, and process mining to find workflow inefficiencies, cutting unplanned downtime by 35%. The outcome he reports is a streamlined plan, better resource management and higher on-time delivery.
+
+## What's holding it back?
+
+Two things come up when he talks to steering committees and manufacturing VPs. Integration first: you're joining software to machines, usually through a manufacturing execution system (MES), and that's where projects get hard. Then data privacy: production lines carry customer, vendor and financial data, and he cites 31% of executives worried about sensitive production and customer data.
+
+Looking ahead, he places hyperautomation at the core of Industry 4.0, with a projected 18.7% CAGR to $26.5 billion by 2026, and mentions his own company's move towards an IoT-controlled smart factory.
+
+## Who should watch
+
+SAP PP consultants, manufacturing IT leads and supply chain engineers who need a quick, numbers-first briefing for a hyperautomation business case. Anyone looking for DevSecOps tooling or implementation detail won't find it here; the security content is the integration and privacy discussion.
+
+## Related Conf42 talks
+
+- Madhusudan S Vadigicherla on [AI for resilient supply chains](https://www.conf42.com/DevSecOps_2024_Madhusudan_S_Vadigicherla_ai_supply_chains), from the same event.
+- Uday Bheemarpu on [RPA ecosystems](https://www.conf42.com/Platform_Engineering_2025_Uday_Bheemarpu_salesforce_rpa_ecosystems) at Conf42 Platform Engineering 2025.
+- Venkateswaran Petchiappan on [orchestrating SAP pipelines](https://www.conf42.com/Platform_Engineering_2025_Venkateswaran_Petchiappan_orchestrating_sap_pipelines) at Conf42 Platform Engineering 2025.
+
+[Watch Karthiksai Chenna's talk](https://www.conf42.com/DevSecOps_2024_Karthiksai_Chenna_hyperautomation_sap_operations)
+
+[Watch the talk on YouTube](https://youtu.be/W8auOXSDuAs).
+",talk,devsecops2024,talk:devsecops2024/Karthiksai Chenna,,Conf42,,queued,"sap, hyperautomation, rpa, process-mining, manufacturing"
+,Supply chain AI is only as good as your master data,"Madhusudan S Vadigicherla (Integra Lifesciences) at Conf42 DevSecOps 2024 on AI for demand sensing, supplier risk and inventory in supply chains",2024-11-09,devsecops2024/supply-chain-ai-starts-with-master-data,,"A regulated product can only be made from an approved supplier's material, so when that supplier stumbles, so does your whole supply chain. At Conf42 DevSecOps 2024, Madhusudan S Vadigicherla, Director of Supply Chain Systems at Integra Lifesciences, walks through where AI makes supply chains more resilient, from short-term demand sensing to supplier network stabilisation, and keeps coming back to the unglamorous prerequisite: clean master data.
+
+This is a supply chain systems talk with 19 years of practitioner experience behind it, not a software supply chain security talk. The security content is a section on fraud detection and cyber threats; the bulk is planning, ERP and logistics.
+
+## Why are supply chains so hard to plan?
+
+Madhusudan lists four pressures, with figures from his slides:
+
+- **Data deluge:** the global datasphere was expected to hit 175 zettabytes by 2025, with supply chains contributing 25% of that growth. Forecasting needs item, location, time and point-of-sale data together.
+- **System complexity:** a typical supply chain runs 15 to 20 interconnected systems, from the core ERP (inventory, procurement, order management) through demand and supply planning to picking, packing, conveyor and transport systems in logistics.
+- **Demand pressure:** customers expect same-day, next-day or four-hour delivery, with less time to react.
+- **COVID-19 aftershocks:** plant closures and shortages showed that shipment history alone can't drive a forecast. He puts the cost of disruption at $184 million per organisation.
+
+## Where does AI help first?
+
+Data movement is his most concrete example. In a classic ERP setup, pulling data from one system into another took four to six hours, processing took another four to six, hundreds of batch jobs ran overnight, and business users got the system the next morning. Moved to the cloud, with targeted refreshes and microservices, the same work finishes in under an hour. That's less an AI story than a modernisation one, and he presents it as the foundation the AI sits on.
+
+From there he covers predictive insights: spotting anomalies (a sale last month and the same month last year doesn't guarantee one next year), planning safety stock, deciding which customer to fulfil first and which distribution centre should hold which product.
+
+## The use cases worth knowing
+
+- **Demand sensing:** short-term forecasting, a week to three months, for volatile and intermittent SKUs where long-range tools struggle. Organisations spend millions to gain a point or two of forecast accuracy, he notes.
+- **Cost prediction:** freight and raw material prices swing with supply and demand; AI turns those inputs into cost predictions for planning and budgeting.
+- **Supplier network stabilisation:** his own life sciences example. Regulation ties a product to approved suppliers, which concentrates risk; AI-assisted assessment helps find dual-sourcing options that still meet compliance.
+- **Fraud detection and compliance:** a supplier certified for one material must stay that way, or an FDA audit can shut the business.
+- **Data and compliance management:** listed last, stressed most.
+
+On that final point, Madhusudan said at Conf42 DevSecOps 2024, ""It is all about garbage in garbage out."" If master data is wrong, every safety stock calculation and forecast built on it is wrong too.
+
+## What are the claimed gains?
+
+The figures he cites: forecast accuracy improved by up to 60%, inventory costs down 20 to 30% through demand sensing, excess inventory reduced by 20 to 30%, carrying costs down 18%, order fulfilment accuracy up to 95%, and 73% of professionals reporting faster, more accurate decisions. The talk doesn't say where each figure comes from, so read them as the case for investing rather than a benchmark. He also touches on capacity planning, modelling resources, equipment and material together to avoid bottlenecks, and on robotic picking and packing in warehouses.
+
+## Who should watch
+
+Engineers and architects joining a supply chain or ERP team who want a practitioner's map of where AI fits, and DevSecOps people supporting those systems who need the business context. If you came for SBOMs and dependency attacks, see the related talks below instead.
+
+## Related Conf42 talks
+
+- Madhusudan S Vadigicherla on [supply chain forecasting](https://www.conf42.com/Golang_2025_Madhusudan_S_Vadigicherla_supply_chain_forecasting) at Conf42 Golang 2025.
+- Vishnu Prasad on [supply chain reliability in warehouses](https://www.conf42.com/DevOps_2026_Vishnu_Prasad_supplychain_reliability_warehouses) at Conf42 DevOps 2026.
+- Danish Tariq and Hassan Khan Yusufzai on [npm supply chain attacks](https://www.conf42.com/DevSecOps_2023_Danish_Tariq_Hassan_Khan_Yusufzai_supply_chain_npm_attacks), for the software side, at Conf42 DevSecOps 2023.
+
+[Watch Madhusudan S Vadigicherla's talk](https://www.conf42.com/DevSecOps_2024_Madhusudan_S_Vadigicherla_ai_supply_chains)
+
+[Watch the talk on YouTube](https://youtu.be/2UP_KHnKfbs).
+",talk,devsecops2024,talk:devsecops2024/Madhusudan S Vadigicherla,,Conf42,,queued,"supply-chain, forecasting, ai, erp, data-quality"
+,AI in fintech does four jobs and brings four new risks,"Sudeep Meduri (Google) at Conf42 DevSecOps 2024 on AI for fraud detection, personal finance, trading and compliance, and the risks it adds",2024-11-08,devsecops2024/ai-in-fintech-four-jobs-four-risks,,"Fraud teams don't only lose money to fraud; they lose customers to false positives. At Conf42 DevSecOps 2024, Sudeep Meduri, Senior Software Engineer at Google, surveys where AI earns its keep in financial technology: fraud detection, personalised banking, algorithmic trading and regulatory compliance. His sharpest example is a multinational bank whose AI fraud system cut false positives by 60%.
+
+It's a short overview, drawn from his own experience with AI in fintech, aimed at people who want the shape of the field rather than an implementation. The DevSecOps angle sits mostly in the compliance and security sections.
+
+## Why is fintech such a natural fit for AI?
+
+Sudeep's starting point is data volume. Financial institutions process huge amounts of complex data, and both fintech startups and traditional banks are adopting AI quickly to stay competitive, keep up with regulation and cut operating costs. He groups the impact into four areas.
+
+## Fraud detection: millions of transactions, fewer false alarms
+
+This is where he spends the most time. AI can analyse millions of transactions as they happen, flag anomalies and intervene quickly, and machine learning models keep picking up new fraud patterns as they're retrained, which rule-based systems miss. The win is on both sides: fewer losses and fewer disruptions for genuine customers. The 60% false-positive reduction at a multinational bank is the example he uses; the bank isn't named.
+
+## Personalised banking and robo-advisors
+
+AI looks at spending habits, goals and income to give tailored financial advice. Robo-advisors make portfolio management cheap enough to reach people who would never hire an adviser, and portfolios can take ESG preferences, tax implications and personal goals into account. The payoff, in his framing, is customers who feel their needs are understood, which shows up as retention.
+
+## Algorithmic trading, with a warning
+
+AI systems process market data in real time, deep learning models forecast stock trends from historical and current data, and execution algorithms optimise timing to cut transaction costs. Sudeep adds the caveat most fintech decks skip. As he said at Conf42 DevSecOps 2024, ""while AI improves market efficiency, it also raises concerns about market instability caused by these automated trading strategies"".
+
+## RegTech: compliance that updates itself
+
+For DevSecOps teams in finance this is the part to watch. AI automates collection, processing and reporting of compliance data, which reduces human error. Machine learning models track changes in regulation and adjust compliance processes, and continuous monitoring with predictive analytics lets institutions manage risk before an audit finds it. His figure: some institutions using AI-driven RegTech have cut compliance costs by up to 30%.
+
+Beyond those four, he points to operational efficiency, 24/7 service through chatbots that free staff for complex cases, and new products such as alternative credit scoring.
+
+## What are the risks?
+
+Four, matching the four jobs:
+
+- **Data privacy:** financial data is sensitive and regulated, GDPR being the example.
+- **Algorithmic bias:** badly designed models can bake bias into credit scoring and loan approvals.
+- **Workforce:** automation displaces jobs, so reskilling is urgent.
+- **Ethical AI:** models need to be transparent, unbiased and secure to keep trust.
+
+His conclusion: the industry has to put ethical AI development, data protection and upskilling first if the technology is going to serve society as a whole.
+
+## Who should watch
+
+Engineers moving into fintech, or security and compliance people who want a quick tour of where AI is already deployed in financial services. Specialists in fraud ML or trading systems will find it high level; there's no architecture or code.
+
+## Related Conf42 talks
+
+- Sandeep Katuri on [fraud detection in digital payments](https://www.conf42.com/Cloud_Native_2025_Sandeep_Katuri_fraud_detection_digital_payments_security) at Conf42 Cloud Native 2025.
+- Ndubuisi Obirije on [AI against fraudulent payments](https://www.conf42.com/Incident_Management_2024_Ndubuisi_Obirije_30_ai_fraudulent_payments) at Conf42 Incident Management 2024.
+- Sudeep Meduri's [AI in fintech talk](https://www.conf42.com/Internet_of_Things_IoT_2024_Sudeep_Meduri_ai_fintech) at Conf42 IoT 2024.
+
+[Watch Sudeep Meduri's talk](https://www.conf42.com/DevSecOps_2024_Sudeep_Meduri_ai_fintech_security)
+
+[Watch the talk on YouTube](https://youtu.be/piK7iWjRjHU).
+",talk,devsecops2024,talk:devsecops2024/Sudeep Meduri,,Conf42,,queued,"fintech, fraud-detection, regtech, ai-ethics, compliance"
+,A healthcare chatbot has to show its reasoning to the doctor,Abhishek Vajpayee (Metropolis Technologies) and Rathish Mohan (Lore | Contagious Health) at Conf42 DevSecOps 2024 on explainable healthcare chatbots,2024-11-07,devsecops2024/healthcare-chatbots-must-show-their-reasoning,,"A chatbot that reminds a diabetic patient to check their blood sugar is useful; one that recommends a treatment nobody can audit is a liability. At Conf42 DevSecOps 2024, Abhishek Vajpayee, Senior Analytics Engineer and Product Owner at Metropolis Technologies, and Rathish Mohan, Senior Applied ML Scientist at Lore | Contagious Health, make the case that healthcare chatbots need explainable AI (XAI) built in, and sketch the data platform and ethical guardrails underneath.
+
+It's a short overview talk, around ten minutes, that covers the whole stack at a high level. No benchmarks or production numbers; the value is in the map.
+
+## What do chatbots actually fix in healthcare?
+
+Rathish opens with access. Traditional care is bounded by office hours, staff shortages and geography; a chatbot is available around the clock, can triage symptoms and either guide patients or escalate. For chronic conditions it can monitor and remind, and his example is the glucose spike: the bot nudges the patient and makes sure the signal is captured for treatment.
+
+Generative AI adds two things. It turns medical jargon into language a patient can follow, and it retains context, so you don't repeat your history to every new interface the way you repeat it to every new doctor. Over time, deep learning, reinforcement learning and knowledge graphs let the bot refine its answers and link medical data together.
+
+## Why isn't a good answer enough?
+
+This is the core of the talk. Rathish Mohan said at Conf42 DevSecOps 2024, ""In healthcare, blind trust in AI isn't enough."" Patients need to know they're talking to an AI and why a recommendation was made. Clinicians need to verify the logic before they act on it. Regulators and institutions need decision-making transparency, and an explanation layer gives you an audit trail of what the bot did and why, plus a way to spot bias or errors in its reasoning.
+
+## Which XAI methods fit?
+
+The speakers split the methods into two families:
+
+- **Model-agnostic:** LIME approximates a single response with a simpler model, SHAP gives each input feature an importance value, and counterfactuals answer the what-if question of which input change would flip the output.
+- **Model-specific:** decision trees and feature importance analysis, familiar to anyone with an ML background, plus layer-wise relevance propagation for convolutional and other neural networks.
+
+The practical takeaway is that the explanation has to be something you can hand to the healthcare professional providing care, not just a chart for the data science team.
+
+## What sits underneath the chatbot?
+
+Abhishek covers the data engineering. Patient records, IoT devices such as wearables and medical knowledge graphs feed ETL pipelines into data lakes (structured and unstructured data: medical images, patient notes, device readings) and data warehouses for fast querying. Batch jobs handle daily updates for consistency, while real-time streaming lets the bot react to events such as an abnormal heart rate. That data trains the models, and the chatbot ships through mobile and web apps.
+
+## Where are the ethical lines?
+
+Secure storage and transmission, informed consent, training on diverse datasets to avoid unsafe biased recommendations, and keeping clinicians in charge. Abhishek put the last one plainly at Conf42 DevSecOps 2024: ""AI should complement, not replace, human healthcare providers."" The closing challenges are the unglamorous ones: technical reliability, operational training, clear privacy and consent rules, strict HIPAA compliance, and clinical validation before broad adoption.
+
+## Who should watch
+
+Engineers and product people starting on a healthcare chatbot who want a checklist of what the system needs beyond the model. If you already know LIME and SHAP, the data architecture and ethics sections are the parts to watch.
+
+## Related Conf42 talks
+
+- Shradha Kohli on [explainable AI and chatbot trust](https://www.conf42.com/DevSecOps_2024_Shradha_Kohli_conversational_ai_trust), from the same event, with user-study numbers.
+- Swapna Chimanchodkar on [clinical healthcare AI](https://www.conf42.com/DevOps_2026_Swapna_Chimanchodkar_clinical_healthcare_ai) at Conf42 DevOps 2026.
+- Santhosh Kumar Rai on [data engineering for precision healthcare](https://www.conf42.com/Cloud_Native_2025_Santhosh_Kumar_Rai_data_engineering_healthcare_precision) at Conf42 Cloud Native 2025.
+
+[Watch Abhishek Vajpayee and Rathish Mohan's talk](https://www.conf42.com/DevSecOps_2024_Abhishek_Vajpayee_Rathish_Mohan_healthcare_chatbot_transparency)
+
+[Watch the talk on YouTube](https://youtu.be/sJePgiU7ecI).
+",talk,devsecops2024,talk:devsecops2024/Abhishek Vajpayee,,Conf42,,queued,"explainable-ai, healthcare, chatbots, data-engineering, ai-ethics"
+,Reinforcement learning makes the exam adapt to the learner,"Vijay Kumar Valaboju (Microsoft) at Conf42 DevSecOps 2024 on reinforcement learning for adaptive assessments, from K-12 to security certification prep",2024-11-07,devsecops2024/reinforcement-learning-for-adaptive-assessments,,"Fixed-difficulty tests are wasted on half the room: too easy for some, too hard for the rest. At Conf42 DevSecOps 2024, Vijay Kumar Valaboju, Senior Software Engineer at Microsoft, explains how reinforcement learning (RL) can drive assessments that adjust in real time, easing off when a learner struggles and pushing harder when they're ahead, and where that applies, from algebra drills to security certification prep.
+
+A note on scope: the abstract pitches RL as a way to strengthen a team's defences against emerging threats. The talk itself is a general introduction to RL in education and assessment. The security angle shows up as one use case, certification prep focused on topics like security protocols, rather than as a DevSecOps implementation.
+
+## How does RL map onto a learner?
+
+Vijay frames it with the four standard RL concepts, translated for education:
+
+- **Agent:** the AI system that analyses the learner's performance and tracks progress.
+- **Environment:** the learner's knowledge state and preferences.
+- **Actions:** the adjustments the agent makes, from changing content or tailoring an assessment to reshaping the whole learning path.
+- **Rewards:** positive reinforcement for progress, through well-timed feedback and recognition.
+
+The loop is observe, adjust, repeat. As Vijay said at Conf42 DevSecOps 2024, ""If they excel, it introduces more complex challenges to keep them engaged."" If they struggle, the system simplifies the material or offers hints.
+
+## What does an RL-driven assessment actually do?
+
+He lists five features:
+
+1. **Dynamic curriculum adjustment:** revisit foundations where the learner is weak, move ahead where they're strong.
+2. **Real-time difficulty adjustment:** question difficulty follows the learner's responses.
+3. **Personalised feedback:** detailed explanations for wrong answers instead of a red cross.
+4. **Gamification:** badges, points and levels to keep motivation up.
+5. **Cognitive load management:** alternate task types and schedule breaks to prevent burnout.
+
+Knowledge retention comes from spaced repetition, reinforcing the right concepts at the right intervals so the learning outlasts the test.
+
+## Where would you use it?
+
+The applications run from K-12 personalised paths and adaptive university exams to professional certifications, corporate training and language learning. The corporate training point is the one engineering managers will recognise: Vijay argues training modules too often drift away from what the organisation actually needs, and RL can keep the content aligned with organisational goals. His case studies are illustrative rather than measured: a maths platform balancing advanced algebra problems against extra practice on weak spots, certification prep that concentrates on hard topics such as security protocols while mixing in other domains, and a language platform that rewards practice in weaker skills like writing.
+
+## What could go wrong?
+
+He is direct about four limits. Algorithmic bias, since the system must be fair across diverse learners. The complexity of human learning, which is hard to model as a state and a reward. Data privacy and security, because learner data is sensitive and trust drives adoption. And scalability, which needs serious infrastructure for large, varied user groups.
+
+For future work he points to combining RL with NLP and computer vision, bias-free and interpretable algorithms, extending adaptive learning to underserved communities, and long-term studies that measure outcomes and professional success over time. That last one is the gap in the talk: there are no results here yet, only the design.
+
+## Who should watch
+
+People building internal training or certification programmes, including security awareness, who want a plain-language model of how adaptive assessment works. ML engineers already familiar with RL will find it introductory, and anyone expecting RL applied to penetration testing or threat modelling should look elsewhere.
+
+## Related Conf42 talks
+
+- Lalitha Potharalanka on [scaling educational AI](https://www.conf42.com/MLOps_2025_Lalitha_Potharalanka_scaling_educational_ai) at Conf42 MLOps 2025.
+- Venkatesan Kandavelu on [MLOps and ethics in education](https://www.conf42.com/DevOps_2026_Venkatesan_Kandavelu_education_mlops_ethics) at Conf42 DevOps 2026.
+- Jyotirmoy Sundi on [scaling reinforcement learning](https://www.conf42.com/JavaScript_2025_Jyotirmoy_Sundi_scaling_reinforcement_learning) at Conf42 JavaScript 2025.
+
+[Watch Vijay Kumar Valaboju's talk](https://www.conf42.com/DevSecOps_2024_Vijay_Kumar_Valaboju_reinforcement_learning_assessments)
+
+[Watch the talk on YouTube](https://youtu.be/MPu-kywAhqs).
+",talk,devsecops2024,talk:devsecops2024/Vijay Kumar Valaboju,,Conf42,,queued,"reinforcement-learning, adaptive-learning, assessments, security-training, ai"
+,Explain the chatbot's reasoning and users forgive its mistakes,"Shradha Kohli (Salesforce) at Conf42 DevSecOps 2024 on LIME, SHAP and counterfactuals for chatbot transparency, tested with 150 users",2024-11-06,devsecops2024/explain-the-chatbot-users-forgive-it,,"A chatbot that shows its working gets more slack when it's wrong. At Conf42 DevSecOps 2024, Shradha Kohli, Senior Software Engineering Manager at Salesforce, presents research that applied three explainable AI (XAI) techniques, LIME, SHAP and counterfactual explanations, to chatbots and measured what happened to user trust. Her headline: trust rose by 35%, and users were 40% more forgiving of errors.
+
+It's a compact research summary, around ten minutes, rather than an implementation walkthrough. Think of it as a map of the XAI toolbox with one study's results pinned to it.
+
+## Why do chatbots need explaining?
+
+Shradha's framing is the black box. Chatbots have been around since the 1960s, starting as rule-based pattern matchers with scripted replies. Modern ones run on deep neural networks and hold far more natural conversations, but they give no view into how they reached an answer. In healthcare or finance that opacity turns into hesitation: users who can't see the reasoning don't trust the response, and don't use the tool.
+
+## Three ways to open the box
+
+She walks through the three techniques at the level a practitioner needs to pick one:
+
+- **LIME** (Local Interpretable Model-agnostic Explanations) builds a simple, interpretable stand-in model for a single response, so users can see which input words most influenced it.
+- **SHAP** (SHapley Additive exPlanations) borrows Shapley values from game theory to assign each input feature an importance weight, at both the local and global level.
+- **Counterfactual explanations** show how a small change to the input would change the output, which tells users where the decision boundary sits and how sensitive the bot is.
+
+## What did the study measure?
+
+The research involved around 150 users across demographics and three chatbot styles: retrieval-based, generative and hybrid, covering the range from FAQ bots to fully conversational systems. Explanations were scored on faithfulness (accuracy), stability (consistency across users) and comprehensibility (whether non-technical users understood them).
+
+Each technique came with a catch. LIME explained individual responses well but struggled globally, so explanations could vary for similar inputs. SHAP gave the most detailed picture of feature importance across interactions, but its compute cost made it impractical, and its output confused non-technical users. Counterfactuals were the most intuitive for users and the hardest to generate under real-time demands.
+
+## The numbers
+
+The user-impact figures from the talk:
+
+| Measure | Change |
+|---|---|
+| Trust in the chatbot | +35% |
+| Understanding of the bot's reasoning | +48% |
+| Willingness to engage with complex tasks | +27% |
+| Error tolerance | +40% |
+| Overall engagement | +31% |
+
+The talk doesn't go into how these were measured beyond the 150-user study, so treat them as directional. Shradha was candid that the open problems are the practical ones: generating explanations without noticeable latency, balancing detail against comprehension, and the risk that an explanation itself exposes sensitive information or bias. Her summary at Conf42 DevSecOps 2024: ""each technique brings its own pros and cons to the chatbot transparency"".
+
+## Where does the research go next?
+
+She lists three directions: XAI methods that work for transformer architectures, which most current chatbots use; real-time adaptive explanations that adjust their level of detail to the user; and self-explaining chatbots that learn to explain themselves as they evolve.
+
+## Who should watch
+
+Product engineers and managers shipping chatbots into regulated or high-stakes domains who want a quick orientation on XAI options and their trade-offs. If you're after code or a production architecture, this isn't that talk; it's a short, readable briefing.
+
+## Related Conf42 talks
+
+- Abhishek Vajpayee and Rathish Mohan on [XAI for healthcare chatbots](https://www.conf42.com/DevSecOps_2024_Abhishek_Vajpayee_Rathish_Mohan_healthcare_chatbot_transparency), from the same event.
+- Saideepak Kandibanda on [trust, explainability and regulation](https://www.conf42.com/DevOps_2026_Saideepak_Kandibanda_trust_explainability_regulation) at Conf42 DevOps 2026.
+- Abigail Haddad on [automated chatbot evaluation](https://www.conf42.com/Large_Language_Models_LLMs_2024_Abigail_Haddad_automated_evaluation_chatbot) at Conf42 LLMs 2024.
+
+[Watch Shradha Kohli's talk](https://www.conf42.com/DevSecOps_2024_Shradha_Kohli_conversational_ai_trust)
+
+[Watch the talk on YouTube](https://youtu.be/OFOCfcfD1tk).
+",talk,devsecops2024,talk:devsecops2024/Shradha Kohli,,Conf42,,queued,"explainable-ai, chatbots, llm, trust, ai-ethics"
+,A full disk and storage at 90% are the same page,"Birol Yildiz (ilert) at Conf42 DevSecOps 2024 on grouping duplicate alerts by meaning, using text embeddings and a tunable similarity threshold",2024-11-05,devsecops2024/embeddings-group-alerts-not-keywords,,"Two alerts can share zero words and still be the same incident. At Conf42 DevSecOps 2024, Birol Yildiz, co-founder and CEO of ilert, shows how his team groups alerts by meaning rather than by text: turn each alert into a vector embedding, compare it with recent alerts, and fold anything close enough into one page. He then explains the pipeline well enough that you could build it yourself.
+
+It is a vendor talk, demoed in ilert, but the second half is a recipe that works with any alerting stack.
+
+## Why bother with alert grouping?
+
+Alert floods drive up MTTA and MTTR and add stress at exactly the wrong moment, the major incident at 3am. Birol opens with a customer result: after two weeks of intelligent alert grouping, alert volume dropped by 93%, and response time improved by more than four hours.
+
+He also tours the other places ilert uses AI across the incident lifecycle: a chat assistant that builds on-call schedules (a follow-the-sun rotation described in plain language), drafting status page updates from a few words, and post-mortems reconstructed from the war-room chat and monitoring data. On that last one, Birol said at Conf42 DevSecOps 2024, ""it almost feels irresponsible not to use, not to leverage AI"", with the model producing an 80% draft so the team spends its time on the learning part.
+
+## Can a model tell a coffee machine from a water cooler?
+
+The demo starts light. Using Postman to fire events into ilert, Birol sends an alert about the coffee machine on floor two, then the same problem reworded as the machine taking a coffee break, then a Java pun. All three land in one alert with a counter. Then the water cooler on floor two breaks: same floor, overlapping words, different thing, so it gets its own alert. That distinction matters, he points out, because the water cooler might belong to another team, and wrongly merging it means nobody gets paged.
+
+The sharper test is technical. ""The hard drive is full"" followed by a storage alert about reaching a 90% limit share no words, and they still group. Then he replays 31 real Prometheus alerts from a production flood. With grouping off, that is 31 alerts. With grouping on, the blackbox HTTP probe failures collapse together while genuinely separate problems, a RabbitMQ node down, a hardware status warning, a firewall subnet running out of IPs, stay separate.
+
+## How does the pipeline work?
+
+Four steps, per his slides:
+
+1. **Preprocess.** Normalise alerts into one format (ilert already does this across 100+ integrations), then clean them: drop unique IDs and timestamps, strip JSON and markdown down to plain text. That cuts tokens and stops the format from influencing the match.
+2. **Vectorise.** Run the text through an embedding model. ilert self-hosts a general-purpose model from Hugging Face, trained on data that includes Stack Overflow, so it handles technical text. With millions of events a day, an external API call per alert was a performance and stability risk they didn't want. BERT, Sentence-BERT or OpenAI's embeddings are named as options.
+3. **Deduplicate.** Store vectors in a vector database and, for each new alert, query for close neighbours within the grouping window (five minutes by default) using a similarity function such as cosine similarity. Above the threshold, it merges. An optional step has a generative model summarise the cluster.
+4. **Feedback.** Thumbs up or down on each grouping, with the metrics exposed so you can tune.
+
+## Is 0.75 the right threshold?
+
+The default similarity threshold is 0.75 on a scale from 0 to 1: closer to 1 groups fewer alerts, lower groups almost everything. Birol is clear that the number has no meaning in isolation; 0.75 can suit one domain while another needs 0.9. ilert's answer is a preview slider that replays past alerts as you move it. He also flags model choice: a model trained mostly on English may behave differently if your alerts aren't in English.
+
+## Who should watch
+
+On-call engineers drowning in duplicate pages, and anyone building alert routing who wants a concrete, small-scale use of embeddings that isn't a chatbot. The demo is ilert; the design is portable.
+
+## Related Conf42 talks
+
+- Mandi Walls on [tackling alert fatigue](https://www.conf42.com/Site_Reliability_Engineering_SRE_2025_Mandi_Walls_tackling_alert_fatigue) at Conf42 SRE 2025.
+- Leonid Yankulin on [making alerts actionable](https://www.conf42.com/Observability_2024_Leonid_Yankulin_actionable_alerts_fix) at Conf42 Observability 2024.
+- Ricardo Castro on [alerting with SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies) at Conf42 SRE 2022.
+
+[Watch Birol Yildiz's talk](https://www.conf42.com/DevSecOps_2024_Birol_Yildiz_aiops_alert_noise)
+
+[Watch the talk on YouTube](https://youtu.be/YKuhDxdHuME).
+",talk,devsecops2024,talk:devsecops2024/Birol Yildiz,,Conf42,,queued,"alerting, aiops, embeddings, incident-response, on-call"
+,"Git never forgets, so stop the secret at the push",Dewan Ahmed (Harness) at Conf42 DevSecOps 2024 on blocking secret commits with Gitleaks rules and Harness Open Source secret scanning,2024-11-05,devsecops2024/gitleaks-stops-secrets-at-push,,"A revert commit does not un-leak an API key: the key is still sitting in the history for anyone who clones the repo. At Conf42 DevSecOps 2024, Dewan Ahmed, Principal Developer Advocate at Harness, shows how to catch secrets before they ever land, using the open-source scanner Gitleaks and the secret scanning built into Harness Open Source, and demos a push being rejected live.
+
+It is a short, practical talk: a few minutes of why, a look inside a Gitleaks rule, then a demo you can repeat on a laptop with Docker.
+
+## Why do Git repositories leak secrets so easily?
+
+Dewan gives three reasons. Repositories are collaborative, so more hands means more chances for someone to commit the wrong file. Accidental commits are easy: you stage everything you touched locally, including the `.env` file you were testing with a database credential in it. And the number of repositories keeps growing, with public, private and open-source repos multiplied by microservices, which makes access control harder to keep tight.
+
+His branch diagram makes the core point. A developer commits an API key on a feature branch, someone spots it and adds a commit to remove it, then another branch picks up a database credential, an SSH key and an access token, and another fix reverts them. Every one of those secrets is still in the history. Erasing Git history is hard, so the only cheap fix is the one that happens before the commit lands. That is his case for shifting left: less exposure time, less remediation work.
+
+## What does a Gitleaks rule look like?
+
+Gitleaks scans Git repositories, files and directories against predefined and customisable secret patterns. It is lightweight and runs locally, as a pre-commit hook or in CI/CD pipelines.
+
+The best detail in the talk is a rule Dewan wrote himself. He contributed a Gitleaks rule for Harness personal access tokens and service account tokens, and the pull request was merged upstream. He walks through the regex: the token starts with `pat` or `sat`, then a dot, a 22-character alphanumeric segment (dashes and underscores allowed), a dot, a 24-character segment, a dot and a 20-character segment. His aside that most of us would ask ChatGPT to get the brackets right is the most honest thing anyone has said about regex. If your organisation's tokens aren't covered yet, his point is that the contribution process is straightforward, so write the rule.
+
+## How does Harness Open Source fit in?
+
+Harness Open Source is a single lightweight Go binary that runs locally or on a small cloud VM. It bundles a code repository, CI, CD, an artifact registry and Gitspaces, pre-configured dev environments based on dev containers (think GitHub Codespaces). Projects map roughly to GitHub orgs, each holding repositories with their own pipelines. Dewan positions it for individual developers and small teams, with the commercial Harness platform as the upgrade for governance and scale.
+
+The demo is the payoff. He starts it with Docker on localhost port 3000, creates a project, imports the public PodInfo repository from GitHub, clones it into VS Code and adds a `config.yaml` containing a fake Harness personal access token from the harness-community lab repo. Then he flips the secret scanning toggle under the repository's security settings, which blocks commits containing passwords, API keys and tokens and is based on Gitleaks. The push fails. The log names the file, the commit ID and the detection: a generic API key.
+
+## What doesn't it do?
+
+Dewan is upfront about the limit. The push-time check stops new secrets; it does not go back through history. As he said at Conf42 DevSecOps 2024, ""if you already have existing secrets in the repository, it doesn't scan and find and detect those."" So you still need a one-off history scan, and rotation for anything already exposed.
+
+## Who should watch
+
+Developers and platform engineers who want a five-minute setup for push-time secret blocking, and anyone curious about how Gitleaks rules are written. Security teams who already run history scanning and vault-based workflows will find it introductory. It is a Harness developer advocate showing Harness Open Source, and the Gitleaks part works without it.
+
+## Related Conf42 talks
+
+- Dwayne McDaniel on [stopping secret commits with Git hooks](https://www.conf42.com/DevSecOps_2022_Dwayne_McDaniel_stop_committing_your_secrets_git_hooks) at Conf42 DevSecOps 2022.
+- Nic Manoogian on [automating secrets workflows with SecretOps](https://www.conf42.com/DevSecOps_2024_Nic_Manoogian_secretops_automation_workflows), from the same event.
+- Kenneth DuMez on [static shared secrets in GitHub Actions](https://www.conf42.com/DevOps_2023_Kenneth_DuMez_static_shared_secrets_github_actions) at Conf42 DevOps 2023.
+
+[Watch Dewan Ahmed's talk](https://www.conf42.com/DevSecOps_2024_Dewan_Ahmed_securing_gitleaks_repos_secret)
+
+[Watch the talk on YouTube](https://youtu.be/hrxhgxSOtuY).
+",talk,devsecops2024,talk:devsecops2024/Dewan Ahmed,,Conf42,,queued,"secrets, gitleaks, git, shift-left, harness"
 ,"Conf42 JavaScript 2024: heap limits, local variables and AI in the browser","The Conf42 JavaScript 2024 roundup - 36 talks on Node.js performance and security, AI in the browser, TypeScript, React, tooling and JavaScript in industry.",2024-11-01,js2024/javascript-2024-roundup-node-performance-browser-ai,,"[Conf42 JavaScript 2024](https://www.conf42.com/js2024) went out on October 31 with 36 talks, and the best of them were about what happens to JavaScript after it ships: heaps that hit their limit, stack traces that don't say enough, event loops that a single bad regex can stall. Around that production core, the day covered AI running inside the browser, TypeScript's type system doing more work than it gets credit for, and a lot of React.
 
 Speakers came from Sentry, Mattermost, Intel, Black Duck, Esri, ING, Walmart Global Tech, Bit.dev, Gatling, DragonflyDB, Block and a long list of smaller teams.
