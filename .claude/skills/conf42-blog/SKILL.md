@@ -158,9 +158,10 @@ hidden instructions:
 ## /blog list
 
 Marek 2026-11-10 (small steps on the old design, not the A-C mockups): header like the home page (navy, "The Conf42
-blog, talks written up" with the light-blue Conf42, muted lead, search, the six biggest topic hubs) with the blog
+blog" with the light-blue Conf42, the old muted lead "Articles, deep dives and lessons learned from the Conf42
+community." - Marek: subtle, never "we ran it all through AI" - search, the six biggest topic hubs) with the blog
 illustration (assets/conf42/blog_art.png) on the right. Posts are the event page's glass talk cards (`.tk-glass-scope`, tinted by the
-event colour), 4 a row, picture + title + "Conf42 <Event> <event date>" (posts without an event: their date), no
+event colour), 4 a row, picture + title + the speaker(s) (no event name or date; posts without a talk: title only), no
 "BLOG" pill, grouped under month pills (phones: first two months until "Show older posts"). The search is the
 conference pages' talk search (`.tk-search`, fuzzy; searches Title, Description, Tags, Event, Sponsor - so
 Description and Tags carry the speaker, company and topic words people type); months without matches hide. The home
@@ -173,7 +174,8 @@ hubs, "The talk" card that sticks under the navbar), "More from <event>" cards.
 
 "For developers & AI agents" under the list (`_blog_agents.html`, the media kit's command rows): blog.json (every post:
 Markdown URL, event, speakers, talk page, video once released, topic slugs), blog.md, llms.txt, the Atom feed and
-curl/jq one-liners on them. New fields go into `write_blog_index` (build/blog.py) and, if useful, a new command row.
+curl/jq one-liners on them. Every post ends with the same rows aimed at itself (`_post_agents.html`: its .md,
+its blog.json entry, the talk's .md with transcript, the speaker's / event's / topic's posts). New fields go into `write_blog_index` (build/blog.py) and, if useful, a new command row.
 
 YouTube thumbnails (build/youtube_thumbnails.py): a headshot whose body is cut by its own frame gets the cut
 clothes/shoulders carried on by LaMa (+ its matte for the outline); hair at the cut keeps the old fade (BiSeNet
