@@ -68,6 +68,7 @@ def assign(context, path=TOPICS_YAML):
     for hub in hubs:
         hub["lastmod"] = max((d for d in (released_on(i["event"]) for i in hub["talks"]) if d), default=None)
         hub["url"] = SITE + "topics/" + hub["slug"]
+        hub["n"] = len(hub["talks"])
         for item in hub.pop("all"):
             item["talk"].setdefault("topics", []).append(hub)
     for event in context.get("events") or []:
