@@ -37,6 +37,11 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 | `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (`registration_free: true` - Chennai, Warsaw 2027, Tel Aviv - and PLATFORMday except London 2027 Q2): no code, "it's free, register" |
 | `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
 
+**Transcript first** (Marek 2026-11-10): talk and sponsored posts are written only for talks whose transcript is in
+the repo (`assemblyai/<YouTubeId>.json` or `srt/<short_url>_<Name1>.srt`). `plan` doesn't propose the others; it
+counts them per event under `waiting_transcript`, and they show up as missing once the factory uploads the transcript.
+Never write a talk post from the abstract alone.
+
 **Remix = 2 posts, never talk posts** (Marek 2026-11-10): Remix only re-airs talks from earlier events, so a Remix
 event gets its `roundup` (about the conference) plus `sponsored` posts if any, and no `talk` posts. `plan` no longer
 proposes them, `lint` rejects them, and the 51 that were queued are `Status: skipped` (kept, never released).
@@ -128,7 +133,7 @@ hidden instructions:
 - Paid plug whose CONF42 coupon couldn't be created: add it with `Status: hidden` and tell Marek; flip to empty once
   the coupon exists. Never publish a code that doesn't work.
 - Never invent a quote, number, feature, customer or result. Quotes are verbatim from the transcript/abstract (the
-  linter checks). No transcript yet? Write from the abstract and say "in the talk" without quoting.
+  linter checks). No transcript yet? Don't write the post (see Transcript first).
 - Never touch legacy rows dated before 2025 (no Ref; the linter refuses). Typed rows dated Dec 2024 (DevOps 2025
   talk posts) are ours and editable.
 - Transcript is a different talk than the CSV row (wrong srt/YouTube): skip that post and report it. Abstract

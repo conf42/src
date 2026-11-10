@@ -24,6 +24,8 @@ sister repos next to this one), compares it with _db/blog.csv and reports:
   missing   posts to write, with their Ref, date and the files to read (due first, then backfill by event)
   orphaned  rows whose Ref is gone from the repo (the build already hides them; the skill sets Status=orphaned)
   enrich    talk/sponsored posts whose talk has since got its video or transcript
+  waiting_transcript  talk/sponsored posts not proposed yet because the talk has no transcript in the repo
+            (Marek 2026-11-10: posts only for talks whose transcript is uploaded), per event
   crowded   dates holding more than MAX_PER_DAY posts
 It also rewrites _db/sister_events.json, the snapshot the build resolves sister:<repo>/<folder> Refs against.
 
@@ -250,14 +252,16 @@ def wanted_posts(ctx, sisters, since, today):
             want.append(dict(ev, type="sponsored", ref="sponsor:%s/%s/%s" % (su, sid, t["Name1"]),
                              date=d + datetime.timedelta(days=offsets[i % len(offsets)]), sponsor=sid,
                              sponsor_name=s.get("name"), sponsor_url=s.get("url"),
-                             image=splash_for_sponsor(event, sid, sponsors_by_id), sources=talk_brief(event, t)))
+                             image=splash_for_sponsor(event, sid, sponsors_by_id), sources=talk_brief(event, t),
+                             ready=bool(transcript_paths(event, t))))
         if is_remix(event):
             continue   # Remix re-airs earlier talks (Marek 2026-11-10): only the roundup + sponsored posts, no talk posts
         start = d - datetime.timedelta(days=TALK_BACKFILL_DAYS) if d <= today else today
         dates = spread(len(plain), start, d - datetime.timedelta(days=1)) if plain else []
         for (t, _), date in zip(plain, dates):
+            # only once the transcript is in the repo (Marek 2026-11-10): posts are written from what was said
             want.append(dict(ev, type="talk", ref="talk:%s/%s" % (su, t["Name1"]), date=date, image="",
-                             sources=talk_brief(event, t)))
+                             sources=talk_brief(event, t), ready=bool(transcript_paths(event, t))))
     for s in sisters:
         if s["past"] or _date(s["date"]) < today:
             continue
@@ -305,9 +309,13 @@ def plan(args):
     have = {(r.get("Ref") or "").strip() for r in rows if (r.get("Ref") or "").strip()}
     want = wanted_posts(ctx, sisters, since, today)
 
-    missing = []
+    missing, waiting = [], collections.Counter()
     for w in want:
-        if w["ref"] in have or w.get("ready") is False:
+        if w["ref"] in have:
+            continue
+        if w.get("ready") is False:
+            if w["type"] in ("talk", "sponsored"):
+                waiting[w.get("event") or "?"] += 1   # no transcript yet: listed, not written
             continue
         w["date"] = w["date"].isoformat()
         w["due"] = not w["past"] or w["type"] == "plug" or _date(w["date"]) >= today - datetime.timedelta(days=DUE_WINDOW_DAYS)
@@ -357,9 +365,11 @@ def plan(args):
         orphaned=orphaned,
         enrich=enrich,
         shared_video=shared_video,
+        waiting_transcript=dict(waiting.most_common()),
         crowded={d: n for d, n in sorted(per_day.items()) if n > MAX_PER_DAY},
         counts=dict(rows=len(rows), due=len(due), backfill_first=len(first),
-                    backfill_talks=sum(e["count"] for e in talk_events), orphaned=len(orphaned), enrich=len(enrich)),
+                    backfill_talks=sum(e["count"] for e in talk_events), orphaned=len(orphaned), enrich=len(enrich),
+                    waiting_transcript=sum(waiting.values())),
     )
     json.dump(out, sys.stdout, indent=1, default=str, ensure_ascii=False)
     print()

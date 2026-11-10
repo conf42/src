@@ -3,6 +3,10 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - Transcript first
+- Talk and sponsored posts only for talks whose transcript is uploaded: plan holds the rest under
+  waiting_transcript. Already out without a transcript: 54 live (53 MLOps 2026, 1 SRE 2026) and 4 queued.
+
 ## 2026-11-10 - /blog refresh + agent-ready
 - /blog: home-style header with the three newest posts fanned out, glass talk cards tinted by event, no BLOG pill,
   "Conf42 <Event> <date>" under each card, posts grouped by month.
