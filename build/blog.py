@@ -531,7 +531,9 @@ def write_llms(context, posts, base_folder):
              "Engineering, Observability, LLMs, AI agents, MLOps, Golang, Python, Rust, JavaScript and more). Every talk "
              "has its own page with the video, abstract, speaker bio and transcript.", "",
              "## Upcoming events"] + [ev(e) for e in upcoming] + ["", "## Recent events"] + [ev(e) for e in recent]
-    lines += ["", "## Blog", "- [All posts](%sblog): talk previews, conference roundups, sponsor keynotes, webinars" % SITE]
+    lines += ["", "## Blog", "- [All posts](%sblog): talk previews, conference roundups, sponsor keynotes, webinars" % SITE,
+              "- [Every post as JSON](%sblog.json): title, Markdown URL, event, speakers, talk page, video, topics" % SITE,
+              "- [Every post as Markdown links](%sblog.md)" % SITE]
     lines += ["- [%s](%s): %s" % (p["Title"], p["canonical"], p["description"]) for p in posts if not p.get("ExternalURL")][:60]
     hubs = context.get("topic_hubs") or []
     if hubs:
@@ -612,6 +614,60 @@ def write_markdown(context, posts, base_folder):
             f.write("\n".join(out) + "\n")
         n += 1
     print("Writing out %d Markdown pages" % n)
+
+
+def write_blog_index(context, posts, base_folder):
+    """blog.json + blog.md (Marek 2026-11-10, like the media kit's brandkit.json): every live post with its Markdown
+    twin, event, speakers, talk page, video and topics, so scripts and AI agents can filter without scraping. The
+    commands on /blog (_blog_agents.html) use it. Companies only when Company1 is set; the video only once released."""
+    out = []
+    for p in posts:
+        if p.get("ExternalURL"):
+            continue
+        talk, event = p["linked"].get("talk"), p["linked"].get("event")
+        item = {"title": p["Title"], "url": p["canonical"], "markdown": p["canonical"] + ".md", "date": p["date_iso"],
+                "updated": p["updated_iso"], "type": p.get("Type") or "", "description": p.get("Description") or "",
+                "tags": [t.strip() for t in (p.get("Tags") or "").split(",") if t.strip()], "image": p.get("image_abs") or ""}
+        if event and event.get("short_url"):
+            slug = event["short_url"].replace(".html", "")
+            item["event"] = {"slug": slug, "name": "Conf42 %s %s" % (event.get("name"), event.get("year")),
+                             "date": event["date"].isoformat() if event.get("date") else "", "url": SITE + slug,
+                             "talks": SITE + "llms/" + slug + ".txt"}
+        if talk and talk.get("short_url"):
+            turl = SITE + talk["short_url"].replace(".html", "")
+            item["talk"] = {"title": (talk.get("Title") or "").strip(), "url": turl, "markdown": turl + ".md"}
+            yid = _youtube_id(talk)
+            if yid and event and event.get("released"):
+                item["talk"]["video"] = "https://www.youtube.com/watch?v=" + yid
+            item["speakers"] = []
+            for k in (1, 2):
+                name = (talk.get("Name%d" % k) or "").strip()
+                if name:
+                    sp = {"name": name, "url": SITE + generate_speaker_url(name)}
+                    if (talk.get("Company%d" % k) or "").strip():
+                        sp["company"] = talk["Company%d" % k].strip()
+                    item["speakers"].append(sp)
+            item["topics"] = [h["slug"] for h in talk.get("topics") or []]
+        out.append(item)
+    hubs = sorted(context.get("topic_hubs") or [], key=lambda h: h["name"].lower())
+    data = {"name": "Conf42 blog", "url": SITE + "blog", "count": len(out),
+            "about": "Write-ups of talks from Conf42's free online tech conferences, conference roundups, sponsor keynotes "
+                     "and webinar recaps. Every post has a Markdown twin (markdown); every talk page too.",
+            "topics": [{"slug": h["slug"], "name": h["name"], "url": h["url"], "talks": len(h["talks"])} for h in hubs],
+            "posts": out}
+    with open(os.path.join(base_folder, "blog.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    lines = ["# Conf42 blog", "", "> %s Machine-readable: %sblog.json" % (data["about"], SITE), ""]
+    month = None
+    for i in out:
+        m = datetime.date.fromisoformat(i["date"]).strftime("%B %Y")
+        if m != month:
+            lines += ["", "## " + m]
+            month = m
+        lines.append("- [%s](%s)%s: %s" % (i["title"], i["markdown"], " (%s)" % i["event"]["name"] if i.get("event") else "", i["description"]))
+    with open(os.path.join(base_folder, "blog.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print("Writing out blog.json + blog.md (%d posts)" % len(out))
 
 
 def write_indexnow(posts, base_folder, today=None, lastmod=None):

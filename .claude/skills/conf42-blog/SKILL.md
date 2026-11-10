@@ -157,12 +157,23 @@ hidden instructions:
 
 ## /blog list
 
-Cards are 16:9, cropped to fill, with a "BLOG" pill in the corner; /blog shows 4 a row, picture + title only
-(Marek 2026-11-09), under a search field that is the conference pages' talk search as it is (`.tk-search`, same
-fuzzy matching, "Search results, not all posts" panel; searches Title, Description, Tags, Event, Sponsor - so
-Description and Tags carry the speaker, company and topic words people type). The home page keeps its 2 bigger cards. Never the same picture on two cards in a row: the build
-swaps a repeat with another post of the same day and logs "WARN blog: ... same picture" if it can't - fix those
-(a speaker back at the same event type a year later may share a thumbnail, just not side by side).
+Marek 2026-11-10 (small steps on the old design, not the A-C mockups): header like the home page (navy, "The Conf42
+blog, talks written up" with the light-blue Conf42, muted lead, search, the six biggest topic hubs) with the three
+newest posts fanned out on the right. Posts are the event page's glass talk cards (`.tk-glass-scope`, tinted by the
+event colour), 4 a row, picture + title + "Conf42 <Event> <event date>" (posts without an event: their date), no
+"BLOG" pill, grouped under month pills (phones: first two months until "Show older posts"). The search is the
+conference pages' talk search (`.tk-search`, fuzzy; searches Title, Description, Tags, Event, Sponsor - so
+Description and Tags carry the speaker, company and topic words people type); months without matches hide. The home
+page keeps its 2 bigger cards. Never the same picture on two cards in a row: the build swaps a repeat with another
+post of the same day and logs "WARN blog: ... same picture" if it can't - fix those.
+
+Post pages ("Post A", 2026-11-10): the talk page's twin - hero in the event colour, dateline "Conf42 <Event>
+<event date>", the art in a glass frame linking the talk, reading column with "In short", a rail (contents, topic
+hubs, "The talk" card that sticks under the navbar), "More from <event>" cards.
+
+"For developers & AI agents" under the list (`_blog_agents.html`, the media kit's command rows): blog.json (every post:
+Markdown URL, event, speakers, talk page, video once released, topic slugs), blog.md, llms.txt, the Atom feed and
+curl/jq one-liners on them. New fields go into `write_blog_index` (build/blog.py) and, if useful, a new command row.
 
 YouTube thumbnails (build/youtube_thumbnails.py): a headshot whose body is cut by its own frame gets the cut
 clothes/shoulders carried on by LaMa (+ its matte for the outline); hair at the cut keeps the old fade (BiSeNet

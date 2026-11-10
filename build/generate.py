@@ -328,7 +328,7 @@ print(f"Matched {len(premieres)} premieres to stats")
 print(DIVIDER)
 print("Loading blog posts")
 # the living blog (build/blog.py): only rows that are due, not hidden and whose Ref still exists in the repo
-from .blog import load_posts, write_feed, write_robots, write_llms, write_indexnow, write_markdown, FEED_FILE
+from .blog import load_posts, write_feed, write_robots, write_llms, write_indexnow, write_markdown, write_blog_index, FEED_FILE
 posts, blog_dropped = load_posts(context, BASE_FOLDER)
 context["posts"] = posts
 context["blog_feed"] = FEED_FILE
@@ -613,6 +613,7 @@ write_feed(posts, BASE_FOLDER, datetime.datetime.now(datetime.timezone.utc))
 write_robots(BASE_FOLDER)
 write_llms(context, posts, BASE_FOLDER)
 write_markdown(context, posts, BASE_FOLDER)
+write_blog_index(context, posts, BASE_FOLDER)
 write_indexnow(posts, BASE_FOLDER, lastmod=SITEMAP_LASTMOD)
 
 print(DIVIDER)
