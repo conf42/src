@@ -69127,6 +69127,106 @@ Network engineers and SREs who own infrastructure and want a structured way to t
 
 [Watch the talk on YouTube](https://youtu.be/XcU30sOUymw).
 ",talk,prompt2024,talk:prompt2024/Akshat Kapoor,,Conf42,,queued,"predictive-maintenance, networking, machine-learning, aiops, reliability"
+,"Node.js stack traces can carry local variables, via the inspector",Abhijeet Prasad (sentry.io) at Conf42 JavaScript 2024 on attaching local variables to Node.js production stack traces with the inspector API,2024-10-16,js2024/nodejs-inspector-local-variables-stacktraces,,"A production stack trace tells you which line threw. It doesn't tell you what `userId` was at the time, and that is usually the question. At Conf42 JavaScript 2024, Abhijeet Prasad, a software engineer who maintains Sentry's open source JavaScript SDKs, showed how the team made local variables appear next to Node.js stack frames by turning the built-in `inspector` module, the same machinery debuggers use, into a production tool.
+
+It is a short talk about how Sentry built the feature, so the product is front and centre, but the technique and the list of things that went wrong apply to anyone curious about the Node.js inspector.
+
+## Why couldn't Node.js do this before?
+
+Sentry already attached local variables to stack frames for Python, PHP and Ruby, where the language exposes the data. JavaScript doesn't: no standard library API hands you the variables in scope when an error is thrown, and the feature request stayed open for a long time because the answer was always that the runtime couldn't do it. Then the team realised the `node:inspector` module, built on the V8 inspector protocol, could. A debugger attached to a process can see every frame's scope, so a debugger you attach to yourself can too.
+
+## How does it work?
+
+The SDK opens an inspector session and starts a worker thread whose job is to watch it. The worker tells the debugger to pause on exceptions, caught or uncaught. When an error is thrown in the main thread:
+
+1. The debugger pauses the main process.
+2. The worker checks the pause reason is a real exception, then walks every frame of the stack, not just the top one.
+3. For each frame it collects the local variables through `Runtime.getProperties`, flattening objects and arrays into something serialisable.
+4. It calls a function in the paused process that writes the frames and their variables to a global, releases the inspector objects to avoid leaking memory, and resumes.
+
+When the SDK turns the error into an event, it looks up that global and attaches the variables to the matching frames. ""although it can be weird, you're actually pausing the process, it's actually not that expensive to do this,"" Abhijeet Prasad said at Conf42 JavaScript 2024.
+
+For users, all of this sits behind one option in the SDK's init call, `includeLocalVariables: true`. His demo is an Express app that throws with a few variables in scope, which then show up in the event beside each frame.
+
+## What went wrong along the way?
+
+The challenges list is the most useful part for anyone thinking of doing this themselves:
+
+- **Worker overhead and memory pressure.** A worker and an inspector session per process have a CPU and memory cost that needed keeping in check.
+- **Handled versus unhandled exceptions.** Pausing behaves differently for an error you catch than for one that bubbles up to the global handlers.
+- **ESM versus CommonJS.** At the time of the talk, a Node.js bug kept the feature from working fully under ESM (tracked in [nodejs/node#38439](https://github.com/nodejs/node/issues/38439)).
+- **Minified code.** Variables renamed by a TypeScript-plus-minifier build, say for a Lambda deploy, can't be mapped back yet; that waits on the source map spec adding support for minified variable names.
+- **One inspector at a time.** With local variables on, you can't attach your own debugger to the same process.
+- **Node.js only.** It relies on the V8 inspector and Node's standard library, so browsers, Bun and Deno are out for now.
+
+The implementation, edge cases included, is in the open source [sentry-javascript](https://github.com/getsentry/sentry-javascript) repository.
+
+## Who should watch?
+
+Node.js developers who debug production errors from stack traces alone, and anyone who wants to see the inspector module used for something other than breakpoints. It is brief and concrete.
+
+## Related Conf42 talks
+
+- Finbar Fleming on [debugging errors in production](https://www.conf42.com/JavaScript_2022_Finbar_Fleming_debugging_errors_in_production) at Conf42 JavaScript 2022.
+- Muhammad Yasir Rafique on [diagnosing memory leaks in Node.js](https://www.conf42.com/JavaScript_2024_Muhammad_Yasir_Rafique_42_memoryleaks_nodejs_diagnostics) at Conf42 JavaScript 2024.
+- Gabriel Schulhof on [cutting memory in a GraphQL subscription server](https://www.conf42.com/JavaScript_2024_Gabriel_Schulhof_25_travails_memory_inmemory) at Conf42 JavaScript 2024.
+
+[Watch Abhijeet Prasad's talk](https://www.conf42.com/JavaScript_2024_Abhijeet_Prasad_1_superchargedproduction_stacktraces_localvariables)
+
+[Watch the talk on YouTube](https://youtu.be/sA1wPo-GTzU).
+",talk,js2024,talk:js2024/Abhijeet Prasad,,Conf42,,queued,"nodejs, error-monitoring, debugging, stack-traces, v8-inspector"
+,"The business case for AI code review, with the caveats left in","Prakash Ojha (BNY) at Conf42 JavaScript 2024 on AI-driven code review and QA, the improvement figures behind it, and why to start small",2024-10-16,js2024/ai-code-review-qa-numbers-hybrid,,"Manual code review misses a lot, and AI review is pitched as the fix. At Conf42 JavaScript 2024, Prakash Ojha, Software Architect Technical Lead at BNY, made the business case for AI-driven code review and quality assurance: where manual review falls short, what AI adds to review and testing, the improvement figures he attributes to it, and a start-small adoption plan with humans kept in the loop.
+
+It is a short, high-level talk. There is no JavaScript on screen and only one product is named, Amazon CodeGuru, so think of it as a briefing for a team lead deciding whether to pilot AI review, not a how-to.
+
+## How much does manual review actually miss?
+
+His starting point is the defect rate. Studies he cites find only 60 to 70% of defects with traditional methods, and he references a Cisco Systems study putting code review at about 60%. The 30 to 40% that slip through cost exponentially more the later they are found, especially after release. On top of that, review quality depends on who happens to review, and keeping test suites current is a manual slog.
+
+## What does AI add to review and testing?
+
+On the review side: pattern recognition for common issues such as memory leaks and subtler security vulnerabilities, NLP that reads documentation and comments, and real-time feedback while you code so problems are fixed before they turn into debt. ""AI doesn't just automate tasks. It enhances them by applying sophisticated analysis to detect issues earlier and more effectively,"" Prakash Ojha said at Conf42 JavaScript 2024.
+
+On the QA side, four capabilities:
+
+- **Automated test generation** from code changes, so coverage follows the code.
+- **Self-healing tests** that update scripts when the UI changes.
+- **Intelligent test execution**, running the tests most likely to catch a bug first.
+- **Predictive analytics** on historical test results to point QA at the riskiest code.
+
+## Which numbers does he put on it?
+
+A before-and-after table, presented as typical results rather than a study he ran:
+
+| Metric | Before | With AI |
+|---|---|---|
+| Bug detection rate | 70% | 95% |
+| Development cycle | 12 weeks | 8 weeks |
+| Review time per 1,000 lines | 8 hours | 2 hours |
+| Test coverage | 75% | 95% |
+
+Test case generation drops from 24 hours to 6, bottleneck prediction accuracy rises from 60% to 85%, and developer output goes from 100 to 150 lines of code a day. For QA he cites up to 50% less testing time, and for case studies, Amazon CodeGuru cutting Amazon's application downtime by 50%, plus 60% better defect detection with AI static analysis in CI/CD and 60% fewer deployment failures.
+
+The sources behind these figures aren't given in the talk, and lines of code per day is a metric most reviewers would like to see retired, so read the table as the shape of the argument rather than a benchmark to promise your manager.
+
+## How should a team adopt it?
+
+This is the part worth taking away. The challenges are upfront cost, a learning curve and the need for good training data. His answers: start small with linting or generating simple test cases, choose tools that improve as they see more data, and keep a hybrid model where AI flags issues and humans still decide. ""Combine AI automation with human oversight to achieve better results,"" as he put it.
+
+## Who should watch?
+
+Engineering managers and tech leads building a case for an AI review pilot, who want the argument and its usual numbers in one place. Developers looking for tool comparisons, prompts or JavaScript examples should look elsewhere.
+
+## Related Conf42 talks
+
+- Prakash Raj Ojha on [code review automation](https://www.conf42.com/Incident_Management_2024_Prakash_Raj_Ojha_33_code_review_automation) at Conf42 Incident Management 2024.
+- Shubham Singh on [AI code review](https://www.conf42.com/Python_2025_Shubham_Singh_ai_code_review) at Conf42 Python 2025.
+- Sharon Barr on [GenAI dev tools for unit testing](https://www.conf42.com/JavaScript_2024_Sharon_Barr_63_genaidevtools_unittesting_automation) at Conf42 JavaScript 2024.
+
+[Watch Prakash Ojha's talk](https://www.conf42.com/JavaScript_2024_Prakash_Ojha_49_aicodereview_automation)
+
+[Watch the talk on YouTube](https://youtu.be/JEpYsIyEhpA).
+",talk,js2024,talk:js2024/Prakash Ojha,,Conf42,,queued,"code-review, ai, quality-assurance, testing, developer-productivity"
 ,Put a security layer between your sales agent and your database,"Batandwa Mgutsi (BBD) at Conf42 Prompt Engineering 2024 on layered AI agents, a proxy-to-experts pattern and hallucination limits for side hustles.",2024-10-15,prompt2024/security-layer-between-agent-and-database,,"Hiring people is the classic way to grow a side business, and most side hustlers can't afford it. At Conf42 Prompt Engineering 2024, [Batandwa Mgutsi](https://www.conf42.com/Prompt_Engineering_2024_Batandwa_Mgutsi_ai_orchestration_superagents), junior software engineer at BBD, showed how to staff one with AI agents instead: layered agents with a security gate in the middle, a proxy agent that routes questions to experts, and a sober list of ways to keep hallucinations from costing you money.
 
 ## Why side hustles, and why agents?
@@ -69208,6 +69308,355 @@ Anyone shipping an LLM feature that takes free text from users, especially struc
 
 [Watch the talk on YouTube](https://youtu.be/T2V0WMI6Ziw).
 ",talk,prompt2024,talk:prompt2024/Hilik Paz,,Conf42,,queued,"prompt-injection, llm-security, input-validation, prompt-testing, llm-evals"
+,"Playwright finds your locator when you use it, not when you write it","Gil Zilberfeld (TestinGil) at Conf42 JavaScript 2024 on Playwright from zero, with getByRole, auto-waiting locators, API checks, axe and fixtures",2024-10-15,js2024/playwright-locators-fixtures-api-axe,,"Coming from Selenium, the strangest thing about Playwright is that you can write a locator for a message that won't exist until two pages later, and the test still passes. At Conf42 JavaScript 2024, Gil Zilberfeld, CTO and CEO of TestinGil, gave a live-coded introduction to Playwright against a small registration app, covering locators, auto-waiting, isolation, codegen, API checks, accessibility scans and fixtures, and ended with sober advice for teams already invested in Selenium or Cypress.
+
+It is pitched at people new to web automation, but the parts on locator evaluation and fixtures will save experienced testers some confusion.
+
+## What makes Playwright a test framework and not just a driver?
+
+His history: Puppeteer started inside Google, stalled, and Microsoft took the know-how and people behind it to build Playwright, launched in 2020. The difference he stresses is scope. Selenium does automation and lives inside someone else's test framework. Playwright identifies tests, registers and runs them, reports and ships its own assertions. It comes in JavaScript, Java, C# and Python, installs via npm plus a one-off browser download, and drives Chromium, Firefox and WebKit.
+
+The config file sets `testDir`, a `baseURL` (so `page.goto('/')` reads cleanly), projects per browser, and `webServer`, which starts a local server for the run if it can't find one already running, then shuts it down.
+
+## Why prefer getByRole over test IDs?
+
+Because users don't see test IDs. A button might be an HTML button, an image or a Material UI component; `getByRole('button')` finds it the way a person would. `getByText`, `getByLabel`, placeholder and alt text come next. Test IDs work but are planted by developers and can break. CSS and XPath are still available through `page.locator`, which he calls the third and fourth languages you need to know after regular expressions.
+
+## Locators are lazy, and that's the trick
+
+A Playwright locator is a reminder to look later, not a handle to a DOM node, so the stale element errors of Selenium don't happen. He moves the line defining the thank-you message above the navigation, runs the test, and it still works. ""So locators are always calculated at the point where they are used,"" Gil Zilberfeld said at Conf42 JavaScript 2024.
+
+The same design gives you auto-waiting. Every action is a message to another process, so assertions retry until a timeout, five seconds by default. Most failures you'll see are therefore timeouts, not mismatches; he injects a `toBeHidden` on a visible title to show what that looks like. Error messages that appear only after a click can be declared up front and asserted when they matter.
+
+## Beyond the browser: isolation, API checks and axe
+
+Each test gets a fresh incognito context: no cache, no cookies. You can still open two pages in one context or two browser contexts in one test, which Cypress, running inside the browser, can't. Codegen (`npx playwright codegen`) records clicks into code, but the output uses placeholder locators, repeats itself and ignores `baseURL`, so treat it as a prototype or a way to find an elusive locator, then refactor.
+
+Two features make it a system-testing tool. The `request` fixture calls the backend after the UI flow to check the registration was really saved. And `AxeBuilder` from axe-core's Playwright integration scans the page in a couple of lines; his demo app fails on insufficient colour contrast.
+
+## Fixtures are great; don't get addicted
+
+`test.describe` and the before/after hooks exist, but the interesting tool is fixtures, borrowed from pytest and TestNG: shared setup and teardown across files. He wraps a page object for the registration form in a fixture that also ticks the terms checkbox, so every test starts with an enabled button. ""They're cool. Don't get addicted to them,"" he warns.
+
+## Should you switch?
+
+New to web automation: take a hard look at Playwright, since it has everything in the box. Already have a big Selenium or Cypress suite: write your next tests in Playwright if you like, but don't rewrite everything, because both are still moving and there will always be a newer tool. Keep using page objects, and keep codegen output out of your long-lived suite.
+
+## Who should watch?
+
+Developers who want end-to-end tests next to their unit tests, and testers comparing frameworks. It is a solid one-hour onboarding.
+
+## Related Conf42 talks
+
+- Taslan A. Graham on [accessibility testing with Playwright and axe-core](https://www.conf42.com/JavaScript_2023_Taslan_A_Graham_web_accessibility_testing_playwrightjs_axecore) at Conf42 JavaScript 2023.
+- Gil Zilberfeld on [refactoring patterns for APIs](https://www.conf42.com/JavaScript_2023_Gil_Zilberfeld_apis_refactoring_patterns) at Conf42 JavaScript 2023.
+- Sharon Barr on [GenAI dev tools for unit testing](https://www.conf42.com/JavaScript_2024_Sharon_Barr_63_genaidevtools_unittesting_automation) at Conf42 JavaScript 2024.
+
+[Watch Gil Zilberfeld's talk](https://www.conf42.com/JavaScript_2024_Gil_Zilberfeld_26_playwright_automation_testing)
+
+[Watch the talk on YouTube](https://youtu.be/xSNAITlEuXw).
+",talk,js2024,talk:js2024/Gil Zilberfeld,,Conf42,,queued,"playwright, testing, test-automation, accessibility, javascript"
+,"setup() runs once, draw() runs forever, and that is enough to make art","Francisca Beatriz Medina Concha (LATAM Airlines) at Conf42 JavaScript 2024 on algorithmic art with p5.js, from Processing's history to fractals and Game of Life",2024-10-14,js2024/p5js-algorithmic-art-randomness-creative-coding,,"Most of us stopped drawing somewhere around the end of primary school. At Conf42 JavaScript 2024, Francisca Beatriz Medina Concha, UX and front-end leader on the data visualization team at LATAM Airlines, invited developers to start again, with code as the brush: a friendly introduction to algorithmic art and p5.js, the JavaScript library built to put creative coding within reach of artists, designers and beginners.
+
+This is an inspirational talk rather than a coding session. You get the history, the core p5.js model, a catalogue of what you can make, and where to go next. If you have never opened the p5.js editor, it is a good evening's push to do it.
+
+## What makes someone an algorist?
+
+She starts with definitions. An algorithm is a recipe, a step-by-step process; art has resisted definition for centuries. Algorithmic art is where they meet: the artist writes the rules, and the computer produces work that would be impossible or painfully slow by hand. Because the output depends on logic, input and chance, no two runs need to look alike.
+
+The term algorist comes from the artist Jean-Pierre Hébert in September 1995, to describe artists who use their own algorithms as the primary tool of creation. Her slides render his definition as an `if` statement, which is the right way to define a programmer-artist.
+
+## How did we get from Processing to p5.js?
+
+The history is compact and worth having straight. Processing came out of the MIT Media Lab in 2001, created by Casey Reas and Ben Fry as a software sketchbook for artists and designers. John Resig, of jQuery fame, ported it to the browser as Processing.js in 2008. Lauren McCarthy created p5.js in 2013 as a rethinking of Processing for the web. Java and Processing updates in 2014-2015 made Processing.js hard to keep alive, and it stopped active development in 2016. The p5.js online editor arrived in 2018, and both projects remain in use.
+
+Her comparison is fair to both: Processing is Java with its own IDE, faster for heavy computation and good for standalone installations; p5.js lives in the browser, shares a sketch as a URL, and plugs into React, Vue or D3.
+
+## What can you actually make with p5.js?
+
+The programming model is two functions on an HTML canvas. `setup()` runs once; `draw()` runs every frame. Everything else is ordinary JavaScript: variables, loops and logic, aimed at pixels instead of a database. Interaction is a built-in away, with `mouseX`, `mouseY` and key presses, and sound input is possible too.
+
+From there she tours the genres:
+
+- Geometric patterns, mandalas and optical illusions built from loops and transformations.
+- Fractals such as the Mandelbrot set or the Sierpinski triangle, via recursion.
+- Data visualisation, where data points become part of a composition.
+- Nature simulations: particles, flocking birds, growing plants.
+- Randomness, through `random()`, so a forest never grows the same tree twice.
+- Interactive generation, where the viewer becomes the artist.
+- Cellular automata, with Conway's Game of Life as the classic.
+
+""Randomness is a key ingredient in many forms of algorithmic art,"" Francisca Beatriz Medina Concha said at Conf42 JavaScript 2024. Her favourite examples balance it with control, so every refresh is new but recognisably the same piece.
+
+## Where should a beginner start?
+
+OpenProcessing, where thousands of sketches are published with their source, so you can read, fork and remix. She walks through three of them: one built from repeated shapes and randomness that looks hand-drawn, a particle system pushed around by invisible forces such as gravity or wind, and an abstract piece that mixes randomness with tight parameters. Her references include The Nature of Code and the p5.js documentation.
+
+## Who should watch?
+
+Front-end developers who miss making things for fun, designers curious about code, and anyone teaching JavaScript who wants a more visual first project than a todo list. Experienced creative coders will know the material.
+
+## Related Conf42 talks
+
+- Preslav Rachev on [order and chaos in generative art](https://www.conf42.com/Golang_2021_Preslav_Rachev_order_and_chaos_create_immersive_generative_art) at Conf42 Golang 2021.
+- Victor Lebrun on [pixel transformation with canvas](https://www.conf42.com/JavaScript_2020_Victor_Lebrun_canvas_pixel_transformation) at Conf42 JavaScript 2020.
+- Alok Kumar on [3D websites with React Three Fiber](https://www.conf42.com/JavaScript_2024_Alok_Kumar_5_3dwebsite_r3f_webdevelopment) at Conf42 JavaScript 2024.
+
+[Watch Francisca Beatriz Medina Concha's talk](https://www.conf42.com/JavaScript_2024_Francisca_Beatriz_Medina_Concha_24_algorithmicart_creativity)
+
+[Watch the talk on YouTube](https://youtu.be/BI6mLiHMeco).
+",talk,js2024,talk:js2024/Francisca Beatriz Medina Concha,,Conf42,,queued,"p5js, creative-coding, generative-art, canvas, javascript"
+,Your Node.js pod is only as safe as the kubelet nobody patched,"Manpreet Singh Sachdeva (Walmart Global Tech) at Conf42 JavaScript 2024 on securing Kubernetes for JavaScript apps, layer by layer from control plane to network",2024-10-13,js2024/kubernetes-security-layers-nodejs-apps,,"Containerising a Node.js app is the easy part; the cluster around it has four separate doors to lock. At Conf42 JavaScript 2024, Manpreet Singh Sachdeva, Staff Software Engineer at Walmart Global Tech, laid out a layered security checklist for JavaScript workloads on Kubernetes: the control plane, the nodes, the workloads themselves and the network, finishing with a Dockerfile and a NetworkPolicy for a Node.js app.
+
+This is a broad overview for application developers who deploy to Kubernetes rather than a deep technical session for platform security engineers. Its value is the map: one tool or practice per layer, in the order an attacker would meet them.
+
+## Why should a JavaScript developer care about cluster security?
+
+Because the cluster is where your app's secrets live. He frames it with the four Cs (cluster, container, cloud and code) and a reminder of what a compromised cluster costs: deleted production pods, leaked customer credentials and the reputational bill that follows. He cites a 2021 incident in which an attacker reached a cluster with admin access and deleted payment-critical apps, without naming the company.
+
+## What does each layer need?
+
+**Control plane.** Strong authentication on the API server (OAuth or OpenID) and RBAC tied to groups, so developers get read-only access, the on-call or DevOps group gets production admin, and testers may not see production at all. Encrypt etcd at rest, since it holds secrets, keys and certificates, and limit who can read it. Kubernetes networking is open by default, so add network policies with Calico or Cilium.
+
+**Nodes.** A minimal hardened OS patched against the CIS benchmarks, and kernels kept current as Kubernetes versions move. AppArmor or SELinux profiles to restrict what containers can do on the host. And TLS on the kubelet, the one he sees forgotten: ""I've seen some teams, they will secure the API server, they will secure the workloads, but the kubelet security sometimes is discarded and, ignored,"" Manpreet Singh Sachdeva said at Conf42 JavaScript 2024.
+
+**Workloads.** Pod Security Policies are deprecated; Pod Security Admission enforces the privileged, baseline and restricted profiles instead. Least privilege means nobody execs into a container as root. Falco or Aqua Security watch for suspicious behaviour at runtime, with Falco rules feeding alerts. Secrets go in HashiCorp Vault or the cloud provider's secrets manager, never in plain text in a manifest.
+
+**Network.** A service mesh such as Istio or Linkerd for mutual TLS between services, an NGINX ingress controller and NetworkPolicies for what enters and leaves the cluster, and AWS Shield or Google Cloud Armor in front of anything public for DDoS protection.
+
+## What does that look like for a Node.js app?
+
+Two small examples. A Dockerfile that creates `appuser` with `useradd` and switches to it with `USER`, so the process never runs as root. And a NetworkPolicy named `allow-nodejs` that selects pods labelled `app: nodejs-app` and only accepts ingress from pods with matching labels. Two caveats a careful viewer will spot: the example builds on `node:14`, which reached end of life in 2023, and his remark that secrets should ""at least"" be base64-encoded describes Kubernetes' default encoding, which is not encryption, which is why the Vault advice matters.
+
+He rounds off with the process side: regular configuration audits, MFA for access to the Kubernetes API, Prometheus, Grafana and Kibana for alerting, and security patches applied promptly. His reading list includes Kubernetes Up and Running and Node.js Design Patterns.
+
+## Who should watch?
+
+JavaScript and full-stack developers whose apps run on Kubernetes and who want to know which layers exist and who owns them. Platform engineers will recognise all of it and might use it as a talk to send to their app teams.
+
+## Related Conf42 talks
+
+- Manpreet Singh Sachdeva on [Kubernetes security practices](https://www.conf42.com/Incident_Management_2024_Manpreet_Singh_Sachdeva_26_kubernetes_security_practices) at Conf42 Incident Management 2024.
+- Aleksandra Drobnjak on [threat detection with Falco and Falcosidekick](https://www.conf42.com/Kube_Native_2024_Aleksandra_Drobnjak_kubernetes_security_falcosidekick_threat_detection) at Conf42 Kube Native 2024.
+- Chris Nesbitt-Smith on [pod security policy](https://www.conf42.com/Chaos_Engineering_2023_Chris_NesbittSmith_pod_security_policy) at Conf42 Chaos Engineering 2023.
+
+[Watch Manpreet Singh Sachdeva's talk](https://www.conf42.com/JavaScript_2024_Manpreet_Singh_Sachdeva_37_kubernetes_bestpractices_security)
+
+[Watch the talk on YouTube](https://youtu.be/2rI1zo0vtrc).
+",talk,js2024,talk:js2024/Manpreet Singh Sachdeva,,Conf42,,queued,"kubernetes, security, nodejs, devsecops, containers"
+,Two lines of memoization tripled a GraphQL subscription server,"Gabriel Schulhof (Intel) at Conf42 JavaScript 2024 on cutting a Node.js GraphQL subscription server's heap with lazy proxies, memoization and heap diffs",2024-10-12,js2024/graphql-subscriptions-heap-memoize-lazy-proxy,,"A Node.js process that keeps hitting its heap limit is a detective story, and this one has a satisfying number of suspects. At Conf42 JavaScript 2024, Gabriel Schulhof, Software Engineer at Intel, told the story of the GraphQL subscription service at Auction.com: pods dying against a roughly 2 GB heap, a load test that pushed just 16 Kafka messages through in four minutes, and the sequence of fixes that took it past 6x the throughput with half the idle memory.
+
+It is the best kind of performance talk: every change comes with a measurement, including the ones that didn't help.
+
+## What was eating the heap?
+
+The graph service answers about 85% of client requests. Subscriptions run over WebSockets and mostly rebroadcast Kafka messages: one pod consumes a message, publishes it through Redis with `graphql-redis-subscriptions`, and Redis forwards it to whichever pods have subscribers. The test rig on a laptop: a local Kafka broker, 4,000 WebSockets, and `kcat` loops flooding the broker with copies of one message. Baseline: 16 messages received and 56,000 sent in four minutes, or about 15 seconds per message fanned out to 4,000 clients.
+
+The first culprit was the GraphQL context. Every connection's context carried wrappers for 32 backends with five HTTP methods each, so 160 objects per context times 4,000 contexts, while a typical response touches five or six. A JavaScript `Proxy` now builds each backend and method wrapper on first access. Memory dropped; throughput didn't, which told him the bottleneck was elsewhere.
+
+## Why memoize a snake_case function?
+
+Because node-clinic's flame graphs kept pointing at one function, `convertObjToSnakeKeys`, which deep-converts Kafka payloads into the snake_case field names the GraphQL schema uses. Replacing old lodash calls with native iteration gave a modest gain. The big one came from noticing that keys like `daysOnMarket` are a fixed vocabulary agreed by programmers, so there is no reason to convert the same key twice. Memoizing the conversion was ""practically two lines"", and messages received went from 16 to 69, a 3.3x jump.
+
+Two more changes followed. The Babel build had been targeting the lowest common denominator browser for the server bundle too, with no spread, optional chaining or async/await; targeting Node.js 20 flattened the memory curve and nudged throughput to 3.7x. Then the converter stopped round-tripping through `Object.entries`, `Object.fromEntries` and `map`: plain loops, a new object only where keys change, and arrays modified in place. That took received messages to 6.3x the baseline.
+
+## The 261,968 objects nobody needed
+
+Chrome DevTools heap snapshots, diffed between idle and 4,000 connected sockets, showed 261,968 `Location` objects. GraphQL attaches a source location to every AST node of every parsed subscription, which only matters if you care where in the query string a token sat. Turning that off in the parser removed them.
+
+The last round attacked the 50 data loaders and even more primers created for every context. Rewriting that big object literal by hand would have been ugly, so the team wrote a Babel plugin that replaces a fictitious `Proxy.lazy` call with a proxy that creates and memoizes each entry on first access. Add an LRU query cache keyed by the SHA-256 of the query string, holding the AST and a JIT-compiled function per query, and the idle plateau fell from 600 MB to 300 MB. Final count: 121 messages received and 484,000 sent, 6.6x and 7.6x the baseline.
+
+## What actually fixed production?
+
+With a straight face, he reports two things. A slow multi-day leak was handled by restarting every night: ""nobody's watching their web sockets at like 2 AM,"" Gabriel Schulhof said at Conf42 JavaScript 2024, and clients reconnect within seconds. And the restarts finally stopped after moving to Yarn 4 and upgrading dependencies, which removed duplicate package versions and with them a package that wasted memory.
+
+His takeaways: keep the GraphQL context lean, remember that execution speed and memory are not independent, and avoid `await` on values that aren't promises: ""Don't use await because that creates like three promises every time you use await.""
+
+## Who should watch?
+
+Anyone running GraphQL subscriptions or other long-lived WebSocket services on Node.js, and anyone who has never diffed two heap snapshots and should.
+
+## Related Conf42 talks
+
+- Muhammad Yasir Rafique on [diagnosing memory leaks in Node.js](https://www.conf42.com/JavaScript_2024_Muhammad_Yasir_Rafique_42_memoryleaks_nodejs_diagnostics) at Conf42 JavaScript 2024.
+- Julian Jandl on [JavaScript heap memory leaks](https://www.conf42.com/JavaScript_2023_Julian_Jandl_js_heap_memory_leaks) at Conf42 JavaScript 2023.
+- Mohammed Zubair Ahmed on [real-time chat performance for 100k users](https://www.conf42.com/JavaScript_2024_Mohammed_Zubair_Ahmed_41_realtimechat_performance_100kusers) at Conf42 JavaScript 2024.
+
+[Watch Gabriel Schulhof's talk](https://www.conf42.com/JavaScript_2024_Gabriel_Schulhof_25_travails_memory_inmemory)
+
+[Watch the talk on YouTube](https://youtu.be/96mm86QVmtg).
+",talk,js2024,talk:js2024/Gabriel Schulhof,,Conf42,,queued,"nodejs, graphql, memory, performance, websockets"
+,Moving AEM to a single page app fixes speed and breaks SEO,"Bhanu Gogula at Conf42 JavaScript 2024 on single page apps in Adobe Experience Manager, and fixing the SEO, caching and authoring gaps they open",2024-10-11,js2024/aem-single-page-apps-seo-caching,,"A single page app makes an Adobe Experience Manager (AEM) site faster and creates a fresh set of problems on the way. At Conf42 JavaScript 2024, full stack web engineer Bhanu Gogula walked through what changes when an AEM site moves from classic multi-page rendering to an SPA built on React or Vue.js, and how to deal with the SEO, debugging, caching and authoring issues that follow.
+
+It is an introductory talk: most of it explains the SPA model itself, then the AEM-specific part covers integration, the issues that remain after the switch, and the fixes. There is no code on screen.
+
+## What actually changes when you switch to an SPA?
+
+Where the rendering happens. In a multi-page application every click sends a request and the server answers with a complete HTML page, header and footer included, every time. In an SPA the browser downloads one HTML page plus the JavaScript once, and after that only data travels, through Ajax or `fetch`, while the framework updates the parts of the page that changed.
+
+""The core difference lies in the shift of logic and rendering from the server to client,"" Bhanu Gogula said at Conf42 JavaScript 2024. His examples are the familiar ones: Gmail swapping the message pane while the sidebar stays put, Google Maps redrawing tiles, Facebook likes that land without a reload. Less HTML from the server means less server load and lower bandwidth, and form state survives navigation.
+
+## How does AEM support an SPA?
+
+Through client-side rendering with React, Angular or Vue.js, while keeping the parts content authors depend on: editable templates and in-context editing, so an author can add a section or an image in a React-based page and see it update live, without touching code. That last part is what makes AEM SPAs viable at all, and it is also where the trouble starts.
+
+## Which problems survive the move?
+
+The list of issues after the switch is the most useful part of the talk:
+
+- **SEO.** Content rendered in the browser is harder for search engines to index.
+- **Debugging.** JavaScript-heavy pages are harder to troubleshoot than server-rendered ones, especially bugs in dynamic data loading.
+- **Caching.** Whole-page caching no longer applies when the data arrives piecemeal.
+- **Compatibility.** Some older AEM components don't work smoothly inside an SPA.
+- **Authoring.** Visual and in-context editing were hard to provide early on for client-rendered pages.
+
+## How do you fix them?
+
+For SEO: server-side rendering, or dynamic rendering that serves pre-rendered pages to crawlers and the SPA to people. For debugging: source maps, plus error tracking tools such as Sentry or LogRocket in production. For caching: service workers and caching of frequently requested API data. For compatibility: custom components built for the SPA, or a hybrid of SPA and multi-page where that fits better. For authoring: the AEM SPA Editor, which works only if it is configured properly, so front-end developers and the AEM implementation team have to work closely on it.
+
+He closes with a case study of a large, unnamed e-commerce site whose page loads of up to three seconds dropped to one second after the move to an SPA, with 20% fewer server requests.
+
+## Who should watch?
+
+Teams running AEM who are weighing an SPA, and developers new to the SPA versus multi-page trade-off who want it explained plainly. If you already ship React on AEM, the fixes list is a quick checklist rather than new material.
+
+## Related Conf42 talks
+
+- Bhanu Gogula on [migrating Salesforce data to AEM](https://www.conf42.com/Incident_Management_2024_Bhanu_Gogula_11_data_salesforce_aem) at Conf42 Incident Management 2024.
+- Tejas Kumar on [React Server Components](https://www.conf42.com/JavaScript_2023_Tejas_Kumar_react_server_components) at Conf42 JavaScript 2023.
+- Juan Felipe Gomez on [CMS and Jamstack](https://www.conf42.com/JavaScript_2023_Juan_Felipe_Gomez_cms_jamstack_innovation_web_dev) at Conf42 JavaScript 2023.
+
+[Watch Bhanu Gogula's talk](https://www.conf42.com/JavaScript_2024_Bhanu_Gogula_aem_performance_single_page_app)
+
+[Watch the talk on YouTube](https://youtu.be/SfjRY-Vtc-s).
+",talk,js2024,talk:js2024/Bhanu Gogula,,Conf42,,queued,"aem, single-page-apps, seo, caching, react"
+,"Nitro is the server engine under Nuxt, and you can use it alone","Iniubong Obonguko at Conf42 JavaScript 2024 on Nitro, the runtime-agnostic UnJS server toolkit, live-coding a cached todo API and deploying it to Vercel",2024-10-11,js2024/nitro-server-toolkit-todo-api-vercel,,"If you have used Nuxt 3, you have already run Nitro without noticing. At Conf42 JavaScript 2024, Iniubong Obonguko, a software engineer, technical writer and Nitro community team member, showed the toolkit on its own: a typed todo API with file-based routes, a storage layer and route caching, built from a starter template and deployed to Vercel inside one session.
+
+It is a practical introduction with a real live demo, including the parts where Postman refuses to cooperate and curl saves the day.
+
+## What is Nitro, exactly?
+
+A universal server toolkit for building type-safe web servers, usable as a standalone server or as the server engine of a full-stack framework. Besides Nuxt 3, it powers Analog, the Angular SSR framework, and Vinxi, which SolidStart is built on. Universal appears twice in its own description, and he explains why: Nitro is meant to be agnostic about both the runtime (Node.js, Bun, even service workers) and the host (Cloudflare, Vercel, Railway and others, picked by setting a preset).
+
+Its four principles are agnostic at all costs, integrate rather than compete, deployment via presets, and web standards compatibility. ""the aim of Nitro is to integrate, not compete,"" Iniubong Obonguko said at Conf42 JavaScript 2024.
+
+## How much setup does a Nitro API need?
+
+Close to none, which is the point of the demo. One command gives you TypeScript, routing and hot module reloading. Routes are files: drop `todos.post.ts` into the routes folder and the HTTP method in the filename does the rest; a dynamic route is a `todos/[id].get.ts` file. Utilities are auto-imported through `unimport`, and the output is tree-shaken and code-split.
+
+The POST handler in the demo reads the request with `readBody`, returns a 400 on missing fields, and stores the list through Nitro's storage layer with `getItem` and `setItem`. In development that layer writes to a `.data/kv` folder in the project, so you can open your data as a file.
+
+## Caching that you can watch break your test
+
+The GET handler uses `defineCachedEventHandler` with a `maxAge` of one hour. He adds a second todo, fetches the list, and it isn't there, because the response is cached. Remove the cache and the new item appears. It is a small demo, but it is the clearest way to show that caching is on and where the cached handler output lands (a cache folder under the Nitro output).
+
+For production he swaps the local driver for Vercel KV via the `@vercel/kv` package, configured in `nitro.config` under `storage`, pushes the repo to GitHub, imports it into Vercel and connects a KV store from the dashboard. The environment variables are set automatically; one redeploy later, a curl POST returns 201 and the GET returns the todo.
+
+## What sits under Nitro?
+
+The UnJS ecosystem: 63 packages with over 421 million monthly npm downloads, 49k+ GitHub stars and 200+ contributors, according to his slides. The engine room is h3, which provides the routing; unstorage is the storage layer; unplugin, ofetch and unimport fill in the rest.
+
+Nitro v3 was on the way at the time of the talk, promising stable versions of the experimental WebSocket, tasks and database features, a smaller output bundle (partly by dropping the fetch polyfills kept for Node 18) and an experimental Vite integration.
+
+## Who should watch?
+
+JavaScript developers who want a backend that deploys to more than one host without rewrites, and Nuxt users curious about what runs their server routes. If you already know h3 and unstorage well, the demo will feel familiar.
+
+## Related Conf42 talks
+
+- Nikolay Pryanishnikov on [Hono, a multi-runtime framework](https://www.conf42.com/Cloud_Native_2024_Nikolay_Pryanishnikov_hono_multiruntime_framework) at Conf42 Cloud Native 2024.
+- Joe Zhou on [full-stack type safety](https://www.conf42.com/JavaScript_2024_Joe_Zhou_76_typesafety_fullstack) at Conf42 JavaScript 2024.
+- Allon Mureinik on [preventing DoS attacks in Node.js](https://www.conf42.com/JavaScript_2024_Allon_Mureinik_4_dosattacks_nodejs_prevention) at Conf42 JavaScript 2024.
+
+[Watch Iniubong Obonguko's talk](https://www.conf42.com/JavaScript_2024_Iniubong_Obonguko_27_serversidejavascript_nitrojs_supercharging)
+
+[Watch the talk on YouTube](https://youtu.be/8JYau_4BVRY).
+",talk,js2024,talk:js2024/Iniubong Obonguko,,Conf42,,queued,"nitro, unjs, nodejs, server-side-javascript, vercel"
+,Stop printing pineapple coupons for people who bought one yesterday,"Anandakumar Kumaravelu (Sada Systems, Inc) at Conf42 JavaScript 2024 on AI-personalised coupons that use purchase history to replace blanket retail offers",2024-10-10,js2024/ai-coupon-personalization-retail-retention,,"Everyone has picked up a flyer promising a free third pineapple the day after buying pineapples. At Conf42 JavaScript 2024, Anandakumar Kumaravelu of Sada Systems, Inc, a cloud and AI/ML consultant working with Google Cloud, made the case for replacing those blanket offers with coupons generated per customer from purchase history, browsing behaviour and context.
+
+Be clear about the scope before you press play: this is a business-level talk about personalisation strategy. Despite the event and the title, there is no JavaScript in it, and no model code. He says so himself near the end: ""I am not going very technical on how the, how, what are the algorithms is all being used.""
+
+## What is wrong with the paper coupon?
+
+His framing is the shopper's frustration. The discount is on shirts the day after you bought a shirt, on beer when you don't drink, and never on the thing you came in for. The retailer pays for the advertising either way, and most of it lands on the wrong people. The ad budget, in other words, has a very poor hit rate.
+
+The fix is old-fashioned salesmanship done with data. ""You cannot sell something that customer won't buy,"" Anandakumar Kumaravelu said at Conf42 JavaScript 2024.
+
+## Which data drives a personalised coupon?
+
+The talk splits the system into data collection, machine learning models that find patterns, predictive analytics, and a real-time decision engine. The inputs are the usual four:
+
+- **Purchase history.** Apples every month means an apple offer, and maybe pears.
+- **Browsing behaviour.** Pages visited, time on site, products viewed.
+- **Demographics.** Age, gender, location; a cold climate suggests wool.
+- **Context.** Time of day, device, and where you are right now, such as a few blocks from a store with a deal in it.
+
+Predictive modelling then forecasts which offer suits each segment, including discount level, category and timing. His example: if you buy a birthday cake every October, send the cake discount in October. Timely relevance is the whole point; nobody needs firewood coupons in July.
+
+## Do the numbers hold up?
+
+He quotes the industry figures that tend to travel with this topic: a 37% increase in coupon redemption rates, loyalty up by as much as 22%, Amazon's recommendation engine credited with around 35% of total sales, and Netflix saving an estimated $1 billion a year by using personalisation to reduce churn. They are presented as cited industry figures, not results from his own projects, so read them as the motivation rather than a benchmark.
+
+The KPIs are more useful for anyone building this: click-through rate and time on page for engagement, conversion of personalised offers against non-personalised campaigns, redemption rate, and customer lifetime value, all benchmarked against the traditional coupon run.
+
+## Where does personalisation go wrong?
+
+The challenges section is the most practical part. Data privacy comes first: personalisation can touch health information (do not push sugar deals at a diabetic customer), so GDPR and CCPA apply and the data use must be transparent. Algorithm bias needs regular audits, which he suggests every three to six months. Over-personalisation feels invasive, so customers should be able to switch off suggestions for products they no longer want. And the infrastructure and AI skills required are a real barrier for smaller retailers.
+
+He closes on the future: finer-grained targeting, AR shopping where the coupon appears in your glasses, and asking a voice assistant whether there is a discount before you buy.
+
+## Who should watch?
+
+Product managers and marketing engineers who want a plain-language map of coupon personalisation, its KPIs and its ethical traps. Developers looking for implementation details or JavaScript will not find them here.
+
+## Related Conf42 talks
+
+- Anandakumar Kumaravelu gave a talk on [AI, retention and personalisation](https://www.conf42.com/Incident_Management_2024_Anandakumar_Kumaravelu_4_ai_retention_personalization) at Conf42 Incident Management 2024.
+- Lakshmi Narayana Gupta Koralla on [hyper-personalisation](https://www.conf42.com/Machine_Learning_2025_Lakshmi_Narayana_Gupta_Koralla_hyper_personalization) at Conf42 Machine Learning 2025.
+- Jubin Thomas on [a scalable microservices backend for e-commerce](https://www.conf42.com/JavaScript_2024_Jubin_Thomas_30_scalablebackend_microservices_ecommerce) at Conf42 JavaScript 2024.
+
+[Watch Anandakumar Kumaravelu's talk](https://www.conf42.com/JavaScript_2024_Anandakumar_Kumaravelu_6_aipersonalization_customerretention)
+
+[Watch the talk on YouTube](https://youtu.be/7nDxYJnxE50).
+",talk,js2024,talk:js2024/Anandakumar Kumaravelu,,Conf42,,queued,"personalization, machine-learning, retail, coupons, customer-retention"
+,"An iPad, a WKWebView and a Zebra printer make a shipping kiosk","Sai Krishna Paladugu (Fedex) at Conf42 JavaScript 2024 on contactless iOS kiosks: WKWebView, NFC and Apple Pay, Bluetooth printers and MDM",2024-10-09,js2024/ios-kiosks-webview-nfc-bluetooth-printers,,"A self-service kiosk is mostly an iPad with a job. At Conf42 JavaScript 2024, Sai Krishna Paladugu, iOS Mobile Specialist at Fedex, walked through the parts that turn one into a shipping-store kiosk: a WKWebView that loads the existing web app inside a native container, NFC and Apple Pay at checkout, Bluetooth to reach the receipt and label printer, QR and barcode scanning, and MDM to keep a fleet of them alive without sending anyone to the store.
+
+It is an overview talk, built from the stack he works on. The abstract mentions a 30% cut in transaction times; the talk itself doesn't come back to that figure, so treat it as a tour of the building blocks rather than a measured case study.
+
+## Why put JavaScript inside a native iOS app?
+
+Because the web team already built the features. The JavaScript angle of the talk is the WebView bridge: create an Xcode project, add a `WKWebView` to the view controller, import WebKit, load a page with a `URLRequest`, and optionally enable JavaScript and register a `WKScriptMessageHandler` so the page can post messages back to Swift. His demo URL was the Conf42 JavaScript 2024 page itself, which is a nice touch.
+
+""this web view is more helpful when your primary application, is a web application where you want to use the same features into your application,"" Sai Krishna Paladugu said at Conf42 JavaScript 2024. The native shell then handles what a browser can't: payments, printers and the camera.
+
+## Which hardware does a contactless kiosk need?
+
+He goes through the pieces in the order a customer meets them:
+
+- **NFC and Apple Pay.** Payment uses Apple's own frameworks; the app passes the sensitive payment token at the end of the shipment, with Face ID or Touch ID on the customer's phone as the extra check. No team member needed at the till.
+- **Bluetooth.** In the shipping kiosk, BLE is how the iPad discovers and connects to a Zebra printer for receipts and shipping labels. The same proximity idea covers automatic check-ins in hotels and clinics.
+- **QR codes and barcodes.** The built-in camera works, but third-party scan guns are faster and more accurate, and easy to integrate. Either way, a scan produces a string, the string goes to the backend, and the response gets printed or shown to the customer.
+
+## Who keeps a hundred kiosks updated?
+
+Not the store staff. The most practical section is about Mobile Device Management. Apps get installed and updated from the MDM console, iOS updates are handled centrally, and when a device stops responding the team looks it up by location ID and serial number, checks its logs, and reboots it remotely. Devices are tracked as they go online and offline, so a support ticket can often be closed before anyone drives out to the store.
+
+He also covers custom kiosk apps wired to CRM, ERP and loyalty systems (swipe a membership card, see your points), and the usual industries: retail self-checkout, patient check-in in healthcare, boarding passes in transport and hotel check-in.
+
+## Who should watch?
+
+Web developers who have been asked to put the company web app on an iPad in the lobby, and iOS developers who want a checklist of the integrations a kiosk project will need. Expect a short, high-level walk-through with a WebView code sample, not a detailed guide to payment certification or Bluetooth pairing quirks.
+
+## Related Conf42 talks
+
+- Rizel Scarlett on [JSON Web Tokens and mobile security](https://www.conf42.com/JavaScript_2024_Rizel_Scarlett_56_jsonwebtokens_mobile_security) at Conf42 JavaScript 2024.
+- Ivan Besarab on [iOS background modes](https://www.conf42.com/Mobile_2022_Ivan_Besarab_iOS_background_modes_timeframes_availability) at Conf42 Mobile 2022.
+- Lucas Cesar Nogueira Fonseca on [shipping app updates without going through the stores](https://www.conf42.com/Mobile_2022_Lucas_Cesar_Nogueira_Fonseca_update_apps_perform_rollouts_no_going_through_stores__singl) at Conf42 Mobile 2022.
+
+[Watch Sai Krishna Paladugu's talk](https://www.conf42.com/JavaScript_2024_Sai_Krishna_Paladugu_59_selfservicekiosks_ios)
+
+[Watch the talk on YouTube](https://youtu.be/ECztxZlRGr4).
+",talk,js2024,talk:js2024/Sai Krishna Paladugu,,Conf42,,queued,"ios, kiosks, webview, contactless, mdm"
 ,Adaptive user interfaces work best with an off switch,"Abhinav Chunchu (Lowes) at Conf42 JavaScript 2024 on adaptive user interfaces that learn from behaviour and context, and where they go wrong",2024-10-08,js2024/adaptive-user-interfaces-need-an-off-switch,,"Google Maps changes its interface depending on whether you are walking, driving or on a bus, and nobody had to file a settings ticket for it. At Conf42 JavaScript 2024, Abhinav Chunchu, Senior Software Engineer at Lowes, surveyed adaptive user interfaces (AUIs): the techniques behind them, the results he attributes to them across industries, and the tension between adapting to users and leaving them in control.
 
 This is a concept tour rather than an implementation talk; there is no framework, library or JavaScript code on screen. It works as a vocabulary and a checklist for product and front-end teams thinking about personalisation.
