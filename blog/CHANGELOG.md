@@ -5,7 +5,8 @@ what's next.
 
 ## 2026-11-10 - Transcript first
 - Talk and sponsored posts only for talks whose transcript is uploaded: plan holds the rest under
-  waiting_transcript. Already out without a transcript: 54 live (53 MLOps 2026, 1 SRE 2026) and 4 queued.
+  waiting_transcript. The 58 written from abstracts (54 live: 53 MLOps 2026, 1 SRE 2026; 4 queued) are now
+  Status waiting - off the site until their transcript lands, then plan lists them under rewrite (same ShortURL).
 
 ## 2026-11-10 - /blog refresh + agent-ready
 - /blog: home-style header with the three newest posts fanned out, glass talk cards tinted by event, no BLOG pill,

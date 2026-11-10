@@ -25,7 +25,9 @@ sister repos next to this one), compares it with _db/blog.csv and reports:
   orphaned  rows whose Ref is gone from the repo (the build already hides them; the skill sets Status=orphaned)
   enrich    talk/sponsored posts whose talk has since got its video or transcript
   waiting_transcript  talk/sponsored posts not proposed yet because the talk has no transcript in the repo
-            (Marek 2026-11-10: posts only for talks whose transcript is uploaded), per event
+            (Marek 2026-11-10: posts only for talks whose transcript is uploaded), per event - plus rows with
+            Status=waiting (written from the abstract before that rule, kept off the site)
+  rewrite   Status=waiting rows whose transcript has arrived: rewrite from it, same ShortURL, Status back to empty
   crowded   dates holding more than MAX_PER_DAY posts
 It also rewrites _db/sister_events.json, the snapshot the build resolves sister:<repo>/<folder> Refs against.
 
@@ -334,7 +336,7 @@ def plan(args):
         te["items"] = sorted([m for m in backlog[te["event"]] if m["type"] == "talk"], key=lambda m: m["date"])
 
     resolver = Resolver(ctx["events"], ctx["sponsors"])
-    orphaned, enrich = [], []
+    orphaned, enrich, rewrite = [], [], []
     for r in rows:
         ref = (r.get("Ref") or "").strip()
         if not ref or (r.get("Status") or "").strip().lower() in ("orphaned", "hidden"):
@@ -344,6 +346,15 @@ def plan(args):
             orphaned.append(dict(ShortURL=r.get("ShortURL"), Ref=ref, Title=r.get("Title")))
             continue
         talk, event = linked.get("talk"), linked.get("event")
+        if (r.get("Status") or "").strip().lower() == "waiting":
+            # written from the abstract before "transcript first" (Marek 2026-11-10): off the site until the transcript
+            # lands, then rewritten from it under the same ShortURL (re-`add`, Status back to empty)
+            if talk and transcript_paths(event, talk):
+                rewrite.append(dict(ShortURL=r.get("ShortURL"), Ref=ref, Title=r.get("Title"), transcripts=transcript_paths(event, talk),
+                                    sources=talk_brief(event, talk)))
+            else:
+                waiting[r.get("Event") or "?"] += 1
+            continue
         if talk and talk.get("YouTubeId") and talk["YouTubeId"] not in (r.get("Body") or ""):
             enrich.append(dict(ShortURL=r.get("ShortURL"), Ref=ref, youtube=talk.get("YouTube"),
                                transcripts=transcript_paths(event, talk)))
@@ -366,10 +377,11 @@ def plan(args):
         enrich=enrich,
         shared_video=shared_video,
         waiting_transcript=dict(waiting.most_common()),
+        rewrite=rewrite,
         crowded={d: n for d, n in sorted(per_day.items()) if n > MAX_PER_DAY},
         counts=dict(rows=len(rows), due=len(due), backfill_first=len(first),
                     backfill_talks=sum(e["count"] for e in talk_events), orphaned=len(orphaned), enrich=len(enrich),
-                    waiting_transcript=sum(waiting.values())),
+                    waiting_transcript=sum(waiting.values()), rewrite=len(rewrite)),
     )
     json.dump(out, sys.stdout, indent=1, default=str, ensure_ascii=False)
     print()

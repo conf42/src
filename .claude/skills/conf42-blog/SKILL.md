@@ -40,7 +40,11 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 **Transcript first** (Marek 2026-11-10): talk and sponsored posts are written only for talks whose transcript is in
 the repo (`assemblyai/<YouTubeId>.json` or `srt/<short_url>_<Name1>.srt`). `plan` doesn't propose the others; it
 counts them per event under `waiting_transcript`, and they show up as missing once the factory uploads the transcript.
-Never write a talk post from the abstract alone.
+Never write a talk post from the abstract alone - abstract-only posts have little substance next to transcript ones.
+The 58 written that way before the rule (53 MLOps 2026, 1 SRE 2026, 2 Feature Flags 2026, 1 LLMs 2026, 1 Platform
+Engineering 2025) are `Status: waiting`: off the site, never released by the rollout. Once a talk's transcript lands,
+`plan` lists the row under `rewrite`: rewrite it from the transcript with the SAME ShortURL, `add`, then set its
+Status back to empty.
 
 **Remix = 2 posts, never talk posts** (Marek 2026-11-10): Remix only re-airs talks from earlier events, so a Remix
 event gets its `roundup` (about the conference) plus `sponsored` posts if any, and no `talk` posts. `plan` no longer
