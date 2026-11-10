@@ -3,6 +3,18 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-10 - AI discoverability (GEO)
+- robots.txt allows every AI crawler incl. training bots; Cloudflare managed robots.txt / Block AI bots to be turned
+  off by Marek in the dashboard.
+- JSON-LD everywhere: Organization + WebSite (SearchAction /blog?q=), VideoObject + transcript + speakers + event,
+  ProfilePage on speaker pages, Event performers + ItemList, BlogPosting mentions/isBasedOn. 27k blocks, all parse.
+- Sitemap lastmod on 5,523 of 5,684 URLs (release day; was 191). IndexNow also on the 17:30 run for released talks.
+- Posts: visible byline + updated date, "In short" line (= Description), fixed "Watch the talk" card. Talk pages link
+  their write-up and up to 3 topic hubs. Lint: talk/sponsored Description must name Conf42.
+- 45 topic hubs at /topics (_db/topics.yaml, intros written from the talks) + /topics index.
+- Markdown twins for talk pages and posts; llms.txt gets Topics + llms/<event>.txt per event (96).
+- Parked: rewriting YouTube descriptions to link conf42.com (backpocket).
+
 ## 2026-11-09 - first maintenance run
 - Published/scheduled 137 posts: 78 talk (53 MLOps 2026 previews Nov 9-18 from abstracts; 25 Platform Engineering
   2026 from transcripts), 18 sponsored, 34 roundups (every finished 2025+ event + Platform 2026), 7 plugs.
