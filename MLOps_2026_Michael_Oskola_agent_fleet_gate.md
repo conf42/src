@@ -1,0 +1,7 @@
+# Running an AI agent fleet behind a write-gate: what broke and what we changed
+
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Michael Oskola](https://www.conf42.com/speaker_Michael_Oskola) (Founder @ Retailbox). Page: https://www.conf42.com/MLOps_2026_Michael_Oskola_agent_fleet_gate
+
+## Abstract
+
+Foreman+ is an open-source fleet of three AI agents (Google ADK, Gemini on Vertex AI, Cloud SQL Postgres with pgvector) that turns a technician's nameplate photo and voice notes into a field-service job record. Every fact passes a write-gate before the fleet can remember it: cheap deterministic checks first, then an LLM verifier. If the verifier errors or returns nothing, the write is refused.  This talk is the build log. A setup prompt that named a job by street address instead of ID made an agent write a technician's name onto a different job at the same address. The gate refused it as a contradiction, but the real fix was in the prompt. On the camera glasses, switching photo compression to medium cut capture time from 34 s to 6.3 s. A camera frame sent before the question was ignored and the model answered from imagination; attached inside the question turn, it was right 3 times out of 3 in our probe. I'll also cover what the repo admits it still lacks: every service runs at a single instance, and there's no CI yet.  In the recorded demo run the fleet made 14 proposals in 83 seconds and the gate refused one. The repo is MIT-licensed and the demo runs without a login.

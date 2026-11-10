@@ -1,0 +1,7 @@
+# Send Metadata, Not Video: Running Computer Vision on Existing CCTV with Poor Connectivity
+
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Aleem Khan](https://www.conf42.com/speaker_Aleem_Khan) (AI Enthusiast and Serial Entrepreneur @ Independent). Page: https://www.conf42.com/MLOps_2026_Aleem_Khan_cctv_vision_metadata
+
+## Abstract
+
+Small and mid-sized retailers already own many CCTV cameras, but streaming that video to the cloud for AI analysis is too expensive. In many markets, the internet connection simply can't carry it. This talk shares how we built a computer-vision analytics system for physical stores that runs people counting, age and gender estimation, queue monitoring and heatmaps on NVIDIA edge devices on site, and sends only anonymised metadata to the cloud.  I'll cover the pipeline architecture (DeepStream modules, ONNX conversion, and what runs at the edge versus in the cloud). I'll also explain how we built our own training data when public datasets didn't match the stores' environments, how we kept models updated across distributed devices, and the privacy benefit of never moving video off site, including the mistakes we made along the way.  **Key takeaways**  1. A reference edge/cloud split for multi-camera computer vision 2. Building and annotating a domain-specific dataset on a startup budget 3. Operating and updating models on a fleet of edge devices

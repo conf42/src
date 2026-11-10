@@ -1,0 +1,9 @@
+# Your Agent Is Confidently Wrong: Guardrails for Agentic AI in Real Engineering Work
+
+A talk at [Conf42 Feature Flags 2026](https://www.conf42.com/featureflags2026) by [Girish Konda](https://www.conf42.com/speaker_Girish_Konda) (Principal Software Engineer @ Microsoft). Page: https://www.conf42.com/Feature_Flags_2026_Girish_Konda_agent_guardrails_ai
+
+Video: https://www.youtube.com/watch?v=9VbGcnTuUCk
+
+## Abstract
+
+Most agentic AI talks show the demo that worked. This one shows the ones that didn't, and what I changed after.  I am a Principal Engineer in Microsoft Fabric, where I am the tech lead and architect for capacity management. For the past year I have run AI agents against my actual job: incident triage, digging through telemetry, code review, and multi-step operational runbooks on a live multi-tenant platform. This talk is what I learned about trusting what they give back.  The capability is real. The failure modes are too, and they are not the ones the demos prepare you for. An agent hands you a number with no source and it reads like arithmetic. It cites documents that do not exist. One wrong fact spreads into every artifact it touches, and then it argues with you when you challenge it. Long sessions drift away from the facts. None of it looks like an error. It looks like a confident, well-formatted answer, and that is exactly what makes it expensive to catch.  This talk is about the discipline that makes agents safe to keep using. Force sources inline, so a claim with no source cannot survive. Verify before recommending, not after. Make the agent write its corrections down where you can see them. Keep "submitted" and "confirmed" as separate states in anything an agent tracks, because an agent will collapse them.  I will go through what I ended up with, the guardrails that held up, and the ones I dropped. You will leave knowing how to tell whether your agent is working or just sounds like it is.
