@@ -1,0 +1,60 @@
+name: Blog rollout
+# Google-safe gradual publishing of the queued blog posts (Status=queued in _db/blog.csv; Marek 2026-11-10: every
+# conference since 2020 + every talk with a transcript, over days, never one big drop). Same job as blog/rollout.sh,
+# but on GitHub so it runs without a laptop: every 4 hours, orphan purged talks/videos, release the PER_SLICE newest
+# queued posts, commit, then start the deploy (a push made with the workflow token does not trigger it by itself).
+# Nothing queued = nothing happens. Pause: disable this workflow in the Actions tab.
+on:
+  schedule:
+    - cron: "20 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  PER_SLICE: "36"   # 6 slices a day = 216 posts/day
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: blog-rollout
+      cancel-in-progress: false
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('build/requirements.txt') }}
+
+      - name: Install
+        run: make deps
+
+      - name: Release a slice
+        id: release
+        run: |
+          python -m build.blog_plan orphan | tail -1   # purged talks/videos never go out
+          LEFT=$(python -m build.blog_plan release "$PER_SLICE" | tail -1)
+          echo "$LEFT"
+          if git diff --quiet _db/blog.csv; then
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add _db/blog.csv
+          git commit -qm "Blog: release $PER_SLICE queued posts ($LEFT)"
+          git pull --rebase -q
+          git push -q
+          echo "changed=1" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy
+        if: steps.release.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run static-build.yml --ref main

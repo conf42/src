@@ -209,13 +209,28 @@ def splash_for_sponsor(event, sid, sponsors_by_id):
     return ""
 
 
+STATIC_SLIDES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "static", "slides")
+
+
+def slides_path(event, talk):
+    """The talk's deck in the sibling static repo (static/slides/), or ''. Marek 2026-11-10: use the slides for
+    content (facts, numbers, structure), never visuals - read with pypdf."""
+    from .shared import conventional_slides_name
+    for name in ((talk.get("Slides") or "").strip().rsplit("/", 1)[-1], conventional_slides_name(event, talk)):
+        if name and name.lower().endswith(".pdf"):
+            p = os.path.normpath(os.path.join(STATIC_SLIDES, name))
+            if os.path.exists(p):
+                return p
+    return ""
+
+
 def talk_brief(event, talk):
     names = [n for n in (talk.get("Name1"), talk.get("Name2")) if n]
     return dict(
         title=talk.get("Title"), speakers=names,
         companies=[c for c in (talk.get("Company1"), talk.get("Company2")) if c],
         url="https://www.conf42.com/" + talk["short_url"], youtube=talk.get("YouTube") or "",
-        keywords=talk.get("Keywords") or "", transcripts=transcript_paths(event, talk),
+        keywords=talk.get("Keywords") or "", transcripts=transcript_paths(event, talk), slides=slides_path(event, talk),
         featured=(talk.get("Featured") or "").lower() == "yes",
     )
 
@@ -722,7 +737,7 @@ def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("plan")
-    p.add_argument("--from", dest="since", default="2025-01-01")
+    p.add_argument("--from", dest="since", default="2020-01-01")   # Marek 2026-11-10: every conference since 2020
     p.add_argument("--today")
     p.add_argument("--all", action="store_true", help="items for every backfill event, not just the next one")
     l = sub.add_parser("lint")
