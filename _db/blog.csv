@@ -109184,6 +109184,224 @@ Students and developers learning quantum algorithms who want to see what a circu
 
 [Watch the talk on YouTube](https://youtu.be/MJFy3gucdIs).
 ",talk,quantum2022,talk:quantum2022/Radu Marginean,,Conf42,,queued,"quantum-computing, quantum-circuits, rust, webassembly, open-source"
+,"Valid Go is not correct Go, and staticcheck guards the gap",Xe Iaso (Tailscale) at Conf42 Site Reliability Engineering 2022 on go vet and staticcheck blocking the trivial Go bugs that page SREs at 3 a.m.,2022-05-31,sre2022/staticcheck-lets-sres-sleep,,"Code that never reaches production cannot page you at 3 a.m. At Conf42 Site Reliability Engineering 2022, Xe Iaso, Archmage of Infrastructure at Tailscale, showed three Go bugs that compile cleanly and fail at runtime, how go vet and staticcheck catch them in CI, and why this is ultimately a talk about SRE health rather than linters.
+
+## Why doesn't the compiler catch these?
+
+The Go spec describes valid programs, not correct ones. ""The specification doesn't define what correct go code is, it only defines what valid go code is,"" Iaso said at Conf42 Site Reliability Engineering 2022. Proving correctness is an open research problem that, in Iaso's words, small scrappy startups like Google, Microsoft and Apple struggle with. Rust and Haskell make these mistakes harder, not impossible. Static analysis is the pragmatic middle path: closer to correct without porting everything to Rust.
+
+Go also leaves these checks out of go build on purpose. The Go team would rather you compile buggy code than have the compiler reject valid code by accident, trusting tests, tools and human review to sit between the programmer and production. A subset of go vet checks with no known false positives runs automatically under go test; the rest belong in CI.
+
+What static analysis can prove: resources you forgot to release, typos the compiler cannot see (often struct tags), invalid constants such as time formats, URLs and regular expressions, and a wide range of predictable crashes.
+
+## Bug one: the deferred close in the wrong place
+
+Reading an HTTP response body without closing it leaks the connection, and eventually the server runs out of sockets at 3 a.m. The obvious fix, deferring the body close right after the GET call, is also wrong: if the request failed, the response is nil and the deferred close panics on the way out. go vet flags it with `using resp before checking for errors`. Move the defer below the error check and it behaves.
+
+## Bug two: the shadowed type assertion
+
+Go lets you scope variables to an if statement, which makes it easy to shadow a variable with a type assertion of the same name. When the assertion fails, the inner variable is a zero-valued int, so the error branch reports an unexpected type of int, about a value that was never an int. It will confuse you thoroughly. staticcheck catches it; the fix is to give the asserted value its own name, such as xInt.
+
+## Bug three: the nil that isn't nil
+
+A custom error type with a pointer receiver, returned from a function whose return type is the error interface. If the function returns a nil pointer of that concrete type, the interface box still exists, so the not-nil check passes and calling Error() panics with a nil pointer dereference. staticcheck reports `doWork never returns a nil interface value`. Returning an untyped nil instead fixes it.
+
+## Why is this an SRE talk?
+
+Because the pager is a health problem. Iaso describes burnout from on-call that severely affected their health, a near panic attack the last time the pager went off, and permanent career changes made to never be in that position again. Pages should be for things that are measurably novel, not for errors that tooling could have blocked. Static analysis in CI will not make things perfect, but trivial errors stop shipping and people sleep better. ""When the machines come to take our jobs, I hope that this is one of the first that they take,"" Iaso said.
+
+Iaso closes by asking Go shops to sponsor Dominik Honnef, staticcheck's author, on GitHub: the better he sleeps, the better you sleep. For other languages, the honest advice is to research the equivalent tools with your team, because it is worth the teething pains.
+
+## Who should watch
+
+Go developers who have not added staticcheck to CI yet (there is a GitHub Action for it), and anyone who needs a persuasive case for why on-call sleep is an engineering concern.
+
+## Related Conf42 talks
+
+- Sylvain Kalache on [burnout and on-call in SRE](https://www.conf42.com/Observability_2026_Sylvain_Kalache_burnout_oncall_sre) at Conf42 Observability 2026.
+- Joseph Hejderup on [static analysis for dependency tools](https://www.conf42.com/DevSecOps_2022_Joseph_Hejderup_going_beyond_metadata_adopting_static_analysis_dependency_tools) at Conf42 DevSecOps 2022.
+- Niladri Choudhuri on [SRE antipatterns](https://www.conf42.com/Site_Reliability_Engineering_2022_Niladri_Choudhuri_sre_antipatterns), also at SRE 2022.
+
+[Watch Xe Iaso's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Xe_Iaso_static_code_analysis)
+
+[Watch the talk on YouTube](https://youtu.be/dSug-XCD8S4).
+",talk,sre2022,talk:sre2022/Xe Iaso,,Conf42,,queued,"golang, static-analysis, on-call, burnout, ci"
+,Run towards the fire - incidents are the fastest way to grow engineers,"Lisa Karlin Curtis (incident.io) at Conf42 Site Reliability Engineering 2022 on incidents as the fastest way to level up engineers, if everyone can join in",2022-05-30,sre2022/incidents-are-a-career-accelerator,,"The fastest way to become a senior engineer may be to lurk in incident channels. At Conf42 Site Reliability Engineering 2022, Lisa Karlin Curtis, Product Engineer and employee number two at incident.io, explained how incidents accelerated her own career, what exactly they teach, and how teams can stop keeping those lessons inside a small group of heroes.
+
+## The day she learned what a query plan was
+
+The story that opens the talk is from her early days at GoCardless. The API, effectively the whole product, slowed to a crawl. One endpoint was sending a query to a large Postgres database whose query plan had flipped from expensive-but-manageable to unmanageable, with no recent change to blame. No statement timeout meant the database kept grinding long after the caller had given up. A subtle query change brought back the good plan. She watched from the sidelines taking notes, and afterwards asked a colleague what a query plan was.
+
+That pattern repeated. The step changes in her ability to handle bigger problems and reason about tradeoffs came from incidents she took part in or watched, and she made senior faster than she expected.
+
+## What do incidents actually teach?
+
+Five things, in her telling.
+
+- **They broaden your horizons.** Engineers live among black boxes: languages, frameworks, databases. ""Incidents force you to open the black boxes around you, peek inside and learn just enough to solve the problem,"" Karlin Curtis said at Conf42 Site Reliability Engineering 2022. After that outage she read up on query plans, and it paid off in the next query plan incident and in writing code that scaled the first time. Incidents also ignore team boundaries, which teaches the wider system faster than any architecture diagram.
+- **They teach graceful failure.** The key follow-up was statement timeouts on every database call: you do not need to know which query will be bad, only that one will be. She also heard the options the responders discussed and discarded, and why.
+- **They teach debuggability.** Useful logs and metrics come from empathy for whoever will debug this later, and that is built from pattern matching on past incidents.
+- **They build your network.** Stress forges connections quickly. Most of the non-engineering people she knew at GoCardless she met during incidents, which later gave her a friendly face in support, sales or risk.
+- **They let you learn from the best.** Big incidents pull in the people with the most context, who are otherwise too busy to shadow.
+
+## How do you make incidents accessible?
+
+At GoCardless she could open any incident channel. Many teams run private, invite-only channels, so juniors who want to watch never know an incident is happening, or an in-group handles everything and newcomers, even senior ones, struggle to get in. Her fixes:
+
+- **Declare lots of incidents.** A low bar means more practice, so the response is smooth when a big one arrives, and more learning opportunities.
+- **Encourage everyone to participate.** Public channels by default. Twenty people in a minor incident is too many, but a few juniors tagging along is fine; they can ask someone not actively responding, or save questions for afterwards. Read debriefs, attend reviews, and give new joiners a list of the best past write-ups.
+- **Show your working.** Post the commands you ran and the theories you disproved, even when you are alone in the channel at 10 p.m. talking to yourself. It protects you from false memories and teaches everyone reading.
+- **Watch out for heroes.** The engineer who quietly fixes everything burns out and takes the learning away from everyone else.
+
+Her closing line for the heroes: ""If you think that you get a lot of recognition for resolving incidents, imagine how much you'll get for leveling up your whole team so they can do the same.""
+
+## Who should watch
+
+Engineering leads deciding whether incident channels should be public, and juniors wondering if it is okay to watch. It is, and the talk tells you how to do it without getting in the way.
+
+## Related Conf42 talks
+
+- Ramón Medrano Llamas on [postmortem culture at Google](https://www.conf42.com/Site_Reliability_Engineering_2022_Ramon_Medrano_Llamas_postmortem_culture_google), also at SRE 2022.
+- Kurt Andersen on [a learning team case study](https://www.conf42.com/Site_Reliability_Engineering_2022_Kurt_Andersen_learning_team_casestudy).
+- Einat Mahat on [on-call heroes and effective practices](https://www.conf42.com/Incident_Management_2023_Einat_Mahat_oncall_heroes_effective_practices) at Conf42 Incident Management 2023.
+
+[Watch Lisa Karlin Curtis's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Lisa_Karlin_Curtis_incidents_levelup_teams)
+
+[Watch the talk on YouTube](https://youtu.be/10FK7iL9u18).
+",talk,sre2022,talk:sre2022/Lisa Karlin Curtis,,Conf42,,queued,"incident-response, engineering-culture, learning, on-call, career-growth"
+,"One engineer, six weeks, a whole R&D org moved from Bitbucket to GitLab","Hila Fish (Wix) at Conf42 Site Reliability Engineering 2022 on running a solo SCM migration like a real project - plan, milestones, training, handoff",2022-05-29,sre2022/bitbucket-to-gitlab-in-six-weeks,,"Engineers learn to write code; nobody teaches them to run a project end to end. At Conf42 Site Reliability Engineering 2022, Hila Fish, Senior DevOps Engineer at Wix, described how, at a previous employer, she moved an entire R&D department's code from Bitbucket Cloud to self-hosted GitLab on her own in a month and a half - planning, implementation, training and handoff included - and turned it into a set of project management habits any engineer can steal.
+
+The twist that shaped everything: she had told the company she was leaving before the project started, and they asked her to do it anyway. So the documentation had to be good enough that nobody would need to call her.
+
+## Ask three questions before planning
+
+Pre-planning was three questions. What is the deadline? Why are we migrating - on-premise to cloud, SaaS to self-hosted, or something internal? Any limitations? That last one decides real choices: GitLab ships as Omnibus for VMs or a Helm chart for Kubernetes, and a company with no Kubernetes should not adopt Kubernetes and a new SCM at once. ""A goal without a plan is just a wish,"" Fish said at Conf42 Site Reliability Engineering 2022.
+
+## Turn the plan into milestones managers can read
+
+A high-level plan is for the person doing the work; managers want milestones and dates. Hers ran roughly from early June to mid July:
+
+1. Terraform code for dev and production GitLab projects (dev for testing upgrades and letting people play).
+2. A dedicated slot for networking troubleshooting, because another team owned the network and other teams are potential bottlenecks.
+3. GitLab up and running: DNS, certificates, SAML.
+4. First bare repo migration with GitLab's Bitbucket importer.
+5. Backups, restores and monitoring - full system, repo and branch restores tested, with her own step-by-step restore procedure because the docs were thin.
+6. Second repo migration with the Jenkins pipeline working end to end.
+7. Training, gradual login and continuous migration, team by team.
+8. Migration done, documentation and handoff.
+
+The largest back-end repo took several hours to import in a dev test, and nobody could push to Bitbucket during a migration, so she ran it on the Israeli weekend, Friday and Saturday. A happy Sunday followed.
+
+One planning doc held everything: first steps, out-of-scope to-dos, a read-more list for later, audit considerations, known issues, an access map of inbound and outbound connectivity, the LDAP groups, and a repo tracker her manager added to ease his mind.
+
+## Communicate more than feels necessary
+
+Working alone made status updates the job. Weekly meetings, ad hoc ones for blockers, Jira tickets for everything including requests to other teams so they could work in parallel. She brought R&D team leads into the folder structure decision, since permissions were set per folder and they own the code, because she wanted them on board rather than handed a decision from outside.
+
+## Read the docs, then write better ones
+
+GitLab was new to her, so documentation drove decisions: a non-default database version that would allow the upgrade path to version 14, and high availability left off because it was not yet GA, with a comment in the Terraform code to turn it on later. Monitoring for the Kubernetes deployment was not built in, so she wrote dashboards and alerts herself. A limits issue her team raised even changed GitLab's official documentation.
+
+For R&D: a training session (pull requests are merge requests now), a dev instance to practise on, an onboarding doc for repointing local clones, and a Slack channel with known GitLab issues pinned. For her own team: documentation covering upgrades, certificates, SAML and what to send GitLab support to skip the ticket ping-pong.
+
+## Who should watch
+
+Any engineer handed a migration with a deadline and no project manager. The GitLab specifics are a bonus; the milestone plan is the takeaway.
+
+## Related Conf42 talks
+
+- Kazuki Higashiguchi on [joining the operational work of a DevOps team](https://www.conf42.com/Site_Reliability_Engineering_2022_Kazuki_Higashiguchi_join_operational_works_devops_team), also at SRE 2022.
+- Mohamed Najaaf on [leveling up developers with GitLab](https://www.conf42.com/Platform_Engineering_2025_Mohamed_Najaaf_developer_gitlab_level) at Conf42 Platform Engineering 2025.
+- Peter O'Neill on [securing terraform apply with Open Policy Agent](https://www.conf42.com/Site_Reliability_Engineering_2022_Peter_ONeill_terraform_apply_secured_open_policy_agent).
+
+[Watch Hila Fish's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Hila_Fish_migrating_entire_rd_scmbitbucket_gitlab)
+
+[Watch the talk on YouTube](https://youtu.be/QTETuso5wxA).
+",talk,sre2022,talk:sre2022/Hila Fish,,Conf42,,queued,"gitlab, migration, project-management, documentation, devops"
+,The OpenTelemetry Collector was the one piece that just worked,"Dave McAllister (NGINX) at Conf42 Site Reliability Engineering 2022 on instrumenting NGINX MARA with OpenTelemetry - traces, metrics, logs and the gotchas",2022-05-28,sre2022/opentelemetry-collector-holds-mara-together,,"Adding observability to an existing microservices app is less about picking a tool and more about surviving the language-specific gotchas. At Conf42 Site Reliability Engineering 2022, Dave McAllister, Senior OSS Technical Evangelist at NGINX, reported how his engineering team instrumented NGINX MARA, the Modern Application Reference Architecture, with OpenTelemetry - and why the OpenTelemetry Collector ended up carrying most of the weight.
+
+He is upfront that it is a point-in-time snapshot, from work done five or six months before the talk, in a project that was moving fast.
+
+## What were they instrumenting?
+
+MARA is a production-ready reference setup on Kubernetes, built around a banking app: a Python front end, a back end split between Python and Java (Spring Boot), and two PostgreSQL databases, with NGINX open source handling application networking, plus load generation and CI. Two languages and two frameworks meant any solution had to handle both and carry context across the hops.
+
+The team started with a feature checklist across Elastic APM, Grafana, Graylog, Jaeger, OpenCensus, OpenTelemetry, StatsD, Zipkin and others, then threw it away: ""this chart is very pretty and honestly kind of meaningless,"" McAllister said at Conf42 Site Reliability Engineering 2022, because Zipkin and Elastic APM solve different problems. The OpenCensus and OpenTracing sites both pointed to OpenTelemetry anyway.
+
+## Logs: it works, but it eats resources
+
+OpenTelemetry logging was in early beta, so they did not trust it for production. Logs went through Filebeat as a Kubernetes DaemonSet into Elasticsearch (deployed via the Bitnami chart with separate ingest, coordinating, master and data nodes) and Kibana. It worked, but it was resource hungry, and queries outside the preloaded indexes got awkward.
+
+## Tracing: Python easy, Java less so
+
+Tracing had hard requirements: it must not hurt quality of service, and it must cover both languages. The OpenTelemetry Collector worked as both agent and aggregator, feeding Jaeger. Python was straightforward: a couple of files, a requirements update, Bunyan for JSON logs, and trace IDs attached to log lines so a problem can be traced back through context.
+
+Java was the hard part. Greenfield Java is fine; their existing Spring app was not. Spring Cloud Sleuth adds trace and span IDs, but its OpenTelemetry autoconfig was a milestone release tied to old OpenTelemetry versions, and they had to pull from Spring snapshots. Their workaround became a common telemetry module that adds standard trace names across languages, a no-op tracing implementation to measure the overhead of tracing, an error handler that writes to both logs and traces, extra attributes such as service name and instance ID, and the trace ID in a comment before every SQL statement, so you know which request produced which query. NGINX also has an OpenTelemetry module, published on the NGINX GitHub.
+
+## Metrics: easy, with caveats
+
+They skipped Python metrics as not meaningful for the goal. Java already used Micrometer, the default metrics API in Spring, which exports Prometheus and StatsD. Because the Collector ingests Prometheus, StatsD or OTLP, Micrometer and OpenTelemetry were never in conflict: Micrometer to a Prometheus exporter, then into the Collector, and from there to any backend.
+
+## What would he change?
+
+A more central store with easy correlation instead of several tools with different query languages, and a look at Loki, Graylog or the newer OpenTelemetry logging. The headline is simple: ""the open telemetry collector is the thing that made this actually work,"" he said. The other lesson: auto-instrumentation is great when it gives you what you want, and you still need trace IDs in your logs.
+
+## Who should watch
+
+Teams retrofitting tracing into a polyglot Kubernetes app, especially with legacy Spring in the mix. Some version details have aged; the architecture choices have not.
+
+## Related Conf42 talks
+
+- Nicolas Fränkel on [OpenTelemetry tracing](https://www.conf42.com/DevOps_2023_Nicolas_Frankel_opentelemetry_tracing) at Conf42 DevOps 2023.
+- Yosef Arbiv on [OpenTelemetry at Epsagon](https://www.conf42.com/Cloud_Native_2022_Yosef_Arbiv_opentelemetry_epsagon) at Conf42 Cloud Native 2022.
+- Dotan Horovits on [tracing adoption in the 2022 DevOps Pulse survey](https://www.conf42.com/Site_Reliability_Engineering_2022_Dotan_Horovits_devops_observability_in_2022), also at SRE 2022.
+
+[Watch Dave McAllister's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Dave_McAllister_opentelemetry_production_apps)
+
+[Watch the talk on YouTube](https://youtu.be/ODQPERg82yQ).
+",talk,sre2022,talk:sre2022/Dave McAllister,,Conf42,,queued,"opentelemetry, distributed-tracing, observability, kubernetes, java"
+,"Kubernetes ships 1,277 metric names per node and dashboards use 307","Aliaksandr Valialkin (VictoriaMetrics) at Conf42 Site Reliability Engineering 2022 on why Kubernetes monitoring is hard - metric bloat, churn, no standard",2022-05-27,sre2022/kubernetes-metrics-nobody-uses,,"Kubernetes monitoring is hard mostly because Kubernetes exports far more than anyone looks at. At Conf42 Site Reliability Engineering 2022, Aliaksandr Valialkin, Founder and CTO of VictoriaMetrics (and author of the Go libraries fasthttp, fastcache and quicktemplate), measured the bloat, explained why pod churn hurts every time series database, and asked the community to agree on a lighter standard.
+
+He is a database vendor talking about a problem his database exists to solve, and he is candid that VictoriaMetrics' own exporter has the same disease.
+
+## How many metrics does a cluster really emit?
+
+The numbers grow by the release. Unique metric names exposed by Kubernetes components grew about 3.4x, from roughly 150 in Kubernetes 1.10 in 2018 to more than 500 in 1.24. node_exporter grew 4.5x over five years. On Kubernetes 1.24 every node exports at least 2,459 series before you count a single application metric, and across the clusters VictoriaMetrics could get data from, the realistic average was around 4,000 per node.
+
+Layers explain why: hardware, VM, pod, container, application, each wanting its own observability. Deploy one container with three replicas and cAdvisor alone adds 629 new series. The application's own metrics come on top.
+
+## Why does pod churn hurt so much?
+
+Churn is old series being replaced by new ones, and monitoring systems hate it because it costs memory and CPU. Kubernetes generates it in two ways: every deployment (even changing an image tag) and every horizontal pod autoscaling event creates new pod names, and therefore a fresh set of series. The new series per event scale with container metrics plus application metrics, multiplied by replicas and by deployments.
+
+Prometheus 2.0 was redesigned largely to cope with this, Valialkin notes, and churn and cardinality are still not solved there or anywhere else. VictoriaMetrics itself started as a fix for Prometheus 1.x cardinality problems and uses a per-day inverted index against churn.
+
+## Do we need all these metrics?
+
+There is no easy answer, he admits: no, because rules and dashboards touch only a fraction; yes, because you might need one later. Grafana's Mimirtool settles it empirically by scanning alerting rules, recording rules and dashboard queries, then generating an allowlist; Grafana's own example cut a small cluster from 40,000 active series to 8,000. In kube-prometheus-stack, one node exposes 1,277 unique metric names, and 307 of them are used in rules and Grafana dashboards. About a quarter.
+
+He points the finger at his own project too: VictoriaMetrics' exported metric names grew about 3x in four years, and only around 30% are used by its own dashboards and rules.
+
+## Why is there no standard?
+
+""Unfortunately, there is no established standards for metrics at the moment,"" Valialkin said at Conf42 Site Reliability Engineering 2022. Google's four golden signals, Brendan Gregg's USE method and Weaveworks' RED method compete, so nobody follows one, metrics drift over time, and most community Kubernetes dashboards on grafana.com are out of date. Microservices pile on: per-instance metrics, correlation across services, network monitoring, noisy neighbours and a service mesh layer that also needs watching.
+
+His fix list: fewer exposed metrics, fewer histograms (the biggest cardinality offender), fewer per-metric labels (does every metric need every pod-level label?), less churn from HPA and deployments, and a community standard for Kubernetes monitoring.
+
+## Who should watch
+
+Anyone paying for a Prometheus-compatible backend by the series, and platform teams wondering why the monitoring stack costs more than the cluster it watches.
+
+## Related Conf42 talks
+
+- Piyush Verma on [picking only the metrics you need](https://www.conf42.com/Site_Reliability_Engineering_2022_Piyush_Verma_openmetrics_exporter), also at SRE 2022.
+- Michael Levan on [Kubernetes monitoring and observability](https://www.conf42.com/Observability_2024_Michael_Levan_kubernetes_monitoring_observability) at Conf42 Observability 2024.
+- Dotan Horovits on [the state of DevOps and observability in 2022](https://www.conf42.com/Site_Reliability_Engineering_2022_Dotan_Horovits_devops_observability_in_2022).
+
+[Watch Aliaksandr Valialkin's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Aliaksandr_Valialkin_kubernetes_monitoring)
+
+[Watch the talk on YouTube](https://youtu.be/YvDKNpvom90).
+",talk,sre2022,talk:sre2022/Aliaksandr Valialkin,,Conf42,,queued,"kubernetes, monitoring, prometheus, cardinality, victoriametrics"
 ,Mulesoft <> Conf42 SRE 2022,"Connect everything, empower everyone",2022-05-26,2022-05-26-mulesoft-sre-sponsor-announcement,./assets/splash/BLOG_Mulesoft_SRE_2022.png,"#### [MuleSoft](https://www.mulesoft.com) - Platinum Sponsor of [Conf42 Site Reliability Engineering 2022](https://www.conf42.com/sre2022)
 
 Connect with your customers in a new way – unlock, integrate, and act on data from any system, faster.
@@ -109196,6 +109414,48 @@ FireHydrant is represented at the conference by [Priya Singh](https://www.linked
 * Read the [Blog](https://blogs.mulesoft.com/bloghome)
 
 #### RSVP for FREE to attend [Conf42 SRE 2022](https://www.conf42.com/sre2022#register)!",,,,,,,,
+,"Dynamic alerting needs high school statistics, not machine learning","Abhijeet Mishra (last9.io) at Conf42 Site Reliability Engineering 2022 on smoke detectors that alert on rate, spikes, seasonality and missing metrics",2022-05-26,sre2022/smoke-detectors-high-school-math-alerting,,"Static thresholds made sense when Nagios checks returned 0, 1 or 2 and nobody had written a line of YAML. At Conf42 Site Reliability Engineering 2022, Abhijeet Mishra, Software Engineer on Last9's core data science team, argued that modern systems need dynamic alerting - and that you can build it from standard deviations and percentiles rather than a fleet of machine learning models.
+
+## Why don't static thresholds work any more?
+
+Because the honest answer to every threshold question is that it depends. A handful of 5xx errors is noise at millions of requests and an SLO breach at hundreds. Container restarts matter relative to the desired count. One second of latency is too slow for an e-commerce page, fine for a data crunching job and blazing fast for a video editing pipeline. ""There are no sitting ducks anymore. The ducks are armed and dangerous,"" Mishra said at Conf42 Site Reliability Engineering 2022.
+
+## Aren't SLOs enough?
+
+No, because SLOs are lagging indicators: they tell you how the system did, not how it is about to do. His analogy is weather: a wet car means it rained, clouds and lightning mean it might.
+
+He also separates request-based from window-based SLOs. A shop that serves 99% of requests successfully on a sale day can still have had a 30-minute window where every request failed and customers left for good; the request-based SLO looks fine. A window SLO - at least 99% of one-minute intervals over 24 hours had a success ratio of 95% or more - catches it. Payments care about successful transactions, so request-based fits; a streaming service cares about uninterrupted viewing, so windows fit.
+
+## What does a smoke detector look for?
+
+Machine learning is ruled out on cost: one model per metric, trained and maintained, gets expensive fast as components multiply. Instead, Last9's smoke detector treats an anomaly as a deviation in one of three characteristics.
+
+- **Rate.** Standard deviation over a sliding window flags sudden change. Worth it for a jump in 4xx errors or RDS queue depth; not for CPU going from 20% to 50%, unless it keeps climbing and stays there.
+- **Amplitude.** Percentile-based cutoffs on historical data, for example the 95th percentile as an upper bound that adjusts as new values arrive. This stops a sparse-traffic service from paging every time it gets its first request in an hour.
+- **Time of day.** The 4 a.m. database backup spikes network I/O every morning and fools both detectors above. Seasonality fixes it: to judge a value at 6:30 p.m., compare it with values from 6 to 7 p.m. in the past week. The window size depends on how predictable traffic is: an hour for a sports stream with known start times, 3 to 5 hours for e-commerce weekends and holidays.
+
+Combining characteristics adds context, and the number of characteristics firing at once gives a severity signal.
+
+## What if the metrics stop arriving?
+
+Every method above assumes data is flowing. Loss of signal is its own alert. For a high-traffic service, any gap is suspicious. For a Lambda that fires roughly hourly, track the time between data points with percentile cutoffs: nothing for 75 minutes is fine, nothing for two hours is a problem.
+
+Mishra ends without a silver bullet, and admits he still uses static thresholds for basics like uptime.
+
+## Who should watch
+
+Anyone whose on-call rotation is drowning in threshold alerts, and teams about to buy an anomaly-detection feature who want to know what is likely inside it.
+
+## Related Conf42 talks
+
+- Ricardo Castro on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies), also at SRE 2022.
+- Piyush Verma, Mishra's Last9 colleague, on [openmetrics-exporter](https://www.conf42.com/Site_Reliability_Engineering_2022_Piyush_Verma_openmetrics_exporter).
+- Yoav Nordmann on [anomaly detection with Apache Pinot and ThirdEye](https://www.conf42.com/Cloud_Native_2023_Yoav_Nordmann_anomaly_detection_apache_pinot_thirdeye) at Conf42 Cloud Native 2023.
+
+[Watch Abhijeet Mishra's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Abhijeet_Mishra_smoke_detectors_large_scale_production_systems)
+
+[Watch the talk on YouTube](https://youtu.be/gWrR1nCT7ew).
+",talk,sre2022,talk:sre2022/Abhijeet Mishra,,Conf42,,queued,"alerting, anomaly-detection, slos, monitoring, alert-fatigue"
 ,FireHydrant <> Conf42 SRE 2022,The reliability platform for every developer,2022-05-25,2022-05-25-firehydrant-sre-sponsor-announcement,./assets/splash/BLOG_FireHydrant_SRE_2022.png,"#[FireHydrant](https://firehydrant.com) - Diamond Sponsor of [Conf42 Site Reliability Engineering 2022](https://www.conf42.com/sre2022)
 
 Incidents impact everyone, not just SREs. FireHydrant gives teams the tools to maintain service catalogs, respond to incidents, communicate through status pages, and learn with retrospectives.
@@ -109209,6 +109469,46 @@ FireHydrant is represented at the conference by [Malcolm Preston](https://www.li
 * Get inspired while reading the [Blog](https://firehydrant.com/blog)
 
 #### RSVP for FREE to attend [Conf42 SRE 2022](https://www.conf42.com/sre2022#register)!",,,,,,,,
+,Teams say MTTR is improving while their incidents get longer,"Dotan Horovits (Logz.io) at Conf42 Site Reliability Engineering 2022 on the DevOps Pulse survey, where 64% of teams took over an hour to recover from incidents",2022-05-25,sre2022/devops-pulse-mttr-is-getting-worse,,"Ask engineers whether they are getting better at incident recovery and most say yes; ask them how long recovery takes and the answer got worse. At Conf42 Site Reliability Engineering 2022, Dotan Horovits, Principal Developer Advocate at Logz.io, tested five common assumptions about cloud, Kubernetes and observability against Logz.io's annual DevOps Pulse survey of more than 1,000 engineers, from startups with a dozen people to enterprises with 5,000 or more.
+
+It is a short talk, about ten minutes of numbers, and it holds up as a snapshot of where the industry stood in 2022.
+
+## Is everybody on AWS?
+
+Mostly. AWS grew from 66% to 71% of respondents. Google Cloud and Azure both jumped from roughly 11-12% to around 30% (32% and 29%), with Google Cloud overtaking Azure for second place. Everyone else was close to zero, with VMware the one showing some strength.
+
+## Is everything containerised?
+
+It is happening across company sizes. Over 50% of respondents said more than half their apps run in containers, and 30% said more than three quarters do.
+
+## Is Kubernetes a piece of cake?
+
+No. Respondents reported trouble across the board, led by security and by monitoring and troubleshooting, followed by networking, cluster management and storage. ""Everyone's moving to containers, as we've seen, but still don't know how to manage them,"" Horovits said at Conf42 Site Reliability Engineering 2022.
+
+## Are logs and metrics still enough?
+
+Logs (about 88%) and metrics (about 80%) remain the default. The story is tracing: 48% now do some distributed tracing, up from 26% in the previous survey and 19% the year before that, and 70% of those not yet tracing plan to start within one or two years. APM, often seen as old-school, is used by 43%. The number Horovits liked most: 21% use all of the above, which he reads as a real step towards full observability built on correlated signals rather than logs alone. He also notes tracing adoption has been slower than people predicted in earlier surveys, even if it is clearly picking up.
+
+## Are we getting better at MTTR?
+
+Here the survey argues with itself. 68% said they are improving mean time to recovery: 14% greatly reduced it, 23% are making great strides, 31% are slowly making progress. Yet 64% reported that recovering from production incidents took more than an hour, up from 47% in the previous report. Horovits suggests the growing adoption of Kubernetes and cloud native architectures may be part of the cause. Either way, the perception gap is the most useful slide in the talk: if your team feels faster, measure it.
+
+One more stat from the opening: the respondent pool moved from 86% male to 79% male and 15% female, which Horovits called encouraging.
+
+## Who should watch
+
+Engineering managers making the case for tracing or for better incident tooling, and anyone who wants a quick reality check on 2022 adoption numbers. The full report, with sections on security, data volumes, cost and team structure that the talk skips, was linked at the end.
+
+## Related Conf42 talks
+
+- Dave McAllister on [adding OpenTelemetry to production apps](https://www.conf42.com/Site_Reliability_Engineering_2022_Dave_McAllister_opentelemetry_production_apps), also at SRE 2022.
+- Cristina Buenahora on [the four key metrics of team performance](https://www.conf42.com/Site_Reliability_Engineering_2022_Cristina_Buenahora_4_key_metrics_team_performance).
+- Aliaksandr Valialkin on [why Kubernetes monitoring is difficult](https://www.conf42.com/Site_Reliability_Engineering_2022_Aliaksandr_Valialkin_kubernetes_monitoring).
+
+[Watch Dotan Horovits's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Dotan_Horovits_devops_observability_in_2022)
+
+[Watch the talk on YouTube](https://youtu.be/os_cJuTn8eQ).
+",talk,sre2022,talk:sre2022/Dotan Horovits,,Conf42,,queued,"observability, devops, distributed-tracing, kubernetes, mttr"
 ,Blameless <> Conf42 SRE 2022,The End-to-End SRE Platform,2022-05-24,2022-05-24-blameless-sre-sponsor-announcement,./assets/splash/BLOG_Blameless_SRE_2022.png,"#[Blameless](https://www.blameless.com) - Diamond Sponsor of [Conf42 SRE 2022](https://www.conf42.com/sre2022)!
 
 Blameless provides engineering teams with an end-to-end SRE platform that empowers teams to optimize reliability without compromising innovation velocity. By streamlining incident response, DevOps and SRE teams continuously learn, improve and stay resilient.
@@ -109223,6 +109523,126 @@ Drawing! Win Beats Solo3 Headphones (wireless) in the free [Raffle!](http://info
 * Subscribe to Blameless on [YouTube](https://www.youtube.com/channel/UC1O9RGv3FGJau091DD09ooQ)
 
 #### RSVP for FREE to attend [Conf42 SRE 2022](https://www.conf42.com/sre2022#register)!",,,,,,,,
+,"Prometheus doesn't take logs, so parse them into metrics first","Samuel Arogbonlo (O(1) Labs) at Conf42 Site Reliability Engineering 2022 on turning logs into Prometheus metrics with Vector, and actionable alerts",2022-05-23,sre2022/vector-turns-logs-into-prometheus-metrics,,"Your logs know why the server crashed; Prometheus only understands numbers. At Conf42 Site Reliability Engineering 2022, Samuel Arogbonlo, Senior Infrastructure Engineer at O(1) Labs (the team behind Mina Protocol), walked through using Vector, the open source observability data pipeline, to turn log lines into metrics Prometheus can scrape - and argued that the metrics you choose and the alerts you set matter more than the plumbing.
+
+This is a short introductory talk: a good first look at the log-to-metric pattern, not a deep configuration walkthrough.
+
+## Why bother with log metrics at all?
+
+Arogbonlo lists the use cases he sees: cutting total observability cost, improving performance and reliability of the observability stack, switching vendors without disrupting workflows, better data quality, and consolidating agents so you are not running one per tool.
+
+His case for logs in SRE is the crash you cannot catch live. When a server dies before you can log in, restart it, tail the logs, and wait: the last line before it falls over often names the culprit, whether that is the image, the config or memory. Metrics are the other half, with a firm rule borrowed from the SRE literature on his slides: each exposed metric should serve a purpose, and you should resist exporting metrics just because they are easy to generate.
+
+## The pipeline in five steps
+
+Vector sits between your servers and Prometheus. ""Prometheus does not accept logs, it accepts metrics,"" Arogbonlo said at Conf42 Site Reliability Engineering 2022, and Vector is the converter. His best practices, in order:
+
+1. Set up the source and web server configuration in vector.toml; a handful of lines in the docs gets it running.
+2. Parse the logs before transforming them. Unparsed lines cannot become metrics, and he has seen people skip this step and wonder why nothing arrives.
+3. Count deliberately. Decide what you actually want - request status, service status, how many 200s versus 404s - and count those components and strings, rather than shipping everything and drowning in it.
+4. Expose the result with Vector's Prometheus exporter sink so Prometheus can scrape the URL.
+5. Check the scrape on a dashboard before trusting it.
+
+## Alert on what needs a human
+
+The last practice is the one with the most opinion in it. A Kubernetes pod that restarts and recovers by itself should not page anyone; a crash loop or a down service should. Set thresholds that catch problems before users feel them without causing alert fatigue, and route notifications to the team that can act, in time, including whoever is on call. His closing line, from the slides: a good monitoring system pays dividends, and it is worth iterating until you get it right.
+
+## Who should watch
+
+Engineers new to Prometheus or to Vector who want the shape of a log-to-metrics pipeline in one sitting. If you already run Vector in production, the alerting section is the part to keep; the rest will be familiar.
+
+## Related Conf42 talks
+
+- Piyush Verma on [choosing which metrics to emit with openmetrics-exporter](https://www.conf42.com/Site_Reliability_Engineering_2022_Piyush_Verma_openmetrics_exporter), also at SRE 2022.
+- Ricardo Castro on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies).
+- Phil Wilkins on [logs with Fluentd](https://www.conf42.com/Cloud_Native_2021_Phil_Wilkins_logs_fluentd) at Conf42 Cloud Native 2021.
+
+[Watch Samuel Arogbonlo's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Samuel_Arogbonlo_logmetrics_prometheus)
+
+[Watch the talk on YouTube](https://youtu.be/hQXBC2F8Lig).
+",talk,sre2022,talk:sre2022/Samuel Arogbonlo,,Conf42,,queued,"prometheus, vector, logging, alerting, observability"
+,Treat your metrics like Terraform treats your infrastructure,"Piyush Verma (last9.io) at Conf42 Site Reliability Engineering 2022 on openmetrics-exporter, observability as code in HCL instead of one exporter per source",2022-05-22,sre2022/openmetrics-exporter-observability-as-code,,"Every new thing you want to observe usually means another exporter binary, and another binary that can quietly die. At Conf42 Site Reliability Engineering 2022, Piyush Verma, Founder and CTO of last9.io, presented openmetrics-exporter (OME), a framework born at Last9 that turns metric collection into declarative HCL files: pick the metrics you care about, correlate sources, and emit them in OpenMetrics format for any Prometheus-compatible agent to ship.
+
+It is a talk about his company's open source tool, and it says so. The interesting part is the argument behind it.
+
+## Are you paying to store metrics nobody reads?
+
+Verma opens with `go_gc_duration_seconds`, the metric every Go exporter emits and almost nobody alerts on. Multiply that by every exporter you run and the store fills with free, unused data. ""40% of your metrics might not even be accessed ever,"" he said at Conf42 Site Reliability Engineering 2022, a figure he attributes to what Last9 observed across its customers. The symptom everyone recognises: the dashboards are getting slower.
+
+The EKS example makes the duplication concrete. CloudWatch reports on the cluster, kube-state-metrics and cAdvisor report on the same cluster to Prometheus, and someone correlates the two by eye in Grafana. Meanwhile the CloudWatch-scraping exporter raises the AWS bill on every pull, and you may not know if it is lagging or has crashed.
+
+His summary of the problem: sources keep changing, there is no correlation between them, metrics explode, and every new source needs a new exporter.
+
+## Declare, plan, dispatch
+
+The workflow borrows from Terraform on purpose. You declare a scraper with a source and its gauges, counters and histograms, each carrying a source-specific query and dynamic labels. A resources block lets one file run across every load balancer you have. You run a plan locally, then dispatch, and OME serves the selected metrics on an `/openmetrics` endpoint for Prometheus agent, Grafana Agent or vmagent to carry away.
+
+Correlation happens in the same file. Throughput can come from CloudWatch and latency from a PromQL query, emitted under the same label set; if the scrape fails, both fail together. Two scraper properties handle sources whose values change after the fact: lookback re-reads a past window and re-emits corrected values with their original timestamps, and lag holds a pipeline until the data has settled. Most exporters stamp data with the scrape time; OME keeps the source timestamp.
+
+For a faster feedback loop, every run can generate a Grafana dashboard from the file, so you check that you did not use an average where you meant a max before shipping. Scrapers can become modules, referenced by remote URL and reused, with a public catalogue of curated metric sets. Sources include Prometheus, Google Stackdriver, Amazon CloudWatch, Redshift and other SQL databases.
+
+## Why HCL and not YAML?
+
+The slide's punchline: YAML gives you job security, HCL lets you concentrate. The real reason is that HCL has expressions - joins, splits, format strings, conditionals - so small transformations live in config rather than in a fork of someone's exporter. It also fits existing editors and GitOps pipelines, as with Terraform, Consul and Nomad.
+
+On performance, Verma quotes a single machine with about six cores and 6 GB of RAM running 500 scrapers and emitting three to four million data points.
+
+## Who should watch
+
+SREs whose Prometheus bill or dashboard load times are growing faster than their system, and anyone running a zoo of single-purpose exporters. Expect a tool tour rather than a vendor-neutral survey.
+
+## Related Conf42 talks
+
+- Aliaksandr Valialkin on [the metrics Kubernetes monitoring collects and never uses](https://www.conf42.com/Site_Reliability_Engineering_2022_Aliaksandr_Valialkin_kubernetes_monitoring), also at SRE 2022.
+- Abhijeet Mishra, Verma's Last9 colleague, on [smoke detectors for production systems](https://www.conf42.com/Site_Reliability_Engineering_2022_Abhijeet_Mishra_smoke_detectors_large_scale_production_systems).
+- Samuel Arogbonlo on [exposing log metrics to Prometheus](https://www.conf42.com/Site_Reliability_Engineering_2022_Samuel_Arogbonlo_logmetrics_prometheus).
+
+[Watch Piyush Verma's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Piyush_Verma_openmetrics_exporter)
+
+[Watch the talk on YouTube](https://youtu.be/5lrjegQCZUw).
+",talk,sre2022,talk:sre2022/Piyush Verma,,Conf42,,queued,"prometheus, openmetrics, observability-as-code, hcl, metrics"
+,LinkedIn's Hodor sheds just enough traffic to keep services alive,"Bryan Barkley and Vivek Deshpande (LinkedIn) at Conf42 Site Reliability Engineering 2022 on Hodor, zero-config overload detection and load shedding",2022-05-21,sre2022/hodor-drops-just-enough-traffic,,"When a LinkedIn service drowns, something called Hodor holds the door. At Conf42 Site Reliability Engineering 2022, Bryan Barkley (Senior Staff Engineer) and Vivek Deshpande (Senior Software Engineer) of LinkedIn explained Hodor - Holistic Overload Detection and Overload Remediation - a framework that spots overload from several root causes and drops just enough requests for the service to recover, with no per-service thresholds to tune.
+
+The no-tuning part is the point. LinkedIn runs hundreds of services on tens of thousands of machines, and hand-configuring each one was never going to happen. Everything shown runs on the JVM, though the ideas travel.
+
+## What counts as overloaded?
+
+Barkley defines it as the point where a service can no longer serve traffic with reasonable latency. The resources that run out can be physical (CPU, memory, network, disk I/O) or virtual (threads, pooled DB connections, semaphore permits). The causes vary too: a 5x traffic spike, a slow downstream applying backpressure up the call chain, or a noisy neighbour on the same host eating CPU while your own metrics look innocent. That spread of causes is why the framework has to be holistic.
+
+Hodor has three parts: overload detectors, a load shedder, and a platform adapter that wires them into Rest.li (LinkedIn's open source RPC framework), gRPC and HTTP servers such as Play.
+
+## Three detectors, one for each way to run out
+
+The CPU detector is the clever one. A lightweight heartbeat thread, running at the same priority as application threads, sleeps for 10 ms and checks whether it woke up on time. If the 99th percentile of a second's worth of wake-up delays exceeds 55 ms, that window is in violation; eight consecutive violating windows and the service is overloaded. Deshpande's rationale: it measures CPU that is actually usable. ""Just because you see 30% free cpu on something like top command does not mean that it is useful cpu,"" he said at Conf42 Site Reliability Engineering 2022. It also works the same on bare metal, VMs or cgroup quotas.
+
+The GC detector tracks the amortised percentage of time spent in garbage collection, in tiers: 10% or more for 30 seconds counts as overload, a lower tier such as 8% needs 60 seconds. The thread pool detector watches queue wait time, which catches a slow downstream without knowing anything about it. In the production cases shown, p90 and p99 latencies jumped by up to 900% when these detectors fired.
+
+## How much traffic should you drop?
+
+Hodor limits concurrency rather than a percentage of requests. The shedder cuts aggressively and lets traffic back in conservatively; a percentage-based shedder kept chasing changing traffic levels in their experiments and lost. Dropped requests return 503 before any business logic runs, so clients can retry them on a healthy host. To stop that turning into a retry storm when the whole cluster is hot, both client and server keep retry budgets.
+
+## Monitoring mode found bugs nobody knew about
+
+Rollout started with detectors in monitoring mode for at least a week per service, correlating firings with latency, CPU and GC data. Some services were not ready, nearly always because of GC, and fixing that often cut CPU use as a side benefit. One team quoted on the slides found that detectors had surfaced behaviour its owners did not know about. The best example: a forgotten setting that periodically wrote thread dumps to disk, freezing the JVM for seconds at a time without ever showing up in high-percentile metrics.
+
+## The 20% that saved the other 80%
+
+The flagship LinkedIn.com app hit a new bug during a data-centre traffic shift. Hodor shed about 20% of requests for a while, and SREs concluded that without it a minor incident would have been a major outage. The team counts over 100 such saves. Next on the list: traffic tiering (drop prefetch and offline requests first), latency-confirmed detection to cut GC false positives, a Netty event-loop detector, and feeding overload signals into autoscaling, which Barkley warns can push the problem further downstream.
+
+## Who should watch
+
+Anyone running a large JVM fleet, or anyone who has tuned a rate limiter per service and hated it. The heartbeat detector alone is worth the 25 minutes.
+
+## Related Conf42 talks
+
+- Christian Elsen and Lerna Ekmekcioglu on [reliable multi-region architecture](https://www.conf42.com/Site_Reliability_Engineering_2022_Christian_Elsen_Lerna_Ekmekcioglu_reliable_multiregion_arch), also at SRE 2022.
+- Aliaksandr Valialkin on [why Kubernetes monitoring is hard](https://www.conf42.com/Site_Reliability_Engineering_2022_Aliaksandr_Valialkin_kubernetes_monitoring).
+- Navendu Pottekkat on [SRE best practices for API design](https://www.conf42.com/Site_Reliability_Engineering_2022_Navendu_Pottekkat_sre_best_practices_api_design).
+
+[Watch Bryan Barkley and Vivek Deshpande's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Bryan_Barkley_Vivek_Deshpande_hodor_overload_linkedin)
+
+[Watch the talk on YouTube](https://youtu.be/7s-mx-IEEkc).
+",talk,sre2022,talk:sre2022/Bryan Barkley,,Conf42,,queued,"load-shedding, overload, microservices, jvm, resilience"
 ,It’s Machine Learning Time!,"Stronger than ever
 ",2022-05-18,2022-05-18-machine-learning-stronger-than-ever,./assets/splash/ML2022_Event_Splash.png,"#Should we be worried about AI?
 
