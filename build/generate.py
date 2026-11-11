@@ -525,7 +525,7 @@ for page in ["index.html", "podcast.html", "sponsor.html", "sponsorship.html", "
     with open(BASE_FOLDER + "/" + page, "w") as f:
         print("Writing out", page)
         template = env.get_template(page)
-        f.write(template.render(page=page, canonical=get_canonical_url(page), **context))
+        f.write(template.render(page=page, canonical=get_canonical_url(page), this_month=datetime.datetime.now(datetime.timezone.utc).strftime("%B %Y"), **context))
         if page not in ["index.html", "stats.html", "seradio.html", "sponsorship.html", "404.html"]:
             register_url(page.replace(".html",""))
 
