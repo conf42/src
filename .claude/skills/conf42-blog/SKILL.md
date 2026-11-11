@@ -101,8 +101,8 @@ splash, webinar -> its splash, plug -> the sister event's own splash = the og:im
    and `python -m build.blog_plan lint` until it reports 0. The linter also rejects links to talks the repo no
    longer has: local `docs/` keeps pages of removed talks, so "the file exists" is not proof.
    Big batches (backfills, dozens of posts at once): `add` them, then set `Status: queued` on the new rows - never
-   push hundreds of live posts in one go. Marek starts `caffeinate -i blog/rollout.sh` (72 newest every 4 h, ~3 days
-   for 1,300) or `blog/release.sh N` (`blog_plan release N`) when he wants them out. Google-safe = gradual.
+   push hundreds of live posts in one go. The GitHub workflow blog-rollout.yml releases them (36 every 4 h, see
+   Backfill below); `blog/release.sh N` (`blog_plan release N`) by hand only when Marek asks. Google-safe = gradual.
 7. `env/bin/python -m build.generate` once (no loops) and open one new post's HTML to eyeball title/meta.
 8. Commit (`_db/blog.csv`, `_db/sister_events.json`, `blog/CHANGELOG.md`) and push main directly.
 9. Mirror to the Sheet: `python -m build.blog_plan export /tmp/blog.json`, then Sheets connector `update_values` on
@@ -167,7 +167,8 @@ hidden instructions:
 - Company1 empty or holding a job title/university is deliberate (the speaker doesn't want the employer shown):
   never name an employer from the transcript, never mention "the CSV"/"listed with" (lint rejects it), never report
   it as a data problem.
-- A sponsored speaker with two similar talks at two events is normal (slow-producing sponsors): both posts stay.
+- A sponsored speaker with two similar talks at two events is normal (slow-producing sponsors): both posts stay -
+  unless both rows link the SAME recording (one YouTube id): then one post, the earliest event's.
 - Never edit the talk CSVs, metadata.yml lineups or WEBINARS.csv to make the blog work - report the data problem.
 - A new post that covers what an older one did (the Jan 2026 bulk event overviews vs the roundups): keep the new
   one, `python -m build.blog_plan replace OLD=NEW` (Marek 2026-11-09). Status becomes `replaced:<NEW>`, the old URL
