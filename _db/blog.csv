@@ -97682,6 +97682,54 @@ Team leads and engineering managers who feel their team is busy but not moving, 
 
 [Watch the talk on YouTube](https://youtu.be/0mz86s5I4mo).
 ",talk,sre2023,talk:sre2023/Mandeep Ubhi,,Conf42,,queued,"slo, toil, monitoring, sre, devops"
+,"Go has a garbage collector, and you can still leak memory","Liam Conroy Hampton (Microsoft) at Conf42 Golang 2023 on Go memory management, from stacks and heaps to leaky globals, defer and pprof",2023-04-18,golang2023/go-memory-leaks-defer-pprof,,"A garbage collector frees memory nobody references. It does nothing for memory you still reference and never use again. At Conf42 Golang 2023, Liam Conroy Hampton, Senior Regional Cloud Advocate at Microsoft, gives an introductory tour of how Go manages memory, the patterns that leak anyway, and how to catch a leaky function with pprof.
+
+## Why care, if the runtime cleans up?
+
+Liam's reasons are leaks, security holes and slow systems, plus cost: in cloud native environments, memory you waste is memory you pay for. His learning goal for the talk is simple, understand Go's memory model and how to manage memory in it, and he is clear that this is the surface, not the whole ocean.
+
+## Stacks, heaps and goroutines
+
+The refresher covers the two places memory lives. The stack holds local variables and call frames, last in, first out, fast and fixed in size; Liam cites about 8 MB as the default on a typical Linux distribution. Goroutines, Go's lightweight threads that sit a layer above the operating system's, start with far smaller stacks, which is a big part of why spawning thousands of them is cheap. The heap holds dynamically allocated, longer-lived data. It grows and shrinks at runtime, which makes it flexible and slower. Short-lived data on the stack, long-lived on the heap.
+
+Go's model rests on three things: the garbage collector reclaiming memory automatically, goroutines for concurrency, and channels for passing data between goroutines safely, without races or hand-rolled locking. For allocation, `new` gives you a zero-valued variable of a type to use later, and `make` builds slices, maps and channels ready to use straight away.
+
+## How do you leak memory in a garbage-collected language?
+
+A leak, in Liam's definition, is memory that is still referenced but no longer needed, so nothing frees it, and eventually the program crashes or the system crawls. His usual suspects: goroutines that never terminate and keep holding their allocations, global variables assigned once and never touched again, and infinite loops.
+
+The code examples make the global case concrete. A struct with a 100 MB byte slice declared inside `main` is fine: when the function ends, the collector reclaims it. The same 100 MB in a package-level variable stays put after the work is done, because the collector sees it as still reachable. The fix is to give the allocation a local scope. A recursion example with a huge call count makes the same point about runaway growth; the fix there is fewer calls or a controlled loop.
+
+The other habit is `defer`. Open a file, check the error, `defer file.Close()`, and the file is closed when the surrounding function returns, even if it fails halfway. The same goes for sockets and database connections, which Liam flags as a security issue as much as a memory one.
+
+## Playground demos, then pprof
+
+In the Go playground Liam runs two goroutines that print task one and task two, and on the second run task two finishes first, which is the point: no ordering guarantee. A channel example sends 42 from one goroutine and reads it in another, and a pointer example takes the address of an int holding 27 and adds 2 through the pointer to get 29.
+
+The finale is the useful bit. A small program imports `net/http/pprof` with a blank identifier, serves it on port 6060 from a goroutine, and calls a deliberately leaky function in a loop. `go tool pprof` against the heap endpoint, then `top`, puts the leaky function at the top of the list with 91% of the memory, and the number climbs the longer it runs. If you have never opened pprof, this is a two-minute reason to.
+
+## How other languages do it
+
+A short comparison rounds things out. Rust uses ownership and borrowing, so the compiler decides when memory is freed. Python combines reference counting with a cyclic garbage collector that periodically finds unreachable objects. Java, with a stack, a heap and a mark-and-sweep collector, is closer to Go than people expect. Liam describes Go's collector as using a stop-the-world technique; in practice it is a concurrent mark-and-sweep that stops the world only briefly.
+
+## Top tips
+
+Use `defer`. Use the collector wisely: ""The garbage collector handles most of it for you,"" Liam Conroy Hampton said at Conf42 Golang 2023, but churning through lots of short-lived objects still slows a program down. And monitor memory with the tools you have, pprof first.
+
+## Who should watch
+
+Go developers early in their journey, or anyone coming from Java or Python who wants a quick map of where Go's memory goes. Readers who already tune GOGC can skip to the pprof demo.
+
+## Related Conf42 talks
+
+- Nishant Roy on [heap optimisations in Go](https://www.conf42.com/Golang_2023_Nishant_Roy_heap_optimizations) at the same event, the next step after this one.
+- Marco Marino on [performance and memory optimisation](https://www.conf42.com/Golang_2024_Marco_Marino_performance_memory_optimization).
+- Yashvardhan Kukreja on [profile-guided optimisation](https://www.conf42.com/Golang_2024_Yashvardhan_Kukreja_profileguided_optimization).
+
+[Watch Liam Conroy Hampton's talk](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management)
+
+[Watch the talk on YouTube](https://youtu.be/xDrvwMK9BmQ).
+",talk,golang2023,talk:golang2023/Liam Conroy Hampton,,Conf42,,queued,"go, memory-management, garbage-collection, pprof, performance"
 ,"Psychological safety in SRE teams can be measured, and it drops fast","Florian Hoeppner, Marco Torre and Alexander Schaper (Accenture) at Conf42 Site Reliability Engineering 2023 on measuring psychological safety in SRE retros",2023-04-16,sre2023/measure-psychological-safety-in-postmortems,,"A team that was doing well had a data leak, and within one retrospective its psychological safety score fell off a cliff, with finger pointing at the two people supposedly responsible. At Conf42 Site Reliability Engineering 2023, Florian Hoeppner, Marco Torre and Alexander Schaper of Accenture showed that drop on a chart, then walked through how the team recovered, making the case that culture in SRE teams can be measured, not just discussed.
 
 The three bring different angles: Hoeppner covers SRE tech strategy, Torre is an SRE subject matter expert, and Schaper leads Accenture's psychological safety capability. The result is one of the few culture talks that comes with a dataset.
@@ -97733,6 +97781,54 @@ SRE managers whose postmortems have turned into quiet blame sessions, and leader
 
 [Watch the talk on YouTube](https://youtu.be/uBVxIThRnMs).
 ",talk,sre2023,"talk:sre2023/Florian Hoeppner, Marco Torre, Alexander Schaper",,Conf42,,queued,"psychological-safety, postmortems, sre-culture, retrospectives, team-performance"
+,"Your webhook is a public URL, so sign it and keep it thin","Marvin Collins Hosea (AppsLab KE) at Conf42 Golang 2023 on securing webhooks with timestamped HMAC and thin payloads, and scaling them with a broker",2023-04-16,golang2023/webhook-security-hmac-dataless-notifications,,"A webhook endpoint is a URL anyone on the internet can POST to, and nothing in the mechanism tells either side who is on the other end. At Conf42 Golang 2023, Marvin Collins Hosea, founder of AppsLab KE, walks through the ways to fix that, from one-time tokens to mutual TLS, and lands on a clear default: an HMAC signature with a timestamp, on a payload that carries almost no data.
+
+## Why webhooks instead of polling?
+
+Marvin starts with the basics for anyone new to them. The term goes back to Jeff Lindsay in 2007, and a webhook is a reverse API: the client registers a URL and the provider calls it, usually with a JSON body in an HTTP POST, when something happens. Polling means asking the server over and over whether anything changed, which wastes resources on both sides. Or, as Marvin put it at Conf42 Golang 2023, ""webhooks is kind of don't call me, I will call you"". His use cases: killing polling, moving data automatically on events, integrating systems, and driving triggers and actions in another application.
+
+## What exactly is insecure about them?
+
+""By default, webhooks does not come with security implementation and this is a big challenge,"" Marvin Collins Hosea said at Conf42 Golang 2023. The producer can't verify it is sending to the right destination, and the consumer can't verify the message came from the expected source. Anyone can pose as either side and push malicious data into the receiving application. Unlike an authenticated API endpoint, the webhook URL is simply out there, so every request needs proof of origin.
+
+## Five ways to secure a webhook, ranked
+
+Marvin goes through the options in rising order of strength:
+
+- **One-time verification.** The provider issues a token at setup (revocable) and the client checks it on every request. Weak, because the provider can't see how the client stores it, and the endpoint stays exposed to DDoS and server-side request forgery. He names Zoom as a user.
+- **Verification token, or shared secret.** A secret sent in a header on every request and compared by the client. Common, and still not enough on its own.
+- **HMAC.** The provider computes a hash signature of the body with a shared key and puts it in a header with a timestamp; the client recomputes it and compares. Messages older than the allowed window get dropped, which shuts the door on replay attacks. He points to GitHub, Shopify and Slack.
+- **IP allowlisting.** Easy to defeat with IP spoofing, and painful to maintain whenever addresses change.
+- **Mutual TLS.** Both sides verify each other's certificates. Very secure (DocuSign uses it, he says), but certificates expire, rotate and get revoked, and every time that means setup work again, which hurts a high-volume webhook service.
+
+## The default he recommends
+
+Which one is best depends on what the payload exposes, Marvin says. For most data, his answer is HMAC with a timestamp plus a thin, dataless notification: the webhook only says that an event happened, and the client fetches the actual resource through the authenticated API. A leaked or forged notification then carries almost nothing worth stealing.
+
+The Go demo is short. A `getSignature` function takes the plain-text body and the shared secret, builds a new HMAC with Go's crypto packages, writes the data and hex-encodes the result. That goes into a signature header on the request (the example names it `Conf42-Signature`), and the receiver repeats the computation over the body with its copy of the key and compares. One thing to add in your own code: compare the two with `hmac.Equal` rather than `==`, so the check runs in constant time.
+
+## Scaling the thing
+
+The scalability list is short and practical: keep payloads minimal, put a load balancer in front, push events through a message broker (he mentions NATS, which his team implemented, as well as RabbitMQ and Kafka) instead of sending straight from the service, cache data that rarely changes so each delivery doesn't hit the database, and monitor response times and errors so you find the bottleneck before your consumers do.
+
+## The parting checklist
+
+Authenticate both ends. Encrypt data where needed and send less of it. Use timestamps against replays. Ship SDKs and good documentation so integrators get the verification right. Log and trace webhook events like any other event-driven flow, and give every event an ID so you can track it back to its origin.
+
+## Who should watch
+
+Developers building a webhook provider for the first time, or consuming one and wondering how much to trust it. It is a survey with a small code sample, not a production implementation.
+
+## Related Conf42 talks
+
+- Mohamed Moussaoui on [NATS as a cloud native alternative to Kafka](https://www.conf42.com/Kube_Native_2024_Mohamed_Moussaoui_nats_cloudnative_kafka), the broker Marvin's team used.
+- Abhishek Gupta on [Go and Redis](https://www.conf42.com/Golang_2023_Abhishek_Gupta_go_redis_better_together) at the same event, for the caching side.
+- James Eastham on [building an event-driven system](https://www.conf42.com/Cloud_Native_2024_James_Eastham_event_driven_system), the bigger picture webhooks sit in.
+
+[Watch Marvin Collins Hosea's talk](https://www.conf42.com/Golang_2023_Marvin_Collins_Hosea_building_secure_scalable_webhooks)
+
+[Watch the talk on YouTube](https://youtu.be/kmaaeJSuhHQ).
+",talk,golang2023,talk:golang2023/Marvin Collins Hosea,,Conf42,,queued,"go, webhooks, security, hmac, scalability"
 ,"Accessibility programs fail on two things, attitude and expertise",Cam Beaudoin (Accelerated Accessibility) at Conf42 Site Reliability Engineering 2023 on building an accessibility program that pays off for the business,2023-04-15,sre2023/accessibility-fails-on-attitude-and-expertise,,"Imagine being a developer handed a spreadsheet with 800 accessibility defects and no plan for fixing them. At Conf42 Site Reliability Engineering 2023, Cam Beaudoin, owner of Accelerated Accessibility, used that scene from his IBM consulting days to open a talk on building accessibility programs that don't waste time and money, and on why disability inclusion is a business case rather than charity.
 
 This is the one talk at the event that isn't about systems. It is about people, which is the point he makes in his first story.
@@ -97782,6 +97878,46 @@ Engineering managers who own a product's front end, SREs whose pipelines could c
 
 [Watch the talk on YouTube](https://youtu.be/nVjl4Y0h03k).
 ",talk,sre2023,talk:sre2023/Cam Beaudoin,,Conf42,,queued,"accessibility, inclusion, engineering-culture, wcag, compliance"
+,"Go and Apache Pulsar from go mod init to a Kubernetes pod, no Dockerfile","David Kjerrumgaard (StreamNative) at Conf42 Golang 2023 on building Pulsar producers and consumers in Go, packing them with buildpacks, and deploying to Kubernetes",2023-04-14,golang2023/pulsar-go-apps-buildpacks-kubernetes,,"Apache Pulsar does queues and streams on the same topic, and Go is a first-class client for it. At Conf42 Golang 2023, David Kjerrumgaard, developer advocate at StreamNative, Apache Pulsar committer and author of Pulsar in Action (Manning), builds a Go producer and consumer, containerises both without writing a Dockerfile, and ships them to Kubernetes with config pulled from ConfigMaps. It is an end-to-end walkthrough, from `go mod init` to `kubectl logs`.
+
+## What makes Pulsar different from Kafka or RabbitMQ?
+
+Pulsar started at Yahoo in 2012, and its party trick is a two-tier architecture. The brokers that serve messages are stateless, and the data lives in a separate layer built on Apache BookKeeper, whose storage nodes are called bookies. A metadata store ties the two together. Because no broker owns any data, any broker can serve any topic, load rebalances on its own, and you scale brokers and storage separately, which plays nicely with Kubernetes autoscaling.
+
+The same split gives tiered storage (offload old data to S3 and keep it for much longer, more cheaply), geo-replication and multi-tenancy from day one. Data is organised as tenant, then namespace (topics that share policies), then topic. On the client side, pluggable protocol handlers let MQTT, RabbitMQ, Kafka and native Pulsar clients publish to or consume from the same topic. Four subscription types pick your semantics: exclusive, failover and key-shared give ordered, Kafka-style streaming, and shared gives a classic work queue.
+
+## Why Go for Pulsar apps?
+
+The official Go client covers producers, consumers and readers, and Go is one of the three languages supported by Pulsar Functions, the lightweight serverless framework David compares to AWS Lambda. He doesn't cover Functions in this talk, but flags them as the next thing to try.
+
+## The producer and the consumer
+
+The code is deliberately plain. Both apps read their settings (broker URL, topic, subscription name) from a properties file through a small utility module, so nothing about the cluster is hard-coded. The producer creates a client, then a producer on `public/default/purchases`, and loops forever, sending a message every 5 seconds: a username as the key, a purchased item (a book, an alarm clock, batteries, a gift card) as the raw byte payload.
+
+The consumer subscribes to the same topic with a named subscription and reads from a message channel. Each message is printed and then acked, so the broker won't redeliver it; a negative ack asks for redelivery when processing fails. The named subscription is what lets a consumer that disconnects pick up exactly where it left off, which the demo shows more than once as message IDs carry on across restarts.
+
+## Containers without a Dockerfile
+
+For packaging David uses Cloud Native Buildpacks instead of Docker. ""Instead, buildpacks automatically detect the language and framework your application is using and will automatically containerize it for you with a single command,"" David Kjerrumgaard said at Conf42 Golang 2023. One `pack build` per app, with a builder image, detects Go, fetches a Go runtime and builds the binary inside a cached layer. The first run spends a while downloading the builder, and that wait is in the video. Both images run locally under Docker before he tags them and pushes them to Docker Hub.
+
+## Kubernetes, with config outside the image
+
+The deployment manifest puts producer and consumer in one pod as two containers. The properties files become two ConfigMaps (`kubectl create configmap` from the files) mounted where the apps expect them, so you can point at another broker or topic without rebuilding. Then `kubectl apply`, `describe` to check images, limits and mounts, and `logs` per container: the producer publishing every 5 seconds, the consumer keeping up.
+
+## Who should watch
+
+Go developers new to Pulsar who want a working mental model of the architecture and a template for a deployable app. Expect a narrated walkthrough, not a production design. The speaker works at StreamNative, a Pulsar company, but the talk sticks to open source Apache Pulsar and buildpacks.
+
+## Related Conf42 talks
+
+- Tim Spann and David Kjerrumgaard on [the FLiPN stack with Flink, NiFi and Pulsar](https://www.conf42.com/Internet_of_Things_IoT_2023_Tim_Spann_David_Kjerrumgaard_flipn_stack_edge_ai_flink_nifi_pulsar).
+- Mary Grygleski on [event streaming and processing with Apache Pulsar](https://www.conf42.com/Cloud_Native_2022_Mary_Grygleski_event_streaming_processing_apache_pulsar).
+- Lorna Mitchell on [Go and Apache Kafka](https://www.conf42.com/Golang_2021_Lorna_Mitchell_go_big_apache_kafka_open_source), the other way to stream from Go.
+
+[Watch David Kjerrumgaard's talk](https://www.conf42.com/Golang_2023_David_Kjerrumgaard_cloud_native_pulsar_apps)
+
+[Watch the talk on YouTube](https://youtu.be/Qzq52ADcBD8).
+",talk,golang2023,talk:golang2023/David Kjerrumgaard,,Conf42,,queued,"go, apache-pulsar, event-streaming, kubernetes, buildpacks"
 ,"Make docs part of code review, or watch your SRE playbooks rot","Yury Nino (Google) at Conf42 Site Reliability Engineering 2023 on the documents SRE teams need across a service's life, and how to keep them alive",2023-04-13,sre2023/sre-docs-die-without-code-review,,"Every team has a playbook that was correct on the day it was written. At Conf42 Site Reliability Engineering 2023, Yury Nino, Cloud Infrastructure Engineer at Google Cloud, mapped the documents an SRE team needs across a service's life, from onboarding to decommissioning, and closed with the rule that keeps them from dying: if a change alters how someone has to behave, the change must include the doc update.
 
 The talk builds on Google's ""Why SRE documents matter"" article and the Seeking SRE book. It is a catalogue with a point of view, useful as a checklist for any team auditing its own docs.
@@ -97833,6 +97969,54 @@ SRE leads setting up a new team or taking over services, and anyone who has open
 
 [Watch the talk on YouTube](https://youtu.be/upRhNddddbA).
 ",talk,sre2023,talk:sre2023/Yury Nino,,Conf42,,queued,"documentation, sre, production-readiness, on-call, playbooks"
+,"TDD on a real Go handler, five failure modes before one line of code","Ivan Pesenti (Sorint Lab) at Conf42 Golang 2023 on test-driving a Gin and Gorm update handler, with sqlmock standing in for PostgreSQL",2023-04-12,golang2023/tdd-gin-gorm-sqlmock-todo-api,,"Most TDD tutorials stop at a function that adds two numbers. At Conf42 Golang 2023, Ivan Pesenti, a software developer at Sorint Lab, skips FizzBuzz and test-drives the hardest handler in a to-do REST API, the edit route, through red, green and refactor, with a mocked PostgreSQL behind it. The takeaway: list every outcome first, then let the tests drag the design out of you.
+
+## What does TDD actually ask of you?
+
+Ivan opens with the three rules and takes them literally. No production code unless it makes a failing unit test pass. No more of a unit test than is enough to fail, and compilation failures count. No more production code than is enough to pass that one test. His first test fails because the handler doesn't exist yet, which by rule two is a perfectly good red.
+
+A clean test, in his checklist, follows Arrange, Act, Assert, has no code smells (a function with a pile of parameters gets a struct), no magic numbers or magic strings, a name that tells you its input and output, and the F.I.R.S.T. principle: fast, independent, repeatable, self-validating, thorough. On coverage he pushes back on the 100% obsession: cover the critical business logic. If you follow TDD strictly you land near 100% statement coverage anyway, because no code exists without a test.
+
+His sharpest line is the one people forget: ""test driven development is not about testing but about designing,"" Ivan Pesenti said at Conf42 Golang 2023. The tests are the feedback loop that shapes the solution.
+
+## Five scenarios, decided before the code
+
+The route is `PUT todos/:id` with a JSON body of description, completion flag and due date. Before writing anything, Ivan lists every outcome:
+
+- id not an integer (say, `abc`): 400 Bad Request
+- payload not valid (an empty description): 400 Bad Request
+- database error: 500 Internal Server Error
+- to-do not found: 404 Not Found
+- happy path: 202 Accepted, empty body
+
+If you can't name the scenarios, he argues, you can't do TDD. Each one becomes a test, then just enough handler code, then cleanup.
+
+## The toolbox
+
+Production code uses Gin, Gorm and Gorm's Postgres driver. Ivan picked Gin partly because Gorilla Mux had just been publicly archived, and he puts Gin at roughly 70,000 GitHub stars against Gorilla Mux's 20,000. Tests use the standard `testing` package (no framework needed in Go, which he counts as a win), `net/http/httptest` for recorders and requests, testify's `assert`, and DATA-DOG's go-sqlmock. The mock is the design point: you program against an abstraction and push the choice of database engine to the end of the project.
+
+## The refactor phase does the real work
+
+The demo is a patient loop. A recorder and a Gin test context, a failing test, `c.String` with a 400, then out go the magic numbers in favour of `http.StatusBadRequest` and a constant for the error string. Two tests that cover the same scenario get merged. Ivan reminds you that tests are code too: you can adjust, delete or improve them as long as every scenario stays covered. Later rounds add sqlmock expectations for Gorm's queries, a DTO struct for the payload, and finally a `repo` package that pulls the database logic out of the handler.
+
+## Proving the 500 path for real
+
+The wiring at the end is where it stops being a toy. Postgres runs in Docker, Gorm runs auto-migration, and a middleware injects the Gorm DB into each request. Ivan wraps it with a 5-second context timeout and a deferred cancel, as a habit for any IO. Postman then walks through each scenario. The database error is the awkward one to trigger by hand, so he adds `SELECT pg_sleep(10)` to the repo, and the request hangs, then comes back as a 500 with context deadline exceeded. A timeout you've watched fire is worth ten you've only configured.
+
+## Who should watch
+
+Go developers who know TDD in theory but have only ever applied it to katas, and anyone who wants to see Gin handlers tested without a live database. It is a long, code-heavy demo; have an editor open.
+
+## Related Conf42 talks
+
+- Mohammad Quanit on [test-driven development in Go](https://www.conf42.com/Golang_2023_Mohammad_Quanit_test_driven_development) at the same event.
+- Francisco Daines on [testing 101](https://www.conf42.com/Golang_2022_Francisco_Daines_testing_101).
+- Julien Breux on [testing with Testcontainers](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container), for when the mock isn't enough.
+
+[Watch Ivan Pesenti's talk](https://www.conf42.com/Golang_2023_Ivan_Pesenti_complex_app_tdd)
+
+[Watch the talk on YouTube](https://youtu.be/-ngNReCPRLE).
+",talk,golang2023,talk:golang2023/Ivan Pesenti,,Conf42,,queued,"go, tdd, testing, gin, gorm"
 ,"Every SRE practice is a change, and CI/CD is where changes travel","Safeer CM (Flipkart, CD Foundation) and Garima Bajpai (Crowdbyte Solutions) at Conf42 Site Reliability Engineering 2023 on CI/CD as the SRE-DevOps overlay",2023-04-11,sre2023/cicd-is-where-sre-meets-devops,,"The SRE-versus-DevOps debate usually ends in a Venn diagram. At Conf42 Site Reliability Engineering 2023, Safeer CM, Senior Staff SRE at Flipkart and a CD Foundation ambassador, and Garima Bajpai, founder of the Canada DevOps Community of Practice (Crowdbyte Solutions), drew it differently: the overlap between the two is change, and the pipeline that carries change, CI/CD, is where the two disciplines actually meet.
 
 The talk comes in two halves. Safeer covers the here and now: which SRE and DevOps practices run through the pipeline. Garima takes the longer view: operating models, measurement beyond DORA, SBOMs and net zero.
@@ -97927,6 +98111,44 @@ Engineering managers and product leaders who need a vocabulary for reliability t
 
 [Watch the talk on YouTube](https://youtu.be/uEJA0wRnXww).
 ",talk,sre2023,talk:sre2023/Prathamesh Sonpatki,,Conf42,,queued,"slo, reliability, sre, distributed-systems, engineering-management"
+,Golings teaches Go by handing you broken programs,"Mauricio Antunes (Globo) at Conf42 Golang 2023 on Golings, a rustlings-style CLI that teaches Go through small exercises with fast compiler feedback",2023-04-10,golang2023/golings-rustlings-for-go-fast-feedback,,"The fastest way to learn a language is to have its compiler yell at you, early and often. That is the whole premise of Golings, and at Conf42 Golang 2023 its author, Mauricio Antunes, a software developer at Globo, demos it in a short, hands-on talk: install the tool, fix a couple of broken exercises, then write a brand new one live.
+
+If you have used rustlings for Rust (or ziglings for Zig), you already know the shape. Golings is the Go version: a binary plus a folder of small programs that don't compile or whose tests fail, ordered from easiest to hardest. Your job is to make them pass, one at a time.
+
+## Why build it at all?
+
+Mauricio's reason is fast feedback. Books carry the theory you need, but they make you read a lot before you type anything, and experienced developers picking up a new language want to get to the code. ""I created golings because I believe in fast feedback while learning new programming language,"" Mauricio Antunes said at Conf42 Golang 2023. Go, with its quick compiler and clear error messages, is a good fit for that loop.
+
+## How does a Golings session go?
+
+You install the binary with `go install` or grab a release for your OS and architecture, clone the repo, and run `golings run next`. It compiles the next unfinished exercise and prints the compiler error. In the demo the first exercise is about variables: a `Printf` call formats an integer, but the variable it needs has no name. Stuck? `golings hint` prints the hint stored for that exercise in the index file, here a gentle reminder that variables in Go have names.
+
+Once the program compiles and prints what it should, you delete the not-done marker comment from the file, and only then does Golings move you on. Forget the comment and you stay put, which is a neat way to make the learner confirm they understood the fix, not just that it compiled. `golings verify` runs every exercise from the first one onwards and stops at the first that still fails, so you always know where you are.
+
+## The honest limitation, and the workaround
+
+Mauricio is upfront about the weak spot of any tool like this: the checker is the compiler. ""It must obey the compiler and if the compiler is happy, you will succeed,"" he said, so an exercise can pass without the learner doing what the author intended. His fix is plain and practical: write comments in the exercise that spell out the expected output, so the target is clear even when the compiler would accept something else.
+
+## Writing your own exercise, live
+
+The second half of the talk is the part contributors will want. Mauricio adds a third struct exercise on camera: the program must print a person's full name, so the learner has to add a method to a struct. He copies an existing exercise into a new folder, rewrites the message and fields, registers it in the index file with a hint (a skeleton of a method on a struct, enough to point someone at the right chapter of a book without giving the answer away), and runs it on its own with `golings run`.
+
+Golings works with any folder of exercises plus its own index file, so you can build a private course for your team. If your exercises would help other learners, he invites a pull request to the upstream repo.
+
+## Who should watch
+
+People teaching Go, or onboarding a team onto it, and anyone who learned Rust through rustlings and wants the same thing for Go. It is a short, practical demo, not a tour of the tool's internals.
+
+## Related Conf42 talks
+
+- Lais Lima on [building the Golings watch mode](https://www.conf42.com/Golang_2023_Lais_Lima_creating_cli) at the same event, the companion piece to this one.
+- Miriah Peterson on [learning Go from zero to hero](https://www.conf42.com/Golang_2021_Miriah_Peterson_from_zero_to_hero_learning_go).
+- Huseyin Babal on [Go development for beginners](https://www.conf42.com/Golang_2021_Huseyin_Babal_development_for_beginners).
+
+[Watch Mauricio Antunes's talk](https://www.conf42.com/Golang_2023_Mauricio_Antunes_golings_tool_beginners_learning)
+
+[Watch the talk on YouTube](https://youtu.be/58JCFkE8BqQ).
+",talk,golang2023,talk:golang2023/Mauricio Antunes,,Conf42,,queued,"go, learning, cli, open-source, beginners"
 ,How HCL turned chaos experiments into an SRE training path,"Chandra Dixit (HCL Cloud Native Labs) at Conf42 Site Reliability Engineering 2023 on using chaos engineering to upskill 1,000+ SREs, from pod deletes to GitOps workflows",2023-04-08,sre2023/chaos-as-code-trains-1000-sres,,"Teaching a thousand engineers SRE is hard to do with slides alone; breaking things in front of them works better. At Conf42 Site Reliability Engineering 2023, Chandra Dixit, SRE Architect at HCL Cloud Native Labs in London, told how his team made chaos engineering a standard part of its SRE enablement programme, growing from manual pod deletes to chaos workflows checked into Git and run by Argo.
 
 It is an enablement story more than a technical deep end: what a large services company did to make a niche practice routine, plus one worked example of a chaos workflow.
