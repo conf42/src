@@ -127,6 +127,8 @@ splash, webinar -> its splash, plug -> the sister event's own splash = the og:im
   runs only `check`. `step.sh <job>` ingests (finds the drafts by Ref, `add`, Status queued, legacy replace, lint),
   commits + pushes, and reserves the next job. Talks whose write-up trips a safety stop (live exploit demos) are set
   aside, not retried - list them for Marek.
+- **Sponsored first** (Marek 2026-11-11): write sponsored posts before anything else, regular talk posts last; the
+  release also takes queued sponsored posts first (`blog_plan release`).
 - Release: `.github/workflows/blog-rollout.yml` releases 36 queued posts every 4 h (216/day) and triggers the deploy.
   No YouTube sweep on the runner (YouTube blocks runners); run `blog_plan orphan` on the laptop (`--offline` skips
   oEmbed; a guard aborts if more than max(10, ids/50) videos look deleted). Pause = disable the workflow.
