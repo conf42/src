@@ -110551,11 +110551,452 @@ Cloudsmith's multi-format repositories allow you to create a repository structur
 - Cloudsmith is hiring! Check out our open positions [here](https://apply.workable.com/cloudsmith)
 
 Don't forget to tune into our session **[The Future is Cloud-native and Your Organization Should Be Too](https://www.conf42.com/Cloud_Native_2022_Ciara_Carey_future_is_cloudnative_your_organization)** with **[Ciara Carey](https://www.linkedin.com/in/ciara-carey-7540173), Developer Relations, Cloudsmith.**",,,,,,,,
+,"RBAC as a Go sidecar with OPA, not a library in every service",Federico Maggi (Mia-Platform) at Conf42 Cloud Native 2022 on distributed RBAC built as a Go sidecar with embedded Open Policy Agent and Rego policies,2022-04-04,cloud2022/rbac-sidecar-opa-go,,"Adding role-based access control to a platform made of many microservices in many languages forces two awkward questions: where does the code live, and what happens when it goes down? At Conf42 Cloud Native 2022, Federico Maggi, Senior Technical Leader at Mia-Platform, walks through how his team answered both: a Go sidecar next to each service that owns a resource, embedding Open Policy Agent and evaluating Rego policies on every request.
+
+It is a design story, with the rejected options left in, which is the most useful part.
+
+## Why did they need RBAC?
+
+Mia-Platform users configure microservices, define data models, deploy, monitor and scale services on Kubernetes. Letting everyone do everything is not safe, so the team defined personas: owners who can do anything, developers limited to certain configuration and environments, and guests with read-only access to a subset. Each API got a permission, permissions were grouped into roles.
+
+Then they noticed APIs behave in two ways. Some must be blocked outright for the wrong users. Others are open to many users but must show each one different data. That gave three requirements:
+
+1. Allow or deny a request.
+2. Filter data before it is fetched from the database, so services only ever handle authorised data.
+3. Rewrite the response body for field-level visibility.
+
+## Where does the code go?
+
+Their first idea was to embed RBAC in each service. That means duplicated code, or libraries in every language the platform uses, a barrier to adopting any new language until its library exists, and a risky change to many existing codebases.
+
+The second idea was one central RBAC service, scaled horizontally. Two problems: every service would need code to call it, and it is a single point of failure. ""No matter the scaling, if it goes down, everything is down,"" Federico Maggi said at Conf42 Cloud Native 2022.
+
+So they chose the sidecar pattern. The RBAC container runs in the pod of every service that owns a resource, intercepts all incoming requests, checks them and either proxies them to the application container or rejects them on the spot. The project configuration service, for example, is the one that blocks a user without permission from changing a project's configuration. They wrote it in Go, for a low resource profile with high request throughput.
+
+## Why OPA instead of a custom rules engine?
+
+Writing the sidecar from scratch would have meant a big configuration format mapping every API to actions and filtered properties. Instead they adopted OPA, whose Rego lets them write policies as code, test them and ship them. The Go SDK is the key: beyond just running policies, they can isolate the engine, precompile policies for faster evaluation, prepare data stores and build dynamic input per request.
+
+For each request the sidecar gathers the headers, the full URL and its parameters and the request body, fetches the user's role bindings from a database, and evaluates the configured policy. The three examples map to the three requirements:
+
+- **Allow**: take the project ID from the path, iterate over the user's bindings, and allow only if one matches that project and carries the project view permission.
+- **Query generation**: using OPA's unknowns, the policy returns conditions rather than a yes or no, and the sidecar turns them into a query passed to the service so data is filtered at the source.
+- **Response rewriting**: in the response flow, the policy gets the original body and drops a field, the sales forecast in his example, from each document with a list comprehension.
+
+## What did they get?
+
+Policies as code with tests that guard the authorization model against regressions, all policies in one place with shared Rego functions, and per-service scaling: the busiest services get more resources for their sidecar, quieter ones stay lean. The extra hop added very low latency in their measurements, though the talk gives no figure. He also wrote a longer post on the Mia-Platform blog.
+
+## Who should watch
+
+Platform and backend engineers designing authorization for polyglot microservices on Kubernetes. Familiarity with RBAC helps; you'll come away with a pattern and the reasons behind it.
+
+## Related Conf42 talks
+
+- David Melamed on [Open Policy Agent as a control engine](https://www.conf42.com/Cloud_Native_2022_David_Melamed_open_policy_agent_control_engine), from the same event.
+- Ara Pulido on [policy as code with OPA Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper) at Conf42 Cloud Native 2021.
+- Graziano Casto on [policy, RBAC and authorization](https://www.conf42.com/DevSecOps_2024_Graziano_Casto_policy_rbac_authorization) at Conf42 DevSecOps 2024.
+
+[Watch Federico Maggi's talk](https://www.conf42.com/Cloud_Native_2022_Federico_Maggi_distributed_application_rbac_opa)
+
+[Watch the talk on YouTube](https://youtu.be/YsPc0CiCJI0).
+",talk,cloud2022,talk:cloud2022/Federico Maggi,,Conf42,,queued,"rbac, open-policy-agent, kubernetes, golang, authorization"
+,One Rego policy gate for every security scanner in your pipeline,"David Melamed (Jit) at Conf42 Cloud Native 2022 on Open Policy Agent as a single decision point for SAST, secrets, SCA and DAST results in CI",2022-04-03,cloud2022/opa-one-policy-language-security-tools,,"Four security scanners in CI means four config formats and four ideas of what failing means. At Conf42 Cloud Native 2022, David Melamed, co-founder and CTO of Jit, shows how to collect all of their output and let Open Policy Agent decide, from policies written once in Rego and kept in a central repository, whether a pull request passes.
+
+""But what if there was a way to write simple policies using a single language for all your security tools?"" David Melamed said at Conf42 Cloud Native 2022. The rest of the talk is that idea, built and run.
+
+## What is OPA, in two examples?
+
+Open Policy Agent is a cloud native, open source policy engine meant to unify policy enforcement across the stack: API gateways, message brokers, the Kubernetes API server, CI/CD. You write policy in Rego, a declarative language, and services offload the decision to OPA through an API. Main uses: authorization, SSH access, admission control and data filtering.
+
+His first example is classic authorization. A salaries service receives a request from user1, asks OPA, and OPA combines the input, a role mapping (user1 is an employee, user2 an admin) and a policy saying only admins see salaries. Answer: deny.
+
+The second moves the same idea to security results. Bandit, a Python SAST tool, writes JSON with totals per severity. A Rego rule says deny if high severity is above zero. The sample report has four highs, so the test fails.
+
+## What does the pipeline do?
+
+The demo app is a tiny Python serverless function that returns the current time, defaulting to Berlin unless you pass a time zone, run locally on LocalStack through docker-compose. The GitHub Actions workflow triggered by a pull request has four scanner jobs and one policy job:
+
+- **SAST with Bandit**, an open source Python tool with 35 built-in rules, output saved as a JSON artifact.
+- **Secrets with Gitleaks**, which knows many well-known secret patterns (GitHub personal access tokens, Slack tokens, AWS keys) and also searches Git history, for the secret you committed and then forgot.
+- **Dependency checks with OWASP Dependency-Check**, with its own vulnerability database cached between runs.
+- **DAST with OWASP ZAP**, which needs the app deployed to LocalStack inside CI first, then attacks the resulting URL; it handles web apps and APIs via OpenAPI or Swagger definitions.
+- **Policy evaluation**: pull the policies from the central repo, download the artifacts, and run conftest, which uses OPA under the hood, against each report.
+
+The policies are deliberately simple. The SAST package has two rules: no medium and no high findings. The secrets package fails on any secret in the serverless YAML file, and on any finding whose rule is the AWS access token. That second one is the useful pattern: if a scanner is noisy, a policy can fail only on the findings you care about.
+
+He first runs the whole workflow locally with act, the local runner for GitHub Actions: two tests, one pass and one fail, because Bandit found a medium severity issue. The same thing happens on GitHub in the PR.
+
+## Why centralise the decision?
+
+One language, one decision point, and policies that differ by context without reconfiguring every tool; some repos are more critical than others. Rego packages can grow more complex rules, and OPA can even make HTTP calls to other services if a decision needs more data. Jit builds this into its platform as part of its security plans, which he mentions at the end.
+
+## Who should watch
+
+Teams already running several scanners who are tired of tuning each tool's pass and fail settings, and anyone curious what OPA looks like outside Kubernetes admission control.
+
+## Related Conf42 talks
+
+- Aviram Shmueli, his co-founder, on [five open source security tools](https://www.conf42.com/Cloud_Native_2022_Aviram_Shmueli_5_open_source_security_tools), from the same event.
+- Noaa Barki on [OPA, conftest and Gatekeeper](https://www.conf42.com/Cloud_Native_2022_Noaa_Barki_open_policy_agent_conftest_gatekeeper_kubernetes_policy_in_action), also from the same event.
+- Peter O'Neill on [securing terraform apply with OPA](https://www.conf42.com/Site_Reliability_Engineering_2022_Peter_ONeill_terraform_apply_secured_open_policy_agent) at Conf42 SRE 2022.
+
+[Watch David Melamed's talk](https://www.conf42.com/Cloud_Native_2022_David_Melamed_open_policy_agent_control_engine)
+
+[Watch the talk on YouTube](https://youtu.be/UPyOCjyT7Qs).
+",talk,cloud2022,talk:cloud2022/David Melamed,,Conf42,,queued,"open-policy-agent, rego, devsecops, github-actions, policy-as-code"
+,Start network automation with Ansible by automating your show commands,"Jason Belk (Cisco) at Conf42 Cloud Native 2022 on Ansible for network engineers, from inventory and Jinja2 templates to pre and post change checks",2022-04-02,cloud2022/ansible-for-network-engineers-show-commands,,"You don't have to hand your next change window to a robot to get value from automation. At Conf42 Cloud Native 2022, Jason Belk, Senior Technical Advocate in Cisco's learning and certifications organisation, makes the case that network engineers should start with Ansible by scripting what they already do (pushing a few config lines, running verification commands) and then demos it against a Cisco IOS XE sandbox router.
+
+## Why Ansible, for network people?
+
+Ansible is a free, open source command line tool for runbook-style automation, owned by Red Hat and used for more than ten years across compute, cloud and storage. It keeps no state database: each run loads your inventory and variables, connects to the devices and does the work. Your compute and storage colleagues are probably using it already, which can mean existing licences and in-house help.
+
+His real argument is about adoption. Playbooks are easy to read and share, so you can borrow other people's. You can begin with the exact lines from your change request, let it run your verification commands on 30 devices at once and save the output, and still make the change by hand. ""So that way you can start having automation trickle into your existing workflows,"" Jason Belk said at Conf42 Cloud Native 2022. Templating comes later, once you trust it.
+
+## The building blocks
+
+- **Inventory**: INI or YAML, listing devices and groups (for example an IOS XE group) with connection details. He uses plain-text credentials for the demo and points out you would not in production.
+- **Playbooks**: ordered tasks run against hosts or groups. Each task checks whether the configuration is present and only pushes it if not.
+- **Modules**: the workhorses inside tasks, over 750 of them, from IOS configuration to Webex Teams, Slack and ServiceNow.
+- **ansible.cfg**: defaults such as the inventory location, custom module paths or turning off host key checking in a lab.
+- **Templates and variables**: copy a running config, swap the values that change (interface name, IP, subnet, description) for Jinja2 variables kept in YAML per device, group or region, and loop over lists. This is where he says productivity takes off.
+- **Facts**: unless you switch them off, Ansible parses the running config and operational data into standard variables at runtime, such as OS version or serial number, for reports and decisions.
+
+## What do the three demos do?
+
+All run from VS Code against a Cisco DevNet sandbox IOS XE router.
+
+1. **Configure interfaces**: the cli_config module renders a Jinja2 template with loopbacks 100 to 104, their descriptions and IPv4 addresses, and pushes them. He previews the render in TD4A, the Template Designer for Automation, a tool built by someone at Red Hat. Run it a second time and Ansible reports changed=false: the config is already there, nothing sent.
+2. **Build a report**: the ios_facts module gathers facts, prints the hostname and OS version, creates an outputs directory and fills a template with model, version, serial number and every interface.
+3. **Pre and post checks**: before the change it runs show ip interface brief, show interfaces and show ip route and saves the output into a timestamped per-device directory. It makes the change, runs the same commands again, then a Linux diff shows exactly that loopbacks 100 to 104 appeared and came up. He resets the shared sandbox first with what he calls a good citizen playbook that removes the loopbacks again, which is a polite habit worth copying.
+
+The abstract sums up the low-risk entry point well: start ""even if it is just grabbing “show” commands to put into a file and view the differences between the state before and after your change.""
+
+## Who should watch
+
+Network engineers who keep meaning to start with automation and don't know which tool to learn first. It is a 101 with working examples; if you already template your configs with Ansible, skip it. The code is on GitHub.
+
+## Related Conf42 talks
+
+- Tim Szigeti on [application networking security](https://www.conf42.com/Cloud_Native_2022_Tim_Szigeti_application_networking_security), from the same event.
+- Imran Abdul on [SD-WAN networking automation](https://www.conf42.com/DevOps_2026_Imran_Abdul_sdwan_networking_automation) at Conf42 DevOps 2026.
+- Jeleel Muibi on [Terraform and Ansible](https://www.conf42.com/Platform_Engineering_2026_Jeleel_Muibi_terraform_ansible_architecture) at Conf42 Platform Engineering 2026.
+
+[Watch Jason Belk's talk](https://www.conf42.com/Cloud_Native_2022_Jason_Belk_ansible_network_engineers)
+
+[Watch the talk on YouTube](https://youtu.be/AnX7sC01ut4).
+",talk,cloud2022,talk:cloud2022/Jason Belk,,Conf42,,queued,"ansible, network-automation, cisco, jinja2, infrastructure-as-code"
+,"Five open source security scanners, picked after testing hundreds","Aviram Shmueli (Jit) at Conf42 Cloud Native 2022 on the five open source security tools Jit chose for SCA, secrets, IaC, DAST and containers",2022-04-02,cloud2022/five-open-source-security-tools-ci,,"For every security problem there are dozens of open source tools, and most comparison posts never ran them. At Conf42 Cloud Native 2022, Aviram Shmueli, co-founder and CPO of Jit, shares the shortlist his team arrived at after researching and trying hundreds of tools on real projects while building Jit's continuous security platform: one pick for each of five categories, and a GitHub Actions pipeline that runs all five in parallel.
+
+## How did they judge the tools?
+
+The criteria are worth stealing for your own bake-off: a high true positive rate with few false positives, usability and output that makes sense, easy CI integration, a large community and regular maintenance, a reputable company behind the tool (it tends to create a standard), GitHub stars as a popularity signal, and free licensing with a preference for permissive ones such as MIT and Apache.
+
+He calls the approach minimum viable security: a few simple controls baked into config files, apps and CI/CD.
+
+## The five picks
+
+| Category | Contestants | Pick |
+|---|---|---|
+| Dependency check (SCA) | Retire.js, OWASP Dependency-Check, npm audit | OWASP Dependency-Check |
+| Secret detection | git-secrets (AWS Labs), detect-secrets (Yelp), Gitleaks | Gitleaks |
+| Infrastructure as code | Checkov (Bridgecrew), KICS (Checkmarx), tfsec (Aqua Security) | KICS |
+| Runtime (DAST) | OWASP ZAP, Nikto, Arachni | ZAP |
+| Container scanning | Trivy (Aqua), Clair (Quay) | Trivy |
+
+The reasons, briefly:
+
+- **OWASP Dependency-Check** for efficacy and ease of use. On a project using adm-zip, the Node.js zip library, it flags three critical CVEs.
+- **Gitleaks** for its detection rate, CI friendliness, almost 100 contributors and reports in several formats. It finds secrets through many regular expressions plus entropy; his sample AWS key matches the AWS access token rule.
+- **KICS**, in a category where he says all three tools are great, for an exceptional detection rate and for severity ratings, which help DevOps people who are not security experts prioritise. A Terraform module with unencrypted EBS data comes back as medium, with a description and fix guidance.
+- **ZAP**, around for over a decade, for authenticated and unauthenticated scanning, API scanning, fuzzing and a large community. It catches a missing Content-Security-Policy header.
+- **Trivy** for efficacy and easy CI integration; it finds a vulnerable library in an image based on Debian 11.3.
+
+## What does the pipeline look like?
+
+A GitHub Actions workflow triggered on push, with five jobs running in parallel: Gitleaks, ZAP, KICS, Dependency-Check and Trivy. One whitespace commit later, the secret scanner reports a password in the Dockerfile on line eight (without printing the secret), KICS reports an unencrypted DynamoDB table as medium, and the Dependency-Check report lands as an artifact. The demo repo is public.
+
+""And it's very possible to build an entire security program only by using open source solutions,"" Aviram Shmueli said at Conf42 Cloud Native 2022. Jit's pitch, in the last minute, is the layer on top: managing the security plan, automating it and putting findings into the pull request instead of making developers dig through each tool's CI output.
+
+## Who should watch
+
+Small teams setting up their first security checks in CI and wanting a defensible default per category. It is a short talk; the table above is most of the value, the demo is the proof it runs.
+
+## Related Conf42 talks
+
+- David Melamed, his co-founder, on [Open Policy Agent as a control engine](https://www.conf42.com/Cloud_Native_2022_David_Melamed_open_policy_agent_control_engine) for the output of these tools, from the same event.
+- Dewan Ahmed on [securing repos with Gitleaks](https://www.conf42.com/DevSecOps_2024_Dewan_Ahmed_securing_gitleaks_repos_secret) at Conf42 DevSecOps 2024.
+- Safeer C M on [open source SAST with Semgrep](https://www.conf42.com/DevSecOps_2025_Safeer_C_M_sast_open_source_semgrep) at Conf42 DevSecOps 2025.
+
+[Watch Aviram Shmueli's talk](https://www.conf42.com/Cloud_Native_2022_Aviram_Shmueli_5_open_source_security_tools)
+
+[Watch the talk on YouTube](https://youtu.be/o_ehBtW1mj0).
+",talk,cloud2022,talk:cloud2022/Aviram Shmueli,,Conf42,,queued,"devsecops, open-source, security-tools, ci-cd, github-actions"
+,"Breakpoints in a Kubernetes sidecar setup, from your laptop","Michael Schilonka (Unikube) at Conf42 Cloud Native 2022 on Gefyra, debugging a FastAPI app behind an OAuth2-Proxy sidecar in Kubernetes from local VS Code",2022-04-01,cloud2022/gefyra-debug-sidecar-locally,,"The bug only happens in Kubernetes, because only Kubernetes has the sidecar that sets the header your code chokes on. At Conf42 Cloud Native 2022, Michael Schilonka, Managing Director at Unikube, shows how Gefyra lets you run the container on your laptop as if it lived in the cluster's namespace, intercept the real traffic, and hit a breakpoint in VS Code.
+
+## What is Gefyra for?
+
+His team built it to let developers work against Kubernetes from day one instead of a docker-compose approximation of production. They had used Telepresence 2 for a while and were not satisfied with its features and approach, so they wrote their own.
+
+The goal is to keep the tools developers already use: their IDE, hot reloading, the source tree mounted into the dev container, overridden environment variables, an interactive shell, easy logs, and a debugger attached to the container under development. Gefyra creates a dedicated Docker network on your local host and, through a sidecar that carries a VPN connection to the cluster, makes the local container behave as if it ran inside a Kubernetes namespace.
+
+## What is the demo setup?
+
+A local k3d cluster, brought up with Getdeck, another of their open source tools, which pulls five sources together (Helm charts, plain YAML and the demo app) plus the Kubernetes dashboard. Inside:
+
+- **Keycloak** as the identity provider, with a realm, an OAuth2 client and a test user.
+- **OAuth2-Proxy** as a sidecar in the same pod as the app, so every request is authorised before it reaches the backend, and the backend never has to implement the login flow.
+- **A FastAPI backend** on port 8155, the container Gefyra will take over.
+
+The sidecar pattern scales the pair together: every replica gets a proxy and an app. Logging in through the OpenID Connect flow works, then requesting an item returns an HTTP 500.
+
+## Where was the bug?
+
+In a classic anti-pattern: an if/else that behaves differently when an access token is present. Locally there is no token, so the dev path never touches it. In the cluster the sidecar forwards the token and the code reads it, and blows up.
+
+The Gefyra flow is four commands. Up installs the operator and local infrastructure. Run starts a container from the same image in the right namespace, here with the working tree mounted, debugpy waiting on port 5678 and Uvicorn started with reload. Bridge intercepts the app container in the deployment's pods and tunnels its traffic to the local instance. Down tears it all down when you are done.
+
+With VS Code attached through a remote attach launch config, a breakpoint on the items route catches the next real request. Inspecting the decoded JSON web token shows the key is email with a lowercase e; the code asked for an uppercase one. One character fixed, Uvicorn reloads, and the page still returns 500, because he forgot to save the file. A very honest demo. Saved, it works.
+
+## Why it matters
+
+""So there's no need anymore for a docker compose or vagrant setup or any custom scripts that create a developing infrastructure which is not really matching your production systems,"" Michael Schilonka said at Conf42 Cloud Native 2022. The pattern is language-agnostic; Python is just the example.
+
+## Who should watch
+
+Developers whose services sit behind sidecars, auth proxies or meshes and who debug with print statements and redeploys. It is a hands-on demo, and the repo is public if you want to follow along.
+
+## Related Conf42 talks
+
+- Shai Almog on [debugging containers with kubectl debug](https://www.conf42.com/Cloud_Native_2022_Shai_Almog_debugging_containers_kubectl_debug_koolkits), from the same event.
+- Matan Cohen on [Skaffold and Helm for local Kubernetes development](https://www.conf42.com/Golang_2021_Matan_Cohen_skaffold_helm_kubernetes_local_development) at Conf42 Golang 2021.
+- Anita Ihuman on [Kubernetes development and testing](https://www.conf42.com/Cloud_Native_2025_Anita_Ihuman_kubernetes_development_testing) at Conf42 Cloud Native 2025.
+
+[Watch Michael Schilonka's talk](https://www.conf42.com/Cloud_Native_2022_Michael_Schilonka_debugging_container_sidecar_kubernetes_gefyra)
+
+[Watch the talk on YouTube](https://youtu.be/FazRUwBWPUI).
+",talk,cloud2022,talk:cloud2022/Michael Schilonka,,Conf42,,queued,"kubernetes, debugging, sidecar, local-development, gefyra"
+,Ghost assets are gone from AWS but alive in your Terraform,"Naor Paz (Firefly) at Conf42 Cloud Native 2022 on ghost assets, the top five types in 100+ AWS accounts, and how to detect, fix and prevent them",2022-03-31,cloud2022/ghost-assets-haunt-terraform-state,,"Drift gets all the attention, but the scarier case is the resource that no longer exists at all. At Conf42 Cloud Native 2022, Naor Paz, Director of Product at Firefly, defines ghost assets (cloud resources created by Terraform, deleted by hand or by API, and still sitting in the code and state file) and ranks the five types that turn up most often across more than 100 AWS production accounts.
+
+## How is a ghost different from drift?
+
+Drift is about changes to existing assets. The familiar story: you created everything with code, then patched something in the console. ""When we want to make just a small patch here and there, we tell ourselves that we'll add it to the code later, but we usually never do,"" Naor Paz said at Conf42 Cloud Native 2022. Next terraform plan, you face a list of manual changes and a choice between reverting and codifying.
+
+A ghost is about existence. The asset was removed outside of code, so it is gone from the cloud but present in the code and the state. That leaves two ways to get hurt:
+
+- You meant to delete it, and the next terraform apply quietly brings it back, with its cost and its attack surface.
+- You did not mean to delete it, and something you need (a backup, a Lambda function, a database replica) is missing when you need it.
+
+## Which ghosts show up most?
+
+From Firefly's customer data, the top five:
+
+1. **EC2 instances**. Deleted by accident, they take down whatever they ran, from a web server to a database, and a quiet internal service can stay missing for days or weeks. Revived by accident, that forgotten test box costs three to four digits a month and may sit on the internet running old, unmaintained code. A fun detail: EC2 was the second AWS service, launched in August 2006, right after S3.
+2. **IAM policies**. Deleting one revokes its permissions from everything attached, which breaks production processes and customer access. Worse for security: explicit deny statements always beat allows, so a deleted policy can remove a guardrail and leave excessive permissions behind.
+3. **SQS queues**. Producers can't send, consumers can't read, jobs already in the queue stop.
+4. **CloudWatch metric alarms**. Lose the alarm and the first sign of trouble is the SLA breach.
+5. **Security groups**. Losing one can cut needed access, and because an asset can have several, it can go unnoticed. AWS won't let you delete a group that is still attached, which keeps this one lower on the list.
+
+## How do you bust them?
+
+He groups the answers into detect, alert, fix and prevent, and covers four options:
+
+- **Firefly**, his company's platform, with a free tier. The inventory filters to ghost assets, Slack alerts fire when a codified asset disappears, and each ghost links to the stack, state file and Git line that created it. To revive it, run terraform apply with a target on that one resource; to bury it, a button opens a pull request that removes the resource block.
+- **Lock the cloud**: no non-read console access, only IaC makes changes. It is the ultimate prevention and also expensive, especially when PagerDuty wakes you at 2am and you would rather click than write Terraform.
+- **ClickOps**, an open source tool that reads CloudTrail logs to detect console actions, deploys across accounts with AWS Control Tower, alerts through a Slack webhook and ships as a Terraform module with its own Lambda.
+- **driftctl**, open source, works from state files, but you schedule it yourself and build your own alerts. He adds a warning: state files can hold sensitive data, so handle them carefully.
+
+## Who should watch
+
+Platform and SRE teams with Terraform estates that predate strict IaC discipline, which is most of them. It is short and concrete, with a clear product section in the middle. His sign-off is the Firefly blessing: may your infrastructure never drift.
+
+## Related Conf42 talks
+
+- Stephane Jourdan on [infrastructure drift](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift) at Conf42 Cloud Native 2021.
+- Hila Fish on [Terraform practices](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices), from the same event.
+- Joshua Arvin Lat on [IaC security best practices](https://www.conf42.com/DevSecOps_2023_Joshua_Arvin_Lat_iac_security_best_practices) at Conf42 DevSecOps 2023.
+
+[Watch Naor Paz's talk](https://www.conf42.com/Cloud_Native_2022_Naor_Paz_ghost_assets_infrastructure_drift)
+
+[Watch the talk on YouTube](https://youtu.be/YnSKRbDpS_0).
+",talk,cloud2022,talk:cloud2022/Naor Paz,,Conf42,,queued,"infrastructure-as-code, terraform, drift, aws, cloud-operations"
+,"A 20-second bug fixed with routing rules, not a redeploy","Jason Dudash (Red Hat) at Conf42 Cloud Native 2022 on Istio service mesh, from the fallacies of distributed computing to canaries, circuit breakers and mTLS",2022-03-31,cloud2022/istio-demo-canary-circuit-breaker-mtls,,"A user profile service that takes 20 seconds to answer is a bad day. Fixing it by shifting traffic back to the old version, with no code change and no redeploy, is the point of Jason Dudash's talk at Conf42 Cloud Native 2022. The Chief Architect at Red Hat explains why service meshes exist and then demos an Istio-based mesh on OpenShift: finding the slow version, rolling it back, canarying the fix, tripping a circuit breaker and turning on mutual TLS.
+
+He warns up front that it is a fire hose. It is, in a good way.
+
+## Why do microservices need a mesh at all?
+
+His starting point is the fallacies of distributed computing, identified more than 25 years ago: the network is not reliable, latency is not zero, bandwidth is finite, security gets overlooked. Microservices make those problems bigger, because one application becomes many small services with chains of network calls between them. Everything looks fine in dev and QA, then production load arrives. ""And scaling up isn't like the solution that fixes a lot of the problems you have,"" Jason Dudash said at Conf42 Cloud Native 2022.
+
+The historical fix was libraries baked into every service, Netflix's Eureka and Zuul being the famous ones. That works until you also write services in Go and Node.js and have to replicate the same plumbing in every language. The mesh moves it into the platform.
+
+His analogy: a small town gets by without traffic lights, a city does not. Police, speed limits, bike lanes and stoplights are the control plane; traffic cameras are the observability.
+
+## Data plane and control plane
+
+Under the hood, each application pod gets an Envoy sidecar, a fast proxy that accepts new configuration through an API without reloading. That is the data plane. Policy lives in the control plane, which pushes it to all proxies, so you never configure hundreds of proxies by hand. Once services are in the mesh, policy changes need no new code, no rebuild and no redeploy.
+
+## What does the demo show?
+
+The app is a small boards application with single sign-on, a UI, a board service backed by MongoDB, and a user profile service running in two versions. Load comes from a couple of shell loops.
+
+- **Find the problem**: Kiali draws the service graph with traffic and success rates. Grafana shows user profile v2 taking 20 seconds against three to five milliseconds for v1. The distributed tracing view confirms it at the end of the call chain.
+- **Roll back by routing**: a destination rule and virtual service flip all traffic to v1, and the profile page loads again. Kiali even flags a deliberately broken destination rule.
+- **Canary the fix**: v3 is deployed and gets 10% of traffic while v1 keeps 90%, then 50/50, then all of it.
+- **Circuit breaking**: an outlier section in the destination rule ejects failing instances. He deletes the v3 pod mid-load; v3 starts throwing errors and the traffic lands back on v1.
+- **mTLS**: before, any container in the cluster can curl the services. A PeerAuthentication policy plus destination rules for mutual TLS, and the same curl fails because it is not a known mesh identity. The OpenShift console can do the same with checkboxes. He also points at request authentication for validating JSON web tokens and authorization policies for access control.
+
+## Who should watch
+
+Developers and architects who have heard the term service mesh and want to see what it does in 30 minutes, and teams on OpenShift weighing whether to turn Service Mesh on. It is an introduction with a solid demo, not an operations guide for running Istio at scale.
+
+## Related Conf42 talks
+
+- Rosemary Wang's [developer's introduction to service mesh](https://www.conf42.com/Cloud_Native_2022_Rosemary_Wang_introduction_service_mesh), the Consul and Envoy view from the same event.
+- Siddhartha Khare on [Istio observability](https://www.conf42.com/Platform_Engineering_2024_Siddhartha_Khare_istio_observability_road) at Conf42 Platform Engineering 2024.
+- Gufran Mirza on [securing Kubernetes with the Istio service mesh](https://www.conf42.com/DevSecOps_2023_Gufran_Mirza_securing_kubernetes_istio_service_mesh) at Conf42 DevSecOps 2023.
+
+[Watch Jason Dudash's talk](https://www.conf42.com/Cloud_Native_2022_Jason_Dudash_service_mesh_in_action)
+
+[Watch the talk on YouTube](https://youtu.be/Hn9snYYzeBI).
+",talk,cloud2022,talk:cloud2022/Jason Dudash,,Conf42,,queued,"service-mesh, istio, openshift, kubernetes, observability"
 ,Golang event is live!,May the Gophers be with you...,2022-03-30,2022-03-30-may-the-gophers-be-with-you,./assets/splash/GOLANG2022_Event_Splash.png,"#A treat for our fellow Gophers!
 
 [Agnes Muthoni](https://www.linkedin.com/in/agnesmuthoni/) is here to talk to you about Andela, the help you might need to put your career path on the right track. This team, [Adelina Simion](https://www.linkedin.com/in/adelina-simion/) and [Andy Kuszyk](https://www.linkedin.com/in/andy-kuszyk/), will walk you through what Load Testing is, why it’s so important and what some of its limitations are. Listen to [Walter Demian Schroeder](https://www.linkedin.com/in/walter-demian-schroeder/) talking about Workflows with Go and [Liam Hampton](https://www.linkedin.com/in/liam-conroy-hampton/) explaining how to get started with IoT devices. Finally, [Tamimi](https://www.linkedin.com/in/atamimi1/) will introduce you to event-driven architecture and how it’s used in real life. This powerful set is only the beginning of this Golang adventure, come and [join](https://www.conf42.com/golang2022)!
 
 A very special thanks to our amazing graphic designer, [Blanka Pawlikowska](https://www.linkedin.com/in/blanka-pawlikowska-michalak-34322a173/), who’s the creator of this Gopher in space, but also our home page image. You’re the best!",,,,,,,,
+,"A service mesh moves five jobs out of your code, but not telemetry","Rosemary Wang (HashiCorp) at Conf42 Cloud Native 2022 on what a service mesh replaces in application code, shown with Consul and Envoy",2022-03-30,cloud2022/service-mesh-for-developers-five-jobs,,"Most service mesh material is written for the operator who installs it. At Conf42 Cloud Native 2022, Rosemary Wang, Developer Advocate at HashiCorp, flips that: she maps each thing developers already do in code (service discovery, load balancing, security, traffic management and telemetry) to what the mesh does instead, with a live Consul and Envoy setup running Java and .NET versions of the same service.
+
+The takeaway: the mesh can take over most of that work, but tracing still needs your application's help.
+
+## How did she end up with a mesh?
+
+A security engineer told her ""we must have a service mesh"". What they actually wanted was mTLS between every service, and the application team's objection was fair: refactoring every app to load and validate certificates would take forever. Digging in, she found that encryption was one of five ways services depend on each other, and each was handled by a different tool or library.
+
+The mesh answer is a proxy (Envoy in her demo) next to every application instance, through which all traffic flows, plus a control plane that pushes configuration to those proxies. On Kubernetes an annotation injects the proxy; on a virtual machine running an older app, Consul can run it as a process sidecar.
+
+## What does each job look like on both sides?
+
+- **Service discovery**: Spring has Eureka and an annotation; not everything is Spring, or even Java. In the mesh, proxies register the service, and Envoy's admin endpoint shows the service-to-IP mappings Consul pushed out.
+- **Load balancing**: Spring gives you Feign clients. In Consul, a service splitter sends 50% to v1 and 50% to v2, which turns into Envoy weights of 5000 and 5000. Her curl loop alternates between the Java and the .NET backends behind one name.
+- **Security**: in .NET, certificate validation is custom code. In the mesh, mTLS happens between proxies, with one caveat she spells out: traffic between a proxy and its own application instance is not encrypted. API authorization moves too: a Consul intention lets the report service call the expense service only on the trip endpoint with a GET, and Envoy enforces it as a filter.
+- **Traffic management**: watch the vocabulary. An Envoy circuit breaker sets maximum pending and concurrent connections; outlier detection is what ejects an instance after, say, more than three HTTP 500s. Together they make the circuit breaker pattern. In Consul that is a passive health check.
+
+## Why telemetry is the exception
+
+""Just because you have a service mesh doesn't mean that you get telemetry out of the box,"" Rosemary Wang said at Conf42 Cloud Native 2022. Traces have to be propagated by the application, so you still instrument it: OpenTelemetry libraries in .NET, the OpenTelemetry agent for Java.
+
+Two practical lessons from her setup. First, the instrumentation's trace format must match the tracer configured in Envoy. Older Envoy versions mostly spoke Zipkin, so she standardised on Zipkin spans as the lowest common denominator and sent them to Jaeger. Second, merge your application's Prometheus metrics into the proxy's metrics endpoint (Consul has an annotation for it), so Prometheus scrapes one place and the app itself stays off the network. With every hop instrumented, from the Kong gateway through the proxies to the database call, the full trace finally shows up.
+
+## Who should watch
+
+Developers who have been handed a mesh and told to use it, and platform engineers who need to explain to app teams what to delete and what to keep. She is explicit that this is not a verdict on whether you need a mesh: most apps end up with some logic in code and some in the mesh.
+
+## Related Conf42 talks
+
+- Jason Dudash's [introduction to service mesh in action](https://www.conf42.com/Cloud_Native_2022_Jason_Dudash_service_mesh_in_action), the Istio take from the same event.
+- Rob Richardson on [service mesh](https://www.conf42.com/Kube_Native_2023_Rob_Richardson_service_mess_service_mesh) at Conf42 Kube Native 2023.
+- Rosemary Wang on [handling secrets](https://www.conf42.com/Cloud_Native_2025_Rosemary_Wang_secrets_handling_security) at Conf42 Cloud Native 2025.
+
+[Watch Rosemary Wang's talk](https://www.conf42.com/Cloud_Native_2022_Rosemary_Wang_introduction_service_mesh)
+
+[Watch the talk on YouTube](https://youtu.be/slyuCb4HgH4).
+",talk,cloud2022,talk:cloud2022/Rosemary Wang,,Conf42,,queued,"service-mesh, consul, envoy, mtls, opentelemetry"
+,"Before you containerise it, ask why five times","Rajalakshmi Srinivasan (Site24x7, Zoho Corp.) at Conf42 Cloud Native 2022 on Kubernetes adoption, its real costs and what a container monitoring tool must cover",2022-03-29,cloud2022/kubernetes-monitoring-start-with-why,,"Moving a monolith to containers is easy on a whiteboard and expensive in production if you skip the question of why. At Conf42 Cloud Native 2022, Rajalakshmi Srinivasan, Director of Product Management at Site24x7 (Zoho Corp.), walks from client-server to serverless, puts numbers on Kubernetes adoption, and lists what a monitoring tool has to do before you trust your cluster to it.
+
+It is an overview talk with 22 years of industry experience behind it, and it ends with her own product, so expect a vendor close.
+
+## How fast is Kubernetes actually spreading?
+
+She compares VMware's State of Kubernetes reports for 2020 and 2021. Organisations running Kubernetes in production grew from 59% to 65%. On-premises deployments were at 64% in 2020 and are slowly shrinking as workloads move to the cloud, but they have not gone away: Kubernetes is also how teams who can't leave their own data centre get a foot on the path.
+
+Lack of experience and expertise is still the top deployment challenge, cited by 65%. The benefits from the same survey: 58% saw better resource utilisation, 48% easier upgrades and maintenance, 46% a shorter development lifecycle, 41% managed to containerise a monolith, 39% said it enabled the move to the cloud and 28% cut their public cloud bill. She adds a separate estimate that close to 30% of cloud resources are simply wasted.
+
+## Where does it go wrong?
+
+Her list of challenges comes from Site24x7's customers and from moving their own setup to containers: missing expertise, deployment complexity that the architecture diagram hides, monitoring that gets bolted on after the first production outage, security across pod, node, cluster and service, regional compliance, a feeling of lost control over a black box, and scaling cost.
+
+The last one is the most useful warning. Not every workload belongs in an auto-scaled container. Some apps are cheaper on a fixed server or on-premises, and adopting the newest stack because it is new is how teams end up with a bigger bill and the same app. ""Don't do things just because somebody else is doing,"" Rajalakshmi Srinivasan said at Conf42 Cloud Native 2022.
+
+## What should container monitoring cover?
+
+She maps it onto the three pillars of observability:
+
+- **Metrics**: availability (the industry expects four nines for nodes, pods and clusters) and performance, because a component that is up but slow is still a problem.
+- **Traces**: when a page takes 10 seconds, you need the container and the line of code, even when each microservice is written in a different language.
+- **Logs**: collected centrally and turned from unstructured text into something you can query, because nobody can remote into every short-lived container.
+
+On top of that, she wants the tool to act, not only watch. Her examples: restart a pod automatically once it fails to respond three or five times in a row, and run a cleanup script when node CPU goes above 90%.
+
+## The ICE checklist
+
+Her shorthand for choosing a tool is ICE. Integration: import and export with your in-house metrics and third-party alerting, no data silos. Customisation: change what the dashboards show. Extension: APIs to build your own views, and they have to work, not just exist.
+
+## The product part
+
+The close is about Site24x7, which she describes as an AI-powered full stack monitoring tool hosted in Zoho's own data centres: ten of them in five regions (US, Europe, China, India and Australia), with data kept inside the region you pick. She frames the whole decision with the golden circle from Start With Why and finishes with the Red Queen's line about running twice as fast to get anywhere, which she credits to Alice in Wonderland. Pedants will note it is from Through the Looking-Glass; the point about keeping up still stands.
+
+## Who should watch
+
+Ops leads and engineers early in a Kubernetes migration who want adoption numbers and a checklist for monitoring. If you already run Prometheus, tracing and central logging, the first half will be familiar.
+
+## Related Conf42 talks
+
+- Aliaksandr Valialkin on [Kubernetes monitoring](https://www.conf42.com/Site_Reliability_Engineering_2022_Aliaksandr_Valialkin_kubernetes_monitoring) at Conf42 SRE 2022.
+- Michael Levan on [Kubernetes monitoring and observability](https://www.conf42.com/Observability_2024_Michael_Levan_kubernetes_monitoring_observability).
+- Shai Almog on [debugging containers with kubectl debug](https://www.conf42.com/Cloud_Native_2022_Shai_Almog_debugging_containers_kubectl_debug_koolkits), from the same event.
+
+[Watch Rajalakshmi Srinivasan's talk](https://www.conf42.com/Cloud_Native_2022_Rajalakshmi_Srinivasan_operations_container_lifecycle)
+
+[Watch the talk on YouTube](https://youtu.be/6PSeuhVsb-U).
+",talk,cloud2022,talk:cloud2022/Rajalakshmi Srinivasan,,Conf42,,queued,"kubernetes, monitoring, observability, containers, cloud-native"
+,"Cloud breaches are not misconfigured servers, they are bad design","Josh Stella (Snyk) at Conf42 Cloud Native 2022 on cloud control plane compromise attacks and five fundamentals, built on policy as code, to prevent them",2022-03-29,cloud2022/control-plane-attacks-are-design-bugs,,"When a breach headline says misconfiguration, the misconfigured server is usually just the doormat. At Conf42 Cloud Native 2022, Josh Stella, Chief Architect at Snyk (and co-founder of Fugue before it joined Snyk), argues that the real damage comes from cloud control plane compromise: attackers using stolen API keys against the cloud provider's own APIs, and getting away with it because of identity and permission design.
+
+## Why doesn't data centre security carry over?
+
+He starts with what changed. Data centre gear was bought, racked and cabled by humans, lived three to five years, got names, and was defended mostly at the network with firewalls and intrusion detection. Cloud resources are an API call away, live for hours, minutes or seconds, never get named, and there are far more of them: Snyk manages millions of resources for its customers. They are also more varied, with a dozen managed databases at one provider alone, each reached through a control plane that has nothing to do with the TCP/IP network your old tools were watching.
+
+Programmable infrastructure cuts both ways. Mistakes happen at the speed of electrons, but you can also test and check things with decades of software engineering practice.
+
+## How do attackers work now?
+
+The older pattern was targeted: pick a victim, hunt for a hole, exfiltrate slowly. His example is North Korea's hack of Sony Pictures. The common pattern now is automated: scan everything public for a known weakness, build a list, pick from the list, then smash and grab. The Capital One attacker was not after that bank in particular; she was collecting anything vulnerable.
+
+His breakdown of the headlines:
+
+- **Twitch**, 125 GB of data and source code, reported as server misconfiguration. He calls that nonsense: no single server should be able to download all your source code. That is an access control design mistake.
+- **Capital One**, blamed on a misconfigured WAF. The WAF was the foothold; the target was S3. According to a Department of Justice filing, a running virtual machine had IAM keys with S3 list permissions.
+- **Uber**, where API keys stored in GitHub repos did the work.
+
+""You're going to have misconfigured servers. You don't have to shoot yourself in the foot with bad architecture,"" Josh Stella said at Conf42 Cloud Native 2022.
+
+The path is always the same: initial penetration (an open port during a maintenance window, an application vulnerability like Log4Shell, long-lived keys in source control), then discovery and lateral movement, then data out through API calls that perimeter tools never see.
+
+## What are the five fundamentals?
+
+Snyk's answer, drawn from its most successful customers, puts policy as code at the centre, surrounded by four verbs:
+
+1. **Know your environment**: every resource, its current state, and how it changed over time. S3 list permissions are fine for a human at the console and dangerous on an internet-facing VM; only the combination makes it a risk.
+2. **Prevent error**: check Terraform and CloudFormation with policy as code before deploy, inside the CI/CD pipeline.
+3. **Empower developers**: one customer has over 2,000 application developers and a cloud security and platform team of about three people. The only way that scales is guidance delivered by the tooling, in the editor and the pipeline, not in emails.
+4. **Measure what matters**: risk differs by data set; a small table can have a huge blast radius. Track fixes quantifiably.
+
+Why code and not spreadsheets of rules? ""If you're not doing policy as code, the hackers are faster than you because they're doing exploitation as code,"" he said. Any human in the loop makes you slower than the attacker.
+
+## Who should watch
+
+Cloud security and platform teams who keep getting asked to fix misconfigurations one ticket at a time, and developers who own their Terraform. It is a methodology talk, no demo; the product mentions are light.
+
+## Related Conf42 talks
+
+- Josh Stella's earlier talk on [cloud security and Open Policy Agent](https://www.conf42.com/Open_Source_Showcase_2020_Josh_Stella_cloud_security__open_policy_agent_opa) at Conf42 Open Source Showcase 2020.
+- Ashish Rajan on [cloud security assessments](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021) at Conf42 Cloud Native 2021.
+- David Melamed on [Open Policy Agent as a control engine](https://www.conf42.com/Cloud_Native_2022_David_Melamed_open_policy_agent_control_engine), from the same event.
+
+[Watch Josh Stella's talk](https://www.conf42.com/Cloud_Native_2022_Josh_Stella_cloud_control_plane_compromise_attacks)
+
+[Watch the talk on YouTube](https://youtu.be/HGu1yykzGsg).
+",talk,cloud2022,talk:cloud2022/Josh Stella,,Conf42,,queued,"cloud-security, policy-as-code, aws, iam, infrastructure-as-code"
 ,Microsoft loves Conf42 Golang!,"Join Microsoft and Conf42 online on March 31st, 2022!",2022-03-24,2022-03-24-microsoft-golang-sponsor-announcement,./assets/splash/BLOG_2022_Microsoft_Golang_2022.png,"# Microsoft loves Conf42 Golang!
 # Join us online on March 31st, 2022!
 
