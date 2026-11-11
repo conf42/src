@@ -108245,6 +108245,343 @@ Pair it with [Lisa Karlin Curtis on using incidents to level up your teams](http
 
 [Watch the talk on YouTube](https://youtu.be/4MiJG3IPyWI).
 ",talk,im2022,talk:im2022/Vanessa Huerta Granda,,Conf42,,queued,"incident-response, postmortems, learning-from-incidents, communication"
+,A Rust blog that serves from RAM and beats nginx at static files,Xe Iaso (Tailscale) at Conf42 Rustlang 2022 on a Rust blog engine that renders compiled templates from RAM faster than static file servers,2022-08-28,rustlang2022/blog-engine-faster-than-static-files,,"Xe Iaso's blog is dynamic, written in Rust, and so fast that readers assume it is a static site. At Conf42 Rustlang 2022, Xe, Archmage of Infrastructure at Tailscale, walks through how it works: Markdown loaded into RAM at startup, templates compiled to Rust functions, and a post lookup that is technically O(n) and in practice constant time. Then comes the hosting history that explains why it ended up that way, Kubernetes included.
+
+## How can a dynamic site beat a static one?
+
+Posts are Markdown with YAML front matter, written in Emacs. They are parsed with comrak, extended with custom HTML elements that lol_html rewrites through a bank of templates, which is how the conversation snippets and AI-generated hero images get onto the page. The page templates use ructe, which compiles a template syntax over HTML into Rust code. Loading the homepage calls a function that renders straight into a string buffer, from data already in memory.
+
+Xe said at Conf42 Rustlang 2022: ""Turns out serving things out of ram is very fast."" To check, Xe benchmarked the site against nginx, OpenResty, Tengine, Apache, the Go standard library, warp and axum. None was faster except a Go binary with the whole site compiled into it, at about 200 MB, which was not viable.
+
+ructe has costs: you declare types inside templates and must make sure the generated code imports the traits you need. Xe has been moving to maud, a procedural macro that turns its own DSL into HTML at compile time, with components as plain Rust functions. The short codes already use it.
+
+## The linked list that should be a problem
+
+Every post lives in memory in the moral equivalent of a linked list (a Vec of posts on the slides), so showing a post means walking the list. That sounds terrible for a high-traffic blog until you look at the analytics: the most read post is almost always the newest one, which sits at the front. At almost 300 posts, it is fine. Xe admits it may need rethinking one day.
+
+Startup reads every post from disk with Tokio spreading the work across all cores, so loading is up to twelve times faster than doing it serially. Xe also credits Rust with lower cognitive load: a line of Rust that would be about 50 lines of Go.
+
+## Stateless, mostly
+
+Because everything is loaded into RAM, the site is stateless and can move to any server. The same in-memory data feeds RSS, Atom and JSON Feed, the last with a custom extension carrying extra front matter such as stream recordings, slides and series names.
+
+The state lives in a separate personal API called mi, after the Toki Pona word for me. It handles POSSE (publish on your own site, syndicate elsewhere), announcing new posts on Twitter and Mastodon automatically, and receives and stores Webmentions, which the blog fetches at startup. The trade-off is some delay before a new mention shows up, which Xe accepts to keep the blog easy to move. Patreon remains manual, because its API does not let you create posts.
+
+## How did it get here?
+
+The history is the most fun part. Heroku's free tier hosted the first version, built on Lapis, a Lua web framework inside nginx, which parsed Markdown on every page load. It barely survived its first Hacker News front page; caching rendered HTML in OlegDB, a key-value store written in C by friends, is what got it through. Then Dokku, a self-hosted Heroku clone, because many apps could share one 5 dollar server. Then a rewrite in Go, nerd-sniped by people in the Go community Slack wanting a standard library web app example, first with PureScript and React and then plain server-rendered HTML for readers whose browsers skip JavaScript. That is where everything moved into RAM.
+
+Traffic kept growing, past 100 GB a month for a mostly text site, with less than one post in ten going viral but each time all at once. When the Docker host started falling over, Kubernetes on DigitalOcean was next. Xe said at Conf42 Rustlang 2022: ""So I decided to commission a freight train to mail a letter and I set up a Kubernetes cluster with digitalocean."" It worked, with GitHub Actions continuous deployment, until stuck mounts and no root access made outages worse than on a single server. Now it runs on one big NixOS server, with nginx routing to a Unix socket.
+
+## Who should watch
+
+Anyone running a content site who reaches for a CDN or a static generator by reflex, and Rust web developers who want a real, opinionated example. Xe said at Conf42 Rustlang 2022 that ""dynamic web apps can be very fast, especially if they are built to purpose."" The talk is the proof, with jokes.
+
+## Related Conf42 talks
+
+- Andreas Moller on [a new way to build for the web](https://www.conf42.com/Rustlang_2024_Andreas_Moller_web_build_design_development) at Conf42 Rustlang 2024.
+- Haseeb Majid on [reproducible development environments with Nix](https://www.conf42.com/Golang_2024_Haseeb_Majid_using_nix_reproducible) at Conf42 Golang 2024.
+- Leigh Capili on [cloud native Nix](https://www.conf42.com/Kube_Native_2024_Leigh_Capili_cloud_native_nix_development) at Conf42 Kube Native 2024.
+
+[Watch Xe Iaso's talk](https://www.conf42.com/Rustlang_2022_Xe_Iaso_blog_hilariously_overengineered)
+
+[Watch the talk on YouTube](https://youtu.be/6m6FUsi4kGc).
+",talk,rustlang2022,talk:rustlang2022/Xe Iaso,,Conf42,,queued,"rust, web-performance, blogging, nixos, indieweb"
+,EpiRust: shrinking a 10 GB grid on the way to 100 million agents,"Jayanta Kshirsagar and Sapana Kale (Thoughtworks) at Conf42 Rustlang 2022 on scaling the EpiRust epidemic simulator with hash maps, Rayon and Kafka",2022-08-24,rustlang2022/epirust-scaling-epidemic-simulation-to-millions,,"Simulating every person in a city of 3.2 million, hour by hour for 45 days, starts with a grid that eats 5 to 10 GB of RAM. Jayanta Kshirsagar and Sapana Kale of Thoughtworks' Engineering for Research team tell the story at Conf42 Rustlang 2022 of how EpiRust, their open-source agent-based epidemic simulator, went from that grid to a hash map of a few hundred MB, then to parallel and distributed engines aimed at 100 million agents.
+
+They keep it technical on purpose: the Covid-19 disease model is out of scope. This is a scientific computing case study.
+
+## What is EpiRust simulating?
+
+Agent-based modelling builds the society bottom-up. Every individual gets a home, maybe a workplace, a schedule and some characteristics; they commute, sit next to strangers on transport, meet colleagues and go home to their families, and each interaction is a chance for the disease to spread. Government interventions like lockdowns, masks and vaccination can be modelled too.
+
+Stripped down, the engine is two loops: an outer loop over simulated hours, an inner loop asking every agent to perform its routine and updating infections, then bookkeeping and interventions at the end of each hour.
+
+The scale grew in steps: 1,000 identical agents, then 10,000 with heterogeneity (age, essential workers), then Pune at 3.2 million, then Mumbai at 12 million with long commutes, with the 100 million agents of Maharashtra and multiple cities as the target. Kshirsagar said at Conf42 Rustlang 2022: ""Scale and performance became the issue pretty quickly for us.""
+
+## Why is it so expensive?
+
+The numbers from their slides: 45 days is 1,080 simulated hours. At 1,000 agents that is about 7 million behaviours to execute; at 1 million, about 7 billion; at 100 million, about 700 billion. The grid is also sparse, mostly empty cells, so memory matters as much as compute.
+
+There is a subtler problem. The inner loop moves agents one after another, but real people move at the same time, so naive iteration makes the result depend on order. EpiRust uses double buffering: agents read neighbour positions from a read buffer and write their new position to a write buffer.
+
+## How did memory drop from gigabytes to megabytes?
+
+The first Pune implementation stored the grid as a 2D matrix, 5,660 by 5,660, which is 32,035,600 cells and 5 to 10 GB of RAM. Replacing it with a hash map from point to citizen made the number of entries equal the number of agents, kept lookups O(1), and brought memory down to a few hundred MB. They then benchmarked hashers, including hashbrown with AHash, FxHash and FNV, since the hash is never exposed outside the simulator and does not need to be cryptographic.
+
+## How did throughput scale up and then out?
+
+Because each agent's update reads only from the read buffer, the inner loop parallelises. Kale walks through two versions: a map-reduce that updates agents in parallel and writes them serially to avoid collisions, and Rayon parallel iterators over a DashMap, a concurrent map that handles both steps. On 5 million agents both roughly doubled the serial throughput, and on 64 cores they performed about the same.
+
+Scaling up stops at the biggest machine you can get, and different cities can need different parameters anyway. So they split geography into engines, each with its own configuration, running in distributed mode. Commuters crossing between engines travel as messages over Kafka, and an orchestrator keeps the engines in step hour by hour, so someone leaving at hour 24 arrives on time.
+
+The slides have the payoff: Mumbai as 24 engines of 0.5 million agents ran at a throughput of 0.57, while 100 engines of 100,000 agents (10 million in total) reached 3.03. Running 100 engines by hand is not an option, so EpiRust is containerised and runs as Kubernetes jobs packaged in a Helm chart, with Kafka in the cluster and the ELK stack, Prometheus and Grafana for logs, metrics and alerts.
+
+## What did Rust bring?
+
+Kale credits C-like performance with no runtime or garbage collector, memory safety without C and C++ debugging sessions, Cargo and the crate ecosystem (Rayon, Tokio), and concurrency that fails at compile time. Kale said at Conf42 Rustlang 2022: ""With the fearless concurrency, we could easily go with the parallel implementation and most of the errors were coming at the compilation time.""
+
+## Who should watch
+
+Anyone writing simulations or other compute-heavy scientific code, and Rust developers who want a real-world story of the hash map, Rayon, then distribution progression. The code is on GitHub under thoughtworks/epirust.
+
+## Related Conf42 talks
+
+- Felipe Zapata on [using Rust for numerical applications](https://www.conf42.com/Rustlang_2023_Felipe_Zapata_numerical_applications) at Conf42 Rustlang 2023.
+- Reetha Vadakkekkara on [software performance optimisation and scaling](https://www.conf42.com/Rustlang_2024_Reetha_Vadakkekkara_software_optimization_scaling_performance) at Conf42 Rustlang 2024.
+- Bogdan Sucaciu on [event-driven architectures with Apache Kafka](https://www.conf42.com/Enterprise_Software_2021_Bogdan_Sucaciu_event_driven_architectures_apache_kafka).
+
+[Watch Jayanta Kshirsagar and Sapana Kale's talk](https://www.conf42.com/Rustlang_2022_Jayanta_Kshirsagar_Sapana_Kale_epirust_ultra_largescale_epidemic_simulator)
+
+[Watch the talk on YouTube](https://youtu.be/LPqdiDEv6zQ).
+",talk,rustlang2022,talk:rustlang2022/Jayanta Kshirsagar,,Conf42,,queued,"rust, scientific-computing, simulation, performance, kafka"
+,Neon or WebAssembly? Two ways to put Rust under Node.js,Dmitry Kudryavtsev (Forter) at Conf42 Rustlang 2022 on speeding up Node.js with Rust native modules via Neon versus WebAssembly,2022-08-20,rustlang2022/neon-or-wasm-for-nodejs,,"Rust can speed up a Node.js service in two quite different ways, and the right one depends less on raw speed than on where the code has to run. Dmitry Kudryavtsev, Senior Software Engineer at Forter, compares them at Conf42 Rustlang 2022: native modules built with Neon, and Rust compiled to WebAssembly with wasm-bindgen, measured on the same recursive Fibonacci and then weighed on reusability, ergonomics, standard library access, portability and browser support.
+
+## Why bring Rust into JavaScript at all?
+
+JavaScript is everywhere, from the browser to Node.js on the backend to desktop apps via Electron and Tauri, and it is not going away. It is also slow at CPU-bound work like image processing or 3D rendering. Native modules have long been the escape hatch, traditionally in C or C++. His case for Rust over them: modern tooling with Cargo, a rich standard library, and memory safety, so no segfaults.
+
+## Path one: a native module with Neon
+
+Neon is the glue layer between the two worlds. The Rust side has the plain Fibonacci function, then a glue function that converts JavaScript numbers into Rust types and the result back, then a main that exports it to JavaScript under a name of your choosing. The neon team's cargo-cp-artifact tool builds a dynamic library wrapped in the Node API, and from JavaScript you simply require it and call it like any other function.
+
+## Path two: WebAssembly
+
+WebAssembly is a portable binary format, executed by a VM that ships in every major browser and in Node.js. It can be written directly in AssemblyScript, but the interesting part is that it is a compilation target for languages like Rust. With wasm-bindgen the Rust version is the same function plus one macro.
+
+## What did the benchmark show?
+
+He ran each version with hyperfine, three warm-ups, taking the mean:
+
+| Fibonacci | Node.js | Native Rust | Rust Wasm |
+|---|---|---|---|
+| 30th | 165.2 ms | 161.5 ms | 163 ms |
+| 44th | 5.846 s | 2.271 s | 3.286 s |
+| 46th | 15.038 s | 5.721 s | 8.317 s |
+
+At small inputs there is no difference worth the effort. At the heavy end native Rust took about 60% less time than Node.js and Wasm about 45% less. Then the honest conclusion. Kudryavtsev said at Conf42 Rustlang 2022 that ""benchmarks like this are useless."" They prove a point; run your own against your real workload before adding a native build to your pipeline.
+
+## So which one?
+
+His comparison, in order:
+
+- **Performance:** native wins, as native beats any VM. Wasm is still fast and a good middle ground.
+- **Reusability:** it is complicated. A native Rust library can be reused through FFI from Java or Swift on mobile; Wasm only runs where there is a Wasm VM.
+- **Ergonomics:** Wasm. wasm-bindgen converts basic types for you, while Neon needs a hand-written glue layer that gets messy with error handling, because JavaScript values can be anything.
+- **Standard library:** native. Wasm has no file system, networking or OS access. WASI is the proposal to fix that and was still in development; embedding a virtual file system does not help with dynamic files on disk.
+- **Portability:** Wasm. Native modules are tied to the host architecture, so a build from an M1 MacBook will not run on an x86_64 Windows machine. Compile them in the target environment, for example the same Alpine Docker image you run in production.
+- **Browser:** Wasm only. Native modules work in Node.js because of N-API; browsers have no FFI.
+
+His two mental models sum it up. Native modules extend your Node.js code with things JavaScript cannot do well. Kudryavtsev said at Conf42 Rustlang 2022: ""webassembly is meant to replace non performant Javascript code."" Image manipulation or heavy visualisation in the browser is the classic case.
+
+## Who should watch
+
+Node.js developers with a hot function they would like to make faster, and Rust developers asked to help them. It is a clear, short decision guide; the blog posts it is based on carry the code and the GitHub repos.
+
+## Related Conf42 talks
+
+- Andrey Makarov on [using Rust and WASM](https://www.conf42.com/Rustlang_2024_Andrey_Makarov_wasm_assembly_code_web) at Conf42 Rustlang 2024.
+- Lorenzo Pieri on [the Node.js event loop](https://www.conf42.com/JavaScript_2023_Lorenzo_Pieri_nodejs_eventloop_fairytale), for why CPU-bound work hurts Node in the first place.
+- Thorsten Hans on [going serverless with WebAssembly](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly) at Conf42 Golang 2024.
+
+[Watch Dmitry Kudryavtsev's talk](https://www.conf42.com/Rustlang_2022_Dmitry_Kudryavtsev_supercharge_nodejs)
+
+[Watch the talk on YouTube](https://youtu.be/yoNoEKZXgMY).
+",talk,rustlang2022,talk:rustlang2022/Dmitry Kudryavtsev,,Conf42,,queued,"rust, nodejs, webassembly, neon, performance"
+,Rust on AWS Lambda answered in 4 ms where Node took 60,"Luca Bianchi (Neosperience) at Conf42 Rustlang 2022 on why Rust cuts Lambda cold starts and run time, and how to start with AWS SAM",2022-08-17,rustlang2022/rust-lambda-cold-starts-versus-node,,"On AWS Lambda you pay per millisecond and wait on every cold start, so the runtime you pick shows up on the bill. Luca Bianchi, CTO at Neosperience and an AWS Hero, makes the case at Conf42 Rustlang 2022 that Rust is the unfair advantage among Lambda runtimes: in his comparison it was at least twice as fast as equivalent Node.js code, and in the best case 4 ms against 60 ms.
+
+A note on scope: the abstract describes a Kinesis churn-prediction pipeline and a Python comparison. The talk as recorded is shorter and simpler, a serverless primer, a DynamoDB example scaffolded with AWS SAM, and a Rust versus Node benchmark. Treat it as a first talk on Rust for Lambda.
+
+## What does serverless remove from your plate?
+
+Bianchi peels the stack layer by layer: no servers to buy, no VMs to size (so no paying for idle and no VM disaster recovery), no operating system to patch, no schedulers or containers to manage. What remains is your code, invoked by the platform. Borrowing Patrick Debois's term, he goes one step further. Bianchi said at Conf42 Rustlang 2022 that ""serverless is serviceful because you can focus directly on what is providing added value for your customers.""
+
+In practice that means configuring managed services rather than writing them: Amazon API Gateway for REST and websockets, AWS AppSync for GraphQL, with scaling, firewalls and monitoring that come with them, and business logic in Lambda functions.
+
+## Where does the time go in a Lambda?
+
+Each invocation runs in a micro virtual machine that Lambda builds on demand: start the container, the runtime, any extensions, then your initialisation code, then the handler. The first part is the cold start. You hit it in two ways: a function nobody has called for a while (he puts it at roughly 30 minutes), and, more worryingly, scaling out. On Black Friday every new concurrent request can mean a new unit of compute and a new cold start, sometimes costing seconds.
+
+You cannot pick CPUs on Lambda, only memory, and CPU scales with it. Across configurations from 128 MB up to 1 GB, his chart shows Java slowest and Ruby, Node.js and Python in between, with Rust ahead at every step.
+
+## Why Rust, beyond raw speed?
+
+Static typing matters more in serverless than people expect, he argues, because the development loop bounces between your laptop and the cloud. Every error the compiler catches is a deploy you did not have to make. Add good tooling and a busy crate ecosystem and Rust is a comfortable fit.
+
+## How do you start?
+
+AWS SAM has a Rust template. Run sam init, pick the template and the architecture (Lambda supports x86_64 and arm64), and SAM writes the template file it later turns into CloudFormation, plus a project skeleton. His example takes an HTTP request and writes an item to DynamoDB:
+
+- the lambda_http crate for the request handler and runtime, the AWS SDK for DynamoDB, and Tokio to make main async;
+- clients and environment variables set up in main, so they persist across warm invocations until the runtime is torn down;
+- the runtime started with a closure that passes the DynamoDB client, the table name and the request to the handler;
+- a handler that parses the body, builds a PutItem request with the builder pattern, matches the result and returns a 200 or a 500 for API Gateway.
+
+## The numbers
+
+On that sample, his Rust versus Node comparison shows Rust at least twice as fast in the worst case. Bianchi said at Conf42 Rustlang 2022: ""But in the best case scenario rust is more than 1000% faster than node so it is four milliseconds compared to 60 milliseconds"". He adds that Node cold starts can stretch towards a second. With per-millisecond billing, that gap is money once functions run at scale.
+
+## Who should watch
+
+Developers already on Lambda with Node or Python who want a quick, practical argument for trying Rust, and Rust developers looking for the shortest path to a deployed function. Experienced serverless engineers will know the first half.
+
+## Related Conf42 talks
+
+- Luciano Mammino on [your Lambdas, in Rust](https://www.conf42.com/Cloud_Native_2023_Luciano_Mammino_lambdas_rust) at Conf42 Cloud Native 2023.
+- Roman Boiko on [why to use Rust for serverless workloads](https://www.conf42.com/Rustlang_2023_Roman_Boiko_serverless_workloads) at Conf42 Rustlang 2023.
+- Dmitry Kudryavtsev on [speeding up Node.js with Rust](https://www.conf42.com/Rustlang_2022_Dmitry_Kudryavtsev_supercharge_nodejs), if you would rather keep Node and swap out the hot path.
+
+[Watch Luca Bianchi's talk](https://www.conf42.com/Rustlang_2022_Luca_Bianchi_blazing_fast_serverless)
+
+[Watch the talk on YouTube](https://youtu.be/HS-BSZcyZIA).
+",talk,rustlang2022,talk:rustlang2022/Luca Bianchi,,Conf42,,queued,"rust, serverless, aws-lambda, cold-start, aws-sam"
+,"Smart contracts under a kilobyte, and references to data that isn't there",Andrei Marinica (Elrond) at Conf42 Rustlang 2022 on a Rust smart contract framework where the VM owns the data and types are handles,2022-08-13,rustlang2022/smart-contracts-that-own-nothing,,"Some of Elrond's smart contracts compile to 800 or 900 bytes of WebAssembly. Andrei Marinica, Core Team Software Developer at Elrond, explains at Conf42 Rustlang 2022 how the team's Rust framework gets there: the contract never touches its own big numbers, the VM does, and Rust's type system is bent far enough to give ownership semantics to data that lives somewhere else entirely.
+
+He pitches it at Rust programmers rather than the blockchain crowd, and it shows: this is a talk about generics, macros and transmute, with a blockchain as the excuse.
+
+## Why does contract size matter so much?
+
+Elrond runs contracts as WebAssembly on Wasmer, under its own VM, Arwen. Contracts are stored on chain and JIT-compiled to machine code when run. Two costs follow: JIT compilation is not free when you want thousands of contract calls per second, and on-chain storage is expensive because every node replicates it. So bytecode size is a first-class goal, next to speed, and next to a third one he states bluntly from the slides: devs cannot be trusted to optimise this themselves. The framework has to do it.
+
+## The contract is the recipe, the VM is the kitchen
+
+The trick is to strip everything heavy out of the contract. Big-number arithmetic, crypto functions and memory allocation all live in the VM. The contract holds integer handles, asks the VM to add big int five to big int seven, and gets a handle back. Marinica said at Conf42 Rustlang 2022: ""the smart contract never even sees these numbers."" In his metaphor the contract is the recipe and the VM does the cooking.
+
+Rust makes that bearable to program against, because operator overloading lets developers write a plus between two BigInt values as if they were local. When millions of dollars flow through the code, readable code is a safety feature.
+
+## 300+ easy steps, grouped into six
+
+His summary of three years of framework work: make it fast, make it pretty, make it testable, make it interoperable, make it composable, make it escape. Some highlights:
+
+- **Contracts are traits.** The implementation is generated, so the same trait can compile to WebAssembly for the chain or to a plain library for unit and integration tests.
+- **Proxies are generated too.** Calling another contract looks like calling a method, with the transaction plumbing hidden in an auto-generated proxy. The same proxies let off-chain code call contracts almost like a database query.
+- **Modules caused stray endpoints.** Splitting a contract into modules via supertraits worked, but every endpoint in a crate was always exported, so including one module from a library dragged in callable endpoints you never meant to ship. The fix was serious metaprogramming: macros generate ABI generators per module, a meta crate calls them for the whole contract, and the wasm crate is generated from that ABI. Endpoints in modules you did not include never reach the binary.
+
+## Three times they nearly broke Rust
+
+**A fat Result.** Error handling with Result inflated bytecode with branches on every return. On a blockchain you want failures to crash immediately anyway, so contracts use a panicking error handler whose error type is the never type. A Result whose error can never exist compiles down to just the value, and he says that cut about 20% off some contracts.
+
+**Vararg madness.** Endpoint argument loaders should hard-code each argument when there are no varargs and loop when there are, decided by type alone, because the macros cannot know. The solution is a compile-time fold over tuples nested inside tuples, as deep as needed, so each level can peek at what comes after it and every branch resolves during monomorphisation.
+
+**Owning stuff that isn't there.** A ManagedVec of BigInt lives in the VM, so what should getting element i return? There is nothing in contract memory to point at. They built a ManagedRef type with a lifetime and, when it must behave like an ordinary reference, transmute it. Marinica said at Conf42 Rustlang 2022: ""You can trick rust into thinking there's something there where there's nothing there, so you can work with reference to nothing."" He calls it the closest they got to the limits of the language.
+
+## Who should watch
+
+Rust developers who enjoy type-level tricks, and anyone building a framework on top of WebAssembly where binary size is a cost. You do not need to care about blockchains; you do need to be comfortable with generics.
+
+## Related Conf42 talks
+
+- Michael Birch on [turning smart contracts into indexers with cross-compilation in Rust](https://www.conf42.com/Rustlang_2023_Michael_Birch_smart_contracts_indexers_crosscompilation) at Conf42 Rustlang 2023.
+- Albert Groothedde on [a typesafe client for smart contracts](https://www.conf42.com/JavaScript_2023_Albert_Groothedde_javascript_client_smart_contracts) at Conf42 JavaScript 2023.
+- Tim McNamara on [getting the most from zero-cost abstractions](https://www.conf42.com/Rustlang_2022_Tim_McNamara_maximum_benefit_zerocost_abstractions) at the same event.
+
+[Watch Andrei Marinica's talk](https://www.conf42.com/Rustlang_2022_Andrei_Marinica_blockchain_environment)
+
+[Watch the talk on YouTube](https://youtu.be/GRX3OAWtLfo).
+",talk,rustlang2022,talk:rustlang2022/Andrei Marinica,,Conf42,,queued,"rust, webassembly, blockchain, smart-contracts, metaprogramming"
+,"A finite state machine inside Redis, live-coded in Rust","Brian Sam-Bodden (Redis) at Conf42 Rustlang 2022 on writing a Redis module in Rust with a custom data type, commands and hash event hooks",2022-08-09,rustlang2022/finite-state-machine-as-redis-module,,"Redis lets you add your own data types and commands, and you no longer need C to do it. Brian Sam-Bodden, Developer Advocate at Redis, spends his Conf42 Rustlang 2022 session live-coding a Redis module in Rust from cargo new to a working finite state machine that manages the state field of ordinary Redis hashes.
+
+It is a demo talk: one terminal, one editor, the whole module built step by step.
+
+## Why would you write a Redis module in Rust?
+
+Redis is a key-value database whose values can be strings, hashes, lists, sets, sorted sets, streams, geospatial indexes, HyperLogLogs and more. The modules API extends that with new data types and commands; Redis itself ships modules such as RedisJSON, RediSearch, RedisGraph, RedisTimeSeries, RedisAI, RedisGears and RedisBloom.
+
+Until recently that API was for C programmers only. Redis has been building a Rust bridge for it, published as the redis-module crate, and the reason is safety. Sam-Bodden said at Conf42 Rustlang 2022: ""Redis modules run in the same memory space as Redis."" A leak or a bad pointer in your module is a problem for the whole server, so memory safety is a requirement, not a nicety.
+
+## What gets built?
+
+A toy job state machine with three states (sleeping, running, cleaning) and three events (run, clean, sleep). The definition is JSON: a name, the key prefix of the hashes it governs, the field that stores the state, the states and the events with their from and to states. The module exposes four commands:
+
+- **FSM.CREATE** parses the JSON with serde and stores it as a custom Redis data type.
+- **FSM.INFO** reads it back and serialises it to JSON.
+- **FSM.ALLOWED** checks whether an event can apply to a given hash in its current state.
+- **FSM.TRIGGER** applies the event and writes the new state into the hash.
+
+Plus one implicit behaviour: when a new hash with a matching prefix is written, the module sets its state field to the initial state, which is the first state in the definition.
+
+## The details you only learn by doing it
+
+Before the module, he gives a quick Redis CLI tour on Redis 7.0.4: strings, colon-separated key namespaces, the NX and XX flags on SET, and hashes. Sam-Bodden said at Conf42 Rustlang 2022: ""Hashes are kind of the workhorse of Redis."" They are what most clients map objects to, which is why the state machine targets them.
+
+The build itself is full of small, useful facts:
+
+- The crate type must be cdylib so Redis can load it with the loadmodule flag; MODULE LIST confirms it is in.
+- A custom data type name must be exactly nine characters, and types carry a version number so you can handle older encodings later.
+- Each command is registered in the redis_module macro with its name, backing function, a write or readonly flag, and the first key, last key and key step. FSM.ALLOWED takes three arguments but only two of them are keys.
+- Keys are opened through the context, writable for create and read-only for info, and he uses the guard crate to avoid nested lets around Redis results.
+- The prefix-to-machine lookup lives in a plain Redis hash the module writes on create, so an incoming hash event can find its state machine with one HGET. Watching the server log, you see the module receive events for that mapping hash too, which is ignored because its prefix matches no machine.
+
+The finale runs the whole loop: create the machine, write a job hash, see it start in sleeping, ask whether sleep is allowed (no) and run is allowed (yes), trigger run, and read the hash back in running.
+
+## Who should watch
+
+Rust developers who use Redis and have wondered what server-side logic would look like if it lived next to the data. It is an intro to the modules API by example, not a production guide; the state machine is deliberately a toy and the source is on his GitHub.
+
+## Related Conf42 talks
+
+- Abhishek Gupta on [Go and Redis](https://www.conf42.com/Golang_2023_Abhishek_Gupta_go_redis_better_together) at Conf42 Golang 2023.
+- Karthik Reddy Beereddy on [self-healing streaming with Redis](https://www.conf42.com/Kube_Native_2025_Karthik_Reddy_Beereddy_streaming_redis_selfhealing) at Conf42 Kube Native 2025.
+- Dmitry Kudryavtsev on [extending Node.js with Rust native modules](https://www.conf42.com/Rustlang_2022_Dmitry_Kudryavtsev_supercharge_nodejs), the same idea for a different host.
+
+[Watch Brian Sam-Bodden's talk](https://www.conf42.com/Rustlang_2022_Brian_SamBodden_extending_redis)
+
+[Watch the talk on YouTube](https://youtu.be/tAvLKsnNJVg).
+",talk,rustlang2022,talk:rustlang2022/Brian Sam-Bodden,,Conf42,,queued,"rust, redis, redis-modules, state-machines"
+,"Zero-cost means zero extra cost, and a dozen ways to collect on it","Tim McNamara (AWS) at Conf42 Rustlang 2022 on idiomatic Rust tips, from Clippy pre-commit hooks and newtypes to enum dispatch",2022-08-05,rustlang2022/clippy-newtypes-and-enum-dispatch,,"A zero-cost abstraction is not free; it is just something you could not have written better by hand. Tim McNamara, Senior Software Engineer at AWS, opens his Conf42 Rustlang 2022 talk with that definition and then spends half an hour on practical ways to write Rust that stays fast and stays readable for the next person on the team.
+
+It is a tips talk built from before-and-after code, so it rewards having an editor open.
+
+## What does zero-cost actually promise?
+
+McNamara said at Conf42 Rustlang 2022: ""So zero cost, in the sense of zero cost abstractions actually means zero additional cost."" He suggests zero marginal cost as the more precise phrase, and adds the trade-off that makes Rust Rust: the cost is measured at runtime, so it is fine for builds to take longer if the program runs faster.
+
+His three go-to references are the Rust API Guidelines, the Clippy lint index (hundreds of checks, each with an explanation) and the idiomatic-rust repository.
+
+## Idioms are for your teammates
+
+McNamara said at Conf42 Rustlang 2022: ""Programming is a team sport, and writing software is easier than reading software."" So follow the conventions. Java-style getters and setters mostly do not belong in Rust, with an exception for wrapper types like the NonZero integers or Cell, where a get method returning the inner value makes sense. Use the as, to and into naming conventions for conversions.
+
+The underrated one: eagerly implement the common traits (PartialEq, Clone, Hash) on your public types. Because of the orphan rule, your users cannot implement a foreign trait for your foreign type; their only way out is a newtype wrapper, which is just annoying.
+
+He also shares his git pre-commit hook: cargo fmt check, then cargo check, then Clippy, in that order of cost, with an environment variable escape hatch for when you really need to commit something broken.
+
+## Small changes that help callers
+
+Accept a string slice rather than a reference to a String, and a slice rather than a reference to a boxed value. Deref coercion means callers holding the owned type can still call you, so the narrower signature costs nobody anything.
+
+For generic functions, he shows a monomorphisation trick: keep the generic public function as a thin shim that converts its input and calls a private non-generic inner function marked not to inline. Only the shim gets copied per type; the body exists once.
+
+## Make the compiler do the testing
+
+He nudges towards formal methods via the cheapest possible entry point, readme-driven development: write the document describing how the program should behave before writing it. Then property testing with the proptest crate, and fuzzing, which he says is far easier than it sounds.
+
+The type-system tips are the strongest section:
+
+- **Newtypes.** Two thermometers both read 20, one in Celsius and one in Fahrenheit, and the naive average is 44. Wrapping f32 in unit types turns that logic bug into a compile error, which is the better failure.
+- **Return enums, not booleans.** A bool ten lines after the call that produced it tells you nothing; a two-variant enum documents itself.
+- **Make illegal states unrepresentable.** Instead of a validate method people forget to call, put validation in the constructor and return a Result. His example is a building whose height must be non-zero.
+- **Option around a reference is free.** References are never null, so the compiler uses the spare bit pattern and the Option takes no extra space.
+- **Do not fake inheritance with Deref.** It is a known antipattern; use a trait with a default method or write the facade by hand.
+
+## The third kind of polymorphism
+
+Everyone knows generics (static dispatch) and trait objects (dynamic dispatch). McNamara argues for a third: an enum that lists every concrete type, matched in the calling code. The enum_dispatch crate removes the boilerplate, and he cites its benchmarks showing around ten times speed-ups even over the static dispatch case. He pairs it with design advice: if your trait needs more than two or three methods implemented, it is probably too broad. Most standard library traits need just one.
+
+## Who should watch
+
+Rust developers past the borrow-checker stage who want their code to read like the ecosystem's. Beginners get a lot from the newtype and constructor sections; experienced Rustaceans will likely argue with at least one tip, which he explicitly invites.
+
+## Related Conf42 talks
+
+- Joe Skeen on [unit testing in Rust](https://www.conf42.com/Rustlang_2023_Joe_Skeen_love_unit_testing) at Conf42 Rustlang 2023.
+- Shriram Balaji on [rustc, symbols and static libraries](https://www.conf42.com/Rustlang_2024_Shriram_Balaji_unlinked_rustc_symbols), for what monomorphisation leaves in your binary.
+- Andrei Marinica on [pushing Rust to the limit in a blockchain environment](https://www.conf42.com/Rustlang_2022_Andrei_Marinica_blockchain_environment), where the never type and monomorphisation go much further.
+
+[Watch Tim McNamara's talk](https://www.conf42.com/Rustlang_2022_Tim_McNamara_maximum_benefit_zerocost_abstractions)
+
+[Watch the talk on YouTube](https://youtu.be/2Py4tQWBrkg).
+",talk,rustlang2022,talk:rustlang2022/Tim McNamara,,Conf42,,queued,"rust, idiomatic-rust, type-system, performance, api-design"
 ,How to Make SPA Apps SEO Friendly,a guest blogpost by Sammy Lin,2022-08-04,2022-08-04-spa-apps-seo-friendly,./assets/splash/SPA_Apps_SEO_friendly.PNG,"## How to Make SPA Apps SEO Friendly
 The evolution of web apps has recently brought about an interesting twist. As developers became ever more reliant on client-side Javascript for creating dynamic web pages, a new pattern of development emerged. This new pattern was great for developers and clients alike.
 However, Googlebot wasn’t so fond of it. This client heavy pattern, known as the single page application (SPA), essentially builds and renders an entire website on the client. In most cases, the only real work happening on the server is client-side API calls for data retrieval.
@@ -108372,6 +108709,48 @@ The techniques mentioned in this article can be used to significantly increase S
 The SPA paradigm is here to stay. While it can be tricky understanding which implementation is best for you, the payoff is usually worth the hard work.
 
 To learn more about Javascript SEO, visit [OhMyCrawl.com](https://www.ohmycrawl.com) for more information.",,,,,,,,
+,"Render video frames as SVG, encode them with libav, skip the browser","Dmitriy Kovalenko (Lightsource) at Conf42 Rustlang 2022 on building videos from code in Rust with SVG frames, libav encoding and a GPU renderer",2022-08-02,rustlang2022/svg-frames-video-pipeline-in-rust,,"The most popular video editors people use for TikTok-style content render their frames through a browser, HTML and CSS. Dmitriy Kovalenko, Lead Software Engineer at Lightsource, used his Conf42 Rustlang 2022 talk to show the alternative he spent about a year and a half building: fframes, a Rust framework where every frame is an SVG, rendering is parallel on the CPU (or tessellated on the GPU), and encoding goes straight through libav instead of a pile of PNGs on disk.
+
+It doubles as a compact primer on how video actually works, which is reason enough to watch it.
+
+## Why Rust for video at all?
+
+His argument is about memory, not fashion. Kovalenko said at Conf42 Rustlang 2022: ""you will notice that the main problem of video is memory and garbage collector."" A 4K frame is a loop over roughly 8 million pixels, and you do that for every frame. A runtime that pauses to collect garbage mid-render is a runtime that drops frames.
+
+## What is a video file, really?
+
+He walks through it from the container down. MP4 is a container, not a codec; it holds an image stream and an audio stream, each split into frames with separate presentation and decoding timestamps, because an encoder may need the next frame to decode the current one. Audio frames bundle samples, typically 48,000 per second. The codec is the maths for making a sequence of images smaller: HEVC (H.265), his pick for the codec that should be used everywhere, has a specification of over 700 pages.
+
+Nobody wants to implement 700 pages, so libav (the library half of FFmpeg) does it. The lazy path is one FFmpeg command over a folder of numbered PNGs, which is how many free mobile and web editors work. The faster path calls libav's C API from Rust and encodes manually: raw image, convert to YUV, send to the encoder, get a packet, stamp it, write it to the container. The YUV step gets a nice history detour: it is a leftover from analogue TV, where colour had to ride on top of a black-and-white signal without breaking old sets.
+
+## Why SVG for frames?
+
+The frame-rendering problem is where the talk gets opinionated. Kovalenko said at Conf42 Rustlang 2022 that ""today, surprisingly, browser is still the most popular way to render any kind of static content."" OBS overlays and GitHub's social preview images are both rendered in a browser.
+
+His list of requirements for a frame format: fixed dimensions, easy to animate, GPU-friendly, specified, and above all debuggable. SVG ticks every box. In fframes you write SVG inside a Rust macro, with Rust expressions and animations inline, and the same definition feeds two things: a Wasm bridge that drives a live editor preview, and a renderer that turns frames into images for the encoder. You can design a frame in Figma, copy it as SVG and paste it into the macro.
+
+For rendering he started on resvg, the Rust SVG library with around 1,500 tests that he says renders SVG more precisely than Chrome, and now runs his own fork tuned for sequential frames, so unchanged parts are not re-rendered.
+
+## CPU first, GPU when it blurs
+
+The CPU renderer simplifies SVG ahead of time to plain paths, then uses Rayon to give each core its own chunk of frames; the chunks are encoded so they can be concatenated at the end. That is fast until you hit shadows, gradients and blur, which force multiple passes over every pixel. For those he built a GPU renderer from scratch that tessellates paths into vertices and indices. He is upfront that it was not yet fully compatible with SVG, and that on a simple hello-world video the parallel CPU path is still competitive; the GPU wins on full-page blurred gradients.
+
+Audio gets the same treatment: decode, mix, encode, plus an API that hands you frequency data so you can draw a visualiser. That was how the project started, as a podcast visualiser, and he quotes an hour of podcast video rendered in about 15 minutes on CPU alone.
+
+## Who should watch
+
+Rust developers curious about multimedia, and anyone generating video from data who is currently shelling out to a headless browser. It is part product launch (fframes opened its beta at the talk), part codec primer; the primer stands on its own.
+
+## Related Conf42 talks
+
+- Alfonso Graziano on [creating videos with React](https://www.conf42.com/JavaScript_2023_Alfonso_Graziano_videos_react), the browser-side take on the same idea.
+- Giovanni Laquidara on [building a video editing app](https://www.conf42.com/Mobile_2022_Giovanni_Laquidara_develop_video_editing_app_in_5_steps) at Conf42 Mobile 2022.
+- Dmitry Kudryavtsev on [Rust native modules versus WebAssembly](https://www.conf42.com/Rustlang_2022_Dmitry_Kudryavtsev_supercharge_nodejs) at the same event.
+
+[Watch Dmitriy Kovalenko's talk](https://www.conf42.com/Rustlang_2022_Dmitriy_Kovalenko_programmatic_videos)
+
+[Watch the talk on YouTube](https://youtu.be/1m9bZ8ztl6s).
+",talk,rustlang2022,talk:rustlang2022/Dmitriy Kovalenko,,Conf42,,queued,"rust, video, ffmpeg, svg, gpu"
 ,Step into the Quantum World with us today!,The size does matter,2022-06-29,2022-06-29-quantum-world-2022,./assets/splash/QUANTUM2022_Event_Splash.png,"#Is there anything cooler than Quantum Computing?
 
 Quantum Computing could be the most life-changing technology of our times. The processes that take years to perform now could be done in a matter of hours - that’s big! But there is a lot we don’t quite know how to figure out yet.
