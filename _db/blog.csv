@@ -98582,6 +98582,56 @@ People building an internal SRE academy or a chaos engineering programme in a la
 
 [Watch the talk on YouTube](https://youtu.be/822IC_tptqE).
 ",talk,sre2023,talk:sre2023/Chandra Dixit,,Conf42,,queued,"chaos-engineering, sre, litmuschaos, argo, kubernetes"
+,"Hide the transaction in the context, keep the repository clean","Ilia Sergunin (Avito) at Conf42 Golang 2023 on transaction management in Go with repositories, a context-based transaction manager and unit of work",2023-04-08,golang2023/go-transactions-in-context-unit-of-work,,"Every Go repository pattern tutorial looks clean until the second table, and then `*sqlx.Tx` starts leaking into every method signature. At Conf42 Golang 2023, Ilia Sergunin, Senior Software Engineer at Avito, walks one shop example from a naive repository to nested transactional use cases. His answer is to store the transaction in `context.Context` behind a transaction manager, and to reach for unit of work when business transactions run long.
+
+Avito runs Go in more than a thousand microservices and handles about 300 million visits a month. His team's own domain, reselling smartphones, has more than 20 states between seller and buyer, so the problem is not academic.
+
+## What should a repository hide?
+
+Saving, loading and mapping, so use cases think about the domain and not the database. One repository per model, because a repository that handles several models becomes a super-repository that is hard to change and test. His `User` has a nested `Profile` in the domain, but they are two tables in the database, and the repository converts between the two views. That alone needs a transaction, so a failure between the two writes cannot corrupt data.
+
+## How does the transaction leak?
+
+Step by step. Registration must save the user and publish a message to a queue, so it begins a transaction and passes `tx` into the repository and the publisher. The repository interface now knows about database transactions. Then the business adds checkout without registration, a use case that calls the registration use case. Now each use case needs if/else logic to decide whether it owns the transaction or joined one. ""But as we know, with great business logics comes great legacy.""
+
+His wish list: a simple repository with no transaction argument, nested transactional use cases, transaction control hidden away, and a database you can swap without rewriting use cases.
+
+## Which fixes don't work?
+
+He tries them in order. A `WithTransaction` closure removes the begin/commit/rollback boilerplate but still ties use cases to `sqlx.Tx`. A factory method that returns a repository bound to a transaction adds a temporal dependency: call it in the wrong order and you are outside the transaction. Reflection that injects the transaction into repositories works, but reflection is no golden path and the transaction still travels through use cases.
+
+Other languages don't help much. SQLAlchemy passes the session explicitly. Django and PHP use globals because each request gets its own thread or process. Java and C# use thread-local storage. Go has no goroutine-local storage, getting a goroutine ID takes hacks that a new release could break, and the Go team discourages it on purpose.
+
+## Why is context the right place?
+
+Because request-scoped values that die with the request are the accepted exception to the advice against storing anything beyond primitives in a context. The transaction manager checks the context for an active transaction, starts one if there is none, and puts it in the context. Repositories pull the transaction from the context, or fall back to the plain DB connection, through a small getter interface. Nested use cases join the outer transaction automatically.
+
+To make it testable he turns the closure into a `Manager` interface with `Do` and `DoWithSettings` (nested transactions, read-only, timeouts), a generic `Transaction` interface, and per-database settings. A generic `TxDecorate[In]` wraps any use case that follows one convention, a `Handle` method taking an args struct, so transaction handling disappears from use case bodies entirely. The result is Avito's go-transaction-manager library, with adapters for `database/sql`, sqlx, GORM, MongoDB and Redis.
+
+## What does it cost?
+
+He is candid about the drawbacks. It needs Go 1.13 or newer. Other drivers need their own adapter, about 70 lines each. The overhead is about 17%, or roughly 5 microseconds, on an in-memory SQLite benchmark. A benchmark against sqlmock showed only 3.4%, but mostly because the mock is slow, and against file-backed MySQL the overhead disappears into I/O. You must pass context everywhere. And long business transactions are out, because a database transaction holds a connection. In his line count comparison the manager wins once you pass about 1.8 nested scenarios.
+
+## When do you need unit of work?
+
+When a business transaction must span slow calls, such as an external service. Martin Fowler defines the pattern as ""maintaining a list of objects affected by a business transaction and coordinating the writing out of changes and the resolution of concurrency problems."" In Go that means `RegisterNew`, `RegisterDirty`, `RegisterClean`, `RegisterDeleted`, `Commit` and `Rollback`. Commit opens one short database transaction and writes everything in batches, so updates stay atomic.
+
+The catch is complexity: a full version needs an identity map, a mapper registry and data mappers, plus a plan for auto-increment IDs (generate them in the app). His simplified version just queues callbacks and fits on two slides. For SQL databases he points to `freerware/work`.
+
+## Who should watch?
+
+Backend engineers building service layers in Go who have felt `tx` creep through their code. Dense slides, but every step is motivated by a concrete business change.
+
+## Related Conf42 talks
+
+- Ilya Kaznacheev on [DDD and state machines](https://www.conf42.com/Golang_2021_Ilya_Kaznacheev_ddd_fsm_state_machine) at Conf42 Golang 2021.
+- Herve Ah-Leung on [successful Go for microservices architecture](https://www.conf42.com/Golang_2022_Herve_AhLeung_successful_microservices_architecture) at Conf42 Golang 2022.
+- Abhishek Gupta on [Go and Redis](https://www.conf42.com/Golang_2023_Abhishek_Gupta_go_redis_better_together) at the same event.
+
+[Watch Ilia Sergunin's talk](https://www.conf42.com/Golang_2023_Ilia_Sergunin_transaction_management_repository_pattern)
+
+[Watch the talk on YouTube](https://youtu.be/aRsea6FFAyA).
+",talk,golang2023,talk:golang2023/Ilia Sergunin,,Conf42,,queued,"go, databases, transactions, design-patterns, architecture"
 ,Observability is the SRE muscle you build with cAdvisor and Grafana,"Jhonnatan Gil Chaves (Globant) at Conf42 Site Reliability Engineering 2023 on observability as the core of SRE, from DORA metrics to a Prometheus demo",2023-04-07,sre2023/observability-first-stack-on-your-laptop,,"When a request fails, the ticket bounces from ops to the developers, who reply that it works on their machine, while the actual culprit is a firewall rule somebody changed yesterday. At Conf42 Site Reliability Engineering 2023, Jhonnatan Gil Chaves, DevOps Engineer at Globant, made the case that observability is what ends that ping-pong, and then built a small local stack with cAdvisor, Prometheus and Grafana to show where to start.
 
 This is an introductory talk: a tour of the concepts followed by a hands-on Docker demo. If you already run OpenTelemetry in production, it is a refresher; if your team is still debating whether it needs observability at all, it is a useful one.
@@ -98633,6 +98683,55 @@ Engineers moving from DevOps work into SRE, and teams that want a first Promethe
 
 [Watch the talk on YouTube](https://youtu.be/lbT9aA0aLBo).
 ",talk,sre2023,talk:sre2023/Jhonnatan Gil Chaves,,Conf42,,queued,"observability, prometheus, grafana, dora-metrics, sre"
+,"Go and Redis, and why your read replicas are probably idle","Abhishek Gupta (AWS) at Conf42 Golang 2023 on using Redis from Go with go-redis, from data structures and pipelines to cluster gotchas",2023-04-06,golang2023/go-redis-replicas-sit-idle,,"You added read replicas to your Redis cluster, and with default client settings every read still goes to the primary. At Conf42 Golang 2023, Abhishek Gupta, Principal Developer Advocate at AWS, gives a practical tour of Redis from Go: which client to pick, how the core data structures map to go-redis calls, two demos (a worker queue and a WebSocket chat), and the production gotchas that trip up newcomers, the idle replicas included.
+
+## Why do Go and Redis fit together?
+
+His answer is simplicity. Redis is a key-value store whose values are the data structures developers already use daily: strings, hashes, lists, sets, sorted sets, plus streams, geospatial indexes and HyperLogLog. Go keeps its tooling and language small. He also stresses that ""contrary to popular opinion, redis is not just a cache."" It is a solid messaging platform, can be made highly available with replication or cluster mode, and can persist to disk.
+
+Some context from the talk: Redis was open-sourced in 2009 and has topped the DB-Engines charts since 2013. He cites the claim that 75% of CNCF projects are written in Go.
+
+## Which Go client should you use?
+
+- **go-redis**: the most popular, well documented, and now under the official Redis GitHub organisation. He uses it throughout.
+- **Redigo**: stable and long-lived, but its API is too loosely typed for his taste, and the deal-breaker is no Redis Cluster support.
+- **rueidis**: newer, supports RESP3 features like client-side caching, and builds commands with a builder pattern that keeps type safety. Its site has benchmarks against go-redis.
+
+## What do the basics look like in go-redis?
+
+Connect with `NewClient`, then issue a `Ping`, because creating the client does not open a connection and failing fast is good practice. Strings use `Set` and `Get`, with an optional TTL after which Redis deletes the key for you. `HSet` accepts key-value pairs, a slice, a map or a struct with `redis` tags, which is the natural way to store objects. Sets get `SAdd`, `SCard` for unique counts and `SIsMember`.
+
+Two features he urges you to try yourself. **Pipelines** batch commands into one round trip; his demo inserts a million keys. ""If you do not invoke the exec function, your pipeline will not get executed."" **HyperLogLog** counts unique items in near-constant space: a million fake IP addresses took about 50 MB as a set and only a fraction of a megabyte with `PFAdd`.
+
+## What do the demos show?
+
+**Worker queue on lists.** A producer registers fake users and workers send welcome emails to a mock SMTP server, using a Go library that speaks the Celery protocol over a Redis list. Start a second worker and the jobs spread across both automatically. Inside `redis-cli` you can see the `celery` list (139 tasks at that moment) and base64-decode a JSON task payload.
+
+**Chat with pub/sub and WebSocket.** Each gorilla/websocket connection is mapped to a username. Incoming messages are published to a Redis channel, and a broadcaster goroutine subscribed to that channel pushes each message to every connected user. Redis absorbs the fan-out that makes stateful WebSocket servers hard to scale.
+
+## What goes wrong in production?
+
+- **Wrong connection mode.** Standalone, cluster and Sentinel need different constructors (`NewClient`, `NewClusterClient`). go-redis v9 also offers a universal client. Some providers hide the mismatch behind a generic error.
+- **Networking.** With Amazon ElastiCache, nodes live in a VPC, so Lambda, EKS or ECS clients need the right VPC and security group setup. Read your provider's docs.
+- **Scaling.** Redis is in-memory and single-threaded, so more RAM helps and more cores barely do. Add replicas for read-heavy loads. Write-heavy loads need Redis Cluster with more shards, since each shard has one primary that takes writes.
+- **Idle replicas.** Cluster clients route reads to primaries by default, so new replicas will ""sit idle, believe it or not."" In go-redis set `ReadOnly`, or `RouteByLatency` or `RouteRandomly`, which enable it too.
+- **Hash slots.** Redis Cluster has 16,384 slots, and multi-key operations fail across slots. Hashtags like `{customer42}` force related keys into one slot.
+- **Sharded pub/sub**, added in Redis 7, scales pub/sub in a cluster with the same hashtag trick. `ForEachShard` and `ForEachMaster` fan bulk operations out across goroutines.
+
+## Who should watch?
+
+Go developers starting with Redis, and teams that already run it and want a checklist for cluster mode. Seasoned Redis operators will know most of the gotchas, but the go-redis specifics are handy.
+
+## Related Conf42 talks
+
+- Ilia Sergunin on [transaction management and the repository pattern](https://www.conf42.com/Golang_2023_Ilia_Sergunin_transaction_management_repository_pattern) at the same event.
+- Karthik Reddy Beereddy on [self-healing streaming with Redis Streams on Kubernetes](https://www.conf42.com/Kube_Native_2025_Karthik_Reddy_Beereddy_streaming_redis_selfhealing) at Conf42 Kube Native 2025.
+- Brian Sam-Bodden on [extending Redis](https://www.conf42.com/Rustlang_2022_Brian_SamBodden_extending_redis) at Conf42 Rustlang 2022.
+
+[Watch Abhishek Gupta's talk](https://www.conf42.com/Golang_2023_Abhishek_Gupta_go_redis_better_together)
+
+[Watch the talk on YouTube](https://youtu.be/IfL6J_6el7E).
+",talk,golang2023,talk:golang2023/Abhishek Gupta,,Conf42,,queued,"go, redis, databases, pub-sub, scaling"
 ,"Quality gates are a speed feature, not a checklist","Craig Risi (REPL Group, Part of Accenture) at Conf42 Site Reliability Engineering 2023 on automated quality gates that let CI pipelines say no fast",2023-04-05,sre2023/quality-gates-belong-in-the-pipeline,,"Most teams treat quality control as the slow bit at the end of a sprint, where testers get two days to do two weeks of work. At Conf42 Site Reliability Engineering 2023, Craig Risi, QA Architect and Senior Manager at REPL Group, Part of Accenture, argued the opposite: move those checks into the CI/CD pipeline as automated quality gates, and they stop slowing you down and start speeding you up.
 
 Risi, who also wrote the book Quality by Design, spends a good third of the talk on software design before he touches a pipeline. That is deliberate, and it is the part most CI talks skip.
@@ -98735,6 +98834,157 @@ SREs and SOC analysts who live in ELK and want a weekend project that makes raw 
 
 [Watch the talk on YouTube](https://youtu.be/agNoLB67PxI).
 ",talk,sre2023,talk:sre2023/Clay Langston,,Conf42,,queued,"llm, logging, kibana, prompt-engineering, observability"
+,"Keep your Postgres, put a stateless sharding proxy on Kubernetes",Trista Pan (SphereEx) at Conf42 Golang 2023 on turning existing PostgreSQL or MySQL into a distributed database with Apache ShardingSphere on Kubernetes,2023-04-04,golang2023/shardingsphere-proxy-postgres-kubernetes,,"The usual answer to an overloaded Postgres is a migration to a new distributed database. At Conf42 Golang 2023, Trista Pan, co-founder and CTO of SphereEx and a PMC member of Apache ShardingSphere, argues for a cheaper route: keep your PostgreSQL or MySQL instances as the storage layer, and add a stateless computing layer, ShardingSphere-Proxy, that runs where Kubernetes is actually good, with stateless pods.
+
+Honest scope: there is no Go code in this one. It is an architecture talk aimed at whoever owns the database your Go services talk to.
+
+## Why are databases awkward on Kubernetes?
+
+Kubernetes was built for stateless services. Databases add data persistence, primary/replica state management, and backup and restore to a point in time. These come on top of the monitoring, HA, deployment, scaling and security that every workload needs. Vendors who run their distributed databases on Kubernetes lean on PersistentVolumes, PersistentVolumeClaims and StorageClasses, StatefulSets and pod identity. It works, but it is the hard way.
+
+Trista Pan said at Conf42 Golang 2023 that ""Kubernetes currently is not so good to help you manage the stateful databases,"" and the rest of the design follows from that sentence.
+
+## What is the trick?
+
+Split the database the way distributed systems already do. She points to the high-level designs of systems like MongoDB and CockroachDB: computing nodes route and process queries, storage nodes persist data. If you accept that model, your existing Postgres or MySQL cluster can be the storage nodes, and you only need to add global computing nodes on top.
+
+ShardingSphere-Proxy is that computing layer. It is stateless, so it belongs in Kubernetes. For storage you have two options: run PostgreSQL in the cluster too, or, as she recommends, keep using managed RDS from your cloud and point the proxy at it. Applications connect to the proxy with their standard database driver and see a single logical database, whatever language they are written in.
+
+The benefits on her list: keep the databases you already run, upgrade to a distributed setup at low cost, gain SQL audit, traffic governance and elastic scaling, sidestep the stateful-on-Kubernetes headache, deploy out of the box, and avoid lock-in.
+
+## What is Apache ShardingSphere?
+
+An Apache top-level project, open source for five or six years at the time of the talk, whose own tagline is to ""Transfer any monolithic databases into a distributed one."" It comes in two forms. ShardingSphere-JDBC is a Java driver embedded in the application. ShardingSphere-Proxy is a standalone database proxy for any language, including Go. Either way you get data sharding, read/write splitting, distributed transactions, data encryption and masking, SQL audit and firewall rules, and elastic scale-out across MySQL, PostgreSQL, Oracle and SQL Server.
+
+## How does a sharded query actually run?
+
+You define tables with DistSQL, ShardingSphere's SQL dialect: instead of a plain `CREATE TABLE` you declare a sharding table rule. In her example the logical table `t_user` is backed by four physical tables spread across two PostgreSQL clusters, each with a primary and a replica. The application sees one table.
+
+When a query arrives, the proxy works out which instances hold the rows, sends the query to one or more of them, and merges the partial results into the final result for the application.
+
+## How do you deploy it?
+
+The `apache/shardingsphere-on-cloud` repository provides Helm charts and an operator to deploy, scale in and scale out the proxy cluster. The demo, which she ran out of time to show live but documents step by step, goes like this:
+
+1. Deploy two PostgreSQL clusters (primary plus replica) with the Bitnami Helm chart.
+2. Deploy two ShardingSphere-Proxy nodes plus governance with the operator chart.
+3. Register the PostgreSQL resources with the proxy.
+4. Create the `t_user` sharding table.
+5. Inspect the metadata.
+6. Insert test data.
+7. Preview the routing.
+8. Run the select.
+
+## Who should watch?
+
+Platform and database engineers with a growing Postgres or MySQL fleet who want sharding without a rewrite, and teams weighing whether to move databases into Kubernetes at all. Go developers looking for code should pick another talk.
+
+## Related Conf42 talks
+
+- Trista Pan on [automatically sharding and scaling out databases on Kubernetes](https://www.conf42.com/Cloud_Native_2023_Trista_Pan_automatically_shard_scaleout_databases_kubernetes) at Conf42 Cloud Native 2023.
+- Jan Karremans on [databases on Kubernetes](https://www.conf42.com/Cloud_Native_2024_Jan_Karremans_databases_kubernetes) at Conf42 Cloud Native 2024.
+- Karthickram Vailraj on [sharding and replication](https://www.conf42.com/Platform_Engineering_2025_Karthickram_Vailraj_sharding_replication_database) at Conf42 Platform Engineering 2025.
+
+[Watch Trista Pan's talk](https://www.conf42.com/Golang_2023_Trista_Pan_distributed_database_kubernetes_leveraging_monolithic_database)
+
+[Watch the talk on YouTube](https://youtu.be/ueeS2C9d93k).
+",talk,golang2023,talk:golang2023/Trista Pan,,Conf42,,queued,"databases, kubernetes, sharding, postgresql, shardingsphere"
+,"Count heap objects, not bytes, when Go's GC hurts your p99",Nishant Roy (Pinterest) at Conf42 Golang 2023 on diagnosing Go garbage collection pressure and cutting heap objects with pprof and struct changes,2023-04-02,golang2023/go-gc-heap-objects-pinterest,,"If your Go service has a fine median and an ugly p99, the garbage collector is a prime suspect, and the number to watch is how many objects live on the heap, not how many bytes. At Conf42 Golang 2023, Nishant Roy, Engineering Manager for the ads serving platform at Pinterest, explains how Go's GC steals from your program under memory pressure, how to prove it is the culprit, and the changes that cut heap objects by around 20% without touching the logic.
+
+Context for the stakes: his team's Go systems power an ad delivery business of over $2 billion a year.
+
+## How does Go's GC end up slowing your program?
+
+By default the collector runs whenever the heap has grown 100% since the last cycle. It uses a tricolour mark algorithm (white is collectible, black is in use, grey is undecided), which lets it run concurrently without the long stop-the-world pauses Java was famous for. It aims to use no more than 25% of available CPU.
+
+The trouble starts when allocation outpaces cleanup. The GC then recruits your goroutines to help with marking, which keeps the heap in check and also slows your program down. Marking means scanning every object on the heap, so cost grows with the object count. Anything that escapes a function's scope, as decided by escape analysis, ends up there.
+
+## How do you prove the GC is the problem?
+
+Three steps. **Observe**: GC pressure shows up as high tail latency, typically p99, because collections are infrequent and only hit the last percent of requests. **Measure**: run with `GODEBUG=gctrace=1` to get a line per GC cycle with phase timings, CPU share and heap sizes before and after (he credits Ardan Labs' write-up for explaining the format). **Align**: line those cycles up against latency spikes. He ran a background goroutine that printed p90 and p99 latency at regular intervals next to the gctrace output and looked for correlation.
+
+## Which tools show where the objects come from?
+
+`runtime.MemStats` first. The three fields he watches are `HeapObjects` (his success metric for every optimisation), `HeapAlloc` (what triggers the next GC) and `HeapSys` (memory obtained from the OS, which is a blocking request if it keeps climbing). In his toy example a single `runtime.GC()` drops `HeapAlloc` from about 929 KB to 112 KB.
+
+He also mentions the newer soft memory limit, which triggers GC at a heap size you choose instead of at 100% growth. Useful as a quick fix, but tuning actual heap usage gives more consistent wins.
+
+Then pprof. Register the handler, run `go tool pprof -inuse_objects` (or `-alloc_objects`) against `/debug/pprof/heap`, and use `-http` to open the web UI. The graph view showed `bufio.NewReaderSize` responsible for about 45% of heap allocation in one example, and the flame graph makes the widest allocators obvious. In the CLI, `list` on a function gives allocations line by line.
+
+## What actually reduces GC work?
+
+Three levers: fewer objects on the heap, a lower allocation rate, and smaller data structures.
+
+**Fewer long-lived objects.** Compute per-request data on demand instead of keeping it in a giant long-lived map. That costs more compute per request but trades unpredictable tail latency for predictable per-request work. Avoid nested pointers, because each referenced field becomes its own heap object. And watch strings: Nishant Roy said at Conf42 Golang 2023 that ""Strings and binaries are treated as pointers under the hood.""
+
+That last point is his best example. A catalog map keyed by a string that encoded product ID and seller ID was switched to a struct key holding the two IDs. Total objects in the profile went from 132 million to 106 million, about 26 million fewer and roughly 20% of the heap. ""So we didn't actually change that much, we just changed how we're representing the exact same data.""
+
+**Lower allocation rate.** Object pools help with bursts of short-lived objects, with two warnings: the GC will not clean the pool for you, so misuse leaks memory, and objects returned unsanitised can leak one user's personal data into another user's request. Use them last.
+
+**Smaller structs.** Removing four unused fields shrank his example struct from 64 to 40 bytes, because unused fields still hold default values. Reordering the remaining fields to avoid alignment padding (bools together, then int32s, then the int64) took it to 24 bytes, a 62% drop per object. Go's allocator does not reorder fields for you.
+
+## Who should watch?
+
+Engineers running high-throughput Go services with tail latency problems, and anyone who has stared at a pprof graph without a plan. His conclusion is balanced: for most programs the Go GC needs no attention at all.
+
+## Related Conf42 talks
+
+- Liam Conroy Hampton on [memory management in Go](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management) at the same event.
+- Marco Marino on [the Go memory model, profiling and optimisation](https://www.conf42.com/Golang_2024_Marco_Marino_performance_memory_optimization) at Conf42 Golang 2024.
+- Yashvardhan Kukreja on [profile-guided optimisation](https://www.conf42.com/Golang_2024_Yashvardhan_Kukreja_profileguided_optimization) at Conf42 Golang 2024.
+
+[Watch Nishant Roy's talk](https://www.conf42.com/Golang_2023_Nishant_Roy_heap_optimizations)
+
+[Watch the talk on YouTube](https://youtu.be/q1p4K5se3jc).
+",talk,golang2023,talk:golang2023/Nishant Roy,,Conf42,,queued,"go, garbage-collection, performance, pprof, memory"
+,TDD in Go starts with a test that is supposed to fail,"Mohammad Quanit (timegram) at Conf42 Golang 2023 on test-driven development with Go's testing package, httptest and table-driven tests",2023-03-31,golang2023/tdd-in-go-failing-test-first,,"Most teams write the code, then the tests, then discover the edge case in production. At Conf42 Golang 2023, Mohammad Quanit, Product Engineering Manager at timegram, makes the beginner's case for flipping that order in Go, and shows the three testing styles you need to start: plain unit tests, HTTP handler tests with `httptest`, and table-driven tests. Every demo includes a deliberately failing assertion, which is the most TDD thing about it.
+
+This is an introduction, and it says so. If you already write table-driven tests every day, skip to the frameworks and best practices at the end.
+
+## Why bother writing tests first?
+
+His argument is that writing the test first forces you to think like the user of the code and enumerate the cases a feature has to cover before you build it. That catches errors earlier, keeps code modular and refactorable, and cuts debugging time because you already know where the failure can hide. He also says it plainly: ""TDD is not just part of merely testing mechanism."" It is a way of designing software, a mental model that feels overwhelming at first and gets easier with practice on side projects.
+
+The motivations on his list: a shorter feedback loop when requirements change (you tweak the existing test rather than writing a new one), a lower cost of change, and confidence that a shipped feature does what it should. His team at timegram had just started adopting TDD on their own product. ""Test cases should be mandatory for every company,"" he says.
+
+The cycle itself is the familiar one: write the test, watch it fail, write the production code, run everything, then refactor either side.
+
+## What does the built-in testing package give you?
+
+More than people remember. Tests live in files ending in `_test.go`, functions start with `Test` and take a `*testing.T`, and `go test` finds and runs them. `-v` shows each step, `-cover` reports coverage, and the same package runs benchmarks for performance work.
+
+His first demo has a `HelloWorld` function and a `Sum` over a slice. The `Sum` test passes in five numbers that add up to 15 and asserts 16, so `go test -v` shows one pass and one failure reported through `t.Errorf`. He uses `t.Run` for subtests to keep cases separated.
+
+## How do you test an HTTP handler?
+
+With `net/http/httptest`. His service uses gorilla/mux and has a handler that returns posts from a public JSON API. The test builds a request with `http.NewRequestWithContext`, creates an `httptest.NewRecorder` (a `ResponseWriter` that records what the handler wrote), calls `ServeHTTP` on the handler, decodes the body and checks that exactly 100 posts came back. Change the expectation to 101 and the test fails with a clear message. The same approach covers status codes and specific fields.
+
+One caveat a reviewer would raise: because the handler fetches from a live public API, this is closer to an integration test. In a real TDD loop you would stub that dependency, which is exactly what his later advice on mocks is for.
+
+## Why do gophers love table-driven tests?
+
+Because adding a case becomes one line. He defines a slice of structs with a description, two inputs and an expected value, loops over it with `range`, and runs each entry under `t.Run(tc.description, ...)` so every case shows up by name in the output. One plus two and three plus four pass. He adds ten plus 45 expecting 70, and the output tells you exactly which row broke and that it got 55.
+
+## Which frameworks and practices does he recommend?
+
+For when the standard library feels thin: Gomega for matchers, GoCheck as a richer testing library, Testify for assertions and mocks, GoMock for dedicated mocking, and Ginkgo for BDD-style specs.
+
+His best practices: write the test before the code, keep tests small and focused, run `go test -v`, mock dependencies to simulate real behaviour, check `go test -cover`, automate tests in CI, and keep tests updated whenever requirements or library versions change.
+
+## Who should watch?
+
+Developers new to Go or new to TDD who want a guided tour of the standard tooling in one sitting. Experienced gophers will find little new, but it is a good link to send a junior colleague.
+
+## Related Conf42 talks
+
+- Ivan Pesenti on [building a complex app with TDD](https://www.conf42.com/Golang_2023_Ivan_Pesenti_complex_app_tdd) at the same event.
+- Francisco Daines on [testing 101](https://www.conf42.com/Golang_2022_Francisco_Daines_testing_101) at Conf42 Golang 2022.
+- Julien Breux on [testing with Testcontainers](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container) at Conf42 Golang 2024, for when the dependency should be real.
+
+[Watch Mohammad Quanit's talk](https://www.conf42.com/Golang_2023_Mohammad_Quanit_test_driven_development)
+
+[Watch the talk on YouTube](https://youtu.be/mLuqyFSyBaU).
+",talk,golang2023,talk:golang2023/Mohammad Quanit,,Conf42,,queued,"go, testing, tdd, table-driven-tests, httptest"
 ,Keep your head in the Cloud!,Kick start this spring with some fresh learning,2023-03-29,2023-03-09-hop-on-the-cloud-nine-with-us,./assets/splash/CLOUD2023_Event_Splash.png,"#Kick start this spring with some fresh learning
 
 Say hi to over 50 Cloud-related talks carefully picked just for you!
@@ -98747,6 +98997,241 @@ Come and join the fun! As always, we’re extremely grateful for our sponsors, a
 
 I’ll see you on the cloud nine!
 ",,,,,,,,
+,"The Go SaaS toolbox, from config file to metered Stripe bill","Huseyin Babal (Kubeshop) at Conf42 Golang 2023 on the tools that take a Go SaaS from config and logging to GoReleaser, Terraform Cloud and Stripe billing",2023-03-29,golang2023/go-saas-toolchain-goreleaser-to-stripe,,"Writing the Go service is the easy 20% of a SaaS product. At Conf42 Golang 2023, Huseyin Babal, Principal Cloud Engineer at Kubeshop, walks through the other 80% with a sample quiz app called Quizzer: configuration, logging, release artifacts, linting, CI, infrastructure, secrets, DNS, TLS and, because the point is to get paid, usage-based billing with Stripe.
+
+It is a breadth talk. Each tool gets a few minutes and one config file, which is exactly what you want when assembling a stack for the first time.
+
+## What does the app itself need?
+
+Start with `go mod init` against your GitHub path. For configuration he uses koanf to unmarshal a YAML file into a Go struct, with methods on the struct (a `DSN()` for the Postgres connection string, for instance). Following the twelve-factor app, every value can be overridden by an environment variable, where an underscore stands for YAML nesting, so `APP_PORT` maps to `app.port`. That is what makes the same image configurable as a Kubernetes pod.
+
+Logging is Uber's zap, with one detail worth remembering: fast loggers buffer, so `defer logger.Sync()` before exit or you lose the last lines. Log with key-value context (which customer, which session) so you can filter in Elasticsearch or Graylog later.
+
+In the Quizzer demo the rest is GORM with `AutoMigrate` on Postgres, Fiber for the REST endpoints, and a Prometheus metrics endpoint via `promhttp`. Wrappers around third-party libraries live in packages named after the technology plus an x, like `loggerx`.
+
+## How do the artifacts get built?
+
+GoReleaser does binaries and Docker images from one `.goreleaser.yml`: a build per entry point under `cmd/`, a Docker section that references builds by id, image tags templated from the Git tag, a build argument that tells one shared Dockerfile which module to copy, and `extra_files` to put the config YAML into the Docker context. It can also announce releases to Slack or Discord.
+
+Quality checks are golangci-lint with its own YAML. In GitHub Actions the pipeline checks out code, sets up Go, runs the golangci-lint action, sets up the QEMU emulator for Docker builds, logs in to GitHub Container Registry with the repo token, and runs the GoReleaser action with `release --clean`. The workflow needs read access to contents and write access to packages. A tag produces a GitHub release and a container package.
+
+## Where does it run?
+
+On Kubernetes, created by Terraform Cloud connected to the repository: a workspace runs `plan` on each change, and in the demo it creates a GKE cluster and node pool once he applies. From there:
+
+- **Argo CD** deploys the Helm chart through an `Application` resource pointing at the chart repo, version and target namespace.
+- **External Secrets** syncs the database password and Stripe key from Vault, AWS or GCP secret managers into Kubernetes secrets, so nobody creates them by hand.
+- **Cloudflare**, through its Terraform provider, creates the A record so customers never see the load balancer IP.
+- **cert-manager** with a Let's Encrypt issuer puts TLS on the ingress, so traffic is HTTPS from Cloudflare to the service.
+
+Huseyin Babal said at Conf42 Golang 2023: ""If I have them in my code base I can easily sync everything to my production with single push or single tag.""
+
+## How does the billing work?
+
+This is the section most Go talks skip. Stripe models it as a subscription to a plan, subscription items as line items (cost per request, cost per storage), and usage records for metered billing. Customers subscribe through a Stripe Checkout link, so payment details never touch your servers. A webhook tells you which customer picked which plan.
+
+Your only job is metering. In Quizzer, an hourly cron job counts questions per customer and sends that number to Stripe as a usage record with the `increment` action. At the end of the billing period Stripe multiplies the total by the unit price, charges the customer and notifies them. In his words: ""You do nothing if you use stripe, almost nothing.""
+
+## Who should watch?
+
+Go developers about to launch a side project or a first SaaS product, and anyone who wants one reference stack to compare theirs against. Expect breadth over depth: the abstract mentions vulnerability scanning, but the talk does not show it.
+
+## Related Conf42 talks
+
+- Robert Pajak on [goyek, using Go for automation](https://www.conf42.com/Golang_2023_Robert_Pajak_goyek_automation), for the build side of the pipeline.
+- Marvin Collins Hosea on [building secure, scalable webhooks](https://www.conf42.com/Golang_2023_Marvin_Collins_Hosea_building_secure_scalable_webhooks) at the same event.
+- Mohamed Abdelrhman on [Go for Kubernetes](https://www.conf42.com/Golang_2024_Mohamed_Abdelrhman_kubernetes) at Conf42 Golang 2024.
+
+[Watch Huseyin Babal's talk](https://www.conf42.com/Golang_2023_Huseyin_Babal_swiss_army_knife_saas_products)
+
+[Watch the talk on YouTube](https://youtu.be/SJGfZ3RU_3Y).
+",talk,golang2023,talk:golang2023/Huseyin Babal,,Conf42,,queued,"go, saas, ci-cd, kubernetes, stripe"
+,"Build pipelines that fail like go test, not like Bash","Robert Pajak (Splunk) at Conf42 Golang 2023 on goyek, a Go library for build automation compared with Make and Mage",2023-03-27,golang2023/goyek-build-pipelines-like-go-test,,"Every Go repo has a Makefile that someone is afraid to touch. At Conf42 Golang 2023, Robert Pajak, Senior Software Engineer at Splunk and the author of goyek, runs the same three-target build (all, fmt, test) through Make, Mage and goyek, and shows why he ended up writing his own library: build tasks should read, log and debug like ordinary Go tests.
+
+He is upfront that this is partly an advert for his project, and the comparison is fair to the alternatives.
+
+## What is wrong with Make?
+
+Nothing fatal. His demo Makefile has an `all` target depending on `fmt` (imported from a shared file so several repos can reuse it) and `test`, which has to run `go test` with coverage, remember the exit code in a shell variable, still produce the HTML coverage report, and only then exit with the saved code. A `help` target parses double-hash comments to print usage, and the shared file pins the shell to Bash because macOS defaults to zsh.
+
+That is the problem in miniature. Anything beyond trivial logic sends him to the docs, old Makefiles or Stack Overflow. Debugging means printing to the console. And making one Makefile behave on Linux, macOS and Windows is hard. Meanwhile most Go programs that stick to the standard library just work everywhere, which is why some SREs he heard from write Go tools instead of shell scripts.
+
+## Why not Mage?
+
+Mage was the first Go-native option he found: plain exported Go functions become Makefile-like targets. Running it through a `mage.go` wrapper with `go run` even pins every developer to the same Mage version through Go modules.
+
+His verdict: ""For me, mage is too magical."" Target discovery needs special build tags, which often breaks IntelliSense in VS Code or GoLand. Reusing targets from another package needs a magic import comment. Logs from concurrent targets interleave. Without verbose mode a failing build tells you almost nothing, not even which target failed. And the `sh` package has so many near-identical run functions that he never knew which one to call. He respects its community (50+ contributors, 3k+ stars) but never used it in production.
+
+## What does goyek do differently?
+
+""It took me one year to create initial version of Goyek,"" he said, and the design borrows from the standard packages every gopher already knows. Tasks are registered with `goyek.Define` much like Cobra commands, with a name, usage and dependencies. Actions receive a `*goyek.A`, which behaves like `testing.T`: `cmd.Exec` runs a shell-style command and marks the task failed on error without stopping, and there are `Skip`, `Fatal` and `Helper` methods. Flags use the `flag` package. Extensions are middlewares in the style of `net/http`.
+
+The result feels like `go test`. A quiet run prints only the failing task and its output. A verbose run prints everything, Make style. Log lines carry file name and line number, and a function marked as a helper drops out of those locations, just as in tests. Since goyek uses no build tags, IntelliSense works, and since the pipeline is just a Go program, he sets breakpoints in VS Code and steps through a failing `go test` call live.
+
+His bonus example adds a spell task that installs misspell, finds every Markdown file with a `filepath.WalkDir` helper and fails on a typo. goyek also dogfoods itself: its own build pipeline is written in goyek.
+
+## So should you drop Make?
+
+He hasn't. He still uses Make, in Go and non-Go repos alike, for simple jobs like setting up local Kubernetes clusters or validating protobufs. Make is concise and language-agnostic, and you can always call a Go program from it instead of writing complex Bash. goyek earns its place once the build has real logic, with if statements, loops and reusable pipelines shared across repositories. His own slide lists its main downside as being unpopular.
+
+## Who should watch?
+
+Anyone maintaining a Makefile that has grown into a Bash program, and platform teams standardising builds across many Go repositories. Even if you never adopt goyek, the critique of Mage and the go test-style output model are worth borrowing.
+
+## Related Conf42 talks
+
+- Francisco Daines on [ArchGo, architecture tooling and test guidelines automation](https://www.conf42.com/Golang_2021_Francisco_Daines_archgo_architecture_tooling_test_guidelines_automation) at Conf42 Golang 2021.
+- Oliver Fuerst on [DevOps automation](https://www.conf42.com/Golang_2021_Oliver_Fuerst_devops_automation) with Go at Conf42 Golang 2021.
+- Huseyin Babal on [a Swiss Army knife for SaaS products built with Go](https://www.conf42.com/Golang_2023_Huseyin_Babal_swiss_army_knife_saas_products), from GoReleaser to Terraform Cloud.
+
+[Watch Robert Pajak's talk](https://www.conf42.com/Golang_2023_Robert_Pajak_goyek_automation)
+
+[Watch the talk on YouTube](https://youtu.be/g6l7gbrmObo).
+",talk,golang2023,talk:golang2023/Robert Pajak,,Conf42,,queued,"go, build-automation, make, developer-tools, ci"
+,"One Gin router, two main.go files, a gqlgen API on AWS Lambda","Durgaprasad Budhwani (Tech9) at Conf42 Golang 2023 on running one Go GraphQL codebase locally and on AWS Lambda with gqlgen, Gin and SAM",2023-03-25,golang2023/gqlgen-on-lambda-one-router-two-mains,,"The annoying part of serverless Go is rarely the handler. It is testing it without deploying it every five minutes. At Conf42 Golang 2023, Durgaprasad Budhwani, Chief Technologist at Tech9, shows a small trick that fixes most of that: put your routes in one shared file, then give the app two entry points, one that listens on port 8080 on your laptop and one that hands the same router to AWS Lambda. On top of that he builds a GraphQL to-do API with gqlgen and DynamoDB and deploys it with AWS SAM.
+
+## What changes when a Gin app moves to Lambda?
+
+Less than you would think. He starts with the canonical Gin hello world, a router with one GET route that runs on `:8080`. The Lambda version imports `aws-lambda-go` and the `awslabs/aws-lambda-go-api-proxy` adapter for Gin (it also supports Fiber and Gorilla), wraps the router with `ginadapter.New`, and calls `lambda.Start` with a handler that takes an API Gateway proxy request and returns `ginLambda.ProxyWithContext(ctx, req)`.
+
+As Durgaprasad Budhwani said at Conf42 Golang 2023: ""Only a small kind of a wrapper is required when we are running this code for the AWS lambda.""
+
+The one Lambda-specific habit he stresses is where to put the setup. Router construction goes in `init`, so it runs once per execution environment instead of on every invocation, which trims cold start cost for the calls that follow.
+
+## How do you test it without deploying?
+
+He mentions LocalStack as the heavyweight option, then shows the lighter one, which follows AWS's own advice to keep initialisation separate from business logic. The routes live in `router.go`. A `local` main calls the router and runs Gin on 8080, so `go run` gives you a normal HTTP server. A `lambda` main builds the same router and passes it to the proxy adapter. Same code, two front doors.
+
+## Which deploy tool?
+
+For a proof of concept he picks AWS SAM over Terraform, CloudFormation, Pulumi or the CDK. `sam init` scaffolds a project, and the `template.yaml` (a CloudFormation template with SAM shortcuts) names the code path, the handler, the `go1.x` runtime and the architecture. He picks Arm over x86_64. A catch-all API event creates the API Gateway, and `sam build` plus `sam deploy` print the endpoint URL with its default `Prod` stage.
+
+## Where does gqlgen fit?
+
+He gives the GraphQL background briefly: built at Facebook in 2012, open-sourced in 2015, one schema that defines your models, queries for reads and mutations for writes, and resolvers in place of REST controllers. gqlgen is the schema-first Go library that generates type-safe server code from that schema.
+
+`go run github.com/99designs/gqlgen init` scaffolds the project. The useful details are all in `gqlgen.yml`: where the `.graphqls` schema files live, where generated code and models go, and `autobind`, which tells gqlgen to reuse your existing model structs instead of generating duplicates. The generated resolvers come as stubs to fill in.
+
+His demo stores to-dos in DynamoDB through the `dynamo` wrapper library, behind a small to-do service that adds and lists items per user. That service is injected into gqlgen's base `Resolver` struct, which is the dependency injection point gqlgen gives you. Gin serves two routes, a GET for the GraphQL playground and a POST for the query endpoint. Asking for only `text` and getting only `text` back is the GraphQL selling point in one screenshot.
+
+## What changes for the GraphQL deploy?
+
+Very little. The router moves into the shared file again, the local and Lambda mains stay thin, and the SAM template gains an IAM role allowing get, put, query and update on the DynamoDB table. Two events are needed, GET for the playground and POST for everything else, since ""in graphql everything is mostly a post operation."" He then queries the deployed API Gateway URL from a GraphQL client extension in Chrome.
+
+## Who should watch?
+
+Go developers about to put their first HTTP service on Lambda, and anyone curious about gqlgen's workflow. The code-sharing layout is the part to steal. The closing minutes are a pitch for Tech9, and the serverless benefits section covers ground most viewers already know.
+
+## Related Conf42 talks
+
+- Savas Ziplies on [serverless with Go](https://www.conf42.com/Golang_2022_Savas_Ziplies_serverless) at Conf42 Golang 2022.
+- Thorsten Hans on [serverless WebAssembly](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly) at Conf42 Golang 2024.
+- Akshay Bhat on [GraphQL efficiency and flexibility](https://www.conf42.com/Kube_Native_2023_Akshay_Bhat_graphql_efficiency_flexibility) at Conf42 Kube Native 2023.
+
+[Watch Durgaprasad Budhwani's talk](https://www.conf42.com/Golang_2023_Durgaprasad_Budhwani_serverless_scalable__costeffective_apps_gqlgen_aws_lambda)
+
+[Watch the talk on YouTube](https://youtu.be/w31oh7ulXwI).
+",talk,golang2023,talk:golang2023/Durgaprasad Budhwani,,Conf42,,queued,"go, serverless, aws-lambda, graphql, gqlgen"
+,"From flag.StringVar to ten fake people in XML, one commit per slide","Abhisek Pattnaik (Impelsys) at Conf42 Golang 2023 on building Go CLI apps with the standard flag package, custom values, embed and goroutines",2023-03-23,golang2023/go-cli-flag-package-to-fake-data,,"Most Go CLI tutorials either stop at `flag.String` or jump straight to Cobra. At Conf42 Golang 2023, Abhisek Pattnaik, Senior Software Engineer at Impelsys, takes the middle road: he builds a random test data generator that writes XML plus its XSD schema using mostly the standard `flag` package, and every code step is a tagged commit in his repository that matches a slide number.
+
+That last detail makes it a workshop you can actually follow along, rather than a talk you nod through.
+
+## Why build CLIs in Go at all?
+
+His pitch is short. ""Go provides reliable, efficient and scalable CLI application development,"" he says, with a rich standard library for text, files and data, and built-in plus third-party modules for parsing arguments. A single static binary is the rest of the argument.
+
+## How far does the standard flag package go?
+
+Further than most people use it. He starts with `flag.StringVar` and a default of world, for the inevitable greeter, and then works through what the package already supports:
+
+- **Typed values**: strings, ints, booleans, floats and `time.Duration` via `DurationVar`.
+- **Aliases**: bind the same variable to `--name` and `-n`. The catch is that the help output lists them as two separate flags, so he brings in `rsc.io/getopt` for cleaner aliasing and usage text.
+- **Help when called bare**: check `os.Args`, and if no arguments were passed, print `flag.PrintDefaults()` as if the user had typed `-h`.
+- **A name for your tool**: `flag.NewFlagSet` gives the CLI a proper name in its usage output.
+- **Custom types**: implement the two-method `flag.Value` interface (`String()` and `Set(string) error`) and a flag like `--address` can parse an address written as street, city, state, pin code and country straight into a struct. `flag.Func` covers the one-off case, such as pulling a number out of an arbitrary string.
+
+The JSON example is the most practical one. An input file has an `aliases` field that is sometimes a comma-separated string and sometimes an array. A custom unmarshaller reads it as `any`, checks which shape arrived, and normalises both into a string slice, all behind a `flag.Var` so the CLI just takes `-i input.json`. He then opens the `flag` package source to show how parsing and the built-in help flags work under the hood.
+
+## How does it turn into a data generator?
+
+The second half builds the actual tool. A min/max random number CLI comes first, then `brianvoe/gofakeit` for realistic fake data: fill a struct with `faker.Struct`, use struct field tags as hints so a street looks like a street, or call faker functions directly. For inspecting the results he recommends `go-spew`, `valast` and `litter`.
+
+`//go:embed` bundles a `person.schema.json` into the binary, which the tool writes out when you pass `--generate`. The layout follows convention: `cmd/` for the entry point, `internal/` for code nothing else may import, and a Makefile that builds into `bin/`.
+
+## How does the concurrency part work?
+
+He generates N people sequentially, then with a `sync.WaitGroup` and one goroutine per record, then with a buffered channel as a semaphore so `-c 3` caps the work at three goroutines at a time (the default is eight). It is the classic bounded-concurrency pattern, shown on a problem small enough to read in one screen.
+
+The finale writes N records to XML with an embedded XSD alongside, refuses to overwrite existing files unless you pass `-f`, and accepts a prefilled `input.json` (scaffolded with `-g`) so fields like first and last name stay fixed while the rest is randomised.
+
+## What should you take away?
+
+His closing advice is the one most CLIs ignore: keep the user experience in mind and ""provide clear and helpful error messages when commandline arguments are incorrect."" For anything bigger than this, he points to Cobra.
+
+## Who should watch?
+
+Go developers who have written a `main.go` with two flags and want to know what comes next, and anyone who needs a quick fake-data generator for tests. If you already ship Cobra-based tools, the `flag.Value` and bounded-concurrency sections are still worth the time.
+
+## Related Conf42 talks
+
+- Lais Lima on [what she learned creating a CLI with Go](https://www.conf42.com/Golang_2023_Lais_Lima_creating_cli), including a file watcher and interactive prompt.
+- Robert Pajak on [goyek, using Go for automation](https://www.conf42.com/Golang_2023_Robert_Pajak_goyek_automation) instead of Makefiles.
+- Jayaganesh Kalyanasundaram on [concurrency for beginners](https://www.conf42.com/Golang_2021_Jayaganesh_Kalyanasundaram_concurrency_for_beginners) at Conf42 Golang 2021.
+
+[Watch Abhisek Pattnaik's talk](https://www.conf42.com/Golang_2023_Abhisek_Pattnaik_building_cli_apps)
+
+[Watch the talk on YouTube](https://youtu.be/vBDkhEA-Lfs).
+",talk,golang2023,talk:golang2023/Abhisek Pattnaik,,Conf42,,queued,"go, cli, flag-package, concurrency, code-generation"
+,"A watch mode for Golings, and the fsnotify events that went missing",Lais Lima (Globo) at Conf42 Golang 2023 on building an interactive watch mode for the Golings CLI as her first open source contribution,2023-03-21,golang2023/golings-watch-mode-first-open-source,,"Your first open source pull request is rarely a typo fix that merges in an hour. For Lais Lima, a software engineer at Globo, it was a watch mode with an interactive prompt for Golings, a CLI that teaches Go through broken exercises you fix one by one. At Conf42 Golang 2023 she walks through how she built it with fsnotify, goroutines and an infinite loop, and the bug that cost her the most time.
+
+It is a short, honest talk from someone shipping her first contribution, and it is better for that.
+
+## What is Golings, and what was missing?
+
+Golings works like Rustlings for Go. Each exercise is a Go file that does not compile or fails a check. `run` compiles an exercise and tells you whether it passes, `list` shows the exercises available, and `hint` gives you a nudge when you are stuck.
+
+The issue she picked asked for a `watch` command: save the file you are editing and the exercise reruns automatically, while you can still type `hint` or `list` into the same terminal without stopping the watcher. Two jobs at once, which in Go means goroutines and channels.
+
+## How do you watch a directory tree in Go?
+
+Her watcher uses the fsnotify package, which listens to operating system file events. The first surprise: adding a directory to an fsnotify watcher does not cover its subdirectories. Golings keeps each exercise in its own folder, so a watcher on the root saw nothing. The fix was to walk the exercises tree with the `filepath` package and add every directory to the watcher individually.
+
+From there the loop is small. Range over the watcher's events, keep only write events, and push the changed file name into a channel that the function received as a parameter.
+
+## How does the interactive mode share the terminal?
+
+The CLI body creates that channel, starts the watcher, and runs a goroutine that ranges over the channel and reruns the next exercise every time a file name arrives. Because the watcher lives in its own goroutine, the main flow is free for the prompt: a `bufio` reader calling `ReadString` until the user presses Enter, inside an infinite loop, with a `switch` that maps `list`, `hint` and quit to their commands.
+
+It is a good minimal pattern for any developer tool that needs to react to file changes and keyboard input at the same time.
+
+## Which parts were actually hard?
+
+She lists three, and only one is technical.
+
+**Understanding the issue.** She first read it as a request for flags after `watch`, as in a CLI flag that switches modes. It only clicked when the maintainer sent her a video of the same feature in Rustlings. Her lesson is about writing clear issues as much as reading them.
+
+**Finding the time.** Between tech communities, family, content production and work, Lais Lima said at Conf42 Golang 2023 that ""it took me about three months to actually finish my contribution."" Coming back after a break meant forgetting what she had been thinking, so next time she plans to organise the schedule first.
+
+**The missing events.** In a stripped-down reproduction she saved a file five times and the watcher printed one event before the program finished; in a second run, two saves printed nothing at all. Since a buffered channel should hold every value you send it, she suspected the OS notifications, her machine's M1 chip or her own code. The talk does not claim a root cause, which is refreshingly honest. Anyone who has fought editors that save via rename-and-replace, or event coalescing on macOS, will recognise the shape of the problem.
+
+## What did she take away?
+
+Ask for feedback early: ""Maybe they can see things you're not seeing."" Learn how Go actually behaves around channels and OS notifications, which her day job rarely touched. And treat open source as active learning, where you read up on something and immediately apply it.
+
+## Who should watch?
+
+Go beginners, and anyone sitting on their first open source contribution and wondering whether it is worth the effort. Experienced gophers will get the fsnotify subdirectory gotcha and a clean watcher-plus-prompt pattern in a few minutes.
+
+## Related Conf42 talks
+
+- Mauricio Antunes on [Golings as a tool for beginners learning Go](https://www.conf42.com/Golang_2023_Mauricio_Antunes_golings_tool_beginners_learning), the project behind this contribution.
+- Abhisek Pattnaik on [building CLI apps with Go](https://www.conf42.com/Golang_2023_Abhisek_Pattnaik_building_cli_apps), from the `flag` package to concurrent data generation.
+- Jesus Espino [dissecting slices, maps and channels](https://www.conf42.com/Golang_2022_Jesus_Espino_dissecting_slices_maps_channels) at Conf42 Golang 2022.
+
+[Watch Lais Lima's talk](https://www.conf42.com/Golang_2023_Lais_Lima_creating_cli)
+
+[Watch the talk on YouTube](https://youtu.be/peSUrYj8bhs).
+",talk,golang2023,talk:golang2023/Lais Lima,,Conf42,,queued,"go, cli, open-source, concurrency, fsnotify"
 ,"Snap! Python again?
 ",Discovering things you never knew you wanted to know!,2023-03-09,2023-03-09-python-event-discover-the-unknown,./assets/splash/PYTHON2023_Event_Splash.png,"#Discovering things you never knew you wanted to know!
 
