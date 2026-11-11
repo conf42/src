@@ -113,6 +113,27 @@ splash, webinar -> its splash, plug -> the sister event's own splash = the og:im
 10. Append a dated entry to `blog/CHANGELOG.md`: what was published/scheduled/orphaned/enriched, what's next.
 11. Tell Marek in a few lines: N posts written (by type), next due dates, anything skipped and why.
 
+## Backfill 2020+ (Marek 2026-11-10: every conference since 2020 + every talk with a transcript, over days)
+
+- `plan` defaults to `--from 2020-01-01`. Plan items carry `sources.slides` (static/slides PDF: the CSV Slides cell,
+  else the conventional name) - use slides for CONTENT only (numbers, structure, names), never describe visuals.
+- Duplicates: for an event that already has an old post (pre-living-blog), the new roundup / sponsored post wins and
+  `blog_plan replace` hides the old one; the old one stays visible until the replacement's Date is out (build/blog.py).
+- A speaker with several talks at one event: the 2nd+ talk's Ref is `talk:<event>/<Name1>#<YouTubeId>` (CSV order,
+  `blog_plan.talk_ref`); the speaker-named srt only counts for their first talk.
+- One recording at two events (same YouTube id, e.g. a sponsor's repeat talk) = one post: keep the earliest event's,
+  set the other `skipped`.
+- Writers: `blog/drafts/_jobs/BRIEF.md` + one job JSON (<=10 items) per general-purpose sub-agent, ~8 in parallel, each
+  runs only `check`. `step.sh <job>` ingests (finds the drafts by Ref, `add`, Status queued, legacy replace, lint),
+  commits + pushes, and reserves the next job. Talks whose write-up trips a safety stop (live exploit demos) are set
+  aside, not retried - list them for Marek.
+- Release: `.github/workflows/blog-rollout.yml` releases 36 queued posts every 4 h (216/day) and triggers the deploy.
+  No YouTube sweep on the runner (YouTube blocks runners); run `blog_plan orphan` on the laptop (`--offline` skips
+  oEmbed; a guard aborts if more than max(10, ids/50) videos look deleted). Pause = disable the workflow.
+- Wrong video in a sheet row (`shared_video`): find the real one on YouTube by its exact Conf42 title, fix the sheet
+  cell (some tabs have an email column - check the row before writing), mirror byte-safely into `_db/<TAB>.csv`. The
+  talk then needs a transcript before it gets a post.
+
 ## House voice (read `blog/STYLE.md` before writing - it has the good-vs-slop examples)
 
 Witty, nerdy, smart. A senior engineer telling a peer about a talk worth their evening. Lead with the most surprising
