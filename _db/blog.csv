@@ -114665,6 +114665,282 @@ Python engineers chasing CPU in production, and anyone who has stared at a py-sp
 
 [Watch the talk on YouTube](https://youtu.be/4R7qCQLjz2Y).
 ",talk,python2022,talk:python2022/Yonatan Goldschmidt,,Conf42,,queued,"python, profiling, ebpf, performance, observability"
+,"Don't touch the tested container, bolt a Python sidecar onto the pod","Moshe Zadka (Palo Alto Networks) at Conf42 Python 2022 on small Python sidecars for readiness, metrics and scheduled jobs in Kubernetes pods",2022-01-12,python2022/python-sidecars-for-kubernetes-pods,,"The application is built, the container passes its tests, and now someone wants readiness checks and Prometheus metrics. At Conf42 Python 2022, Moshe Zadka, Principal Engineer at Palo Alto Networks, made the case for leaving that container alone and adding a small Python sidecar to the pod instead, and set himself the challenge of fitting each sidecar's code on one slide.
+
+It is a fast, funny talk with a Kubernetes refresher up front and a party trick at the end.
+
+## What do you need to know about pods first?
+
+A pod is the unit Kubernetes runs, though not usually what you configure. Its containers always share a network namespace, so 127.0.0.1 is the same for all of them; they may share the process namespace and volume mounts; they never share the filesystem. Readiness answers whether the pod is good, and it matters because a Service routes only to good pods. TCP and HTTP checks are the norm, and he steers people away from command checks.
+
+A sidecar is not a Kubernetes type, just a shape your YAML takes: an extra container next to the one that does the work. He is cheerfully uninterested in arguing what counts as a true sidecar. The classic example is a web app caching to files, with a sidecar that deletes the old ones.
+
+## Why split it out at all?
+
+Three reasons. Each container gets its own resource limits, which helps capacity planning. Restarts and logs stay separate, so dashboards and tools like Prometheus see each one clearly. And both containers stay simple, with Kubernetes handling the supervision you would otherwise write yourself.
+
+Python fits the job because sidecar needs show up late, when the schedule is tight, and because the sidecar is often owned by a different team (infrastructure, SRE) and has to keep up as the main container changes. Quick prototyping and quick iteration matter more than raw speed here.
+
+## The sidecars on a slide
+
+All of them talk to the main container over localhost with httpx, served by Pyramid where they need an endpoint.
+
+- **Readiness.** Fetch a JSON value from the app and raise an exception if it is not 5, so the framework returns a 500. His exception of choice is dividing one by zero, the shortest code that raises in Python.
+- **Metrics.** A Prometheus client registry with a latency gauge, fed by a synthetic request to the app on every scrape, so you see slowdowns even if the app never measures itself.
+- **Scheduler.** Call the app's flush-queues endpoint every 60 seconds. A CronJob would start a new pod; this has to flush the queue inside each running container.
+
+## How do you read a log you can't see?
+
+The finale is a log analyser for a container that writes to /var/log/something on its own filesystem, with no shared volume allowed. With shareProcessNamespace enabled on the pod, the sidecar reads the inode of its own root under /proc, loops over the other processes until it finds one whose root differs, and reads the peer's log through that process's root link, counting lines and posting them to a metrics endpoint every minute.
+
+""That you can do the impossible in three slides, not even full slides worth of code,"" Moshe Zadka said at Conf42 Python 2022, admitting he had failed his one-slide rule.
+
+## Make your containers sidecar friendly
+
+His closing advice is aimed at whoever builds the main container: treat containers as black boxes and keep them simple, but give them good internal APIs, for example on a separate port that is exposed only to peers in the pod. Packaging into containers is good; packaging into separate containers is better.
+
+## Who should watch
+
+Python developers who deploy to Kubernetes, and SREs who keep being asked to add health checks to images they did not build. The code is written for slides, not production, as he says himself.
+
+## Related Conf42 talks
+
+- Michael Schilonka on [debugging containers with sidecars and Gefyra](https://www.conf42.com/Cloud_Native_2022_Michael_Schilonka_debugging_container_sidecar_kubernetes_gefyra).
+- Samuel Arogbonlo on [logs and metrics with Prometheus](https://www.conf42.com/Site_Reliability_Engineering_2022_Samuel_Arogbonlo_logmetrics_prometheus).
+- Rohit Ghumare on [whether a sidecarless service mesh is real](https://www.conf42.com/Platform_Engineering_2023_Rohit_Ghumare_sidecarless_service_mesh__is_it_a_dream_or_a_reality_).
+
+[Watch Moshe Zadka's talk](https://www.conf42.com/Python_2022_Moshe_Zadka_side_cars)
+
+[Watch the talk on YouTube](https://youtu.be/-vNSfodp8tg).
+",talk,python2022,talk:python2022/Moshe Zadka,,Conf42,,queued,"python, kubernetes, sidecars, prometheus, containers"
+,Stop picking the best forecaster and let a network blend them,"Pawel Skrzypek (Omphalos Fund) and Anna Warno (7bulls.com) at Conf42 Python 2022 on ensembling time series forecasters, up to a neural ensembler",2022-01-11,python2022/ensembling-forecasters-beats-picking-one,,"Which forecaster is best? Depends on the week. At Conf42 Python 2022, Pawel Skrzypek, CEO of Omphalos Fund, and Anna Warno of 7bulls.com showed why the winning answer in time series is usually several forecasters combined, and how a small neural network trained as the ensembler beat every simple combination on a real cloud-resource dataset.
+
+Pawel gives the theory in about ten minutes; Anna spends the rest on a production case study.
+
+## Why did ensembling win the M4 competition?
+
+Ensembling simply means combining the outputs of several forecasters to get better accuracy and, just as important, more stable results, because one model having a bad period gets outvoted. The simple forms are voting for classification, averaging for regression, plus stacking and bagging.
+
+Pawel's point is that the breakthroughs in the M4 and M5 competitions, run by forecasting veteran Spyros Makridakis, leaned on cleverer ensembling. The hybrid exponential smoothing model that won M4 rated every model on every series during training with sMAPE, after each epoch, and kept a set of the best models per series for the final prediction. N-BEATS, its successor, ensembles up to 100 models trained on different subsets of the data, different loss functions and different horizons, so no single wrong model can spoil the forecast. For the financial series he works on, he says, ensembling significantly improves both accuracy and robustness.
+
+## The real problem: forecasting cloud usage in real time
+
+Anna's case is a system that forecasts cloud resource usage and decides whether to scale, say, the number of instances. Several forecasters, among them the Temporal Fusion Transformer and N-BEATS, are trained independently and each sends a prediction on the same clock, every 10 seconds for example. The ensembler has to turn those into one number.
+
+Real time makes it messy. Predictions go missing because of delays or a model that is not ready yet, the solution has to work across applications and metrics, and it must survive a forecaster that goes badly wrong.
+
+""Large predictions error can lead to bad decisions and be very costly in cloud computing environment,"" Anna Warno said at Conf42 Python 2022.
+
+## Simple ensembles: good, but never consistently best
+
+The demo dataset is 6,000 rows of CPU usage predicted by five forecasters on a test set. The simple ensemblers are naive mean, mean over the best subset of forecasters (scored by mean absolute error on a training window), mean over the best n on the last k steps, weights found with linear programming (positive, summing to one), and weights proportional to each model's scores.
+
+Across five metrics, linear programming wins most often, while mean over the best subset tends to win on sMAPE, and which method leads changes from one stretch of the series to the next. Ensembles beat the best single forecaster, but there is no single best ensemble.
+
+## The neural ensembler
+
+So Anna trains one. Each input has a past part, holding every forecaster's errors (real minus predicted), the real values and a time index, and a future part with every forecaster's predictions. She tried fully connected networks and 1D convolutional networks with and without residual connections and attention. The 1D CNN with residual connections came out on top, with attention adding little.
+
+For the missing-prediction problem, a second model is trained with random forecaster columns zeroed out and a mask marking which ones are absent; it keeps returning good results when inputs drop. On the comparison plot the deep learning ensembler is the best method throughout, where the simple ones swap places. Her caveat: it needs a reasonable amount of data before it can be trained, so simple ensembles are the place to start.
+
+## Who should watch
+
+Anyone running more than one forecasting model in production, especially for autoscaling or finance. It assumes you know what TFT and N-BEATS are; it does not show code.
+
+## Related Conf42 talks
+
+- Pawel Skrzypek and Anna Warno on [time series forecasting methods](https://www.conf42.com/Machine_Learning_2021_Pawel_Skrzypek_Anna_Warno_Time_Series_Forecasting_Methods) at Conf42 Machine Learning 2021.
+- Piotr Stepinski on [forecasting time series](https://www.conf42.com/Machine_Learning_2024_Piotr_Stepinski_forecasting_timeseries).
+- Andrei Stroganov on [ML ensemble performance](https://www.conf42.com/Cloud_Native_2025_Andrei_Stroganov_ml_ensemble_performance).
+
+[Watch Pawel Skrzypek and Anna Warno's talk](https://www.conf42.com/Python_2022_Pawel_Skrzypek_Anna_Warno_ensembling_techniques_time_series_forecasting)
+
+[Watch the talk on YouTube](https://youtu.be/qDqNyfCaiIU).
+",talk,python2022,talk:python2022/Pawel Skrzypek,,Conf42,,queued,"python, time-series, forecasting, ensembling, deep-learning"
+,A correlation heatmap hides structure that a stock network shows,Kalyan Prasad (Creative Crewz) at Conf42 Python 2022 on turning ETF return correlations into NetworkX graphs and minimum spanning trees,2022-01-09,python2022/stock-correlation-networks-with-networkx,,"A correlation matrix of 40 assets is 1,600 numbers, and a heatmap of it only tells you how close pairs are. At Conf42 Python 2022, Kalyan Prasad, Data Scientist and Analytics Manager at Creative Crewz, showed how to turn the same correlations into a network with NetworkX, prune it, and end with a minimum spanning tree where equities, bonds, commodities and currencies fall into readable clusters.
+
+The first half is a gentle tour of graph theory; the second half is a notebook you can follow line by line.
+
+## Why model markets as networks?
+
+He starts with Leonhard Euler and the Königsberg bridge problem, where four land masses and seven bridges became the first nodes and edges. A network is a system of nodes connected by links, and both can carry metadata: his example is two people who connect at a conference, with age and location on the nodes and the date they met on the edge.
+
+Finance picked this up after the 2008 crisis, when economists came to see the architecture of the financial system as central to systemic risk. Interbank networks, stock correlation networks and agent-based models followed. He also covers the three centrality measures you meet first: degree (the most connected node), closeness (the fastest communicator) and betweenness (the most influential, the one sitting on the most shortest paths).
+
+## The warm-up: who owns Tesla and Google?
+
+Section one uses the yfinance library to pull the institutional holders of Tesla and Google, concatenates the two DataFrames, and builds a graph with `nx.from_pandas_edgelist`, holders as sources and companies as targets. Colouring the two companies red and the holders green makes the shared owners visible at a glance. It is deliberately small, a template for exploring who holds what.
+
+## From heatmap to graph
+
+Section two is the real case: daily prices for 40 ETFs across 1,013 rows, from January 2013 to December 2017. Prices become daily log returns so assets can be compared, then pandas computes the pairwise correlation matrix. A seaborn clustermap shows the expected blocks, with international equity ETFs moving together and safe havens moving against equities.
+
+His complaint about the heatmap is that it is one-dimensional: it shows how close assets are, not the shape of the whole system. So the matrix becomes an edge list and a graph of 39 nodes and 741 edges. Drawn with circular, random, spring and spectral layouts, it is a hairball.
+
+""All these plots look pretty fancy if you observe them and they looks pretty fancy, but they actually fail to convey the information which we are actually looking from our network graph,"" Kalyan Prasad said at Conf42 Python 2022.
+
+## How do you make the network readable?
+
+Four steps, each a small function:
+
+1. Drop weak edges: anything with absolute correlation under 0.5 goes, which removed 530 of the 741 edges.
+2. Colour edges by sign, green for positive and red for negative correlation.
+3. Scale edge width by correlation strength, and node size by the number of strong links, so heavily connected ETFs such as VGT and DIA stand out.
+4. Switch to the Fruchterman-Reingold layout, which pulls strongly correlated nodes together, so gold sits with commodities and BND with the bond funds.
+
+The last cluster of equities is still too dense to label, so he finishes with NetworkX's built-in minimum spanning tree. It keeps just enough edges to connect every node, and the result shows clear groups of equities, bonds, commodities and currencies.
+
+## Who should watch
+
+Python developers curious about graph analysis, and finance people who live in correlation matrices and want another lens. The finance theory is light; the value is the notebook, which goes from raw prices to a clean minimum spanning tree in a few dozen lines.
+
+## Related Conf42 talks
+
+- Venkateswarlu Boggavarapu on [graph databases for fraud detection](https://www.conf42.com/Machine_Learning_2025_Venkateswarlu_Boggavarapu_fraud_detection_db_graph).
+- Matt Harrison on [idiomatic pandas](https://www.conf42.com/Python_2021_Matt_Harrison_Idiomatic_Pandas) at Conf42 Python 2021.
+- Pawel Skrzypek and Anna Warno on [ensembling for time series forecasting](https://www.conf42.com/Python_2022_Pawel_Skrzypek_Anna_Warno_ensembling_techniques_time_series_forecasting), the same event.
+
+[Watch Kalyan Prasad's talk](https://www.conf42.com/Python_2022_Kalyan_Prasad_financial_network_analysis)
+
+[Watch the talk on YouTube](https://youtu.be/IpggeW9dO3A).
+",talk,python2022,talk:python2022/Kalyan Prasad,,Conf42,,queued,"python, networkx, finance, data-visualization, graph-analysis"
+,"Python is secure by design, its third-party packages are not","Gajendra Deshpande (Eyesec Cyber Security Solutions) at Conf42 Python 2022 on scanning Python code and dependencies with Bandit, Safety and Semgrep",2022-01-07,python2022/bandit-safety-semgrep-for-python-packages,,"Python's popularity makes it a target, and the soft spot is rarely the interpreter. At Conf42 Python 2022, Gajendra Deshpande, founder and managing director of Eyesec Cyber Security Solutions, toured three free tools for finding the weak spots in your own code and in the packages you install: Bandit, Safety and Semgrep.
+
+It is a practical, command-by-command introduction, aimed at developers who have never run a security scanner over a Python project.
+
+## Where do the vulnerabilities come from?
+
+His framing is that open source is not insecure because the code is visible. Python, like other big open-source projects, has a large community watching it and bug bounty programmes behind it. The risk arrives with third-party packages written by people who may not know secure coding principles, or published deliberately by attackers.
+
+The abstract puts a number on it: a large-scale static analysis of PyPI by Jukka Ruohonen, Kalle Hjerppe and Kalle Rindell found at least one security issue in about 46% of the packages scanned. In the talk he adds press coverage of dependency confusion via PyPI, packages stealing credit card data, and remote code execution findings.
+
+## Bandit: what does it check?
+
+Bandit parses each file into an abstract syntax tree, runs plugins against its nodes and writes a report. `bandit -r <path>` scans a project; `-p` runs a profile such as shell injection only; `-b` compares against a JSON baseline so known non-issues, like a clear-text password in a unit test, stop showing up.
+
+The plugins are grouped by ID series: B1xx miscellaneous, B2xx framework misconfiguration, B3xx blacklisted calls, B4xx blacklisted imports, B5xx cryptography, B6xx injection, B7xx cross-site scripting. His examples include `assert` and `exec` use, bad file permissions, binding to all interfaces, hard-coded passwords, try-except-pass, Flask with debug left on (B201), certificate checks disabled, weak SSL versions and keys, subprocess calls with a shell, and raw SQL or `mark_safe` in Django. You can also write custom tests with Bandit's decorators.
+
+## Safety: are my dependencies known to be vulnerable?
+
+Safety checks installed packages against Safety DB, an open database of known vulnerabilities in Python packages built from CVEs and changelogs, with an API key option for a commercial feed. `safety check` scans the active virtual environment, `-r requirements.txt` scans a requirements file, and you can pipe in `pip freeze`. His run checked 221 packages and flagged an outdated whitenoise; installing the deliberately vulnerable insecure-package demo pushed it to 222 and added a second finding. The fix in both cases was an upgrade.
+
+He stresses one nuance that is easy to miss: Safety DB lists affected versions, not packages to avoid. Some of the most popular packages appear in it; check which versions are hit and upgrade.
+
+## Semgrep and the house rules
+
+Semgrep is an open-source static analyser for 17-plus languages, with more than a thousand community rules and rules that look like the code they match. It covers OWASP Top 10 classes such as SQL injection and broken authentication, and its online playground is the quickest way in.
+
+His closing guidelines are short. Maintainers should keep their packages secure. Developers should scan dependencies before using them and keep scanning afterwards.
+
+""Periodically scan your environment, that is, even after upgrading it, because the new packages may come up with new vulnerabilities,"" Gajendra Deshpande said at Conf42 Python 2022.
+
+Beyond that: scan packages before and after upgrades, sign and verify packages with PGP keys, upload with Twine, and install only from trusted sources, never from nulled copies. The abstract also promised a section on GPG signing for PyPI and conda; in the recording it is one line in that checklist.
+
+## Who should watch
+
+Python developers and team leads who want a scanner in CI by the end of the week. Security specialists will know the tools; the Bandit plugin tour is still a handy checklist.
+
+## Related Conf42 talks
+
+- Tzachi Zornstain on [why attackers in code packages get a pass](https://www.conf42.com/Python_2022_Tzachi_Zornstain_attackers_code_packages), the same event.
+- Joseph Hejderup on [static analysis for dependency tools](https://www.conf42.com/DevSecOps_2022_Joseph_Hejderup_going_beyond_metadata_adopting_static_analysis_dependency_tools).
+- Ciara Carey on [making SBOMs actionable](https://www.conf42.com/DevSecOps_2022_Ciara_Carey_software_bill_of_materials_sboms_actionable).
+
+[Watch Gajendra Deshpande's talk](https://www.conf42.com/Python_2022_Gajendra_Deshpande_security_considerations_packaging)
+
+[Watch the talk on YouTube](https://youtu.be/CrY5GFS53fE).
+",talk,python2022,talk:python2022/Gajendra Deshpande,,Conf42,,queued,"python, security, bandit, dependencies, static-analysis"
+,"Malicious packages have authors, so hunt them like attackers","Tzachi Zornstain (Checkmarx) at Conf42 Python 2022 on why malicious open-source packages need threat hunting, not patch management",2022-01-04,python2022/malicious-packages-are-attackers-not-bugs,,"Removing a malicious package from a registry fixes one package; the person who published it moves on to the next. At Conf42 Python 2022, Tzachi Zornstain, who leads software supply chain research at Checkmarx, argued that the open-source ecosystem treats malicious packages like vulnerabilities to patch, when they are the work of attackers who can be tracked and hunted.
+
+He comes from malware research at McAfee, Symantec and Palo Alto Networks, and the talk reads like it: attacker habits, indicators of compromise, and a call for the data researchers need to do the job.
+
+## How do attackers get code into your build?
+
+He walks through two attack patterns, both of which he says show up weekly rather than in theory.
+
+**Dependency confusion.** A project mixes internal packages with public ones, and by default nothing marks which is which. An attacker guesses the name of an internal package, registers it on npm or PyPI with a very high version number, and an artifact server told to take the latest version pulls the attacker's copy. In his words this is often not a bug but a feature. The case he describes had odd version numbers, names that pointed at the targeted organisation, and code that stole the developer's SSH keys and sent them to a server the attacker controlled. Checkmarx released an open-source tool, Dustilock, to flag configurations that expose internal package names.
+
+**Account takeover.** The compromise of the popular npm package ua-parser-js added a password stealer and a crypto miner, and drew an advisory from CISA. Two weeks later the same actor hit coa and rc, this time with a bug that made the attack fail while still breaking build servers worldwide.
+
+## What gave the hijacked releases away?
+
+The attacker took over the npm account but not the GitHub one. Normally a maintainer tags a release on GitHub and pushes it to npm, so the two line up; during the attack three new versions appeared on npm with no matching code on GitHub. Three versions, he notes, so that whatever update policy you use, you pick one up.
+
+That gap became ChainAlert, a free early-warning service from Checkmarx for the open-source community. It watches new releases and, when one has no corresponding code or activity on GitHub, opens an issue for the maintainer and for projects that depend on the package. It does not call the release malicious; it asks whether it was expected.
+
+## Why are these attacks so slow to detect?
+
+Two reasons. The ecosystem is reactive: it waits for someone to report a package, which stretches the time to detection. And it leans on static signatures, which attackers bypass easily.
+
+His alternative is hunting. Starting from a package already listed in the Backstabber's Knife Collection, a research dataset of removed malicious packages, his team pulled its metadata (account, description, repository, homepage, owner) and its indicators of compromise (URLs, domains, IPs, cryptocurrency addresses), built a fingerprint, and searched other registries. They found related packages still live years after the first was removed, and had them taken down from PyPI, npm and RubyGems.
+
+""Those are attackers. And we need to change our mindset about how do we approach attackers and how do we track them, how do we hunt them down,"" Tzachi Zornstain said at Conf42 Python 2022.
+
+## The ask
+
+The talk ends as a call to action: the major registries should keep a central repository of removed malicious packages with their full metadata, so researchers can hunt the people behind them. The abstract also promises a StarJacking demo and a broader look-ahead; the recording sticks to the attacks, ChainAlert and the hunting case.
+
+## Who should watch
+
+Security engineers and platform teams who own a package mirror or an artifact server, and anyone who thinks their software composition analysis already covers malware. It is a short talk and a useful reframe.
+
+## Related Conf42 talks
+
+- Gajendra Deshpande on [security considerations in Python packaging](https://www.conf42.com/Python_2022_Gajendra_Deshpande_security_considerations_packaging), the same event.
+- Thomas Chauchefoin and Paul Gerste on [somebody in my package manager](https://www.conf42.com/DevSecOps_2022_Thomas_Chauchefoin_Paul_Gerste_somebody_in_my_package_manager).
+- Leonid Akinin on [package TTPs in open-source Python](https://www.conf42.com/DevSecOps_2023_Leonid_Akinin_trusty_package_ttps_oss_python).
+
+[Watch Tzachi Zornstain's talk](https://www.conf42.com/Python_2022_Tzachi_Zornstain_attackers_code_packages)
+
+[Watch the talk on YouTube](https://youtu.be/RAQOkvEx8eg).
+",talk,python2022,talk:python2022/Tzachi Zornstain,,Conf42,,queued,"python, supply-chain-security, open-source, npm, threat-hunting"
+,Shrink the pandas DataFrame before you rent a bigger machine,"Marco Carranza (Teamcore Tech) at Conf42 Python 2022 on pandas memory tricks, then Vaex, Modin and PySpark as data outgrows one machine",2022-01-02,python2022/pandas-memory-tricks-before-buying-ram,,"The script works on the sample file and crashes on the real one. At Conf42 Python 2022, Marco Carranza, technical co-founder of Teamcore Tech, laid out a ladder of fixes for data that has outgrown memory: six pandas tricks first, then vertical scaling in the cloud, then Vaex, Modin and finally PySpark. His recurring advice is to climb only as far as you need, and to optimise the DataFrame before throwing money at it.
+
+He has used Python for more than 15 years, and Teamcore runs sales data from retail stores through machine learning models, so the examples come from people who actually hit these limits.
+
+## How much memory can a few lines of pandas save?
+
+More than you would guess, and he brings the numbers:
+
+- **Sparse columns.** A column full of NaN values switched to a sparse dtype used 41% less memory.
+- **Sampling.** `DataFrame.sample` gives a uniform sample whose descriptive statistics and histograms track the full data; taking the first thousand rows does not, and he shows the two diverge.
+- **Load only the columns you need.** A 3.8 GB text file with 77 columns took 4.5 GB in memory; keeping four columns brought it to a little over 300 MB. You can do this at read time.
+- **Smaller numeric types.** A column holding values from one to nine stored as int64 used 196 MB; as int8 it used 24 MB, an 87.5% cut from one line.
+- **Categoricals.** A two-value text column went from 142 MB as object to 2.4 MB as category, a 98% reduction.
+- **Chunked reads.** A file of almost 4 GB read with `chunksize` in blocks of 500,000 rows, aggregating each block and releasing it before the next.
+
+## When is a bigger machine the right answer?
+
+Sometimes. He is candid that the easiest fix for missing RAM is renting more, and cloud notebooks make it trivial: Binder, Kaggle Kernels, Google Colab, Azure Notebooks, with machines past 1 TB of RAM. No code changes, and you pay only for what you use.
+
+""Of course, if you forget to turn off your machine, you'll have to pay that too,"" Marco Carranza said at Conf42 Python 2022.
+
+The catch is that unoptimised code stays unoptimised. Long term it is expensive, it does not scale well and it is not production ready.
+
+## Vaex, Modin or PySpark?
+
+Each gets a pros-and-cons pass:
+
+**Vaex** works with datasets larger than memory, where the limit is the size of your disk. It memory-maps the data and never copies it into RAM unless asked, computes lazily with virtual columns, and claims statistics at up to a billion rows per second. It prefers HDF5, and `vaex.from_csv(..., convert=True)` converts a big CSV in chunks on the fly. The syntax is close to pandas but not identical, and the project is younger.
+
+**Modin** keeps the pandas API: change the import to `modin.pandas` and your code uses every core instead of one, with Dask or Ray to spread work across a cluster. The project quotes a 4x speed-up on an 8-core machine. The costs are cluster setup, the usual distributed-systems debugging, and memory needs as high as pandas'.
+
+**PySpark** is the all-in option when data and computation both have to be distributed. It brings a mature ecosystem and Hadoop integration, but you rewrite your pandas code in a different syntax, small datasets run slower than in pandas, MLlib has fewer algorithms, and Spark is hungry for RAM.
+
+## Who should watch
+
+Analysts and data engineers whose notebooks have started to swap, and anyone about to propose a Spark cluster for a 4 GB CSV. The pandas section alone pays for the half hour. He signs off with Donald Knuth's line about premature optimisation, which is fair warning not to start at the top of the ladder.
+
+## Related Conf42 talks
+
+- Matt Harrison on [idiomatic pandas](https://www.conf42.com/Python_2021_Matt_Harrison_Idiomatic_Pandas) at Conf42 Python 2021.
+- Marcin Szymaniuk on [Apache Spark SQL](https://www.conf42.com/Machine_Learning_2024_Marcin_Szymaniuk_apache_spark_sql).
+- Anant Kumar on [running Apache Spark clusters](https://www.conf42.com/Cloud_Native_2025_Anant_Kumar_apache_spark_clusters).
+
+[Watch Marco Carranza's talk](https://www.conf42.com/Python_2022_Marco_Carranza_strategies_data_growth)
+
+[Watch the talk on YouTube](https://youtu.be/f4xMh2gWY-g).
+",talk,python2022,talk:python2022/Marco Carranza,,Conf42,,queued,"python, pandas, big-data, pyspark, data-engineering"
 ,Excited to see you in 2022!,Happy New Year to all of our favourite tech geeks!,2022-01-01,2022-01-01-happy-new-year,./assets/splash/BLOG_2022_Happy_New_Year.png,"# Happy New Year to all of our favourite tech geeks!
 
 If your resolutions include something like learning new stuff and widening your professional horizons, then fear not. Conf42 is ready for 2022 and it’s got your back!
@@ -114673,6 +114949,51 @@ Pick a number, any number. Now, double it. And double again! That’s how many n
 
 We are very excited for the upcoming year. But let us take a quick step back and say the biggest THANK YOU to, well, you! Everything we do is because of you and for you. Stop me before it’ll get too cheesy. We are simply grateful and proud to be a part of this with you all. Take care, stay safe and let’s rock this 2022 together!
 ",,,,,,,,
+,"Stop tracking ML experiments in a spreadsheet, let DVC bundle them","Milecia McGregor (Iterative) at Conf42 Python 2022 on DVC experiments that snapshot code, data and hyperparameters so any model can be rebuilt exactly",2021-12-31,python2022/dvc-experiments-beat-the-spreadsheet,,"Every data scientist has had the eureka model: great accuracy, and no idea which combination of code, data and hyperparameters produced it. At Conf42 Python 2022, Milecia McGregor, Developer Advocate at Iterative, showed how DVC experiments turn each training run into a bundle of code, data and config, so a good result can be reproduced exactly instead of reconstructed from memory.
+
+It is a short, practical talk built around one workflow: queue a batch of hyperparameter values, run them all, compare the table, repeat. If you have ever kept a spreadsheet with a commit hash in one column and a Google Drive zip link in another, this one is for you.
+
+## Why is experiment tracking hard in the first place?
+
+Her framing is that the experiments pile up faster than you notice. You tune hyperparameters, spot a line of code you could change, and then fresh data arrives from production. Each change is layered onto the last, and after a few hundred runs nobody can say which state of the world produced the best model. The cost lands at deployment, as an unexplained accuracy drop or an environment difference nobody wrote down.
+
+The fix she proposes is to treat every experiment as one bundle: the dataset, the hyperparameters, the code and, if you start from one, the model. She also covers the two classic tuning strategies the demo uses. Grid search tries every combination, so it is guaranteed to find the best one in the grid; random search samples the same value sets at random and, run for about the same time, often lands on better combinations because it covers a wider spread.
+
+## What does DVC actually record?
+
+DVC is open source and sits on top of Git, which she sums up as Git for your data: Git versions the code, DVC versions the data, and an experiment ties them together with the parameters. There is no library to import into your training script and no tracking server to call, a point she makes directly against MLflow's API calls. Everything runs locally, with optional remote storage on AWS, GCP or Azure.
+
+The workflow in the demo is a handful of commands:
+
+- `dvc exp run` runs the training script and snapshots code, data and configuration as metadata attached to the resulting model.
+- `dvc exp run --queue` lines up experiments with different hyperparameter values; queued runs get their own IDs and can be pushed to a bigger machine or a GPU.
+- `dvc exp run --run-all` executes the queue, and `dvc exp show` prints a table of every run with its parameters and metrics (average precision and ROC AUC in her example).
+- `dvc plots diff` takes two experiment IDs and plots them side by side from the JSON or TSV metrics your training script already writes.
+
+She runs three rounds of this, including a random-search round that turns out worse than an earlier run, which is the point: the table tells you which direction to tune next, or that it is time for a different algorithm or more data.
+
+## The spreadsheet has to go
+
+The closing argument is blunt. Any run in the table can be rebuilt from its experiment ID with a few DVC commands, so the bookkeeping that eats an afternoon becomes a lookup.
+
+""Please don't use spreadsheets to keep up with your machine learning experiments when we have stuff that'll do it for you now,"" Milecia McGregor said at Conf42 Python 2022.
+
+She adds a reason to care about data versioning in particular: when data drift hits production, you still have exact copies of the datasets from before the drift. And she ends with a nudge engineers need more often than they admit, that using an existing tool is not cheating and that an hour spent trying one is cheap even if it does not fit.
+
+## Who should watch
+
+Data scientists and ML engineers who run more than a few experiments a week and still track them by hand. It is an intro to DVC experiments, not a comparison of MLOps platforms; as a developer advocate for the company behind DVC she is open about her preference.
+
+## Related Conf42 talks
+
+- Rohan Mitra on [experimentation and reproducibility as a science](https://www.conf42.com/Machine_Learning_2026_Rohan_Mitra_experimentation_reproducibility_science).
+- Sudheer Kumar Aluvala on [optimising hyperparameter tuning](https://www.conf42.com/Machine_Learning_2026_Sudheer_Kumar_Aluvala_optimization_hyperparameters_tuning).
+- Noa Goldman's [hitchhiker's guide to MLOps](https://www.conf42.com/Machine_Learning_2023_Noa_Goldman_hitchhiker_guide_mlops_experience).
+
+[Watch Milecia McGregor's talk](https://www.conf42.com/Python_2022_Milecia_McGregor_reproducible_experiments_better_ml_models)
+
+[Watch the talk on YouTube](https://youtu.be/mjaHYXwubY4).
+",talk,python2022,talk:python2022/Milecia McGregor,,Conf42,,queued,"python, mlops, dvc, reproducibility, hyperparameter-tuning"
 ,"Kubernetes is an API to compute, and OpenShift ships the rest",JJ Asghar (IBM) at Conf42 Python 2022 on taking a tiny Flask app from a GitHub repo to a live OpenShift route with webhook-driven rebuilds,2021-12-29,python2022/openshift-from-git-repo-to-live-route,,"Most Python developers who end up on Kubernetes want the shortest path from a git repo to a URL, and as little YAML as possible. At Conf42 Python 2022, JJ Asghar, Developer Advocate at IBM, gives a fast vocabulary tour of containers, Kubernetes and OpenShift, then deploys a one-file Flask app to OpenShift from the web console in a few clicks, with a GitHub webhook that rebuilds it on every push.
 
 It is an intro talk and says so: the goal is to get your developers to focus on code, not the cluster. If you already run production clusters, the demo will feel familiar. If you are the Python person who just inherited a namespace, it is a friendly half hour.
