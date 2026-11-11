@@ -87990,6 +87990,491 @@ Teams that already run chaos experiments and suspect they are testing whatever w
 
 [Watch the talk on YouTube](https://youtu.be/Ed6g6yFUE5E).
 ",talk,ce2024,talk:ce2024/Gunnar Grosch,,Conf42,,queued,"chaos-engineering, resilience-modeling, hypothesis, aws, failure-modes"
+,"Many clients, many IPs, one GitHub Actions matrix of Gatling runs",Kaye Alvarado (Asurion) at Conf42 DevOps 2024 on load testing from many client IPs by running Gatling in parallel GitHub Actions runners,2024-01-13,devops2024/gatling-load-tests-from-parallel-github-runners,,"A load test from one machine tells you how your platform treats one very enthusiastic client. Real traffic comes from many clients with many IP addresses. At Conf42 DevOps 2024, Kaye Alvarado, DevOps Engineer at Asurion, showed [the low-ceremony fix her team used](https://www.conf42.com/DevOps_2024_Kaye_Alvarado_loadtesting_pipeline): write the load test as code in Gatling, then trigger the same workflow in parallel on several GitHub Actions runners, each with its own IP.
+
+It's a short talk, and that's the point. The closing advice is to keep things simple, and the talk takes its own medicine.
+
+## Why load test at all here?
+
+Her team had migrated their platform to a more modern architecture and needed proof that the new sizing kept the availability of the old one. So they simulated real production traffic against an isolated non-production environment, pushing towards the system's upper limits.
+
+## Why Gatling?
+
+The selection criteria are the ones any DevOps team would write down: open source, ease of use and community, programming language, triggering from the command line, and reports. JMeter, Locust and Gatling all tick most boxes, so she's candid that it often comes down to what your developers already know. For them it was Gatling.
+
+## What goes into the Gatling code?
+
+A quick walk through the project layout:
+
+- **`gatling.conf`** in the `conf` directory, where you point Gatling at your simulations and resources directories.
+- **Resources**: feeder files with the values your scenarios use, such as credentials or sample data.
+- **Simulations**: the tests themselves, traditionally Scala and now also Java. Variables fed from a map, an HTTP protocol config with common headers like `Accept` and `Content-Type`, a scenario that feeds credentials, calls the API and asserts the expected result, and a setup that injects users with open or closed injection profiles.
+
+A shell script launches the Java program, and the run ends in Gatling's HTML report: successes versus failures, per-request response times, users over time against responses per second. Enough to tell whether the infrastructure needs tweaking.
+
+## How do you get many IPs?
+
+Put it in a pipeline. The code lives in GitHub; triggering the workflow in parallel spins up multiple GitHub runners, each with its own server IP, all sending traffic to the platform at once. ""And that's it. That's the solution,"" Kaye Alvarado said at Conf42 DevOps 2024.
+
+Four small problems needed solving to make it reusable:
+
+1. **Pick a simulation without the interactive prompt**: set it in the Gatling config file, replaced in a workflow step.
+2. **Reuse across environments**: the environment lives in the API domain, so a `sed` command rewrites it in the simulation code.
+3. **Override auth headers** and 4. **override injection rates**: both become workflow inputs written into the load test code.
+
+The workflow installs Java, runs the shell script, and uploads the HTML report as a GitHub artifact. Push it to a server, an email or a Slack message if you prefer.
+
+## What should you watch out for?
+
+Design tests to reach the breaking point, or close to it; start from a baseline scenario built on production data and adjust load between runs. Consider scheduled runs, with heavier traffic at peak times of day and lighter traffic off hours. And her personal preference: serverless wherever possible, to skip maintaining your own load generators.
+
+## Who should watch
+
+Teams who want a believable multi-client load test without standing up a distributed load-testing cluster, and anyone already on GitHub Actions. If you need tens of thousands of distinct source IPs or coordinated ramp-ups across runners, this approach won't stretch that far, and the talk doesn't claim it does. Her blog post on load test as code for non-coders, on Asurion's dev community, fills in the Gatling details.
+
+## Related Conf42 talks
+
+- Samir Akarioh on [load testing optimisation with Gatling](https://www.conf42.com/JavaScript_2024_Samir_Akarioh_61_loadtesting_optimization_gatling) at Conf42 JavaScript 2024.
+- Adelina Simion and Andy Kuszyk on [load testing with F1](https://www.conf42.com/Golang_2022_Adelina_Simion_Andy_Kuszyk_load_testing_f1) at Conf42 Golang 2022.
+- Hari Krishnan on [shift-left performance testing](https://www.conf42.com/Site_Reliability_Engineering_2021_Hari_Krishnan_shift_left_performance_testing) at Conf42 SRE 2021.
+
+[Watch the talk on YouTube](https://youtu.be/Hm1Ygav56zw).
+",talk,devops2024,talk:devops2024/Kaye Alvarado,,Conf42,,queued,"load-testing, gatling, github-actions, performance, ci-cd"
+,Four ways to stop hand-writing near-identical Airflow DAGs,"Aliaksandr Sheliutsin at Conf42 DevOps 2024 on Airflow DAG factories fed by CSV, Google Sheets or Airflow connections, plus event-triggered DAGs",2024-01-13,devops2024/airflow-dag-factories-and-event-triggers,,"If your Airflow repo has thirty DAG files that differ only by an ID and a start date, this talk is your intervention. At Conf42 DevOps 2024, freelance data engineer Aliaksandr Sheliutsin shared [four tricks from client work](https://www.conf42.com/DevOps_2024_Aliaksandr_Sheliutsin_leverage_airflow_pipelines): three ways to generate DAGs from configuration, from a CSV file to Airflow's own metadata database, and one way to make a scheduler-first tool react to events.
+
+The abstract promises more fireworks than the talk delivers; what you get is calmer and more useful: four patterns, each with honest pros and cons from a real project.
+
+## Trick 1: one CSV, one DAG factory
+
+The starting case: a client pulling data from many decentralised organisations through the same API, each with its own ID and its own start date. Instead of a DAG file per organisation, one CSV lists them all and a DAG factory creates a DAG per row.
+
+The upsides he lists: adding an entity is one line of config, which the scheduler picks up; less code; a per-DAG start date, so no runs crawling empty history; and isolation. He chose separate DAGs over one big one on purpose, because a single DAG would hit the API for empty dates on younger entities and force a re-run of everything whenever one changed. A separate data validation pipeline reads the same config, so every new row is validated for free.
+
+The downsides: it takes more Airflow understanding, there are more ways to break the scheduler, and pipelines that look similar often aren't. Keep bolting on special cases and the factory turns into a spaghetti bowl of if conditions. ""So sometimes it's really better to create separate pipelines for this kind of similar pipelines,"" Aliaksandr Sheliutsin said at Conf42 DevOps 2024.
+
+## Trick 2: let the client edit a Google Sheet
+
+The upgrade: his client wanted to add pipelines without him. So the config moved to a shared Google Sheet, read through the Google Sheets API. Others can now add DAGs, and changes skip the commit-and-deploy step entirely.
+
+The price is validation, and he's emphatic about it. DAG files are parsed by the scheduler, so an API that takes two or three seconds to answer can crash it. Users will ignore even good documentation. His fix is to fetch the sheet, validate the rows, write them to a local file, and have the DAG factory read only that file, so garbage never reaches the scheduler. And because you'll miss something too, add error notifications.
+
+## Trick 3: generate DAGs from Airflow connections
+
+A client kept creating and dropping MySQL databases, each needing its own pipeline, and credentials don't belong in a config file. So each database becomes an Airflow connection with a fixed name prefix. The DAG code queries the metadata database through SQLAlchemy, lists the connections, filters by prefix and builds a DAG for each.
+
+No external API calls, no separate config to maintain, and the extra query is a rounding error next to what the scheduler already does. The risk: lose the metadata database, or migrate Airflow to a new server, and your connections and therefore your pipeline config go with it. Back it up.
+
+## Trick 4: make Airflow event-driven
+
+Airflow is for schedules, until it isn't. His case had low event volume, a few an hour, but results needed as soon as possible. The application, which they didn't control, published to Google Cloud Pub/Sub; a Cloud Function on that topic triggered an unscheduled DAG through the Airflow API.
+
+He rejects the obvious alternative, a DAG that polls the queue every minute, because it fills the metadata database with a mountain of empty one-minute runs and slows the whole installation. The limit is volume: thousands of events an hour won't work, and he puts the practical ceiling at about one event every five minutes. Often that's enough.
+
+## Who should watch
+
+Data engineers maintaining many lookalike Airflow pipelines, and anyone asked to let non-engineers add pipelines. Platform folks get a useful reminder that DAG parsing is part of the scheduler's hot path.
+
+## Related Conf42 talks
+
+- Tamara Janina Fingerlin on [orchestrating workflows with Apache Airflow](https://www.conf42.com/Machine_Learning_2023_Tamara_Janina_Fingerlin_orchestrating_workflows_apache_airflow) at Conf42 Machine Learning 2023.
+- Tamara Janina Fingerlin on [frameworks for Apache Airflow pipelines](https://www.conf42.com/Python_2024_Tamara_Janina_Fingerlin_frameworks_apache_airflow_pipelines) at Conf42 Python 2024.
+- Sruthi Erra Hareram on [ETL optimisation with Airflow](https://www.conf42.com/Kube_Native_2025_Sruthi_Erra_Hareram_etl_airflow_optimization) at Conf42 Kube Native 2025.
+
+[Watch the talk on YouTube](https://youtu.be/OdioqPcklag).
+",talk,devops2024,talk:devops2024/Aliaksandr Sheliutsin,,Conf42,,queued,"airflow, data-engineering, data-pipelines, event-driven"
+,Code review is not a stamp competition,"Israel Heringer (Meta) at Conf42 DevOps 2024 on efficient code reviews that fit the team, code and goals, automate the trivia and skip the gatekeeper",2024-01-12,devops2024/code-review-not-a-stamp-competition,,"Send a ten-line pull request and get ten comments; send 500 lines and get ""looks good to me"". At Conf42 DevOps 2024, Israel Heringer, Software Engineer at Meta, used that familiar joke to open [a talk on efficient code reviews](https://www.conf42.com/DevOps_2024_Israel_Heringer_efficient_code_reviews_codebase), and his answer is less about reviewer heroics and more about shaping the process around the team, the code and what you want reviews to achieve.
+
+It's a short, process-level talk with no tooling pitch. Think of it as the checklist you wish someone had handed the team before the first review war.
+
+## What is a code review for, and what isn't it?
+
+He starts with the reasons everyone lists (finding bugs earlier, code quality, security, sharing knowledge, mentoring newer engineers, compliance) and then the ones nobody admits to. A code review is not for blaming or shaming someone's code, not a stage for showing off your engineering skills, and not about executing the code. It's reading, analysing and commenting so the change gets better.
+
+There are three common approaches: pair programming, over-the-shoulder reviews and tool-assisted reviews (the pull request). Most of his advice targets the last, though nearly all of it transfers.
+
+## Look inward before writing any rules
+
+Before setting up a process, he asks three sets of questions.
+
+- **The team**: seniority, familiarity with the code, whether people work alone or together, communication style, time zones.
+- **The code**: coding standards, testability, the riskiest paths (his example is a bank's core banking feature that can't break in any way), legacy versus new.
+- **The goals**: catching bugs, improving quality or test coverage, onboarding newcomers.
+
+Goals shift over time, and he's fine with the review focus moving with them. What doesn't change, in his view, is that the practice is here to stay, not a temporary fix.
+
+## Efficient is not the same as fast
+
+""We are not trying to be fast. We are trying to be efficient,"" Israel Heringer said at Conf42 DevOps 2024. That means actually reading the code instead of skimming it, and treating reviews as something other than a stamp competition; the reviewer who did 200 reviews this month has proved nothing about whether the team got better.
+
+Comments should be clear and actionable. ""This doesn't look good"" with no alternative or pointer to a practice doesn't improve the code, it just creates friction. Focus on what matters for the context: functionality first, then design and complexity (is it over-engineered?), tests and evidence, then style, consistency and naming. Be explicit when nitpicking: prefix with `nit` so the author knows it's optional and the back-and-forth stays short.
+
+And automate whatever can be automated. Auto-formatters, linters and CI warnings exist for almost every language. He recalls a project years ago where pull requests went back for tabs instead of spaces, which is not a good use of a human.
+
+## The author has homework too
+
+Code review is a team effort, not a solo duty for the reviewer. Write code for the people who will read it, since code is read more often than written. Split big changes into smaller, meaningful ones, because a large change is slower to review and harder to iterate on. Attach the test runs or other evidence. And reviewers: drop the bossy tone. ""Have you considered..."" lands better than ""you should have"".
+
+## How do you introduce reviews without killing autonomy?
+
+The closing section is the most practical. Avoid the gatekeeper, the one person who, intentionally or not, has to approve everything; it's bad for them and for the team. Map the exceptions before you need them: if every change needs an approval, what does the on-call engineer do at night with nobody around to approve the fix? Reviews should be part of shipping, not a high-friction checkpoint.
+
+Encourage open discussion with no finger-pointing, review the pain points, iterate, and recognise people who give good reviews. If the team can't absorb it all at once, start small: selected projects, only the critical code paths, randomly sampled reviews, or even non-blocking reviews where a change may land after a few days without one.
+
+## Who should watch
+
+Tech leads setting up or repairing a review process, and anyone whose team argues more about reviews than about the code. Senior engineers won't hear much new, but the context questions and the unblocking ideas are a good template for a team retro.
+
+## Related Conf42 talks
+
+- Victor Rentea on [code review](https://www.conf42.com/Enterprise_Software_2021_Victor_Rentea_code_review) at Conf42 Enterprise Software 2021.
+- German Urikh's [code review tips](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_German_Urikh_code_review_tips) at Conf42 SRE 2024.
+- Prakash Raj Ojha on [code review automation](https://www.conf42.com/Incident_Management_2024_Prakash_Raj_Ojha_33_code_review_automation) at Conf42 Incident Management 2024.
+
+[Watch the talk on YouTube](https://youtu.be/pKMhlmddYXY).
+",talk,devops2024,talk:devops2024/Israel Heringer,,Conf42,,queued,"code-review, engineering-culture, developer-experience, pull-requests"
+,ElastiCache Serverless ends the cache capacity guessing game,"Indika Wimalasuriya (Virtusa) at Conf42 DevOps 2024 on AWS ElastiCache Serverless replacing cache capacity planning, plus the traps of easy caching",2024-01-11,devops2024/elasticache-serverless-ends-capacity-guessing,,"Every cache cluster you have ever sized was either too big (you paid for it) or too small (your users paid for it). At Conf42 DevOps 2024, Indika Wimalasuriya, Associate Director of Managed Services at Virtusa, walked through [AWS ElastiCache Serverless](https://www.conf42.com/DevOps_2024_Indika_Wimalasuriya_aws_elastic_cache_serverless), announced at re:Invent 2023, as the way out of that trade-off, and then spent his closing minutes on the new mistakes a one-minute cache makes easy.
+
+It's an overview for engineers deciding whether to try it, not a benchmark or a migration story.
+
+## Why does a few milliseconds matter?
+
+He opens with the familiar argument that speed is revenue, backed by the usual industry figures: Walmart saw conversions rise 2% for every second shaved off page load, COOK gained 7% by cutting load time by 0.85 seconds, and Mobify measured a 1.11% conversion lift per 100 ms on its homepage. Caching frequently accessed, rarely changing data is the decades-old answer, buying low latency, high throughput and a layer you can scale separately from the database.
+
+## Which AWS cache, then?
+
+AWS had three in-memory options before serverless, and his comparison is useful on its own:
+
+- **ElastiCache for Memcached**: simple, non-persistent, no replicas or automatic failover.
+- **ElastiCache for Redis**: adds persistence, replication, backups, failover, sharding and Global Datastore.
+- **MemoryDB for Redis**: durable, and the only one of the three tuned for ultra-low sub-millisecond latency.
+
+## What actually hurts with server-based caches?
+
+His list: capacity management, scaling (on which metric?), operational load (patching, backups, security), manual high availability, the cost of a separate high-spec cluster, and slower development because every feature now has a cache design to think about. If he had to pick one, it's capacity, because capacity is cost.
+
+Anyone who has done a capacity plan and shipped it to production lands in one of two groups. Over-provision and you bleed money on headroom you never touch. Under-provision and every traffic spike above the line becomes a customer-facing incident. That is the gap he expects serverless caching to close.
+
+## What does serverless change?
+
+The numbers he gives for ElastiCache Serverless:
+
+- A cache created in under a minute, with no capacity to manage.
+- 700 microseconds at p50 and 1.3 milliseconds at p99.
+- Up to 5 TB of storage.
+- A 99.99% availability SLA and a single endpoint.
+- PCI-DSS and SOC compliance, HIPAA eligibility.
+
+Pricing comes in two parts: data stored in GB-hours (each cache is metered for at least 1 GB), and ElastiCache Processing Units (ECPUs), where each read or write consumes 1 ECPU per kilobyte transferred and extra vCPU time or data scales it up. He quotes about $0.125 per GB-hour in US East at the time, and reminds you it varies by region.
+
+The setup is three clicks: choose serverless, name it, create. Connect with `openssl s_client` to the endpoint, `set` a key, `get` it back. He skips a live demo because, honestly, there isn't much to watch.
+
+## The new trap: caching because you can
+
+This is the best part of the talk. When standing up Memcached or Redis took real effort, teams asked whether they needed a cache at all. ""But here, now that we can make a cache within less than 1 minute, I would say someone would just go and create a cache and rely on that,"" Indika Wimalasuriya said at Conf42 DevOps 2024. His anti-patterns:
+
+- **Over-reliance on caching**: critical data must still be retrievable from the primary source, with fallbacks in place.
+- **Ignoring cache misses**: handle them gracefully and detect them quickly.
+- **Neglecting security**: AWS runs the infrastructure, but the data in the cache is yours to authenticate, authorise and encrypt.
+
+And the best practices to pair them with: pick an access pattern (read-through, write-through, write-behind, cache-aside, refresh-ahead), use efficient serialisation such as MessagePack, Protocol Buffers or Avro, design cache keys like `user_profile:{user_id}`, and monitor hit and miss rates, latency, evictions, transfer volume and size.
+
+## Who should watch
+
+Teams on AWS running ElastiCache clusters sized by guesswork, or about to add a cache to a service for the first time. If you want load tests or a cost comparison against a provisioned cluster, the talk doesn't have them; it's a capability tour with a sensible checklist at the end.
+
+## Related Conf42 talks
+
+- Rafal Leszko on [architectural caching patterns for Kubernetes](https://www.conf42.com/Cloud_Native_2021_Rafal_Leszko_architectural_caching_patterns_kubernetes) at Conf42 Cloud Native 2021.
+- Shailin Saraiya on [caching for millions at low latency](https://www.conf42.com/Platform_Engineering_2025_Shailin_Saraiya_cache_millions_latency) at Conf42 Platform Engineering 2025.
+- Abhishek Gupta on [Go and Redis](https://www.conf42.com/Golang_2023_Abhishek_Gupta_go_redis_better_together) at Conf42 Golang 2023.
+
+[Watch the talk on YouTube](https://youtu.be/4PBB6X_f3X8).
+",talk,devops2024,talk:devops2024/Indika Wimalasuriya,,Conf42,,queued,"aws, elasticache, caching, serverless, performance"
+,"OpenTelemetry metrics into Prometheus, and every gotcha on the way","Prathamesh Sonpatki (Last9) at Conf42 DevOps 2024 on shipping OpenTelemetry metrics to Prometheus, from collector tricks to temporality and naming traps",2024-01-11,devops2024/otel-metrics-meet-prometheus-gotchas,,"OpenTelemetry has no storage backend, and Prometheus is the natural place to put its metrics, which is exactly where the friction starts. At Conf42 DevOps 2024, Prathamesh Sonpatki, Developer Evangelist at Last9, gave [a handbook-style tour of OpenTelemetry metrics](https://www.conf42.com/DevOps_2024_Prathamesh_Sonpatki_handbook_opentelemetry_metrics): how the data model differs from Prometheus, what the OpenTelemetry Collector can do before anything is stored, and the conversion traps between the two.
+
+It's a reference talk, best watched with your collector config open in the next window. Last9 builds Levitate, a time series database that accepts both formats, and it gets a mention at either end; the middle is vendor-neutral.
+
+## Why look at OpenTelemetry metrics at all?
+
+He opens with the case for: OpenTelemetry is the second most popular CNCF project after Kubernetes, it brings vendor neutrality through a standard API and spec, and semantic conventions plus shared metadata promise correlation across metrics, logs and traces. The metrics project had three stated goals: connect metrics to the other signals, give OpenCensus users a migration path (you can still see OpenCensus in the design), and interoperate with existing standards such as Prometheus and StatsD.
+
+Prometheus, for contrast: pull-based scraping of `/metrics`, the text exposition and OpenMetrics formats, float values, a label-based data model, and cumulative reporting. A counter that reads 1, 4, 7, 9 reports exactly that.
+
+## The collector is where the work moves
+
+The OpenTelemetry Collector sits between source and backend with receivers, processors and exporters. The Prometheus receiver is, in his words, a drop-in replacement for a Prometheus doing the scraping: paste your existing scrape config, service discovery included, into the collector config.
+
+Processors are the interesting layer. Batch and memory limiter are the defaults, the latter refusing data and forcing GC when the collector nears its limits, so a metrics flood doesn't take it down. Beyond those you can redact, change attributes, and generate new metrics with arithmetic, such as pod CPU utilisation from pod CPU usage divided by the CPU limit. Transformation processors rename, drop and aggregate, which means high-cardinality series can be rolled up before they ever hit storage. ""Your recording rules use cases probably will not be needed anymore because you can just create or transform the metrics in the collector itself,"" Prathamesh Sonpatki said at Conf42 DevOps 2024.
+
+On the way out there are three options: let Prometheus scrape the collector's own `/metrics`, remote write to long-term storage, or use the then-experimental OTLP push into Prometheus.
+
+## So why isn't it just plug and play?
+
+Because the two models disagree in several places:
+
+- **Metric types.** OpenTelemetry has counters, asynchronous counters, up-down counters (sync and async), gauges and histograms; Prometheus has counters, gauges, summaries, histograms and sparse histograms. One-to-one matches convert; the rest are not supported on the way to Prometheus.
+- **Temporality.** Cumulative reports the running total, delta reports the change since last time (3 instead of 4 in his example). Cumulative needs client-side state; delta is stateless. Prometheus only does cumulative, while Datadog recommends delta for performance. The catch with delta: drop a sample and that data is gone, whereas with cumulative, rate and similar functions absorb the gap.
+- **Naming.** OpenTelemetry uses dots and a mandatory unit, like `http.requests.duration` in milliseconds; Prometheus uses underscores and often puts the unit in the name, as in `http_requests_duration_milliseconds_count`. Receivers and exporters normalise names in both directions, but never convert units. And renamed metrics can quietly break dashboards built on the old names.
+- **Out-of-order data.** OpenTelemetry pushes in batches, and Prometheus historically rejected out-of-order samples.
+
+## What is Prometheus changing?
+
+The roadmap he walks through: better out-of-order support, UTF-8 in metric and label names (which would end the dots-to-underscores dance), delta temporality support, handling OpenTelemetry resource attributes, storing metric metadata, and performance work. Some of it was slated for Prometheus 3.0, according to the dev summit discussion he cites.
+
+## Who should watch
+
+Teams already on Prometheus who are being nudged towards OpenTelemetry SDKs, and anyone who has watched a Grafana dashboard go blank after putting a collector in the path. The temporality and naming sections alone will save you an afternoon. If you want hands-on config, look elsewhere; this is the map, not the walkthrough.
+
+## Related Conf42 talks
+
+- Bruno Ferreira on [tail sampling with the OpenTelemetry Collector](https://www.conf42.com/DevOps_2024_Bruno_Ferreira_observability_opentelemetry_collector), also at Conf42 DevOps 2024.
+- Samuel Arogbonlo on [logs and metrics with Prometheus](https://www.conf42.com/Site_Reliability_Engineering_2022_Samuel_Arogbonlo_logmetrics_prometheus) at Conf42 SRE 2022.
+- Nocnica Mellifera on [open source observability with OpenTelemetry](https://www.conf42.com/DevOps_2023_Nocnica_Mellifera_open_source_observability_opentelemetry) at Conf42 DevOps 2023.
+
+[Watch the talk on YouTube](https://youtu.be/4k2WHfq_OF0).
+",talk,devops2024,talk:devops2024/Prathamesh Sonpatki,,Conf42,,queued,"opentelemetry, prometheus, metrics, observability, otel-collector"
+,Tail sampling with the OpenTelemetry Collector keeps the bill sane,Bruno Ferreira (TheyDo) at Conf42 DevOps 2024 on cutting trace volume with OpenTelemetry Collector tail sampling and tamer auto-instrumentation,2024-01-10,devops2024/otel-collector-tail-sampling-budget,,"Most of your traces are boring, and you are paying to store them anyway. At Conf42 DevOps 2024, Bruno Ferreira, Senior DevOps Engineer at TheyDo, explained [how his team got their OpenTelemetry volume under the vendor's daily limit](https://www.conf42.com/DevOps_2024_Bruno_Ferreira_observability_opentelemetry_collector): trim the auto-instrumentation, then let the OpenTelemetry Collector keep only errors, slow requests and a few traces they always want.
+
+It's a compact, practical talk with real collector config, aimed at teams who adopted OpenTelemetry and then met their first invoice.
+
+## Why did they need to cut data at all?
+
+After adopting OpenTelemetry for metrics, traces and logs, TheyDo was fine on weekends and over the daily ingest target on every weekday. Depending on the backend, that means paying per ingested byte or, in their case, getting throttled and having events rejected. He sets the scene with the $65 million observability bill a cryptocurrency company made headlines with, as the outcome to avoid.
+
+The question they asked themselves was simple: do we need all this data? The answer was probably not.
+
+## Auto-instrumentation is generous with spans
+
+""The first tip I can give you is to be careful with the auto instrumentation,"" Bruno Ferreira said at Conf42 DevOps 2024. Defaults in the popular Node.js and Python libraries send far more than you need. Two examples bit them:
+
+- **AWS SDK**: internal instrumentation isn't suppressed by default, so one S3 `PutObject` comes with four extra child spans: the HTTP PUT, the DNS lookup, the TLS connection and the TCP connection. Handy when you suspect DNS, noise the rest of the time; switch it on when you need it.
+- **Koa**: a span for every middleware on every request. They told the instrumentation to ignore the middleware layer type, and suggest manual spans inside a middleware if you suspect it of latency.
+
+That helped, but it wasn't enough.
+
+## Which collector should you run?
+
+Tail-based sampling decides after all spans of a trace have completed, and the collector is the usual place to do it. They tried the AWS Distro for OpenTelemetry (ADOT) first. Loading config from S3 instead of baking it into the image is nice, but ADOT lacked the transform processor (he opened an issue for it) and, at the time, didn't support logs, which they needed to enrich. So they moved to upstream: the core image carries the components the core team maintains, contrib carries nearly everything. They run contrib, and he points to Martin's blog post on building a slimmer, more secure custom collector with only the components you use. Honeycomb's Refinery is mentioned as a vendor alternative, a separate sampling proxy rather than a collector.
+
+## The pipeline: errors, slow, and things you care about
+
+The collector runs as a sidecar. The app sends spans to it, the collector scrapes the app's Prometheus metrics endpoint, and a Fluent Bit sidecar tails logs into it. The collector enriches all three signals with attributes such as the running task's identity and ships them over OTLP to whichever backend you use. Traces were the signal generating the most data, so the trace pipeline is where the work is:
+
+1. **Batch** processor, for compression and fewer outgoing connections.
+2. A tail sampler named **default**, with three OR'd policies: keep any trace with an error span, any trace over 100 ms, and any trace containing the GraphQL operation they always want (a resync operation; a new feature you're watching is the other example).
+3. A second tail sampler, **synthetics**, for the CloudWatch synthetic monitors that hit the API every minute from several regions. Keep errors and anything over 1 second, keep 1% of successful synthetic calls (an AND of two sub-policies) for a latency baseline, and a failover policy with `invert_match` that keeps 100% of traffic without the CloudWatch user agent. Forget that last one and the processor drops every real trace.
+4. A **filter** processor that drops individual trivial GraphQL field spans.
+
+He flags the danger in step 4. Tail sampling drops whole traces; a filter drops spans, and dropping a parent leaves orphans. Only drop spans you know are childless, which those few-millisecond GraphQL field spans were.
+
+The rule of thumb he closes on, borrowed from Reese Lee's post on the OpenTelemetry blog: keep high-latency and error traces, keep traces with attributes you care about, and the other 99% can be discarded or randomly sampled if the budget allows.
+
+## Who should watch
+
+Anyone running OpenTelemetry on a metered backend, especially Node.js shops on AWS. If you've never written a `tail_sampling` block, this is a good, concrete first one to copy. If you need sampling across many collector replicas, that isn't covered here; this is the sidecar setup.
+
+## Related Conf42 talks
+
+- Prathamesh Sonpatki's [handbook to OpenTelemetry metrics](https://www.conf42.com/DevOps_2024_Prathamesh_Sonpatki_handbook_opentelemetry_metrics), also at Conf42 DevOps 2024.
+- Pranay Prateek on [scaling OpenTelemetry with Kafka](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pranay_Prateek_scaling_opentelemetry_kafka) at Conf42 SRE 2024.
+- Nicolas Frankel on [OpenTelemetry tracing](https://www.conf42.com/DevOps_2023_Nicolas_Frankel_opentelemetry_tracing) at Conf42 DevOps 2023.
+
+[Watch the talk on YouTube](https://youtu.be/AbnD9lsHStU).
+",talk,devops2024,talk:devops2024/Bruno Ferreira,,Conf42,,queued,"opentelemetry, observability, tail-sampling, tracing, cost"
+,"Ingress is frozen, so here's the Gateway API migration on GKE","Yuri Bacciarini (CRIF) at Conf42 DevOps 2024 rebuilds an Ingress setup with Gateway API on GKE, adding header routing, rewrites, canary and blue-green",2024-01-10,devops2024/ingress-frozen-gateway-api-hands-on-gke,,"The Kubernetes docs say the Ingress API is frozen: no new features, ever, in favour of the Gateway API. At Conf42 DevOps 2024, Yuri Bacciarini, Senior DevOps Engineer at CRIF, took that as his cue to [say goodbye to Ingress](https://www.conf42.com/DevOps_2024_Yuri_Bacciarini_kubernetes_ingress_gateway_api) properly: a short history, an honest list of what Ingress never did, and a hands-on GKE demo that rebuilds an Ingress setup with Gateway API and then does the things Ingress needed annotations for.
+
+## Is Ingress actually going away?
+
+He reads the word choice with some suspicion. ""What I suppose is that the frozen word has been carefully chosen to avoid riots from kubernetes users,"" Yuri Bacciarini said at Conf42 DevOps 2024, adding that this is his opinion and the softer word may come before a deprecation. Then, as any Hitchhiker's Guide fan would, he tells the room not to panic.
+
+The timeline he gives: Ingress arrived in 2015, became stable in 2020, and the Gateway API hit v1.0 GA on 31 October 2023 (he wonders aloud whether that date was trick or treat). The official Gateway API FAQ answers the replacement question with a no, since Ingress has been GA since Kubernetes 1.19 and controllers are expected to keep supporting it. ""But in my opinion I'd say the answer is yes,"" he said.
+
+## What did Ingress never do?
+
+Nothing is wrong with Ingress for the basic job of exposing HTTP, he says. The trouble starts with real systems. Out of the box there is no path rewrite, no weighted routing, no header manipulation, and the Ingress config can't live in a different namespace from the pods it serves. Every controller filled those gaps with its own annotations, so a typical NGINX Ingress grows a header of `nginx.org/...` timeouts and body sizes that no other controller understands. Portability, the original goal, quietly went out of the window.
+
+The deeper problem is that it isn't role oriented. TLS, hostnames and routing all sit in one resource, so developers end up handling certificates they shouldn't need to touch.
+
+He credits Istio as the design's visible inspiration (HTTPRoute plays the role of Istio's VirtualService) and points to the Kubernetes Podcast episode with Rob Scott, lead of the SIG Network Gateway API project, for the backstory.
+
+## The hands-on: same app, two hats
+
+The demo runs on a GKE Autopilot cluster, and all the material sits in his [k8s-gateway-api-playground](https://github.com/texano00/k8s-gateway-api-playground) repository. First the baseline: a blue app exposed with a GCE Ingress, a cloud load balancer, and a hostname faked through `/etc/hosts`. It works, and that's all it does.
+
+Then he wears the cluster operator hat. GKE already ships the GatewayClasses (four of them in his cluster). He creates an `infrastructure` namespace and puts the Gateway there: an HTTP listener on port 80, a hostname, and a rule for which namespaces may attach routes. The TLS secret can be referenced from another namespace, which, as he notes, lets a separate team own certificates entirely.
+
+Then the developer hat, in a separate `development` namespace. One HTTPRoute pointing at the Gateway in `infrastructure` and the blue app gives the same result as the Ingress, on a new load balancer. From there, each step is a small edit to the same route:
+
+- A `RequestHeaderModifier` filter adds a custom header, visible in the app's output.
+- A `URLRewrite` filter changes the path the app receives, while clients still call `/`.
+- A **canary by header**: requests carrying a traffic header with value `test` go to the green app; everyone else stays on blue.
+- A **blue-green split** with weights, 50% to each, the starting point for shifting traffic gradually.
+
+None of it needed a controller-specific annotation, which is the whole argument in four YAML diffs.
+
+## What is coming next?
+
+The closing teaser is Gateway API for service mesh, alpha at the time: the same HTTPRoute attached to a Kubernetes Service instead of a Gateway, bringing those routing features to east-west traffic.
+
+## Who should watch
+
+Teams running Ingress with a pile of annotations and wondering what a migration looks like in practice, and platform engineers who want to give developers routing control without giving them the TLS keys. If you want the theory side, pair it with Gregorio Palama's talk from the same event; this one is the lab session.
+
+## Related Conf42 talks
+
+- Gregorio Palama's [K8s Gateway API 101](https://www.conf42.com/DevOps_2024_Gregorio_Palama_k8s_gateway_api), also at Conf42 DevOps 2024, covers the personas and GAMMA in more depth.
+- Shane Utt on [going beyond Kubernetes Ingress with Gateway API](https://www.conf42.com/Cloud_Native_2023_Shane_Utt_beyondkubernetes_ingress_gateway_api) at Conf42 Cloud Native 2023.
+- Rosemary Wang's [introduction to service mesh](https://www.conf42.com/Cloud_Native_2022_Rosemary_Wang_introduction_service_mesh) at Conf42 Cloud Native 2022.
+
+[Watch the talk on YouTube](https://youtu.be/JL7ZKM3wvcg).
+",talk,devops2024,talk:devops2024/Yuri Bacciarini,,Conf42,,queued,"kubernetes, gateway-api, ingress, gke, canary-deployments"
+,"Gateway API splits Ingress into three jobs, and that's the point",Gregorio Palama (Lutech) at Conf42 DevOps 2024 on why the Kubernetes Gateway API's three personas make it the right successor to Ingress,2024-01-09,devops2024/gateway-api-three-personas-beat-ingress,,"Ingress was designed for one person who owned everything: the TLS, the load balancer config and the routing rules, all in one resource. At Conf42 DevOps 2024, Gregorio Palama, Senior Cloud Engineer and DevOps at Lutech, gave a [Gateway API 101](https://www.conf42.com/DevOps_2024_Gregorio_Palama_k8s_gateway_api) arguing that the Kubernetes Gateway API's real upgrade is not new protocols but a permission model that matches how teams actually split the work.
+
+It's an introduction, with a live demo on Google Kubernetes Engine and a short tour of the GAMMA initiative for mesh traffic.
+
+## What is actually wrong with Ingress?
+
+He reads the Ingress docs back to the audience and pulls out the limits. HTTP and HTTPS only, no other protocols. Everything in a single resource. And one persona in mind: the ingress owner, who carries infrastructure, TLS and routing configuration at once. IngressClass later added an infrastructure provider and cluster operator, but as a bolt-on; the API was never redesigned around them.
+
+Extensibility is the other sore point. Anything the spec doesn't cover goes into annotations, and each controller invents its own. Move from one implementation to another and your annotations stay behind.
+
+## Three personas, with names
+
+The Gateway API, which reached general availability on October 31, 2023, starts from the people instead. The personas even get names: Ian, the infrastructure provider, who can work across multiple clusters; Chihiro, the cluster operator, who owns entry points and TLS; and Ana, the application developer, who owns routing rules. As he points out, each can be a whole team, and the application developer is the one who really knows how the routing should look.
+
+The resources follow the same split:
+
+- **GatewayClass**, cluster-scoped and handled by a single controller, roughly what IngressClass was.
+- **Gateway**, a request for a specific load balancer config, which can limit which routes may attach to it (by kind and by namespace).
+- **Routes**, the protocol-specific rules: HTTPRoute, TLSRoute, TCPRoute and UDPRoute, and GRPCRoute. TCP, UDP and gRPC were never on the Ingress menu.
+
+His YAML examples step up from a plain route to a weighted split (one request in ten to `my-second-service`), header matching, and filters that add a header on the way through. Traffic splitting set by the application developer on the route itself, no service mesh required.
+
+## The demo: two teams, one gateway
+
+On GKE he picks the `gke-l7-global-external-managed` GatewayClass for a public IP and a managed load balancer, then creates two pods, two services, a gateway and a route. `/1` hits pod one, `/2` hits pod two, and the root path returns a fault filter abort because nothing claims it, which is exactly what you want.
+
+A fourth route then sends 20% of `/3` traffic to service one and 80% to service two, and a few curls bear it out. The part worth pausing on: two separate HTTPRoutes attached to one Gateway. That's two microservice teams each owning their own routes while the cluster operator owns the entry point, and none of them editing the same file.
+
+## Does it work for east-west traffic too?
+
+That's GAMMA, Gateway API for Mesh Management and Administration. A route can take a Service as its parent instead of a Gateway, and a Service is treated as having a frontend (ClusterIP plus DNS) and a backend (its endpoint IPs). With no route attached, the call goes to the endpoints as usual. With a route attached and no matching path, the request is aborted. With a match, the route's rules apply.
+
+On implementations at the time of the talk, he lists GKE and Kong as GA and Apache APISIX and Istio as beta.
+
+## Should you rip out Ingress?
+
+No, and he is careful about that. Ingress won't be deprecated; it just won't be extended. ""The Gateway API permission model with the three personas is definitely better than the Ingress API one,"" Gregorio Palama said at Conf42 DevOps 2024. His summary: Ingress isn't evil, it has limits, and those limits aren't in the Gateway API.
+
+## Who should watch
+
+Anyone still running Ingress with a drawer full of controller-specific annotations, and platform teams deciding who owns what at the cluster edge. If you already run HTTPRoutes in production, the GAMMA section is the part you haven't seen before.
+
+## Related Conf42 talks
+
+- Yuri Bacciarini makes the same case from production in [Bye Kubernetes Ingress, Long Life to Gateway API](https://www.conf42.com/DevOps_2024_Yuri_Bacciarini_kubernetes_ingress_gateway_api), also at Conf42 DevOps 2024.
+- Shane Utt on [going beyond Kubernetes Ingress with Gateway API](https://www.conf42.com/Cloud_Native_2023_Shane_Utt_beyondkubernetes_ingress_gateway_api) at Conf42 Cloud Native 2023.
+- Wei Jin on [the Apache APISIX ingress](https://www.conf42.com/Cloud_Native_2022_Wei_Jin_apache_apisix_ingress) at Conf42 Cloud Native 2022.
+
+[Watch the talk on YouTube](https://youtu.be/IsvPRHoMpt4).
+",talk,devops2024,talk:devops2024/Gregorio Palama,,Conf42,,queued,"kubernetes, gateway-api, ingress, networking, gke"
+,Sveltos hands tenants their clusters with a label and a namespace,"Gianluca Mardente (Cisco) at Conf42 DevOps 2024 on Sveltos, which lets platform admins grant tenant admins scoped add-on control from one cluster",2024-01-08,devops2024/sveltos-tenant-admins-without-cluster-sprawl,,"Running one Kubernetes cluster is a job. Running forty, each needing Kyverno, Calico, a gateway and whatever the tenants want this week, is a different job. At Conf42 DevOps 2024, Gianluca Mardente, Principal Engineer at Cisco, showed how [Sveltos](https://www.conf42.com/DevOps_2024_Gianluca_Mardente_centralised_access_management) lets a platform admin drive add-ons across a fleet from a single management cluster, and then hand slices of that fleet to tenant admins without letting them step on each other.
+
+It is a short, focused talk: a tour of the CRDs, a couple of worked examples, no detours.
+
+## What problem is Sveltos actually solving?
+
+The starting point is one most platform teams will nod at. ""We all know that kubernetes by itself is not a complete solution,"" Gianluca Mardente said at Conf42 DevOps 2024. A production cluster needs a pile of add-ons around it, and multiply that by a fleet and the add-ons become the work.
+
+Sveltos runs in a management cluster. Anything built with Cluster API is discovered automatically; other clusters (GKE, Civo, Hetzner, Rancher RKE2 are the examples on screen) can be registered by hand. The only hard requirement is network connectivity from the management cluster to each managed one.
+
+## A ClusterProfile is a label selector plus a shopping list
+
+The main CRD is `ClusterProfile`, and its spec has four fields:
+
+- `clusterSelector`: a plain Kubernetes label selector over the managed clusters.
+- `helmCharts`: charts to install, in his example Kyverno at a pinned version.
+- `kustomizationRefs`: sources (a Git repo path, say) that Sveltos runs through Kustomize and deploys.
+- `policyRefs`: ConfigMaps or Secrets holding raw resources in YAML or JSON, such as a GatewayClass, a namespace and a Gateway for Contour.
+
+The demo is the satisfying part. Label a workload cluster `env=production` and Sveltos notices it now matches the profile and installs the add-ons. Label a second one and the same happens there. No pipeline per cluster, no loop in a shell script.
+
+## Templates that read from the management cluster
+
+What he pitched as the differentiator is templating. Helm values and raw YAML can be written as templates and filled in from resources in the management cluster. His example installs Calico on every production cluster, pulling the pod CIDR block from the Cluster API `Cluster` object that represents the target. By default Sveltos can see the Cluster, SveltosCluster, infrastructure provider and KubeadmControlPlane instances; with extra RBAC it can fetch anything, such as a Secret holding autoscaler settings.
+
+## How do tenants get access without getting everything?
+
+Two models, depending on whether tenants get whole clusters or share them.
+
+**Dedicated clusters.** The platform admin keeps `ClusterProfile` objects, which can match clusters in any namespace. Each tenant gets a namespace, and writes `Profile` objects there. A `Profile` is the same shape as a `ClusterProfile` but namespaced, so it can only match clusters living in that tenant's namespace. In his words, ""two tenants do not interfere with each other.""
+
+**Shared clusters.** Here Sveltos adds a `RoleRequest` CRD. It selects clusters by label, references ConfigMaps or Secrets holding ClusterRoles and Roles, and names the admin who gets them. Sveltos then needs to know who created each profile, which it reads from a `projectsveltos.io/admin-name` label. Rather than trust tenants to set it honestly, the platform admin can use an admission controller; Sveltos ships a Kyverno ClusterPolicy that stamps the label from the creating service account.
+
+The closing example ties it together. The `eng` admin gets full access to clusters labelled `env=pre-release`. A profile from `eng` that deploys Kyverno to pre-release clusters goes through. The same admin aiming at `env=production` gets blocked for not having the permissions. That's the whole access model, and it fits on a whiteboard.
+
+## Who should watch
+
+Platform engineers with more than a handful of clusters and more than one team asking for things on them, especially anyone already on Cluster API. If you're comparing Sveltos with Argo CD or Flux for add-on delivery, this gives you the multi-tenancy side of the picture quickly. Don't expect benchmarks or a production war story; it is a feature walkthrough by one of the people building it.
+
+## Related Conf42 talks
+
+- Andrei Novoselov on [managing Kubernetes on OpenStack Magnum with Cluster API](https://www.conf42.com/Cloud_Native_2023_Andrei_Novoselov_managing_k8s_openstack_magnum_cluster_api) at Conf42 Cloud Native 2023.
+- Graziano Casto on [policy-based RBAC and authorization](https://www.conf42.com/DevSecOps_2024_Graziano_Casto_policy_rbac_authorization) at Conf42 DevSecOps 2024.
+- Lahiru De Silva on [Kubernetes multi-tenancy isolation](https://www.conf42.com/DevSecOps_2026_Lahiru_De_Silva_kubernetes_multitenancy_isolation) at Conf42 DevSecOps 2026.
+
+[Watch the talk on YouTube](https://youtu.be/n2lFfxPP6jE).
+",talk,devops2024,talk:devops2024/Gianluca Mardente,,Conf42,,queued,"kubernetes, multi-tenancy, sveltos, platform-engineering, rbac"
+,"Kubernetes explained as a country, with a president and a phone network",Siddhant Khisty (Cloud Native Nashik) and Aakansha Priya (EmpathyOps) at Conf42 DevOps 2024 map every core Kubernetes component onto a nation,2024-01-08,devops2024/kubernetes-explained-as-a-country,,"If you have ever tried to explain the Kubernetes control plane to a new hire and watched their eyes glaze over at ""etcd"", this one is for you. At Conf42 DevOps 2024, Siddhant Khisty (co-organizer at Cloud Native Nashik) and Aakansha Priya (DevRel at EmpathyOps) gave [Kube-Nation](https://www.conf42.com/DevOps_2024_Siddhant_Khisty_Aakansha_Priya_kubenation_exploring_k8s), a beginner talk that builds a whole country first and only then reveals that you've just learned the Kubernetes architecture.
+
+Set expectations accordingly: it's a first talk on Kubernetes, not an internals session. Its value is the analogy, which is tidy enough to steal for your own onboarding docs.
+
+## Why bother with an analogy?
+
+The talk opens with the honest version of the Kubernetes pitch: the de facto container orchestrator, used everywhere from Google to Netflix, distributed across machines that can sit anywhere on the globe. And then the catch. One wrong letter in a config file, they warn, and you have opened a range of security or performance problems. So they throw Kubernetes ""out of the window"" for a while and build a nation instead.
+
+## The country checklist
+
+Aakansha Priya walks through six things a nation needs: land, authority, people, homes, communication and builders. Land can be bought, rented, conquered or (not recommended) stolen. The country has a capital where the authorities sit, plus ordinary cities: Park City, Industrial City and Night City, the last one a nod to the gamers in the audience.
+
+The authorities are a cast of four:
+
+- A **president**, the face of the nation, through whom every important request and decision passes.
+- A **manager** who checks the cities are working and the nation is healthy, and steps in when something breaks.
+- A **task manager** who decides who does which work, and where.
+- A **central reserve**, the history books: past commands, who did what, why something failed.
+
+Homes hold one or more people, telephones let any house call any other, and two crews of hard workers do the building and wiring, present in every city.
+
+## So which part is the API server?
+
+Then Siddhant Khisty flips the map over. Land is your hardware: CPU, memory, storage. Each city is a node, and the capital is the control plane node. ""The API server is your entry point to a Kubernetes cluster. All the requests that you make, all the actions that you make inside a cluster, they will all go through the Kube API server,"" Siddhant Khisty said at Conf42 DevOps 2024. The rest of the cluster is ordinary nodes, all taking instructions on how to run containers.
+
+The mapping, in one list:
+
+- President = **kube-apiserver**, the face of the cluster.
+- Manager = **controller manager**, which restarts or heals what isn't working.
+- Task manager = **kube-scheduler**, which decides which node runs what.
+- Central reserve = **etcd**, a database built to work well with Kubernetes.
+- Homes = **pods**, people = **containers**.
+- Telephones = **Services**, with ClusterIP, NodePort and LoadBalancer named as the three main types.
+- Builders = **kubelet**, which builds pods and rebuilds destroyed ones based on deployments.
+- Phone company = **kube-proxy**, which handles networking.
+
+Both kubelet and kube-proxy run on every node, control plane included, just as the builders and phone company exist in every city. The talk leaves the analogy there; there is no YAML, no demo cluster and no discussion of what happens when the president goes down.
+
+## Who should watch
+
+Students, career switchers, and anyone writing a Kubernetes onboarding session who wants a picture to hang the components on. If you can already explain why the scheduler doesn't talk to your pods directly, skip it, or watch it to borrow the metaphor. The speakers also share a GitHub repository of learning resources at the end.
+
+## Related Conf42 talks
+
+- Mikkel Mork Hegnhoj on [Kubernetes architecture and extensions](https://www.conf42.com/Cloud_Native_2025_Mikkel_Mork_Hegnhoj_kubernetes_architecture_extensions) at Conf42 Cloud Native 2025, a good next step after this one.
+- JJ Asghar on [deploying a simple app to Kubernetes and OpenShift](https://www.conf42.com/Python_2022_JJ_Asghar_deploying_simple_app_kubernetes_openshift) at Conf42 Python 2022.
+- Rohit Mishra on [Kubernetes operators](https://www.conf42.com/DevOps_2024_Rohit_Mishra_deepdive_kubernetes_operators), from the same event.
+
+[Watch the talk on YouTube](https://youtu.be/uqZ10obNqDo).
+",talk,devops2024,talk:devops2024/Siddhant Khisty,,Conf42,,queued,"kubernetes, beginners, architecture, control-plane"
 ,Lift and shift is a migration; modernisation also rebuilds the app and the data,"Anupam Phoghat (Cognizant Servian) at Conf42 DevOps 2024 on why cloud modernisation means application, infrastructure and data together, mapped onto Google Cloud",2023-12-31,devops2024/modernisation-is-not-just-migration,,"Anupam Phoghat, Associate Director at Cognizant Servian, spends his Conf42 DevOps 2024 talk on a distinction that budget meetings tend to blur: moving an application to the cloud is migration, while modernisation changes the application, the infrastructure under it and the data it uses, all three together. His slide formula is blunt: App Mod + Infra Mod + Data Mod = Digital Mod.
 
 Scope check: this is a short, high-level overview with a Google Cloud and HashiCorp reference architecture, not a migration war story. It is most useful as a shared vocabulary for a team about to argue over what modernise means in their roadmap.
