@@ -6,6 +6,7 @@
     python -m build.blog_plan orphan                  set Status=orphaned on every row whose Ref is gone
     python -m build.blog_plan export <out.json>       the CSV as rows of values, for the Excels_for_WWW "blog" tab
     python -m build.blog_plan release <N>             publish the N newest Status=queued posts (Status -> empty)
+    python -m build.blog_plan descript                missing transcripts of finished events from Descript into srt/
 
 Drafts (blog/drafts/<ShortURL>.md, git-ignored) look like:
     ---
@@ -48,6 +49,7 @@ import json
 import os
 import re
 import subprocess
+import urllib.parse
 import urllib.request
 import sys
 
@@ -827,6 +829,105 @@ def export(args):
     print("%d rows x %d columns -> %s" % (len(values), len(COLUMNS), args.out))
 
 
+# ---------------------------------------------------------------- transcripts from Descript
+
+DESCRIPT_API = "https://descriptapi.com/v1"
+
+
+def _descript_token():
+    t = os.environ.get("DESCRIPT_API_TOKEN", "").strip()
+    path = os.path.join(os.path.expanduser("~"), ".conf42-factory", "descript_token")   # the factory's own (machine.py)
+    if not t and os.path.exists(path):
+        with open(path) as f:
+            t = f.read().strip()
+    return t
+
+
+def _descript(token, path, params=None, body=None):
+    url = DESCRIPT_API + path + ("?" + urllib.parse.urlencode(params) if params else "")
+    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+                                 method="POST" if body is not None else "GET")
+    with urllib.request.urlopen(req, timeout=120) as r:
+        raw = r.read()
+    return raw if body is not None else json.loads(raw)
+
+
+def _event_keys(event):
+    """Names a Descript project may use for the event: "Large Language Models (LLMs)" -> llms / large language
+    models, "Machine Learning" -> ml (Conf42 ML 2025)."""
+    name = (event.get("name") or "").strip()
+    bare = re.sub(r"\s*\(.*?\)", "", name).strip()
+    keys = {_norm(name), _norm(bare)} | {_norm(x) for x in re.findall(r"\((.*?)\)", name)}
+    words = bare.split()
+    if len(words) > 1:
+        keys.add("".join(w[0] for w in words).casefold())
+    return keys
+
+
+def _comp_people(name):
+    """Speakers in a composition name: "A & B", "Kosseila_haddalene", "Shivam Tiwari-1" (a re-upload)."""
+    name = re.sub(r"-\d+$", "", (name or "").replace("_", " ").strip())
+    return {_norm(n) for n in re.split(r"\s*(?:&|,|\band\b)\s*", name)}
+
+
+def descript(args):
+    """Missing transcripts from Descript (Marek 2026-11-11): every talk of a finished event with no transcript in the
+    repo is looked up in the event's Descript project ("Conf42 <name> <year>", one composition per talk named after
+    its speakers) and its transcript exported to srt/<event>_<Name1>.srt, where plan finds it. A talk Descript does
+    not have stays without a post."""
+    token = _descript_token()
+    if not token:
+        print("descript: no DESCRIPT_API_TOKEN - skipped")
+        return 0
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    projects, cursor = [], None
+    while True:
+        page = _descript(token, "/projects", dict(limit=100, **({"cursor": cursor} if cursor else {})))
+        projects += [p for p in page.get("data", []) if (p.get("name") or "").startswith("Conf42 ")]
+        cursor = (page.get("pagination") or {}).get("next_cursor")
+        if not cursor:
+            break
+    got, missed = [], []
+    for event in load_context()["events"]:
+        if "external_url" in event or not event.get("short_url") or event["date"] >= today:
+            continue
+        todo = [t for t in event.get("talks_raw") or [] if (t.get("Name1") or "").strip()
+                and "#" not in talk_ref(event, t) and not transcript_paths(event, t)]
+        if not todo:
+            continue
+        keys, year = _event_keys(event), str(event.get("year"))
+        proj = next((p for p in projects if p["name"].endswith(" " + year)
+                     and _norm(p["name"][len("Conf42 "):-len(year) - 1]) in keys), None)
+        comps = _descript(token, "/projects/" + proj["id"]).get("compositions", []) if proj else []
+        for t in todo:
+            who = [_norm(t.get(k)) for k in ("Name1", "Name2") if (t.get(k) or "").strip()]
+            comp = next((c for c in comps if set(who) <= _comp_people(c.get("name"))), None)
+            if not comp:
+                missed.append("%s/%s" % (event["short_url"], t["Name1"].strip()))
+                continue
+            try:
+                srt = _descript(token, "/export/transcript", body={"project_id": proj["id"], "composition_id": comp["id"],
+                                                                 "format": "srt", "include_speaker_labels": "off"})
+            except Exception as e:
+                missed.append("%s/%s (%s)" % (event["short_url"], t["Name1"].strip(), e))
+                continue
+            if b"-->" not in srt:
+                missed.append("%s/%s (empty export)" % (event["short_url"], t["Name1"].strip()))
+                continue
+            path = ("srt/%s_%s.srt" % (event["short_url"], t.get("Name1", ""))).replace(" ", "_")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(srt)
+            got.append(path)
+    print("descript: %d transcripts fetched, %d not in Descript (no post for those)" % (len(got), len(missed)))
+    for g in got:
+        print("  + " + g)
+    for m in missed:
+        print("  - " + m)
+    return 0
+
+
 def main():
     cwd = os.getcwd()
     os.chdir(HERE)
@@ -849,6 +950,7 @@ def main():
     rp.add_argument("pairs", nargs="+", help="OLD_SHORTURL=NEW_SHORTURL")
     rl = sub.add_parser("release")
     rl.add_argument("n", type=int)
+    sub.add_parser("descript")
     e = sub.add_parser("export")
     e.add_argument("out")
     args = ap.parse_args()
@@ -863,7 +965,7 @@ def main():
     elif args.cmd == "check":
         sys.exit(check(args))
     else:
-        {"add": add, "orphan": orphan, "export": export, "release": release, "replace": replace}[args.cmd](args)
+        {"add": add, "orphan": orphan, "export": export, "descript": descript, "release": release, "replace": replace}[args.cmd](args)
 
 
 if __name__ == "__main__":

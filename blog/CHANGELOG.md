@@ -3,6 +3,14 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-11 - Missing transcripts from Descript
+- New rule: a talk with no transcript is looked up in Descript (`blog_plan descript`, also in every rollout run once
+  the DESCRIPT_API_TOKEN secret is set); not in Descript = no post. First run: 5 transcripts (sre2026 David McNerney,
+  featureflags2026 Girish Konda + Ishan Shah, platform2025 Shivam Tiwari, llms2026 Kosseila Haddalene). Not in
+  Descript (no post): all of Rust 2024 (16), Rust 2023 Ovidiu Ionescu, IoT 2023 Mayank Aggarwal, Cloud 2023 Abby
+  Bangser, Cloud 2024 Hareesh Iyer, DevSecOps 2021 (2), DevSecOps 2024 Anthony Laiuppa.
+- /blog: "Latest posts" pill; roundup cards carry the conference on a tinted pill; "In short" only on typed posts.
+
 ## 2026-11-11 - Every post under /blog/
 - Posts are served at conf42.com/blog/<ShortURL> (event posts conf42.com/blog/<event>/<slug>, plugs/webinars
   conf42.com/blog/<Date>-<slug>), so a post is never taken for a talk page. ShortURL in blog.csv is unchanged.
