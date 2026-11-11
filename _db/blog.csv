@@ -112184,6 +112184,50 @@ Cloud security and platform teams who keep getting asked to fix misconfiguration
 
 [Watch the talk on YouTube](https://youtu.be/HGu1yykzGsg).
 ",talk,cloud2022,talk:cloud2022/Josh Stella,,Conf42,,queued,"cloud-security, policy-as-code, aws, iam, infrastructure-as-code"
+,Nine Go gotchas that compile fine and still bite,"Ranjan Mohan (Menlo Security) at Conf42 Golang 2022 on Go gotchas from variable shadowing and shared slices to defer, loop closures and recover",2022-03-25,golang2022/go-gotchas-shadowing-defer-labels,,"Go is famously simple, which is exactly why its sharp edges catch people off guard. At Conf42 Golang 2022, Ranjan Mohan, Senior Software Engineer at Menlo Security, ran through a set of Go gotchas, each one a short program that looks innocent, runs, and prints the wrong answer, followed by the fix.
+
+It is a compact, demo-driven talk aimed at beginners and at anyone who arrived in Go from Python or Java with their old reflexes intact.
+
+## Why did my input change?
+
+The opener squares a list of numbers inside a function and prints the original afterwards: it has been squared too. Mohan frames it as pass-by-reference. The precise version is that Go copies the slice header, but the header points at the same backing array, so a function that writes into its input mutates the caller's data. Same root cause in his slicing demo: `names[:2]` has length 2 but capacity 4 and the same address as the original, so writing to the slice writes to the original.
+
+## Why does an all-negative check say true?
+
+A function sets `result := true`, loops, finds a negative number, and inside the `if` writes `result := false`. The colon makes it a new variable in the inner scope, shadowing the outer one, so the function returns true. The fix is plain `=`. ""So be careful when redeclaring variables using the shorthand notation,"" Ranjan Mohan said at Conf42 Golang 2022. Of all the bugs in the talk, this is the one most likely to be in your code right now.
+
+## Strings, operators and overflow
+
+Three quick ones. `len` on a string counts bytes, not characters, so a single visible symbol can report 3; use `utf8.RuneCountInString` when you mean characters. The caret is Go's bitwise NOT when used with one operand and XOR with two, which surprises anyone expecting `!`, `~` or exponentiation.
+
+The third is better. A loop sums numbers, and a `switch` case sets the sum to the maximum unsigned integer and calls `break` when it sees that value. The output is 9, not the max. In Go, `break` inside a `switch` exits the switch, not the loop, so the loop keeps adding and the sum wraps around past zero. The fix is a labelled loop and `break` with the label.
+
+## When does defer read its arguments?
+
+Immediately. He defers a goodbye function with a joined list of names, changes the names afterwards, and the deferred call still prints the original: arguments to a deferred call are evaluated at the `defer` statement, not when it runs. Multiple defers run last-in, first-out, like a stack.
+
+## Goroutines in a loop
+
+The classic: start goroutines inside a `for ... range` loop that print the index and name, and they all print the last element, because the closures share the loop variables. His fix is to copy them into fresh variables inside the loop body; the output then shows every value, in a scrambled order, because goroutines run concurrently. Worth knowing when you watch it today: Go 1.22 changed loop variables to be per-iteration, so on modern toolchains this bug is gone, but you will still meet the copy idiom in older code.
+
+## Recover only works in a deferred call
+
+Finally, calling `recover` next to or after a `panic` does nothing; the panic propagates up the stack and the program dies. Put `recover` inside a deferred function and it catches the panic and hands you its value.
+
+## Who should watch
+
+Go beginners, reviewers who want a checklist of things to look for, and people preparing for Go interviews. It is under 20 minutes, mostly live code, and he planned to publish the samples on GitHub.
+
+## Related Conf42 talks
+
+- Jesús Espino on [how slices, maps and channels work under the hood](https://www.conf42.com/Golang_2022_Jesus_Espino_dissecting_slices_maps_channels), also at Conf42 Golang 2022.
+- Jayaganesh Kalyanasundaram on [concurrency for beginners](https://www.conf42.com/Golang_2021_Jayaganesh_Kalyanasundaram_concurrency_for_beginners) at Conf42 Golang 2021.
+- Liam Conroy Hampton on [memory management in Go](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management) at Conf42 Golang 2023.
+
+[Watch Ranjan Mohan's talk](https://www.conf42.com/Golang_2022_Ranjan_Mohan_best_practices)
+
+[Watch the talk on YouTube](https://youtu.be/jKKJ_yXhXVg).
+",talk,golang2022,talk:golang2022/Ranjan Mohan,,Conf42,,queued,"go, best-practices, gotchas, defer, concurrency"
 ,Microsoft loves Conf42 Golang!,"Join Microsoft and Conf42 online on March 31st, 2022!",2022-03-24,2022-03-24-microsoft-golang-sponsor-announcement,./assets/splash/BLOG_2022_Microsoft_Golang_2022.png,"# Microsoft loves Conf42 Golang!
 # Join us online on March 31st, 2022!
 
@@ -112217,6 +112261,95 @@ The company is represented at the Conf42 Golang 2022 event by [Agnes Muthoni](ht
 * __[For Companies](https://bit.ly/Andela-For-Companies)__ - Accelerate Innovation with Vetted Technical Talent
 * __[Andela Enterprise](https://bit.ly/Andela-Enterprises)__ - The simplest, fastest way to build teams with global talent
 * __Andela on [YouTube](https://www.youtube.com/c/AndelaVideos)__",,,,,,,,
+,Put a Go slice under a microscope and it starts sharing memory,"Jesús Espino (Mattermost) at Conf42 Golang 2022 on how slices, maps and channels really behave in memory, read straight from the runtime with unsafe",2022-03-19,golang2022/slices-maps-channels-under-microscope,,"You use slices, maps and channels every day; Jesús Espino wanted to see what they look like from the inside. At Conf42 Golang 2022, the Staff Engineer at Mattermost used `unsafe` to read the Go runtime's own structures out of memory and print them after every operation, showing exactly when a slice reallocates, how a map grows without stalling, and where a blocked goroutine actually waits.
+
+The method is the fun part: a scalpel function casts a pointer to the value into a copy of the runtime's internal struct, a microscope function prints it, and the subject gets poked between prints. Everything is reproducible from his GitHub repo.
+
+## Why does append change the address?
+
+A slice is three words: a pointer to an array, a length and a capacity. An empty `[]int` has length and capacity zero. Append one value and the runtime allocates room for one. Append four more and the array address changes, because the old allocation was full: the runtime reserves a bigger chunk and copies everything over. After five appends the slice has length 5 and capacity 8, so the backing array holds 1, 2, 3, 4, 5 followed by three zeros. Growth is never one slot at a time, because ""you don't want to resize the slice with every single insertion,"" Jesús Espino said at Conf42 Golang 2022.
+
+## When is a subslice a window, and when is it a stranger?
+
+This is the section that justifies the talk. Take `s[1:4]` and its array pointer is exactly 8 bytes after the original's (one int64 in), with length 3 and capacity 7. Write to the subslice's index 0 and the original's index 1 changes. Append 6 to the subslice and it overwrites the original's fifth element, because the subslice's end is not the original's end.
+
+Then append enough to the original to force a resize, and the two silently stop sharing memory: changes to one no longer show in the other. A subslice is a window onto its parent only until either side reallocates. Espino's advice is not to rely on this behaviour for anything, which is the right advice and also the reason to know it exists.
+
+## How does a map grow without freezing?
+
+The map header holds the element count, B (log2 of the bucket count), an approximate overflow-bucket count, a random hash seed, pointers to the current and old bucket arrays, and an evacuation counter. The random seed, generated per map, is one reason map iteration order is unpredictable.
+
+Each bucket holds eight keys and eight values in parallel arrays, plus a few top bits of each key's hash and an overflow pointer. Insert nine entries and B goes from 0 to 1. When one bucket fills before the whole map justifies growing, the runtime chains an overflow bucket instead. Real growth doubles the bucket array, moves the old one to old buckets, and evacuates entries gradually on later operations, so a big resize becomes a period of slight slowdown rather than one long pause. Worth knowing when you read his slides today: this is the bucket design of the runtime at the time, and Go 1.24 later replaced it with Swiss tables.
+
+## Where does a blocked goroutine go?
+
+For channels he dissects a buffered `chan int32` with capacity 4 (an unbuffered channel behaves the same with a zero-sized buffer). The header has the queue count, buffer size, element size (4 bytes), a closed flag, send and receive indexes into a ring buffer, and two wait queues of parked goroutines.
+
+Fill the buffer with four values and the fifth sender parks itself on the send queue. A receiver takes the oldest value, sees a sender waiting, wakes it, and its value drops into the freed slot, so the count stays at 4 while both indexes move one step. Drain the channel completely and the reader parks on the receive queue instead. Close it and every parked receiver wakes up with the zero value.
+
+## Who should watch
+
+Go developers who want a mental model of the runtime that holds up under debugging. His own conclusion is refreshingly modest: you may never need this at work, but the trade-offs the Go team made show up in behaviour that will one day surprise you. His other tip: reading the Go runtime source is less scary than it sounds, and it is how he built the talk; in his words, ""reading the go runtime code is not complicated.""
+
+## Related Conf42 talks
+
+- Liam Conroy Hampton on [memory management in Go](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management) at Conf42 Golang 2023.
+- Piyush Verma on [Go's concurrency primitives](https://www.conf42.com/Golang_2021_Piyush_Verma_concurrency_primitives) at Conf42 Golang 2021.
+- Marco Marino on [the Go memory model, profiling and optimization](https://www.conf42.com/Golang_2024_Marco_Marino_performance_memory_optimization) at Conf42 Golang 2024.
+
+[Watch Jesús Espino's talk](https://www.conf42.com/Golang_2022_Jesus_Espino_dissecting_slices_maps_channels)
+
+[Watch the talk on YouTube](https://youtu.be/VfAff-aBpNg).
+",talk,golang2022,talk:golang2022/Jesus Espino,,Conf42,,queued,"go, go-runtime, memory, slices, channels"
+,"Peernet makes UDP act like TCP, in pure Go","Akilan Selvacoumar (Peernet) at Conf42 Golang 2022 on a pure-Go p2p file-sharing protocol with NAT hole punching, decentralized search and UDT",2022-03-13,golang2022/peernet-p2p-udt-pure-go,,"Peernet is a peer-to-peer file-sharing protocol written entirely in Go, and its most interesting trick is moving the transport layer's job into the application. At Conf42 Golang 2022, Akilan Selvacoumar, a core developer at Peernet, toured the protocol's design: per-peer blockchains for metadata, NAT traversal, keyword search without a central index, a content-addressed file store, and a pure-Go implementation of UDT for reliable transfers over UDP.
+
+It is a project tour from the people building it, ending with a live demo of the command-line client and a call for contributors.
+
+## Why pure Go?
+
+Portability. One static binary runs on Windows, Linux, an Android phone or RISC-V, with zero configuration. The core library ships inside the command-line binary, and anything else, including Peernet's own (proprietary, Windows-only at the time) browser app, talks to it over a local REST API. Go developers can also import the packages directly.
+
+## A blockchain that is allowed to shrink
+
+Each peer keeps its own blockchain holding file metadata and profile information, and shares it with other peers, so search can look up who has what. ""I like to think of blockchain as a fancy link list,"" Akilan Selvacoumar said at Conf42 Golang 2022.
+
+The unusual part is that it is mutable. Delete a file and its entry goes away; the chain gets a new version number, which propagates to the network within about a minute. The whole network ends up as a forest of small per-peer chains rather than one global ledger.
+
+## The packet is designed to look like nothing
+
+The design goals read like a security checklist: handshake on the first packet, no eavesdropping or spoofing, no forged messages from a peer pretending to be another, detect tampering and bit flips, keep packets small. Each packet carries a random number against replay attacks, a protocol version, a command, a sequence number, the payload size, and random padding so a router cannot fingerprint Peernet by packet size.
+
+Most commands are encrypted with Salsa20. File transfers, at the time of the talk, were not: encrypting every one of thousands of small packets cost too much CPU, and he lists that as an open problem the team was still working on.
+
+## Finding peers behind NAT
+
+Discovery starts centralized and stops there. A new node bootstraps from root peers (Peernet ran some, but a private network can use a box in your house), then nodes swap peer lists. On a LAN it uses IPv4 broadcast and IPv6 multicast.
+
+To get through NAT it tries UPnP first, asking the router to open and map a port, which only works if the router supports it and someone left it on. Otherwise it falls back to UDP hole punching via a rendezvous node, the same technique WebRTC relies on. Being UDP-native is what makes this easy.
+
+## Search without Google
+
+Decentralized search is deliberately simple. On upload, the file name is split on spaces, dashes and underscores into words, and each word becomes an index pointing at the file's hash. A search query is lowercased and stripped the same way, matched against the index table, and the hashes are resolved to metadata via the blockchains. Files themselves live in the warehouse: content-addressed by hash, deduplicated, and seekable, so a peer can serve just part of a file.
+
+## UDT: congestion control you can edit
+
+The backbone of file transfer is UDT, which makes UDP reliable with acknowledgements, negative acknowledgements and congestion control, all in user space. ""We want UDP to act like TCP,"" Akilan Selvacoumar said at Conf42 Golang 2022. Living in the application layer means the team can tune packet and window sizes per connection, for example sending bigger packets to nearby peers, without touching the kernel, and the same code runs on every platform. He believes Peernet was the only project running UDT fully in pure Go.
+
+The demo shows `go build` on the command-line repo, the status command listing nodes by public IP, and a probe file transfer command that measures speed and verifies the transfer by hash.
+
+## Who should watch
+
+Networking-curious Go developers, anyone who has fought NAT, and people looking for an open-source p2p codebase to contribute to. His suggested extensions include a decentralized game engine loading maps from the nearest peer and better, ranked search.
+
+## Related Conf42 talks
+
+- Sean DuBois on [WebRTC, the secret power Go has](https://www.conf42.com/Golang_2021_Sean_Dubois_WebRTC_secret_power) at Conf42 Golang 2021.
+- Akim Mamedov on [decentralized P2P networks](https://www.conf42.com/Cloud_Native_2025_Akim_Mamedov_p2p_networks_decentralization) at Conf42 Cloud Native 2025.
+
+[Watch Akilan Selvacoumar's talk](https://www.conf42.com/Golang_2022_Akilan_Selvacoumar_peernet_open_p2p)
+
+[Watch the talk on YouTube](https://youtu.be/kwAwfkh4vOA).
+",talk,golang2022,talk:golang2022/Akilan Selvacoumar,,Conf42,,queued,"p2p, networking, go, udp, decentralization"
 ,Rollbar <> Conf42 Chaos Engineering 2022,Continuously Improve Your Error Resolution Time with Rollbar,2022-03-08,2022-03-08-rollbar-sponsor-announcement,./assets/splash/BLOG_Rollbar_Chaos2022.png,"# [Rollbar](https://try.rollbar.com/chaos-eng2022/?utm_campaign=chaoseng) is the Diamond Sponsor of [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022)!
 
 Continuously Improve Your Error Resolution Time
@@ -112284,6 +112417,52 @@ Developers and tech leads who lose afternoons to small decisions, and managers w
 
 [Watch the talk on YouTube](https://youtu.be/WB9PH6P-FV0).
 ",talk,ce2022,talk:ce2022/Fabricio Buzeto,,Conf42,,queued,"decision-making, developer-productivity, engineering-culture, cognitive-load"
+,"Go testing from first test to Ginkgo, minus the copy-paste","Francisco Daines (Walmart) at Conf42 Golang 2022 on Go unit testing basics, table-driven tests, testify mocks, test packages and BDD with Ginkgo",2022-03-07,golang2022/table-driven-tests-mocks-ginkgo,,"If your Go test file is the same function copy-pasted forty times with different numbers, this talk is your intervention. At Conf42 Golang 2022, Francisco Daines, Principal Software Engineer at Walmart and maintainer of the Arch-Go architecture testing tool, walked through testing in Go from the first `go test` to behaviour-driven development with Ginkgo and Gomega, with live demos at every step.
+
+It is a 101 and says so in the title. It is also a well-ordered one, and the section on where to put your test files is worth it even for people who have been writing Go for years.
+
+## Why bother: the death spiral
+
+Daines opens with Kent Beck's ""no time for testing"" death spiral from *Test-Driven Development: By Example*: more stress means less testing, less testing means more errors, more errors mean more stress. Automated tests break the loop because the computer can rerun the same battery in seconds after every change.
+
+He also gives the two arguments that work on non-engineers: fewer production errors save money, and shipping more often with higher quality keeps customers. On strategy, he shows Mike Cohn's testing pyramid next to Kent C. Dodds' testing trophy and declines to crown a winner. ""There is no rule of thumb to select the right testing approach,"" Francisco Daines said at Conf42 Golang 2022.
+
+## The standard library goes a long way
+
+Everything starts with the built-in `go test` tool and the `testing` package, nothing to install. The first demo is an `AddNumbers` function: a file ending in `_test.go`, a function starting with `Test`, and a check that fails. He then swaps the bare fail call for `t.Errorf` so the failure tells you expected 55, got 56, on which line.
+
+Next comes the fix for copy-paste tests: table-driven tests. Define a slice of structs with inputs and expected results (1, 2, 3 gives 6; 1 and 100 give 101; an empty input gives 0), loop over it, and run each row as a subtest with `t.Run`. Adding case number 101 becomes one line. He names each subtest after its input, so a failure points straight at the offending row.
+
+He also covers testable examples: functions named `Example...` that print to standard output, are checked against an `Output` comment, and show up on the package's Go documentation page with a runnable playground. Tests and documentation in one function.
+
+## Assertions and test doubles, via testify
+
+For assertions he prefers testify. The demo highlights the difference between `assert.Equal` on two slices, which cares about order, and `ElementsMatch`, which does not, plus `Contains` and friendlier failure output.
+
+The test doubles section lists the five variants (dummy, fake, stub, spy, mock) and then makes the design point that actually matters: you can only stub a dependency cleanly if your business code depends on an interface, not on a concrete SQL driver. With that in place, a stub is just a struct in the test file that satisfies the interface. Mocks go one step further with testify's `mock` package: bind specific inputs to specific return values, limit how many times a call may happen, and fail the test when the code calls the mock with arguments nobody configured.
+
+## Where should test files live?
+
+Go convention puts tests in the same directory and the same package as the code, and the compiler leaves `_test.go` files out of builds. Daines recommends the other allowed option: same directory, but a separate package with the `_test` suffix. That way the tests can only reach exported functions, so you test the package's public interface, and you drop back to the internal package only when a private function genuinely needs exhaustive tests.
+
+## BDD with Ginkgo and Gomega
+
+The closer is behaviour-driven development, aimed at the gap between acceptance criteria written in human language and tests written in code. His example is a user story about a dean checking scholarship eligibility (medicine students with a GPA over 80 qualify), turned into `Describe`, `Context` and `It` blocks with Gomega expectations, so each test reads like its acceptance criterion.
+
+## Who should watch
+
+Go newcomers, and teams where testing is still the thing that happens when there is time. Experienced gophers can skip to the test-package and mocking sections.
+
+## Related Conf42 talks
+
+- Francisco Daines on [using Arch-Go to test your architecture](https://www.conf42.com/Golang_2021_Francisco_Daines_archgo_architecture_tooling_test_guidelines_automation) at Conf42 Golang 2021.
+- Mohammad Quanit on [test-driven development in Go](https://www.conf42.com/Golang_2023_Mohammad_Quanit_test_driven_development).
+- Julien Breux on [testing with Testcontainers in Go](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container) at Conf42 Golang 2024.
+
+[Watch Francisco Daines's talk](https://www.conf42.com/Golang_2022_Francisco_Daines_testing_101)
+
+[Watch the talk on YouTube](https://youtu.be/VlI7Ke9JYV4).
+",talk,golang2022,talk:golang2022/Francisco Daines,,Conf42,,queued,"go, testing, unit-testing, mocks, bdd"
 ,"What chaos experiments actually find, and what to do with it",Vishnu Vardhan Chikoti (Fanatics) at Conf42 Chaos Engineering 2022 on the weaknesses chaos experiments keep exposing and how to fix and share them,2022-03-05,ce2022/what-chaos-experiments-actually-find,,"Most chaos engineering talks stop at the moment the fault is injected. At Conf42 Chaos Engineering 2022, [Vishnu Vardhan Chikoti](https://www.conf42.com/Chaos_Engineering_2022_Vishnu_Vardhan_Chikoti_utilising_results_from_chaos_experiments), Senior SRE Manager at Fanatics, covers the bit after: the weaknesses that four or five years of experiments kept turning up, how to get the fixes prioritised, and why the results need to travel beyond the team that ran them.
 
 He brings 17 years across investment banking, product development and SRE (Goldman Sachs, Bank of America and DBS among them), and co-wrote Hands-On Site Reliability Engineering. The talk is a practitioner's checklist rather than a tool demo.
@@ -112453,6 +112632,52 @@ Engineers running Istio who keep hitting partial writes across services, and any
 
 [Watch the talk on YouTube](https://youtu.be/dMhSaIjOTRA).
 ",talk,ce2022,talk:ce2022/Alparslan Avci,,Conf42,,queued,"distributed-transactions, saga-pattern, istio, envoy, hazelcast"
+,"Data is the bottleneck now, and SpongeBob explains why","Joe Karlsson (SingleStore) at Conf42 Golang 2022 on reliability, scalability and maintainability when data, not CPU, is the constraint",2022-03-01,golang2022/data-intensive-apps-spongebob-scale,,"Cloud made CPU cheap; data stayed stubborn. At Conf42 Golang 2022, Joe Karlsson, Senior Developer Advocate at SingleStore, gave a gentle introduction to data-intensive applications, built on the three pillars from Martin Kleppmann's *Designing Data-Intensive Applications*: reliability, scalability and maintainability. And yes, every pillar gets a SpongeBob SquarePants analogy.
+
+Honest scope first: the abstract promised a build with Redpanda, SingleStore Pipelines, stored procedures and a Grafana dashboard. The recording is a conceptual talk instead, with no demo and no Go code, and a fair amount of SingleStore pitch along the way. Treat it as a primer on how to think, not a tutorial.
+
+## What makes an application data-intensive?
+
+Karlsson's working definition has five triggers: lots of data, data streaming in fast, low-latency queries that matter, complex queries across many sources, or heavy parallelism and concurrency. The one-line version:
+
+""data intensive applications is where data is the main constraint or bottleneck,"" Joe Karlsson said at Conf42 Golang 2022.
+
+His argument is that with Kubernetes and the cloud you can throw nodes at compute, but you cannot throw nodes at a data model that was wrong from day one. He opens with the volume problem: roughly 80 zettabytes of data created in 2022, heading for about 175 zettabytes by 2025.
+
+## Reliability: humans are the flakiest component
+
+Hardware fails, software fails more, and people fail most. He points to Netflix's Chaos Monkey as the case for designing systems that survive losing machines, including the database tier, and walks through SingleStore's approach of replicating data across leaf nodes so a dead node triggers re-election instead of downtime.
+
+The bigger point is about people. ""humans tend to be the least reliable component of any system,"" Joe Karlsson said at Conf42 Golang 2022. His remedies are unglamorous and correct: admin interfaces that make the wrong thing hard, automated tests, and full sandbox environments for trying things safely.
+
+He also makes a sidebar that deserves its own talk: databases tend to get left out of the DevOps conversation, and leaving the most important part of the system to manual processes is how human error gets into your data.
+
+## Scalability: the Twitter timeline problem
+
+The best section is the classic Twitter example from Kleppmann's book. Version one: store tweets, join against a follows table at read time. With a few thousand tweets posted per second against roughly 300,000 timeline reads per second (his figures, which he admits are a few years old), the joins could not keep up.
+
+Version two: fan-out on write. Each new tweet gets copied into every follower's timeline cache, like a letter photocopied into thousands of mailboxes. Reads become cheap; writes explode. A user with 30 million followers turns one tweet into 30 million writes.
+
+Twitter's answer was both: fan-out for most accounts, read-time merge for the handful of celebrities. Karlsson's takeaway is that real systems end up hybrid, after you measure where the load actually lands. He also sketches the scale-up vs scale-out choice and argues for horizontal, node-based scaling.
+
+## Maintainability: the bill comes after launch
+
+Most software cost is maintenance, not the first build, so he splits maintainability into operability (routine tasks are easy), simplicity (fewer moving parts) and evolvability (you will need to change it, and data is sticky). His practical advice: plan for the load you expect in five years, assume real-time analytics will become a requirement even if it isn't one today, and resist the urge to overcomplicate things to look smart.
+
+## Who should watch
+
+Developers who have built a few CRUD apps and are about to meet their first real data volume. If you have already read Kleppmann's book, this is a quick, friendly refresher with cartoon breaks; the Go content is limited to the advice that Go is a good language to build a learning project in. His closing homework: build something real, like a stock ticker or a streaming Twitter analysis, on a free developer tier.
+
+## Related Conf42 talks
+
+- Lorna Mitchell on [going big with Apache Kafka in Go](https://www.conf42.com/Golang_2021_Lorna_Mitchell_go_big_apache_kafka_open_source) at Conf42 Golang 2021.
+- Dmitry Vinnik on [Ent, making data easy in Go](https://www.conf42.com/Golang_2021_Dmitry_Vinnik_ent_making_data_easy).
+- Trista Pan on [building a distributed database on Kubernetes from your monolith](https://www.conf42.com/Golang_2023_Trista_Pan_distributed_database_kubernetes_leveraging_monolithic_database) at Conf42 Golang 2023.
+
+[Watch Joe Karlsson's talk](https://www.conf42.com/Golang_2022_Joe_Karlsson_dataintensive_applications)
+
+[Watch the talk on YouTube](https://youtu.be/jllPMWL5rK8).
+",talk,golang2022,talk:golang2022/Joe Karlsson,,Conf42,,queued,"data-intensive-applications, scalability, databases, reliability, system-design"
 ,Two weeks until Chaos Engineering event!,Embrace the power of chaos!,2022-02-24,2022-02-24-embrace-the-power-of-chaos,./assets/splash/CE2022_Event_Splash.png,"# Embrace the power of chaos!
 
 This year's Chaos Engineering edition has prepared over 20 inspiring [talks](https://www.conf42.com/ce2022) specially for you! With as many as six amazing keynote speakers to start you off. 
