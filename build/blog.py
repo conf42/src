@@ -194,11 +194,13 @@ class Resolver:
             self.sisters = {}
 
     def talk(self, short_url, name1):
+        # "Name#YouTubeId" picks one of a speaker's several talks at the same event (blog_plan.talk_ref)
+        name1, _, yid = name1.partition("#")
         event = self.events.get(short_url)
         if not event:
             return None, None
         for talk in event.get("talks_raw") or []:
-            if _norm(talk.get("Name1")) == _norm(name1):
+            if _norm(talk.get("Name1")) == _norm(name1) and (not yid or talk.get("YouTubeId") == yid):
                 return event, talk
         return event, None
 
