@@ -119524,6 +119524,432 @@ Python developers in their first couple of years, and reviewers who want numbers
 
 [Watch the talk on YouTube](https://youtu.be/ioFwOt3_aWg).
 ",talk,python2021,talk:python2021/Ranjan Mohan,,Conf42,,queued,"python, performance, best-practices, code-review, benchmarking"
+,Reference counts free most Python objects. Cycles need the collector,"Nisarg Shah (Fountain9) at Conf42 Python 2021 on how CPython allocates memory, counts references and uses a generational collector to break cycles",2021-05-22,python2021/cpython-reference-counting-garbage-collector,,"Python has no free(), and most of the time it doesn't need one: an object dies the moment nothing points to it. At Conf42 Python 2021, [Nisarg Shah](https://www.conf42.com/Python_2021_Nisarg_Shah_memory_understanding), then a computer science undergraduate and Software Developer Intern at Fountain9, walked through how CPython stores objects, how reference counting frees them, and why a second, generational garbage collector exists to clean up the reference cycles counting can never catch.
+
+It's an introductory internals talk, built on the CPython developer guide's garbage collector design page, which he recommends reading next.
+
+## What is a Python object, in memory terms?
+
+Everything is an object. Assign 9 to a variable and CPython creates an object with a unique id, a type, a value and a reference count; id() and type() show the first two. Objects and instance variables live on the heap, while each function call gets a stack frame that is destroyed when it returns. Because objects nest freely (lists in dicts in lists), allocation has to be both smart and fast, which is the job of pymalloc, CPython's allocator sitting on top of the general-purpose one.
+
+Why not let developers manage it? Long-running processes with hundreds of objects need a lot of memory, and freeing the wrong object by hand means a crash and a long debugging session. Automatic tracking takes that off the programmer.
+
+## Watching the reference count move
+
+His examples run on Python 3.8.5. Bind 19 to a, then b = a, and id(b) matches with a count of two. Then c = 19 lands on the same object too and the count reaches three, which works because CPython caches small integers, so treat that one as an implementation detail rather than a rule. Check with sys.getrefcount and you get four, not three, because passing an object into a function adds a reference for the duration of the call. Copy a list with copy.copy and the ids differ: a new object. Rebind l1 to a new list and its id changes.
+
+The count goes up on assignment, on appending an object into a container and on passing it as an argument, and down on del and when a function's locals go away. When it hits zero the object is freed immediately, which he names as the algorithm's big advantage. Globals keep their count above zero until the program ends.
+
+## Why reference counting isn't enough
+
+A list that appends itself, or two objects pointing at each other, never reach zero, even after the rest of the program has forgotten them. Reference counting can't see cycles, so CPython adds a generational, trace-based collector. ""Now, one thing to note is that this algorithm does not run in real time,"" Nisarg Shah said at Conf42 Python 2021. It runs periodically, while reference counting runs on every change.
+
+New objects go into generation 0. When the collector runs, survivors move to generation 1 and then generation 2, where long-lived objects stay until the program exits. Each generation has its own counter and threshold, and crossing a threshold triggers a scan of that generation.
+
+## How the collector finds a cycle
+
+This is the most useful part. For a scan, every container object gets a second counter, gc_refs, initialised from its real reference count. The collector then walks the objects and subtracts every reference that comes from inside the group being scanned. Whatever is still above zero is referenced from outside, so it's alive. Zero doesn't yet mean garbage, only that nothing outside points at it directly, so those objects move to a tentatively unreachable list.
+
+A second pass, driven by each type's tp_traverse, starts from the objects known to be alive and pulls back anything they can reach. In his four-link example, links two and three are rescued because link one, held by a variable, reaches them. Link four, referenced only by itself, stays unreachable and is freed.
+
+For hands-on follow-up he points to gc.collect() and gc.garbage, the devguide's design document and Medium's Python memory model posts.
+
+## Who should watch
+
+Python developers who have never looked below the object model, people chasing memory growth in long-running services, and anyone preparing for interviews where the question about reference cycles will come up. CPython core developers will know all of it.
+
+## Related Conf42 talks
+
+- Liam Conroy Hampton on [memory management](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management) at Conf42 Golang 2023, how Go handles the same problem.
+- Yonatan Goldschmidt on [low-overhead application profiling with eBPF](https://www.conf42.com/Python_2022_Yonatan_Goldschmidt_low_overhead_application_profiling_using_ebpf) at Conf42 Python 2022.
+- Ranjan Mohan on [Python performance best practices](https://www.conf42.com/Python_2021_Ranjan_Mohan_performance_best_practices_pep) at Conf42 Python 2021.
+
+[Watch the talk on YouTube](https://youtu.be/K_YGDX5VhUo).
+",talk,python2021,talk:python2021/Nisarg Shah,,Conf42,,queued,"python, cpython, memory-management, garbage-collection, internals"
+,Python is how architects get skyscrapers out of drawing tools,"Tadeh Hakopian (HMC Architects) at Conf42 Python 2021 on using Python with Dynamo, Rhino, Blender and Ladybug Tools to design buildings faster",2021-05-21,python2021/python-in-architecture-skyscrapers,,"A modern building ships with thousands of drawing sheets, and the architects producing them have quietly become Python programmers. At Conf42 Python 2021, [Tadeh Hakopian](https://www.conf42.com/Python_2021_Tadeh_Hakopian_Skyscraper_coding_architecture_blender_pythonweb_data_analysis__machine_l), Design Technology Manager at HMC Architects, toured the Python tools that let building architects script geometry, automate BIM models and run daylight and energy studies, and his one-line takeaway is that Python makes it possible.
+
+It's a short showcase rather than a tutorial: lots of tools, a few snippets, and a strong pitch for open source in an industry built on proprietary suites.
+
+## Architects and architects
+
+He opens with the overlap between building architects and software architects: Christopher Alexander's pattern language, which influenced both. A pattern that has proved reliable can be reused at any scale without reinventing the process, and that's a design philosophy either kind of architect will recognise.
+
+The problem is volume. Drawing, feedback and revision worked when a house needed about 20 drawing plans. Today's projects run to 2,000 or more 30x40-inch sheets. ""Now you need thousands, literally thousands,"" Tadeh Hakopian said at Conf42 Python 2021. He calls the traditional process wasteful and limited, and it's why computational design, generating designs from inputs and parameters with a computer, has spread through the profession over the past decade.
+
+## From diamonds to a twisting tower
+
+The first examples are small. In Rhino and Grasshopper, a Python script places points in a diamond, joins them into planes, then repeats the shape into a curtain wall. ""Just simple scripting has gone a long way,"" he said.
+
+The bigger lever is building information modelling (BIM): a 3D model tied to a relational database that knows each wall's size and each floor's material, so the drawings carry the data. Revit is the largest BIM platform, and Autodesk's Dynamo add-in puts visual, low-code scripting on top of it. His tower workflow feeds in coordinates plus the levels and walls he wants and extrudes them through 100 levels into a full skyscraper, complete with elevations for the documentation set.
+
+Dynamo was his gateway to programming, and its Python node, running IronPython, was his gateway to Python. One example takes a 100-foot rectangle, sets an origin and rotation axis, and loops through floors with a fixed rotation step to make a twisting tower. The visual graph can do it too, with more nodes and less fluency. He jokes the script is simple enough to teach a child.
+
+The slides add pyRevit, an open-source rapid prototyping environment that lets people build Revit add-ins in Python instead of C# and the SDK. Since, by the slides' count, 90% of an architect's work is documents, that one matters for productivity.
+
+## Open formats, open tools
+
+Blender, open source and scriptable in Python, is gaining ground with designers. The BlenderBIM add-on writes Blender geometry out as IFC, the open BIM format, which Revit and Archicad can read, so a design can start in free tools and still land in the enterprise suite. In a few steps you go from massing to floor plans and sections. He calls that world candy.
+
+## Daylight, energy and feedback from the finished building
+
+Sustainable design gets the last section. Ladybug Tools, written in Python and runnable in any geometry engine (pip install lbt-ladybug), simulates sun and daylight inside the design environment, so you don't have to export to another package, and can lay out options to pick from. Honeybee, from the same developer, visualises daylight and energy analysis. On a tall tower, one floor's study often holds for every floor with the same orientation, shading aside.
+
+After handover, Python collects metered energy data per floor and plots kilowatt-hours over time, so the team checks the building against the design instead of assuming it works. His vision for the future is Python as glue: XML, CSV, HTML and JSON from BIM and design models into pandas, then into analysis and Matplotlib charts, and out of the proprietary formats that used to box architects in.
+
+## Who should watch
+
+Architects, BIM managers and computational designers wondering where to start with Python, and software engineers curious how their language is used in building design. Developers looking for deep code will find a menu, not a meal. The credits slide, thanking pyRevit, Revit Python Wrapper, BlenderBIM and Ladybug Tools contributors, doubles as a reading list.
+
+## Related Conf42 talks
+
+- Paolo Melchiorre on [maps with GeoDjango and PostGIS](https://www.conf42.com/Python_2021_Paolo_Melchiorre_Django_Web_Development_Rest_APIs_Map_GeoDjango_SpatiaLite_SQLite_PostGI) at Conf42 Python 2021.
+- Ivan Chiou on [virtual and physical worlds with ROS, Python and three.js](https://www.conf42.com/Python_2024_Ivan_Chiou_virtualphysical_ros_python_threejs) at Conf42 Python 2024.
+- Andre Santos on [working smarter by automating repetitive tasks with Python](https://www.conf42.com/Python_2024_Andre_Santos_work_smarter_python_repetitive_tasks) at Conf42 Python 2024.
+
+[Watch the talk on YouTube](https://youtu.be/z9JB98wHQJY).
+",talk,python2021,talk:python2021/Tadeh Hakopian,,Conf42,,queued,"python, architecture, bim, blender, open-source"
+,Stock forecasting where the naive baseline wins on error and loses money,"Paweł Skrzypek and Anna Warno (7bulls.com) at Conf42 Python 2021 on ML time series forecasting, N-BEATS and a reinforcement learning trading agent",2021-05-20,python2021/nbeats-forecasting-reinforcement-learning-trading,,"In stock prediction, the model that predicts tomorrow equals today often posts the best error metrics and is useless for investing. At Conf42 Python 2021, [Paweł Skrzypek](https://www.conf42.com/Python_2021_Pawe_Skrzypek_Anna_Warno_ai_forecasting_methods_investments_portfolio_optimization), CTO, and Anna Warno, data scientist, both of 7bulls.com, surveyed the machine learning methods that overtook classical forecasting in the M4 and M5 competitions, then built a Python pipeline from yfinance data to N-BEATS forecasts to a toy reinforcement learning agent that trades.
+
+Skrzypek gives the map and Warno the hands-on half. The demo is deliberately small, and they say so.
+
+## Why did machine learning take over forecasting?
+
+Until a few years before the talk, Skrzypek says, statistical methods ruled: ARMA and ARIMA, exponential smoothing, ARCH/GARCH, the Theta method. The M competitions, organised by the University of Nicosia and Professor Spyros Makridakis, changed that. M4 ran on 100,000 time series of varying length and frequency, its first and second places went to hybrid methods, and M5 was dominated by machine learning. On finance specifically: ""for financial time series we are able to achieve over 60% of the accuracy, which is a very significant number for the financial time series,"" Paweł Skrzypek said at Conf42 Python 2021. Low for most series, but a real edge in portfolio construction. He mentions a first version of their platform already deployed for an investment fund in Luxembourg.
+
+## Five methods worth knowing
+
+- **ES-RNN hybrid**, the M4 winner by Slawek Smyl of Uber. Its exponential smoothing preprocessing is learned by backpropagation together with the network weights, it has its own way of ensembling and assigning models to series, and it uses residual, dilated LSTMs with attention.
+- **N-BEATS**, pure machine learning, built from stacked blocks for trend, seasonality and generic patterns, with explainability, transfer learning and ensembling.
+- **Facebook Prophet**, generalised additive models in a library. The easiest to start with, and it gives uncertainty intervals, not just a point.
+- **GluonTS**, a full probabilistic forecasting framework with many models and transformations, cloud support and a strong research community. Harder than Prophet, much more powerful.
+- **Tsetlin machines**, stochastic learning automata (an idea dating to the 1960s) that learn a probability distribution for each feature. The odd one out, and he treats it as such.
+
+## From yfinance to N-BEATS
+
+Warno's pipeline uses yfinance (Yahoo Finance data, for learning purposes) for daily open, high, low, close and volume, QuantStats for its 20-odd ready-made plots and metrics, and statsmodels for seasonal decomposition, transformations and outlier detection. She thinks statsmodels does a fine job of replacing R for classical analysis. A Kalman filter gets a mention for its smoothing.
+
+The target is the closing price at daily and weekly frequency, which she calls very noisy and very hard to predict. Data splits into train, validation and test. Benchmarks first: naive (repeat the last value), exponential smoothing and ARIMA. Then N-BEATS from PyTorch Forecasting, built on PyTorch Lightning.
+
+The punchline is in the comparison table. ""naive method achieves surprisingly good scores. However, from investor point of view, its prediction is worthless,"" Anna Warno said. A model with good mean absolute error may only be the series shifted by a day, so she adds the metric investors care about: how often the model gets the direction of the move right. The numbers, she stresses, are examples that vary a lot between stocks.
+
+## A reinforcement learning agent, kept honest
+
+The last step treats the market as a game where profit is the score. Instead of an existing environment such as FinRL, she writes a minimal OpenAI Gym environment for one stock. The observation is past prices, shares and cash held, time remaining and the forecasts from the previous step. The reward is cash plus shares at the current price. Actions buy or sell a percentage: sell up to 100% of holdings, buy at most three shares a day. Episodes last 20 days to keep training short. The agent is PPO from Stable Baselines3 with small multilayer perceptrons, evaluated on the last 365 days with 365 different start dates.
+
+Against buy-and-hold and a simple last-n-values rule, over four runs on randomly chosen companies, the agent is not the worst. She is explicit that this proves nothing, since fair comparison is hard, but it suggests the approach has potential.
+
+## Who should watch
+
+Python developers moving into time series, quants curious which ML forecasters are worth trying, and anyone about to report a stock model's MAE without checking the naive baseline. Skip it if you want a production trading system; this is a map and a sandbox.
+
+## Related Conf42 talks
+
+- The same pair on [ensembling techniques for time series forecasting](https://www.conf42.com/Python_2022_Pawel_Skrzypek_Anna_Warno_ensembling_techniques_time_series_forecasting) at Conf42 Python 2022.
+- Their [time series forecasting methods](https://www.conf42.com/Machine_Learning_2021_Pawel_Skrzypek_Anna_Warno_Time_Series_Forecasting_Methods) talk at Conf42 Machine Learning 2021.
+- Piotr Stepinski on [forecasting time series](https://www.conf42.com/Machine_Learning_2024_Piotr_Stepinski_forecasting_timeseries) at Conf42 Machine Learning 2024.
+
+[Watch the talk on YouTube](https://youtu.be/AiavxedXWJA).
+",talk,python2021,talk:python2021/Paweł Skrzypek,,Conf42,,queued,"python, time-series, forecasting, reinforcement-learning, finance"
+,Counting trucks from orbit to measure a lockdown's economic cost,"Aakash Gupta (ThinkEvolve Consulting) at Conf42 Python 2021 on measuring economic activity from open satellite data via NO2, truck counts and surface water",2021-05-18,python2021/satellite-data-economic-activity-lockdown,,"Economists struggle to see a policy's impact on the ground; satellites see it from orbit. At Conf42 Python 2021, [Aakash Gupta](https://www.conf42.com/Python_2021_Aakash_Gupta_Abha_Porwal__Apsal_K_earth_observations_measuring_economic_indicators), CEO and co-founder of ThinkEvolve Consulting, and interns Abha Porwal and Apsal K showed how open Earth observation data and Python can stand in for economic indicators: NO2 over industrial belts, trucks counted on highways from 10-metre Sentinel-2 pixels, and surface water measured with Google Earth Engine.
+
+It's three talks in one: a survey of proxies, then two hands-on Python projects, then a refreshingly long list of everything that can go wrong.
+
+## Which signals from space track the economy?
+
+Gupta's list of proxies: air pollution over industrial belts, water quality, ESG signals such as deforestation and mangrove loss, surface water levels, and vehicle density on highways and at airports. The hypothesis is simple. ""Measuring pollution can be a very good measure of identifying ongoing economic activity,"" Aakash Gupta said at Conf42 Python 2021.
+
+The headline example uses Sentinel-5P NO2 composites of the Indian subcontinent. April 2019 shows red over the Delhi belt, the leather and tanning areas south of Varanasi, the steel and coal region around Jamshedpur, Mumbai, Gujarat, Hyderabad and Karachi. April 2020, after India's strict late-March lockdown, shows a sharp drop. The team saw the same in Germany and Wuhan, and no such effect where lockdowns were loosely enforced.
+
+The rest of the tour moves fast: clearer, less turbid Venice canals once the boats stopped; a floating algae index over Lake Victoria from Sentinel-2 L2A; synthetic aperture radar, which sees through cloud, to track field-hospital construction in Spain and Wuhan; a Planet hackathon app built in 2020 to flag Amazon logging in near real time; and car and aircraft counts from 30-centimetre imagery with open-source detectors covering more than 60 vehicle classes, or Picterra if you prefer low-code.
+
+## Counting trucks with pixels too big to see them
+
+Very-high-resolution imagery costs money, and at Sentinel-2's 10 metres you can't see a car. Abha Porwal's project uses a quirk of the sensor instead. Sentinel-2's detectors sit in two parallel arrays, so each band sees a pixel at a slightly different moment. A moving truck lands in a different place in each band, which leaves a rainbow-like smear in RGB.
+
+The pipeline is all Python:
+
+- **xcube**, which serves Earth observation data as an analysis-ready cube on top of xarray, Zarr and Dask, plus the xcube_sh plugin to pull cubes from Sentinel Hub on the fly.
+- **An OpenStreetMap road mask** built with the Overpass API from highway and motorway tags, for a bounding box around Visakhapatnam.
+- **Six bands** (B02, B03, B04, B08, B11 and the SCL scene classification), with NDVI, NDWI and NDSI masks to remove vegetation, water and snow.
+- **Thresholds on the blue-green and blue-red ratios**, since the moving-object signature is a pixel where blue beats green and red. Each truck shows up as one to three pixels.
+
+One date in June produced 195 trucks for the region, and comparing 2019 with 2020 put the lockdown drop at up to 26%. She is upfront that counts are approximate at 10 metres and that clouds decide which dates you can use. The output is a relative truck density, not a census.
+
+## Measuring water with Earth Engine
+
+Apsal K uses Google Earth Engine through its Python API and geemap, the Jupyter-friendly wrapper. Draw a rectangle on the map, compute NDWI from Landsat 8's bands 3 and 6, count pixels above a threshold (conventionally 0.2 or 0.3) and multiply by pixel area to get surface water, plotted from January to May. Counting water bodies goes through OpenCV and scikit-learn: grayscale, smooth, threshold, then connected component analysis, keeping blobs above a minimum size. NDWI overestimates near built-up land, and small or oddly shaped ponds slip through.
+
+## What breaks with open satellite data?
+
+Gupta's closing list is worth the watch on its own. Revisit gaps mean you may get no image for your period, especially in remote areas. Ageing sensors produce bad data, so you need anomaly detection. Cloud cover makes optical imagery hard over equatorial belts and rainforests such as Indonesia, Myanmar and Cambodia. ""You may notice a large gap during revisit times and you may not get an image for the period of interest,"" he warned. Commercial providers prioritise industrial and urban areas, and local law matters: in India, imagery finer than 50 centimetres goes through the national remote sensing agency, and defence sites must be blurred.
+
+## Who should watch
+
+Data scientists curious about geospatial work, economists and analysts looking for alternative data, and Python developers who want a tour of xcube and Earth Engine. No remote sensing background needed, though it helps to know what a spectral band is.
+
+## Related Conf42 talks
+
+- Paolo Melchiorre on [maps with GeoDjango and PostGIS](https://www.conf42.com/Python_2021_Paolo_Melchiorre_Django_Web_Development_Rest_APIs_Map_GeoDjango_SpatiaLite_SQLite_PostGI) at Conf42 Python 2021.
+- Alex Smolyak on [data science for wastewater intelligence](https://www.conf42.com/Python_2023_Alex_Smolyak_data_science_machine_learning_wastewater_intelligence) at Conf42 Python 2023, another unusual sensor for measuring a pandemic.
+- Kalyan Prasad on [financial network analysis](https://www.conf42.com/Python_2022_Kalyan_Prasad_financial_network_analysis) at Conf42 Python 2022.
+
+[Watch the talk on YouTube](https://youtu.be/iGTMpcNhjsE).
+",talk,python2021,talk:python2021/Aakash Gupta,,Conf42,,queued,"python, earth-observation, satellite-imagery, geospatial, data-science"
+,Your first data pipeline can run on Google Sheets and a cron job,"Hui Xiang Chua (Essence) at Conf42 Python 2021 on starting data engineering side projects with Python scraping, ETL into Google Sheets and Data Studio",2021-05-17,python2021/data-engineering-side-projects-google-sheets,,"You don't need a warehouse budget to practise data engineering; a free spreadsheet API and a scheduled script will do. At Conf42 Python 2021, [Hui Xiang Chua](https://www.conf42.com/Python_2021_Hui_Xiang_Chua_data_engineering_projects), Senior Analytics Manager at Essence in Singapore, showed two side projects built that way: a daily scraper that collected 1,680 Towards Data Science headlines into Google Sheets, and an image pipeline that produced the average face of each party's candidates in Singapore's 2020 general election.
+
+It's a beginner-friendly, code-on-screen talk. Experienced data engineers will spot the shortcuts; that's rather the point.
+
+## What does a data engineer actually do?
+
+She frames the job as plumbing: pipelines that move data rather than liquid or gas, so data scientists and analysts get a consistent flow. At work her team pulls campaign data from advertising platforms through their APIs into a warehouse on Google Cloud Platform. The pattern is ETL, extract, transform, load, automated as much as possible to save time and keep things consistent and accurate. The transform step is where test records and junk get cleaned out. ""So the data warehouse should be the place where there is a single source of truth and it should contain the most accurate data,"" Hui Xiang Chua said at Conf42 Python 2021.
+
+For a side project with no budget, her suggestion is to swap the warehouse for Google Sheets (the API is free) and the BI tool for Google Data Studio (also free).
+
+## Use case one: scraping a Medium publication every day
+
+The target is Towards Data Science: author, recency and post title for every new article, plus a timestamp column for when the script ran. The stack is Beautiful Soup and Selenium for scraping, NumPy and pandas for transformation, and gspread with gspread-dataframe to write to the sheet. She walks through the Google API setup, the downloaded JSON credentials file and the spreadsheet scope, and flags authentication as the step that makes or breaks the whole thing. Without it, nothing is automated.
+
+The scraping is where the real-world mess shows:
+
+- **The page only loads about ten articles**, so Selenium clicks Show more 20 times, with a two-second sleep between clicks to look less like a bot (which, she admits, it is).
+- **The text under the a tags is noisy**, with image captions mixed in. The pattern she found: three blank elements between posts. The script finds runs of three identical elements and takes the fields after them.
+- **When a caption sneaks in first**, the title shifts position. Captions are under 20 characters, so an if-else on length picks the right line.
+- **Overlap between days** is handled by appending to the existing sheet data and dropping duplicates on author and title in pandas.
+
+Scheduling is plain Windows Task Scheduler pointing at the virtualenv's Python and the script. Her honest assessment of the output is roughly 90 to 95% clean data, with outliers left for manual fixes. Over six weeks the sheet collected 1,680 articles, enough to start text mining for the hottest topics in data science, and Data Studio put a friendlier interface on top.
+
+## Use case two: ELT, and an average face
+
+The second project flips the order to extract, load, transform, which she relates to data lakes, while noting that in her own work it's ETL most of the time. The source is The Straits Times' interactive page of GE2020 candidates. Selenium runs headless with the GPU disabled so the scrolling page loads fully, Beautiful Soup collects the img tags, a bit of trial and error finds where the candidate photos start and end in the list, blank alt texts are skipped, and each image is saved with the candidate's name and the extension taken from the URL. The transform is an open-source face-averaging library from GitHub, run once per party with at least ten candidates. She credits the wonders of open source for making it quick.
+
+## The order she recommends
+
+Start from the analysis you or your data science team want to do, work out what data that needs, then write the Python that automates the ETL or ELT. She covers more of this on her blog, Data Double Confirm.
+
+## Who should watch
+
+Analysts and data scientists who want a portfolio project that proves they can feed their own models, and students looking for a first pipeline. Production data engineers can skip it, or send it to the intern.
+
+## Related Conf42 talks
+
+- Fabien Vauchelles on [live-coding anti-ban web scraping](https://www.conf42.com/JavaScript_2024_Fabien_Vauchelles_23_livecoding_antiban_webscraping) at Conf42 JavaScript 2024.
+- Steven Kolawole on [data apps with Streamlit](https://www.conf42.com/Python_2021_Steven_Kolawole_Streamlit_DataApp_PyData_DevOps) at Conf42 Python 2021.
+- Tamara Janina Fingerlin on [Apache Airflow pipeline frameworks](https://www.conf42.com/Python_2024_Tamara_Janina_Fingerlin_frameworks_apache_airflow_pipelines) at Conf42 Python 2024, for when the cron job grows up.
+
+[Watch the talk on YouTube](https://youtu.be/JsiwcZkH75c).
+",talk,python2021,talk:python2021/Hui Xiang Chua,,Conf42,,queued,"python, data-engineering, etl, web-scraping, google-sheets"
+,Stop writing tests by hand and let Hypothesis pick the inputs,"Zac Hatfield-Dodds (Australian National University) at Conf42 Python 2021 on property-based testing, the Hypothesis ghostwriter and adaptive fuzzing",2021-05-16,python2021/hypothesis-ghostwriter-stop-writing-tests,,"Most automated test suites automate one thing: re-running examples a human picked. At Conf42 Python 2021, [Zac Hatfield-Dodds](https://www.conf42.com/Python_2021_Zac_HatfieldDodds_stop_writing_tests_fuzzing_propertybased_testing), a researcher at the Australian National University and a maintainer of Hypothesis, argued for automating the rest: let the computer choose the inputs (property-based testing), write the test code (the Hypothesis ghostwriter) and decide what to run (adaptive fuzzing with HypoFuzz).
+
+The title is provocative on purpose. He wants you to keep testing, just not by typing out input-output pairs.
+
+## What's left to automate in a test suite?
+
+Testing, in his definition, is running code to see what it does: choose inputs, run, check the result, repeat. Tools like pytest automate the repeat. Choosing inputs, deciding what to run and writing assertions for a particular output are still manual.
+
+He shows this by growing a test for sorting. Hard-coded examples become a parametrised test, which scales but still needs every expected output worked out by hand. Without the answers, you can compare to a trusted implementation (the pre-refactor version, a single-threaded one, a slow bubble sort). Without that, check that the output is in order. But the empty list is always in order, so check the length. Then that the set of elements matches, which lets an evil sort turn 1, 2, 1 into 1, 2, 2. Finally, compare collections.Counter of input and output. Two properties, ordered output and the same elements, are the full definition of sorting, and he has just invented property-based testing.
+
+## Let the random number generator be the pessimist
+
+The remaining flaw is that you still pick the inputs, so you'll never test anything you didn't think of when writing the code. Hypothesis takes a description of the data instead: lists of mixed integers and floats, or lists of strings. Run the sort test with it and it fails at once, because NaN compares unequal to itself. His starter plan has three steps: pip install hypothesis, skim the docs, find lots of bugs.
+
+## A ghostwriter for the test you were going to skip
+
+The Hypothesis ghostwriter writes tests from a function signature. Pointed at sorted, it immediately covers the key and reverse arguments his hand-written demo forgot. It can also generate tests for idempotence (sorting twice changes nothing), equivalence between two implementations, commutative and associative properties, and the one he recommends to everyone: round trips, such as save then load or compress then decompress. ""So for pretty much everyone I would recommend writing these round trip tests,"" Zac Hatfield-Dodds said at Conf42 Python 2021, because IO and persistence cross many abstraction layers and break more often than you'd expect.
+
+The JSON round-trip demo is the best part. Hypothesis reports two distinct failures: NaN isn't equal to itself, and infinity with allow_nan off is invalid under strict JSON. Patch those with an assume and it finds a third: a list containing NaN does compare equal to itself, because CPython's list equality checks identity first as a performance shortcut. The real fix is to stop generating NaN at all.
+
+## Migrating an existing test, one refactor at a time
+
+You don't have to throw out your suite. His example is git-like business logic: create an empty repo, check out a new branch, assert it's active. Make the branch name a parameter, then a Hypothesis strategy that returns the same name, so nothing changes yet but the intent is clearer. Then widen the strategy. Git's real branch-name rules are long, so he settles for ASCII letters of reasonable length, and finally any repository, not just an empty one.
+
+## Fuzzing all night
+
+The last step hands the choice of what to run to the machine. Google's Atheris wraps libFuzzer and runs one function for hours or days, which suits C extensions and sanitisers, and it works with Hypothesis-generated inputs. HypoFuzz, his own pure-Python tool at hypofuzz.com, runs a whole test suite at once and spends time on the tests making the fastest coverage progress. In the live dashboard, run on hypothesmith, his generator of Python source code, it had found a failure in the black formatter. ""This is genuinely a new bug to me, and so I'm going to have to go report that after the talk,"" he said.
+
+## Who should watch
+
+Any Python developer who writes pytest tests, especially for parsers, serialisers, data pipelines or financial code. It's one of the clearest introductions to property-based testing you'll find, from the person who maintains the main library for it.
+
+## Related Conf42 talks
+
+- Gil Zilberfeld on [TDD with legacy code](https://www.conf42.com/Python_2022_Gil_Zilberfeld_TDD_legacy_code) at Conf42 Python 2022.
+- Mario Garcia on [generating test data for a database project](https://www.conf42.com/Python_2023_Mario_Garcia_generate_test_data_database_project) at Conf42 Python 2023.
+- Everett Pompeii on [catching performance regressions](https://www.conf42.com/Python_2023_Everett_Pompeii_catch_performance_regressions) at Conf42 Python 2023.
+
+[Watch the talk on YouTube](https://youtu.be/pV-TbqqUMsA).
+",talk,python2021,talk:python2021/Zac Hatfield-Dodds,,Conf42,,queued,"python, testing, property-based-testing, hypothesis, fuzzing"
+,"A decade of mistakes, and the CEO who wanted servers in a nuclear silo","Bojan Miletic (Softerrific) at Conf42 Python 2021 on ten years of career mistakes, from deleting production to a nuclear silo pitch, and the lessons",2021-05-14,python2021/nuclear-silo-decade-of-mistakes,,"The best career advice often comes from someone who ran sudo rm -rf / on a production server and lived. At Conf42 Python 2021, [Bojan Miletic](https://www.conf42.com/Python_2021_Bojan_Miletic_server_nuclear_silo), CEO of Softerrific, told a decade of his own mistakes as anecdotes, from that midnight deletion to talking a blockchain CEO out of buying a decommissioned nuclear silo, with a plain lesson after each.
+
+There is no code in this one. It's a story talk, and a funny one, about the non-technical things that sink technical projects.
+
+## How do you learn Linux administration?
+
+His way: in the middle of the night, deleting a directory with sudo privileges and a path that turned out to be the root of the disk. For a brief moment there was nothing on the hard drive and the site kept serving from memory. Then came a new server, all the requirements, the deployment, the permissions and a DNS switch, in one panicked sitting. ""If you want to switch from Red Bull or coffee, I warmly recommend deleting production servers,"" Bojan Miletic said at Conf42 Python 2021.
+
+The early-career hits keep coming: two or three weeks writing code in plain Notepad and uploading it over FTP straight to production (safe enough, he jokes, because the client was asleep in the USA), versioning by copying files with a timestamp until a YouTube video introduced him to version control, and discovering git branches roughly two years after that.
+
+## Why do teams build the wrong thing?
+
+His first startup was a search engine that returned listings in under 15 milliseconds and had no monetisation plan, which they noticed after a year and a half. His takeaway isn't a 50-page business plan, just knowing how the thing will make money before you build it. Staffing it with juniors led by him, at six months of experience, taught him that ""Seniors are expensive, but they are less expensive than juniors.""
+
+The second startup, a social network, adds three more. Hype-driven tech: they picked MongoDB, and two years later most of his database code was turning it back into a relational model. His rule now is that in 95% of cases a relational database is perfectly fine, and if you do pick NoSQL, know why. Ship to users early: they spent a year and a half before anyone used it, then nobody did. And talk to your team: when he asked each of 15 people what they were building, he ""got 15 different answers, myself included"".
+
+## How do you say no to a client?
+
+Consulting brought the best stories. Clients skim a 20-page proposal for the price, so talk to them first and find out what they actually care about and fear; compete on price alone and someone will always be cheaper. One client wanted a three-dimensional video player; Bojan spent two weeks on it, and by the time he had a design the client had forgotten asking. Another client's friend said Python was no good because his company used Java, until Bojan asked to speak to the friend directly.
+
+Then the title story. At the 2018 blockchain peak, the CEO of a client building a new blockchain wanted to move everything from AWS into a nuclear silo, which apparently sell decommissioned for about 800,000. Technical arguments about configuring AWS security went nowhere, so he switched to a metaphor: ""using nuclear silos to secure your blockchain servers is the same thing as buying a dog and putting it next to your computer to ward off the hackers."" It worked. The real problem, he notes, was that nobody was using the blockchain. Find product-market fit first, then solve its problems.
+
+## Know your limits, and keep your evenings
+
+He closes on limits. His teenage Flash website was five megabytes of unstoppable music that took 20 minutes to load on a friend's dial-up, and the only frontend he'll now admit to writing is a red CSS background. A no-fixed-hours experiment with a junior team ended in chaos and 12 to 14-hour days, so they went back to regular hours. His final point, made at a programming conference: personal life matters more than your programming skills.
+
+## Who should watch
+
+Junior developers who want the mistakes without paying for them, first-time founders and tech leads, and freelancers learning to handle clients. Senior engineers will laugh in recognition.
+
+## Related Conf42 talks
+
+- Mihailo Joksimovic on [fighting imposter syndrome](https://www.conf42.com/Python_2022_Mihailo_Joksimovic_fighting_imposter_syndrome) at Conf42 Python 2022.
+- Matt Harrison on [consulting for introverted developers](https://www.conf42.com/Python_2023_Matt_Harrison_consulting_introverted_developers) at Conf42 Python 2023.
+- Renato Losio on [mistakes and lessons from scaling](https://www.conf42.com/Database_DevOps_2026_Renato_Losio_mistakes_lessons_scaling) at Conf42 Database DevOps 2026.
+
+[Watch the talk on YouTube](https://youtu.be/fHxHsfVUk8o).
+",talk,python2021,talk:python2021/Bojan Miletic,,Conf42,,queued,"career, lessons-learned, startups, consulting, databases"
+,"Pythonic code is a quality bar, and linters are the lint filter","Ammara Laeeq at Conf42 Python 2021 on what makes code Pythonic, how the Zen of Python, PEP 8 and linters enforce it, and the idioms worth adopting",2021-05-13,python2021/pythonic-code-pep8-linters-idioms,,"Writing Python and writing Pythonic code are not the same thing, and the gap shows up in maintenance budgets. At Conf42 Python 2021, [Ammara Laeeq](https://www.conf42.com/Python_2021_Ammara_Laeeq_tools_tips), a Python developer from Pakistan with more than six years in the language, made the case that idiomatic code is a quality signal, showed the three tools that keep a codebase honest (the Zen of Python, PEP 8 and linters), and finished with a long run of before-and-after idioms.
+
+It's a fundamentals talk, pitched at developers who came to Python from C++ or Java and still write it with an accent.
+
+## What makes code Pythonic?
+
+""Any program, function or block of code that follows style guidelines and make use of Python's unique capabilities or language features is said to be pythonic code,"" Ammara Laeeq said at Conf42 Python 2021. She ties it to code quality, which she defines in three parts: it does what it's supposed to do, it has no known defects (her analogy is a detergent that's fine on everyday laundry and useless on a hard stain), and it's readable, maintainable and extendable. The last one matters most, because the person who wrote the code won't be around to maintain it forever. Bad quality costs you clarity, efficiency (maintenance costs skyrocket) and your credibility as a programmer.
+
+## Three tools, from philosophy to enforcement
+
+**The Zen of Python.** Tim Peters' aphorisms, printed by typing import this in a shell, and sung as lyrics by Barry Warsaw in May 2020. She walks through the practical ones: explicit is better than implicit (name variables for what they hold), flat is better than nested (itertools.product instead of nested loops), errors should never pass silently unless explicitly silenced.
+
+**PEP 8.** One statement per line, four spaces per indentation level, spaces over tabs, 79 characters per line and 72 for comments and docstrings (PEP 257 covers docstrings), imports at the top and one per line with standard library first, then third party, then your own, and no wildcard imports. Pick one string quote style and stick to it. Naming gets a full checklist: short lowercase modules, PascalCase classes without the word Class, an Error suffix on exceptions, SNAKE_CASE constants, self and cls as first arguments, a trailing underscore to dodge keywords (class_, not clss), and one or two leading underscores for non-public and name-mangled attributes. She also recommends a single point of return per function, which is more of a house preference than PEP 8, and early-return fans will have opinions.
+
+**Linters.** Her best analogy: lint is what sticks to clothes in the washing machine, and the lint filter is what saves them. She splits lint into logical (errors, dangerous patterns, unintended results) and stylistic (convention violations), then maps the tools: IDEs mostly stylistic, Pylint both, pycodestyle stylistic, pydocstyle for docstrings, PyFlakes logical.
+
+## When should the linter run?
+
+She weighs three moments: as you write, when you check in, and when tests run. Linting only at test time means a big pile of fixes a couple of times a sprint. Her pick is the daily check-in. ""So in my opinion, the best choice is to use the option of when it's checked in,"" she said, because half an hour at the end of the working day keeps quality up with the least effort.
+
+## The idioms
+
+The second half is a catalogue, each with the non-idiomatic version first:
+
+- Swap with a, b = b, a, no temp variable.
+- Don't compare to True, False or None with ==; use is not rather than not ... is; treat empty sequences as false.
+- Replace chains of or comparisons with in.
+- Loop with for element in my_list, reversed() for backwards, enumerate() when you need the index.
+- for ... else for search loops, so the else runs only when the loop never broke.
+- iter() with a sentinel and functools.partial to read a file in 32-byte chunks.
+- startswith and endswith over slicing, join over += in a loop.
+- Context managers for files, locks, ignoring a specific OSError, redirecting stdout and temporary decimal contexts.
+- List multiplication, star-unpacking with _ as a throwaway, list comprehensions and dictionary idioms.
+
+Her closing caveat is the right one: these are powerful constructs, to be used where they help, not for the sake of using them.
+
+## Who should watch
+
+Developers in their first year or two of Python, team leads writing a style guide, and anyone who still writes for i in range(len(x)). Seasoned Pythonistas will know most of it, though the for-else and iter-with-sentinel sections catch plenty of people out.
+
+## Related Conf42 talks
+
+- Matt Harrison on [idiomatic pandas](https://www.conf42.com/Python_2021_Matt_Harrison_Idiomatic_Pandas) at Conf42 Python 2021.
+- Mason Egger on [context managers](https://www.conf42.com/Python_2021_Mason_Egger_context_managers) at Conf42 Python 2021, the longer version of one of her idioms.
+- Alex Sharypov on [improving application code quality](https://www.conf42.com/Python_2024_Alex_Sharypov_improve_application_code_quality) at Conf42 Python 2024.
+
+[Watch the talk on YouTube](https://youtu.be/BPPiWpRN1g0).
+",talk,python2021,talk:python2021/Ammara Laeeq,,Conf42,,queued,"python, code-quality, pep8, linters, idioms"
+,Your Python build probably isn't reproducible. Bazel gets you most of the way,"Gaspare Vitta (FCA Fiat Chrysler Automobiles) at Conf42 Python 2021 on hermetic, reproducible Python and Flask builds with Bazel",2021-05-12,python2021/bazel-hermetic-python-builds,,"Run the same commit on two machines and you will most likely get two different builds. At Conf42 Python 2021, [Gaspare Vitta](https://www.conf42.com/Python_2021_Gaspare_Vitta_Reproducible_Builds_Bazel), CI/CD Engineer for Autonomous Driving at FCA Fiat Chrysler Automobiles, showed how Bazel makes a Python project hermetic down to the interpreter, built a Flask app that hashes identically across clean builds, and then admitted, to his credit, that it still wasn't fully reproducible.
+
+That last twist is the reason to watch. Most build talks stop at the green checkmark.
+
+## What counts as reproducible?
+
+He uses the Reproducible Builds project's definition: given the same source code, build environment and build instructions, anyone can recreate bit-by-bit identical copies of all specified artifacts. The pay-off is a smaller attack surface, knowing exactly which sources an artifact came from, and much faster builds because intermediate artifacts can be cached safely.
+
+Two enemies stand in the way. The first is inputs that aren't source code: compilers, build tools, third-party libraries. Every reference has to be unambiguous, pinned to an exact version or hash, and ideally checked into source control. That's what hermetic means, and it buys you cherry-picking: check out a two-month-old release, fix a bug and rebuild it with the compiler it was built with, not today's. The second enemy is internal randomness. Timestamps are the usual culprit, and he's blunt about them: you're already tracking the environment in version control, so get rid of them. Initialise your variables too.
+
+## How does Bazel enforce it?
+
+Sandboxing. Bazel runs each action in a working directory that contains only the declared inputs, so a compiler can't wander off and read something you forgot to list; undeclared input means a failed build. Caching is the other half, and he cites up to 50 times faster repeated builds.
+
+The walkthrough builds everything from the WORKSPACE file:
+
+- **The interpreter itself.** An http_archive rule downloads the Python 3.8.3 tarball from python.org, pinned by SHA-256, and runs configure, make and make install as patch commands. The host Python is never used.
+- **Python rules.** rules_python 0.1.0, also fetched by hash.
+- **A toolchain.** py_runtime points at the freshly built interpreter, py_runtime_pair wraps it (Python 3 only), and register_toolchains goes at the very end of WORKSPACE, a placement he stresses.
+- **Dependencies.** A requirements.txt with every package, child dependencies included, pinned with hashes, loaded through pip_install with the interpreter target overridden to the one Bazel built. No virtualenv, no manual pip install: you list deps on the target and you're done.
+
+A small pytest target checks that the running interpreter is the Bazel one and the version is 3.8.3. Then a Flask app prints both interpreters side by side: Bazel's 3.8.3 and the 3.8.5 from pyenv on his Mac.
+
+## So is it reproducible?
+
+He builds, takes the MD5 of the binary, runs bazel clean --expunge_async, builds again from scratch, and gets the same hash. Done? Not quite. Building Python through patch commands means it's compiled with whatever GCC and system libraries the host has, and those aren't pinned. His three ways out: run Bazel inside a Docker image with a pinned GCC, check in a precompiled interpreter binary, or use Nix and its Bazel rules to bring system packages in hermetically.
+
+""From now on, don't take for granted that your build is reproducible, since most probably is not,"" Gaspare Vitta said at Conf42 Python 2021. The example code is on GitHub at gasparev/reproducible-python-bazel, ready to reuse as the base for your next project.
+
+## Who should watch
+
+Python teams in regulated or safety-critical work (he builds for autonomous driving, where knowing exactly what went into a binary isn't optional), monorepo owners eyeing Bazel, and anyone whose CI has ever behaved differently from a laptop. It's code-heavy: expect Starlark, not slides about philosophy.
+
+## Related Conf42 talks
+
+- Eugene Khabarov on [when Bazel is enough](https://www.conf42.com/Golang_2024_Eugene_Khabarov_build_enough_bazel) at Conf42 Golang 2024.
+- Haseeb Majid on [using Nix for reproducible environments](https://www.conf42.com/Golang_2024_Haseeb_Majid_using_nix_reproducible) at Conf42 Golang 2024, the escape hatch Vitta points to.
+- Milecia McGregor on [reproducible experiments for better ML models](https://www.conf42.com/Python_2022_Milecia_McGregor_reproducible_experiments_better_ml_models) at Conf42 Python 2022.
+
+[Watch the talk on YouTube](https://youtu.be/vrojmYRHxwY).
+",talk,python2021,talk:python2021/Gaspare Vitta,,Conf42,,queued,"python, bazel, reproducible-builds, build-systems, ci-cd"
+,"Production Celery is a pipeline, a retry policy and a memory cap","Vishrut Kohli (Grofers) at Conf42 Python 2021 on turning Celery into a production-ready task queue with pipelines, tuning, retries and monitoring",2021-05-10,python2021/celery-pipelines-retries-and-flower,,"Getting a task onto a queue is the easy part; keeping the workers that consume it fast, honest and alive is where teams lose sleep. At Conf42 Python 2021, [Vishrut Kohli](https://www.conf42.com/Python_2021_Vishrut_Kohli_productionready_distributed_task_queue_system_celery_django_queing), Software Engineer at Grofers, walked through a Celery setup in five steps: build it as a pipeline, tune it, make it resilient, plan for the SOS moment, and monitor it. His definition of production-ready is four words: efficient, scalable, transparent, resilient.
+
+It's a practical, config-level talk with a running e-commerce warehouse metaphor and, as promised on the agenda, bad jokes.
+
+## Why put a queue in front of the database at all?
+
+His opening story is a mall with an IoT sensor at the door that fires an API request per visitor and bumps a counter in the database. It works until he streams a football match, the crowd arrives, and concurrent requests time out on database locking. The counter comes out low. The fix is a task queue: the web server enqueues and returns 200, and the database consumes at its own pace. Real time becomes eventually consistent, which is fine when you only read the count once, at closing time.
+
+On brokers he keeps it simple: RabbitMQ if you need several workers on different queues and persistence across shutdowns (at the cost of more setup and upkeep), Redis if you want a quick messaging system that's easy to run.
+
+## One big task is worse than a pipeline of small ones
+
+The warehouse has three jobs: picking, packing, delivery. One worker doing all three scales only by cloning the whole worker. Split into a pipeline of specialised tasks and you get three wins he lists: you can see the bottleneck and scale just that stage, each stage can run on hardware that suits it (more CPU here, more memory there), and retries restart from the last succeeded step instead of from the beginning. For a sale-day spike he prefers horizontal scaling, a second makeshift warehouse, since the load drops back afterwards.
+
+## Measure first, then batch and pick the right pool
+
+""It is always better to benchmark before moving to any further optimization because in my experience I have seen if we go by intuition, either we end up over optimizing the system or optimizing wrong parts of the architecture,"" Vishrut Kohli said at Conf42 Python 2021. In his load test the picking worker had far more queued tasks than any other stage, so that's where he started.
+
+The tuning list:
+
+- **Batching.** An order aggregator task chunks orders so one picker grabs ten at a time, cutting trips to the aisle (the database) tenfold. The trade-off: retries and failures now happen per batch, so one bad order retries all ten.
+- **Split IO-bound from CPU-bound work.** Gevent or eventlet pools for tasks that wait on IO; the prefork pool, built on multiprocessing, for number crunching. It's the -P and -c flags on the worker command.
+- **Use -Ofair** when task durations vary, so work goes to free workers rather than round robin. It costs some coordination but behaves far more predictably.
+- **Ignore results you never read.** CELERY_IGNORE_RESULT saves calls to the result backend.
+
+## Retries need backoff, jitter and late acks
+
+Software errors are inevitable, as he quotes Sentry. Start with automatic retries and a circuit breaker (his example: five retries, then give up). With a 10-second interval, five linear retries give a downstream service about 50 seconds to recover; exponential backoff at 10, 20, 40, 80 and 160 seconds stretches that to 160. Turn on late acknowledgement so a task isn't marked done until a worker actually finishes it, which saves it when the worker dies mid-flight. Add retry jitter so two tasks that deadlocked don't retry in lockstep and deadlock again. Whatever still fails goes to a dead letter queue.
+
+## When memory climbs and nobody owns the leak
+
+His SOS step: check CPU and memory first. High memory that your own code can't explain is often a leak inside a C-based library. Celery's --max-tasks-per-child and --max-memory-per-child recycle the worker process once a threshold is hit, which clears it out without anyone finding the leak. For watching it all he uses Flower, which can purge queues, show acknowledgement rates, manage workers and expose an HTTP API to feed your own alerts, with the RabbitMQ admin panel as a broker-level alternative.
+
+## Who should watch
+
+Python and Django developers who already run Celery and want a checklist of the settings that matter, or anyone about to put their first background worker into production. If you've tuned prefetch and pools for years, it's a refresher.
+
+## Related Conf42 talks
+
+- Julien Jakubowski on [choosing the right messaging platform](https://www.conf42.com/DevOps_2024_Julien_Jakubowski_right_messaging_platform_rabbitmq) at Conf42 DevOps 2024.
+- Francesco Tisiot on [event-driven applications with Apache Kafka](https://www.conf42.com/Python_2021_Francesco_Tisiot_Apache_Kafka_event_driven_applications_streaming_platform_data_streamin) at Conf42 Python 2021.
+- Tamara Janina Fingerlin on [Apache Airflow pipeline frameworks](https://www.conf42.com/Python_2024_Tamara_Janina_Fingerlin_frameworks_apache_airflow_pipelines) at Conf42 Python 2024.
+
+[Watch the talk on YouTube](https://youtu.be/-Xgv4ZVWORg).
+",talk,python2021,talk:python2021/Vishrut Kohli,,Conf42,,queued,"python, celery, task-queues, rabbitmq, resilience"
 ,Streamlit lets data scientists skip the frontend ticket,"Steven Kolawole (SCITYLANA) at Conf42 Python 2021 on building data apps in plain Python with Streamlit, and where its convenience runs out",2021-05-09,python2021/streamlit-data-apps-without-a-frontend,,"Steven Kolawole, a data scientist speaking from Lagos, Nigeria, made the case at Conf42 Python 2021 for Streamlit as the shortest path from a notebook to a shareable data app: a Python script with a few st. calls becomes an interactive web page, with no HTML, CSS, JavaScript or Flask in sight. His honest conclusion: it is superb for showing a model or an analysis quickly, and the wrong tool once you need custom layouts or real application features.
 
 It is a beginner-friendly talk with a couple of live demos, and it closes with a cons list, which is more than most framework talks offer.
