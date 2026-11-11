@@ -94961,6 +94961,95 @@ Game backend engineers, and anyone shipping to clients they don't control, such 
 
 [Watch the talk on YouTube](https://youtu.be/GHmDqJxT03k).
 ",talk,platform2023,talk:platform2023/Dmitrii Ivashchenko,,Conf42,,queued,"game-development, blue-green-deployment, ci-cd, backend-architecture, scalability"
+,"Eight ways floating point lies to you, and the Rust crates that help","Prabhat at Conf42 Rustlang 2023 on floating-point pitfalls, from rounding and cancellation to equality tests, and the Rust tools that contain them",2023-08-21,rustlang2023/floating-point-traps-and-rust-fixes,,"`0.1 + 0.2` is not `0.3`, and in 1991 a cousin of that bug sent a Patriot missile defence system off target. At Conf42 Rustlang 2023, Rust developer Prabhat maps the ways floating-point arithmetic goes wrong, one issue at a time, and pairs each with a fix from Rust's standard library or its crate ecosystem.
+
+He is upfront about the format: this is a map, not a textbook. He wants you to know which problem you are looking at and where to search next. Most of it applies to any language; the solutions lean on Rust.
+
+## Why care about the last bit?
+
+The opening case is the Patriot failure in the Gulf War. The system tracked incoming Scud missiles using time measured in tenths of a second, and a tenth cannot be stored exactly in binary. The rounding error grew the longer the system ran, and because the radar predicted a missile's position from that time, the prediction drifted away from where the missile actually was.
+
+## How is a float built?
+
+A quick IEEE 754 refresher. Single precision is 32 bits: 1 sign bit, 8 exponent bits (biased by 127) and 23 significand bits. Double precision is 64 bits: 1, 11 and 52. The standard also defines extended precision (80 bits or more). Everything else in the talk follows from the significand having a fixed number of bits.
+
+## The problems, and what to reach for
+
+- **Limited precision.** Real numbers that don't fit get rounded. Fixes: fixed-point arithmetic with scaled integers (think cents, not euros), arbitrary-precision crates such as num-bigint, and picking `f32` or `f64` deliberately.
+- **Rounding errors.** They accumulate across operations. Use decimal arithmetic via rust_decimal, round only when presenting results, avoid divisions where a multiplication will do, and consider interval arithmetic with the inari crate.
+- **Loss of significance.** Subtracting two nearly equal numbers throws away the significant bits, also known as catastrophic cancellation. Reorder operations so the subtraction happens late, rewrite the formula algebraically, approximate functions with a Taylor series (his favourite, straight from first-year engineering), or go arbitrary precision with rug or rust-gmp.
+- **Associativity.** His example adds the same three numbers grouped two ways and gets 1 in one case and 0 in the other. As he said at Conf42 Rustlang 2023: ""So changing orders can lead to different results."" Group explicitly with parentheses, order operations so the least lossy parts come first, and look at fused multiply-add, which multiplies and adds with a single rounding (Rust exposes it as `mul_add` on `f32` and `f64`).
+- **Equality.** ""Trust me, this one is the one which most of you will come across if you ever will work with the floating point numbers in your code,"" Prabhat said at Conf42 Rustlang 2023. Never `a == b`; compare `(a - b).abs()` against an epsilon (the standard library already ships `f64::EPSILON`), use relative error when magnitudes vary, use ULP comparison via the float_cmp crate's `ulps_eq`, or a fixed tolerance your domain can justify.
+- **NaN and infinity.** Zero divided by zero or the square root of a negative number produce special values; `is_nan()` and `is_infinite()` let you check before they spread through a calculation.
+- **Compiler optimisations.** Optimisers may reorder or combine float operations and change the result. He points at function attributes such as `#[inline(never)]` and `#[target_feature]`, plus RUSTFLAGS passed to the LLVM backend. This is the thinnest section, closer to a reading list than a recipe, so check the current Rust documentation before changing build flags.
+- **Accumulated errors in loops.** Iterative sums drift. His fix is Kahan (compensated) summation, which carries the lost low-order bits forward in a second variable.
+
+## The checklist to keep
+
+He closes with the summary you'd pin above your desk: choose the float type for the precision you need; reach for rug, num-bigint-dig, inari, float_cmp or rust_decimal when accuracy matters; never compare floats directly; run error-propagation analysis to estimate how much error a calculation can accumulate; use Kahan summation in iterative code; control compiler float behaviour explicitly; and test numerical code with diverse inputs, edge cases included, so you don't ship your own Patriot.
+
+## Who should watch
+
+Developers about to write their first financial, scientific or sensor-handling code in Rust, and anyone who has stared at `0.30000000000000004` and wondered how deep the hole goes. Numerical analysts won't learn much new, but the crate list is handy.
+
+## Related Conf42 talks
+
+- Felipe Zapata on [using Rust for numerical applications](https://www.conf42.com/Rustlang_2023_Felipe_Zapata_numerical_applications) at the same event.
+- John Darrington on [Nuclear Rust](https://www.conf42.com/Rustlang_2023_John_Darrington_nuclear_rust), where correctness is not optional, at Conf42 Rustlang 2023.
+- Tim McNamara on [zero-cost abstractions](https://www.conf42.com/Rustlang_2022_Tim_McNamara_maximum_benefit_zerocost_abstractions) at Conf42 Rustlang 2022.
+
+[Watch Prabhat's talk](https://www.conf42.com/Rustlang_2023_Prabhat_handling_floating_point_challenges)
+
+[Watch the talk on YouTube](https://youtu.be/uXieRNrVqdg).
+",talk,rustlang2023,talk:rustlang2023/Prabhat,,Conf42,,queued,"rust, floating-point, numerical-computing, ieee-754, precision"
+,"A lazy tester, a Java prototype, and a testing language in Rust","Atmaram Naik (Sedin Technologies) at Conf42 Rustlang 2023 on writing Journey, a scripting language for test data, mocks and load tests, in Rust",2023-08-19,rustlang2023/tester-writes-a-language-in-rust,,"Testers repeat the same chores all day: create test data, poke an API, stand up a fake for a third-party service. At Conf42 Rustlang 2023, Atmaram Naik, Test Manager at Sedin Technologies, tells how automating those chores turned into the Journey programming language and its compiler, corr, written in Rust by someone who had never written Rust before. It has since been used at his past and present employers for test data, service virtualization and load testing.
+
+The talk is a project story with demos, not a language-design lecture, and it is candid about what went wrong along the way.
+
+## What does Journey actually do?
+
+The demo uses a to-do REST API on localhost. Running the `create to do` command, the tool stops and asks for a title of type string, then creates the item. `get all to dos` prints the list. `create multiple to dos` asks how many, then whether you want random names, and fills the server with a dozen entries.
+
+The trick is what Atmaram calls correlation. A script refers to `title` without defining it, and the runtime asks whoever invoked the command. As he said at Conf42 Rustlang 2023: ""Whatever is not known it will ask the user."" Types are checked too: declare an `id` as a positive integer, type text, and it asks again. The create script is eight lines; the list script is six, using a `matching body object result` clause to capture the response.
+
+The reveal at the end: the to-do server itself is written in Journey. It listens on port 9001, matches requests, keeps the to-dos in a temporary variable and responds with 201, 200 or 404. That is the service virtualization feature in miniature.
+
+## Why did the Java version have to go?
+
+The first pilot was plain Java and entirely config-driven: commands were folders and files in a fixed structure, and even control structures lived in config. Colleagues liked the idea and used it on a real project, but the feedback was consistent: commands were hard to write, you had to learn the conventions, everyone needed the right Java version installed, and the tool was restrictive.
+
+So he switched from config-driven to code-driven commands, which meant writing a language, and wrote down what its host language needed: native cross-platform binaries for Mac, Windows and Debian, memory safety for a highly programmable tool, high concurrency for mock servers and load tests, good CLI libraries, systems-level reach, little or no GC footprint (load tests care about every virtual user), and type safety.
+
+## Why Rust over C++ and Go?
+
+All three passed the native-binary, concurrency and CLI-library checks. The difference was enforcement. In C++ memory safety is the programmer's job. Go is memory safe but lets you escape it, and its garbage collector periodically scans the heap. Rust is memory safe, forces it on you through the borrow checker, and has no GC. Rust won despite his inexperience with it.
+
+## What did the project look like?
+
+Three crates and one plugin: corrs, a WebSocket server so commands could be triggered from messaging apps; corr, the compiler that builds distributable packages; a library holding the parsing and execution logic; and an IntelliJ IDEA plugin written in Kotlin for syntax support.
+
+Features came and went with demand. One employer's product integrated with third-party systems that had poor sandboxes, so he added service virtualization and used it to fake more than ten of them. Test data went straight into databases. A WebSocket load-testing need arrived, and because the tool already ran on Tokio's event loop, spawning scripts as virtual users was a small step. corrs was removed for low adoption. A CI/CD pipeline builds a Homebrew formula, Windows installers and Debian installers, because his teams used all three platforms.
+
+## How was Rust as a first-timer?
+
+Honest answer: the usual fights with the compiler, then reward. He needed nightly for some language features and libraries, and where crates were missing or immature he wrote quick ones himself, such as async-rdbc. The stack: nom for the parser and AST, Tokio, hyper, serde and serde_json, clap, futures, async-trait, async-recursion, fake for generated data and mockito for test doubles. Unit, integration and end-to-end tests were the safety net for a side project he might not touch for months; the demo run shows 263 passing.
+
+His verdict, as he said at Conf42 Rustlang 2023: ""The feared learning curve with Rust had a minimal impact as the programming settles.""
+
+## Who should watch
+
+Testers and QA engineers who script their way out of repetitive work, and anyone weighing Rust for a first real project. If you want parser theory, look elsewhere; if you want to see how a side project survives real users, this is a good half hour.
+
+## Related Conf42 talks
+
+- Jim Lynch on [learning Rust by building CLI tools](https://www.conf42.com/Rustlang_2023_Jim_Lynch_building_cli_tools) at the same event.
+- Adelina Simion and Andy Kuszyk on [load testing with F1](https://www.conf42.com/Golang_2022_Adelina_Simion_Andy_Kuszyk_load_testing_f1) at Conf42 Golang 2022.
+- Ovidiu Ionescu on [Rust for Java programmers](https://www.conf42.com/Rustlang_2023_Ovidiu_Ionescu_java_programmers_personal_perspective) at Conf42 Rustlang 2023.
+
+[Watch Atmaram Naik's talk](https://www.conf42.com/Rustlang_2023_Atmaram_Naik_journey_programming_tester)
+
+[Watch the talk on YouTube](https://youtu.be/BdD8RcNayps).
+",talk,rustlang2023,talk:rustlang2023/Atmaram Naik,,Conf42,,queued,"rust, testing, service-virtualization, load-testing, cli"
 ,Mattermost's internal platform is a GitHub label and a slash command,Spiros Economakis (Mattermost) at Conf42 Platform Engineering 2023 on dogfooding the SaaS platform as an IDP via GitHub bots and ChatOps,2023-08-18,platform2023/mattermost-platform-chatops-github-bots,,"The best internal developer portal might be the one nobody has to open. At Conf42 Platform Engineering 2023, Spiros Economakis, Head of Cloud Infrastructure at Mattermost, explains how his team built Mattermost Cloud once for paying customers and then reused the same SaaS platform as the internal platform for developers, sales, support and DevRel, driven entirely from GitHub labels and chat slash commands.
 
 The team motto is build once and for all. The talk is a real case study with real bot names, and it doubles as an argument for dogfooding.
@@ -95007,6 +95096,59 @@ Platform teams designing self-service before they buy a portal, and anyone with 
 
 [Watch the talk on YouTube](https://youtu.be/FsUQor3PbKI).
 ",talk,platform2023,talk:platform2023/Spiros Economakis,,Conf42,,queued,"platform-engineering, chatops, internal-developer-platform, github, dogfooding"
+,"Unit tests that read like sentences, built from a doorknob","Joe Skeen (World-Class Engineers) at Conf42 Rustlang 2023 on four keys to unit testing, from use-case sentences to nested Rust test modules and macros",2023-08-17,rustlang2023/unit-tests-that-read-like-sentences,,"Most developers agree unit tests matter and quietly dread writing them. At Conf42 Rustlang 2023, Joe Skeen, Developer and Mentor at World-Class Engineers, argues the dread is a skills gap, not a character flaw, and fixes it with a bathroom doorknob: write the behaviour as plain sentences first, then turn each sentence into a Rust test whose name reads back as that sentence.
+
+Joe has been writing code for nearly 30 years, and his diagnosis is blunt. As he said at Conf42 Rustlang 2023: ""I've come to the conclusion that most developers are uncomfortable with unit testing simply because they never learned how to do it well."" Self-taught developers never hear the term, CS courses mention it without making it stick, and bootcamps leave it off the critical path to a first job. Add a management edict demanding a coverage number and you get people who associate tests with punishment.
+
+## Key 1: break it down into sentences
+
+His running example is a privacy doorknob, the kind with a push button on the inside. Before any code, he names the parts (inside knob, outside knob, push button, latch bolt; the latch plate belongs to the door frame, so it's outside the unit) and starts writing behaviour:
+
+A privacy doorknob, when the push button is not pressed, when the user turns the inside knob, should also turn the outside knob.
+
+Each sentence immediately suggests the next one. Should it retract the latch bolt? Does direction matter? Clockwise on the inside means counterclockwise on the outside. Then the pressed state: the outside knob shouldn't turn at all, while turning the inside knob pops the button out. Then the odd cases: a pin in the outside hole, closing the door on a locked knob, a user applying excessive force. Those last ones are a conversation for the business analyst, which is the point. Given/when/then works too if you prefer BDD phrasing.
+
+It also makes his case for unit tests over end-to-end ones: try listing every permutation for the whole door and the pile becomes unmanageable, while each component can be specified on its own.
+
+## Key 2 and 3: treat test code like production code, and ignore the coverage number
+
+The flat list of sentences is already unreadable, so he nests it: doorknob, then button state, then action, then expected outcomes. Duplication in tests deserves the same DRY instinct as anywhere else.
+
+And coverage isn't the goal. Start from use cases, he says, and you end up close to 100% coverage as a side effect. As he put it at Conf42 Rustlang 2023: ""You're not testing to get a certain percentage of code coverage.""
+
+## Key 4: arrange, act, assert, then let Rust do the boilerplate
+
+The Rust part is where the talk earns its place at a Rust conference. The nested sentences map directly onto nested `mod` blocks inside `#[cfg(test)] mod tests`, with the last clause as the test function name. The test runner output then reads as the original sentence, something like `when_the_push_button_is_pressed::when_the_user_tries_to_turn_the_outside_knob_clockwise::should_not_retract_the_latch_bolt`. A failing test tells you which requirement broke, in words a non-technical person can follow.
+
+From there he refactors step by step:
+
+1. Each test does arrange, act and assert inline.
+2. An `action()` function moves into the module whose name describes that action, so renaming `turn_outside_knob` touches one place.
+3. An `arrange()` function moves up to the module that describes the state, here the pressed push button.
+4. A `macro_rules! it` macro takes the test name, arrange and action functions, and finally an assertion closure, so every test is one line.
+
+Once that structure exists, he says, AI code completion becomes useful; starting from scratch with AI-written tests disappointed him. His claim on speed: ""once you get some momentum, you can pump out over 100 top quality unit tests in under an hour.""
+
+## Can you overdo it?
+
+Yes, and he says so. For a function that strips vowels, test classes of input, not every string: empty, some vowels, only vowels, no vowels, very long, and Unicode such as emoji. Ten tests or a hundred is fine, as long as each one is there for a reason.
+
+He admits he's still new to Rust and that the knob implementation could be more idiomatic. That doesn't matter much; the testing approach transfers to any language, and the nested-module trick is a cheap way to get RSpec-style readable test names out of plain `cargo test`.
+
+## Who should watch
+
+Anyone who writes tests because the pipeline makes them, and team leads looking for a way to teach it. Mocking, async and multithreaded testing are out of scope; he leaves those for another talk.
+
+## Related Conf42 talks
+
+- Gil Zilberfeld on [TDD in legacy code](https://www.conf42.com/Python_2022_Gil_Zilberfeld_TDD_legacy_code) at Conf42 Python 2022.
+- Mohammad Quanit on [test-driven development in Go](https://www.conf42.com/Golang_2023_Mohammad_Quanit_test_driven_development) at Conf42 Golang 2023.
+- Ivan Pesenti on [building a complex app with TDD](https://www.conf42.com/Golang_2023_Ivan_Pesenti_complex_app_tdd) at Conf42 Golang 2023.
+
+[Watch Joe Skeen's talk](https://www.conf42.com/Rustlang_2023_Joe_Skeen_love_unit_testing)
+
+[Watch the talk on YouTube](https://youtu.be/-fDIPnG6xJc).
+",talk,rustlang2023,talk:rustlang2023/Joe Skeen,,Conf42,,queued,"rust, unit-testing, testing, bdd, macros"
 ,"AWS networking in one sitting, from reserved IPs to VPC Lattice","Samuel Baruffi (AWS) at Conf42 Platform Engineering 2023 on the core AWS networking toolbox, from VPCs and endpoints to Transit Gateway and VPC Lattice",2023-08-16,platform2023/aws-networking-tour-vpc-to-lattice,,"Every AWS subnet quietly eats five IP addresses before you deploy anything, and that is one of the gentler surprises in AWS networking. At Conf42 Platform Engineering 2023, Samuel Baruffi, Senior Solutions Architect at AWS working with global financial services customers, gives a fast tour of the core networking toolbox: VPC basics, security groups and NACLs, gateways and endpoints, Transit Gateway, hybrid connectivity, VPC Lattice and traffic visibility.
 
 It is a survey, not an in-depth design session, and Samuel says so up front: networking fundamentals, not application architecture. As a map of which tool solves which problem, it is a very good one.
@@ -95053,6 +95195,57 @@ Platform engineers who inherited an AWS account and want the whole map in one si
 
 [Watch the talk on YouTube](https://youtu.be/NcFms1dpLQ8).
 ",talk,platform2023,talk:platform2023/Samuel Baruffi,,Conf42,,queued,"aws, cloud-networking, vpc, transit-gateway, vpc-lattice"
+,"Rust's ownership rules, explained from the memory leak up",David Oyinbo (HeySummit) at Conf42 Rustlang 2023 on how ownership and borrowing replace both manual frees and the garbage collector,2023-08-15,rustlang2023/ownership-instead-of-garbage-collector,,"Every systems language has to answer one question: who frees the memory? At Conf42 Rustlang 2023, David Oyinbo, Senior Frontend Developer at HeySummit, walks through Rust's answer for people who know the other two. C++ makes you call `delete` yourself; garbage-collected languages do it for you at a time of their choosing. Rust's ownership and borrowing system does neither, and the compiler enforces it.
+
+It is an introductory talk, and a tidy one: a leak, a fix, a comparison with TypeScript, a threading example, then a tour of the optimisations the compiler does so you don't have to.
+
+## Why not just use a garbage collector?
+
+David starts with a C++ snippet that allocates on the heap and never frees. Wrap the allocation in a `while (true)` and you have a crash on a timer. The consequences he lists are the familiar ones: less available memory, slower execution, crashes, resource saturation and code that's painful to maintain.
+
+The garbage collector fixes the leak and adds three problems of its own: runtime overhead, unpredictability and resource spikes when it decides to run. That makes it a poor fit for low-latency work such as games, which is why those teams historically stayed with C++ and manual memory management. Rust's pitch is the third option: no collector, no manual frees, and you can still drop a value yourself if you want to.
+
+## Own it, or borrow it
+
+The core rule fits on a sticky note. As David said at Conf42 Rustlang 2023: ""Any data I own, the moment I'm going out of scope, I'm going to destroy them basically and deallocate the memory.""
+
+His examples make the consequences concrete. Pass a `String` into a function by value and it moves; the function drops it when it returns, and touching the original afterwards is a compile error (""value has already been moved""), not a dangling pointer at runtime. Pass a reference instead, as in his `calculate_length` example, and the function only borrows: it doesn't own the value, so it doesn't free it, and the caller can keep using the string.
+
+## The TypeScript comparison is the best part
+
+The section worth the evening is a small `User` class with a `set_age` method. In TypeScript, he wants one function that must not modify the user and another that may. `Object.freeze` stops the first function from mutating it, and then breaks the second one too, because frozen is frozen for everyone.
+
+In Rust the intent lives in the signature. A function that takes `&User` cannot mutate it, and the code won't compile if it tries; a function that takes `&mut User` can. David's point: you can tell what each function will do to your data without reading its body, which the TypeScript version can't promise.
+
+## What about threads?
+
+Moving a value into a spawned thread with the `move` keyword works for one thread. Add a second, and the compiler points out that the first thread already took ownership. The fix he shows is `Arc`, the atomically reference-counted pointer: clone it once per thread, move each clone in, and ownership is shared safely.
+
+## What the compiler does for you
+
+The second half covers optimisations Rust applies largely without your help:
+
+- **Zero-cost abstractions**: ownership itself costs nothing at runtime. David also argues that Rust iterators are at least as fast as the loop you would write by hand, where in Java or C# the hand-written loop usually wins.
+- **`#[inline]`**: a hint to copy a function body to the call site. The compiler may ignore it depending on function size, optimisation level and target; it pays off for small, frequently called functions.
+- **Constant propagation**: with `const` values, an expression like `2 * radius * PI` can be computed at compile time.
+- **`const` and `static`**: both feed the optimiser. One detail to correct when you watch: the talk says a `static` lives on the heap, but statics sit in the binary's static memory for the whole run of the program.
+
+He closes with where Rust already runs: Redox OS and Tock OS, Microsoft rewriting core Windows libraries, Actix and Rocket for web servers, plus databases, games, embedded, blockchain and networking.
+
+## Who should watch
+
+Developers coming from TypeScript, Java or C# who keep hearing about the borrow checker and want the why before the how. Experienced Rustaceans will know all of it, though the TypeScript-versus-Rust mutability example is a handy one to borrow (pun accepted) for teaching.
+
+## Related Conf42 talks
+
+- Tim McNamara on [getting the most from zero-cost abstractions](https://www.conf42.com/Rustlang_2022_Tim_McNamara_maximum_benefit_zerocost_abstractions) at Conf42 Rustlang 2022.
+- Ovidiu Ionescu on [Rust for Java programmers](https://www.conf42.com/Rustlang_2023_Ovidiu_Ionescu_java_programmers_personal_perspective) at the same event.
+- Vishnu Chilukoori and Srikanth Gangarapu on [fearless programming](https://www.conf42.com/Rustlang_2024_Vishnu_Chilukoori_Srikanth_Gangarapu_empowering_fearless_programming) at Conf42 Rustlang 2024.
+
+[Watch David Oyinbo's talk](https://www.conf42.com/Rustlang_2023_David_Oyinbo_building_safe_fast_software_future)
+
+[Watch the talk on YouTube](https://youtu.be/BE4hjv5IgvI).
+",talk,rustlang2023,talk:rustlang2023/David Oyinbo,,Conf42,,queued,"rust, memory-management, ownership, borrow-checker, compiler-optimization"
 ,Every packet that crosses a VPC boundary gets a firewall,Atif Siddiqui (Silicon Valley Bank) at Conf42 Platform Engineering 2023 on Transit Gateway route tables and blackhole routes for zero trust segmentation,2023-08-13,platform2023/transit-gateway-segmentation-for-zero-trust,,"A flat network is a gift to an attacker who gets one foothold. At Conf42 Platform Engineering 2023, Atif Siddiqui, Senior Principal Software Engineer at Silicon Valley Bank, shows how to segment an AWS estate with AWS Transit Gateway: two route tables, centralised inspection firewalls, and blackhole routes so dev cannot reach prod even by accident.
 
 He opens with the bill. IBM's Cost of a Data Breach report put the average breach at $4.35 million, up 2.6% on the year before. The talk is a short, dense design walkthrough, and the design is the payoff.
