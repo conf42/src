@@ -91404,6 +91404,516 @@ Related Conf42 talks:
 
 [Watch the talk on YouTube](https://youtu.be/WW2srirtw3M).
 ",talk,devsecops2023,talk:devsecops2023/Romano Roth,,Conf42,,queued,"continuous-delivery, devsecops, platform-engineering, testing, architecture"
+,A working monitoring stack in about 100 lines with ClickHouse and Grafana,"Robert Hodges (Altinity) at Conf42 DevSecOps 2023 on building cheap DIY monitoring from vmstat, ClickHouse and Grafana in about 100 lines of code",2023-11-08,devsecops2023/diy-monitoring-clickhouse-grafana,,"You don't need a monitoring vendor to watch your hosts; you need a collector, an analytic database and a dashboard. Robert Hodges, CEO of Altinity, built exactly that live at Conf42 DevSecOps 2023: vmstat output turned into JSON, loaded into ClickHouse, charted in Grafana, about 100 lines of code in total. Then he hammered his own machines until the collector stopped reporting.
+
+Honest scope: Altinity is a ClickHouse service provider, so the database choice is no surprise. The pattern, and the reasons ClickHouse fits time-series data, are worth knowing either way.
+
+## Why build your own?
+
+Monitoring exists to answer questions. Why are users seeing performance problems? When did it start? How many users are affected? Which service is at fault? Those need history, not a terminal running vmstat until the numbers blur. Off-the-shelf observability products can do it, but they can be costly, your needs may be specialised, or monitoring may be your business and you want to own the stack and the data.
+
+The design has three parts: something to collect and ingest the data, an analytic database to hold it and answer fast, and a visualisation layer.
+
+## Why ClickHouse for monitoring data?
+
+Hodges compares the open source options: OpenSearch for full-text search over unstructured logs, Presto for federated queries over data lakes, and ClickHouse for real-time analytics, meaning answers almost instantly on very large data. His reasons:
+
+- It is a SQL database with something like MySQL's simplicity, Apache 2.0 licensed, and it runs anywhere from a phone to clusters of hundreds of servers.
+- Columns are stored separately as sorted, compressed arrays. ""Particularly in observability cases, we can often get compression levels of 90 or even 95% on data,"" Robert Hodges said at Conf42 DevSecOps 2023.
+- Vectorised query execution uses SIMD instructions and fits CPU caches well, with parallel queries across shards and replicas.
+- Dozens of input formats (CSV, JSONEachRow, Protobuf, Parquet), so your collector's output is probably readable as is.
+- Strong time support: DateTime and DateTime64 down to nanoseconds, plus functions to round timestamps to the hour or year.
+
+Grafana is the natural partner: built for time series, easy to install, many data sources and panel plugins, good zoom in and out, and open source under AGPL 3.0.
+
+## How does the pipeline work?
+
+Four steps, each small:
+
+1. **Collect.** A Python script of about 14 lines runs vmstat at one-second intervals and emits each sample as a JSON document with a timestamp, the host and the measurements, such as 98% idle.
+2. **Model.** A ClickHouse table with timestamp, day and host as dimensions and the vmstat values as measurements, using the MergeTree engine, partitioned by day and ordered by host then timestamp. That sort order keeps neighbouring rows similar, which is why they compress so well.
+3. **Load.** An INSERT in JSONEachRow format, posted with curl in about two lines, or a small Python loader.
+4. **Show.** A Grafana dashboard with CPU, detailed CPU breakdown and memory panels, and a host selector. He uses Altinity's ClickHouse plugin for Grafana, which he says has around 12 million downloads.
+
+The bonus is full SQL over your own data. His example query lists hosts that ran above 25% load for at least a minute in the last 24 hours, and counts those minutes.
+
+## The demo: beating up the hosts
+
+The live part runs on two machines in his home office. He zooms Grafana into a short window, then runs sysbench to load the CPUs, followed by stress with first four and then eight memory-hungry workers. (""You have to love any performance test program that calls its workers hogs."") CPU pegs at 100%, memory climbs, and then gaps appear in the charts: the machine is so loaded that the collector can't produce data. That gap is a monitoring lesson of its own.
+
+The code, dashboard and loaders are published in Altinity's clickhouse-sql-examples repository, in the open source monitoring directory.
+
+## Who should watch?
+
+Engineers who want observability data they fully control, and anyone curious why column stores keep turning up under monitoring products. Hodges is clear that a production version also needs configuration management and operating ClickHouse and Grafana themselves; on Kubernetes he points to the Altinity operator for ClickHouse.
+
+## Related Conf42 talks
+
+- Siddhartha Khare on [OpenTelemetry's path to observability's future](https://www.conf42.com/DevSecOps_2023_Siddhartha_Khare_opentelemetry_path_observability), also at Conf42 DevSecOps 2023.
+- Roni Dover on [OpenTelemetry from code to prod](https://www.conf42.com/DevSecOps_2023_Roni_Dover_opentelemetry_code_prod), same event.
+- Karamveer Kaur Sangha on [platform engineering with GitHub Actions and Prometheus](https://www.conf42.com/DevOps_2024_Karamveer_Kaur_Sangha_platform_engineering_github_actions_prometheus) at Conf42 DevOps 2024.
+
+[Watch Robert Hodges's talk](https://www.conf42.com/DevSecOps_2023_Robert_Hodges_monitoring_open_source_analytics_visualization)
+
+[Watch the talk on YouTube](https://youtu.be/ItF7-ksHpJM).
+",talk,devsecops2023,talk:devsecops2023/Robert Hodges,,Conf42,,queued,"monitoring, clickhouse, grafana, observability, open-source"
+,Every Kafka topic needs an owner and a second pair of eyes,"Muralidhar Basani (Aiven) at Conf42 DevSecOps 2023 on governing thousands of Kafka topics, ACLs and schemas with self-service approvals in Klaw",2023-11-07,devsecops2023/kafka-topics-need-owners-klaw,,"Creating one Kafka topic, granting producer and consumer access and promoting it to a higher environment can take at least ten emails and two to three hours of command execution, not counting the time waiting for humans to reply. Muralidhar Basani, Staff Software Engineer at Aiven, opened his Conf42 DevSecOps 2023 talk with that and then showed the fix: Klaw, an open source toolkit that puts every topic, ACL, schema and connector behind a request, an approval and a named owning team.
+
+Honest scope: Klaw is an Aiven open source project, Apache-licensed, and the talk is built around five demos of it. The governance problems he describes apply whatever tool you use.
+
+## Why does Kafka get messy?
+
+Kafka is easy to adopt for its scalability, retention and reliability, and the trouble only shows once the project grows. Large companies end up with hundreds or thousands of topics, and the questions pile up. Who is allowed to produce or consume on this topic? Who owns it, its connector, its schema? How do you promote tested configs from lower to higher environments? Is access control really enforced? How do you back up the configuration for disaster recovery?
+
+When the answers live in email threads and spreadsheets, nobody knows who ran which command, and manual releases cause outages. Schemas are the sharpest example. Basani points out that many Kafka consumer clients run into deserialisation issues when a new schema version is released on a topic, unless the right compatibility is set.
+
+His analogy is a library: a pile of books where you can't find anything, against shelves that are categorised and track who has rented which book, and for how long.
+
+## Why weren't existing tools enough?
+
+He credits CMAK (Kafka Manager from Yahoo) for its friendly UI, Julie GitOps for keeping metadata in Git with CI/CD, and Provectus's UI for Apache Kafka for observability and troubleshooting. The gap: a user can still create a topic or ACL directly on the cluster without approval, and nothing records ownership, so there is nobody to contact when something breaks.
+
+## Governance, self-service, security, automation
+
+Klaw is built on four principles:
+
+- **Governance**: roles, ownership, audit, naming conventions, and Klaw as the single source of truth. It detects manual changes on the cluster, notifies admins and can sync them.
+- **Self-service**: teams create, promote, edit and claim topics, request producer and consumer access, schemas and connectors, without waiting on an infrastructure team.
+- **Security**: Kerberos and SSL to the clusters, login through Active Directory or SSO, and ACL details (IP addresses, principals) masked for teams that don't own the topic.
+- **Automation**: provisioning, promotion across environments, metadata sync and notifications on every request.
+
+Under the hood are two Spring applications and a React UI. Ownership metadata and configs live in a metastore (H2 by default, MySQL or another RDBMS for production), and it connects to any number of Kafka clusters.
+
+## The four-eyes principle, demoed five times
+
+Every change follows the same pattern: one user requests, another approves, only then does Klaw apply it to the cluster. The demos run it with two users, William and Jennifer: creating a topic, a consumer ACL on a topic owned by another team (the owning team decides), a schema request, and promoting a topic from dev to test.
+
+Do you really need two people for this? Basani's answer is yes: topics and ACLs are infrastructure, and infrastructure as code gets peer-reviewed. Is ownership mandatory? Also yes. ""Basically this ownership gives responsibility to them,"" Muralidhar Basani said at Conf42 DevSecOps 2023.
+
+## Disaster recovery is a sync away
+
+The last demo is the most practical. A superadmin with sync permission pulls topic configuration from a cluster into Klaw; in the demo, 162 topics show as out of sync and get assigned to a team in one bulk action. It syncs in both directions, so after an outage Klaw can reinstate topics and ACLs on a new cluster. It syncs configuration only, never the messages on the topics.
+
+## Who should watch?
+
+Platform teams running shared Kafka clusters for many product teams, and anyone whose topic requests currently arrive as emails or Jira tickets. Schema registry support covers Aiven's Karapace and Confluent Schema Registry.
+
+## Related Conf42 talks
+
+- Natan Silnitsky on [migrating to multi-cluster managed Kafka with zero downtime](https://www.conf42.com/Cloud_Native_2022_Natan_Silnitsky_migrating_multi_cluster_managed_kafka_0_downtime) at Conf42 Cloud Native 2022.
+- Dewan Ahmed on [who manages the credentials for your data infrastructure](https://www.conf42.com/DevSecOps_2022_Dewan_Ahmed_managing_credential_managed_database) at Conf42 DevSecOps 2022.
+- Alex Olivier on [decoupled authorization](https://www.conf42.com/DevSecOps_2023_Alex_Olivier_modernizing_auth_decoupled_abac), also at Conf42 DevSecOps 2023.
+
+[Watch Muralidhar Basani's talk](https://www.conf42.com/DevSecOps_2023_Muralidhar_Basani_simplifying_kafka_governance)
+
+[Watch the talk on YouTube](https://youtu.be/x9lX7rJ6yN4).
+",talk,devsecops2023,talk:devsecops2023/Muralidhar Basani,,Conf42,,queued,"kafka, governance, access-control, open-source, self-service"
+,Ten ways organisations sabotage their own DevSecOps,"Gene Gotimer (Praeses) at Conf42 DevSecOps 2023 on ten organisational habits that doom a DevSecOps adoption, and the fix for each",2023-11-06,devsecops2023/ten-ways-to-doom-devsecops,,"DevSecOps transformations rarely die because of tooling. They die because the organisation gets in its own way. Gene Gotimer, DevOps Engineer at government contractor Praeses, has been through enough transformations to count the ways, and at Conf42 DevSecOps 2023 he listed ten habits that virtually guarantee failure from the start, each with what to do instead.
+
+It's a quick, dense talk with no fluff, and most viewers will recognise at least three of their own employers in it.
+
+## Dooms one to three: fake speed
+
+**Slow onboarding.** If it takes days, weeks or months before a new hire contributes, it bores them, sets a slow pace and tells them how little you thought about their arrival. Have the laptop ready, the tools installed and the permissions granted, then pair, mob or ensemble with them, and practise that ahead of time.
+
+**The pretend cloud.** Running your data centre in the cloud is not using the cloud. Of NIST's five essential characteristics, the one Gotimer sees missing most often is on-demand self-service. Put cloud resources behind a long ticketing and approval process, and executives get frustrated that the cloud didn't make anything faster, while the organisation is the thing stopping it.
+
+**Pretend agile.** A top-down, standardised process is not agile, which is driven by self-organising teams. His line about it lands: ""But you say we have a stand up for an hour every day."" The sign you aren't agile is status meetings, status reports, status roll-ups and monthly summaries of all of them. Invite stakeholders to stand-ups or reviews instead.
+
+## Doom four: the change control board
+
+""Every production change must be approved by a group that has no idea what we do,"" Gene Gotimer said at Conf42 DevSecOps 2023, describing the change advisory board. You can't release several times a day if approval comes from a group that meets several times a month, and he cites the DORA research finding that such boards increase risk rather than reduce it.
+
+The replacement is evidence. Show a disciplined process: pull request approvals, quality gates, least privilege, and infrastructure as code with immutable infrastructure, so it is always clear what is going to production.
+
+## Dooms five to eight: culture
+
+**Afraid to fail.** No failure means no learning. Protect psychological safety aggressively and ruthlessly, aim for a generative culture in Westrum's sense, constrain the blast radius of experiments, and be loud and public about what you learned, good or bad.
+
+**Unchanging culture.** DevSecOps is a culture, not a set of tools, and it can't stop at the team boundary. Evangelise to other teams so they want what you have, and find a champion who keeps you out of trouble for doing things differently. His slide quote: ""If you don't manage your culture, your culture will manage you.""
+
+**Unchanging policies.** Existing policies were usually written for monthly or yearly changes. Find out why a policy exists, then use automation to generate evidence that you meet its intent, instead of following it blindly or quietly ignoring it.
+
+**Too many decision makers.** If many people are responsible for a decision, nobody is. Gotimer reaches for the Office Space scene with eight bosses, and notes this usually traces back to fear of failure. Find a champion and highlight early wins so someone wants to take the credit.
+
+## Dooms nine and ten: numbers and hope
+
+**Too many metrics.** Quoting Goodhart, a measure that becomes a target stops being a good measure. Too many metrics turn management into whack-a-mole. Pick one target metric, improve it, add process to protect it, then pick the next.
+
+**Unrealistic expectations.** DevOps won't make problems vanish; it usually shines a light on them. You will need more discipline, not less, and you will fail more often, not less. Set realistic expectations and people can see steady progress.
+
+## Who should watch?
+
+Engineering managers, transformation leads and the engineers who keep explaining to them why the new pipeline didn't fix everything. It pairs well with any talk on tools, as the reason those tools stall.
+
+## Related Conf42 talks
+
+- Tanya Janca on [DevSecOps being more than pipelines](https://www.conf42.com/DevSecOps_2023_Tanya_Janca_more_than_pipelines), also at Conf42 DevSecOps 2023.
+- Grzegorz Sztandera on [DevOpsSup, an extended DevOps approach in one competency-diverse team](https://www.conf42.com/DevSecOps_2023_Grzegorz_Sztandera_devopssup_extended_devops_one_team), same event.
+- Christopher Harrison on [changing culture, not just tools](https://www.conf42.com/DevOps_2023_Christopher_Harrison_change_culture__not_just_tools) at Conf42 DevOps 2023.
+
+[Watch Gene Gotimer's talk](https://www.conf42.com/DevSecOps_2023_Gene_Gotimer_doom_devsecops)
+
+[Watch the talk on YouTube](https://youtu.be/EkF-wapfsY0).
+",talk,devsecops2023,talk:devsecops2023/Gene Gotimer,,Conf42,,queued,"devsecops, devops-culture, change-management, agile, metrics"
+,Your authorization if-statement will not survive the sales team,"Alex Olivier (Cerbos) at Conf42 DevSecOps 2023 on moving authorization from if-else code to decoupled, policy-based ABAC as a company scales",2023-11-05,devsecops2023/authorization-logic-out-of-your-code,,"Every product starts with one line of authorization: if the email ends in our domain, you're an admin. Alex Olivier, on the founding team (product) at Cerbos, spent his Conf42 DevSecOps 2023 talk scaling a fictional company through six stages until that line becomes an unmaintainable mess copied into several languages, then argued for pulling all of it out into a separate, policy-driven authorization service.
+
+Honest scope: Cerbos is his company's open source project, and it is the example he uses. The six-stage story is the best part, and it applies whatever tool you end up picking.
+
+## AuthN is not AuthZ
+
+Olivier sets the vocabulary first. Authentication challenges a user for a credential and returns a verified identity. Authorization is the next question: what can this person actually do, on which resource? His slide adds a line to Benjamin Franklin's death and taxes, credited to every product manager: ever-changing authorization requirements.
+
+## Six stages of authorization pain
+
+The story, as he tells it:
+
+1. **The blissful days of roles.** A boolean: is this person an employee? Maybe an OAuth scope.
+2. **Sales changes the packaging.** Now it's admin OR premium package. Maybe feature flags.
+3. **Selling into another region.** GDPR, CCPA and data locality mean a region check before every data fetch. Libraries like CASL and CanCanCan help a little.
+4. **Enterprise customers.** A company with 70,000 employees won't fit into two roles; now you need groups, directory data from Active Directory or LDAP, and membership checks in every request handler.
+5. **A new CISO wants ISO 27001 and SOC 2.** Every authorization decision now needs an audit log of inputs and outputs, in a strict format you can show an auditor.
+6. **Engineering wants microservices.** The main app is Node and TypeScript, the ML work is in Python, there is a legacy .NET component. All that logic has to be rewritten and tested in every language.
+
+""Can you confidently say that every service in every language is behaving as it should?"" Alex Olivier asked at Conf42 DevSecOps 2023. Most teams that reach stage six can't.
+
+## What a decoupled authorization service looks like
+
+His answer borrows from authentication's maturity curve: few teams build their own login anymore, so why build your own authorization layer? The service takes three inputs, the principal (user ID, roles, attributes like team or region), the resource (type, ID, attributes like owner) and the action (not just CRUD but approve, flag, export, whatever your domain has), evaluates policies, and returns allow or deny.
+
+The policies are YAML files in Cerbos's case, one per resource type. They cover RBAC (does the user have the role?) and ABAC, where the decision depends on attributes of the principal and the resource. His example: there can never be an owner role, because ownership depends on which user and which specific record. That has to be an attribute check.
+
+In the application, the big if-else block becomes one SDK or API call. Policies live in Git with unit tests and branch-based deployment, and the decision points pull the new version after merge, so changing authorization logic doesn't mean redeploying the app.
+
+## Why it has to run next to your app
+
+One detail is easy to miss. Authentication can be done once and cached for half an hour; authorization can't. It sits in the blocking path of every request, so the service must be fast and local. Olivier recommends running it as a sidecar in the same Kubernetes pod, says Cerbos evaluates decisions in under a millisecond, and calls going out over the internet for authorization checks ""just a terrible design decision"".
+
+## The trade-offs he admits
+
+Advantages: logic defined centrally, policy evolving independently of code, language and framework agnostic, GitOps friendly, and one consistent audit trail because every decision happens in one place. Costs: another service to deploy and scale (pick a stateless one), a new policy language to learn (YAML, love it or hate it), and a new component in the critical path, so health checks matter.
+
+## Who should watch?
+
+Back-end engineers whose permission checks are spreading across services, and anyone heading into SOC 2 who hasn't thought about authorization audit logs yet. The stage-by-stage walkthrough is the bit to show your product manager.
+
+## Related Conf42 talks
+
+- Graziano Casto on [policy, RBAC and authorization](https://www.conf42.com/DevSecOps_2024_Graziano_Casto_policy_rbac_authorization) at Conf42 DevSecOps 2024.
+- Federico Maggi on [distributed application RBAC with OPA](https://www.conf42.com/Cloud_Native_2022_Federico_Maggi_distributed_application_rbac_opa) at Conf42 Cloud Native 2022.
+- Mohammad Shahbaz Alam on [API authorization](https://www.conf42.com/Golang_2021_Mohammad_Shahbaz_Alam_API_authorization) at Conf42 Golang 2021.
+
+[Watch Alex Olivier's talk](https://www.conf42.com/DevSecOps_2023_Alex_Olivier_modernizing_auth_decoupled_abac)
+
+[Watch the talk on YouTube](https://youtu.be/5mwmgCDmw-8).
+",talk,devsecops2023,talk:devsecops2023/Alex Olivier,,Conf42,,queued,"authorization, abac, rbac, microservices, policy-as-code"
+,Most of DevSecOps happens outside the pipeline,"Tanya Janca (We Hack Purple) at Conf42 DevSecOps 2023 on AppSec goals you can reach without touching CI/CD, from inventory to incident response",2023-11-04,devsecops2023/devsecops-outside-the-pipeline,,"Ask an AppSec team what their DevSecOps program is and too many will say they bought $100,000 of tools and put them all in the pipeline. Tanya Janca, Founder of We Hack Purple and author of Alice and Bob Learn Application Security, used her Conf42 DevSecOps 2023 talk to argue that this is the smallest part of the job. Her definition: DevSecOps is AppSec plus DevOps, and most AppSec program goals can be met without touching the pipeline at all.
+
+## What does DevSecOps mean to her?
+
+Janca does a quick 101 on CI/CD first (integration, delivery, and the rarer continuous deployment), then frames everything around the three ways of DevOps: efficiency of the whole system, fast and accurate feedback to the right person, and continuous learning. She adds the accuracy part on purpose, because security tools get that part wrong a lot.
+
+Pipelines serve the first two ways well. But she learned the limits the hard way on an open source project, where she planned to run 100 tools and a teammate asked whether he could please write some code. ""But if you put every single thing into the pipeline, your developers will not want to be friends with you anymore,"" Tanya Janca said at Conf42 DevSecOps 2023.
+
+## Goal one: you can't protect what you don't know you have
+
+Inventory comes first in most AppSec programs, and none of it needs CI/CD. Scrape domains, put network agents on servers, run Nmap and scan for open ports, look at your cloud's PaaS and IaaS, scrape your code repositories, or buy one of the newer tools that discover apps on-prem and in the cloud. If an app isn't in your inventory, it is unlikely to be in a pipeline either.
+
+## Find bugs where they are cheapest
+
+She wants bugs found in written code, running code and third-party code, and from as far left as possible. That means the IDE for some checks, scans the moment code is committed, weekly scheduled scans of dependencies, and dynamic scans that run overnight so they don't hog resources during the day.
+
+Her rule for what does belong in the pipeline is practical. Tools with false positives shouldn't go there. Anything that takes six hours, or even 16 minutes, shouldn't go there. And continuous scanning catches what a pipeline misses when nobody runs it for weeks because the team is off touring the hostels of Europe.
+
+## Knowledge, education and tools for developers
+
+The third way of DevOps is learning, and Janca maps a lot of AppSec onto it: reference materials, an advocacy program, a security champions program with one person per dev team, lunch and learns, time reserved in calendars for learning. Then hand developers the tools directly: static analysis, secret scanning, linting, software composition analysis, IDE plugins and security unit tests, most of which work before the code even compiles.
+
+## A secure SDLC, not a secure build step
+
+The bit that frustrates her most is teams that stop at the build. What about standard security requirements for every API, web app or serverless project? A secure coding guideline, and teaching it? Threat modelling in design, pen tests in testing, an AppSec person assigned to the project team, a sprint dedicated only to security? Automated tools are notoriously bad at business logic flaws, and red teams, pen testers and chaos exercises have no business touching your pipeline.
+
+## Incident response and metrics close the loop
+
+Incident response should be a trained team that understands AppSec, with a process, access to the inventory from goal one, read-only access to repos, and post-mortems. Metrics should drive the program: review all tool output every three months, try new tools on one project before rolling them out, visit other AppSec shops and learn from them.
+
+""Appsec is not a tool that you can buy. It's not a button you can press,"" she said, adding that there is no check you can write either, though she would accept one.
+
+## Who should watch?
+
+Security people building or rescuing an AppSec program, and DevOps engineers who are tired of being handed one more blocking scanner. Janca is funny and fast; expect a lot of ideas, no demo. She also runs a Monday mentoring-matching hashtag and points to her free We Hack Purple community at the end.
+
+## Related Conf42 talks
+
+- Gene Gotimer on [ten ways to doom your DevSecOps](https://www.conf42.com/DevSecOps_2023_Gene_Gotimer_doom_devsecops), also at Conf42 DevSecOps 2023.
+- Jagdsh Chand on [iterative threat modelling in agile development](https://www.conf42.com/DevSecOps_2023_Jagdsh_Chand_iterative_threat_modelling_agile_development), same event.
+- Sven Ruppert on [quick wins in DevSecOps](https://www.conf42.com/DevSecOps_2021_Sven_Ruppert_Quick_Wins_DevSecOps) at Conf42 DevSecOps 2021.
+
+[Watch Tanya Janca's talk](https://www.conf42.com/DevSecOps_2023_Tanya_Janca_more_than_pipelines)
+
+[Watch the talk on YouTube](https://youtu.be/wUoZ4OK7yEM).
+",talk,devsecops2023,talk:devsecops2023/Tanya Janca,,Conf42,,queued,"appsec, devsecops, ci-cd, security-champions, incident-response"
+,"Istio security in three demos - identity, strict mTLS, deny by default","Gufran Mirza (TrustCore Systems) at Conf42 DevSecOps 2023 on securing Kubernetes traffic with Istio identities, strict mTLS, gateways and deny-all policies",2023-11-03,devsecops2023/istio-mtls-deny-all-kubernetes,,"Inside a default Kubernetes cluster, any service can call any other. Gufran Mirza, Co-Founder of TrustCore Systems, used his Conf42 DevSecOps 2023 talk to show how Istio closes that gap in three steps: give every workload a cryptographic identity, require mutual TLS between them, then deny everything and open access one rule at a time. Each step comes with a live demo where you watch requests get dropped.
+
+## What does the sidecar actually do?
+
+Mirza starts with the service mesh basics. Without a mesh, routing, retries, circuit breakers and network policy live inside your application code. With Istio, that infrastructure logic moves into a sidecar proxy (Envoy, written in C++, named istio-proxy in the pod) that sits next to your container and intercepts all incoming and outgoing traffic. The proxy doesn't modify requests; it enforces policy, and when a request fails a policy, your application never sees it.
+
+The practical win is independence. You can change network policy without rolling out the application, and vice versa. Sidecars can be injected by hand, automatically by labelling a namespace, or per deployment through annotations. He also notes that since Istio 1.5 the old separate components (Citadel for certificates, Mixer for telemetry, Galley for config validation) are consolidated into the single control plane.
+
+## Identity comes before policy
+
+You can't write a rule that lets service A call service B until A and B have identities. In most clusters that identity is the Kubernetes service account; GCP service accounts, AWS IAM roles or on-prem user accounts also work.
+
+The flow is neat. When a pod starts, the istio-proxy creates a key pair and sends a certificate signing request to the control plane, which signs a certificate scoped to the service account and returns it over the SDS API. Certificates live in memory, so deleting the container deletes the certificate, and the control plane rotates them before they expire.
+
+## Permissive, strict, disabled
+
+Istio has two kinds of authentication: end-user authentication with JWTs, and service-to-service authentication with mTLS, which is the focus here. Mutual TLS has three modes: permissive (accept plain text and mTLS), strict (mTLS only) and disabled. You can set them mesh-wide, per namespace or per workload. ""In general, we want mtls enabled within all of our service mesh applications,"" Gufran Mirza said at Conf42 DevSecOps 2023.
+
+The first demo makes it concrete. An httpbin service runs in namespace foo inside the mesh with strict mTLS; a sleep pod runs in namespace bar with no sidecar. The sleep pod's request gets a connection reset from httpbin's sidecar. Delete the policy and the same call goes straight through.
+
+## The front door: ingress gateway modes
+
+Exposing services to the outside world goes through the ingress gateway, a reverse proxy at the edge of the mesh that handles TLS. Mirza explains its three TLS modes:
+
+- **PASSTHROUGH**: the gateway doesn't terminate TLS; the client and the application pod do mTLS directly.
+- **SIMPLE**: server-side TLS terminated at the gateway, no client certificate needed.
+- **MUTUAL**: two-way TLS between client and gateway, terminated at the gateway.
+
+His second demo uses passthrough to an NGINX pod, accepting traffic only on port 443 for one hostname. A request with the client certificate works; port 80 fails with an SSL error, and a different hostname is dropped at the gateway. His advice on the gateway config is to be strict about what you accept, down to minimum TLS versions and cipher suites.
+
+## Authorization: allow nothing, then open up
+
+The third step answers whether service A can send this request to service B. Istio authorization policies support ALLOW, DENY and CUSTOM actions, enforced at runtime by each Envoy proxy. Mirza's recommended starting point is the allow-nothing policy, then incremental ALLOW rules: the database is reachable from the back end, never the front end.
+
+The demo has three services in namespace auth: inventory, users and a third service. One policy lets only the inventory service account make GET requests to the third service; the users service has a policy with no rules, so everything to it is denied. GET from inventory succeeds, POST is forbidden, users is unreachable. Delete the policies and everything opens up again, which is exactly the point.
+
+## Who should watch?
+
+Kubernetes operators who installed Istio for traffic management and never turned on the security half, and anyone who needs a clear explanation of what mTLS modes and gateway TLS modes actually do. The YAML is on screen; this is a hands-on talk.
+
+## Related Conf42 talks
+
+- Fouad Mulla on [protecting container infrastructure and workloads](https://www.conf42.com/DevSecOps_2023_Fouad_Mulla_cloud_security_containers_infra_workloads), also at Conf42 DevSecOps 2023.
+- Jason Dudash on [service mesh in action](https://www.conf42.com/Cloud_Native_2022_Jason_Dudash_service_mesh_in_action) at Conf42 Cloud Native 2022.
+- Siddhartha Khare on [Istio and the road to observability](https://www.conf42.com/Platform_Engineering_2024_Siddhartha_Khare_istio_observability_road) at Conf42 Platform Engineering 2024.
+
+[Watch Gufran Mirza's talk](https://www.conf42.com/DevSecOps_2023_Gufran_Mirza_securing_kubernetes_istio_service_mesh)
+
+[Watch the talk on YouTube](https://youtu.be/aNqc9tzo4Bc).
+",talk,devsecops2023,talk:devsecops2023/Gufran Mirza,,Conf42,,queued,"istio, kubernetes, service-mesh, mtls, zero-trust"
+,"Treat your container images like secrets, because they are","Fouad Mulla at Conf42 DevSecOps 2023 on why containers are not secure by default, and the images, runtime and network fixes that make them so",2023-11-02,devsecops2023/container-images-are-sensitive-data,,"Containers can make an application more secure, but only if you stop trusting the defaults. That is Fouad Mulla's message at Conf42 DevSecOps 2023. Mulla, a multi-cloud security architect, opens with two figures from an Aqua Security report: in 2021 about 40% of container images were pulled from public sources, and only 12% of containers ran as a non-root user.
+
+Put those together and you get a lot of unvetted code running with more privilege than it needs. The rest of the talk is a checklist for fixing that, from the image to the network.
+
+## Do you need containers to be secure?
+
+No, and Mulla says so up front. Containers are not a prerequisite for application security. Used well, they help: runtime separation, a smaller attack surface because you only deploy what you need, a predefined setup that is easy to patch and consistent, and isolation that helps contain a breach. Used carelessly, they are the opposite. ""Using containers without thinking about security is a recipe for a disaster,"" Fouad Mulla said at Conf42 DevSecOps 2023.
+
+## Where containers bite
+
+His list of challenges is worth pinning to a wall:
+
+- **The daemon attack surface.** Only trusted users should reach the API, it shouldn't be exposed unless needed, and the host needs patching.
+- **Secrets management**, where images themselves count as sensitive material, not just passwords and keys.
+- **Untrusted content**: compromised or vulnerable images from public registries.
+- **Sprawl and ephemeral runtimes.** Containers spin up and die fast and share CPU and other host resources, which makes monitoring and forensics hard.
+- **Lightweight isolation.** Containers separate workloads less strongly than VMs, so breakout scenarios matter.
+
+The ephemeral point deserves a moment. An immutable, short-lived container may be replaced before anyone starts the investigation, so the incident plan has to account for logs and records being kept somewhere that outlives the container.
+
+## Images are sensitive data
+
+The takeaway he repeats most: treat container images as sensitive data. Apply strict access control, review them, scan their contents. Start from official, minimal base images, avoid unnecessary packages and tools, and scan regularly as part of the pipeline. Never hard-code secrets into an image.
+
+For the AWS flavour of a secure pipeline, he walks through CodeCommit, CodeGuru to catch credentials embedded in code, AWS Secrets Manager, IAM and CloudWatch, and stresses that Azure or Google Cloud work just as well. For linting Dockerfiles he names Red Hat's dockerfile_lint and Hadolint, and for scanning images two open source tools: Anchore Engine, which plugs into CI/CD so only compliant images reach production, and Clair from CoreOS, which ranks findings by CVE. Cloud registry scanners, such as the one in AWS private registries, cover the same ground.
+
+## Going beyond the defaults
+
+""Docker is not secure by default"" is on his takeaways slide, and the fixes are concrete:
+
+- Least privilege, and isolation for sensitive workloads, with gVisor, Kata Containers or hypervisor-based containers where the data justifies it.
+- Immutable containers: never patch a running one, replace it. Read-only filesystems cut down the places an attacker can persist.
+- Resource limits so a single container can't exhaust the host or be used for a DoS.
+- Kubernetes security contexts and pod security policies, or the equivalent in your orchestrator.
+- Infrastructure as code to keep environments consistent while the team races to ship.
+
+He frames all of this as a balance between developer flexibility and robust security, not as a gate.
+
+## The network: default deny, then open up
+
+On network segmentation Mulla is direct. Use micro-segmentation and Kubernetes namespaces as boundaries, apply network policies that block everything by default, and add only what each service needs. Isolate sensitive workloads first, which also helps with compliance. Encrypt container traffic with TLS, audit regularly, and consider a service mesh such as Istio or Linkerd for finer traffic control, feeding its logs into whatever WAF, IDS or IPS you already run.
+
+## Who should watch?
+
+Teams moving workloads into containers who want a structured checklist, and security folks who need the vocabulary to talk to platform teams. It is a survey of practices and tools rather than a hands-on demo.
+
+## Related Conf42 talks
+
+- Gufran Mirza on [securing Kubernetes workloads with Istio](https://www.conf42.com/DevSecOps_2023_Gufran_Mirza_securing_kubernetes_istio_service_mesh), also at Conf42 DevSecOps 2023.
+- Rob Richardson on [container scanning that runs fast and stays safe](https://www.conf42.com/DevSecOps_2021_Rob_Richardson_container_scanning_run_fast_stay_safe) at Conf42 DevSecOps 2021.
+- Adrian Gonzalez on [container security](https://www.conf42.com/DevSecOps_2022_Adrian_Gonzalez_contain_security_containers) at Conf42 DevSecOps 2022.
+
+[Watch Fouad Mulla's talk](https://www.conf42.com/DevSecOps_2023_Fouad_Mulla_cloud_security_containers_infra_workloads)
+
+[Watch the talk on YouTube](https://youtu.be/UonbyILnlSo).
+",talk,devsecops2023,talk:devsecops2023/Fouad Mulla,,Conf42,,queued,"containers, cloud-security, kubernetes, devsecops, vulnerability-management"
+,"Writing is 20% of a technical writer's job, and that's the safe part","Tomas Fernandez (Semaphore) at Conf42 DevSecOps 2023 on why technical writing stays a worthy career next to LLMs, and how to use them",2023-11-01,devsecops2023/technical-writing-survives-ai,,"Forrester's 2023 forecast put technical writers in the corner of the chart nobody wants to be in: high exposure to generative AI. Tomas Fernandez, Technical Writer at Semaphore, answered the obvious question at Conf42 DevSecOps 2023 with a short yes and a long ""it depends"". Writing is the part of the job language models can do; the other 80% is interviewing people, and that is where the career lives.
+
+It is a short, opinionated talk built on five reasons, and it comes from someone who writes blogs, video content and ebooks for a living.
+
+## Why is this leap different?
+
+Fernandez doesn't hand-wave the threat. Every technological leap had people crying about lost jobs, and sometimes they were right (there are no typesetters left), but new technology usually made more jobs than it destroyed. Language models are a different class of thing, he argues, because they produce text at scale and feel like they can think. There are already products that take code and output documentation, and Synthesia that can deliver a talk with a virtual avatar.
+
+## Five reasons not to panic (too much)
+
+**1. The hype cycle.** Crypto has been through it; language models are just starting. In the early phase, the press prints the most extreme outcomes because fear sells.
+
+**2. AI already failed to replace writers in a high-stakes business.** The 2023 Writers Guild of America strike ended with Hollywood settling with the guild. Back in tech, he points out that Google's State of DevOps 2023 report had AI as the lowest contributor to team performance.
+
+**3. The limits are real.** Models trained on internet text inherit its misinformation, clutter and verbosity. Some companies can't use them at all for privacy or compliance reasons. Add context size limits and model updates shipped without notice.
+
+**4. You can adapt.** This is the practical core (see below).
+
+**5. Writing is 20% of the job.** ""You have to interview people, you have to talk to SMEs, to developers, to product managers,"" Tomas Fernandez said at Conf42 DevSecOps 2023. You have to put yourself in the users' shoes and prioritise information, which models struggle with.
+
+## The uncanny valley of generated text
+
+The biggest problem with AI text, in his view, is not hallucination. It is the uncanny valley, the aversion people feel towards things that try to look human and nearly make it. He shows it with roboticist Hiroshi Ishiguro and his robot twin, then argues text has the same problem in a quieter form. Read enough unedited model output and you notice nobody is at the wheel, and there is no ""I-ness"" in it. For documentation that sounds minor, until you remember the reader has to trust it.
+
+## Cyborg, director or Swiss army writer?
+
+His adoption spectrum is the most reusable idea in the talk. At one end, the cyborg publishes raw model output, usually under pressure to ship volume, and it shows: inaccurate, too long, slow to reach the point. At the other end, the classical writer can't or won't use AI, often for compliance reasons.
+
+The middle has two roles:
+
+- **The director** prompts paragraph by paragraph, rewrites, goes back and forth, and keeps the big picture coherent, like a film director coaching actors.
+- **The Swiss army writer** (his own camp) uses the model where it beats him: outlining, writer's block, research, summarising, translation, editing, brainstorming, while still writing half or more of the text by hand.
+
+The middle is where he wants writers to be, so they don't become over-dependent and don't lose their skills. His bar for worrying is clear: until a model can sit down with a developer and ask the right questions, writers are safe.
+
+## Who should watch?
+
+Technical writers, developer advocates and anyone who owns docs and has been asked whether a model could just do it. It is a short talk with no demo; the adoption spectrum is worth stealing for your own team discussion.
+
+## Related Conf42 talks
+
+- Susie Su on [what AI can and can't take from DevOps roles](https://www.conf42.com/DevSecOps_2023_Susie_Su_revolution_iot_workforce), also at Conf42 DevSecOps 2023.
+- Rich Niemiec's [AI and machine learning 101](https://www.conf42.com/DevSecOps_2023_Rich_Niemiec_ai_machine_learning_101), same event.
+- Aleksandra Drobnjak on [documentation artifacts for beginners](https://www.conf42.com/Machine_Learning_2026_Aleksandra_Drobnjak_documentation_artifacts_beginners) at Conf42 Machine Learning 2026.
+
+[Watch Tomas Fernandez's talk](https://www.conf42.com/DevSecOps_2023_Tomas_Fernandez_technical_writing_ai_career_path)
+
+[Watch the talk on YouTube](https://youtu.be/miBgmjh_9TI).
+",talk,devsecops2023,talk:devsecops2023/Tomas Fernandez,,Conf42,,queued,"technical-writing, llm, careers, documentation"
+,"When AI hacks IoT, the outage has a body count","Susie Su (Signify (Philips Lighting)) at Conf42 DevSecOps 2023 on AIoT, the DevOps skills AI can't copy, and an 11-part map of AI security",2023-10-31,devsecops2023/aiot-security-when-hacks-hurt-people,,"A hacked website goes down. A hacked pipeline, power grid or car can kill someone. That is the core of Susie Su's talk at Conf42 DevSecOps 2023: Su, Global Software Operations Architect at Signify (Philips Lighting), argues that once AI moves into connected devices (AIoT, AI plus IoT), security stops being about uptime and money and starts being about physical safety, so the security model has to grow to match.
+
+It is a broad, framework-style talk in three parts: what AIoT is, what it does to DevOps jobs, and what AI security should cover.
+
+## What does AIoT look like in practice?
+
+Su starts from her own industry. Her examples of AIoT include automated vehicles (Tesla, Waymo, Mobileye, Cruise, Baidu), smart cities with lighting, video surveillance and traffic monitoring, and manufacturing lines that use deep neural networks for quality checks.
+
+The demo idea is a nice one for anyone who has fiddled with smart bulbs. Take a photo of the Black Forest, turn the image into lighting parameters the hardware understands, send the command, and your bedroom gets the same ambience. She points to OpenAI's DALL-E 3 as the kind of model that can now handle the image-to-parameters step. It is a small, friendly example, but it shows the chain that matters later: model output turns into hardware commands.
+
+## Which DevOps work can AI actually take?
+
+The middle section is about jobs, and Su doesn't sugar-coat it. Her slide compares the roles predicted ten years ago to be automated (telemarketers, bookkeeping clerks, receptionists, proofreaders) with today's list, which now includes coders, software engineers and data analysts. She frames current AI as roughly a Google level 3 software engineer.
+
+Then she lists what it can't do, and it reads like a job description for a senior DevOps engineer:
+
+- Handle intricate, open-ended problems, such as a migration across many departments with zero downtime for the running business.
+- Show the depth of thought of a professional engineer who sees the whole lifecycle, from communication to Linux and networking.
+- Think critically.
+- Collaborate across teams: interpersonal skills, leadership, teamwork, work ethic.
+
+On that last point she is blunt. ""It's not like if it's just a machine, just because of your test, can understand what you really mean,"" Susie Su said at Conf42 DevSecOps 2023. Read that as: the hard part of DevOps was always people, and that is the part that stays.
+
+## Why is IoT the scary part of AI security?
+
+This is the section worth the watch. Su contrasts a software attack, which takes your website down or costs money, with an attack on IoT. ""If AI hacked IoT industry is so horrible, it means it will kill someone,"" she said. Her slides place IoT security inside cybersecurity, next to network, cloud, endpoint and application security, and break it down into 5G networks, the Internet of Vehicles and industrial IoT, including industrial control systems. She walks through a timeline of real industrial control system incidents, with gas pipelines and nuclear facilities as the cases where one compromised device can hurt a whole city.
+
+## What should AI security cover?
+
+Drawing on ten years in cybersecurity and three in AI, Su proposes eleven areas. The useful bit is how each maps to a concrete technique:
+
+- **Data security**: confidentiality, integrity, availability, encryption, access control, anonymised data.
+- **Privacy preservation**: differential privacy (managed noise in the data) and federated learning (training spread over devices so raw data never leaves).
+- **Information security**: the classic list, from application and cloud security to incident response, cryptography and disaster recovery.
+- **Explainability and transparency**: transparent models are easier to audit and debug.
+- **IoT security** and **human-AI interaction security**: preventing impersonation and the malicious use of AI output.
+- **Model security**: adversarial perturbations, transfer attacks, white-box and black-box attacks.
+- **Bias and fairness**: bias mitigation and fairness-aware learning.
+- **Lifecycle security**: coding practices, regular updates and proper disposal of systems when a project ends.
+- **Regulatory compliance**: GDPR, industry rules, ethical guidelines. Her point: relying on AI firms to be good-hearted is not a plan.
+- **Hybrid AI-human security**: a human in the loop for threat detection and overall oversight.
+
+The lifecycle item is the one most teams forget. Software gets switched off; a model that is still feeding devices needs to be retired on purpose.
+
+## Who should watch?
+
+Engineers in IoT, embedded and industrial settings who need a checklist for AI risk, and DevOps folks wondering where their job is heading. It is a taxonomy and a point of view, not a hands-on talk: no code and no tooling demo.
+
+## Related Conf42 talks
+
+- Andrey Slastenov on [IoT, 5G devices and DDoS threats](https://www.conf42.com/DevSecOps_2023_Andrey_Slastenov_iot_5g_devices_ddos_threat_landscape), also at Conf42 DevSecOps 2023.
+- Jonathan Williams on [IoT security threats](https://www.conf42.com/DevSecOps_2021_Jonathan_Williams_IoT_Security_Threats) at Conf42 DevSecOps 2021.
+- Eugene Neelou on [MLSecOps for Software 2.0](https://www.conf42.com/DevSecOps_2022_Eugene_Neelou_ai_introducing_mlsecops_for_software_20) at Conf42 DevSecOps 2022.
+
+[Watch Susie Su's talk](https://www.conf42.com/DevSecOps_2023_Susie_Su_revolution_iot_workforce)
+
+[Watch the talk on YouTube](https://youtu.be/1aKjHVjQEfc).
+",talk,devsecops2023,talk:devsecops2023/Susie Su,,Conf42,,queued,"iot, ai-security, devops, careers, privacy"
+,"Machine learning 101 starts with the business problem, not the model","Rich Niemiec (Viscosity North America) at Conf42 DevSecOps 2023 on picking ML algorithms by business problem, from decision trees to RAG on Oracle",2023-10-31,devsecops2023/ml-101-start-with-business-problem,,"Most ML projects fail at the first question, not the last: nobody wrote down what they were trying to solve. Rich Niemiec, Chief Innovation Officer at Viscosity North America, spent his Conf42 DevSecOps 2023 talk on exactly that order of operations: business problem first, then the function, then the algorithm. The algorithms, explained in plain English, turn out to be the easy part.
+
+Be clear about scope: this is a 101, and his abstract says outright that it is not for the experts. It is also a database person's tour, heavy on Oracle, with Twilight Zone episodes as the running gag.
+
+## Problem, function, algorithm
+
+His recipe for supervised learning is a three-step funnel. Name a specific business problem: not making more money, but finding which customers look like your best ones. Pick the function: classification, clustering, anomaly detection, regression, attribute importance, association rules, time series. Only then choose among the algorithms for that function. Train on about 60% of the data, test and score on the other 40%, compare algorithms, then run the winner against the big data.
+
+The slides push for precise problem statements. Targeting the best customers is poorly defined; customers who spent $500 or more in the most recent 18 months is something a model can work with.
+
+## A plain-English tour of the algorithms
+
+This is the bulk of the talk and the most useful part for newcomers:
+
+- **Decision trees**: a lawyer deciding whether to take a case, weighing the win, the loss and the costs. Niemiec uses one to predict who will buy a sports-logo credit card.
+- **Random forest**: many decision trees, which smooths out the curvy line and keeps the model from fitting too closely.
+- **Neural networks**: show it 1,000 cats and 1,000 dogs; the math under it is decades old, and backpropagation does the tuning. With deep learning, the model finds the features itself.
+- **Anomaly detection**: what sits outside the sphere. Subtle-anomaly models are used in nuclear power plants, airliners and Oracle's Exadata hardware.
+- **Clustering**: k-means by distance, and Oracle's O-Cluster by density.
+- **Principal component analysis**: of 80 reasons a customer buys, maybe 20 matter. His aside on eigen (Dutch or German for your very own, so you go looking for your Eigen customer) is the best mnemonic in the talk.
+- **Association rules**: the a priori algorithm and the classic bread, diapers and milk market basket.
+
+His point is not that you should implement these. It is that the code is short. Attribute importance for ""who buys insurance"" is a few lines of SQL against a table, and Oracle's AutoML tried every classification algorithm and generated a Python notebook in about four minutes for work that took him days.
+
+## The DBA is most of the ML job
+
+One claim stands out for this audience. Data science is about 20% of an ML project, Niemiec argued; the rest is finding the right data, cleansing it and checking it for bias, which is DBA and developer work. ""So we're moving from predictive to prescriptive right now,"" Rich Niemiec said at Conf42 DevSecOps 2023: the CFO doesn't want last quarter's numbers, but what to do to hit next quarter's.
+
+## From transformers to RAG
+
+The last third covers generative AI. He traces it to the ""Attention Is All You Need"" transformer paper from Google Brain and one of its authors, Aidan Gomez, who went on to start Cohere. Oracle partnered with Cohere instead of building its own LLM, and added a vector database so you can query by image or document alongside JSON, graph, spatial and relational data. On hallucinations, the answer he shows is retrieval augmented generation over a company's own protected data.
+
+There is a handful of figures along the way: ChatGPT reached 100 million users in two months, against 70 months for Uber, 30 for Instagram and nine for TikTok. APEX, Oracle's low-code tool, has around 2 million apps with about 3,000 built a day, according to him, and now generates SQL from plain English prompts.
+
+## Who should watch?
+
+Developers and DBAs who want the vocabulary of ML before their first project, and managers who need to tell classification from clustering in a meeting. If you already ship models, skip it; if you run Oracle, there is a lot here for you.
+
+## Related Conf42 talks
+
+- Tomas Fernandez on [technical writing in the age of AI](https://www.conf42.com/DevSecOps_2023_Tomas_Fernandez_technical_writing_ai_career_path), also at Conf42 DevSecOps 2023.
+- Anmol Agarwal's [beginner's guide to adversarial ML](https://www.conf42.com/Machine_Learning_2024_Anmol_Agarwal_beginners_guide_adversarial) at Conf42 Machine Learning 2024.
+- Eugene Neelou on [MLSecOps for Software 2.0](https://www.conf42.com/DevSecOps_2022_Eugene_Neelou_ai_introducing_mlsecops_for_software_20) at Conf42 DevSecOps 2022.
+
+[Watch Rich Niemiec's talk](https://www.conf42.com/DevSecOps_2023_Rich_Niemiec_ai_machine_learning_101)
+
+[Watch the talk on YouTube](https://youtu.be/AbEoMu7piQ4).
+",talk,devsecops2023,talk:devsecops2023/Rich Niemiec,,Conf42,,queued,"machine-learning, ai, oracle, databases, beginners"
 ,Spooky season with Incident Management,Shh… Just make it look like an ‘incident’,2023-10-19,2023-10-19-incident-management,./assets/splash/INCIDENT2023_Event_Splash.png,"#Shh… Just make it look like an ‘incident’
 
 We all know the frustration of trying to pick that stunning Halloween costume. Don’t worry, been there, done that. No one said it was gonna be easy.
