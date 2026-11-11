@@ -102114,6 +102114,281 @@ Developers and product people who find security overwhelming, and tech leads who
 
 [Watch the talk on YouTube](https://youtu.be/Q1NF_vC2m1w).
 ",talk,python2023,talk:python2023/Wiktoria Dalach,,Conf42,,queued,"security, appsec, shift-left, threat-modeling, software-design"
+,"Autoscaling won't save an overloaded service, but load shedding can",Tanveer Gill (FluxNinja) at Conf42 Chaos Engineering 2023 on graceful degradation with adaptive concurrency limits and prioritized load shedding,2023-02-05,ce2023/autoscaling-wont-save-an-overloaded-service,,"Once median latency reaches the timeout, half your requests fail, and a little more traffic takes availability to zero. Tanveer Gill, co-founder and CTO of FluxNinja, used his Conf42 Chaos Engineering 2023 talk to build that result from Little's Law, explain why autoscaling alone cannot fix it, and show how adaptive concurrency limits and prioritized load shedding keep a service useful while it is overloaded.
+
+The last third demos Aperture, the open-source project from his own company. The first two thirds are vendor-neutral load management theory and worth the time on their own.
+
+## What actually happens when a service is overloaded?
+
+Every service has a concurrency limit: thread contention, context switching, garbage collection and I/O contention cap how many requests it can process in parallel. Little's Law, L = λW, ties it together: requests in flight equal average throughput times average response time. If L is capped by resources and W is set by the workload, maximum throughput λ follows. Anything beyond it queues.
+
+So there is an inflection point. Below the concurrency limit, latency is flat. Above it, every extra request adds queueing delay. Gill's chart plots throughput against median latency and availability (requests served within the timeout), and the curve is brutal: when median latency equals the timeout, availability is 50%, and it falls to zero quickly after.
+
+In microservices this spreads. A failing service A drags down service B that depends on it, and failure also spreads laterally: lose a few instances of A and the rest take their load, overload, and fall over in turn.
+
+## Why isn't autoscaling enough?
+
+Gill likes autoscaling for persistent demand changes and cloud costs, but lists three limits:
+
+- It is slow to respond, especially for services that take a while to become available.
+- It is capped by resource quotas, often shared across many microservices.
+- It can amplify load on dependencies, moving the overload downstream.
+
+The third is illustrated by the Pokémon GO migration to Google Cloud Load Balancer, the case study from the Google SRE Workbook. Scaling the load balancing layer let more traffic through to backends that could not take it, which prolonged the outage. ""Auto scaling is not a complete solution on its own, but rather a piece in the larger load management puzzle,"" Gill said at Conf42 Chaos Engineering 2023.
+
+## Why not just set a concurrency limit?
+
+Cap in-flight requests and shed the rest, and availability for admitted requests stays at 100% even when incoming throughput is far above capacity. The catch is the number. Too low and you reject requests you could have served; too high and the service slows to a crawl. And in a system with constant deployments, autoscaling, new dependencies and changing machine types, any static value goes stale. Hence the need for limits that adapt - which also protect against performance regressions, not just traffic spikes.
+
+## How does Aperture adapt the limit?
+
+An Aperture agent runs next to the service; on each request the service asks it whether to admit or drop. Policies are declarative and drawn as a circuit graph. The one shown queries the service's response time from Prometheus with PromQL, smooths it with an exponential moving average, compares the current value with the long-term trend to detect overload, and feeds an AIMD concurrency controller inspired by TCP congestion control: ramp the limit up gradually, back off multiplicatively when latency deteriorates. It integrates with language frameworks or slots into an Envoy service mesh without code changes.
+
+The demo service handles only 10 concurrent users. A k6 load generator alternates 5 users for two minutes with 30 users for one minute. Without the policy, latency balloons during each burst; with it, Aperture starts dropping requests as response times turn and latency stays in a reasonable range.
+
+## Who gets dropped first?
+
+That is the question that makes this graceful degradation and not just rejection. Borrowing from weighted fair queuing in packet scheduling, Aperture lets you rank workloads: checkout above recommendations, subscribed users above guests. In the demo, with equal numbers of guests and subscribers and subscribers given four times the priority, subscribers got roughly four times the acceptance rate during overload.
+
+## Who should watch
+
+SREs and backend engineers whose overload plan is to add replicas, and anyone who wants a crisp explanation of why latency falls off a cliff. Watch the first half even if you never touch Aperture; watch the second if you want adaptive limits without writing your own controller.
+
+## Related Conf42 talks
+
+- Bryan Barkley and Vivek Deshpande on [Hodor and handling overload at LinkedIn](https://www.conf42.com/Site_Reliability_Engineering_2022_Bryan_Barkley_Vivek_Deshpande_hodor_overload_linkedin) at Conf42 SRE 2022.
+- Rehana Sultana Khan on [rate limiting](https://www.conf42.com/JavaScript_2025_Rehana_Sultana_Khan_rate_limiting_cost) at Conf42 JavaScript 2025.
+- Pablo Chacin on [chaos testing with k6](https://www.conf42.com/Chaos_Engineering_2023_Pablo_Chacin_shifting_left_chaos_testing) at the same event, the load generator in this demo.
+
+[Watch Tanveer Gill's talk](https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong)
+
+[Watch the talk on YouTube](https://youtu.be/nm62d2gYqNk).
+",talk,ce2023,talk:ce2023/Tanveer Gill,,Conf42,,queued,"graceful-degradation, load-shedding, concurrency-limits, microservices, sre"
+,"QA engineers should estimate testing, then say the number out loud","Grzegorz Niczyporuk (Swing Development) at Conf42 Chaos Engineering 2023 on why test estimation matters and how to defend it from ""can you do it faster?""",2023-02-03,ce2023/estimate-your-testing-out-loud,,"Project managers ask developers how long a feature will take, and almost never ask the testers. Grzegorz Niczyporuk, QA Manager at Swing Development with more than twelve years in testing, used his Conf42 Chaos Engineering 2023 talk to argue that QA engineers should estimate their work, communicate the estimate loudly, keep it updated - and know how to defend it.
+
+It is a non-technical talk about a professional habit, built on experience rather than formulas. He says up front that you can find the estimation methods on Google; what he offers is the approach.
+
+## Why estimate testing at all?
+
+He opens with fortune tellers. Poland, he says, has around 75,000 fortune tellers, bioenergy therapists and seers, and 56% of citizens use their services at $1 to $250 a visit. Yet in the QA job descriptions he read, test estimation never appears. His theory is blunt: nobody cared in previous projects, so testers stopped offering numbers.
+
+Estimating is guessing, he admits, but guessing with rules. He gives four reasons it pays off: resource management (spare capacity on project A can support project B, and a tight deadline on A can borrow help), safety for the business, which knows when testing ends instead of wondering what the testers are doing, professionalism, because accurate estimates come from experience, and knowledge, because estimating forces you to understand what you actually test.
+
+## What goes into the number?
+
+The trap he keeps hitting: someone sees one test takes an hour, needs 20 runs, and writes down 20 hours. His analogy is a room of 100 people. One photo takes about 10 seconds. A photo of every person is not 1,000 seconds, because setup and teardown change. The sum of single task estimates is not the total.
+
+A real estimate also includes the supporting work around execution: writing test cases, tracing them to requirements, reporting bugs and results, writing and discussing the test report. And it carries a buffer for what nobody can predict, from an unavailable environment to a requirement that turns out to be wrong.
+
+## When and by whom?
+
+When is not about project phase, but about what is happening around you. How stable are the test environments? He mentions a summer when the server room's air conditioning had to be shut down and the machines slowed. How stable is the application? Is half the team being pulled onto other projects, as happened during COVID-19?
+
+Who should estimate: the QA engineers, ideally the experienced ones who know the project and the environment, though a newcomer can still estimate less accurately. Above all, people who are engaged and care about quality beyond the 8-to-4 shift. And the company culture matters: if nobody asks how long testing needs, be the one who starts telling them.
+
+## Communicate, monitor, update
+
+""The biggest sin about the test estimation or about the activities which we actually perform as a QA is the fact that we are not talking about this,"" Niczyporuk said at Conf42 Chaos Engineering 2023. Say it out loud, even if nobody asked: one week, a full 40 hours. Then track progress against it, as ISTQB foundation material says, and update it. He borrows the cone of uncertainty from SAFe: early estimates have wide margins, and they narrow as you run tests and learn. Telling your PM you need two more days two weeks before the deadline is a very different message from telling them the day before release.
+
+## How do you answer ""can you do it faster?""
+
+Every PM, PO or Scrum Master will eventually ask. He offers four answers:
+
+- **Tell them what they already know**, fortune-teller style: it is a new project, the test plan they agreed covers critical functions, the risks and client impact are real.
+- **Add a buffer that can be cut**, so the manager gets a win. He admits it is not very elegant.
+- **Ask for priorities**: accept the shorter window, ask what to focus on, and put that decision in the test report.
+- **Use your own authority**: if your estimates have held over many deliveries, say so. ""So I know that it will just take that much time,"" as he put it. He recommends this one most, because it builds your reputation as someone who knows what they are doing.
+
+## Who should watch
+
+QA engineers and test leads who never get asked for an estimate, or get theirs cut, and PMs who want to understand what a test estimate should contain. It is a talk about professional practice, not tooling or chaos experiments, despite the event it aired at.
+
+## Related Conf42 talks
+
+- Dana Scheider on [testing, QA and the quality process](https://www.conf42.com/Golang_2021_Dana_Scheider_testing_qa_quality_process) at Conf42 Golang 2021.
+- Mesut Durukal on [quality assurance as a touchstone](https://www.conf42.com/DevOps_2024_Mesut_Durukal_quality_assurance_touchstone) at Conf42 DevOps 2024.
+- Vitali Shchur on [the QA mindset in a startup](https://www.conf42.com/Chaos_Engineering_2025_Vitali_Shchur_qa_mindset_startup) at Conf42 Chaos Engineering 2025.
+
+[Watch Grzegorz Niczyporuk's talk](https://www.conf42.com/Chaos_Engineering_2023_Grzegorz_Niczyporuk_test_estimation_fortuneteller)
+
+[Watch the talk on YouTube](https://youtu.be/qwXpqlq40iE).
+",talk,ce2023,talk:ce2023/Grzegorz Niczyporuk,,Conf42,,queued,"qa, testing, estimation, project-management, quality-assurance"
+,"A first chaos engineering talk on AWS, from Chaos Monkey to an AZ failure",Shirisha Vivekanand (AWS) at Conf42 Chaos Engineering 2023 on chaos engineering basics and FIS experiments for CPU stress and AZ failure,2023-02-01,ce2023/chaos-engineering-101-on-aws,,"If your team has heard the phrase chaos engineering but never run an experiment, this is a good place to start. Shirisha Vivekanand, Solutions Architect at AWS, used a Conf42 Chaos Engineering 2023 talk to cover the what, why and how of the discipline, a short history of its tools, and two AWS Fault Injection Simulator experiments on a three-tier ECS application: CPU stress and the loss of half the EC2 fleet.
+
+It is an introductory talk, and honest about it. Seasoned chaos engineers will recognise every slide; teams on AWS looking for the first step get a clear map.
+
+## Why does AWS frame chaos as Well-Architected advice?
+
+Vivekanand starts with Werner Vogels' line that everything fails all the time, and with the AWS Well-Architected Framework's six pillars: operational excellence, security, reliability, performance efficiency, cost optimisation and sustainability. Three matter here, and the reliability pillar spells the practice out: run tests that inject failures regularly into pre-production and production environments. Chaos engineering is AWS's own advice, written down.
+
+The business case is the cost of downtime. For Amazon.com's retail business, Vivekanand notes, even a few minutes of outage can hit revenue hard. ""Waiting for the next costly outage is not an option,"" Vivekanand said at Conf42 Chaos Engineering 2023. The alternative is to cause the failure yourself, in working hours, rather than let it find you at 3 a.m. on a weekend.
+
+## What does an experiment look like?
+
+Five phases: understand the steady state, form a hypothesis, run the experiment (usually by injecting faults), verify the results, and improve. The events worth simulating fall into three groups: hardware failures such as a server dying, software failures such as malformed responses, and non-failure events like a traffic spike or a scaling event. Anything that can disturb the steady state is fair game.
+
+## Where did the tools come from?
+
+The history tour is short and useful for newcomers. Netflix built Chaos Monkey around 2010 and the Simian Army added failure modes in 2011. Chaos Toolkit arrived in 2017 with an open API for developers and CI/CD integration, and Chaos Mesh brought experiments to Kubernetes in 2019 without changing the application's deployment logic. Kolton Andrus, who had built fault injection at Amazon, co-founded Gremlin, a hosted failure-as-a-service platform for hosts, containers, functions and Kubernetes primitives. Then there is AWS Fault Injection Simulator, with actions, targets (often picked by tags), experiment templates and stop conditions to keep the blast radius in check.
+
+## Two experiments on a three-tier app
+
+The test bed is a multi-AZ application: an Internet gateway, an Elastic Load Balancer in front of a web tier on ECS, another load balancer in front of an ECS application tier, and Amazon Aurora underneath.
+
+**CPU stress.** Hypothesis: if CPU on a compute resource is under stress, the website stays available thanks to the system's built-in capacity. The FIS template uses a prebuilt action that runs an AWS Systems Manager command under the hood; you type start to confirm and watch the spike on the ECS monitoring dashboard or a custom one. Network packet loss works the same way through SSM.
+
+**Availability zone failure.** The second experiment mimics losing an AZ by removing it from the auto scaling group's configuration and triggering a database failover. Hypothesis: terminating 50% of the EC2 instances across the web and application tiers does not hurt availability, and auto scaling brings capacity back. You watch healthy hosts drop in the ECS cluster, instances terminate and reappear in EC2, the auto scaling group count dip and recover, and the user's view through a CloudWatch Synthetics canary probing the endpoints.
+
+## Once is not enough
+
+The closing point is the one most teams miss. Recovery designs rest on assumptions that age: a replication job that finishes within the steady-state window today may not once the data grows. So run experiments regularly, bring in people who do not know the system for game days, wire tests into CI/CD starting with staging, and do not trust manual runbooks that silently go stale. She ends on Casey Rosenthal and Nora Jones: chaos engineering is about making the chaos already in the system visible.
+
+## Who should watch
+
+Teams on AWS new to chaos engineering, architects who want the Well-Architected angle to pitch it internally, and anyone who needs a short history of the tools. If you have already run FIS in anger, you know most of this.
+
+## Related Conf42 talks
+
+- Samuel Baruffi on [AWS Fault Injection Simulator in depth](https://www.conf42.com/Chaos_Engineering_2023_Samuel_Baruffi_cloud_aws_fault_injection_simulator_fis) at the same event, with a live instance kill.
+- Gunnar Grosch on [serverless chaos with FIS](https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator) at Conf42 Chaos Engineering 2022.
+- Rain Leander on [when Gremlins play with cockroaches](https://www.conf42.com/Chaos_Engineering_2022_Rain_Leander_when_gremlins_play_with_cockroaches_a_chaos_experiment) at Conf42 Chaos Engineering 2022.
+
+[Watch Shirisha Vivekanand's talk](https://www.conf42.com/Chaos_Engineering_2023_Shirisha_Vivekanand_building_resilience)
+
+[Watch the talk on YouTube](https://youtu.be/lpm2IK0N1nQ).
+",talk,ce2023,talk:ce2023/Shirisha Vivekanand,,Conf42,,queued,"chaos-engineering, aws, well-architected, game-days, resilience"
+,The chaos experiment went fine until nobody could find the runbook,"Yury Nino (Google) at Conf42 Chaos Engineering 2023 on a documentation framework for chaos engineering, from team charters to postmortems",2023-01-29,ce2023/chaos-experiments-need-paperwork,,"A planned chaos experiment turns into a customer-facing outage, and the fix sits in a script nobody on the team knew existed. Yury Nino, Cloud Infrastructure Engineer at Google and a long-time chaos engineering advocate, opened her Conf42 Chaos Engineering 2023 talk with that story and used it to argue a point the discipline tends to skip: chaos needs its own documents, and she proposes a framework for which ones.
+
+It is a structured, practical talk: one cautionary tale, then a checklist of documents mapped to the stages of a chaos exercise.
+
+## How does a controlled experiment become real chaos?
+
+The story is fictional but painfully familiar. On a Friday at 13:50, a co-host announces the exercise in the chaos engineering Slack channel. At 14:00 they run the prepared commands to unplug some network links in production while the note taker records the time. At 14:15 all looks well: evidence collected, hypothesis confirmed, recovery prepared.
+
+At 14:30 production does not return to steady state. The chaos lead stops the experiment, but an automated recovery procedure has already brought the isolated region back online, and customers notice. The failure is in a new component with no documentation. The development team does not answer the page. After 90 minutes the team finds a document with commands to restart the new service, runs it and crosses their fingers. It works.
+
+""Luckily, all the characters and episodes in this story are fictional,"" Nino said at Conf42 Chaos Engineering 2023. Her postmortem of the story: teamwork, communication channels and the experiment's isolation went well; knowledge of the automated recovery script, the unavailable dev team and the missing docs did not. First action item: a meeting between the dev and SRE teams, then document the new service.
+
+## Why bother writing it down?
+
+Teams tend to keep operational knowledge as nuggets passed verbally to new members, and when it is not written down, it has to be relearned painfully through trial and error - exactly what happened on that Friday. Documentation helps developers talk to each other, helps future engineers maintain the code, helps onboarding, and helps you learn from mistakes. She leans on an ACM Queue article on SRE documentation for the argument that high-quality docs keep teams from that decay as they scale.
+
+She is explicit about scope: these are not the documents for building and operating systems, but the documents for the chaos.
+
+## Which documents, and when?
+
+The framework sorts documents into four stages:
+
+- **General**: a team charter (vision, how the team operates, its top services, key principles), a production readiness review (architecture and dependencies, capacity planning, failure modes, processes and automation, external dependencies), and technical design documents. A design doc describes the system's steady state, which makes it gold for chaos engineers.
+- **Before the chaos**: chaos policies (goals, what steady state means, SLOs and SLIs, outage and escalation policies), service agreements with user and internal targets, and on-call policies covering training, shifts, pager load and compensation.
+- **During the chaos**: the chaos engineering design, which she calls the most important document of all - application, hypothesis, environment, duration and load, results, observability and actions. ""It is like an airplane black box,"" she says. Next to it sit playbooks for each alert (verification, troubleshooting, escalation) and incident management documents covering hand-off, escalation, responsibilities and dashboards.
+- **After the chaos**: postmortems (what went well, what didn't, lessons, prioritised action items) and reliability reports for management, with each indicator's collection method, formula, targets, data source and revision date.
+
+The playbook is where the opening story turns. Had the engineer in it had one, Nino says, the incident could have been resolved in minutes rather than after a frantic intranet search. She also gives technical writers a role: partnering with chaos engineers on operational docs and improving the tooling around them.
+
+## Who should watch
+
+Teams about to run their first game day in production, SRE leads who want a checklist before they let anyone unplug anything, and anyone who has ever searched the intranet during an incident. It is a framework talk, so expect lists of sections rather than tools; pair it with a hands-on talk and you have both halves.
+
+## Related Conf42 talks
+
+- Yury Nino on [postmortem culture](https://www.conf42.com/Chaos_Engineering_2020_Yury_Nino_postmortem_culture) at Conf42 Chaos Engineering 2020.
+- Chinyere Chinekezi on [incident playbooks](https://www.conf42.com/Incident_Management_2024_Chinyere_Chinekezi_12_incident_playbooks_response) at Conf42 Incident Management 2024.
+- Mandi Walls on [game days and chaos engineering](https://www.conf42.com/Incident_Management_2022_Mandi_Walls_game_days_chaos_engineering) at Conf42 Incident Management 2022.
+
+[Watch Yury Nino's talk](https://www.conf42.com/Chaos_Engineering_2023_Yury_Nino_documents_matter)
+
+[Watch the talk on YouTube](https://youtu.be/c8umhENDV6g).
+",talk,ce2023,talk:ce2023/Yury Nino,,Conf42,,queued,"chaos-engineering, sre, documentation, runbooks, postmortems"
+,"One bad pod owns your cluster, and PSP's replacements won't save you",Chris Nesbitt-Smith (UK Government) at Conf42 Chaos Engineering 2023 on the death of PodSecurityPolicy and why cluster-enforced policy is not real security,2023-01-27,ce2023/one-bad-pod-owns-your-cluster,,"A vanilla Debian container with one hostPath volume is enough to take over a Kubernetes cluster, no tooling required. Chris Nesbitt-Smith, a consultant with the UK Government and a Kubernetes user since 0.4, shows it live at Conf42 Chaos Engineering 2023, then walks through what replaces the deprecated PodSecurityPolicy - and finishes by arguing that none of the replacements gives you real security on their own.
+
+He warns early that he has opinions, and he is not lying. It is a fast, funny, recorded-in-a-room talk that takes you on what he calls a roller coaster: problem, solution, problem, tool, problem.
+
+## What can one bad pod actually do?
+
+PodSecurityPolicy let cluster admins limit what pods could do: run as root, open host ports, mount certain volume types. Nesbitt-Smith shows what happens when those limits are missing. On a fresh kind cluster, he starts a plain Debian pod that mounts the host's root filesystem, then puts the host's binaries on his path, symlinks in the kubelet's config and uses the kubelet's own certificates to talk to the API server.
+
+From there he can list every pod and node. The API server rightly refuses a kubectl exec from a kubelet, but that barely matters: impersonating a node, he can relabel it, pull workloads onto the node he owns, talk to the container runtime socket, cordon and drain every other node and copy their taints and tolerations onto his own. A pod on the host network is a quieter path to the same end: grab port 443 or 80 once the real ingress pod is gone and sit between your users and your apps. ""You can be kind of one bad pod away from losing absolutely everything that you own,"" he said at Conf42 Chaos Engineering 2023.
+
+## Why did PodSecurityPolicy die?
+
+PSPs existed since Kubernetes 1.0 and never left beta. They were deprecated in 1.21 and removed in 1.25. The idea was sound; the usability was not:
+
+- The policy is tied to the user who created the pod, not the workload. Nobody creates pods - deployments, stateful sets and jobs do, so the identity in play is a controller's service account.
+- Some fields do not just accept or reject; they mutate the pod, which the docs do not make clear.
+- With several overlapping policies, evaluation order is confusing and in some ways unpredictable.
+- It only applies to new pods, so a policy change can break a running workload silently until the next reschedule, when a node fails at the worst possible moment.
+
+## What replaces it?
+
+The built-in answer is Pod Security Standards with Pod Security Admission: three fixed levels. Privileged is anything goes, baseline stops the obvious attacks and most workloads should run there unchanged, and restricted is the one to aspire to. Fixed, universal levels are easy to communicate and test. The catch: they apply per namespace, via a label, with no fine-grained exemptions. One workload that cannot meet restricted drags its whole namespace down a level. His verdict on who benefits is dry: mainly vendors shipping software onto Kubernetes, who can prove it runs under restricted.
+
+For everything else there is a long list of admission tools - Kyverno, Kubewarden, OPA Gatekeeper, jsPolicy, Polaris and more - or your own webhook, which is just something that answers 200 or not 200. There is no like-for-like mapping from PSP, and he recommends refactoring tangled old policies rather than porting them. Still, he built a converter that takes an existing PSP and emits Kyverno, Kubewarden or Gatekeeper policies, and demos it in the browser, bugs and all; some mappings fail because of limits in the engines themselves.
+
+## So should you migrate at all?
+
+Here is the twist. ""Using a cluster enforced policy does not guarantee any real security,"" he says, and the cure may be worse than the disease. The vulnerabilities trending in the wild - PwnKit, Dirty Pipe, Dirty COW - are attacks admission policy would not stop. The answers, he says, ""are simple, but not necessarily easy"", and he runs out of time before giving them, leaving a list instead: seccomp, AppArmor, SELinux, kernel-level protection, eBPF, version-controlled policy as code, GitOps, testing, secure by design, zero trust, and the cultural change that has to go with it.
+
+## Who should watch
+
+Platform engineers who still have PSP-shaped holes in their mental model of Kubernetes security, and anyone who thinks an admission controller is the end of the story. The demo alone is worth showing to whoever keeps asking for cluster-admin. The ending is a tease, so budget time for the follow-up reading.
+
+## Related Conf42 talks
+
+- Ara Pulido on [policy as code with OPA Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper) at Conf42 Cloud Native 2021.
+- Reza Ramezanpour on [Kubernetes security policy design](https://www.conf42.com/Cloud_Native_2023_Reza_Ramezanpour_kubernetes_security_policy_design_top10) at Conf42 Cloud Native 2023.
+- Noaa Barki on [Kubernetes policy with OPA, Conftest and Gatekeeper](https://www.conf42.com/Cloud_Native_2022_Noaa_Barki_open_policy_agent_conftest_gatekeeper_kubernetes_policy_in_action) at Conf42 Cloud Native 2022.
+
+[Watch Chris Nesbitt-Smith's talk](https://www.conf42.com/Chaos_Engineering_2023_Chris_NesbittSmith_pod_security_policy)
+
+[Watch the talk on YouTube](https://youtu.be/bpj5bRAJ2J0).
+",talk,ce2023,talk:ce2023/Chris Nesbitt-Smith,,Conf42,,queued,"kubernetes, security, pod-security, policy-as-code, admission-control"
+,"Chaos-test the ingress controller, the data plane must keep proxying",Jintao Zhang (API7.AI) at Conf42 Chaos Engineering 2023 on using LitmusChaos to prove Apache APISIX Ingress keeps serving traffic when its controller fails,2023-01-25,ce2023/chaos-test-the-ingress-controller-not-the-proxy,,"An ingress controller has one job that matters, and Jintao Zhang knows it: ""Proxy traffic is the most important capability so I write it three times,"" he said at Conf42 Chaos Engineering 2023. Zhang, Technical Expert at API7.AI, Apache APISIX PMC member and a Kubernetes Ingress-NGINX maintainer, showed how the APISIX Ingress project used LitmusChaos to check that traffic keeps flowing when the controller itself misbehaves - and the bug it turned up.
+
+It is a compact maintainer's talk: one open-source project testing another, with a clear method you can lift for your own controllers and operators.
+
+## Where can an ingress controller break?
+
+Zhang starts with the basics. An Ingress is a deliberately simple Kubernetes resource holding routing rules. It does nothing on its own: an ingress controller watches those resources and translates them into proxy configuration. Real deployments need more than the spec offers (access limits, authentication), so controllers extend it with annotations, and every controller does it differently.
+
+Apache APISIX Ingress uses APISIX as the data plane, with nearly 100 built-in plugins, and accepts three configuration styles: plain Ingress, the Gateway API and its own CRDs. The architecture choice that makes the chaos story interesting is the separation of planes. The controller handles routing rules but carries no traffic; every client request goes through the data plane. A retry module re-syncs rules to the data plane once the control plane comes back.
+
+## Which experiments are worth running?
+
+This is the part to steal. Zhang walks the path a configuration takes: user applies Ingress, Gateway API or CRD objects, kube-apiserver authenticates and stores them in etcd, the controller watches and translates, the data plane routes client requests upstream. Then he crosses out what does not need an experiment:
+
+- If kube-apiserver fails, writes fail. Obvious, so no experiment.
+- If the data plane itself crashes or loses its network, traffic stops. Also obvious.
+- Bad configuration is already covered by end-to-end tests.
+
+What is left is the interesting question: when the ingress controller has a problem - a DNS error, a network interruption, its pod killed - can the data plane still proxy requests normally? The hypothesis follows the template: when the controller pod gets hit with fault X, the client's request still gets a normal response.
+
+His method is the standard five steps, done properly: define the system under test, choose the right experiment, establish a hypothesis, run it (in a controlled environment such as staging, with SLOs in mind), and evaluate the results against the hypothesis.
+
+## Why LitmusChaos?
+
+LitmusChaos is a CNCF incubating chaos framework for Kubernetes, declarative and extensible. Asked why he picked it, Zhang's answer is refreshingly unmarketed: it has the functions he needs and he knows it best. Experiments can be built in the ChaosCenter portal or submitted as YAML manifests, and can be scheduled. He calls out Litmus probes - pluggable checks attached to the chaos engine that decide whether an experiment passed. Results come from the built-in statistics reports; Prometheus and Grafana integration exists, but his scenario did not need it.
+
+## What did it find?
+
+The experiments built confidence that the data plane holds when the controller fails, which matters for a project with many production users. They also found a real bug: after the ingress controller pod was restarted multiple times, configuration could become invalid. The GitHub issue on the project's tracker describes `resolveGranularity: service` no longer taking effect after repeated restarts of the controller. It has been fixed.
+
+Next steps at the time: run the Litmus experiments in the APISIX Ingress project's CI and publish reference docs and examples so users can run the same chaos in their own environments.
+
+## Who should watch
+
+Maintainers of Kubernetes controllers and operators, platform teams running an ingress or gateway, and anyone who wants a worked example of scoping chaos experiments by ruling out the obvious first.
+
+## Related Conf42 talks
+
+- Wei Jin on [Apache APISIX Ingress](https://www.conf42.com/Cloud_Native_2022_Wei_Jin_apache_apisix_ingress) at Conf42 Cloud Native 2022.
+- Akram Riahi on [chaos engineering with Litmus and Jenkins](https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins) at Conf42 Chaos Engineering 2022.
+- Shane Utt on [going beyond Kubernetes Ingress with the Gateway API](https://www.conf42.com/Cloud_Native_2023_Shane_Utt_beyondkubernetes_ingress_gateway_api) at Conf42 Cloud Native 2023.
+
+[Watch Jintao Zhang's talk](https://www.conf42.com/Chaos_Engineering_2023_Jintao_Zhang_building_robust_apache_apisix_ingress_controller_litmus_chaos)
+
+[Watch the talk on YouTube](https://youtu.be/EstawZAVaVo).
+",talk,ce2023,talk:ce2023/Jintao Zhang,,Conf42,,queued,"chaos-engineering, kubernetes, ingress, litmuschaos, apache-apisix"
 ,Let's welcome the new year with DevOps!,We're so glad to see you,2023-01-23,2023-01-23-devops-first-event-of-the-year,./assets/splash/DEVOPS2023_Event_Splash.png,"#We’re so glad to see you!
 
 So… We all made it to 2023! And you’re back with us! Those are very big news and we couldn’t be any happier. Let’s not waste time then and get this show on the road, shall we?
@@ -102125,6 +102400,186 @@ Get excited for 35+ amazing [talks](https://www.conf42.com/devops2023) coming in
 … Right?
 
 Anyway, let’s not forget about our gold sponsor, [Teleport](https://www.conf42.com/teleport). We really appreciate your support, thank you!",,,,,,,,
+,Your DORA metrics lie unless the team trusts each other,"Tomasz Manugiewicz (Grand Parade / William Hill) at Conf42 Chaos Engineering 2023 on trust, not tooling, as the real lever of a DevOps transformation",2023-01-23,ce2023/devops-metrics-lie-without-trust,,"Any team can hit a great deployment frequency: split the user stories small enough and the chart goes up and to the right. Tomasz Manugiewicz, General Manager at Grand Parade / William Hill, used his Conf42 Chaos Engineering 2023 talk to argue that a DevOps transformation runs on trust between people, and that without it even your metrics turn into theatre.
+
+This is a culture talk, not a tooling one. No YAML, no pipelines, and a former Java developer explaining why ""works for me"" was never a deployment strategy.
+
+## Why is trust the bottleneck?
+
+Manugiewicz starts from the VUCA world (volatile, uncertain, complex, ambiguous) and offers his own engineering version, MUCA: market dynamics, unknown requirements, complex problems and ambiguous estimations. Then he reads the Agile Manifesto line by line and finds trust in every one. Individuals and interactions need people who trust each other; customer collaboration needs a customer you are not fighting over every feature; working software needs investors who trust you with their money.
+
+The silos are where it breaks. He remembers a competition, about 15 years ago, between developers and QA: developers shipped a jar and declared it bug-free, QA sent back a pile of Jira tickets. The same blame game repeats between the people who deploy and the people who run production. DevOps, as he puts it, is just development plus operations: a shared goal, shared responsibility and shared ways of working. The tool chain is the easy part.
+
+## What is trust made of?
+
+His model has two pillars. The cognitive one is competence: skills, knowledge, experience and the results you show. The emotional one is character: intentions, openness and honesty, together adding up to integrity. Trust is competence plus character. Engineers tend to over-invest in the first and forget that the product owner in a planning meeting may be worried, or excited, about a feature the team considers a nightmare.
+
+He applies it to the three things a transformation changes: team structure (he points to the book *Team Topologies*), process adjustments that will meet resistance from people who like the old way, and the tools review engineers love. Each needs trust in a different direction. The payoff is autonomy, the stage in the DevOps evolution model where individuals can work without manual approval from outside the team - the green button in Jira someone has to click before every release.
+
+## Where does it get built?
+
+Quoting Brené Brown, he says trust is not built in big sweeping moments but in tiny everyday ones. His two examples are the most practical part of the talk. Pair programming carries a fear of being assessed, for the senior as much as the junior, and behind it a fear of rejection. Code review raises the question every author has felt: are they reviewing my code or me? ""If we will be brave enough to show ourselves, then it helps building trust,"" Manugiewicz said at Conf42 Chaos Engineering 2023.
+
+That leads to vulnerability. In engineering, a vulnerability is a flaw to be found and fixed. In people, it means showing a weakness and not rushing to patch it. Retrospectives only work when people do that.
+
+## How do metrics get gamed?
+
+The closing argument lands hardest for anyone with a DORA dashboard. Deployment frequency and lead time for changes can be inflated by slicing work into tiny chunks. Mean time to recover can be shaved by deploying a fix behind a feature flag the client cannot see yet and stopping the clock there, before the final tests. ""Give me your metrics and I will tell you whatever you want to hear,"" as he puts it. Honest numbers need a team that trusts each other enough to show the bad ones.
+
+## Who should watch
+
+Engineering managers starting a DevOps transformation, team leads whose metrics look suspiciously good, and engineers who have been on either side of a dev-versus-QA standoff. If you want an implementation guide, look elsewhere; this is about the people the implementation depends on.
+
+## Related Conf42 talks
+
+- Christopher Harrison on [changing culture, not just tools](https://www.conf42.com/DevOps_2023_Christopher_Harrison_change_culture__not_just_tools) at Conf42 DevOps 2023.
+- Mandi Walls on [the culture challenges of DevOps](https://www.conf42.com/DevOps_2025_Mandi_Walls_culture_challenges_devops) at Conf42 DevOps 2025.
+- Julie Gunderson on [blameless postmortems and continuous learning](https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture) at Conf42 Chaos Engineering 2021.
+
+[Watch Tomasz Manugiewicz's talk](https://www.conf42.com/Chaos_Engineering_2023_Tomasz_Manugiewicz_trust_driven_development_devops_transformation_practice)
+
+[Watch the talk on YouTube](https://youtu.be/gRbhNHO0jRk).
+",talk,ce2023,talk:ce2023/Tomasz Manugiewicz,,Conf42,,queued,"devops, culture, team-trust, dora-metrics, code-review"
+,"AWS FIS terminates real instances, so bring stop conditions","Samuel Baruffi (AWS) at Conf42 Chaos Engineering 2023 on AWS Fault Injection Simulator templates, targets, stop conditions and a live instance kill",2023-01-21,ce2023/aws-fis-kills-real-instances,,"An auto scaling group with two instances sounds redundant until one of them dies during a traffic spike. Samuel Baruffi, Senior Solutions Architect at AWS, used his Conf42 Chaos Engineering 2023 talk to walk through AWS Fault Injection Simulator (FIS), the managed chaos service, and then killed one of his own two nginx instances live to show that redundant and fine are different things.
+
+It is a vendor talk about an AWS service, given by AWS, and it is a clear one: the building blocks, the safety rails and a demo that does not go perfectly, which is the point.
+
+## Why do teams struggle to run chaos on their own?
+
+Baruffi opens with how many steps hide inside one client-to-server message: the network delivers, the server validates, updates state, replies, the client validates and updates its own state. Every step can fail, and then you multiply by thousands of microservices. Traditional tests verify known conditions; they do not tell you what happens when a disk fills because log rotation was never set up.
+
+AWS, he says, collected four complaints from customers who tried chaos engineering on their own: stitching together tools and homemade scripts, needing lots of agents and libraries to start, ensuring safety, and reproducing real-world events that are rarely a single failure but several, in sequence or in parallel.
+
+## What are the building blocks?
+
+FIS has four components, defined in JSON or YAML so they can be version-controlled and code-reviewed:
+
+- **Actions**: the fault to inject, namespaced as `aws:<service>:<action>`, with parameters such as duration or the share of requests to throttle. Actions can run in parallel or in sequence (a wait action can follow a stop-instances action). Some host-level actions on EC2 go through the Systems Manager agent.
+- **Targets**: which resources get hit, by resource IDs, tags and filters, with a selection mode - all, a count, a percentage or random. His example picks exactly two running EC2 instances in us-east-1a tagged environment=test, in one VPC.
+- **Experiment templates**: actions plus targets, an IAM role, and the stop-condition alarms.
+- **Experiments**: a snapshot of a template each time it runs, with who started it, status and results.
+
+The supported faults at the time included EC2 API errors and throttling, latency injection, killing ECS containers, terminating EKS nodes, and the newer network disruption and EBS I/O pause actions.
+
+## Real faults need real guardrails
+
+The detail that matters most: faults are injected at the service control plane level. Terminate an instance in an experiment and AWS terminates the instance. There is no metric trickery, so a sloppy target filter is an outage you scheduled yourself.
+
+The safeguards are CloudWatch (or third-party) alarms wired up as stop conditions, with EventBridge telling FIS to halt and roll back. IAM decides who can start experiments, and tag policies can restrict which resources are fair game - only instances tagged as test, say. ""I highly recommend every single time you create a stop condition,"" Baruffi said at Conf42 Chaos Engineering 2023, while skipping one for the demo. The console asked him twice whether he was sure.
+
+## From one-off experiments to CI/CD
+
+His adoption path runs from one-off experiments (verify a new service, expose monitoring blind spots) to game days that rehearse a promotion day or a launch, then to automation: experiments on a recurring schedule, experiments triggered by events like an auto scaling action, and a stage in the CI/CD pipeline that runs experiments against every staging deploy. The more automated it gets, the more the stop conditions earn their keep, because nobody is watching the button.
+
+## What did the demo show?
+
+Two EC2 instances running nginx behind a load balancer, in two availability zones, with an auto scaling group at desired and minimum capacity two. Hypothesis: lose one instance under load and the application stays up. The template targets instances by tag, filters on running state and selects 50%.
+
+Under synthetic load from Lambda functions, FIS terminated one instance. The application stayed up, and the auto scaling group started a replacement, but the dashboard told the real story: more than half the requests returning HTTP 500s or failing to connect, CPU on the survivor above 60%, and response times up to a 2.6-second maximum and a 1.3-second average. His fix as the owner: more instances across three or four availability zones. Hypothesis disproved, which is the useful outcome.
+
+## Who should watch
+
+Teams on AWS that want managed chaos rather than a folder of scripts, and anyone who wants a clear mental model of templates, targets and stop conditions before touching the console. Non-AWS shops will get less from it.
+
+## Related Conf42 talks
+
+- Gunnar Grosch on [serverless chaos with AWS Fault Injection Simulator](https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator) at Conf42 Chaos Engineering 2022.
+- Mandi Walls on [game days and chaos engineering](https://www.conf42.com/Incident_Management_2022_Mandi_Walls_game_days_chaos_engineering) at Conf42 Incident Management 2022.
+- Pablo Chacin on [shifting chaos testing left with k6](https://www.conf42.com/Chaos_Engineering_2023_Pablo_Chacin_shifting_left_chaos_testing) at the same event.
+
+[Watch Samuel Baruffi's talk](https://www.conf42.com/Chaos_Engineering_2023_Samuel_Baruffi_cloud_aws_fault_injection_simulator_fis)
+
+[Watch the talk on YouTube](https://youtu.be/R23q51wkvY4).
+",talk,ce2023,talk:ce2023/Samuel Baruffi,,Conf42,,queued,"chaos-engineering, aws, fault-injection, cloudwatch, game-days"
+,Pre-aggregate your telemetry before a thousand dashboards ask,Shay Lin (Confluent) at Conf42 Chaos Engineering 2023 on serving Kafka telemetry at scale by pushing predefined aggregations through Kafka Streams,2023-01-19,ce2023/precompute-telemetry-before-the-queries-arrive,,"Chaos experiments are only as good as the metrics you read during them, and at cloud scale the metrics platform is its own reliability problem. Shay Lin, Staff Software Engineer at Confluent, used a Conf42 Chaos Engineering 2023 talk to show how Confluent stopped answering the same telemetry query over and over: it computes predefined aggregations once, with Kafka Streams, and publishes the results back through Kafka and into Apache Druid.
+
+It is a short talk, closer to an architecture sketch than a tutorial, and a useful one for anyone whose observability store is starting to sweat.
+
+## Why does telemetry need its own architecture?
+
+The abstract puts the scale up front: at Confluent, raw telemetry flows in at 5 million metrics per second. Lin starts from the SRE's view of a hypothetical global Kafka deployment, where a product manager asks to roll a feature out tomorrow and the boss asks what happens if us-west-2 goes down. Answering either needs telemetry from clients and brokers, and the questions people ask of it fall into four patterns: facts (total network bytes in the last hour), trends (CPU over seven days), diagnosis (a point-in-time value) and attribution (does the CPU trend correlate with fetch requests?).
+
+A plain data store handles the first two. Attribution pushes you to a time-series-optimised OLAP store, and the example is Druid: data streams into segments in near real time, and a query engine fetches from the right ones.
+
+## What breaks when everyone asks the same question?
+
+Segments fill up constantly. Lin compares it to a stream of water filling bottles: each has a capacity, so a full one is pushed aside and a new one starts. At millions of events per second, Lin notes, you can pile up petabyte-scale data within an hour.
+
+Meanwhile the consumers multiply: billing, SREs running continuous monitoring, and external customers who want to see their own Kafka cluster (and nobody else's). The result: repetitive queries on hot entities, rising compute and serving costs, metric definitions that must stay consistent, and more customers depending on the platform staying up. The quiet killer is the third one - billing and a customer computing the same metric two different ways.
+
+## How do pre-aggregations fix it?
+
+Raw segments still land in Druid. But instead of serving the same heavy query to every consumer, Confluent publishes predefined aggregations that everyone reuses. The pipeline is event-driven: when a segment fills, it emits a signal, and a set of Kafka Streams topologies picks it up.
+
+- A central registry holds the metric definitions, so there is one answer to what a metric means.
+- A global task manager splits the work into the smallest units, based on how many clusters to aggregate and the metric granularity in space and time.
+- A second sub-topology runs the processing with external compute.
+- The results are published to Kafka for consumers and back into Druid as aggregation segments.
+
+One detail worth stealing: the output uses OpenTelemetry, so the pipeline has to respect counter versus gauge semantics and keep state, or consumers end up with duplicated data over time.
+
+## What about the alternatives?
+
+Lin is fair about other routes. Offline roll-ups are built into some stores: Apache Pinot's Star Tree index can reduce, say, five dimensions to three in background tasks, and Druid supports custom roll-up ingestion too. Online stream processing (Flink, Kafka Streams) is the other path. The lesson from their proof of concept: ""your partition strategy should be highly coherent with how you're aggregating your data,"" Lin said at Conf42 Chaos Engineering 2023. Get that wrong and you replicate the data set through every processing step, which is slow and expensive.
+
+The closing trade-off is a curve: the more compressed the aggregate, the narrower the use cases it serves; the more dimensions you keep, the broader. Picking which aggregations to predefine is the actual design work.
+
+## Who should watch
+
+Platform and observability engineers running a metrics store that serves both internal teams and customers, and anyone weighing Druid or Pinot roll-ups against a streaming pre-aggregation layer. Chaos engineers get the framing - telemetry as the foundation of experiments - but little chaos itself.
+
+## Related Conf42 talks
+
+- Pranay Prateek on [scaling OpenTelemetry with Kafka](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pranay_Prateek_scaling_opentelemetry_kafka) at Conf42 SRE 2024.
+- Yoav Nordmann on [anomaly detection with Apache Pinot and ThirdEye](https://www.conf42.com/Cloud_Native_2023_Yoav_Nordmann_anomaly_detection_apache_pinot_thirdeye) at Conf42 Cloud Native 2023.
+- Mark Needham on [a real-time analytics dashboard with Streamlit, Pinot and Kafka](https://www.conf42.com/Python_2022_Mark_Needham_realtime_analytics_dashboard_streamlit_apache_pinot_apache_kafka) at Conf42 Python 2022.
+
+[Watch Shay Lin's talk](https://www.conf42.com/Chaos_Engineering_2023_Shay_Lin_streaming_aggregation_cloud_scale_telemetry)
+
+[Watch the talk on YouTube](https://youtu.be/4FqrMgPTA1s).
+",talk,ce2023,talk:ce2023/Shay Lin,,Conf42,,queued,"telemetry, kafka-streams, apache-druid, observability, data-platform"
+,"Chaos testing belongs in your load tests, not just in production",Pablo Chacin (Grafana Labs / K6) at Conf42 Chaos Engineering 2023 on shifting chaos testing left into k6 tests developers already write,2023-01-17,ce2023/chaos-testing-belongs-in-your-load-tests,,"Most catastrophic failures in distributed systems come from error handling code nobody tested. Pablo Chacin, Technical Lead for Chaos Engineering at Grafana Labs / K6, used his Conf42 Chaos Engineering 2023 talk to argue that chaos testing should move left, into the load and functional tests developers already run, and showed how the k6 disruptor extension injects faults straight from test code.
+
+The pitch is modest on purpose: before you break production on a Tuesday, check that your service survives the incident you already had.
+
+## Why not just do chaos in production?
+
+Chacin does not argue against production experiments. ""Nothing can substitute testing this real stuff,"" he says. His problem is the adoption bar. He lists four obstacles: experimenting in production assumes battle-tested procedures many teams do not have, the blast radius of killing instances or disrupting the network is hard to predict, results are hard to reproduce, and the tools seem built by and for SREs and DevOps engineers, so developers cannot use them on their own.
+
+Learning from real incidents has its own limits. They are stressful, unpredictable, and you do not get to choose what or when you learn. Game days help, but only for failures you can already imagine.
+
+## Does testing known faults actually help?
+
+This is the honest question at the centre of the talk: if modern systems fail in unpredictable ways, is testing predictable faults in staging just false confidence? Chacin answers with the 2014 USENIX OSDI paper by Yuan et al., *Simple Testing Can Prevent Most Critical Failures*. In that study, 92% of catastrophic failures came from incorrect handling of non-fatal errors, and in 58% of cases the fault could have been caught by simple testing of the error handling code.
+
+The study gets better (or worse, if it is your code). In 35% of cases the error handler fell into one of three patterns: it overreacted and aborted the system on a non-fatal error, it was empty or only logged, or it carried a FIXME or TODO comment. Everyone has written at least one of those this year.
+
+So chaos testing shifts the emphasis from experimentation to verification: from hunting unknown faults to making sure known ones are handled. He frames four tenets: incremental adoption, application-centric testing (faults described as latency and error rates, not infrastructure), chaos testing as code in the tools developers already use, and controlled, reproducible faults with a small blast radius. As he put it, ""You cannot be confident from flocky test"" - flaky chaos is just noise.
+
+## The Sock Shop incident, replayed in k6
+
+The demo uses the Sock Shop, a polyglot microservices e-commerce demo on Kubernetes. The invented incident: long-running queries overload the catalog database, adding up to 100 milliseconds of latency and some HTTP 500 errors. The catalog team fixes the root cause; the front end team wants to know how its own service copes.
+
+The baseline is a plain k6 load test in JavaScript against the front end: zero errors, about 50 milliseconds of latency. Then the same test gets a second scenario that calls the disruptor, which installs agents in the pods behind the catalog service and injects 100 milliseconds of extra latency plus 10% HTTP 500 responses for the duration of the test. No extra tooling, no separate pipeline: the fault lives in the test file.
+
+The result: latency up by the injected 100 milliseconds and an error rate at the front end of almost 12%. The front end was passing the catalog's errors straight through, with no retries. ""I wouldn't be surprised if we find a two to comment in the error handle code,"" Chacin said at Conf42 Chaos Engineering 2023 - the transcript garbles ""TODO"", but the joke lands.
+
+From there, the team can add retries, raise the error rate in the test and tune the fix before it turns into a retry storm.
+
+## Who should watch
+
+Developers and QA engineers who own a service but not the chaos tooling, and SRE teams trying to get product teams to care about failure handling. It is a short, clear talk with one worked example, not a tour of the disruptor's internals. If you already run k6, this is the cheapest chaos experiment you will ever set up.
+
+## Related Conf42 talks
+
+- Harsh Mishra on [shift-left chaos testing](https://www.conf42.com/DevOps_2024_Harsh_Mishra_shift_left_chaos_testing) at Conf42 DevOps 2024.
+- Hari Krishnan on [shift-left performance testing](https://www.conf42.com/Site_Reliability_Engineering_2021_Hari_Krishnan_shift_left_performance_testing) at Conf42 SRE 2021.
+- Kennedy Torkura on [fault injection](https://www.conf42.com/Chaos_Engineering_2021_Kennedy_Torkura_fault_injection) at Conf42 Chaos Engineering 2021.
+
+[Watch Pablo Chacin's talk](https://www.conf42.com/Chaos_Engineering_2023_Pablo_Chacin_shifting_left_chaos_testing)
+
+[Watch the talk on YouTube](https://youtu.be/Lxtr9h0Xkqc).
+",talk,ce2023,talk:ce2023/Pablo Chacin,,Conf42,,queued,"chaos-engineering, k6, fault-injection, testing, kubernetes"
 ,The first event of its kind - Web 3.0 2022!,"Join us for the last event of the year
 ",2022-12-15,2022-12-15-web3-the-last-event-of-the-year,./assets/splash/WEB32022_Event_Splash.png,"#Join us for the last event of the year
 
