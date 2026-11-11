@@ -2,7 +2,7 @@
 
 A talk at [Conf42 Platform Engineering 2024](https://www.conf42.com/platform2024) by [Elliott Clark](https://www.conf42.com/speaker_Elliott_Clark) (CEO @ Batteries Included). Page: https://www.conf42.com/Platform_Engineering_2024_Elliott_Clark_automation_ui_excellence
 
-Video: https://www.youtube.com/watch?v=anxo4yYWSeM
+Video: https://www.youtube.com/watch?v=7Q41zlz_8Io
 
 ## Abstract
 
