@@ -101480,6 +101480,182 @@ And last, but not least, the dessert! We’ll have a think about troubleshooting
 
 Are you in for some [chaos](https://www.conf42.com/ce2023) feast with us? All the chaos-loving little birds (and their other halves) are invited. Let them eat cake!
 ",,,,,,,,
+,"The case for testing in production, made to a sceptical boss",Vipin Jain (Metacube Software) at Conf42 Chaos Engineering 2023 on chaos testing in production as a vaccine for distributed systems,2023-02-13,ce2023/vaccinate-software-test-in-production,,"Ask most managers whether testers may run experiments on production and the answer arrives before the question ends. Vipin Jain, QA Head and Product Delivery Manager at Metacube Software, spends his Conf42 Chaos Engineering 2023 talk building the argument for yes: chaos testing as a vaccine, a small, deliberate dose of harm that leaves the system more resistant to the real thing. It is an introductory talk, aimed squarely at testers and the people who sign off on their test plans.
+
+## Why the vaccine metaphor?
+
+He wrote the original paper during the pandemic, when everyone was talking about immunity, and the metaphor holds up well. In his words at Conf42 Chaos Engineering 2023: ""like a vaccine, we inject harm into the system to build the system's immunity."" The harm is concrete: added latency, a CPU failure, a network black hole, injected to find weaknesses before they become unplanned downtime.
+
+The history is the familiar one, told briskly. Netflix built Chaos Monkey in 2010 after moving to AWS, randomly terminating instances to make sure the service survived it. The Simian Army followed in 2011 with Janitor Monkey, Conformity Monkey, Chaos Kong (drop a whole AWS region), Latency Monkey and friends. By 2020, he notes, chaos engineering had made it into the AWS Well-Architected Framework.
+
+## Five principles, with the traps called out
+
+Jain walks through the principles of chaos engineering one at a time, and the useful part is where he says how teams get them wrong:
+
+- **Build a hypothesis around steady-state behaviour.** His template is a fill-in-the-blank sentence: under these circumstances, the security team is notified. The team agrees on what goes in the blank before anyone injects anything.
+- **Vary real-world events.** Two failure modes here: variables picked because they are easy to inject rather than because they teach the most, and engineers picking variables from their own experience instead of the user's.
+- **Run experiments in production.** Staging and production differ in ways nobody predicts, so confidence built in staging is confidence in staging. He is honest that regulation or technical barriers sometimes rule this out, and adds a firm limit: ""If we know that an experiment is going to generate an undesirable effect on the production system or the outcomes, then we should not run that experiment.""
+- **Automate and run continuously.** Dependencies change underneath you, noisy neighbours saturate the network, downstream responses grow extra fields, and the engineers who knew the system leave. Only continuous experiments notice.
+- **Minimise the blast radius.** Control groups, shadow traffic, excluding high-value requests such as transactions over a hundred dollars, and the sampling and sticky sessions Netflix's chaos team used.
+
+## The known-unknowns matrix, applied to a database
+
+The section he calls his favourite maps a real scenario onto a two-by-two of things you are aware of and things you understand. Region A runs a primary database with two replicas on semi-synchronous replication; Region B holds a pseudo-primary and two pseudo-replicas.
+
+- Known known: when one replica dies, it is removed, a new one is cloned from the primary and added back.
+- Known unknown: the clone happens and the logs confirm it, but nobody knows the average time from failure to a replica back in the cluster. Minutes? A day?
+- Unknown known: two replicas dying at once has never been tried, so the time to clone both is a guess, though the pseudo-region is known to be recording every transaction.
+- Unknown unknown: lose the whole Region A cluster and nobody knows whether Region B fails over cleanly, because nobody has ever dared to try.
+
+That last box is the argument for chaos testing in one line.
+
+## Selling it to the business
+
+He closes with the benefits split by audience (fewer outages for customers, less lost revenue and fewer ruined weekends for the business, fewer incidents and a lighter on-call load for engineers) and the eight fallacies of distributed computing as a source of experiment ideas: the network is reliable, latency is zero, bandwidth is infinite, and the rest. Packet loss and latency attacks test exactly the applications that wait forever for a packet or retry too aggressively once the network comes back.
+
+## Who should watch
+
+QA engineers and test leads who need the vocabulary to pitch chaos testing to management, and anyone new to the field. Practitioners who already run game days will find the principles familiar; the database matrix is the bit worth borrowing.
+
+## Related Conf42 talks
+
+- Sakshyam Shah on [steady states and developing hypotheses](https://www.conf42.com/Chaos_Engineering_2022_Sakshyam_Shah_steady_states_developing_hypotheses).
+- Henrik Rexed on [Kubernetes chaos engineering in production](https://www.conf42.com/Site_Reliability_Engineering_2022_Henrik_Rexed_kubernetes_chaos_engineering_production).
+- Quintin Balsdon on [production support experiences](https://www.conf42.com/Chaos_Engineering_2021_Quintin_Balsdon_production_support_experiences).
+
+[Watch Vipin Jain's talk](https://www.conf42.com/Chaos_Engineering_2023_Vipin_Jain_vaccinate_your_software_immunity)
+
+[Watch the talk on YouTube](https://youtu.be/QtpeVicQy1Y).
+",talk,ce2023,talk:ce2023/Vipin Jain,,Conf42,,queued,"chaos-engineering, testing-in-production, qa, distributed-systems"
+,Gojek's A/B testing platform hit 2 million RPM by moving into a sidecar,Riteek Srivastava (Gojek Tech) at Conf42 Chaos Engineering 2023 on scaling an A/B testing platform from 100K to 2M RPM with a sidecar,2023-02-11,ce2023/ab-testing-sidecar-two-million-rpm,,"An experimentation service is one more network call in the middle of every flow it touches, so it has to be fast for everybody, including the client running two experiments next to the one running hundreds. At Conf42 Chaos Engineering 2023, Riteek Srivastava, Lead Software Engineer at Gojek Tech, tells how Litmus, Gojek's A/B testing platform, went from about 100K requests per minute in 2019 to about 2 million in 2022, and why the architecture that finally scaled was the one that pushed the work out to the clients.
+
+## What does Litmus do?
+
+Litmus does two things: experiments (A/B tests with two or more variants) and releases (a staggered rollout of the winning variant). His example is Gojek's driver allocation algorithm: instead of shipping a tweaked algorithm straight to production, you run old against new for a few weeks and let booking conversion decide.
+
+The detail that shapes the whole design is targeting rules. Experiments carry rules such as an app version newer than 3.12, a platform in Android or iOS, or a latitude/longitude inside a set of circles. Every request has to evaluate the rules of every experiment a client runs, which makes the service CPU-intensive and makes response time proportional to the number of experiments. The non-functional targets were low latency, high availability, high throughput and weak (eventual) consistency.
+
+## Why splitting reads and writes was not enough
+
+Version one was a single Litmus server cluster on a Postgres primary, serving both the portal where experimenters edit experiments and the clients asking which variant to use. The traffic was lopsided. Srivastava said at Conf42 Chaos Engineering 2023: ""The read throughput is around six to seven x larger than the write throughput."" Sharing one cluster meant heavy reads could starve writes, a single deployment touched both paths, and the primary database took everything.
+
+Version two separated write servers (portal, primary database) from read servers (clients, replica). Each side could scale and deploy on its own. Two problems remained. All clients still shared the read cluster's CPU, so a client with hundreds of experiments slowed down a client with two. And it did not scale horizontally, since every new server opened more Postgres connections until the database's maximum knocked servers over. Both architectures held up to roughly 500K throughput within the SLA.
+
+## How fast was it growing?
+
+Fast, and unevenly. Active experiments went from 178 to 739 to about 1.8K by the end of 2022, with about 1.6K active releases. Year-end peak throughput:
+
+| Year end | Peak throughput |
+|---|---|
+| 2019 | ~100K RPM |
+| 2020 | ~500K RPM |
+| 2021 | ~1.1M RPM |
+| 2022 | ~2M RPM |
+
+The distribution of experiments per client was just as skewed, and so were the expectations: a heavy client might accept a 50 ms p99, a light one has no reason to.
+
+## The sidecar: every client pays for its own rule parsing
+
+Version three runs a Litmus sidecar next to each client process. The sidecar polls the write servers every few seconds (configurable, five in his example) for that client's experiments, stores them in BadgerDB, and does the rule parsing locally. Clients never touch the database, so the platform scales horizontally; the write servers alone hold the database connections. A client with a hundred experiments gives its sidecar more resources, a client with two gives it one core or less, and neither affects the other's response time.
+
+In PACELC terms, the sidecar chooses availability over consistency during a network partition and consistency over latency otherwise, a choice the team made after surveying its clients. Because the platform team now ships code that runs on other teams' servers, every sidecar reports to central monitoring on New Relic and Grafana. The screenshot that closes the talk shows about 1.61 million RPM at a p99 of 9.52 ms.
+
+## Who should watch
+
+Engineers designing any high-read, CPU-heavy internal platform: feature flag services, config services, authorization. It is a system design story rather than a chaos engineering talk, compact, with the numbers to back each architectural step.
+
+## Related Conf42 talks
+
+- Bhavana Reddy Chadagonda on [A/B testing and experimentation](https://www.conf42.com/Kube_Native_2025_Bhavana_Reddy_Chadagonda_abtesting_experimentation_careers) at Conf42 Kube Native 2025.
+- Travis Gosselin on [deploy velocity with feature flags](https://www.conf42.com/Site_Reliability_Engineering_2022_Travis_Gosselin_unleashing_deploy_velocity_feature_flags).
+- Matthew Schillerstrom on [feature flags for reliability](https://www.conf42.com/Chaos_Engineering_2024_Matthew_Schillerstrom_feature_flags_reliability_agile_response).
+
+[Watch Riteek Srivastava's talk](https://www.conf42.com/Chaos_Engineering_2023_Riteek_Srivastava_ab_testing_platform_at_scale)
+
+[Watch the talk on YouTube](https://youtu.be/PqhRGgZMgn0).
+",talk,ce2023,talk:ce2023/Riteek Srivastava,,Conf42,,queued,"ab-testing, experimentation, system-design, scalability, sidecar"
+,60 bugs found before production by putting chaos in the build,"Ravi Bellam, Chris Ashton and Rohith Gundreddy at Conf42 Chaos Engineering 2023 on nominal and disaster chaos scenarios in CI/CD with Azure Chaos Studio",2023-02-09,ce2023/chaos-studio-faults-in-the-build-pipeline,,"Fifty-five services onboarded, 60 previously undetected bugs found and 22 critical issues kept out of production: those are the numbers behind this three-speaker talk at Conf42 Chaos Engineering 2023. Chris Ashton, Ravi Bellam and Rohith Gundreddy explain how they moved chaos engineering out of the occasional game day and into the CI/CD pipeline, using Azure Chaos Studio, and how they split their scenarios so the pipeline runs the cheap ones on every build.
+
+## Why shift chaos left at all?
+
+Chris Ashton opens with the case for doing chaos early. Injecting faults in production can be fun and is valuable, but it can also cause the outage you were trying to prevent. His advice is blunt: ""Add chaos engineering to your CI CD pipeline, test in a pre production environment."" Most teams he describes do it in the integration stage, layered on top of the stress or performance benchmarks they already run, so they can compare the baseline with and without chaos.
+
+He then tours Azure Chaos Studio, at the time of the talk in public preview: a managed service with an Azure portal UI and Azure Resource Manager APIs, role-based access control both on which resources can be targeted and on who can run which faults, and two kinds of faults. Agent-based faults run on Windows or Linux VMs (CPU, memory and disk I/O pressure, network delay, blocked IP addresses). Service-direct faults need no agent: shutting down VMs, a Cosmos DB failover, a Redis reboot, Chaos Mesh faults on AKS, and network security group rules. The neat trick is combining NSG rule faults with Azure service tags, which have a regional component, so you can cut off Cosmos DB in a single region and rehearse a regional failover.
+
+## Nominal scenarios for every build, disaster scenarios on a schedule
+
+Ravi Bellam covers how to scale adoption across hundreds of services, starting with the economics. Ravi said at Conf42 Chaos Engineering 2023: ""Our data suggests the cost of problem skyrockets as the software engineering progresses."" The organisational answer is one shared platform instead of every team building its own fault tooling, and a split of scenarios by risk:
+
+- **Nominal scenarios** are quick and low-risk: CPU, memory and disk I/O pressure, dependency disruption. They run in CI/CD as part of build qualification.
+- **Disaster scenarios** are the big ones: Azure Active Directory or DNS outages, load balancer failures, Availability Zone and data centre loss, and load-driven cascading failures. They run in staging or a sandbox, and only move towards production once teams have repeated them and recovered with confidence.
+
+The pilot picked critical services that together covered the compute, networking, storage and authentication stacks, so the standards would generalise. Telemetry before, during and after each experiment tracks whether resilience holds over time. The team also fed features back into the product, including faults for Cosmos DB failover, network security groups, Key Vault access denial and certificate rotation. At the time of the talk: 55 services onboarded and 65 more in progress, six using nominal scenarios for build qualification and two running monthly disaster validation.
+
+## What the experiments actually caught
+
+Rohith Gundreddy, an engineering manager on a key management platform, brings the concrete results. The service has a data plane on VMs, control and management planes on Service Fabric-backed VM scale sets, Cosmos DB and Azure Storage for data, a DNS-managed load balancer in front, and Azure Active Directory for auth. Each stack gets its own nominal and disaster standards, and the team also combines them, for instance load plus faults, because some failures only show under pressure.
+
+Two findings stand out. Replicating 99% CPU pressure across the fleet in pre-production surfaced operation failures: higher latency was expected because hardware constraints prevented auto-scaling, outright failures were not. And slow packet transmission between compute and storage under heavy traffic crashed the services, which then failed to recover on their own. Rohith said at Conf42 Chaos Engineering 2023 that ""these type of bugs are difficult to detect unless a real world event occurs"", and now that scenario runs continuously in CI/CD.
+
+To make it routine, the team built and released internally an Azure DevOps extension for Chaos Studio. Official builds run load, performance and nominal chaos scenarios in pre-production before they can ship, and disaster scenarios run automatically every two weeks.
+
+## Who should watch
+
+Platform and SRE leads who need to sell chaos engineering to many teams at once, and anyone on Azure wondering what Chaos Studio can disrupt. The first third is a product tour; the payoff is the nominal-versus-disaster split and the pipeline numbers.
+
+## Related Conf42 talks
+
+- John EngelKemnetz on [Azure Chaos Studio](https://www.conf42.com/Chaos_Engineering_2022_John_EngelKemnetz_azure_chaos_studio) at Conf42 Chaos Engineering 2022.
+- Akram Riahi on [chaos engineering alongside Litmus and Jenkins](https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins).
+- Vishnu Vardhan Chikoti on [utilising results from chaos experiments](https://www.conf42.com/Chaos_Engineering_2022_Vishnu_Vardhan_Chikoti_utilising_results_from_chaos_experiments).
+
+[Watch the talk](https://www.conf42.com/Chaos_Engineering_2023_Ravi_Bellam_Chris_Ashton__Rohith_Gundreddy_certificate_outages_resilient_dist)
+
+[Watch the talk on YouTube](https://youtu.be/4ZClzWwNbhM).
+",talk,ce2023,"talk:ce2023/Ravi Bellam, Chris Ashton & Rohith Gundreddy",,Conf42,,queued,"chaos-engineering, azure, ci-cd, shift-left, resilience"
+,A good chaos experiment is one you expect to pass,"Narender Gakka (AWS) at Conf42 Chaos Engineering 2023 on running chaos engineering as a program, from game day to pipeline",2023-02-07,ce2023/chaos-experiments-you-expect-to-pass,,"If you already know an experiment will break production, don't run it: go fix the bug. That is the rule Narender Gakka, Solutions Architect at AWS, puts near the start of his Conf42 Chaos Engineering 2023 talk, and the rest of it follows from there. Chaos engineering, in his framing, is a program of controlled experiments the system should tolerate, scaled across teams, and ending in automation. Randomly switching things off in prod is not on the list.
+
+## What chaos engineering isn't
+
+He opens by retiring the cartoon version: chaos engineering is not the thing that blows up production. AWS frames it with a shared responsibility model for resilience. AWS owns the resilience of the facilities, the network and the storage; you own where you put your EC2 instances, where your data lives and how you fail over. The questions he asks are the ones that keep architects up at night. What happens to your database when the Redis cache in front of it fails? Does injected latency between two microservices turn into a retry storm? Can you fail over to another Availability Zone, or another Region, inside your SLA?
+
+The reason to answer them with experiments rather than good intentions is a line AWS likes to repeat. Gakka puts it this way: ""You need mechanisms which come into play, and those mechanisms can be built using chaos engineering and the continuous resilience."" He also cites Gartner's I&O leader's guide: 40% of companies would adopt chaos engineering as part of their DevOps initiatives in 2023, and the guide puts the reduction in unplanned downtime at 20%.
+
+## Four prerequisites, and the fourth is the one people skip
+
+Before the first experiment he wants four things in place:
+
+- **Monitoring and observability.** Metrics alone are the known knowns; you need metrics, logs and traces correlated end to end (AWS X-Ray or an open source equivalent) so a CPU spike can be traced to a restarting Kubernetes node and a wall of HTTP 500s.
+- **Organisational awareness.** A small central team builds common faults and guardrails, then the development teams run experiments themselves, because they already hold the IAM permissions and know their own workloads. Executive sponsorship makes it stick.
+- **Real-world faults.** Bad deployments and expired credentials, infrastructure failures, data and state problems such as a database running out of disk, third-party dependencies like an identity provider, and the unlikely-but-possible loss of a whole Region.
+- **Remediation.** Findings that touch resilience or security should outrank new features. As Gakka said at Conf42 Chaos Engineering 2023: ""There's no point finding it, but not fixing it, right?""
+
+## What does a well-written hypothesis look like?
+
+The worked example is a payments workload on Amazon EKS across several Availability Zones, behind Route 53 and an Application Load Balancer, with Aurora and managed Kafka behind it. The experiment is a brownout: the point where clients give up waiting while the server keeps burning cycles on requests nobody will read.
+
+The steady state is a business metric, not a CPU graph: transactions per second for payments, orders per second for retail, stream starts for streaming. The hypothesis is specific enough to fail. At 300 transactions per second, with 40% of the nodes terminated, 99% of API requests should still succeed and return within 100 milliseconds; nodes should come back within five minutes and pods should be scheduled and serving traffic within eight. The experiment template adds the duration, the fault isolation boundary and the alarms that stop and roll everything back.
+
+## From a staging game day to a production canary
+
+The execution flow checks the system is healthy, checks the experiment is still valid (someone may already have fixed the bug), then builds a control group and an experiment group from synthetic resources, so a fresh cluster with the same code takes the fault while the real one keeps serving customers. Load comes first, the fault second. The tool is AWS Fault Injection Simulator, which calls AWS APIs directly, integrates Litmus Chaos and Chaos Mesh for Kubernetes faults, and reaches EC2 through Systems Manager; its stop conditions are the CloudWatch alarms that define your steady state.
+
+Production gets extra guardrails: no first runs at peak hours, tighter permissions, a changed fault isolation boundary, and a canary that moves a small slice of real traffic into the control and experiment groups before any fault is injected. Then a correction-of-error review, and finally pipelines, because faults do not wait for deploys.
+
+## Who should watch
+
+Teams who want to start chaos engineering on AWS and need the process more than the tooling: how to plan a first game day (he budgets one to three weeks of preparation), whom to invite, and how to write a hypothesis that can actually fail. It is a methodology talk with FIS as the tool, not a live demo.
+
+## Related Conf42 talks
+
+- Samuel Baruffi on [AWS Fault Injection Simulator](https://www.conf42.com/Chaos_Engineering_2023_Samuel_Baruffi_cloud_aws_fault_injection_simulator_fis) at the same event.
+- Gunnar Grosch on [chaos for serverless with AWS FIS](https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator).
+- Mandi Walls on [game days and chaos engineering](https://www.conf42.com/Incident_Management_2022_Mandi_Walls_game_days_chaos_engineering).
+
+[Watch Narender Gakka's talk](https://www.conf42.com/Chaos_Engineering_2023_Narender_Gakka_building_confidence_aws)
+
+[Watch the talk on YouTube](https://youtu.be/o7lsPRXzPII).
+",talk,ce2023,talk:ce2023/Narender Gakka,,Conf42,,queued,"chaos-engineering, aws, fault-injection, resilience, game-days"
 ,Let's welcome the new year with DevOps!,We're so glad to see you,2023-01-23,2023-01-23-devops-first-event-of-the-year,./assets/splash/DEVOPS2023_Event_Splash.png,"#We’re so glad to see you!
 
 So… We all made it to 2023! And you’re back with us! Those are very big news and we couldn’t be any happier. Let’s not waste time then and get this show on the road, shall we?
