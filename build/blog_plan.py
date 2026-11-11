@@ -688,8 +688,14 @@ def orphan(args):
         elif video_purged(r, linked):
             why[id(r)] = "video link removed"
     ids = sorted({m.group(1) for r in live if id(r) not in why for m in YOUTUBE_IN_BODY.finditer(r.get("Body") or "")})
+    if getattr(args, "offline", False):
+        ids = []   # GitHub runners: YouTube may refuse datacenter IPs - only the repo-side checks (Ref gone, link removed)
     with concurrent.futures.ThreadPoolExecutor(24) as pool:
         dead = {y for y, gone in zip(ids, pool.map(video_gone, ids)) if gone}
+    if len(dead) > max(10, len(ids) // 50):
+        # a purge is a handful of videos; hundreds "gone" at once means YouTube refused us - write nothing
+        raise SystemExit("orphan: %d of %d videos look deleted - YouTube is probably blocking the checks; nothing written"
+                         % (len(dead), len(ids)))
     for r in live:
         if id(r) not in why and any(m.group(1) in dead for m in YOUTUBE_IN_BODY.finditer(r.get("Body") or "")):
             why[id(r)] = "video deleted on YouTube"
@@ -704,7 +710,7 @@ def orphan(args):
                 by_video[yid].append((r, linked["talk"].get("Name1") or ""))
     held = []
     for yid, posts in by_video.items():
-        if len({n for _, n in posts}) < 2:
+        if getattr(args, "offline", False) or len({n for _, n in posts}) < 2:
             continue
         try:
             title = json.load(urllib.request.urlopen("https://www.youtube.com/oembed?format=json&url=https://youtu.be/" + yid, timeout=20))["title"]
@@ -747,7 +753,8 @@ def main():
     c = sub.add_parser("check")
     c.add_argument("drafts", nargs="+")
     c.add_argument("-v", "--verbose", action="store_true")
-    sub.add_parser("orphan")
+    op = sub.add_parser("orphan")
+    op.add_argument("--offline", action="store_true", help="skip the YouTube checks (CI)")
     rp = sub.add_parser("replace")
     rp.add_argument("pairs", nargs="+", help="OLD_SHORTURL=NEW_SHORTURL")
     rl = sub.add_parser("release")
