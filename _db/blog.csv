@@ -114980,6 +114980,436 @@ Platform and application engineers deciding where encryption at rest belongs in 
 
 [Watch the talk on YouTube](https://youtu.be/eC39cVFlbVk).
 ",talk,devsecops2021,talk:devsecops2021/Senthil Raja Chermapandian,,Conf42,,queued,"encryption, data-security, kubernetes, cloud-native, storage"
+,"Treat Terraform like code, and never hand-edit the state file","Eran Bibi (Firefly) at Conf42 DevSecOps 2021 on Terraform habits for immutable infrastructure: modules, remote locked state, data blocks and drift checks",2021-11-20,devsecops2021/terraform-state-drift-lessons-iac,,"Most Terraform pain comes from a handful of habits: one giant file, a state file on someone's laptop, and a colleague who fixes production in the console. At Conf42 DevSecOps 2021, Eran Bibi, co-founder and CPO of Firefly, shared his short list of lessons from writing Terraform for immutable infrastructure, ending with the one he rates most important: ""just treat your infrastructure as code, the same as any other code.""
+
+A note on scope: the abstract promises a single-tenant SaaS case study with Kubernetes and Step Functions. The talk itself is a compact list of practical tips, without that worked example. Come for the checklist, not the case study.
+
+## What does immutable mean here?
+
+The concept, as he puts it, is that ""you cannot change or alter any configuration after you are provisioning a server."" Instead of patching and reconfiguring servers over time, you replace them. You get consistency and predictability, and when something breaks you build new infrastructure rather than reasoning about how each server has diverged. The examples are Terraform, but he says most tips carry over to Pulumi and CDK.
+
+## Keep the blast radius small
+
+- **Modules.** Split the monolithic Terraform file into a root module and child modules (networking, storage) you can reuse across projects.
+- **DRY.** Minimise duplicated code, even on a project you think you will finish and forget.
+- **Logical separation.** Changes usually touch certain resources, so separate them; a typo in one module should not take down the whole application.
+- **Consistency.** Read up on naming conventions before the first project, use variables in a consistent order, and check the Terraform Registry before writing a module someone has already written.
+
+## The state file deserves respect
+
+The state file is how Terraform knows the current state of your cloud and plans the next change, so most of his tips are about protecting it:
+
+- **Use remote state** as soon as more than one person runs Terraform against the same infrastructure. He prefers an S3 bucket as the backend.
+- **Back it up.** On S3, turn on bucket versioning so you can roll back to an earlier revision if the state is damaged.
+- **Lock it.** With S3, add DynamoDB for state locking, so a second engineer gets a locked message instead of a corrupted file.
+- **Do not edit it by hand.** It is human-readable JSON, which is exactly why people try. To bring existing resources under management, use `terraform import`. ""I didn't face any situation that required a manually modification of state file,"" Eran Bibi said at Conf42 DevSecOps 2021, adding that he knows plenty of people who tried and ended up with a corrupted deployment.
+
+## Ask the cloud instead of hardcoding
+
+Data blocks work like a query language over provider APIs. His example: instead of a hardcoded list of availability zones that someone has to update by hand, query `aws_availability_zones` filtered to available ones and feed the result into a variable. Data sources also let projects share information with each other.
+
+## Drift will happen anyway
+
+Once you commit to infrastructure as code, every change has to go through the pipeline, and you should put guardrails in place so nobody can alter infrastructure directly in the console, CLI or API. Even with education and guardrails, though, drift happens: a manual change, or a third-party tool such as a CSPM creating resources on its own. So run tooling that continuously compares your state and HCL against what is actually deployed.
+
+## Give IaC the full CI treatment
+
+His closing tip is the one that ties the rest together. Whatever your application code gets in CI (reviews, static analysis, linters, scanners) your Terraform should get too. He names Terrascan and Checkov for security scanning and Infracost for cost projections, plus proper peer review on every pull request, something teams tend to be looser about for infrastructure. In his experience, once the team started treating IaC as just more code, quality improved steadily.
+
+## Who should watch
+
+Engineers moving from a first Terraform project to a shared one, and team leads who want a short checklist to hand out. Seasoned Terraform users will know most of it; the talk runs well under half an hour.
+
+## Related Conf42 talks
+
+- Hila Fish on [Terraform best practices](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices) at Conf42 Cloud Native 2022.
+- Naor Paz on [ghost assets and infrastructure drift](https://www.conf42.com/Cloud_Native_2022_Naor_Paz_ghost_assets_infrastructure_drift) at Conf42 Cloud Native 2022.
+- Dmytro Prekrasnyi on [managing multiple Terraform projects](https://www.conf42.com/DevOps_2024_Dmytro_Prekrasnyi_multiple_terraform_projects) at Conf42 DevOps 2024.
+
+[Watch Eran Bibi's talk](https://www.conf42.com/DevSecOps_2021_Eran_Bibi_Writing_Thousands_of_Lines_of_IaC)
+
+[Watch the talk on YouTube](https://youtu.be/29Sbt3Jg2Hk).
+",talk,devsecops2021,talk:devsecops2021/Eran Bibi,,Conf42,,queued,"terraform, infrastructure-as-code, immutable-infrastructure, drift, devsecops"
+,"Start DevSecOps by scanning your binaries, not your source code","Sven Ruppert (JFrog) at Conf42 DevSecOps 2021 on SAST-first quick wins after SolarWinds, and why build info beats a bare SBOM",2021-11-18,devsecops2021/devsecops-quick-wins-scan-binaries-first,,"If you are starting security from zero, the quickest win is scanning the binaries you already depend on for known vulnerabilities. That is the answer Sven Ruppert, Developer Advocate at JFrog, gave at Conf42 DevSecOps 2021 to the question he says he gets at every conference: where are the low-hanging fruits? He also argued that build info, the full record of how a binary was made, is a better weapon than the SBOM the US executive order on cybersecurity asks for.
+
+The talk was recorded on the second day of a hiking trip in the German woods, which makes it the only supply chain security talk where the speaker packs up his tent at the end.
+
+## What did SolarWinds change?
+
+His starting point is the SolarWinds attack. SolarWinds, with roughly 300,000 customers, sells network management software that runs with administrative rights. The attackers did not look for a hole in that product; they broke into the company's CI environment and made it inject compromised code into every build. The signed, legitimate-looking update then went out through automatic updates, and around 15,000 to 20,000 customers installed it. The malware stayed quiet for two weeks, then started pulling other binaries, so every infection looked different and cleaning up often meant rebuilding the infrastructure from scratch.
+
+The new lesson: you have to protect yourself against consuming compromised components and against distributing them. ""Did you ever check if your compiler is not compromised?"" Sven Ruppert asked at Conf42 DevSecOps 2021. The same goes for CI agents, their firewalls and their own known vulnerabilities.
+
+## Which of SAST, DAST, IAST and RASP comes first?
+
+He walks through the four families:
+
+- **SAST** scans every component statically, from the first line of code, across your libraries, operating system, compiler, tooling and CI. It misses runtime context, but it is fast and robust. One caveat: source code scanning still leans on pattern matching and machine learning, and ""it's too early to just trust the scan of your source code."" Binary scanning, by contrast, works on known fingerprints.
+- **DAST** attacks a running system from outside using common vulnerability patterns. It needs something close to production, takes a long time, cannot see inside, and is slow to pick up new attack vectors.
+- **IAST** combines both into something like a security debugger, but needs skilled people to drive the interactive part.
+- **RASP** is an agent in production that monitors data flows and can shut the system down during an attack. Good as an add-on, a bad place to start, and dangerous if teams start believing it will catch everything.
+
+His order: SAST first, then DAST, then IAST if you have the people, then RASP. Two reasons. Known vulnerabilities vastly outnumber unknown ones, so fight those first, using a vulnerability database merged from several sources, since any single one is a subset. And across the whole stack (application, OS, Kubernetes, virtualisation), he estimates that 99% of what you run is binaries, not code you wrote. Scan what you ship, in the IDE as soon as a dependency is added.
+
+## Why build info instead of a bare SBOM?
+
+The executive order requires an SBOM for software the US government creates, operates or uses: every component with version, origin and fingerprint. Because so many companies sell into that chain directly or indirectly, he expects it to reach almost everyone, including European vendors like his employer's customers.
+
+His point is that an SBOM is a subset of build info, which also records the timestamps, operating system and patch level, agent name, compiler and library versions used to produce a binary. That context is what you need for a postmortem on a compromised build. And because build info is immutable, you can keep correlating it with fresh vulnerability data. ""So you don't need to scan production, you just need to hold build info,"" Sven Ruppert said at Conf42 DevSecOps 2021.
+
+To make that work you need one place that stores every binary across tech layers (Docker images, Maven dependencies, Debian packages) so you can follow the full impact graph: this JAR is in this web archive, in this Docker layer, in this image, in this Helm chart, running in production. Build info can be generated with free tools, which he suggests open source maintainers start doing now.
+
+## Who should watch
+
+Teams that have no security tooling yet and need a defensible first step, and anyone who needs a plain-language walkthrough of SolarWinds and the executive order. Experienced AppSec engineers will know the taxonomy already.
+
+## Related Conf42 talks
+
+- Sven Ruppert on [supply chain security for open source projects](https://www.conf42.com/Cloud_Native_2023_Sven_Ruppert_supply_chain_security_opensource_projects) at Conf42 Cloud Native 2023.
+- Ciara Carey on [making SBOMs actionable](https://www.conf42.com/DevSecOps_2022_Ciara_Carey_software_bill_of_materials_sboms_actionable) at Conf42 DevSecOps 2022.
+- Marek Najmajer and Aleksander Baranowski on [risk assessment beyond the SBOM](https://www.conf42.com/DevSecOps_2023_Marek_Najmajer_Aleksander_Baranowski_beyond_sbom_risk_assessment) at Conf42 DevSecOps 2023.
+
+[Watch Sven Ruppert's talk](https://www.conf42.com/DevSecOps_2021_Sven_Ruppert_Quick_Wins_DevSecOps)
+
+[Watch the talk on YouTube](https://youtu.be/1tX-fVXCnGQ).
+",talk,devsecops2021,talk:devsecops2021/Sven Ruppert,,Conf42,,queued,"devsecops, supply-chain-security, sbom, vulnerability-scanning, ci-cd"
+,"Kubernetes only protects itself, so scan the container in four places","Rob Richardson (Cyral) at Conf42 DevSecOps 2021 on where to put container scanning (pipeline, registry, cluster, admission webhook) and a pragmatic fail policy",2021-11-16,devsecops2021/container-scanning-four-places-to-scan,,"Kubernetes keeps Kubernetes running; what happens inside your container is your problem. At Conf42 DevSecOps 2021, Rob Richardson, Developer Advocate at Cyral, Microsoft MVP and Docker Captain, explained what container scanning actually does, the four points where you can run it, and why ""fail on any CVE"" is a policy most teams will regret. The demo wires the open source scanner Anchore into a scripted build and into GitHub Actions.
+
+## Doesn't Kubernetes handle this?
+
+No. The control plane microservices exist to keep the cluster alive and do nothing for the process in your pod. Once an attacker pops one container, every other container is reachable over the network by default, in Docker and in Kubernetes alike. ""Namespaces are not a security boundary, they're an organizational boundary,"" Rob Richardson said at Conf42 DevSecOps 2021. If you want to restrict east-west traffic, that is a service mesh's job.
+
+A container looks a lot like a Linux machine, with a file system, users, processes and ports, and the usual hardening still applies: do not run as root, remove extra users and unused software, keep packages current. What changes is how. Containers are ephemeral, immutable and deterministic, so ""we don't run patch Tuesday inside of a container""; you build a new image and replace the old one. A compromised container is evicted, not scrubbed, though you still chase whatever it pivoted to.
+
+## What does a scanner do?
+
+Two things. It inventories the image (OS packages plus every app ecosystem inside it, including the Node libraries your back-end image ships for the front end), then compares that list of names and versions against a vulnerability database. Because images are deterministic, the inventory stays valid for that image hash forever. You do not need to rescan; you re-compare the saved inventory against the latest vulnerability data and find out which running images became vulnerable overnight.
+
+Container scanning sits alongside the other pipeline checks he runs through quickly: unit and integration tests, static analysis, license analysis (does that GPL library make your system open source?), then a policy step that weighs all the results against the organisation's risk tolerance. His slides on robrich.org link several tools per category.
+
+## Where should you scan?
+
+Scanning is slow, so placement matters. If your build takes ten minutes and the scan takes ten, either accept twenty or move the scan downstream.
+
+1. **In the pipeline**, after the image is built and before it is pushed, so vulnerable images never reach the registry.
+2. **In the registry**, periodically, to catch images that were pulled from Docker Hub and pushed without going through your build.
+3. **In the cluster**, too late in theory, but the only place to catch pods that reference public registries directly.
+4. **In a Kubernetes validating admission webhook**, the last gate before a pod starts. Mutating webhooks run in series and can rewrite the YAML; validating webhooks run in parallel and each one says yes or no. An image you have seen before can be checked against stored results in time; a brand-new one cannot be fully scanned in a webhook's time budget, so you reject it and let the pod retry once the scan finishes.
+
+Which ones you need depends on what flows where. If every image, including third-party ones, is rebuilt in your pipeline, the pipeline may be enough.
+
+## Should one CVE fail the build?
+
+His pragmatic answer is usually no. A known vulnerability with no fix does not mean you stop shipping, and the new image may still be safer than what runs in production. One middle ground he suggests: block high-severity findings and anything that already has a patch. The same logic applies to purging the registry: remove vulnerable images that are not in use, but do not delete the one production needs to restart a pod.
+
+## The Anchore demo
+
+Anchore is free, open source and, in his words, ""definitely not fast,"" with docs that are not great either. It starts from a Docker Compose file that runs the same image several times with different arguments, which he notes looks more like a distributed monolith than microservices. The docs promise a feed sync of about ten minutes; his ran from the 20th to the 23rd.
+
+The scripted build runs image add, image wait, then exports vulnerabilities and the package inventory to JSON, fails on findings, saves both files tagged with the image hash, and only then pushes. The GitHub Actions version skips the feed sync entirely, uploads the reports as build artifacts on every run, and exposes a fail-build flag he could not get to work. One finding worth knowing: Anchore reads package manifests, so a JavaScript file dropped straight into a public folder went unnoticed.
+
+## Who should watch
+
+Developers and platform engineers adding scanning to an existing Docker and Kubernetes pipeline, and anyone writing the policy for what a scan failure means.
+
+## Related Conf42 talks
+
+- Brian Vermeer on [breaking into containers](https://www.conf42.com/Cloud_Native_2021_Brian_Vermeer_containers_breaking_in) at Conf42 Cloud Native 2021.
+- Adrian Gonzalez on [container security](https://www.conf42.com/DevSecOps_2022_Adrian_Gonzalez_contain_security_containers) at Conf42 DevSecOps 2022.
+- Chris Nesbitt-Smith on [pod security policy](https://www.conf42.com/Chaos_Engineering_2023_Chris_NesbittSmith_pod_security_policy) at Conf42 Chaos Engineering 2023.
+
+[Watch Rob Richardson's talk](https://www.conf42.com/DevSecOps_2021_Rob_Richardson_container_scanning_run_fast_stay_safe)
+
+[Watch the talk on YouTube](https://youtu.be/vXrWdjMpccI).
+",talk,devsecops2021,talk:devsecops2021/Rob Richardson,,Conf42,,queued,"containers, container-scanning, kubernetes, ci-cd, vulnerability-management"
+,"A TACO gives security, compliance and devs one language for pipelines","Peter Maddison (Xodiac) at Conf42 DevSecOps 2021 on TACO, a control model that turns regulated-bank governance into automated pipeline checks",2021-11-14,devsecops2021/taco-common-language-for-pipeline-governance,,"In a bank, the thing slowing your delivery down is rarely the tooling; it is five departments using five vocabularies for the word safe. At Conf42 DevSecOps 2021, Peter Maddison, Managing Partner at Xodiac, presented TACO (Traceability, Access, Compliance, Operations), a set of pipeline controls he has used at several banks to give architecture, security, compliance and developers a shared definition of a good pipeline, and then automate it.
+
+This is a people-and-process talk. There is no demo, and the main artefact is a spreadsheet of controls, which he offers to send to anyone who fills in his feedback form.
+
+## Why do DevSecOps efforts stall?
+
+His opening claim, backed by McKinsey and Boston Consulting Group research on failed transformations, is that efforts fail from a lack of clarity, not a lack of tools. Developers, testing, operations, security, compliance and architecture all want a safe delivery system, and all describe it differently. ""You can have the best security team and the best delivery team and still fail at being able to deliver securely,"" Peter Maddison said at Conf42 DevSecOps 2021.
+
+The symptoms will be familiar to anyone who has worked in a regulated shop. A delivery team asks which standard applies and gets pointed at a 300-page book that references 200 more. A technical review board leads to an architecture review board, and a decision on whether you may even try something takes three, six, nine or twelve months. His goal for security is to move ""from this idea of being the department of no to the department of yes.""
+
+## Controls belong all along the pipe, not at the end
+
+Using a generic pipeline from an IT Revolution white paper (source repository, build, dependency management, package, artifact repository, non-production and production deploy), he argues that controls only at the production gate cannot tell you how secure anything is. Linting and SCA at the repository, open source scanning in dependency management, SAST and DAST through the build: each stage feeds information back to the team.
+
+Small batches matter for controls too. Peer review is a good control only if the change is small; a developer who submits every two weeks hands reviewers a few thousand lines and gets a rubber stamp.
+
+Automated pipelines also make governance visible. At one bank his team started with the Hygieia dashboard, found that keeping it in step with every upgraded tool was a job in itself, and switched to pulling logs from each tool into their own dashboards. Those showed deployment frequency going from once every six months to once a month within six months, a number that helped adoption more than any audit report.
+
+## What goes in the TACO?
+
+The four groups, each with its own short list of controls:
+
+- **Traceability**, identify what happens in the pipe: chain of custody (he has tagged everything back to a Jira ticket), test results visible to all, deployed version tracked, every change recorded.
+- **Access**, secure the delivery process: source code managed, creator tracked and code signed, build once and deploy many with immutable artifacts, deployments by pipelines only.
+- **Compliance**, validate the payload: peer review, code scanning, artifact scanning, data management.
+- **Operations**, record and monitor: validate the target, validate quality, check it works, watch it live.
+
+The model maps onto existing compliance frameworks as a straw man the organisation can adapt. His spreadsheet records, for every control, why it exists, what the control is, where its evidence is stored, what happens on pass and on fail, and who owns it. When a control fails, the build breaks and the result goes back to the team. He points to Capital One's published pipeline gates and Nationwide's lean controls, where control tickets land in the delivery team's backlog, as similar real-world sets.
+
+## The paved road is an invitation
+
+A standard pipeline with TACO built in becomes the easy button for teams that are struggling. Faster teams get the guidelines instead and can build their own, as long as the controls are there. In a company with 20,000 developers and every version of every tool, he notes, nobody reaches uniform compliance, so frameworks have to bend.
+
+His advice for getting started: it is not about keeping audit off your back, start with one team or one value stream, and engage leaders on the conversation rather than the tooling. A new scanner that floods teams with false positives and never feeds back into their work adds reports, not safety. ""Safety is about behavior, not just tools,"" Peter Maddison said at Conf42 DevSecOps 2021, adding that teams need to be able to admit mistakes without 300 approvals.
+
+## Who should watch
+
+Engineering leaders, platform teams and security people in banks, insurers or anywhere with an audit function, especially if you are the one translating regulation into pipeline steps. Hands-on engineers looking for tool configs can skip it.
+
+## Related Conf42 talks
+
+- Darren Richardson on [threat modelling CI/CD environments](https://www.conf42.com/DevSecOps_2022_Darren_Richardson_threat_modelling_cicd_environments) at Conf42 DevSecOps 2022.
+- Chris Nesbitt-Smith on [policy as versioned code](https://www.conf42.com/Incident_Management_2022_Chris_NesbittSmith_policy_as_versioned_code) at Conf42 Incident Management 2022.
+- Matt Jarvis on [continuous security in pipelines](https://www.conf42.com/Cloud_Native_2021_Matt_Jarvis_conunuous_security_pipelines) at Conf42 Cloud Native 2021.
+
+[Watch Peter Maddison's talk](https://www.conf42.com/DevSecOps_2021_Peter_Maddison_securing_your_pipes_TACO)
+
+[Watch the talk on YouTube](https://youtu.be/fAZy8Y5z1ec).
+",talk,devsecops2021,talk:devsecops2021/Peter Maddison,,Conf42,,queued,"devsecops, governance, compliance, ci-cd, regulated-industries"
+,Let a script read,Christopher Van Der Made (Cisco) at Conf42 DevSecOps 2021 on automating threat hunting by turning tweets and vendor blogs into enriched cases,2021-11-12,devsecops2021/threat-intel-from-twitter-to-casebook,,"There is more threat intelligence published every day than any security operations centre can read. At Conf42 DevSecOps 2021, Christopher Van Der Made, Developer Advocate for security at Cisco, showed Python scripts that pull indicators out of #opendir tweets and research blogs, check them against your own environment through the Cisco SecureX APIs, and only alert a human, at high priority, when a machine in your network actually touched one.
+
+The tooling is Cisco's, and he says so up front, but the pattern ports to any platform with an enrichment API.
+
+## Why automate the hunt?
+
+He starts with the asymmetry. Attackers ""can do a million attempts to hack you, but they only need one to succeed,"" Christopher Van Der Made said at Conf42 DevSecOps 2021. Defenders have to stop all of them, with analysts who are scarce and expensive. After five years as a consulting systems engineer, he says, he met few customers with a truly well-staffed SOC.
+
+Threat hunting, in his framing, is proactive: form a hypothesis (say, a new malware campaign is hitting us), investigate its tools and techniques, then enrich and test it against your own data and global intelligence. That last step is the one machines are good at. He cites the Hunting Maturity Model from Sqrrl's threat hunting framework, where level 0 relies on automated alerts and little data collection and level 4 automates most of the successful analysis, and argues you can borrow level 4 habits without the full governance programme.
+
+## The pyramid of pain decides what to automate
+
+The pyramid of pain ranks indicators by how much it hurts an attacker when you find them. File hashes are trivial to change, which is why polymorphic malware exists; IP addresses and domain names are cheap too. Network and host artefacts start to annoy, tools more so, and tactics, techniques and procedures hurt most. His split: automate collection and blocking for the bottom four layers, and hand analysts bite-sized cases so they can spend their time on the top two.
+
+## How SecureX does the plumbing
+
+SecureX, which comes included with Cisco security products, is an aggregation layer, not a SIEM. ""We don't gather data. We pull data when we need it, and we push data when we need it,"" Christopher Van Der Made said at Conf42 DevSecOps 2021. It queries local telemetry from products such as AMP and firewalls and global intelligence from Talos, and can push response actions like blocks.
+
+Everything is described in CTIM, the Cisco Threat Intelligence Model: observables (domains, IPs, hashes), judgements and verdicts about them, and sightings. A target sighting is the one that matters, meaning a device in your organisation contacted the observable. The APIs follow the OpenAPI spec with OAuth2, and there are three ways in: the raw APIs, a low-to-no-code orchestrator, and relay modules for deeper integrations.
+
+## The demo: #opendir to Webex
+
+The first script watches the #opendir hashtag, where researchers post fresh malicious domains and IPs. On each run it fetches only tweets newer than the last seen ID, cleans them, sends the text to the Inspect API, which extracts observables (even defanged IPs) as CTIM, then enriches them. Every tweet with observables becomes a case in Casebook and a Webex Teams message; when there are target sightings, both get a high-priority tag. He tweeted a known-malicious domain before the session, and the live run picked it up and flagged it high priority because his demo environment had contacted that domain earlier.
+
+The second script does the same for RSS feeds from Talos, Fortinet's FortiGuard and Palo Alto Networks' Unit 42, using the Python feedparser module and saved feed metadata so posts are not imported twice. It matters even for Cisco customers, he notes, because a blog about a zero-day can reveal a connection your product logged weeks before the block existed. A third outline routes MSSP events into ServiceNow, and closing the ticket triggers responses in SecureX. All the code is on his GitHub.
+
+## Who should watch
+
+SOC engineers and threat hunters who want a concrete starting point for automated enrichment, and anyone curious how indicator feeds become tickets. If you do not run Cisco gear, watch for the loop, not the product; he lists alternatives including CrowdStrike Falcon, Cortex XDR and TheHive.
+
+## Related Conf42 talks
+
+- Christopher Haller on [Atomic Red Team and emulating threat actors](https://www.conf42.com/Incident_Management_2023_Christopher_Haller_atomic_red_team_threat_actors) at Conf42 Incident Management 2023.
+- Kennedy Torkura on [threat-informed defense](https://www.conf42.com/Cloud_Native_2024_Kennedy_Torkura_threat_informed_defense) at Conf42 Cloud Native 2024.
+- Nader Zaveri and Brandan Schondorfer on [cloud metadata abuse by threat actors](https://www.conf42.com/Cloud_Native_2023_Nader_Zaveri_Brandan_Schondorfer_cloud_metadata_abuse_threat_actors) at Conf42 Cloud Native 2023.
+
+[Watch Christopher Van Der Made's talk](https://www.conf42.com/DevSecOps_2021_Christopher_Van_Der_Made_automate_threat_hunting_workflows)
+
+[Watch the talk on YouTube](https://youtu.be/NJOYKX4gAUg).
+",talk,devsecops2021,talk:devsecops2021/Christopher Van Der Made,,Conf42,,queued,"threat-hunting, threat-intelligence, soc-automation, python, security-apis"
+,"One operator, four secret stores, and developers who never see the value",Jhonnatan Gil Chaves (AppGate) at Conf42 DevSecOps 2021 on syncing cloud and Vault secrets into Kubernetes with External Secrets Operator,2021-11-10,devsecops2021/external-secrets-operator-vault-to-pod,,"Every cloud has its own secret store, and Kubernetes has its own Secret object, and the glue between them is where passwords end up in Git. At Conf42 DevSecOps 2021, Jhonnatan Gil Chaves, DevOps Engineer at AppGate, showed how the External Secrets Operator pulls secrets from AWS, Azure, Google Cloud or HashiCorp Vault into a cluster, and how that lets the security team own the values while developers only ever reference a name.
+
+It is an introductory talk with a live demo, aimed at teams that have Kubernetes running and secrets scattered across providers.
+
+## Which secret stores does it cover?
+
+He starts with a tour of the four backends most teams will meet:
+
+- **AWS Systems Manager Parameter Store**: hierarchical storage for configuration and secrets, stored as plain text or encrypted with a key managed in AWS, readable from Lambda, EC2 or a cluster through IAM users and roles. Read-only access for the application, write access for the security team.
+- **Azure Key Vault**: vaults for software- and HSM-backed keys, secrets and certificates, plus managed HSM pools for HSM-backed keys only, with access controlled by Azure RBAC.
+- **Google Cloud Secret Manager**: a central place and single source of truth for API keys, passwords and certificates, with audit across Google Cloud.
+- **HashiCorp Vault**: a unified interface to any secret, encrypted before it hits storage, with an audit log, running on premises or in the cloud. He suggests a separate cluster just for Vault, owned by the security team, with dev, staging and production kept apart.
+
+The common thread across all four is granular access: the security team updates the secret, the application reads it, and nobody in between needs to.
+
+## Where does Kubernetes fit?
+
+A Kubernetes Secret keeps sensitive data out of the pod spec and the container image, and reaches the container as an environment variable, a file or a mounted path, depending on how the application was built. What Kubernetes does not do is fetch that value from your cloud's store. That is the job of the External Secrets Operator: an operator, following the Kubernetes control loop, that reads from the external API and writes the value into a native Secret.
+
+The architecture is three steps. Define the secret in your provider, describe in YAML where to fetch it from, then consume the resulting Secret in your workload.
+
+## What does the demo show?
+
+The live part uses Vault as the backend:
+
+1. Create a secret in Vault.
+2. Add the external-secrets Helm repository and install the chart into its own `external-secrets` namespace.
+3. Create a Kubernetes Secret holding the Vault token, and a SecretStore that points at the Vault server and path and authenticates with that token.
+4. Apply an ExternalSecret that references the store, fetches one property from the Vault secret and writes it into a new Kubernetes Secret.
+5. Deploy an nginx pod that reads the value through `secretKeyRef` into an environment variable, then confirm with `kubectl describe` that it arrived.
+
+He splits the YAML deliberately. The token file belongs to the security team, the SecretStore configuration to operations, and developers only reference the synced Secret in their deployment. Developers and IT never learn the database password, as Jhonnatan Gil Chaves said at Conf42 DevSecOps 2021: ""Just the secure team and the application. No more.""
+
+One caveat for anyone copying the demo: the Vault token used is the root one, which is fine on a laptop and a bad idea anywhere else. In production you would give the operator a scoped auth method and policy.
+
+## Who should watch
+
+Platform and DevOps engineers new to Kubernetes secrets who want to see the External Secrets Operator wired up end to end in under half an hour. If you already run it across clusters, you will not find much new here.
+
+## Related Conf42 talks
+
+- Michael Levan on [Kubernetes secret management with Vault](https://www.conf42.com/Cloud_Native_2023_Michael_Levan_kubernetes_secret_management_vault) at Conf42 Cloud Native 2023.
+- Alex Soto on [Kubernetes secrets](https://www.conf42.com/DevSecOps_2023_Alex_Soto_kubernetes_secrets_secret) at Conf42 DevSecOps 2023.
+- Gianluca Mardente on [scaling secrets in Kubernetes](https://www.conf42.com/Cloud_Native_2024_Gianluca_Mardente_scaling_secrets_kubernetes) at Conf42 Cloud Native 2024.
+
+[Watch Jhonnatan Gil Chaves's talk](https://www.conf42.com/DevSecOps_2021_Jhonnatan_Gil_Chaves_secrets_cloud_kuberentes)
+
+[Watch the talk on YouTube](https://youtu.be/qfUbp7uJqWw).
+",talk,devsecops2021,talk:devsecops2021/Jhonnatan Gil Chaves,,Conf42,,queued,"kubernetes, secrets-management, hashicorp-vault, external-secrets, devsecops"
+,"PIACERE, an EU-funded plan to make DevSecOps one pipeline","Radoslaw Piliszek (7bulls.com) at Conf42 DevSecOps 2021 on PIACERE, a Horizon 2020 framework that models, verifies, sandboxes and deploys IaC",2021-11-06,devsecops2021/piacere-eu-devsecops-framework-blueprint,,"DevSecOps has no complete standard, so a consortium of twelve European organisations decided to build one. At Conf42 DevSecOps 2021, Radoslaw Piliszek, IT systems architect at 7bulls.com, presented PIACERE, a Horizon 2020 research project that wants to take infrastructure from a cloud-agnostic model to verified, sandbox-tested, monitored deployments in a single framework.
+
+Be clear on the scope: this is an architecture tour of a project one year into a three-year run, not a demo. He says so himself. ""So we are presenting how we are thinking about it, but not how it works already,"" Radoslaw Piliszek said at Conf42 DevSecOps 2021.
+
+## What is PIACERE?
+
+The name stands for Programming trustworthy Infrastructure As Code in a sEcuRE framework. The consortium spans academia, business and government, is led by Tecnalia from Spain, and runs from December 2020 to November 2023. 7bulls.com, a certified research and development centre in Poland and France, owns the integration work and the Canary Sandbox Environment. The talk was prepared with his colleague Paweł Skrzypek.
+
+The case for it is the usual DevSecOps one, sharpened for software-defined infrastructure: frequent builds and deploys widen the attack surface, mixed on-premises, edge and multicloud estates add risk, and companies still struggle to bolt security onto DevOps. He acknowledges the XKCD comic about competing standards multiplying, and answers it by saying this end-to-end piece has not been done yet.
+
+## Why snowflakes are the enemy
+
+The goal he dwells on is killing snowflake servers: hand-tuned machines built for one purpose, cared for by an admin who has since left, and drifting quietly away from every standard you set. Anything you are not monitoring can hurt your security.
+
+His fix is GitOps with teeth. A single repository is the source of truth, merge requests are the approval gate, and repository permissions are the access control, borrowing the desired-state model from Kubernetes. ""The best way that we have as a humanity developed so far is the usage of version control systems,"" Radoslaw Piliszek said at Conf42 DevSecOps 2021, and he calls this accountability the one point to take away if you take nothing else. Subversion users are welcome, he adds, since the principle is what counts.
+
+## How the pieces fit together
+
+The design-time half:
+
+- **DOML**, the DevSecOps Modelling Language, describes applications and infrastructure, including security rules, at an abstract, environment-agnostic layer and a concrete layer. You can still reach for a provider-specific feature, at the cost of portability for that part. Modelling tools live in a web IDE built on Eclipse Theia.
+- **The infrastructure code generator** turns DOML into runnable IaC, starting with Terraform and Ansible, rather than replacing those tools.
+- **The Verification Tool** statically checks both the model and the generated IaC for correctness, known vulnerabilities and security best practice.
+
+The runtime half:
+
+- **A runtime controller** based on BPMN drives the deployment workflow once a verified change lands in the repository.
+- **The IaC Executor Manager** runs Ansible and Terraform, understands their state and output, handles reconfiguration and scaling, and is the only component that pulls credentials, for example from HashiCorp Vault.
+- **The Canary Sandbox Environment** has a provisioner for opinionated, minimal OpenStack and Kubernetes environments, plus a mocked-cloud tool for checking how IaC behaves against fake provider APIs without calling AWS. Static analysis misses things; dynamic tests get closer to production behaviour.
+- **The Infrastructural Elements Catalogue** stores provider offers, what was deployed where, and historic performance and security metrics.
+- **The Infrastructure Advisor** deploys monitoring agents during the IEM run, self-heals small discrepancies, and feeds a machine-learning optimiser that trades off cost, performance and availability.
+
+## Is it worth your time?
+
+If you design internal platforms, the talk is a useful checklist of the stages a full DevSecOps flow needs: model, generate, verify statically, test dynamically in a sandbox, deploy with scoped credentials, monitor and optimise. If you want working code and benchmarks, this is the wrong talk; the project was a year old and the diagrams were the deliverable.
+
+## Related Conf42 talks
+
+- Paweł Skrzypek and Alicja Reniewicz of 7bulls.com on [autonomous multicloud serverless deployment](https://www.conf42.com/Cloud_Native_2021_Pawe_Skrzypek_Alicja_Reniewicz_autonomous_multicloud_serverless_deployment) at Conf42 Cloud Native 2021.
+- Jim Sheldon on [Terraform, GitOps and Kubernetes](https://www.conf42.com/Cloud_Native_2022_Jim_Sheldon_terraform_gitops_kubernetes_manage_infrastructure_aac) at Conf42 Cloud Native 2022.
+- Ara Pulido on [policy as code with OPA Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper) at Conf42 Cloud Native 2021.
+
+[Watch Radoslaw Piliszek's talk](https://www.conf42.com/DevSecOps_2021_Radoslaw_Piliszek_Piacere_DevSecOps_automated)
+
+[Watch the talk on YouTube](https://youtu.be/upKbmSiJOk4).
+",talk,devsecops2021,talk:devsecops2021/Radoslaw Piliszek,,Conf42,,queued,"devsecops, infrastructure-as-code, multicloud, gitops, research"
+,SAST sees three apps where your serverless system has one,"Tal Melamed (Contrast Security) at Conf42 DevSecOps 2021 on why SAST, DAST and IAST miss serverless flows, and testing from inside the cloud instead",2021-11-04,devsecops2021/serverless-security-testing-needs-the-cloud,,"The classic application security toolbox was built for an HTTP request going in and a response coming out, and serverless apps mostly do neither. At Conf42 DevSecOps 2021, Tal Melamed, Senior Director of cloud native security research at Contrast Security, walks through why SAST, DAST and IAST each fall short on AWS Lambda, and argues for testing that connects to the cloud account and simulates events against the functions themselves.
+
+He has been in serverless security for about five years, through two startups that were acquired (one by Check Point, one by Contrast Security), and he leads the OWASP Serverless Top 10 project. The last part of the talk shows his employer's approach, so expect a vendor section; the first two thirds stand on their own.
+
+## What changes when there is no server?
+
+A small serverless application, he says, already means a couple of dozen APIs and functions, 200 to 300 resources in total, and he has seen customers with millions. Everything is event-driven: a file upload, a database row change, an IoT rule or a log line can run your code. ""The problem is that where your code is could also be your mistakes,"" Tal Melamed said at Conf42 DevSecOps 2021.
+
+He lists the Lambda details that matter for an attacker. The environment is read-only except for `/tmp`. You cannot SSH in. Execution data is supposed to be temporary, but AWS recycles warm environments between invocations, so anything your code leaves in `/tmp` can be read by the next event if the code is exploitable. The code itself and the function's credentials both sit inside the runtime, the credentials as environment variables.
+
+## Least privilege, one function at a time
+
+The single biggest problem is the policy attached to each function. A function that only writes one item should get `PutItem` on one table, with the table taken from the environment variable, not a wildcard action on a wildcard resource. That way an attacker who manages to run arbitrary code gets blocked by the cloud when they try a scan or a delete.
+
+Easy for one function, hard at scale, and the internet does not help. He shows the Stack Overflow answers that fix an access-denied error by granting `dynamodb:*`, or by attaching the AWSLambdaFullAccess managed policy, which included wildcards across CloudWatch, DynamoDB, Lambda, logs and S3 before AWS deprecated it.
+
+## You lose the perimeter
+
+In a monolith, input validation, DLP, IPS and the firewall all sit at the load balancer. Serverless removes that choke point, since a function can be triggered by a database change with nothing in between. ""When you talk about serverless, you lose the perimeter,"" Tal Melamed said at Conf42 DevSecOps 2021. Security has to move into each function, and with hundreds of functions, anything done by hand simply will not get done.
+
+His risk list mirrors the OWASP work: event injection, broken authentication, sensitive data exposure, over-privileged functions, vulnerable dependencies, insufficient logging, open resources, denial of service and denial of wallet, insecure shared space and insecure secret management.
+
+## Why the usual scanners miss it
+
+He takes a three-function iRobot registration flow from an AWS case study and runs the traditional tools against it in his head:
+
+- **SCA and image scanning** covers around 10% of the app, and only finds problems you imported.
+- **IaC scanning** is as far left as you can go, but sees configuration only, with zero code coverage and no prioritisation.
+- **IAST** needs a server to instrument; on Lambda it is overkill.
+- **SAST** sees three separate apps, because the queue that links the functions lives in configuration, not code. No source, no sink, plenty of false positives and false negatives.
+- **DAST** can only hit the one function with an API, and gets back a 200 or a 403 while the rest of the flow happens out of sight. In one 200-function system he saw, about ten had APIs.
+
+## Testing from inside the account
+
+The alternative he presents connects to the account through a CloudFormation template, discovers resources, triggers and policies, builds a graph of what talks to what, then simulates events against each function and checks the cloud to see whether the attack worked, such as a file written or a table touched. It re-runs on every deployment and can generate least-privilege policies from what the code actually needs. He also mentions his earlier Black Hat demo of hacking a Lambda function by talking to an Alexa device.
+
+For hands-on practice, he points to DVSA, the Damn Vulnerable Serverless Application he created, which deploys in a few clicks. Install it in a throwaway AWS account, never in one holding real data.
+
+## Who should watch
+
+AppSec engineers inheriting a serverless estate, and Lambda developers who copy IAM policies from Stack Overflow. Skip the last ten minutes if product demos are not your thing.
+
+## Related Conf42 talks
+
+- Tal Melamed's follow-up on [serverless security](https://www.conf42.com/Cloud_Native_2022_Tal_Melamed_serverless_security) at Conf42 Cloud Native 2022.
+- Gunnar Grosch on [serverless chaos with AWS Fault Injection Simulator](https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator) at Conf42 Chaos Engineering 2022.
+- Efi Merdler-Kravitz on [CI/CD for serverless](https://www.conf42.com/Cloud_Native_2021_Efi_MerdlerKravitz_cicd_serverless) at Conf42 Cloud Native 2021.
+
+[Watch Tal Melamed's talk](https://www.conf42.com/DevSecOps_2021_Tal_Melamed_serverless_security_testing_secure_apps)
+
+[Watch the talk on YouTube](https://youtu.be/5ymvUCfU-A4).
+",talk,devsecops2021,talk:devsecops2021/Tal Melamed,,Conf42,,queued,"serverless, aws-lambda, application-security, security-testing, iam"
+,"Your Terraform pipeline needs three scanners, not one","Pawel Piwosz (EPAM Systems) at Conf42 DevSecOps 2021 on running Checkov, TFSec and Terrascan side by side, because each catches different misconfigurations",2021-11-02,devsecops2021/three-terraform-scanners-not-one,,"No single free Terraform scanner is enough. At Conf42 DevSecOps 2021, Pawel Piwosz, Lead Systems Engineer at EPAM Systems, ran Checkov, TFSec and Terrascan against the same deliberately broken templates, got three different answers, and concluded that you need all three in the pipeline before you can be roughly 90% sure your infrastructure code is clean.
+
+His working definition of the tool sets the tone. ""Infrastructure as code is a fast, dynamic, programmable way to deploy hidden misconfigurations everywhere,"" Pawel Piwosz said at Conf42 DevSecOps 2021.
+
+## How bad is the misconfiguration problem?
+
+He opens with numbers, mostly from 2020 reports. The IBM and Ponemon Institute study puts the average breach at 280 days from start to containment, 207 of them spent just finding it, and attributes 19% of breaches to cloud misconfiguration. Imperva's 2019 leak of API keys and TLS certificates came from a network misconfiguration, a hardcoded API key and unencrypted records, and took ten months to spot. Capital One, the same year, exposed more than 100 million records through IAM policy mistakes and unencrypted storage.
+
+A Sonatype survey of 300 professionals adds the day-to-day picture: 36% had suffered a serious breach from cloud misconfiguration, and almost half of the teams saw more than 50 misconfigurations a day. Only 33% check templates manually before deployment; 27% check after. And 4% reported spending more than 500 hours a week on infrastructure-as-code security, which he translates as twelve people doing nothing else.
+
+IAM and security groups top the list of offenders. The security group failure mode will be familiar to anyone who has ever needed to test something quickly and did not know their own IP address.
+
+## Why does dev count as production?
+
+His rule is to control everything before it deploys, and to treat the first environment in the chain with production-level suspicion. He asks whether you would open an account at a bank whose dev and QA environments had just been exposed.
+
+""If we deploy templates, it is already too late,"" Pawel Piwosz said at Conf42 DevSecOps 2021.
+
+That means shift left for infrastructure too: static analysis in CI/CD, pipelines that break on findings, and policy engines such as Open Policy Agent for enforcement across environments.
+
+## What does each scanner actually find?
+
+The demo uses the Accurics test templates, which are written to be problematic, and runs each tool with defaults only. He says the beauty lies in simplicity, so no tuning.
+
+- **Checkov** (Bridgecrew, Python): 44 checks passed, 58 failed, each with the resource, file, line and a fix guide. It also flags things like a missing security group description, which he points out is not really a security issue, so skipping checks matters.
+- **TFSec** (Aqua, Go): ten critical findings plus high, medium and low, fewer than Checkov but not a worse tool. It is happiest with Terraform installed.
+- **Terrascan** (Accurics, now Tenable): 38 policies violated, 20 high, 13 medium and 5 low. The slowest of the three, but it can run as a standing API server the pipeline calls.
+
+Then all three go into an AWS CodePipeline built with CloudFormation, running in parallel after the source step. All three emit JUnit reports and all three can fail the pipeline. On a different repository the reports showed Checkov at 20 failed and 84 passed, Terrascan at 14 failed and 16 passed, and TFSec at 11 failed with no pass count, which he dislikes because it makes trend metrics harder.
+
+The live demo also fought back: a Vagrant box refused to cooperate, and the fallback EC2 instance went up with a wide-open security group, which he flagged on camera as exactly what not to do.
+
+## Scanners do not see drift
+
+Drift, the undocumented manual change nobody can explain, is the harder half. Someone always holds elevated privileges, and detection tools miss things; even CloudFormation's own drift detection catches a lot but not everything. He points to driftctl and to paid offerings from Bridgecrew and Accurics for continuous monitoring, and argues for everything as code: policy, security, drift detection and remediation.
+
+His closing line is the one to tape to the monitor: ""please do not pretend that you have security.""
+
+## Who should watch
+
+Teams that already ship Terraform through CI and want a quick comparison of the free scanners, with real output. It is an intro-level demo, not a tuning guide.
+
+## Related Conf42 talks
+
+- Peter O'Neill on [securing terraform apply with Open Policy Agent](https://www.conf42.com/Site_Reliability_Engineering_2022_Peter_ONeill_terraform_apply_secured_open_policy_agent) at Conf42 SRE 2022.
+- Stephane Jourdan on [infrastructure drift](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift) at Conf42 Cloud Native 2021.
+- Joshua Arvin Lat on [IaC security best practices](https://www.conf42.com/DevSecOps_2023_Joshua_Arvin_Lat_iac_security_best_practices) at Conf42 DevSecOps 2023.
+
+[Watch Pawel Piwosz's talk](https://www.conf42.com/DevSecOps_2021_Pawel_Piwosz_security_testing_terraform_templates)
+
+[Watch the talk on YouTube](https://youtu.be/W8abhX_9AmE).
+",talk,devsecops2021,talk:devsecops2021/Pawel Piwosz,,Conf42,,queued,"terraform, infrastructure-as-code, security-scanning, ci-cd, devsecops"
 ,JavaScript 2021 is ready!,Come and see what's on the table.,2021-10-27,2021-10-27-java-script-event,./assets/splash/JS2021_Session_Splash.png,"# Amazing news! We’ve got 30+ talks for you guys, our favourite geeks <3
 
 This event is like no other! Listen to [Lauren Hayward Schaefer](https://www.linkedin.com/in/laurenjanece/) talk about why it’s worth putting some effort into your developer profile. And [Jay McCarthy](https://www.linkedin.com/in/jay-mccarthy-34a6b95/) is here to tell you all about blockchains and how you can use them in JavaScript. 
