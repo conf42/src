@@ -436,7 +436,9 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         post["ThumbnailPath"] = _image(post, linked, base_folder)
         post["image_abs"] = absolute(post["ThumbnailPath"])
         if not post.get("ExternalURL"):
-            post["canonical"] = SITE + post["ShortURL"]
+            # every post lives under /blog/ so it is never taken for a talk page (Marek 2026-11-11); ShortURL stays the key
+            post["path"] = "blog/" + post["ShortURL"]
+            post["canonical"] = SITE + post["path"]
             post["description"] = post.get("Description") or re.sub(r"\s+", " ", re.sub(r"[#*_>\[\]`]|\(http[^)]*\)", "", post["Body"]))[:200].strip()
             post["jsonld"] = _post_jsonld(post)
         visible.append(post)
@@ -618,7 +620,8 @@ def write_markdown(context, posts, base_folder):
         if talk and event and talk.get("short_url"):
             out += ["", "## Watch the talk", "", "[%s](%s%s) at Conf42 %s %s." % (talk.get("Title"), SITE, talk["short_url"].replace(".html", ""),
                                                                          event.get("name"), event.get("year"))]
-        with open(os.path.join(base_folder, p["ShortURL"] + ".md"), "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(os.path.join(base_folder, p["path"])), exist_ok=True)
+        with open(os.path.join(base_folder, p["path"] + ".md"), "w", encoding="utf-8") as f:
             f.write("\n".join(out) + "\n")
         n += 1
     print("Writing out %d Markdown pages" % n)
