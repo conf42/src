@@ -121415,6 +121415,441 @@ Architects and engineering leads planning a migration, or living with one that h
 
 [Watch the talk on YouTube](https://youtu.be/7qNlwtiY43I).
 ",talk,cloud2021,talk:cloud2021/Vandana Verma,,Conf42,,queued,"cloud-security, threat-modeling, architecture-review, shared-responsibility, iam"
+,The bug that owns your container is usually in code you didn't write,"Brian Vermeer (Snyk) at Conf42 Cloud Native 2021 on Docker image security, shown by hacking an outdated ImageMagick and a vulnerable Spring Data REST",2021-04-11,cloud2021/hacking-docker-images-imagemagick-spring,,"Putting an application in a container doesn't seal it off from the world; the container ships its own operating system, binaries and dependencies, and each one is attack surface. At Conf42 Cloud Native 2021, [Brian Vermeer](https://www.conf42.com/Cloud_Native_2021_Brian_Vermeer_containers_breaking_in), Developer Advocate at Snyk and Java Champion, went through Docker image best practices and proved the point twice by getting remote code execution in apps whose own code was fine.
+
+## Why isn't a container a safe box?
+
+A real-world container, a soda can or a lunch box, keeps the outside out. Software containers need two-way traffic: a UI, a database connection, incoming requests. And everything inside is your responsibility. His slides put Docker Hub at 1 billion container image downloads a week, so the defaults people start from matter.
+
+## Start from less
+
+Tip one: prefer minimal base images. In Snyk's late-2019 research, all ten of the most popular free images on Docker Hub had known vulnerabilities by default. The untagged node image, for example, sat on a full Debian install. Switching Debian to Debian slim already removes a pile of issues; Alpine or Fedora may remove more. For OpenJDK 11, the default image was Ubuntu-based with 25 known vulnerabilities, mostly from the OS rather than the JDK. ""What you do not have in your container cannot harm you,"" Brian Vermeer said at Conf42 Cloud Native 2021.
+
+## Don't run as root, and check whether a user already exists
+
+Least privilege: create a system user with no password, home directory or shell, give it ownership of the app folder only, and switch to it with a USER line, because creating the user without switching still runs everything as root. The node image already ships a node user; many people never call it. Security is a chain of attacks, he says, so each link you harden limits how far the next step goes.
+
+## Scan, rebuild, monitor
+
+Most teams scan their application and forget the OS layer they ship. He shows the Snyk CLI testing a node 10 image and suggesting a better base image, then a monitor command that snapshots the image and alerts daily on new vulnerabilities and fixes. Two numbers from the slides: 44% of Docker image vulnerabilities can be fixed with newer base images, and 20% just by rebuilding. FROM ubuntu:latest today isn't the latest in three weeks, so rebuild regularly with no cache, even if your code hasn't changed a character.
+
+## What can go wrong? Demo one: ImageTragick
+
+A small Node.js app resizes uploaded pictures for Twitter using ImageMagick, an outdated version with improper input validation. A crafted file named like a JPEG breaks out of a URL with a pipe and runs touch; an empty file appears in the container. A second payload fetches a script from the host via host.docker.internal, downloads and unpacks a Netcat tarball, and opens a reverse shell to his machine. The application code did nothing wrong; the binary shipped with the image did.
+
+## Your dependencies are in the container too
+
+Lint the Dockerfile itself: he uses hadolint, which catches things like ADD where COPY belongs. Then look at the app: most of the binary is frameworks and libraries, and most of their vulnerabilities sit in indirect dependencies several levels deep.
+
+## Demo two: the grocery list that runs commands
+
+A Spring Boot grocery list (beans for 50 cents, milk for $1.09) uses Spring Data REST to turn a CRUD repository into endpoints. In the vulnerable version, a PATCH request to the item endpoint carries a JSON body that the server evaluates as Spring Expression Language, so he gets the runtime, executes a command and reads /etc/passwd back. Run that container as root and an attacker can read and write a lot more.
+
+## Build big, ship small
+
+Multi-stage builds separate the factory from the car: build with a Maven and JDK image, then copy only the jar into a JRE-on-Alpine image. His example went from 631 MB to 132 MB. It also keeps build-time secrets out of production; a registry token used during a node 12 build stays in the build stage instead of lingering in the layer history.
+
+## Who should watch
+
+Developers who write Dockerfiles and have never tried attacking their own images. The demos make the case better than any checklist. Snyk is his employer and the scanner on screen, and he notes the tooling shown can be used for free.
+
+## Related Conf42 talks
+
+- Mofizur Rahman's [Kubernetes security jumpstart](https://www.conf42.com/Cloud_Native_2021_Mofizur_Rahman_kubernetes_security_jumpstart) at the same event.
+- Matt Jarvis on [continuous security pipelines](https://www.conf42.com/Cloud_Native_2021_Matt_Jarvis_conunuous_security_pipelines).
+- Adam Gordon Bell on [compiling containers](https://www.conf42.com/Cloud_Native_2021_Adam_Gordon_Bell_compiling_containers).
+
+[Watch the talk on YouTube](https://youtu.be/YVUDklRY9m4).
+",talk,cloud2021,talk:cloud2021/Brian Vermeer,,Conf42,,queued,"container-security, docker, vulnerabilities, devsecops, java"
+,"Kubernetes security is more locks on the bike, never a safe bike","Mofizur Rahman (IBM) at Conf42 Cloud Native 2021 on a Kubernetes security starter map, from base images and RBAC to admission webhooks and scanners",2021-04-09,cloud2021/kubernetes-security-is-a-spectrum,,"The strongest padlock you can buy off the shelf took a YouTube lock-picker about four minutes. At Conf42 Cloud Native 2021, [Mofizur Rahman](https://www.conf42.com/Cloud_Native_2021_Mofizur_Rahman_kubernetes_security_jumpstart), Developer Advocate at IBM, used that to set up his main point: security is a spectrum, and the job is to make your Kubernetes cluster more secure layer by layer, with the right tool at each layer, until breaking in isn't worth anyone's time.
+
+He is clear that this is a jumpstart, not an in-depth tutorial: a checklist of what to worry about and which tools exist, with a few short demos.
+
+## Why is security a spectrum?
+
+His opening is a slideshow of real-world security theatre: a door with the code written on it, a turnstile next to a wide gap, a camera blocked by a sign. Then the padlock that was declared the strongest in the world, beaten by a lock-picker in about four minutes. ""Things can be more secure or less secure. Never just secure,"" Mofizur Rahman said at Conf42 Cloud Native 2021. Software is worse off than doors because, once it touches the internet, everything on the internet is an adversary.
+
+## What should you lock down first?
+
+He walks the stack in order:
+
+- **Application**: follow the best practices of your language and runtime. Common sense, he notes, is not that common.
+- **Container**: no unknown base images, and never latest. A specific tag is good; a digest SHA is best, because it pins exactly what you tested. Rebuild to pick up vulnerability fixes. Prefer Alpine over Debian, and scratch images for compiled languages such as Go, C, C++, Rust, or Java with GraalVM.
+- **Image**: least privilege. Run as an unprivileged user, never root. ""Root is the root of all evil,"" as he puts it: a root container that escapes is root on the host.
+- **Infrastructure**: don't expose nodes. He cites the Tesla cryptojacking case, where an unauthenticated Kubernetes dashboard leaked AWS credentials. Treat metadata such as node IPs as valuable, harden nodes (no SSH), and keep both OS and Kubernetes versions current.
+- **Network**: by default any pod can talk to any pod. Use network policies, for example back end accepts traffic only from front end.
+
+## What about the cluster at runtime?
+
+- **RBAC**: can subject verb object, scoped to the cluster or a namespace. His example lets user Jane get, watch and list pods in default, so kubectl get pods works and delete pod fails.
+- **Resource quotas and limits**: a compromised pod can't starve the cluster, the scheduler packs better (he cites 70 to 80% utilisation), and equal requests and limits give the Guaranteed QoS class, so the pod is evicted last.
+- **Central logging and monitoring**, outside the cluster, because pods are ephemeral and so are their logs.
+- **Admission webhooks**: mutate requests to add a default quota, or reject anything without one, or with privilege escalation, or without an SELinux profile.
+- **Encrypt etcd at rest**. Kubernetes secrets are only base64-encoded, so use a KMS from your cloud or HashiCorp Vault and inject secrets at runtime.
+
+## Which tools did he show?
+
+He stresses none of it is an endorsement. For image scanning: Anchore, Clair, Dockle, Snyk and Trivy. The demos run Dockle on a deliberately bad test image (credentials in environment variables, uncleared apt caches) and Trivy on golang:latest, a long list of CVEs; both can fail a CI build. For runtime: Falco from Sysdig, SELinux and seccomp. For networking, your overlay's own policies (IBM Cloud uses Calico). For image provenance: Grafeas, in-toto and Portieris, which has an admission webhook that only admits images from allowed sources.
+
+For auditing, kube-bench from Aqua Security checks a running cluster, while kubeaudit and kubesec check YAML before deploy. kubeaudit flags the demo deployment for no AppArmor, the default service account, a missing security context, no run-as-non-root and unset privilege escalation; kubesec gives it a score of 4 and suggests the same fixes. OPA gets a mention as the most flexible option, too big to demo here. Service meshes (Istio, Linkerd, Kuma) add mTLS between services and traffic visibility.
+
+## Who should watch
+
+Developers and new platform engineers who need the whole map before going deep. Security specialists will know the list; the value is in its order and the CI-ready tools.
+
+## Related Conf42 talks
+
+- Brian Vermeer on [securing containers by breaking in](https://www.conf42.com/Cloud_Native_2021_Brian_Vermeer_containers_breaking_in) at the same event.
+- Ara Pulido on [policy-as-code with OPA and Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper).
+- Reza Ramezanpour on [Kubernetes security policy design](https://www.conf42.com/Cloud_Native_2023_Reza_Ramezanpour_kubernetes_security_policy_design_top10) at Conf42 Cloud Native 2023.
+
+[Watch the talk on YouTube](https://youtu.be/FGfsf2pyF5Y).
+",talk,cloud2021,talk:cloud2021/Mofizur Rahman,,Conf42,,queued,"kubernetes, security, container-images, rbac, devsecops"
+,RBAC can't enforce your trusted-registry rule. Gatekeeper can,"Ara Pulido (Datadog) at Conf42 Cloud Native 2021 on policy-as-code for Kubernetes with OPA, Gatekeeper and its reusable policy library",2021-04-08,cloud2021/gatekeeper-policy-as-code-kubernetes,,"RBAC answers who can do what to which resource. It has no opinion on whether that pod has the labels your organisation requires or pulls from a registry you trust. At Conf42 Cloud Native 2021, [Ara Pulido](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper), Technical Evangelist at Datadog, showed how OPA Gatekeeper fills that gap, and how far you get with its community policy library before writing a line of Rego yourself.
+
+The talk is a compact introduction with two live demos on Minikube. If you have never used Gatekeeper, it is a good place to start.
+
+## Why isn't RBAC enough?
+
+She defines policy as the rules that govern what you can and cannot do with a software service. RBAC covers one slice: subject, Kubernetes API resource, verb, as in user ara may create, get and watch pods in a namespace. Authorisation is only a subset of the rules teams want, though. Images only from approved registries, mandatory labels on deployments and pods, digests on container images, CPU and memory limits on every container: none of that is expressible as RBAC.
+
+## Where do OPA and Gatekeeper fit?
+
+The Open Policy Agent, a CNCF project, decouples policy decisions from enforcement. It takes a JSON query, evaluates it against rules written in Rego plus any stored data, and returns a JSON decision. That's all it does; integrations handle enforcement, and Gatekeeper is the one for Kubernetes.
+
+Gatekeeper embeds OPA and plugs into the API server's request path. A request goes through authentication, then authorisation (usually RBAC), then admission controllers, which can validate or mutate it. Gatekeeper registers as a validating admission webhook, with mutation in progress at the time, and blocks requests that violate a policy.
+
+It is also Kubernetes native: policies are CRDs, reconciled by a controller. A ConstraintTemplate holds the Rego and declares parameters; a Constraint instantiates it. One required-labels template becomes namespaces must carry a gatekeeper label and, separately, pods in default must carry do-not-delete. Because they're ordinary objects, they live in Git with the rest of your cluster config.
+
+## Do you have to learn Rego first?
+
+No, and that's the main message. The common rules are the same everywhere; only the values change. The Gatekeeper Library, part of the OPA organisation, ships tested templates (HTTPS-only ingresses, required labels, allowed registries) with sample constraints and objects that should fail them. ""The goal of this talk is for you to see the opportunity for gatekeeper to be used straight away, even if you don't know Rigo,"" Ara Pulido said at Conf42 Cloud Native 2021. (The transcript's spelling; she means Rego.)
+
+## What does it look like in a cluster?
+
+Demo one installs Gatekeeper from the default manifest: four CRDs, a gatekeeper-system namespace with a three-replica controller and an audit pod. She applies the required-labels template from the library and adapts the sample constraint so every pod needs a conf42 label key. A typo bites first (the kind must be Pod, singular), which is the most realistic thing in the demo.
+
+The audit pod then reports violations on existing objects without deleting them, here 14 pods, so you can roll out a new rule and clean up gradually. A new NGINX pod without the label is rejected with a clear message; add the label and it goes through.
+
+Demo two needs context beyond the object itself: every ingress host must be unique. A Config object tells Gatekeeper to sync ingress objects into OPA's data. The first ingress is admitted, a second with the same host is rejected.
+
+## Can you see what it's doing?
+
+Gatekeeper exposes metrics out of the box: template and constraint counts, webhook request counts and latency, violations. Datadog's agent autodiscovered the pods and filled a ready-made dashboard, including those 14 violations. That's her employer's product; the metrics themselves come from Gatekeeper.
+
+## Who should watch
+
+Platform teams that have outgrown RBAC and want guardrails without building admission webhooks by hand. Rego experts can skip it.
+
+## Related Conf42 talks
+
+- Noaa Barki on [OPA, Conftest and Gatekeeper in action](https://www.conf42.com/Cloud_Native_2022_Noaa_Barki_open_policy_agent_conftest_gatekeeper_kubernetes_policy_in_action) at Conf42 Cloud Native 2022.
+- Mofizur Rahman's [Kubernetes security jumpstart](https://www.conf42.com/Cloud_Native_2021_Mofizur_Rahman_kubernetes_security_jumpstart) at the same event.
+- Peter O'Neill on [securing terraform apply with Open Policy Agent](https://www.conf42.com/Site_Reliability_Engineering_2022_Peter_ONeill_terraform_apply_secured_open_policy_agent) at Conf42 SRE 2022.
+
+[Watch the talk on YouTube](https://youtu.be/l-3tBjuPv_I).
+",talk,cloud2021,talk:cloud2021/Ara Pulido,,Conf42,,queued,"kubernetes, policy-as-code, opa, gatekeeper, admission-controllers"
+,A cost-only utility function says deploy nothing. Melodic does better,"Paweł Skrzypek and Alicja Reniewicz (7bulls.com) at Conf42 Cloud Native 2021 on Melodic, open source autonomous multi-cloud deployment and optimisation",2021-04-07,cloud2021/melodic-autonomous-multicloud-deployment,,"Model your application once, declare what good looks like, and let the platform pick the clouds, size the resources and keep resizing them while it runs. At Conf42 Cloud Native 2021, [Paweł Skrzypek](https://www.conf42.com/Cloud_Native_2021_Pawe_Skrzypek_Alicja_Reniewicz_autonomous_multicloud_serverless_deployment), CTO of 7bulls.com, presented Melodic, an open source multi-cloud deployment platform he co-authors, and Full Stack Engineer Alicja Reniewicz showed it scaling a Spark genome-analysis job on AWS against a 60-minute deadline.
+
+It is the authors presenting their own platform, and Paweł Skrzypek says so upfront. The demo is the part that earns the time.
+
+## What is Melodic?
+
+A single platform that deploys one cloud-agnostic application model to Azure, AWS, Google Cloud and OpenStack providers, covering virtual machines, containers, serverless functions and big data frameworks such as Spark. You don't learn each provider's tooling; you write a model, and Melodic decides which providers and how much of what to use. He calls it your smart, autonomic DevOps operator.
+
+## How do you tell it what good looks like?
+
+The model is written in CAMEL, the Cloud Application Modelling and Execution Language. It builds on TOSCA ideas but goes further: components, connections and security rules, plus requirements, constraints and a utility function that defines the best deployment.
+
+The utility function is where the thinking is. Cost alone fails. ""If we have only the cost as a goal or as utility function, then the best solution is just simply to not deploy anything because in that case the cost will be zero,"" Paweł Skrzypek said at Conf42 Cloud Native 2021. So the utility is a trade-off between cost and business metrics (average response time, workload, a deadline), fed by custom sensors rather than CPU and memory figures.
+
+## What happens after you press the button?
+
+Only the modelling is manual, and only once. Then the loop: Melodic fetches offers from the selected providers, generates a constraint problem from the model, solves it, deploys, and starts collecting metrics. When a metric crosses a threshold it reasons again and reconfigures the running deployment in place, adding, removing or replacing resources rather than redeploying from scratch.
+
+Internally it is microservices orchestrated as a BPM process in Camunda, with Mule ESB for integration and ActiveMQ with Esper for monitoring. They evaluated point-to-point, queue-based and ESB integration (three ESBs and four BPM engines in total) before settling on that pair, and the comparison is documented for anyone building something similar. The upside of BPM: changing the logic is a drag-and-drop edit, not a code change.
+
+## What did the demo show?
+
+Alicja Reniewicz uploads the genome application's CAMEL model (converted to XMI) through the UI. AWS credentials stay out of the model as placeholders filled from a secure store. A simulation mode lets you set metric values by hand and see which solution Melodic would pick, without starting any virtual machines; she turns it off for a real run on AWS only.
+
+Melodic resolves the constraint problem (one to ten Spark workers allowed) and starts with a single worker in Dublin. A Grafana dashboard tracks the deadline with a traffic light: time left against estimated time, and cores needed against cores running. Within minutes the light goes red, the estimate needs four to seven cores against the one available, and a reconfiguration process kicks in and adds a second worker, which shows up in the Spark master UI. The cycle continues: add workers while the job is behind, remove them near the end once finishing on time is safe.
+
+The second use case in the talk, a serverless image classifier fed by augmented reality glasses, is described rather than demoed.
+
+## Who should watch
+
+Teams that run batch or bursty workloads with a business deadline and want to see constraint-solving autoscaling across clouds in practice. If you want a general multi-cloud overview, this is one specific platform. Melodic is released under the Mozilla Public License 2.0, and the team was continuing the work in the Morphemic project.
+
+## Related Conf42 talks
+
+- Lawrence Finn on [breaking vendor lock-in with Cloud Sidecar](https://www.conf42.com/Cloud_Native_2021_Lawrence_Finn_multicloud_breaking_cloud_sidecar) at the same event.
+- Adrienne Tacke on [multi-cloud clusters](https://www.conf42.com/Cloud_Native_2021_Adrienne_Tacke_multicloud_magic_clusters).
+- Jorge Fonseca on [global active-active serverless](https://www.conf42.com/Cloud_Native_2021_Jorge_Fonseca_global_activeactive_serverless).
+
+[Watch the talk on YouTube](https://youtu.be/VKKupHojptA).
+",talk,cloud2021,talk:cloud2021/Paweł Skrzypek,,Conf42,,queued,"multi-cloud, serverless, optimisation, spark, open-source"
+,Your app thinks it's talking to S3. It's talking to Google Cloud,Lawrence Finn (Cloud Sidecar) at Conf42 Cloud Native 2021 on breaking vendor lock-in by translating AWS API calls to Google Cloud in a sidecar,2021-04-05,cloud2021/cloud-sidecar-translates-aws-to-gcp,,"The usual answer to a make-us-multi-cloud mandate is an abstraction library per service per language, which is a lot of libraries. At Conf42 Cloud Native 2021, [Lawrence Finn](https://www.conf42.com/Cloud_Native_2021_Lawrence_Finn_multicloud_breaking_cloud_sidecar), author of Cloud Sidecar, showed the opposite approach: leave the application alone, point its AWS SDK at a local sidecar, and let the sidecar translate S3, SQS, Kinesis, DynamoDB and Redshift calls into their Google Cloud equivalents.
+
+It is the author presenting his own open source project, so expect enthusiasm, but it comes with a working demo and a production story.
+
+## Why go multi-cloud at all?
+
+The talk opens with a CTO who read an article over breakfast and wants multi-cloud by the end of the half. Past the joke, Larry Finn gives real reasons: rising cloud bills and the leverage of being able to move; redundancy when your provider's status page says everything is fine and half the internet disagrees (though he says multi-region in one cloud is the sensible first step); picking each cloud's best service; and customers who won't work with you because of who hosts you, such as an ad tech prospect that won't touch a vendor on Google Cloud.
+
+He splits the job in two. Infrastructure is mostly solved with Terraform or Kubernetes. Software is the hard part.
+
+## Why not just write an abstraction layer?
+
+Because it multiplies. Wrapping boto and google-cloud-storage behind one interface is fine for one Python app. Now add Go, Scala, Node.js, Java and something esoteric, and services like S3, SQS, Kinesis, DynamoDB and Redshift: n languages times m services worth of wrappers. Then roll that out across 1,500-plus microservices, each using the SDKs slightly differently.
+
+## How does Cloud Sidecar work?
+
+It runs next to the application in the sidecar pattern, on localhost on an EC2 box or as a sidecar container in a Kubernetes pod. The app's own cloud library is configured to talk to localhost. An HTTP router exposes each API on its own port and sends requests to a handler (S3, SQS, Kinesis), which either passes the call through to AWS or translates it to Google Cloud and dresses the response back up as AWS. Because it translates wire APIs, it works with any language that has a cloud library.
+
+He wrote it in Go for a small memory and CPU footprint. ""It's not like JVM, which will eat all the memory on your machine,"" Lawrence Finn said at Conf42 Cloud Native 2021, adding that Go's simplicity also makes the project easier for contributors.
+
+## What does the demo show?
+
+A PNG-to-JPG converter: a Scala Play front end uploads to S3 and drops a message on SQS; a Python worker reads SQS, converts the image and writes the result to S3. Both talk to the sidecar on localhost. With the sidecar pointed at AWS, both files land in the S3 bucket. Restart the sidecar with a GCP config (it can reload config live, the restart is for the demo) and the next upload goes to Google Cloud Storage through Pub/Sub, without touching the Scala app or the worker.
+
+## Where do the clouds disagree?
+
+The interesting part is the gaps. S3 multipart upload has no GCS equivalent, so the sidecar mimics it with GCS compose (combine). Going the other way, GCS resumable upload and combine are faked using S3 primitives. SQS is a worker queue, Kinesis is offset-based like Kafka, and Pub/Sub sits in between with topics feeding many subscriptions. DynamoDB has both query and scan where Datastore has one call, and its nested JSON filter and update syntax has no direct match. For big data the sidecar speaks the Postgres wire protocol, so a JDBC client aimed at Redshift can be translated to BigQuery SQL, with stored-procedure-style plugins for queries that don't translate well.
+
+The community edition covers S3/GCS both ways, SQS and Kinesis to Pub/Sub, plugins and middleware; DynamoDB, Redshift and StatsD/Datadog metrics were in the enterprise edition at the time.
+
+## Does anyone run it?
+
+Yes. His day job is at ActionIQ, a customer data platform that ran on AWS until customers asked for Google Cloud. The sidecar let them support both with very little code change, and they shipped multi-cloud before the deadline. It had been in production for many months by the time of the talk.
+
+## Who should watch
+
+Teams with heavy AWS SDK usage across many services facing a second-cloud requirement. The translation caveats are the real value even if you never run the tool.
+
+## Related Conf42 talks
+
+- Adrienne Tacke on [multi-cloud clusters](https://www.conf42.com/Cloud_Native_2021_Adrienne_Tacke_multicloud_magic_clusters) at the same event.
+- Leonardo Murillo on [GitOps for multi-cloud with Crossplane and Flux 2](https://www.conf42.com/Cloud_Native_2021_Leonardo_Murillo_gitops_multicloud_crossplane_flux2).
+- Arun Pandiyan Perumal on [managing multi-cloud](https://www.conf42.com/Site_Reliability_Engineering_SRE_2025_Arun_Pandiyan_Perumal_managing_multi_cloud) at Conf42 SRE 2025.
+
+[Watch the talk on YouTube](https://youtu.be/2LMFVjv6kJo).
+",talk,cloud2021,talk:cloud2021/Lawrence Finn,,Conf42,,queued,"multi-cloud, vendor-lock-in, sidecar, aws, google-cloud"
+,"Write the pipeline before the feature, like you write the test first","Ricardo Miranda (Closer Consulting) at Conf42 Cloud Native 2021 on building CI/CD, infrastructure as code and test automation from day one",2021-04-04,cloud2021/automation-first-day-of-project,,"If your deployment automation gets built in the last sprint, it gets tested for the first time in production. At Conf42 Cloud Native 2021, [Ricardo Miranda](https://www.conf42.com/Cloud_Native_2021_Ricardo_Miranda_automation_is_where_a_project_starts), Big Data Consultant at Closer Consulting, made a short, sharp argument: treat automation the way TDD treats tests, and start it before the first line of feature code.
+
+It is a brief talk, about ten minutes, and an opinion piece rather than a demo. That's a feature: the whole argument fits in one sitting.
+
+## Why do services need more automation than a monolith?
+
+He starts with the trade. A monolith tends to turn into a big ball of mud: tightly coupled, slow to change, and a newcomer can take years to really understand it. Its one advantage is that calls are cheap: no latency, no transport security, no service discovery. And it scales up, onto a bigger machine, which is slow, expensive, and sometimes impossible because the bigger machine doesn't exist.
+
+Services flip that. Each one does one thing, a newcomer gets it in days, and you can rewrite one and benchmark it against the old version. Each scales out and in on its own. The complexity moves to coordination: contracts, discoverability, secure communication and a much harder deploy.
+
+His wish list follows: loosely coupled services you can develop, maintain, test and deploy independently. The catch is the code that wish list demands. ""The amount of code that you need to develop for your application increases much more than the functional requirements,"" Ricardo Miranda said at Conf42 Cloud Native 2021.
+
+## What does the toolchain look like?
+
+Nothing exotic, and that's the point:
+
+- **Git** for everything, with one repository per service, the approach he says has worked best for his teams.
+- **An automation server** such as Jenkins for builds, tests and deploys.
+- **Artifactory** to store versioned artifacts.
+- **Infrastructure as code**, such as Terraform, for everything from virtual machines to databases, tables and VPNs.
+
+The flow: every merge to main publishes a new artifact version, and deploying is a script call that says which version goes to which environment. Testing goes well beyond unit tests: integration, acceptance, performance and security tests all have to be automated before anything reaches production.
+
+## Humans are gatekeepers, not operators
+
+His hard line is that no task belongs to a person. A human may approve a production deploy, but never performs it. The upside is that the works-on-my-machine anti-pattern disappears, because nothing runs on your machine but the IDE. Pipelines run the builds and tests; a red pipeline gives you a report, a green one means it's ready for production.
+
+## Why start on day one?
+
+Because automation is incremental, exactly like TDD's write a test, make it pass, refactor loop. On day one you might only need a build script and a little infrastructure code; as the application grows you add test stages, deployment stages and more infrastructure. He gives two reasons this beats bolting it on later. Coverage: building incrementally means nothing gets left behind, and the effort is far smaller than a big push at the end. And confidence: the automation layer is itself exercised against production from the start, so by the time the stakes are high it has, in his words, gained muscle.
+
+## Who should watch
+
+Tech leads kicking off a new service, and anyone who needs a short, quotable case for putting pipeline and infrastructure work in sprint one. If your team already ships everything through CI/CD from the first commit, this will confirm what you do rather than teach you something new.
+
+## Related Conf42 talks
+
+- Zan Markan on [a fast CI/CD setup](https://www.conf42.com/Cloud_Native_2021_Zan_Markan_need_for_speed_cicd_setup) at the same event.
+- Ricardo Castro on [CI/CD build and deploy automation](https://www.conf42.com/Cloud_Native_2023_Ricardo_Castro_cicd_builddeploy_automation) at Conf42 Cloud Native 2023.
+- Fabricio Buzeto on [Gall's law and building systems that work](https://www.conf42.com/Cloud_Native_2021_Fabricio_Buzeto_stonehenge_galls_law).
+
+[Watch the talk on YouTube](https://youtu.be/Ii-Bc3D0aUc).
+",talk,cloud2021,talk:cloud2021/Ricardo Miranda,,Conf42,,queued,"automation, ci-cd, infrastructure-as-code, microservices, devops"
+,Stop patching your database and pick the one built for the job,"Akanksha Sheoran (AWS) at Conf42 Cloud Native 2021 on moving off self-managed databases to managed, purpose-built AWS engines like Aurora and DynamoDB",2021-04-03,cloud2021/aws-purpose-built-databases-managed,,"One relational database doing every job for every service is the last monolith in a lot of microservice architectures. At Conf42 Cloud Native 2021, [Akanksha Sheoran](https://www.conf42.com/Cloud_Native_2021_Akanksha_Sheoran_save_grow_innovate_databases), EMEA Business Development Manager at AWS, made the case for two moves: hand the undifferentiated database work to a managed service, and replace the one-size-fits-all database with engines picked per access pattern.
+
+To be clear about scope: this is an AWS portfolio talk from AWS, a tour of the managed database line-up and the migration tooling around it, with no demo. If you want a map of which AWS database fits which workload, it delivers that in about 25 minutes.
+
+## What's driving the change?
+
+She names three trends. Data from phones, watches and IoT devices, which by AWS's own estimate grows 10x every five years. Microservices, because applications now need to reach millions of users globally with millisecond responses, and small teams want to ship without taking the whole site down. And DevOps, which pushes code to production faster through CI/CD. Together, she argues, they create demand for purpose-built databases rather than a single shared engine.
+
+## Why stop running your own?
+
+The self-managed list will be familiar to anyone who has carried a database pager: installing hardware and software, patching, making sure backups exist and actually restore, and capacity planning months ahead, where you overbuy to be safe or underbuy and eat downtime. ""Many dbas don't even know how the databases will handle an instance failure until it actually happens,"" Akanksha Sheoran said at Conf42 Cloud Native 2021.
+
+Her pitch for the managed model is that AWS takes patching, minor upgrades, backups, failover and storage scaling, and the DBA's time goes to schema design, query optimisation and access control instead.
+
+## Which engine for which job?
+
+AWS counted 15 purpose-built database engines at the time. She walks through the families:
+
+- **Relational**: Amazon RDS with seven engines (MySQL, PostgreSQL, MariaDB, SQL Server, Oracle and others), and Aurora.
+- **Key-value**: DynamoDB, for shopping carts and product catalogues.
+- **Document**: DocumentDB, MongoDB-compatible, for catalogues and mobile apps.
+- **In-memory**: ElastiCache for Redis and Memcached, for caching and gaming.
+- **Wide-column**: Keyspaces, Cassandra-compatible.
+- **Graph**, for social networks and fraud detection; **time series**, for monitoring; and **ledger**, an immutable cryptographic log for finance, HR and invoicing.
+
+## What do Aurora and DynamoDB actually promise?
+
+The numbers she gives for Aurora: MySQL- and PostgreSQL-compatible, three to five times the throughput when you lift and shift MySQL or PostgreSQL onto it, storage in 10 GB segments each replicated six ways across availability zones, writes surviving the loss of two of six copies and reads surviving three. She also positions it as the licence-free exit from commercial databases and their audits.
+
+For DynamoDB: more than 10 trillion requests per day across the service, peaks above 20 million requests per second, encryption at rest by default, point-in-time recovery, and Lambda triggers on item-level changes. DocumentDB gets MongoDB compatibility, CloudWatch metrics and up to 15 read replicas.
+
+## How do you get there?
+
+The migration section is the most practical part. The Database Freedom programme offers advice, workshops and partners for leaving Oracle, SQL Server, Netezza, Teradata, Cassandra or MongoDB. Free migration playbooks walk through common hurdles. The Database Migration Service (DMS) handles both homogeneous moves (MySQL to MySQL) and heterogeneous ones (a commercial engine to Aurora), and the Schema Conversion Tool translates schemas, stored procedures and embedded SQL in application code.
+
+## Who should watch
+
+Teams weighing a move from self-managed or commercial databases onto AWS, and architects splitting a shared database along service lines. If you already run Aurora and DynamoDB in production, you'll know most of this; the purpose-built framing is still a useful checklist to hold your current schema up against.
+
+## Related Conf42 talks
+
+- Erez Berkner on [what happens when DynamoDB explodes](https://www.conf42.com/Cloud_Native_2022_Erez_Berkner_dynamodb_explodes_guide) at Conf42 Cloud Native 2022.
+- Samuel Baruffi on [Amazon Aurora DSQL](https://www.conf42.com/Site_Reliability_Engineering_SRE_2025_Samuel_Baruffi_amazon_aurora_dsql) at Conf42 SRE 2025.
+- Joe Karlsson on [data lakes](https://www.conf42.com/Cloud_Native_2021_Joe_Karlsson_save_the_world_data_lakes) at the same event.
+
+[Watch the talk on YouTube](https://youtu.be/TbVJD1qUtQk).
+",talk,cloud2021,talk:cloud2021/Akanksha Sheoran,,Conf42,,queued,"databases, aws, aurora, dynamodb, database-migration"
+,Instance 42 shouldn't have a different config than instance 1,"Ismael Hommani and Joachim Rousseau (WeScale) at Conf42 Cloud Native 2021 on the configuration layer pattern, shown with Lightbend Config and HOCON",2021-04-01,cloud2021/configuration-layer-pattern-cloud-native,,"Cloud native patterns get written for services and data, and configuration is left to whoever writes the deploy script. At Conf42 Cloud Native 2021, [Ismael Hommani and Joachim Rousseau](https://www.conf42.com/Cloud_Native_2021_Ismael_Hommani_Joachim_Rousseau_cloud_application_configuration), Cloud Native Developer and Coding Architect at WeScale, argue for a third way between baking config into the artifact and scattering getenv calls everywhere: a configuration layer that ships the model with the code and pulls the values from the environment.
+
+## Why is config a cloud native problem?
+
+Their definition is the twelve-factor one: configuration is whatever is likely to vary between deploys. They split it in two: application configuration you control (third-party service locations, identifiers, algorithm settings) and values the platform hands you (IP address, port).
+
+The cloud part is scale and churn. You run hundreds or thousands of ephemeral instances and still want them to behave as one logical service, so the same input gets the same output on any of them. Statelessness handles the request-history half of that. ""What if my instance 42 contain a different configuration than the instance one? I won't have the same result for sure,"" Ismael Hommani said at Conf42 Cloud Native 2021. And there's no operator SSHing in to fix a file anymore; some instances you can't even connect to.
+
+## What's wrong with the two usual approaches?
+
+**Config baked into the artifact.** Developers like it: one central model, values right there. Operators don't: the artifact is now tied to an environment, the dev build can't go to staging, traceability between deploys breaks, and you're back to it works on my machine.
+
+**Twelve-factor, factor three: config in environment variables.** One artifact, which is good. But the code reads the environment directly, getenv calls spread through the codebase, and nobody has a single view of what the application needs to start.
+
+## What is the configuration layer?
+
+One artifact that carries the configuration model without the values. The values live in the environment, and the layer fetches them and exposes them to the application, which never touches the environment directly. They stress it is a concept, an association of libraries and patterns, not a product. Values can come from environment variables or from a config server such as Spring Cloud Config, backed by a Git repository, a blob store or Vault.
+
+They show it on a client's PHP estate. Before: an in-house CLI synced the code repo to servers and symlinked files from a second repo holding every application's config, exposing far too much and hiding the model from developers. Step one moved the templates into the source code and rendered them in a CI/CD pipeline with values fetched from Spring Cloud Config (still one package per environment). Step two moved the rendering into a Kubernetes init container that writes the config to a volume before the application starts.
+
+## What does it look like in code?
+
+Joachim Rousseau's demo is a Scala app on Lightbend Config, using the HOCON format (JSON-compatible, with dot paths, durations like 30 seconds, references and includes), in three layers:
+
+1. **reference.conf** in the jar: defaults only, under your own namespace, since all reference.conf files on the classpath get merged.
+2. **A fixed application file** in the jar, loaded as a fallback: values tied to this version of the artifact, such as business and algorithm parameters, optionally referencing environment variables.
+3. **A runtime file** outside the artifact, passed with a JVM system property and mounted as a volume: hostnames, ports, sizing.
+
+JVM system properties override everything. A client ID built from the app name and an instance ID that only exists when an environment variable is set means a missing variable throws at load time, and the app refuses to start. ""If the configuration is not consistent, we won't start,"" Joachim Rousseau said. PureConfig then maps the merged tree onto a typed Kafka consumer/producer model, so no code checks types at the moment of use. The debug output shows which file every value came from.
+
+## Who should watch
+
+JVM teams with config sprawl across environments, and anyone whose Helm values files have quietly become the real source of truth. The pattern isn't JVM-only, but the demo is.
+
+## Related Conf42 talks
+
+- Robert Hoffmann on [configuring infrastructure by coding](https://www.conf42.com/Cloud_Native_2022_Robert_Hoffmann_configuring_infrastructure_coding) at Conf42 Cloud Native 2022.
+- Stephane Jourdan on [infrastructure drift](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift) at the same event.
+- Elder Moraes on [making Java code cloud native ready](https://www.conf42.com/Cloud_Native_2021_Elder_Moraes_java_code_cloud_native_ready).
+
+[Watch the talk on YouTube](https://youtu.be/b5-qxyangIs).
+",talk,cloud2021,talk:cloud2021/Ismael Hommani,,Conf42,,queued,"configuration, cloud-native, twelve-factor, kubernetes, scala"
+,Microservices are supposed to be Dory. Most real apps are Marlin,"Mary Grygleski (IBM) at Conf42 Cloud Native 2021 on keeping state in cloud native microservices with sagas, LRA, JCache and Open Liberty on Kubernetes",2021-03-31,cloud2021/stateful-microservices-open-liberty-kubernetes,,"The twelve-factor app says processes should be stateless, and then your users want to stay logged in. At Conf42 Cloud Native 2021, [Mary Grygleski](https://www.conf42.com/Cloud_Native_2021_Mary_Grygleski_stateful_microservices_open_liberty_kubernetes), Developer Advocate at IBM, walked through where state lives once a system becomes a set of cloud native microservices: in the infrastructure (StatefulSets, persistent volumes, cookie affinity), in patterns (sagas and MicroProfile Long Running Actions), and in a distributed session cache, which she demoed with Open Liberty, JCache and Hazelcast.
+
+She is upfront that this is exploratory: a new topic for her, and examples that are not production level yet. Treat it as a map of the options, with one worked example.
+
+## Why does a stateless platform need stateful services?
+
+Her framing device is Finding Nemo. Dory forgets everything, which makes her fast and fearless (she happily bounces on jellyfish); Marlin remembers, which makes him careful and slow. Stateless computing is Dory: easy to scale out, trivial to recover after a crash. Stateful computing is Marlin: every new node must sync with the others, and recovery means rebuilding the state the system had before it fell over.
+
+""Realistically, we actually live in a stateful world and we really cannot survive if we are living statelessly,"" Mary Grygleski said at Conf42 Cloud Native 2021. A logged-in session that doesn't make you reauthenticate on every request is already state.
+
+## How did we do this before the cloud?
+
+In the client-server era the database carried most of the weight, with stateful Enterprise JavaBeans and servlet HTTP sessions on top, and cookies or tokens on the client. She contrasts the two auth styles: a cookie hands the server a session ID it has to look up, while a JWT can carry the session information itself, saving the lookup. The mechanisms haven't changed much; the topology has.
+
+## Where does state go in a cloud native system?
+
+She sorts the answers into layers:
+
+- **Infrastructure**: Kubernetes StatefulSets, persistent volumes and cookie affinity, which take the burden off the application.
+- **Caching**: still valid, now distributed.
+- **Patterns**: sagas, so a transaction can span services without falling back to two-phase commit. Choreography sagas pass events (order placed, then payment checks the card); orchestration sagas put a coordinator in the middle. She points to Chris Richardson's microservices.io as the reference.
+- **MicroProfile LRA** (Long Running Actions): a newer spec, supported in Open Liberty, built on a compensator model. There is no rollback in the database sense; a compensator works out what failed and reinstates the earlier state.
+
+## What does the demo show?
+
+The worked example is the Open Liberty guide on caching HTTP session data with JCache and Hazelcast. A small cart application with JAX-RS endpoints keeps its session in a Hazelcast-backed cache, so the data survives across instances. She runs it with Maven's Liberty dev mode (hot deploy on every change) on OpenJ9 with AdoptOpenJDK 15, then uses the OpenAPI UI to add bananas for $2 and read the cart back.
+
+The demo also shows the usual live-coding weather: the IDE run fails, the fix is running from the right directory in a terminal. Her advice when tooling misbehaves is to drop to the command line. A second repo, a stateful Kubernetes demo with NGINX and Hazelcast by her colleague Graham Charters, is left as homework.
+
+## Who should watch
+
+Java developers moving session-heavy applications into Kubernetes, and anyone who has been told microservices must be stateless and suspects it isn't the whole story. If you already run sagas in production, the theory half will be familiar; the Open Liberty guide is the practical takeaway.
+
+## Related Conf42 talks
+
+- Dmitry Khorev on [the saga pattern for distributed transactions](https://www.conf42.com/Cloud_Native_2023_Dmitry_Khorev_saga_pattern_distributed_transactions) at Conf42 Cloud Native 2023.
+- Rafal Leszko on [architectural caching patterns for Kubernetes](https://www.conf42.com/Cloud_Native_2021_Rafal_Leszko_architectural_caching_patterns_kubernetes) at the same event.
+- Natalie Pistunovich on [writing a Kubernetes operator for a distributed database](https://www.conf42.com/Cloud_Native_2021_Natalie_Pistunovich_k8s_operator_distributed_database).
+
+[Watch the talk on YouTube](https://youtu.be/6uQ_TzC1Vbk).
+",talk,cloud2021,talk:cloud2021/Mary Grygleski,,Conf42,,queued,"microservices, stateful, open-liberty, kubernetes, saga-pattern"
+,"Five languages, one trace, and the blank SSL credentials nobody mentions",Michael Sickles (Honeycomb.io) at Conf42 Cloud Native 2021 on porting Google's polyglot microservices demo from OpenCensus to OpenTelemetry,2021-03-30,cloud2021/opentelemetry-across-five-languages-one-trace,,"OpenTelemetry has a ""hello world"" for every language and very few examples where five languages share one trace. At Conf42 Cloud Native 2021, [Michael Sickles](https://www.conf42.com/Cloud_Native_2021_Michael_Sickles_telemetry_polyglot_environment), Solutions Architect at Honeycomb.io, took the CNCF/Google microservices demo (Go, Java, Node.js, .NET and Python on Kubernetes), ripped out its OpenCensus code and rebuilt the instrumentation in OpenTelemetry until a single checkout showed up as one trace across every service. The takeaway: auto-instrumentation gets you moving, but trace propagation breaks in small, language-specific ways, and you only find them in a real polyglot system.
+
+## Why bother with OpenTelemetry at all?
+
+His pitch is the lock-in argument. Vendor-specific agents mean every tool switch is a rewrite; OpenTelemetry means you instrument once and point the exporter at one vendor, or several, and compare. The demo app was a good target because it already used OpenCensus, and OpenCensus and OpenTracing merged into OpenTelemetry, so most concepts map across. In the Java service the change was close to search-and-replace: put attribute became set attribute, add annotation became add event.
+
+He also lays out the vocabulary before the code: a span is a timed unit of work, span attributes carry context like user and session IDs, span events are point-in-time logs such as exceptions, a trace is the set of spans for one user action, OTLP is the wire format, and exporters decide where the data goes.
+
+## How did each language behave?
+
+He worked front end to back end, one hop at a time.
+
+- **Go** (front end and three other services): wrap the gorilla/mux router with the OpenTelemetry middleware, add the gRPC wrapper, set up an OTLP-over-gRPC exporter with a batch span processor. Then copy and paste into the other Go services and change the service name.
+- **Java** (ad service): the agent hooks into the JVM and instruments Spring, HTTP, databases and Kafka from a few environment variables. The WithSpan annotation plus Span.current let him enrich auto-created spans without starting and stopping them by hand.
+- **Node.js** (payment and another service): a tracing.js loaded at startup with gRPC and HTTP plugins. The docs said the plugins would load automatically; they didn't, so he listed them explicitly. Node wasn't GA yet, and the API was already shifting from plugins to instrumentations.
+- **.NET** (cart service): built on Microsoft's own diagnostics libraries, so the naming differs, but the startup wiring was straightforward.
+- **Python** (email service and another): thinner documentation and a gRPC server interceptor to pick up the upstream trace ID.
+
+## What broke?
+
+Two things stand out. First, in Go, Node.js, .NET and Python a secure endpoint needed explicitly empty SSL credentials passed to the gRPC exporter; Java didn't, and he only found that by reading the libraries' source. Second, trace context didn't propagate until he added the automatic gRPC instrumentation in Go. ""The short answer is yes. The long answer is it took me a couple of tries,"" Michael Sickles said at Conf42 Cloud Native 2021, on whether the grand trace finally worked.
+
+There was also a Kubernetes casualty: with OpenTelemetry added, pods started too slowly for their readiness health checks and kept crashing, so he removed the checks for now.
+
+## Auto-instrumentation is the floor, not the ceiling
+
+The part worth stealing is the manual layer. On the front end he added email, zip code, state, country and session ID as span attributes, so a support ticket with a session ID turns into a query for that one user's checkout. ""Auto instrumentation is good, definitely to get up and going. It's not going to be the end, be all,"" he said. Since then he has added baggage, so the session ID propagates to every downstream span instead of living only at the edge.
+
+His to-do list is honest: more manual instrumentation, health checks back in, upgrades to GA versions, and injected slowness so the demo can show a tracing tool finding a bottleneck.
+
+## Who should watch
+
+Anyone instrumenting more than one runtime with OpenTelemetry, especially teams migrating from OpenCensus. The OpenTelemetry versions have moved on since 2021, so treat the specific API calls as history, but the propagation and TLS gotchas are the kind that still bite. His fork of the demo is linked from the talk.
+
+## Related Conf42 talks
+
+- Michael Haberman on [distributed tracing with OpenTelemetry](https://www.conf42.com/JavaScript_2021_Michael_Haberman_distributed_tracing_OpenTelemetry) at Conf42 JavaScript 2021.
+- Dotan Horovits on [monitoring microservices](https://www.conf42.com/Cloud_Native_2021_Dotan_Horovits_monitoring_microservices) at the same event.
+- Shelby Spees on [how Honeycomb moved its highest-volume service to Graviton2](https://www.conf42.com/Cloud_Native_2021_Shelby_Spees_graviton2_honeycomb_infra_spend_highestvolume_service).
+
+[Watch the talk on YouTube](https://youtu.be/RyxqYe8TGJU).
+",talk,cloud2021,talk:cloud2021/Michael Sickles,,Conf42,,queued,"opentelemetry, distributed-tracing, observability, microservices, kubernetes"
 ,Enterprise Software lands on Earth!,"My name is Apache Kafka, but everybody calls me Kafka",2021-03-25,2021-03-25-enterprise-software,./assets/splash/ENTERPRISE2021_Session_Splash.png,"# How do you feel about enterprise software? A big fan? Shy but curious? Or maybe just neutral? Whichever the case, we’ve got something for you!
 
 Listen to 21 epic talks covering some Java lifehacks, how to react in a world full of events, all about building your own Dependency Injection framework and many, many more! Our keynote speaker, [Liran Haimovitch](https://www.conf42.com/Enterprise_Software_2021_Liran_Haimovitch_understandability_wrong), will talk you through the most important idea in software, the underrated concept of understandability. 
