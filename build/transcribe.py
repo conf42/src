@@ -32,6 +32,17 @@ for event in context.get("events"):
             video_queue.append((talk, video))
 print(f"Found {len(video_queue)} talks with videos")
 
+# TRANSCRIBE_IDS="id1,id2" (workflow input): only those videos, re-done even if a transcript file exists (an empty
+# cache file or a corrected YouTube link) - everything else is left alone (Marek 2026-11-11)
+ONLY = {x.strip() for x in os.environ.get("TRANSCRIBE_IDS", "").split(",") if x.strip()}
+if ONLY:
+    video_queue = [(t, v) for t, v in video_queue if get_yt_id(v) in ONLY]
+    for _, v in video_queue:
+        p = "./assemblyai/%s.json" % get_yt_id(v)
+        if os.path.exists(p) and os.path.getsize(p) < 3:
+            os.remove(p)
+    print(f"Only {sorted(ONLY)}: {len(video_queue)} talks")
+
 # find all talks with missing transcriptions
 missing_transcriptions = []
 for talk, video in video_queue:
