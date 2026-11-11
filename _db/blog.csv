@@ -88475,6 +88475,457 @@ Students, career switchers, and anyone writing a Kubernetes onboarding session w
 
 [Watch the talk on YouTube](https://youtu.be/uqZ10obNqDo).
 ",talk,devops2024,talk:devops2024/Siddhant Khisty,,Conf42,,queued,"kubernetes, beginners, architecture, control-plane"
+,"A Docker Compose for Terraform, built to stop memorising workspaces","Dmytro Prekrasnyi (Westwing) at Conf42 DevOps 2024 on Terra Compose, a YAML wrapper that tames Terraform versions and workspaces in a mono-repo",2024-01-07,devops2024/terra-compose-terraform-monorepo-aliases,,"Every mono-repo full of Terraform has one person who knows which project uses Terraform 0.12, which workspace is called live rather than production, and which tfvars file ignores the naming rule. At Conf42 DevOps 2024, [Dmytro Prekrasnyi](https://www.conf42.com/DevOps_2024_Dmytro_Prekrasnyi_multiple_terraform_projects), Principal DevOps Engineer at Westwing, showed Terra Compose, the small open source wrapper he wrote to move that knowledge out of heads and into one YAML file, borrowing the idea from Docker Compose.
+
+## What does the mess look like?
+
+His starting point is a set of projects in one repository with four kinds of variety. Workspaces, roughly equal to environments, differ per project: some have staging and production, some have live and stage. Structures differ, because some projects split into components and add a directory level, and a shared common project (VPCs, for example) may sit somewhere else entirely. Terraform versions differ between projects, and even between workspaces of the same project while an upgrade is half done.
+
+The pain points follow: switching Terraform versions locally and in CI, snippets that only work for some projects, and workspaces that are invisible to version control. So everyone memorises the combinations, and onboarding a newcomer or pulling a colleague into troubleshooting means a tour of tribal knowledge. The alternative to the long, creeping per-project upgrade is upgrading everything at once, which nobody enjoys.
+
+## Why not Terragrunt or Terraform Cloud?
+
+He compares Terraform Cloud, Terragrunt, Terramate and Terraspace against those pain points. Terraform Cloud is the native SaaS option and good, but pricey, and workspaces still have low visibility. The others each solve some problems while adding their own required files or directory conventions. He wanted something with almost no overhead, and remembered that Docker Compose already solved the same shape of problem for containers: config as code, visible and traceable.
+
+## How does Terra Compose work?
+
+A config file has two blocks: `default`, holding shared properties such as a Terraform version, and `aliases`, one per project-environment pair, which can override anything. The only required property per alias is `path`. Others include `workspace`, `tfvars`, `tfversion`, a backend config, and hooks such as `before_tf_init`.
+
+When you run an action against an alias, Terra Compose reads the config and runs Terraform inside a Docker container at the right version, wrapping the command with the change of directory, init and workspace selection. Actions are plan, apply, workspaces, run (any command inside the container), shell and help. A plan chains init, fmt, validate and plan, so validation always happens, the saved plan is guaranteed validated, and fewer failures turn up in CI later. That is shift-left, enforced by laziness: the easiest command is also the correct one.
+
+## The demo, on AWS
+
+The demo projects create VPCs and security groups only. ""And also we will keep terraform state locally for simplicity, but please never do it in production,"" Dmytro Prekrasnyi said at Conf42 DevOps 2024.
+
+The common project has nonprod and production workspaces; production's tfvars file doesn't match its workspace name, so the alias just names it. Planning is `plan` plus the alias. Apply shows which saved plan file it will use and how long ago it was modified before asking for confirmation, a small touch that prevents applying yesterday's plan by accident. A `debug` suffix skips init, formatting and validation for quick iteration, which he recommends only during development.
+
+The second project shows the edge cases. An app component has integration and live workspaces plus an experimental state directory for integration, selected through a backend config property. Switching between aliases with different backend configs makes Terraform complain on init, so a `before_tf_init` hook deletes the `.terraform` directory. Apply writes to the experimental state and leaves the original untouched. The shell action drops you into the container for poking around.
+
+## What's still unsolved?
+
+He scores it honestly. Version switching, workspace visibility, traceability and onboarding: solved, because they are now attributes in YAML. Snippet compatibility is partly solved. Command chaining works but is hard-coded, so making actions customisable, and letting users add or override actions, is on the roadmap along with rethinking the command interface, since this began as a quick wrapper written three years earlier. Cost and complexity: open source, and in his experience about an hour to set up on a project. He floats a rewrite in Go and invites contributors.
+
+## Who should watch
+
+Teams with a Terraform mono-repo that grew project by project and now has more conventions than people who remember them, and anyone who finds Terragrunt too heavy for what they need. It is short and practical, and the YAML is the whole idea.
+
+## Related Conf42 talks
+
+- Hila Fish on [Terraform practices](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices) at Conf42 Cloud Native 2022.
+- Andrew Kirkpatrick on [self-service, PR-based Terraform](https://www.conf42.com/Site_Reliability_Engineering_2021_Andrew_Kirkpatrick_selfservice_PRbased_Terraform) at Conf42 SRE 2021.
+- Karol Pieciukiewicz on [private Azure DevOps agents built with Terraform and Packer](https://www.conf42.com/DevOps_2024_Karol_Pieciukiewicz_azure_devops_private_agents) at Conf42 DevOps 2024.
+
+[Watch the talk on YouTube](https://youtu.be/R7Ias3EeIYI).
+",talk,devops2024,talk:devops2024/Dmytro Prekrasnyi,,Conf42,,queued,"terraform, infrastructure-as-code, monorepo, docker, developer-tooling"
+,EKS Blueprints turns add-ons and team access into Terraform flags,"Samuel Baruffi (AWS) at Conf42 DevOps 2024 on bootstrapping EKS clusters with add-ons, teams and namespaces using EKS Blueprints",2024-01-06,devops2024/eks-blueprints-addons-teams-terraform,,"Creating an EKS cluster is the easy afternoon. The weeks go on everything after: metrics server, cert-manager, a load balancer controller, GitOps tooling, and a permissions model for every team, repeated across dev, test and production. At Conf42 DevOps 2024, [Samuel Baruffi](https://www.conf42.com/DevOps_2024_Samuel_Baruffi_bootstrapping_clusters_eks_blueprints), Senior Solutions Architect at AWS, showed how EKS Blueprints, AWS's open source framework for Terraform and CDK, collapses that bootstrap work into a few lines of infrastructure as code per add-on and team.
+
+Honest scope: this is an AWS architect presenting an AWS project. The first half is a Kubernetes and EKS refresher; the Terraform demo is the useful part.
+
+## Why is a bare cluster not enough?
+
+He walks a ""Kubernetes journey"" of decisions. Choose an orchestrator: EKS gives you a managed, single-tenant control plane spread across availability zones, with etcd replicated, a 99.95% SLA, automatic scaling of control plane instances and managed upgrades. It runs in AWS regions, Local Zones, Wavelength and Outposts, with EKS Anywhere for your own data centre.
+
+Choose a data plane: Fargate for serverless pods, or EC2 via managed node groups (AWS handles the scaling group and eases upgrades), self-managed node groups (rarely worth it, in his view), or Karpenter, which he calls probably the best option for everyone. The key difference he draws: a node group is pinned to one instance type family, while Karpenter can mix EC2 types at once, picking spot or on-demand with cost, performance and availability in mind.
+
+Then comes the part that hurts. A cluster on its own is not very useful without add-ons, and the CNCF ecosystem is enormous. ""There is no shortage of amazing tooling that can be deployed within the Kubernetes ecosystem,"" Samuel Baruffi said at Conf42 DevOps 2024. The catch is that there is no guide for putting it together. Install Prometheus, Grafana and OPA by hand from each project's repo and you can spend days or weeks on one cluster, before day-two questions like who gets admin, who gets read-only, and how you replicate it to a dozen more clusters.
+
+## What does EKS Blueprints give you?
+
+Four things, by his list:
+
+- **Cluster management**: VPC, security groups and the cluster itself built to AWS best practice, replicable across accounts and regions, into a new or existing VPC, on Amazon Linux, Bottlerocket or Fargate.
+- **Add-on management**: out-of-the-box integrations, from Argo CD, Flux, CoreDNS and External DNS to Cluster Autoscaler, Prometheus and Grafana, plus the AWS resources each one needs. Enabling metrics server and Kubecost is two lines.
+- **Team management**: distinct teams for platform admins and application owners, with namespace-scoped access.
+- **Workload management**: GitOps with Argo CD or Flux, so application teams onboard new workloads through a pull request.
+
+Both Terraform and CDK flavours are open source, each has a step-by-step AWS workshop, and the repositories ship patterns for common setups: fully private clusters, IPv6, Karpenter, EFS shared storage, EMR on EKS, Airflow and an observability stack with ADOT, OpenSearch and Amazon Managed Prometheus.
+
+## The demo: uncomment, apply, done
+
+The Terraform template uses the official EKS module (Kubernetes 1.27 in the demo) with a new VPC and a managed node group of m5.large instances, minimum one, maximum five, desired two. The add-ons block enables the official EKS add-ons (EBS CSI driver, CoreDNS, VPC CNI, kube-proxy) plus metrics server and cert-manager. A cluster build takes 15 to 20 minutes or more, so it was pre-deployed.
+
+Teams are where it gets interesting. An admin team gets full access. Two dev teams, red and blue, each get a namespace with labels, resource quotas and limit ranges for pods, persistent volume claims and containers, and they are deliberately read-only. Writes are meant to come from the GitOps tool, not from developers with kubectl.
+
+To add the AWS Load Balancer Controller, he uncomments one line and reruns Terraform; the controller's pods appear within seconds. As admin he deploys an Nginx Deployment with three pods, a ClusterIP service and an internet-facing ingress into the team-blue namespace, and an Application Load Balancer is provisioned with all three pods healthy in its target group. Switching kubectl context to the team-blue developer role, listing everything across namespaces returns a wall of forbidden errors, while pods and ingress in team-blue are visible. The Nginx page loads through the load balancer.
+
+## Who should watch
+
+Platform teams standing up more than a couple of EKS clusters, and anyone who has hand-rolled add-on installs and namespace RBAC and wants to compare notes with AWS's own defaults. If you already run a mature cluster factory, the patterns list may still save you a search.
+
+## Related Conf42 talks
+
+- Samuel Baruffi on [EKS clusters with Karpenter](https://www.conf42.com/Cloud_Native_2023_Samuel_Baruffi_aws_eks_cluster_karpenter) at Conf42 Cloud Native 2023.
+- Rohit Mishra on [Kubernetes operators and control loops](https://www.conf42.com/DevOps_2024_Rohit_Mishra_deepdive_kubernetes_operators) at Conf42 DevOps 2024.
+- Ismael Hommani and Clement Loiselet on [Flux and Argo CD](https://www.conf42.com/DevOps_2023_Ismael_Hommani_Clement_Loiselet_flux_argocd) at Conf42 DevOps 2023.
+
+[Watch the talk on YouTube](https://youtu.be/2qVAe8ypkUY).
+",talk,devops2024,talk:devops2024/Samuel Baruffi,,Conf42,,queued,"kubernetes, aws-eks, terraform, platform-engineering, multi-tenancy"
+,"Skip the staging cluster, route by header inside dev","Aleksandr Tarasov and Dmitry Ulianov (Cenomi) at Conf42 DevOps 2024 on merging dev and test into one cluster with header routing, per-branch Pub/Sub and DBs",2024-01-06,devops2024/one-cluster-dev-test-header-routing,,"The obvious answer when the CTO asks where testing happens is another cluster between dev and prod. At Conf42 DevOps 2024, [Aleksandr Tarasov](https://www.conf42.com/DevOps_2024_Aleksandr_Tarasov_Dmitry_Ulianov_cocktail_of_environments_mixtest), Principal Platform Engineer, and Dmitry Ulianov, Director of Platform & Infrastructure, both at Cenomi, argued for the opposite: one physical cluster holding a production-like stable dev plus any number of branch and release-candidate versions, selected per request by a routing header. They cover the three hard parts, request routing, event routing and data isolation, and they are frank about the cost in people's heads.
+
+## What were they trying to fix?
+
+Four goals: an always-stable test environment, a smaller gap between developers and QA (developers ignore a QA-only environment), parallel testing where two testers don't trample each other, and keeping it as simple as possible. The background pressure is microservice sprawl. ""If you have hundreds of microservices, it's becoming quite tricky and hard to keep it stable,"" Aleksandr Tarasov said at Conf42 DevOps 2024.
+
+The design has one physical cluster with several logical environments. **Stable dev** always runs every service at its production version and receives all default traffic. **Branch dev** lets each developer deploy a feature branch next to it. **Release candidate dev** holds every new release before it moves on.
+
+## How does a request find your branch?
+
+Through a header, `x-service-route`, carrying the service name and a reference: `payment-service:mp-101` sends payment calls to the branch built from feature MP-101, while every other hop in the call chain goes to stable. Front-end testers use a cookie of the same name, which Nginx unpacks into the header. Chain several pairs to test multiple branches at once, and QA uses the fixed reference `rc` for release candidates.
+
+They implement it with Istio. Each stable service ships an Istio VirtualService through the common Helm chart. The snag is that branches and release candidates are separate Helm releases and cannot all manage one VirtualService, so they use a VirtualService merge operator: every branch deploys a small patch resource that adds its header-match route to the target VirtualService.
+
+## What about webhooks from the outside world?
+
+Third parties know nothing about your branches. Changing the webhook URL on the provider side would break the stable version. A fake of the external service works and makes tests independent of the provider being up. They chose a smart proxy instead: outbound calls go through it, it stores a correlation ID (an order or payment ID) in an in-memory key-value store, and routes the callback to the right branch or release candidate. That keeps genuine end-to-end tests against the real provider.
+
+## Events are the harder half
+
+Background events from cron jobs and producers don't carry HTTP headers, and the test matrix doubles: a new consumer version may need events from a stable producer, and a new producer version may need a stable consumer.
+
+Their answer is still one topic, but subscriptions per release candidate and per branch, since a shared branch subscription would let developers interfere. Release candidate subscriptions are static, created by changing the Pub/Sub module in their service catalog's state machine. Branch subscriptions are dynamic: a service they call Environment Hub registers the branch on its first pipeline run, the Pub/Sub module is reapplied, and deregistering on branch deletion removes it again.
+
+A shared library does the clever part in every service. It copies the routing header from the request context into message attributes, decides before deserialising whether this instance should process or skip the message, and puts the header back into the client context so the call chain continues through events as well as HTTP and gRPC. The tricky case is stable: a message tagged `mp-102`, where no MP-102 version exists, must still be processed by stable or data goes missing. So the library fetches the live list of versions from Environment Hub.
+
+## Isolation that is good, not perfect
+
+A developer's migration can break a shared database, so each branch gets its own logical database on first deployment, imported by a Terraform module from nightly exports of stable dev data to GCS. Large databases make that slower, and data across services can be inconsistent: a branch payment service may face orders with no payment. After talking to the engineering teams they accepted that risk, since microservices should tolerate some data skew anyway.
+
+Combine all of this and you get ephemeral environments: one service branch, several branches under one route, or custom environments per squad or per domain such as warehouse.
+
+## Is it worth it?
+
+Benefits: no silo between dev and QA, on-demand environments, fewer clusters and a cost saving they estimate at maybe 10 to 20% of infrastructure, plus more consistent configuration. Drawbacks: high cognitive load, real time investment, and isolation that is not entirely fair, with shared GCS buckets as one example. One colleague, they joke, responded to the LinkedIn announcement with a remark about his antidepressant budget. You need dynamic infrastructure, an internal developer portal and comfort reading distributed traces.
+
+## Who should watch
+
+Platform teams with dozens or hundreds of microservices whose staging environment is always broken, and anyone evaluating preview environments on Istio and Pub/Sub.
+
+## Related Conf42 talks
+
+- Natalie Lunbeck on [ephemeral environments](https://www.conf42.com/Cloud_Native_2024_Natalie_Lunbeck_ephemeral_environments) at Conf42 Cloud Native 2024.
+- Lucas da Costa on [a blueprint for staging environments](https://www.conf42.com/Cloud_Native_2023_Lucas_da_Costa_staging_environments_blueprint_preproduction) at Conf42 Cloud Native 2023.
+- Rob Richardson on [service mesh](https://www.conf42.com/Kube_Native_2023_Rob_Richardson_service_mess_service_mesh) at Conf42 Kube Native 2023.
+
+[Watch the talk on YouTube](https://youtu.be/wNZB2QYASl0).
+",talk,devops2024,talk:devops2024/Aleksandr Tarasov,,Conf42,,queued,"ephemeral-environments, istio, testing, microservices, pubsub"
+,A Kubernetes operator is a control loop that knows your database,"Rohit Mishra (Google Cloud) at Conf42 DevOps 2024 on control loops, CRDs and building a Redis operator with Operator SDK",2024-01-05,devops2024/kubernetes-operators-control-loops-explained,,"You apply one Deployment and go fetch coffee; behind your back, four separate control loops hand the work along until three Nginx containers exist. At Conf42 DevOps 2024, [Rohit Mishra](https://www.conf42.com/DevOps_2024_Rohit_Mishra_deepdive_kubernetes_operators), Senior Customer Engineer at Google Cloud, used that chain to explain what Kubernetes operators really are: custom control loops plus the operational knowledge a human used to carry around, packaged so the cluster can run stateful workloads for you.
+
+The talk builds bottom-up, from control plane architecture to a working Redis operator scaffolded with Operator SDK and run against a local kind cluster. It is a solid first look under the hood if you have used CRDs without ever writing the controller behind one.
+
+## What does a control loop actually do?
+
+Mishra starts with the controller manager, the control plane component that runs Kubernetes' built-in control loops. Each loop watches one kind of API object, compares the desired state you declared with what it observes in the cluster, and acts or asks another controller to act. That is what keeps three replicas at three after one crashes overnight.
+
+He traces a Deployment end to end. The API server persists it; the deployment controller asks for a ReplicaSet; the ReplicaSet controller sees zero of three pods and asks for three; the scheduler finds nodes; each node's kubelet, itself a loop, notices pods assigned to it and starts the containers. The user asked for one object. He also shows the real ReplicaSet controller code on GitHub, which boils down to computing the difference between desired and observed pods and creating or deleting accordingly.
+
+Every controller, whatever framework built it, has three parts in his model: an informer that watches state and handles resync, a work queue that buffers changes and retries failures, and the events themselves (add, update, delete). He recommends the O'Reilly book *Programming Kubernetes* and Andrew Chen and Dominik Tornow's writing on Kubernetes mechanics for the gory details.
+
+## Why doesn't Kubernetes lock anything?
+
+The section most worth rewinding for is optimistic concurrency. Locking shared state would hurt performance and scale, so Kubernetes does not do it. Every resource carries a resource version; if you fetch an object, modify it and write it back after someone else changed it, the API server rejects your write because you were working on stale data. The client, usually a controller, is expected to requeue, refetch and try again. If you have ever seen a conflict error from a controller and wondered whether something was broken, this is why it is normal.
+
+## So what makes a controller an operator?
+
+""Operators are basically control loops, or you can think of them as custom control loops and more,"" Rohit Mishra said at Conf42 DevOps 2024. The more is operational intelligence. CoreOS introduced operators in 2016 to codify what the people running a workload in production know. His running example is a database: backups, snapshots, point-in-time recovery, transaction log archiving, replicas and high availability. Fine by hand for two or three databases, impossible for thousands.
+
+An operator has two building blocks. Custom resources, available since Kubernetes 1.7, extend the API with your own kinds, defined and validated by a CustomResourceDefinition. Istio, Linkerd, Flux and Argo all lean on them. But a custom resource on its own does nothing: it gets persisted, you can query it, and no loop in the cluster knows what to do with it. The custom controller is the missing piece, and the two together are the operator.
+
+## Which framework should you use?
+
+He walks the tooling: Kubebuilder, maintained by SIG API Machinery, provides the manager, client, cache, reconciler and webhook packages; Operator SDK, from CoreOS and Red Hat, builds on it with scaffolding, code generation and automated tests, and lets you write operators in Go, Ansible or Helm. If Python is your language, he points at Kopf. Go helps if you want to read Kubernetes internals, but it is not a requirement.
+
+## The Redis operator demo
+
+The commands are short: `operator-sdk init --domain acme.io`, `operator-sdk create api --group cache --version v1alpha1 --kind Redis`, then `make generate`, `make manifests` and `make install run` to run the controller locally against the kind cluster. The reconciler looks up the Redis resource, handles finalizers on delete, then finds or creates a Deployment and corrects any drift between the requested size and the observed replica count.
+
+Applying a Redis resource with three replicas produces a Deployment with three healthy pods. Deleting the Redis resource deletes the Deployment too, because the controller sets an owner reference on it; without that, he notes, the built-in controllers would own the Deployment instead of yours. He also suggests where to take it: enforce non-root containers, read-only file systems or approved image tags in the controller, so users get a simple abstraction with your rules baked in.
+
+## Who should watch
+
+Platform engineers about to write their first operator, and anyone who installs operators daily and wants to know what they are doing in the cluster. Kubernetes basics are assumed; Go is not.
+
+## Related Conf42 talks
+
+- Natalie Pistunovich on [a Kubernetes operator for a distributed database](https://www.conf42.com/Cloud_Native_2021_Natalie_Pistunovich_k8s_operator_distributed_database) at Conf42 Cloud Native 2021.
+- Stephen Atwell on [continuous delivery for stateful applications](https://www.conf42.com/Database_DevOps_2026_Stephen_Atwell_cd_stateful_applications) at Conf42 Database DevOps 2026.
+- Samuel Baruffi on [bootstrapping clusters with EKS Blueprints](https://www.conf42.com/DevOps_2024_Samuel_Baruffi_bootstrapping_clusters_eks_blueprints) at Conf42 DevOps 2024.
+
+[Watch the talk on YouTube](https://youtu.be/_WDaKgFrj8A).
+",talk,devops2024,talk:devops2024/Rohit Mishra,,Conf42,,queued,"kubernetes, operators, crd, operator-sdk, golang"
+,Learning Vi at 16 and Tivoli by accident still paid off,"Leon Adato (Kentik) at Conf42 DevOps 2024 on why 35 years of dead-end tools, bad bets and outages still paid off in his tech career",2024-01-04,devops2024/no-such-thing-poor-tech-choice,,"An 80-hour WordPerfect certification sounds like the worst use of a week anyone in IT ever made. At Conf42 DevOps 2024, [Leon Adato](https://www.conf42.com/DevOps_2024_Leon_Adato_poor_tech_choices), Principal Technical Evangelist at Kentik, argued it was not, and neither were most of his other dead ends. His claim after 35 years in tech, about 25 of them in monitoring and observability: there is no such thing as a poor technical choice, because the lessons travel even when the tool doesn't.
+
+He calls it an oyster talk, an idea borrowed from parenting educator Barbara Coloroso. Half an hour is too short to teach anything, so the best he can do is irritate you. ""Now, when an oyster becomes irritated, it does one of two things. It either creates a pearl or it dies,"" Leon Adato said at Conf42 DevOps 2024.
+
+## OK, a few choices really are bad
+
+He hedges almost immediately. No backups is bad. Thinking replicas, mirrors or RAID are backups is bad. Moving fast and breaking things belongs in test, and you do have a test environment, right? Trying to do it all yourself is bad. And Oracle, he suggests, is a bad choice for literally anything, which will land well or badly depending on your employer.
+
+## Every dead end left a tool behind
+
+The core of the talk is a string of stories where a seemingly wasted effort paid off later:
+
+- **Vi on the Cleveland Freenet.** As a teenager on the free community BBS, he picked Vi as his editor more or less at random. Years later a grumpy Unix admin needed to train someone from desktop support on a new system and warned that first they'd have to learn this weird editor nobody gets. Adato already knew it, and got the job, which was learning BIND 8.
+- **WordPerfect's reveal codes.** That 80-hour certification test (taking it, not studying for it) taught him how hidden formatting codes work, so HTML took him about 15 minutes to grasp.
+- **A newsletter nobody read.** He typed tech-magazine snippets into web pages on a server the Unix admin set up for him, then learned enough Perl to automate it. Nobody read the pages. When he was later out of work, building websites faster than most people put food on the table.
+- **Tivoli.** His first monitoring tool, a multi-million-dollar suite that was, in his words, a gang of Perl scripts in a trench coat feeding a CORBA backend. It crashed and corrupted itself whenever he nested groups more than three levels deep, which turned out to be the object database's containment limit. Three weekends of rebuilds taught him to understand a tool's architecture and pedigree before trusting it.
+
+## The career move that went wrong
+
+The work on Tivoli got him noticed at Nestlé, which moved his family to Switzerland in September 2000 for a global monitoring project covering 250,000 systems in 5,000 locations. Roughly six months later the dot-com bubble burst, the project was sent home, and he was without steady work for 18 months. The lessons there were not technical: humility, mental health, his worth beyond a paycheck, and who his friends were.
+
+## Two outages, one firing: what was the difference?
+
+The sharpest operational story is one he watched rather than caused. Two Sev 1 incidents, one week apart, both caused by a configuration change in production. One person was walked out the door; the other got a stern talking-to. The one who stayed flagged the failure immediately, owned it, and stayed through the fix bringing coffee and pizza. The one who left tried to bury it. ""There's always a log file,"" he said. His rule: there should be no expectation of perfection, but there should be one of decency.
+
+He has his own entry in that file: an alert tweak that opened 772 tickets twice in 15 minutes. The help desk made him close all 1,544 by hand and would not let him use the mass-close function. Years later, as a DevRel advocate for that vendor, he pushed for a warning screen before that kind of change, and got one.
+
+## How do you choose when every option might be wrong?
+
+Kubernetes or not, AWS or Azure or GCP or all three, buy a monitoring tool or build it: the choices are paralysing. He leans on Seth Godin's answer to technical FOMO, that the thing you have now is worth working with rather than waiting for the next one. His closing point is that even his misspent youth (talking too much, obsessive note-taking, years of theatre) turned out to be job training for developer relations, because ""it was never about the tech.""
+
+He made the talk open source on GitHub so anyone can submit their own version to a conference CFP.
+
+## Who should watch
+
+Anyone mid-career wondering whether the last five years on a now-dead stack were wasted, and engineers who need the blameless-but-accountable incident story for their next team meeting. Pure storytelling, very funny, zero YAML.
+
+## Related Conf42 talks
+
+- Andrew Murphy on [Zeno and Stoicism for tech leaders](https://www.conf42.com/DevOps_2024_Andrew_Murphy_athens__algorithms__zeno__tech_leader) at Conf42 DevOps 2024.
+- Julie Gunderson on [blameless postmortems and continuous learning](https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture) at Conf42 Chaos Engineering 2021.
+- Leonid Yankulin on [actionable alerts](https://www.conf42.com/Observability_2024_Leonid_Yankulin_actionable_alerts_fix) at Conf42 Observability 2024.
+
+[Watch the talk on YouTube](https://youtu.be/pP9yZZrHqUI).
+",talk,devops2024,talk:devops2024/Leon Adato,,Conf42,,queued,"career, monitoring, devrel, incident-response"
+,"Your GitHub organisation, built three times as code","Jhonnatan Gil Chaves (Globant) at Conf42 DevOps 2024 on agile, DevOps and version control, with a GitHub org built in OpenTofu and Pulumi",2024-01-04,devops2024/github-org-as-code-opentofu-pulumi,,"Branch protection clicked together in the GitHub settings page is a rule nobody can review. At Conf42 DevOps 2024, [Jhonnatan Gil Chaves](https://www.conf42.com/DevOps_2024_Jhonnatan_Gil_Chaves_agile_efficiency_git), DevOps and SRE engineer at Globant, ran through the path from waterfall to agile to DevOps, then showed the practical end of it: a GitHub organisation's template repository, team, members and branch protection created as code, once with OpenTofu and once with Pulumi in Python.
+
+Honest scope: the first two thirds are an introduction to agile, the SDLC and version control, aimed at people new to DevOps. The demo is where practitioners will want to skip to.
+
+## Why does DevOps need agile first?
+
+He starts with the familiar contrast. Waterfall means big requirements, long timelines, late customer feedback, big releases, and development, QA and business teams working apart with plenty of friction. Agile means granular requirements, short cycles, fast feedback, small and quick releases, and teams that collaborate, anchored in the four values of the Agile Manifesto.
+
+His point is that DevOps sits on top of that. If a company doesn't already work in an agile culture, he argues, DevOps is very hard to implement, or gets implemented the wrong way. He frames DevOps with CALMS: culture, automation, lean, measurement and sharing, with the reminder that without measurement you cannot see the impact of the change you made.
+
+## Version control is not just for application code
+
+The SDLC section walks requirements analysis, design, implementation and testing, with testing in every phase. Version control is the thread through it, and his key claim is that once you put your work into code, the repository holds far more than application source: infrastructure as code, automation as code, security as code. So the version control system stops being a developer tool and becomes everyone's, which is how you take down the wall of confusion between development, operations, QA, security and networking.
+
+CI is then pulling code from version control, compiling, testing and producing an artifact; CD is getting that artifact onto Kubernetes, Docker or virtual machines, in the cloud or on premises. He names Jenkins, GitLab CI, GitHub Actions and Azure DevOps as orchestrators without picking a favourite.
+
+## The demo: a GitHub org in OpenTofu, then Pulumi
+
+The demo repo (linked from the talk) starts with a disclaimer worth repeating: ""please don't execute this on production"". Setup is manual once: create a free GitHub organisation, enable tokens for it, generate a personal access token with repository and organisation permissions, export it and confirm with a curl against the GitHub API that you get something other than a 401.
+
+Tool versions are pinned in a `.tool-versions` file for asdf: Python, Terraform, Pulumi and OpenTofu, plus terraform-docs to generate module documentation automatically, which he pitches as the start of continuous documentation.
+
+The OpenTofu run creates seven objects: a template repository, its main branch and default branch setting, a development team, the team's access to the repository, a team membership and the branch protection rule. He singles out the last one as the most important, because the protection rules encode your branching strategy for every team. The first apply fails on a mistyped organisation variable, he fixes it live, and the org appears with the repository, team and branch settings in place.
+
+Then he destroys it and builds the same thing in Pulumi with Python, to show that the IaC tool is a team choice rather than a religion. The same code exists for Terraform too.
+
+## Who should watch
+
+People early in a DevOps role who want the agile-to-CI/CD story in one sitting, and anyone who manages a GitHub organisation by hand and wants a starting point for managing it as code. The transcript is hard going in places, so the demo repository and the video are the better companions.
+
+## Related Conf42 talks
+
+- Leo Diaz Longhi on [GitHub for platform engineering](https://www.conf42.com/DevOps_2024_Leo_Diaz_Longhi_github_platform_engineering) at Conf42 DevOps 2024.
+- Travis Gosselin on [fortifying your codebase on GitHub](https://www.conf42.com/DevSecOps_2023_Travis_Gosselin_fortifying_codebase_github) at Conf42 DevSecOps 2023.
+- Debosmit Ray on [GitOps automation for efficient platforms](https://www.conf42.com/DevOps_2024_Debosmit_Ray_gitops_automation_efficient_platforms) at Conf42 DevOps 2024.
+
+[Watch the talk on YouTube](https://youtu.be/VBNL7-Za-SM).
+",talk,devops2024,talk:devops2024/Jhonnatan Gil Chaves,,Conf42,,queued,"git, github, infrastructure-as-code, opentofu, pulumi"
+,What a volunteer salmon hatchery teaches about DevOps stakeholders,"Brian Walter (OpenContext) at Conf42 DevOps 2024 on sociotechnical engineering, told through fly fishing on Oregon's Wilson River",2024-01-03,devops2024/devops-lessons-from-a-salmon-river,,"A fish hatchery with a dozen government agencies, Canadian treaties and a pile of advocacy groups weighing in on every decision looks a lot like your release process. At Conf42 DevOps 2024, [Brian Walter](https://www.conf42.com/DevOps_2024_Brian_Walter_river_runs_through_it), co-founder and CEO of OpenContext, used fly fishing on Oregon's Wilson River to explain sociotechnical engineering: the idea that people and technology form one system, and DevOps only works when you treat them that way.
+
+He is upfront that he could have called it a talk on sociotechnical engineering for DevOps, ""but then all the cool fish pictures wouldn't have made sense."" It is a reflective, principles-level talk, not a tooling one.
+
+## A river loved to death
+
+Walter, who has spent 27 years building technical teams across four startups and six enterprises, lived in a cabin on the Wilson River near Tillamook. The river's closeness to Portland made it hugely popular, and by the 1980s and 1990s its Chinook, coho and steelhead fisheries were collapsing under pressure, harvest, logging and habitat loss. By 2000, salmon runs were down by 80%.
+
+Today, he says, more than half of the salmon and steelhead runs in Tillamook Bay start at the Whiskey Creek hatchery, almost entirely volunteer run. Running it means satisfying more than a dozen state, federal, tribal and international agencies, plus local fishery advocates, environmental groups and commercial interests. Some are easy, some are obstinate. On the Columbia River, with the largest salmon run in the world, it is ten times more complicated.
+
+His mapping is direct: those groups are your product team, finance, compliance and customers. ""Everyone cares, everyone has a voice, and everyone can make a complete mess of your project,"" Brian Walter said at Conf42 DevOps 2024. What keeps the hatchery running is everyone agreeing they want a healthy river, and accepting that compromise is often the answer.
+
+## What is sociotechnical systems theory, briefly?
+
+Walter is clear he is a learner here, crediting John Willis (and his book on Edward Deming), Andrew Clay Shafer and James Wickett. The theory, as he summarises it: a holistic systems view of people, teams, code and infrastructure; feedback loops and continuous learning; collaboration and shared craft; adaptive design; resilience and anticipatory measures; and ethics and human values. If that reads like the DevOps manifesto you half-remember, that is the point: DevOps has its roots there.
+
+## How does an introvert do the socio part?
+
+The most relatable section. Borrowing Simon Sinek's framing, an introvert starts the day with five coins and spends one on every human interaction; an extrovert starts with none and earns them. If DevOps runs on cross-team interaction, how do introverts survive it? His tools: asynchronous communication, deliberate writing, and real-time context maps of the environment. ""Nothing kills me faster than an 80 person conference bridge just to solve an incident,"" he said. The general lesson is empathy for whichever kind of person is on the other end.
+
+## Six principles, on the river and in production
+
+The rest pairs six DevOps principles with fishing:
+
+- **Systems thinking**: anglers read the whole river, from insect cycles to water temperature and clarity, before they cast; teams understand the environment and set up monitoring before deploying.
+- **Feedback and iteration**: not every cast catches a fish, and not every deployment is smooth. You observe, adjust and go again.
+- **Collaboration and shared knowledge**: fishing can be solitary, but anglers trade spots, fly patterns and techniques; tying flies is a craft honed over years, like a good pipeline.
+- **Adaptability**: a river can change completely within hours, with or without you being ready.
+- **Resilience through problem solving**: weather, gear failures, fish that won't bite. In DevOps, he adds, failures are often human rather than technical.
+- **Ethics, community and sustainability**: catch and release on the river; data privacy, security, sustainable work practices and carbon footprint in tech.
+
+## The pitch at the end
+
+He closes by explaining his interest: OpenContext builds an auto-discovered sociotechnical map linking people, code, infrastructure and vulnerabilities, so you can find who can fix a problem faster. It was in open beta at the time. That pitch is a minute; the rest is the river.
+
+## Who should watch
+
+Engineers who suspect their incident problems are mostly people problems, introverts on large on-call rotations, and anyone who likes their systems thinking with fish pictures. Skip it if you want config files.
+
+## Related Conf42 talks
+
+- Cansu Kavili Ornek and Val Yonchev on [team topologies principles in platform engineering](https://www.conf42.com/Platform_Engineering_2024_Cansu_Kavili_Ornek_Val_Yonchev_topologies_principles_engineering) at Conf42 Platform Engineering 2024.
+- Christopher Harrison on [changing culture, not just tools](https://www.conf42.com/DevOps_2023_Christopher_Harrison_change_culture__not_just_tools) at Conf42 DevOps 2023.
+- Matt Harrison on [consulting for introverted developers](https://www.conf42.com/Python_2023_Matt_Harrison_consulting_introverted_developers) at Conf42 Python 2023.
+
+[Watch the talk on YouTube](https://youtu.be/g7SKnbeIP6M).
+",talk,devops2024,talk:devops2024/Brian Walter,,Conf42,,queued,"sociotechnical, devops-culture, systems-thinking, collaboration"
+,Earn the right to criticise - five compliments for every correction,Yasia Romanets (Pegasystems) at Conf42 DevOps 2024 on the standards-devotion matrix and the 5:1 ratio of positive reinforcement to advice,2024-01-02,devops2024/feedback-five-to-one-ratio,,"Most engineering managers swing between pushing too hard and being too nice, and blame the team for the whiplash. At Conf42 DevOps 2024, [Yasia Romanets](https://www.conf42.com/DevOps_2024_Yasia_Romanets_positive_constructive_feedback), Senior Manager, Cloud Engineering at Pegasystems, gave a compact talk on breaking that loop: split feedback into positive reinforcement and constructive advice, keep both short and specific, and give the first five times as often as the second.
+
+It is a short, management-focused talk built on the Leadership Consortium course taught by Harvard Business School professors, which she graduated from, plus five years managing cloud engineers at Pega. No tooling, no metrics dashboards, just a framework you can try on Monday.
+
+## Where do you sit on the standards-devotion matrix?
+
+The core model, from Frances Frei and Anne Morris's book *Unleashed*, plots two things: how high your standards are for someone, and how much they feel you care about their success.
+
+- **Neglect**: low standards, low devotion. Rare, and not worth dwelling on.
+- **Severity**: high standards, low devotion. She says this is where we often land with peers, thanks to peer bias: you expect far more from a colleague at your own level than from anyone above or below.
+- **Fidelity**: high devotion, low standards. Comfortable, a little too kind, and people stagnate there.
+- **Justice, or love**: high standards and deep devotion. The quadrant you want with your direct reports.
+
+## Why managers keep bouncing between too hard and too soft
+
+Human nature, she argues, makes you oscillate. You start in severity, people say they are burning out, you lower the bar to make them comfortable, and you drift into fidelity. Then one morning you notice nothing ships, raise the bar again, and you are back in severity.
+
+The way out is to move on each axis separately. Devotion goes up through inquiry: asking how you can help someone be most successful, and what opportunities you can open for them. ""And remember, the currency of love is attention,"" Yasia Romanets said at Conf42 DevOps 2024. Standards go up through feedback, which is the rest of the talk.
+
+## Does feedback depend on culture?
+
+Yes, and she spends a few minutes on Erin Meyer's *The Culture Map* to show how much. On the direct-negative-feedback end sit the Netherlands, Ukraine, Poland and France, where people will tell you plainly what you did wrong, sometimes in front of the group, and nobody thinks it rude. Japan sits at the indirect end, where you listen for what is not said. The US and India lean indirect; the US gets the compliment sandwich, which she says you should never use.
+
+Her answer to the culture problem is to reframe feedback so it works anywhere.
+
+## Positive reinforcement and constructive advice, timed
+
+The two halves are defined by what they ask for and how long they take:
+
+- **Positive reinforcement**: catch someone doing something well and tell them to do more of it. About 12 seconds is enough. Specific and sincere. Give it all the time.
+- **Constructive advice**: catch someone doing something not quite right and tell them to do it a little differently. At most 10 seconds. Specific, non-judgemental and developmental. Give it as soon as possible after you notice.
+
+Then the number the talk is really about. ""And the ratio is five to one,"" she said. If you only ever correct people, they conclude you never notice the good work and stop taking the advice seriously. Frequent reinforcement buys the credibility the advice needs. Want to give constructive advice once a day? Five pieces of positive reinforcement a day. Once a month? Roughly once a week. And because advice has to land quickly after the event, the reinforcement has to start now, not after the first awkward conversation.
+
+## The homework
+
+Three tasks: find your default quadrant, and which quadrant you occupy with each person; reveal your devotion by asking more questions; and practise constructive advice out loud with a friend, telling them up front that you are practising and might be clumsy at first. For further reading she points to Marcus Buckingham's work on the feedback fallacy.
+
+## Who should watch
+
+New engineering managers, tech leads who suddenly have reports, and senior ICs who give peer reviews and wonder why they land badly. It is short, so it costs you less time than one bad one-to-one.
+
+## Related Conf42 talks
+
+- Andrew Murphy on [Zeno's paradoxes as a tech leader](https://www.conf42.com/DevOps_2024_Andrew_Murphy_athens__algorithms__zeno__tech_leader) at Conf42 DevOps 2024.
+- Nathen Harvey and Amanda Lewis on [building high-performing teams](https://www.conf42.com/DevOps_2023_Nathen_Harvey_Amanda_Lewis_building_highperforming_teams) at Conf42 DevOps 2023.
+- Christopher Harrison on [changing culture, not just tools](https://www.conf42.com/DevOps_2023_Christopher_Harrison_change_culture__not_just_tools) at Conf42 DevOps 2023.
+
+[Watch the talk on YouTube](https://youtu.be/jHJiHQ_STrQ).
+",talk,devops2024,talk:devops2024/Yasia Romanets,,Conf42,,queued,"engineering-management, feedback, leadership, culture"
+,A Stoic's guide to inheriting a messy team,"Andrew Murphy (Tech Leaders Launchpad) at Conf42 DevOps 2024 on applying Zeno's Stoicism, starting with the dichotomy of control, to tech leadership",2024-01-02,devops2024/stoic-dichotomy-of-control-tech-leads,,"You inherit a team with bad habits, the market is in the bin and the client just made a decision nobody understands. At Conf42 DevOps 2024, [Andrew Murphy](https://www.conf42.com/DevOps_2024_Andrew_Murphy_athens__algorithms__zeno__tech_leader), founder of Tech Leaders Launchpad, argued that a 2,300-year-old philosophy already has the playbook: Stoicism, as taught by Zeno of Citium, mapped onto the daily life of a tech leader.
+
+It is a lightning talk, 15 to 20 minutes, with no code and no slides worth screenshotting. What it does have is a clear three-part model and a speaker who opens by humiliating himself on purpose.
+
+## Which Zeno?
+
+The opening story is the best bit of honest scope you will hear at a conference. Murphy loves maths, read about Zeno's paradoxes, read about Stoicism, assumed the two Zenos were one man, and built an intro on the mathematics. A friend pointed out they were different people. ""Turns out Zeno is the John Smith of the ancient greek era,"" Andrew Murphy said at Conf42 DevOps 2024. So no arrows and no tortoises: this is Zeno of Citium, born on Cyprus, who also helped formalise logic and the idea of cosmopolitanism, being a citizen of the world rather than of a tribe or country.
+
+Murphy's own route to the topic is less funny. He has been paid to write code for about 20 years and was running a team of ten at 24. ""I sucked at it,"" he said, and the mistakes landed on the people he led. That sent him into learning, then teaching, leadership, and eventually into founding a company that trains new tech leaders.
+
+## Stoicism in one triangle
+
+He reduces Stoicism to three tenets:
+
+- **The dichotomy of control**: focus only on what you control, accept what you don't, and save the energy.
+- **Take responsibility for your judgments**: own the decisions and actions that are yours.
+- **Live with arete**: be your best self through constant improvement.
+
+Do all three and you head towards eudaimonia, which literally translates as a happy inner demon. Murphy suggests reading it as a happy inner self, which plays better in a performance review.
+
+## What is actually in a tech leader's control?
+
+This is the meat of the talk. You control your actions, reactions and attitudes; you can influence other people and events but not control them. He walks through three things leaders fixate on:
+
+- **Team dynamics you inherited.** How the team got its habits and skill gaps was not your call. How you move forward is. You need not ignore the history, but treating it as an excuse helps nobody.
+- **Market dynamics.** Recording in early 2024, he points at a rough 2023 and an even rougher end of 2022. You cannot fix the market; you can keep developing your team so it handles the situation better.
+- **User and client decisions.** Anyone in a consultancy knows the client who acts against their own interest. Resentment is not a strategy. Build teams, systems and software that respond well to change, because the decisions will keep changing.
+
+## Judgments are where the energy goes
+
+The second tenet becomes a little flowchart. An event happens: zero control. You have an emotional response: very little control, though practices such as CBT can shift it over time. Then you act and react, which Stoics call judgments, and those are fully yours. The point is not suppressing emotions, it is owning what you do after them. He calls the result emotional resilience.
+
+## Keep improving, visibly
+
+Arete for a leader means constant learning and empathy in an industry whose tools change under your feet. Not every waking hour, just the habit of asking what you did this week, month and year to get better. Doing it in the open has a second effect: you model improvement and admit you are not perfect, which makes it safe for your team to do the same.
+
+He closes on Zeno: ""man conquers the world by conquering himself"", with an apology for the 300 BC gendered phrasing.
+
+## Who should watch
+
+New and accidental managers, especially engineers promoted for being good at code. Short enough for a lunch break, and the dichotomy-of-control section is a handy reframe for your next one-to-one with a frustrated team member.
+
+## Related Conf42 talks
+
+- Yasia Romanets on [positive and constructive feedback](https://www.conf42.com/DevOps_2024_Yasia_Romanets_positive_constructive_feedback) at Conf42 DevOps 2024.
+- Leon Adato on [a lifetime of poor tech choices](https://www.conf42.com/DevOps_2024_Leon_Adato_poor_tech_choices) at Conf42 DevOps 2024.
+- Tanvi Mishra on [leadership in tech-driven paradigms](https://www.conf42.com/Cloud_Native_2024_Tanvi_Mishra_leadership_techdriven_paradigms) at Conf42 Cloud Native 2024.
+
+[Watch the talk on YouTube](https://youtu.be/zI4_WOGbbok).
+",talk,devops2024,talk:devops2024/Andrew Murphy,,Conf42,,queued,"leadership, engineering-management, stoicism, emotional-resilience"
+,"Private Azure DevOps agents for about $10 each, on Microsoft's own image","Karol Pieciukiewicz (PwC) at Conf42 DevOps 2024 on private Azure DevOps agent pools built on VM scale sets, Packer and the runner-images repo",2024-01-01,devops2024/azure-devops-scale-set-agents-ten-dollars,,"Network-isolated project, private endpoints everywhere, and a Microsoft-hosted agent that cannot reach any of it: that is the moment most teams discover they need private build agents. At Conf42 DevOps 2024, [Karol Pieciukiewicz](https://www.conf42.com/DevOps_2024_Karol_Pieciukiewicz_azure_devops_private_agents), Manager, Senior Azure Architect and Team Leader at PwC, showed how to build a self-hosted Azure DevOps agent pool on a virtual machine scale set, using the same image Microsoft builds its hosted agents from. His bill for a month with up to 15 agents: $150, roughly $10 per agent.
+
+## Self-hosted or Microsoft-hosted: what actually decides it?
+
+He compares the two on maintenance, integration and price. Microsoft-hosted is the easy path. ""In Microsoft hosted you just use it, you do not care at all,"" Karol Pieciukiewicz said at Conf42 DevOps 2024. Self-hosted means you own updates, networking and tooling.
+
+Integration is the deciding factor in his view. Microsoft-hosted agents cannot join your virtual network, and they have CPU and memory limits, so a firewalled workload or a heavy build pushes you to self-hosted whether you like it or not. On price, a self-hosted slot costs about $15 a month (with free slots for MSDN subscribers) plus whatever infrastructure you run it on, against about $40 a month for a Microsoft-hosted agent with infrastructure included.
+
+## Which of the three private options should you pick?
+
+He walks through three ways to run private agents:
+
+- **Azure Container Instances**: one CLI command to set up, but you cannot build Docker images on it (a private Azure Container Registry pool is a workaround), and the agent is a single long-running instance. That last part bites: leftover settings, environment variables and tools from one build leak into the next, so pipelines start passing or failing depending on the order they ran in.
+- **AKS with KEDA**: event-driven scaling on the build queue, all the Kubernetes self-healing, Docker builds with extra configuration. Powerful, but hard to set up; he reserves it for big projects expected to run two years or more.
+- **Virtual machine scale sets**: harder than ACI, easier than AKS, scales up and down with the queue, builds Docker images and needs no extra scaling configuration. This is the one the rest of the talk builds.
+
+## Don't write a golden image, borrow one
+
+The hard part of a shared pool is the image. It has to serve .NET, Java, Node, data and cloud architecture teams, with many tool versions, and you cannot upgrade a tool on a whim without breaking somebody's build. His shortcut: the GitHub runner-images repository already contains the Packer definitions used for GitHub-hosted runners and Microsoft-hosted Azure Pipelines agents. As he put it, ""you do not need to create this golden image because it's already created.""
+
+Packer spins up a temporary VM, runs the install scripts, runs the tests (each tool has a Pester-style check, for Terraform just a version call that must exit 0) and turns the VM into an image. That image goes into an Azure Compute Gallery as a numbered version, which solves the versioning problem: teams move to a new pool on version N+1 while the old pool stays until their pipelines are checked.
+
+## The Terraform, step by step
+
+The demo builds everything with Terraform from an Azure DevOps pipeline: shared image gallery, shared image (a container for versions, not an image itself), a Packer build via a null resource, an image version pointing at the Packer output, and the scale set. Two scale set settings matter: overprovisioning off and upgrade mode manual, both required for Azure DevOps to drive it. Instance count starts at one because Azure DevOps does the scaling.
+
+Set the pipeline timeout high. The image build took about two hours in his run, which is also why his first attempt on a Microsoft-hosted agent died after an hour and a half with a disconnected agent. He rebuilt it from another private agent instead; a later 403 when fetching packages went away on a rerun.
+
+## The pool settings worth knowing
+
+In the Azure DevOps agent pool setup, turn on tearing down each VM after use, so every build gets a clean machine and the build-order bugs from ACI disappear. Standby agents set to zero saves money at the cost of a two to three minute wait for the first build. The idle-agent delay controls how long spare agents survive after the team goes home. A new pool takes around 15 minutes to become ready; his test Docker build finished in under two minutes.
+
+## Who should watch
+
+Azure DevOps admins who need agents inside a private network, and anyone tired of hand-maintaining a build VM. It is a practical walkthrough with source code on his AzureWay blog, not a survey of CI theory.
+
+## Related Conf42 talks
+
+- Travis Gosselin on [CI/CD efficiency with Azure pipeline templates](https://www.conf42.com/DevOps_2024_Travis_Gosselin_cicd_efficiency_templates_azure) at Conf42 DevOps 2024.
+- Mert Coskuner and Cenk Kalpakoglu on [securing CI/CD runners](https://www.conf42.com/Cloud_Native_2024_Mert_Coskuner_Cenk_Kalpakoglu_securing_ci_cd_runners) at Conf42 Cloud Native 2024.
+- Dmytro Prekrasnyi on [multiple Terraform projects in a mono-repo](https://www.conf42.com/DevOps_2024_Dmytro_Prekrasnyi_multiple_terraform_projects) at Conf42 DevOps 2024.
+
+[Watch the talk on YouTube](https://youtu.be/jMnUVBo2EN8).
+",talk,devops2024,talk:devops2024/Karol Pieciukiewicz,,Conf42,,queued,"azure-devops, ci-cd, packer, terraform, azure"
 ,Lift and shift is a migration; modernisation also rebuilds the app and the data,"Anupam Phoghat (Cognizant Servian) at Conf42 DevOps 2024 on why cloud modernisation means application, infrastructure and data together, mapped onto Google Cloud",2023-12-31,devops2024/modernisation-is-not-just-migration,,"Anupam Phoghat, Associate Director at Cognizant Servian, spends his Conf42 DevOps 2024 talk on a distinction that budget meetings tend to blur: moving an application to the cloud is migration, while modernisation changes the application, the infrastructure under it and the data it uses, all three together. His slide formula is blunt: App Mod + Infra Mod + Data Mod = Digital Mod.
 
 Scope check: this is a short, high-level overview with a Google Cloud and HashiCorp reference architecture, not a migration war story. It is most useful as a shared vocabulary for a team about to argue over what modernise means in their roadmap.
