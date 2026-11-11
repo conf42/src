@@ -80010,6 +80010,52 @@ Every on-call engineer and incident commander, especially on teams where inciden
 
 [Watch the talk on YouTube](https://youtu.be/ImMph1w04ho).
 ",talk,sre2024,talk:sre2024/Dan Slimmon,,Conf42,,queued,"incident-response, troubleshooting, sre, on-call, debugging"
+,go build compiles your code; Bazel builds the rest of the pipeline,"Eugene Khabarov (Arctic Wolf) at Conf42 Golang 2024 on Bazel for Go, with hermetic, cached builds of generators, binaries, images and manifests",2024-04-22,golang2024/bazel-for-go-build-orchestration,,"`go build` turns Go files into a binary. A real build also runs code generators, pins a compiler, builds container images, renders Kubernetes manifests and publishes it all, and most teams glue that together with a Makefile and good intentions. At Conf42 Golang 2024, Eugene Khabarov, Lead Developer and DevX at Arctic Wolf, makes the case for Bazel as the orchestrator, then builds and deploys a small gRPC microservice stack to Kubernetes with a single `bazel run`.
+
+## What counts as a dependency?
+
+His answer: anything that can change the output. He sorts them into three groups.
+
+- **Code and tools**: Go packages (pinned by `go.mod` and `go.sum`), the Go compiler itself (whatever happens to be installed, or a version baked into a CI image), and generators, because `//go:generate` can call any arbitrary binary or script before the compiler even sees a file.
+- **Environment**: the host machine you build on, the target you build for (macOS or Linux, amd64 or arm64), the CI runner, and environment variables.
+- **Publishing**: Docker for images, tar or zip archives for AWS Lambda, Kustomize, ytt or Helm for manifests, the AWS CLI, and usually Make to tie it together.
+
+Go has a good answer for the first item and shrugs at the rest. Is the build reproducible? Hermetic, beyond wrapping it in a Docker image? Can it restart from the failed step instead of from scratch? His conclusion is that `go build` is one step, and what you need is build orchestration: one command that fetches every pinned dependency, builds artifacts, and publishes them to ECR or S3, without deploying them.
+
+## What does Bazel bring?
+
+Bazel is Google's open source build and test tool, aimed at very large codebases and multi-language, multi-platform builds. You describe builds declaratively in Starlark, a strict subset of Python meant for configuration rather than applications. It builds in parallel across every core it finds, locally or on remote runners, caches downloaded dependencies and intermediate results, and rebuilds only what changed.
+
+The principles that make it trustworthy are hermeticity (same inputs, same output, regardless of what is installed on the host), source identity (checksums on every input), and sandboxing. Eugene Khabarov said at Conf42 Golang 2024 that ""we need to define all the inputs explicitly, and if we don't define them, build will not see them.""
+
+## How does a go:generate pipeline look in Bazel?
+
+His first demo is a toy generator that prints a hello world Go program. The plain Go flow takes four steps: build the generator, `go generate` with it, build the generated file, run it. With Bazel it is `bazel run //go:hello-world`.
+
+The project has no Go files of its own, only a `WORKSPACE` and `BUILD.bazel` files. The `WORKSPACE` loads the rules_go ruleset by SHA-256, registers Go 1.20.3 as a toolchain for Bazel to download, and pulls the generator with `go_repository` pinned by version and sum. The `BUILD.bazel` declares a `genrule` that runs the generator to produce `hello.go`, a `go_library` over it, and a `go_binary` embedding the library. Run the binary target and Bazel works the chain backwards: generate, compile the library, link, run.
+
+Labels are worth learning early. Eugene Khabarov said at Conf42 Golang 2024: ""Label is a unique name for a build target."" `//` is the workspace root, `//go` a package, `:hello-world` a target; `//...` builds everything, and `@hw_generator//...` builds an external dependency.
+
+## Does it scale past hello world?
+
+The second demo builds two gRPC services, Docker images for them and for an Envoy proxy that translates HTTP into gRPC, and deploys everything to a local minikube cluster driven by Tilt, from one command. A request with a valid token goes through the auth service; an invalid one is refused.
+
+Nobody wants to hand-write a `BUILD` file per package, and you mostly don't have to: Gazelle generates them, keeps them current, formats them and manages Go dependencies. Image and publishing targets you still write yourself. `bazel query` answers questions such as which packages use package X, or where a transitive dependency came from, and can emit a graph for Graphviz. Rulesets such as rules_oci and rules_proto cover other jobs, catalogued on awesomebazel.com.
+
+## Who should watch
+
+Go teams whose Makefile has grown its own folklore, polyglot monorepos, and anyone who has been burnt by a build that only works on one laptop. It is an introduction: it shows what Bazel buys you, not the migration pain or the learning curve, which you should budget for separately.
+
+## Related Conf42 talks
+
+- Haseeb Majid on [reproducible Go development environments with Nix](https://www.conf42.com/Golang_2024_Haseeb_Majid_using_nix_reproducible) at the same event, a different route to the same goal.
+- Gaspare Vitta on [reproducible builds with Bazel](https://www.conf42.com/Python_2021_Gaspare_Vitta_Reproducible_Builds_Bazel) at Conf42 Python 2021.
+- Robert Pajak on [build automation in Go with goyek](https://www.conf42.com/Golang_2023_Robert_Pajak_goyek_automation).
+
+[Watch Eugene Khabarov's talk](https://www.conf42.com/Golang_2024_Eugene_Khabarov_build_enough_bazel)
+
+[Watch the talk on YouTube](https://youtu.be/XFFvwcKvByo).
+",talk,golang2024,talk:golang2024/Eugene Khabarov,,Conf42,,queued,"go, bazel, build-systems, reproducible-builds, devex"
 ,Agile sprints ship code; reliability lives in everything else,"David Argent (Salesforce) at Conf42 SRE 2024 on how Agile's short-term focus hurts online services, and what to lock in before the first sprint",2024-04-21,sre2024/agile-sprints-forget-the-non-code,,"A control plane that can replace one host at a time is fine, right up until it runs a 10,000-node database. David Argent, Senior SRE at Salesforce and a veteran of Microsoft and Amazon, opened his Conf42 SRE 2024 talk with that war story, then spent half an hour on why Agile's short planning cycles quietly produce exactly this kind of design, and how to keep the benefits without becoming what he calls an Agile victim.
 
 His core point: Agile is a set of principles, not a methodology, and favouring working software over documentation or change over plans does not mean ignoring architecture, failure modes or everything that isn't code.
@@ -80110,6 +80156,54 @@ Founders, CTOs and engineering managers at small and mid-sized teams deciding wh
 
 [Watch the talk on YouTube](https://youtu.be/Zjht3YcdF08).
 ",talk,sre2024,talk:sre2024/Evgenii Korneev,,Conf42,,queued,"sre, on-call, engineering-management, slo, team-structure"
+,"Build your own L7 load balancer from Envoy, a Go control plane and cloud-init","Sandeep Bhat (Harness) at Conf42 Golang 2024 on a cloud-agnostic L7 load balancer from Envoy, a Go xDS control plane and cloud-init",2024-04-20,golang2024/envoy-load-balancer-go-control-plane,,"A managed cloud load balancer is convenient right up until you need the same thing on three clouds, or notice what it costs at idle. At Conf42 Golang 2024, Sandeep Bhat, Staff Software Engineer at Harness, shows how to assemble a layer 7 load balancer from parts: Envoy as the data plane, a small Go control plane that feeds it configuration over gRPC, and a cloud-init script that boots both on any VM. The demo ends with a backend killed mid-traffic and the balancer quietly routing around it.
+
+## What does the load balancer need to do?
+
+He starts from first principles. Load balancing spreads incoming traffic across application servers so none is overwhelmed, gives you high availability when one dies, and lets you scale horizontally. Round robin, weighted round robin and least connections are the usual algorithms. The cloud versions (AWS ALB, Azure Application Gateway, GCP's offering) all boil down to incoming traffic, rules, and target groups. The talk deals with layer 7 only.
+
+His requirements list: spread traffic over multiple backends, serve multiple domains from one balancer, health-check targets out of rotation, run on any cloud, and scale by picking a bigger or smaller VM.
+
+## Why Envoy, and which parts of it?
+
+Envoy is a CNCF graduated project that came out of Lyft, written in C++, with about 19k commits and 22k GitHub stars on his slides. It is a layer 7 reverse proxy whose behaviour is built from chained filters, much like middleware in an API server, and it already does service discovery, load balancing, health checks, rate limiting and observability.
+
+The pieces he uses: listeners (ports 80 and 443), filter chains (domain matching and anything else that should act on the request), clusters (logical groups of upstreams for a domain or path), upstreams (individual VMs) and secrets (certificates). A static config with a round-robin cluster and an HTTP health check every 5 seconds with a 2-second timeout is enough for one service. It does not scale to adding domains without restarts.
+
+## The Go control plane is the interesting bit
+
+Instead of a static file, Envoy boots with dynamic resources: Listener Discovery Service and Cluster Discovery Service, both pointed over gRPC at an `xds_cluster` on 127.0.0.1:18000. That cluster is the Go control plane, running on the same VM as a systemd service next to Envoy.
+
+The control plane is small. One goroutine runs the xDS gRPC server backed by a snapshot cache; another runs a sync loop, a `time.Ticker` in a `for`/`select`, that polls an API server for the latest configuration and pushes a new snapshot into the cache. He notes websockets would beat polling. The API server sits outside the VM and reads from a database (a Postgres JSONB column works) where each row describes a host, its target IPs, incoming and outgoing ports, and health-check settings.
+
+Add a domain to the database, and on the next sync Envoy picks it up without a restart or downtime.
+
+## Cloud-init makes it cloud-agnostic
+
+Packaging is a cloud-init user-data script that installs Envoy as a service, downloads the control plane binary and starts both. Setting `scripts-user` to `always` in `cloud_final_modules` makes the script run on every boot, not just the first, which doubles as an upgrade path for new control plane versions. The same script works on AWS, GCP and Azure.
+
+## Is it actually cheaper?
+
+His comparison uses Ohio (US East) prices: an ALB at $0.0225 per hour comes to about $16.20 a month before any Load Balancer Capacity Unit charges for connections, bytes and rules, while a t2.micro at $0.0116 per hour is about $8.30 a month plus traffic. He counts only the base components on both sides, so treat it as a floor rather than a full TCO; your own LB is also yours to patch, monitor and keep highly available, which the talk doesn't cost out.
+
+## The demo
+
+Three terminals (Envoy, the API server, the control plane), an `/etc/hosts` entry pointing his test domain at localhost, and two Nginx VMs on AWS that print their own IP. Sandeep Bhat said at Conf42 Golang 2024 as requests alternated between the two: ""So as you can see here, it's routing traffic evenly across both of them."" He stops one VM, the health check fails it out, and every request lands on the survivor.
+
+## Who should watch
+
+Platform engineers who need the same edge on several clouds or on-prem, and Go developers who have heard of xDS and want to see how small a working control plane can be. It is an architecture walkthrough with code snippets rather than a production-hardened design: TLS, HA for the balancer itself and the control plane's failure modes are left as exercises.
+
+## Related Conf42 talks
+
+- Rosemary Wang's [introduction to service mesh](https://www.conf42.com/Cloud_Native_2022_Rosemary_Wang_introduction_service_mesh), where Envoy usually lives.
+- Rohit Ghumare on [sidecarless service mesh](https://www.conf42.com/Platform_Engineering_2023_Rohit_Ghumare_sidecarless_service_mesh__is_it_a_dream_or_a_reality_).
+- Ivan Lemeshev on [keeping Go services up during traffic spikes](https://www.conf42.com/Golang_2024_Ivan_Lemeshev_resilient_traffic_spikes) at the same event.
+
+[Watch Sandeep Bhat's talk](https://www.conf42.com/Golang_2024_Sandeep_Bhat_custom_load_balancer_envoy)
+
+[Watch the talk on YouTube](https://youtu.be/TCGsSSHPYUw).
+",talk,golang2024,talk:golang2024/Sandeep Bhat,,Conf42,,queued,"envoy, load-balancing, go, xds, cloud-init"
 ,"Your SRE skills gap is a people problem, so build a community","Jorge Luis Castro Toribio (NTT DATA) at Conf42 SRE 2024 on growing SRE skills across a 600-person delivery org with a community of practice, OKRs and a game",2024-04-19,sre2024/sre-community-of-practice-playbook,,"A handful of people who really know SRE, spread across a delivery organisation of hundreds, is a reliability risk no tool can fix. Jorge Luis Castro Toribio, Lead of Transformation Strategy at NTT DATA, tells at Conf42 SRE 2024 how his team turned that into an SRE community of practice at a large IT enterprise, and how they kept it alive past the point where earlier communities had quietly died.
 
 This is a talk about organisational design, not tooling. You won't see a dashboard. What you will get is a reusable template: a canvas, sample OKRs, metrics and a gamification trick.
@@ -80160,6 +80254,58 @@ SRE leads, engineering managers and transformation people trying to spread SRE b
 
 [Watch the talk on YouTube](https://youtu.be/4_oyFML8INA).
 ",talk,sre2024,talk:sre2024/Jorge Luis Castro Toribio,,Conf42,,queued,"sre, culture, community-of-practice, gamification, okrs"
+,"Secure, fast, robust: an SRE's checklist for Go APIs","Prabesh Thapa (Capsule) at Conf42 Golang 2024 on a checklist for Go APIs, from auth, passwords and rate limits to caching, health checks and retries",2024-04-19,golang2024/go-api-checklist-secure-fast-robust,,"Most API incidents trace back to something on a checklist nobody ran. Prabesh Thapa, Senior SRE at Capsule and a Docker Captain, turns his Conf42 Golang 2024 talk into exactly that checklist: what a Go API needs to be secure, fast and robust, each item with a short Go snippet. None of it is exotic. All of it is the stuff that shows up in postmortems.
+
+## What does secure mean for an API?
+
+The longest section, and the most opinionated.
+
+- **Tokens, chosen on purpose.** Know whether you need an access token or an ID token. If you use JWTs, sign them with a strong algorithm and secret, and know that misconfiguration is their usual failure; he points to PASETO as a more opinionated alternative with less room for error. OAuth 2.0 with the right flow for SSO, access plus refresh tokens for microservices.
+- **CORS and cookies.** Don't leave CORS on defaults. Cookies get `Secure` and `HttpOnly`, an HMAC with a strong secret, and a SameSite policy that doesn't stay on the relaxed local-development setting in production.
+- **Re-authenticate before critical changes**: email, password, profile, even for a logged-in user, checking both that they are authenticated and that they are authorised.
+- **Validate and sanitise everything** with go-playground's validator and bluemonday rather than home-made helpers, against SQL, NoSQL and XSS injection.
+- **Audit trails with a baseline**: define what each role should do and alert on activity outside it, such as a customer account poking at the admin portal.
+- **Boring error messages.** A response that says the user does not exist is an enumeration oracle. Return one generic message instead.
+- **Passwords**: bcrypt; reject passwords containing runs of characters from the user's email or username; reject anything on a common-passwords list (his slide links the SecLists top 10k); check length and complexity.
+
+His least conventional advice is about secrets. Prabesh Thapa said at Conf42 Golang 2024: ""Personally I don't like using environment variables."" Any code in the process can read them with `os.Getenv`. He prefers a config file protected by filesystem permissions, loaded once and passed explicitly into a server struct, so secrets reach only the code that needs them.
+
+The section closes with masking or tokenising sensitive fields, rate limiting with per-endpoint policies (a password reset endpoint should not share a budget with list-orders) and limit, remaining and reset time in the response, native TLS support for when no proxy terminates it, and Snyk, Dependabot and Wiz to keep dependencies patched.
+
+## What makes it fast?
+
+The usual suspects, done properly. Stop writing `SELECT *` and fetch only the columns you need; index the columns you filter on; cut redundant queries. Cache repeated reads in memory or Redis, send `ETag` and `Cache-Control` so clients can cache too, and put static content on a CDN. Paginate (offset or cursor) because it reduces data transfer and latency, not just to make the UI tidy. Reuse connections with a pooled HTTP client.
+
+On microservices he is refreshingly blunt: they are a double-edged sword, and only warranted when separate teams own separate business domains like payments or fulfilment.
+
+## What makes it robust?
+
+- **Fail early, fail fast**: check config and dependencies at startup and exit with a clear error rather than failing later on the first request.
+- **Status codes that mean something**: 403 Forbidden when the user is logged in but not allowed, 401 when they aren't authenticated, balanced against not leaking too much.
+- **Errors with context.** In his words, ""don't just check errors, handle them gracefully"": wrap with `fmt.Errorf`, return them up the stack, and only panic in `main`.
+- **A request ID on everything**, for log correlation, Sentry and Jaeger, and idempotency: a retried POST with an ID you have already processed can be ignored.
+- **Transactions** for multi-step writes (his example is a MongoDB session with snapshot reads and majority writes), so a failed checkout rolls back the charge.
+- **Structured JSON logs**, split into transport logs and application logs, ready for Loki.
+- **Liveness and readiness endpoints**, the first returning commit, branch and tag, the second checking the database and Redis.
+- **Retries without storms**: exponential backoff on the client, 429 or 503 plus a `Retry-After` header from the server.
+- **Metrics and versioning**: time series for baselines, anomaly detection and capacity planning, and versioned endpoints for clients that won't upgrade.
+
+He closes by comparing API tuning to fiddling with an old nineties TV until brightness, picture and sound are all acceptable at once.
+
+## Who should watch
+
+Developers building or reviewing their first production Go API, and leads who want a list to hold a code review against. Each item gets only a minute or two, so treat it as an index of what to look up next rather than a tutorial on any one topic.
+
+## Related Conf42 talks
+
+- Ivan Lemeshev on [rate limiting and load shedding in Go](https://www.conf42.com/Golang_2024_Ivan_Lemeshev_resilient_traffic_spikes) at the same event.
+- Kirill Parasotchenko on [simple but common system design mistakes](https://www.conf42.com/Golang_2024_Kirill_Parasotchenko_system_design_mistakes), idempotency and backoff included.
+- Mohammad Shahbaz Alam on [API authorization](https://www.conf42.com/Golang_2021_Mohammad_Shahbaz_Alam_API_authorization) at Conf42 Golang 2021.
+
+[Watch Prabesh Thapa's talk](https://www.conf42.com/Golang_2024_Prabesh_Thapa_optimizing_performance_security)
+
+[Watch the talk on YouTube](https://youtu.be/SaU7skLcpUQ).
+",talk,golang2024,talk:golang2024/Prabesh Thapa,,Conf42,,queued,"go, api-design, security, performance, reliability"
 ,Kubernetes is an HTTP API with a reconciliation loop attached,"Alex Dejanu (Systematic) at Conf42 SRE 2024 on why Kubernetes is a platform for building platforms, shown with a live log-draining operator and its CRD",2024-04-18,sre2024/kubernetes-is-an-api-with-a-loop,,"Every Kubernetes talk opens with the same architecture diagram: control plane, etcd, workers. Alex Dejanu, SRE at Systematic, points out at Conf42 SRE 2024 that other orchestrators have the same diagram, so that can't be what makes Kubernetes special. What does is underneath the YAML: an HTTP API you can extend, and a watch loop that keeps reality matching what you declared. He proves it with a small operator, built and deployed live, that drains logs from any pod carrying a label.
 
 It's an explainer for people early in their Kubernetes journey, or anyone who uses it daily without ever having looked behind `kubectl`. It does that job well, in about half an hour.
@@ -80261,6 +80407,92 @@ SREs with a large estate of services they can't or won't instrument, and anyone 
 
 [Watch the talk on YouTube](https://youtu.be/i_VbzftcDvk).
 ",talk,sre2024,talk:sre2024/Nikolay Sivko,,Conf42,,queued,"ebpf, observability, kubernetes, tracing, profiling"
+,"gosec found nothing, SonarCloud found 206 things, and neither found the XSS","Munawar Hafiz (OpenRefactory) at Conf42 Golang 2024 on the gaps in Go static analysis, tested with gosec, SonarCloud and OpenRefactory's iCR",2024-04-17,golang2024/go-static-analysis-false-positives-icr,,"Static analysis has two failure modes: it misses the bug that matters, or it buries it under hundreds that don't. Munawar Hafiz, CEO of OpenRefactory, spends his Conf42 Golang 2024 talk on both, then runs three tools against a Go codebase with two known security holes: Google's gosec, SonarCloud, and his own company's Intelligent Code Repair (iCR). This is a vendor talk, and the head-to-head is the vendor's own demo, but the setup is a useful template for evaluating any SAST tool.
+
+## Why are static analysis tools struggling?
+
+His opening numbers set the scene. Over 150 vulnerabilities land in the National Vulnerability Database every week. Munawar Hafiz said at Conf42 Golang 2024 that ""research data has shown that existing static analysis tools detect only about 14% of all the bugs detected,"" and added: ""The remaining 86% of the bugs are detected by pure luck."" He puts typical false-positive rates at 50% to 90%, which means someone on the team triages nine non-bugs for every real one.
+
+The third gap is fixing. Tools report; humans patch, and humans get it wrong under pressure. His example is Log4Shell: four fixes released in four days, the earlier ones not fully closing the hole.
+
+## What iCR claims to do differently
+
+iCR runs as a set of Docker containers: a web navigator that connects to GitHub, GitLab or Bitbucket, one analysis engine per language (Java, Python and Go), and a reviewer where you accept or reject findings and push accepted fixes to a temporary branch. He describes three building blocks: deep path-based static analysis, machine learning and generative AI (summarisation to understand context and cut false positives, generation to improve fixes), and code refactoring tech from his 20-plus years building rewriting tools.
+
+The claims, all his: as low as 3% false positives on benchmarks, synthesised fixes for about half the detected bugs, and around 11% more developer productivity. The talk does not show the benchmark behind these, so treat them as vendor figures.
+
+## The test: two known bugs in a real Go project
+
+The interesting part is the experiment design. He takes Red Hat's Service Provider Integration Operator, about 20,000 lines of Go, and checks out an old version that still had two critical bugs later fixed upstream: a cross-site scripting issue and an open redirect. Any tool's job is to find those two.
+
+- **gosec**, run with all rules, reports nothing. No triage burden, but no protection either: both holes stay open.
+- **SonarCloud** reports 33 security bugs, 6 reliability bugs and 257 maintainability issues across the repo. Filtered to the Go code, that becomes 206 issues, none of them security: duplicated string literals, high cyclomatic complexity, empty functions.
+- **iCR** reports two issues, the open redirect and the XSS, each with a taint trace from where untrusted input enters to where it is used. For the open redirect it has no fix. For the XSS it synthesises one that sanitises the input with the bluemonday library, import included.
+
+His triage arithmetic: at ten minutes per finding, 200-odd reports cost a developer roughly 2,000 minutes before anyone fixes anything. He concedes these particular findings were benign enough to triage faster, but the point stands for noisier codebases.
+
+## How much should you read into it?
+
+One application, two bugs, chosen by the vendor, is a demo rather than a benchmark. It does show something real about Go tooling: a linter-style scanner and a code-quality platform answer different questions than a taint-tracking analyser, and a zero from gosec is not the same as zero vulnerabilities. If you evaluate tools yourself, his method is worth stealing: go back to a commit with known, later-fixed CVEs and see who finds them.
+
+## Who should watch
+
+Go teams choosing a security scanner, or living with one whose findings nobody reads any more. Expect a product walkthrough in the middle (a recorded demo of the iCR workflow on a Python project) and the Go comparison at the end.
+
+## Related Conf42 talks
+
+- Safeer C M on [open source SAST with Semgrep](https://www.conf42.com/DevSecOps_2025_Safeer_C_M_sast_open_source_semgrep).
+- Joseph Hejderup on [static analysis for dependency tools](https://www.conf42.com/DevSecOps_2022_Joseph_Hejderup_going_beyond_metadata_adopting_static_analysis_dependency_tools).
+- Alessio Greggi on [generating seccomp profiles from Go tests](https://www.conf42.com/Golang_2024_Alessio_Greggi_secured_project_tests) at the same event.
+
+[Watch Munawar Hafiz's talk](https://www.conf42.com/Golang_2024_Munawar_Hafiz_bridging_security_tool)
+
+[Watch the talk on YouTube](https://youtu.be/CwFoTEZEZAY).
+",talk,golang2024,talk:golang2024/Munawar Hafiz,,Conf42,,queued,"go, static-analysis, security, sast, false-positives"
+,"Autoscaling is too slow for a spike, so rate limit and shed load","Ivan Lemeshev (Unity) at Conf42 Golang 2024 on surviving traffic spikes with five rate limiting algorithms and load shedding, built in Go",2024-04-16,golang2024/rate-limiting-load-shedding-go-service,,"Autoscaling handles load that grows gradually. It does nothing for a burst that arrives faster than new instances can start, or for one client eating every core you have. At Conf42 Golang 2024, Ivan Lemeshev, Senior Software Engineer at Unity, overloads a small Go HTTP service on purpose, then walks through the two defences that work in that window: rate limiting and load shedding, with a Go implementation of each and the honest caveat that both cost something.
+
+## What does overload actually look like?
+
+A server can only run so many concurrent requests before it spends more time context switching and collecting garbage than doing work. Past that threshold latency climbs steeply, clients time out, and availability falls even though the process is technically still up. In the worst case it runs out of memory and dies.
+
+His spike sources come in two kinds. The predictable ones are launches, sales, seasonal peaks and the daily rhythm of your audience. The unpredictable ones are viral posts, a competitor's outage sending users your way, DoS attacks, scraping bots, and slow external dependencies whose users retry their way into your service.
+
+To make it concrete he builds a password-generator service in Go and runs it in a distroless container limited to one CPU and 300 MB of memory, with swap pinned to the same value so the container can't cheat. Grafana k6 ramps from 0 to 1,000 virtual users over two minutes, holds, then ramps to 2,000 and holds, each user sleeping 100 ms between requests (about ten requests per second each). At 1,000 users latency stays low. At 2,000 the container runs out of headroom and the latency percentiles shoot up.
+
+## Which rate limiting algorithm should you pick?
+
+He covers five, each with a trade-off:
+
+- **Fixed window counter**: one counter per time window. Cheap and simple, but a burst straddling two windows can let through twice the limit.
+- **Sliding window log**: stores a timestamp per request and counts those inside the window. Accurate, but memory grows with request volume.
+- **Sliding window counter**: weights the previous window's count by how much the sliding window overlaps it. A middle ground: nearly as accurate, far cheaper.
+- **Token bucket**: tokens refill at a steady rate, each request spends one. Low memory and smooth, but allows bursts up to the bucket size.
+- **Leaky bucket**: requests drain at a fixed rate. Smoothest output, but a quick burst gets dropped even when the user is under their average rate.
+
+His demo implements a token bucket keyed by client IP, behind a mutex, wrapped in middleware that answers 429 when `IsAllowed` says no, configured at a bucket size of one and a refill of one token per second. The k6 run shows lower average load and less extreme latency, but no miracle.
+
+The reason matters more than the chart. Ivan Lemeshev said at Conf42 Golang 2024: ""Using a rate limiter has its overhead and costs as well."" An in-process limiter burns the same CPU it is trying to protect, and with several instances it needs shared state, such as counters in Redis, or a distributed limiter in an API gateway. His slides list Go packages to borrow rather than write: `golang.org/x/time/rate`, `uber-go/ratelimit`, `juju/ratelimit`, `mennanov/limiters`, `tollbooth` and others.
+
+## Load shedding: fail some requests on purpose
+
+Rate limiting is about fairness per client. Load shedding is about the server itself: when it detects that it is overloaded, it rejects random or non-critical requests, slows down background work, or redirects traffic, so the critical paths still answer in time. In his words, ""A controlled slowdown is better than a complete system breakdown in this situation."" The cost is explicit: some users get errors or delays, and some processing may be delayed or lost.
+
+His detector is deliberately crude, and he says not to ship it: a ticker fires every 10 ms, and if the gap between ticks exceeds 11 ms the runtime is assumed to be starved, so an atomic flag flips and middleware returns errors until things recover. Under the same k6 profile it also lowered the average load. For the real thing he points to the Amazon Builders' Library article on using load shedding to avoid overload.
+
+## Who should watch
+
+Backend developers who have a vague sense that they should rate limit but have never compared the algorithms, and anyone who wants a reproducible overload test with Docker resource limits and k6. The Go code is small enough to read in the video; the production lessons are in the caveats.
+
+## Related Conf42 talks
+
+- Kirill Parasotchenko on [simple but common system design mistakes](https://www.conf42.com/Golang_2024_Kirill_Parasotchenko_system_design_mistakes) at the same event, rate limiters and retries included.
+- Bryan Barkley and Vivek Deshpande on [Hodor, LinkedIn's overload protection](https://www.conf42.com/Site_Reliability_Engineering_2022_Bryan_Barkley_Vivek_Deshpande_hodor_overload_linkedin).
+- Rehana Sultana Khan on [rate limiting](https://www.conf42.com/JavaScript_2025_Rehana_Sultana_Khan_rate_limiting_cost).
+
+[Watch Ivan Lemeshev's talk](https://www.conf42.com/Golang_2024_Ivan_Lemeshev_resilient_traffic_spikes)
+
+[Watch the talk on YouTube](https://youtu.be/H5a6psrN0GM).
+",talk,golang2024,talk:golang2024/Ivan Lemeshev,,Conf42,,queued,"go, rate-limiting, load-shedding, resilience, backend"
 ,A WAF is chicken wire around a wall with holes in it,"Joshua Fox (DoiT International) at Conf42 SRE 2024 on why a web application firewall breeds complacency, and the few cases where you should still deploy one",2024-04-15,sre2024/a-waf-is-a-chicken-wire-fence,,"The CISO is shouting, the app is full of holes, and someone says: get a WAF. Joshua Fox, Senior Cloud Architect at DoiT International, argues at Conf42 SRE 2024 that this is usually the wrong move: a web application firewall blocks your own users, misses the attacks that matter, and lets the team skip learning security. Then, to be fair, he lists the cases where you should get one anyway. The examples run on Google Cloud Armor, though the argument applies to any WAF.
 
 His comparison sticks: a jewellery store with giant holes in its concrete walls puts up a chicken wire fence and says that at least it has a fence.
@@ -80313,6 +80545,48 @@ SREs and platform engineers who get handed a WAF as a security strategy, and the
 
 [Watch the talk on YouTube](https://youtu.be/XQywClfDEJw).
 ",talk,sre2024,talk:sre2024/Joshua Fox,,Conf42,,queued,"security, waf, google-cloud, owasp, ddos"
+,"Profile-guided optimization in Go: 2% faster, zero lines changed","Yashvardhan Kukreja (Red Hat) at Conf42 Golang 2024 on Go PGO, using production CPU profiles so the compiler inlines only the hot functions",2024-04-15,golang2024/go-pgo-hot-functions-inlining,,"The Go compiler makes its inlining decisions blind: it sees your code, not your traffic. Profile-guided optimization (PGO) fixes that by feeding it a CPU profile from the running program. At Conf42 Golang 2024, Yashvardhan Kukreja, Software Engineer (SRE) at Red Hat, explains why inlining is the optimization that benefits most, and demonstrates PGO on a small markdown-rendering server, with a gain of about 2% from a rebuild alone.
+
+## Why does the compiler need help at all?
+
+He starts from the compiler pipeline (lexer, abstract syntax tree, semantic analysis, intermediate representation, optimization, code generation) and a few classic optimizations: constant folding, loop unrolling, dead-store elimination. Then he narrows in on inlining.
+
+Calling a function costs something every time: a new stack frame, parameters pushed, a jump, a return. Inlining pastes the function body at the call site, which removes that cost and often enables more optimization. His `sum(1, 2)` example becomes `1 + 2` and then simply `3` at compile time.
+
+The catch is that inlining everything bloats the binary. More static instructions means more instruction cache misses, more page faults, and on something the size of a Raspberry Pi, possibly thrashing. Too little inlining and you pay call overhead; too much and you pay for the size. What you want is to inline the hot functions and leave the cold ones alone, and the source code alone cannot tell the compiler which is which.
+
+## Why not instrumentation and benchmarks?
+
+Feedback-driven optimization is not new. The early approach was instrumentation: the compiler injects timers and call counters, you run benchmarks, and the collected data steers the next build. He lists three problems: the instrumented code is bloated, the extra benchmark step makes builds slow, and the benchmarks may not resemble production at all, so the compiler can optimize for the wrong hot path and make things worse.
+
+His one-liner on the alternative: ""If you hate benchmarks, don't use them."" Sample-based profiling of the real workload needs no extra code in the binary: the kernel interrupts the process at intervals and records the instruction pointer and call stack. PGO is exactly that loop: run in production, collect a CPU profile, rebuild with it.
+
+## What did PGO actually change in the demo?
+
+The demo app is a server with a POST `/render` endpoint that turns markdown into HTML. Building with the `-m` gcflag prints the compiler's inlining decisions, and two calls on the hot path are not inlined, among them `io.ReadAll`, which runs on every single request. Non-leaf functions are often skipped by the default heuristics.
+
+He then runs the PGO-free binary under a load generator, captures a 30-second CPU profile, saves it as `default.pgo`, and rebuilds with `-pgo=auto`. This time the compiler inlines `io.ReadAll`, plus whatever else the profile marks hot inside the libraries. The cost shows up in the binary: the original was roughly 8.5 MB, and the PGO build came out about 0.2 MB larger.
+
+## How big is the win?
+
+Benchmarking both binaries and comparing with benchstat, his slides show a 1.88% improvement, with no change to the code. In the live run the average went from 309 to 301 microseconds per operation. Yashvardhan Kukreja said at Conf42 Golang 2024: ""I did not have to change a single line of code and I got this benefit out of the box.""
+
+He is upfront that 2% on a toy server under light load is modest, and expects bigger gains on real services with real traffic; that part is his expectation rather than something the talk measures. The more durable lesson is the workflow: profile under realistic load, commit the profile, rebuild, and verify with benchmarks before believing anything.
+
+## Who should watch
+
+Go developers who have heard of PGO and want the reasoning behind it, not just the flag. The first third is a compiler refresher; skip ahead to the demo if you already know what inlining costs. The code is on his GitHub, linked from the slides.
+
+## Related Conf42 talks
+
+- Marco Marino on [benchmarking and profiling Go with benchstat and pprof](https://www.conf42.com/Golang_2024_Marco_Marino_performance_memory_optimization) at the same event, which is where your `default.pgo` comes from.
+- Nishant Roy on [heap optimizations in Go](https://www.conf42.com/Golang_2023_Nishant_Roy_heap_optimizations).
+- Jesus Espino on [squeezing performance out of Go functions](https://www.conf42.com/Golang_2023_Jesus_Espino_squeezing_function).
+
+[Watch Yashvardhan Kukreja's talk](https://www.conf42.com/Golang_2024_Yashvardhan_Kukreja_profileguided_optimization)
+
+[Watch the talk on YouTube](https://youtu.be/8yrhrtZOfgM).
+",talk,golang2024,talk:golang2024/Yashvardhan Kukreja,,Conf42,,queued,"go, pgo, compilers, performance, inlining"
 ,"Every cloud, every boot mode, fully tested in three hours worst case","Ederson Brilhante (Cisco) at Conf42 SRE 2024 on a staged GitHub Actions, Packer, Terraform and Ansible pipeline that builds multi-cloud, multi-boot images",2024-04-14,sre2024/multi-cloud-images-in-three-hours,,"Shipping one VM image is easy. Shipping it to AWS, Azure, Google Cloud, VMware and OpenStack, with and without Secure Boot, from a hardened base nobody wants to copy-paste, is where pipelines go to die. Ederson Brilhante, SRE Technical Leader at Cisco, shows at Conf42 SRE 2024 how his team builds images for Cisco's Resource Connector this way, and why a change to the hardened base image is fully tested across every cloud and boot mode within three hours.
 
 Ederson Brilhante said at Conf42 SRE 2024: ""The worst case scenario that we identified was 3 hours.""
@@ -80419,6 +80693,55 @@ Engineers and managers new to chaos engineering, and anyone who has to explain t
 
 [Watch the talk on YouTube](https://youtu.be/Pps07QsyvzU).
 ",talk,sre2024,talk:sre2024/Hareesh Iyer,,Conf42,,queued,"chaos-engineering, resilience, aws, sre, testing"
+,"Why goroutines are cheap, and how benchstat and pprof catch slow code","Marco Marino (ION) at Conf42 Golang 2024 on the Go scheduler, goroutine stacks, and finding slow code with benchmarks, benchstat and pprof",2024-04-13,golang2024/go-benchmarks-benchstat-pprof-walkthrough,,"Two pipelines with the same shape, one of them 40% faster, and the reason turns out to be a hand-written loop doing what `strings.ToLower` already does. Marco Marino, a software engineer at ION, uses that example at Conf42 Golang 2024 to walk the full loop of Go performance work: why the runtime makes concurrency cheap, how to write a benchmark that means something, how to compare two runs with benchstat, and how to open the result in pprof until the guilty line is obvious.
+
+It was his first conference talk, and it is pitched at Gophers who have written Go for a while but never sat down with the profiler.
+
+## Why is Go fast at concurrency in the first place?
+
+He starts with a contrast to Java's classic threading, where each Java thread maps to a kernel thread and the OS scheduler decides who runs. In his Java experiment, with 100 threads about 51% of CPU time went into the actual work function; with thousands of threads that share fell to about 27%, the rest lost to context switches. A thousand sleeping Java threads showed up as 1,000 OS threads plus 18 for the JVM. The equivalent Go program needed two.
+
+The difference is Go's M:N scheduler: many goroutines multiplexed onto `GOMAXPROCS` OS threads through per-processor contexts with their own run queues. A context that runs out of goroutines steals work from another, so threads stay busy without the kernel getting involved. On top of that sits CSP: goroutines talking over buffered or unbuffered channels instead of sharing memory behind mutexes, which is why he likes building programs as pipelines.
+
+Memory matters too. OS threads get a fixed-size stack, wasteful for one thread and too rigid for hundreds of thousands. A goroutine starts with roughly 2 KB of stack that grows and shrinks as needed, so there is less state to save on every switch.
+
+A note on scope: the memory model in the title means goroutine stacks here, not the happens-before rules of the Go memory model document.
+
+## How do you write a benchmark worth comparing?
+
+Same machine, a stable environment, and the code under test isolated from everything else. Benchmarks live in `_test.go` files as `BenchmarkXxx(b *testing.B)` functions, and `b.N` is not yours to set: the runtime decides how many iterations it needs.
+
+His trick for comparing two implementations with benchstat is to keep the benchmark function name identical: run it against `RunPipeline1` and save the output as the before file, then swap the call to `RunPipeline2` and save the after file. Run with `-run=x` so no unit tests tag along, and with `-benchmem` so you get bytes and allocations per operation next to nanoseconds per operation.
+
+The benchstat comparison is what started the hunt: the second pipeline was about 40% faster, used about 40% less memory, and made around 86% fewer allocations.
+
+## What does pprof show that benchstat can't?
+
+Benchstat tells you that one version is slower; pprof tells you where. Marco Marino said at Conf42 Golang 2024: ""Profiling is the process of keeping track of all the inner functions that your main function runs."" Add `-cpuprofile` and `-memprofile` to the benchmark run, open the CPU profile with `go tool pprof`, and `top` lists the most expensive functions. Every stage near the top belonged to the first pipeline.
+
+Then `list` on the slow lowercasing stage shows the culprit line by line: a loop lowering the string one character at a time, around 17 seconds of samples. The fast pipeline calls `strings.ToLower` directly. That still has a cost, but overall it saved almost 5 seconds. The memory profile tells the same story in allocations.
+
+## The fine print he adds at the end
+
+- Store the result of the function under test, or the compiler may optimise the call away and flatter your benchmark.
+- pprof samples at a fixed frequency, so short runs can mislead. Raise `-benchtime` (and use `-count`) to collect more samples.
+- Watch memory: allocations wake the garbage collector, and GC time is time your code isn't running.
+- Design for pipelines of goroutines, and benchmark on a machine without load spikes.
+
+## Who should watch
+
+Go developers who know `go test` but have never compared benchmarks properly or opened pprof. If you already profile weekly, the first half on the scheduler will be familiar, but the benchstat workflow is a neat habit to borrow.
+
+## Related Conf42 talks
+
+- Yashvardhan Kukreja on [profile-guided optimization in Go](https://www.conf42.com/Golang_2024_Yashvardhan_Kukreja_profileguided_optimization) at the same event, the next step once you have profiles.
+- Nishant Roy on [heap optimizations in Go](https://www.conf42.com/Golang_2023_Nishant_Roy_heap_optimizations).
+- Liam Conroy Hampton on [Go memory management](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management).
+
+[Watch Marco Marino's talk](https://www.conf42.com/Golang_2024_Marco_Marino_performance_memory_optimization)
+
+[Watch the talk on YouTube](https://youtu.be/KRX3pr5iR2E).
+",talk,golang2024,talk:golang2024/Marco Marino,,Conf42,,queued,"go, performance, profiling, pprof, benchmarking"
 ,"Azure Chaos Studio, from resource provider to 99% CPU in one sitting","Peter De Tender (Microsoft) at Conf42 SRE 2024 on Azure Chaos Studio, a portal walkthrough from enabling targets to CPU pressure and AKS pod chaos",2024-04-12,sre2024/azure-chaos-studio-from-zero,,"Peter De Tender, Business Program Manager and Azure Technical Trainer at Microsoft, spends his Conf42 SRE 2024 session building chaos experiments in Azure Chaos Studio live in the portal: register the resource provider, onboard a VM and an AKS cluster as targets, hammer two VMs with 99% CPU for ten minutes, kill a process, then let Chaos Mesh restart pods. If you run on Azure and have been meaning to try chaos engineering, this is the half hour that gets you to a first experiment.
 
 It is a product walkthrough by a Microsoft trainer, and it is honest about that. It is also funny, which helps.
@@ -80471,6 +80794,52 @@ Azure engineers and SREs who want to get from zero to a running chaos experiment
 
 [Watch the talk on YouTube](https://youtu.be/ZjNN4av54e8).
 ",talk,sre2024,talk:sre2024/Peter De Tender,,Conf42,,queued,"chaos-engineering, azure, kubernetes, sre"
+,Seven system design mistakes that look fine until traffic shows up,"Kirill Parasotchenko (Delivery Hero) at Conf42 Golang 2024 on idempotency keys, outbox queues, jitter, rate and body limits, and retries with backoff",2024-04-12,golang2024/seven-small-system-design-mistakes,,"Most outages in distributed systems are not exotic. Kirill Parasotchenko, Senior Software Engineer at Delivery Hero, spends his Conf42 Golang 2024 talk on seven mistakes that every service team makes at least once: missing idempotency keys, network calls inside database transactions, clients that all wake up at the same minute, no rate limiter, no request size limit, no retries, and retries without backoff. Each one gets a small diagram, the failure mode, and the fix.
+
+It is a short, brisk talk, closer to a checklist with worked examples than a lecture, and that is its appeal.
+
+## Why does a retried request count twice?
+
+The first example is an advertisement service that records ad impressions and forwards them to an external ad service, which increments a counter. Latency spikes between that service and its database, the user's client gives up after the counter was already incremented, and retries. The second attempt succeeds too. One impression, a counter of two.
+
+The fix is an event ID: a unique ID per impression, separate from the ad ID, passed all the way downstream so the database can deduplicate. The ad ID says what was shown; the event ID says which showing this is.
+
+## Don't hold a database connection while you wait on someone else's API
+
+Mistake two is a transaction that inserts an ad campaign and then makes a POST to an external service before committing. It works in testing. Under load, with a slow external dependency, every in-flight request pins a pooled connection until the remote call returns, and the pool runs dry.
+
+His fix is a queue, and the simplest one is a table in the same database: insert the campaign and create a job row in one transaction (two SQL statements against one database, so the transaction is safe again), then let a worker pick up the job and call the external service. You trade immediate consistency for eventual consistency and get your connection pool back.
+
+## Two million clients and one cron expression
+
+The third case is a client app that checks for new plugin versions. Organically, that load spreads over the day. Hardcode the check to a fixed time, and all 2 million clients in his example hit the service in the same instant, which is a load test nobody scheduled. The fix: each client picks a random time.
+
+Because you don't always control the clients, the fourth mistake is having no rate limiter in front of the service: a global cap on requests per second, plus per-user limits so one noisy client can't starve the rest, whether the cause is a DDoS or bad client design.
+
+## Rate limits don't stop a 5 GB request body
+
+Limiting the number of requests says nothing about their size. His Go example is a POST handler that reads the whole body into memory; send it 5 GB and the likely outcome is an out-of-memory crash. A single line of Go that caps the body at 500 KB fixes it, and the oversized client gets an error instead of taking the process down.
+
+## Retries need backoff, and backoff wants jitter
+
+Requests to external services fail for boring reasons, so no retries means a high error rate and a poor user experience. But hammering a struggling dependency is worse. Kirill Parasotchenko said at Conf42 Golang 2024 that retrying without backoff against an overloaded service means ""we are making things worse, not better, because we don't let the service recover.""
+
+He closes with four backoff strategies: linear (a constant wait, say one second), linear with jitter (one second plus a few random milliseconds), exponential (1, 2, 4, 8 seconds), and exponential with jitter. The jitter variants exist for the same reason as the random check-in time earlier: to stop many clients retrying in lockstep.
+
+## Who should watch
+
+Engineers early in their backend careers, and anyone preparing for a system design interview, will get the most from it. Seasoned SREs will recognise every incident and can use it as a ten-minute refresher to send to a new teammate. Apart from the body-limit snippet, it is language-agnostic.
+
+## Related Conf42 talks
+
+- Ivan Lemeshev on [keeping services resilient during traffic spikes](https://www.conf42.com/Golang_2024_Ivan_Lemeshev_resilient_traffic_spikes) at the same event.
+- Suraj Modi on [backoff and system resilience](https://www.conf42.com/Rustlang_2024_Suraj_Modi_system_resilience_backoff_computing) at Conf42 Rustlang 2024.
+- Rehana Sultana Khan on [rate limiting](https://www.conf42.com/JavaScript_2025_Rehana_Sultana_Khan_rate_limiting_cost).
+
+[Watch Kirill Parasotchenko's talk](https://www.conf42.com/Golang_2024_Kirill_Parasotchenko_system_design_mistakes)
+
+[Watch the talk on YouTube](https://youtu.be/zi0X30n5QQI).
+",talk,golang2024,talk:golang2024/Kirill Parasotchenko,,Conf42,,queued,"system-design, distributed-systems, retries, rate-limiting, go"
 ,Large Language Models are back,All talks available now,2024-04-11,2024-04-11-LLMs-are-back,./assets/splash/LLM2024_Event_Splash.png,"#All talks available now
 
 There is so much to learn! Let me give you a quick tour.
@@ -80588,6 +80957,48 @@ SRE leads who need a structured overview to plan an AI roadmap, or to sanity-che
 
 [Watch the talk on YouTube](https://youtu.be/ULbguBen10E).
 ",talk,sre2024,talk:sre2024/Asutosh Mourya,,Conf42,,queued,"sre, aiops, alerting, capacity-planning, anomaly-detection"
+,Your Go test suite already knows which syscalls your app needs,"Alessio Greggi at Conf42 Golang 2024 on generating seccomp profiles from Go unit and integration tests with Harpoon, an eBPF syscall tracer",2024-04-10,golang2024/seccomp-profiles-from-go-tests,,"If your tests exercise most of your code, they also exercise most of the system calls your binary will ever make. Alessio Greggi, a software engineer, used his Conf42 Golang 2024 talk to turn that observation into a pipeline: trace the syscalls your Go tests trigger, and ship a seccomp profile as a build artifact next to the binary. The word almost in the title is there for a reason, and the honest part about where the approach breaks is the most useful bit of the talk.
+
+## What is a seccomp profile, and why build it in CI?
+
+Seccomp is a Linux kernel feature that restricts which system calls a process may make. A profile is the list of allowed (or denied) syscalls attached to a program. Alessio Greggi said at Conf42 Golang 2024: ""So it works as a firewall for system calls."" Kubernetes uses it heavily, including a default profile that blocks the most dangerous calls.
+
+Hand-writing a tight profile for your own service is tedious and easy to get wrong. His idea is to generate it at the end of the test pipeline, and to treat its quality as a function of coverage: if your tests cover 70% of the code, the extracted syscall list is reliable for that 70%. Go helps here. Coverage for unit tests arrived in Go 1.2, and Go 1.20 added coverage for integration tests, which pushes the measured percentage up considerably.
+
+Deployment is the easy half. An init container downloads the profile from the artifact registry, drops it on the node under the kubelet's seccomp directory, and the application container references it with a `Localhost` seccomp profile in its security context.
+
+## Integration tests are easy, unit tests are noisy
+
+For integration tests you build the binary, run it under `strace` or `perf` with scripts that check the expected results, and collect what it calls. Done.
+
+Unit tests are where it gets awkward. You cannot `strace go test`, because `go test` compiles and runs the test binary in one go, and you would trace the toolchain along with your code. Building the test binary separately with `go test -c` and tracing that is better, but still noisy: test setup that reads fixtures from disk shows up as file opens and reads your function never makes.
+
+## Harpoon: trace only while the function runs
+
+His answer is Harpoon, a small eBPF tool. You build the test binary, find the mangled symbol of the function you care about with `objdump --syms`, and run `harpoon -fn <symbol> ./binary.test`. Harpoon attaches a uprobe at the function's entry and a uretprobe at its return, and only records syscalls between the two. In his demo, tracing an `InterfaceExists` function from one of his own iptables-related projects yields just the syscalls that function makes.
+
+## Where does it break?
+
+Uretprobes and Go do not get along. A uretprobe works by overwriting the probed function's return address with the address of a trampoline into the eBPF program. Go stacks move around at runtime, which he attributes to the garbage collector, so the restored instruction pointer can be wrong and the program can be corrupted, or the return is simply never reported.
+
+The workaround, from a long-standing bcc issue, is to skip uretprobes entirely: uprobes can be attached at arbitrary offsets, so Harpoon places one uprobe on every `RET` instruction in the function to simulate the return probe.
+
+That workaround forced a library change. Harpoon started on iovisor's gobpf, which sits on bcc and could not attach uprobes at offsets. Moving to Aqua Security's libbpfgo, a wrapper over libbpf, made offsets possible and brought CO-RE (compile once, run everywhere), so the eBPF program no longer needs GCC at runtime and can be built once in a pipeline and distributed.
+
+## Who should watch
+
+Go developers running workloads on Kubernetes who keep meaning to tighten seccomp but never get past the default profile, and anyone curious about the practical friction of uprobes on Go binaries. It is a short talk about an experiment, not a finished product: the profile is only as good as your coverage, and branches your tests skip are syscalls your profile will block in production.
+
+## Related Conf42 talks
+
+- Thomas Labarussias on [protecting applications with Falco and eBPF](https://www.conf42.com/Observability_2023_Thomas_Labarussias_falco_ebpf_protect_applications).
+- Sooter Saalu on [writing eBPF programs](https://www.conf42.com/Observability_2025_Sooter_Saalu_writing_programs_ebpf).
+- Julien Breux on [Testcontainers for Go](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container) at the same event, for integration tests worth tracing.
+
+[Watch Alessio Greggi's talk](https://www.conf42.com/Golang_2024_Alessio_Greggi_secured_project_tests)
+
+[Watch the talk on YouTube](https://youtu.be/Z8IHOTlG3pM).
+",talk,golang2024,talk:golang2024/Alessio Greggi,,Conf42,,queued,"go, seccomp, ebpf, testing, security"
 ,An eBPF honeypot and a GenAI copilot as a deployment gate,"Michele Dodic (Accenture) at Conf42 SRE 2024 on a five-stage AIOps journey ending in zero-touch ops, with eBPF and a GenAI copilot guarding deploys",2024-04-09,sre2024/ebpf-genai-copilot-guards-the-pipeline,,"Most AIOps talks stop at a maturity diagram. Michele Dodic, SRE Associate Manager at Accenture, and his colleague Anastasia (Nastia) Archangelskaya, Cloud Advisory Manager at Accenture, keep going at Conf42 SRE 2024: after the roadmap from reactive monitoring to zero-touch operations, they run a GitLab pipeline where an eBPF experiment catches a container reading `/etc/passwd` and an OpenAI-backed SRE copilot tells you not to ship it.
 
 The takeaway is modest on purpose. Michele Dodic said at Conf42 SRE 2024: ""start simple and scale fast.""
@@ -80638,6 +81049,52 @@ SREs and platform engineers who want a vocabulary for where their team sits on t
 
 [Watch the talk on YouTube](https://youtu.be/qMxcF6-W5Vo).
 ",talk,sre2024,talk:sre2024/Michele Dodic,,Conf42,,queued,"aiops, ebpf, observability, devsecops, genai"
+,"One Go codebase, desktop and phone apps, and no 40 GB SDK first","Andrew Williams (Fyne Labs) at Conf42 Golang 2024 on building native GUI apps for desktop, mobile and web from one Go codebase with Fyne",2024-04-09,golang2024/go-gui-apps-with-fyne,,"Go already made command line tools pleasant to build and ship; Andrew Williams wants it to do the same for graphical apps. At Conf42 Golang 2024, the founder of the Fyne project and CEO of Fyne Labs walks from an empty directory to a markdown editor that runs on a Mac and in the iPhone simulator, gets unit tested without opening a window, and is packaged for the app stores, all with one codebase and the `fyne` command line tool.
+
+## Why is GUI development still so painful?
+
+Williams starts with a short history. Most of today's widget toolkits carry a heavy C heritage: manual memory management, thread handling, and string types designed before Unicode and multibyte runes mattered. The modern alternatives in Go, Rust and JavaScript are often bindings over that same old technology, so they never feel idiomatic. The polished platform toolkits from Apple and Google are large and assume a lot of prior knowledge. His favourite example is a hello world for an unnamed toolkit that needed a 10 GB download and took 40 GB of disk before the first line of code.
+
+The other catch: the vendors with modern toolkits want you building for their platform, not everyone's.
+
+## What does Go bring to the table?
+
+Write once, compile for every target, ship a single binary with no runtime dependencies, and get native performance because the compiler does the work. Andrew Williams said at Conf42 Golang 2024 that Go offers ""a great way to lower the barrier of entry to building graphical applications, just like it does command line applications.""
+
+Fyne is his attempt to cash that in: an open source toolkit, roughly six years old at the time of the talk, with 23,180 GitHub stars on his slides. It targets Windows, macOS, Linux and the BSDs, iOS and Android, the browser through WASM (nearly complete, with the next release meant to finish it), and embedded devices such as Raspberry Pi kiosks.
+
+## From go mod init to a markdown editor
+
+The setup is honest about its one wart: you need Go 1.17 or newer plus a C compiler, because Fyne talks to the graphics stack natively. Linux usually has gcc already, macOS gets it through Xcode, Windows needs MSYS2 and mingw. Then it is `go get fyne.io/fyne/v2@latest`, an `app.New()`, a window, a label, and `ShowAndRun()`. He warns that some editors auto-import the wrong major version, so check for `v2` in the import path.
+
+The more interesting demo is a markdown editor in a handful of lines: a multi-line entry and a rich text widget side by side in an adaptive grid, with the entry's change callback wired straight into the rich text's markdown parser. The same code then runs in the iPhone simulator, switches to light mode because that is the iOS default, and flips the grid's orientation when the device rotates.
+
+## GUI tests that don't grab your keyboard
+
+Unit testing graphical apps is usually where good intentions go to die. Fyne ships a test package that simulates typing and double-taps on a widget, so a test can type ""hello"" into an entry, double-tap to select the word, and assert on the selection and cursor column. The test runner executes the app in memory, without real input or output devices, so no windows pop up and the tests are fast.
+
+## Packaging and the stores
+
+The `fyne` CLI fills the gap between `go build` and what each platform expects: `fyne package` builds an `.app` bundle on macOS or an `.exe` with icon and metadata on Windows, `fyne install` puts the app in your launcher, and `-os android` or `-os ios` with an app ID cross-compiles for phones. If the C toolchains get in the way, `fyne-cross` does the builds inside containers. `fyne release` handles signing with Apple profiles and certificates or an Android keystore, and a `FyneApp.toml` file keeps all those flags in source control.
+
+## The rest of the toolkit
+
+The second half is a tour of the `fyne_demo` app: canvas primitives drawn with OpenGL acceleration, bundled icons and light and dark themes, basic and input widgets, forms, and collection widgets (list, table, tree, grid wrap) built on three callbacks so only visible rows get rendered. That is how you scroll through hundreds of thousands of items. The file dialog hands you a URI reader rather than a file path, which is why the same code can stream a document out of iCloud or Dropbox on iOS. Community packages in fyne-x add map and terminal widgets, and FyshOS goes all the way to a Linux desktop where every app is a Fyne app.
+
+## Who should watch
+
+Go developers who have only ever shipped servers and CLIs and wondered what a desktop or mobile app would cost them. It is an introduction with plenty of code, from the toolkit's author, so expect enthusiasm for Fyne rather than a comparison with other toolkits.
+
+## Related Conf42 talks
+
+- Abhisek Pattnaik on [building CLI apps in Go](https://www.conf42.com/Golang_2023_Abhisek_Pattnaik_building_cli_apps), the other half of the single-binary story.
+- Thorsten Hans on [serverless WebAssembly with Go](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly) at the same event.
+- Ishuah Kariuki on [terminal emulator basics](https://www.conf42.com/Golang_2021_Ishuah_Kariuki_tty_linux_terminal_emulator_basics), for when you want to know what that terminal widget is doing.
+
+[Watch Andrew Williams's talk](https://www.conf42.com/Golang_2024_Andrew_Williams_love_building_apps)
+
+[Watch the talk on YouTube](https://youtu.be/b9JjkNdbhUA).
+",talk,golang2024,talk:golang2024/Andrew Williams,,Conf42,,queued,"go, fyne, gui, cross-platform, mobile"
 ,"Go gotchas that compile fine, from leaky time.After to non-nil nils","Dmitry Korolev (Avito) at Conf42 Golang 2024 on common Go mistakes with slices, strings, channels, time.After, WaitGroup, mutex copies, defer and interfaces",2024-04-07,golang2024/go-gotchas-slices-timers-nil-interfaces,,"Go is friendly until a nil interface is not nil. At Conf42 Golang 2024, Dmitry Korolev, Senior Software Engineer at Avito, goes through the mistakes that compile cleanly, pass review and then bite in production: slices that share memory, a time.After that leaks about 200 MB, a WaitGroup used wrong, a copied mutex, a defer that logs zero and an interface that is nil and not nil at once. Each one comes with the reason from the language internals or the docs, and the fix.
 
 It is a dense checklist talk. Mid-level Go developers will recognise at least two of these from their own git history.
