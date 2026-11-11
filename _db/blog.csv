@@ -80638,6 +80638,430 @@ SREs and platform engineers who want a vocabulary for where their team sits on t
 
 [Watch the talk on YouTube](https://youtu.be/qMxcF6-W5Vo).
 ",talk,sre2024,talk:sre2024/Michele Dodic,,Conf42,,queued,"aiops, ebpf, observability, devsecops, genai"
+,"Go gotchas that compile fine, from leaky time.After to non-nil nils","Dmitry Korolev (Avito) at Conf42 Golang 2024 on common Go mistakes with slices, strings, channels, time.After, WaitGroup, mutex copies, defer and interfaces",2024-04-07,golang2024/go-gotchas-slices-timers-nil-interfaces,,"Go is friendly until a nil interface is not nil. At Conf42 Golang 2024, Dmitry Korolev, Senior Software Engineer at Avito, goes through the mistakes that compile cleanly, pass review and then bite in production: slices that share memory, a time.After that leaks about 200 MB, a WaitGroup used wrong, a copied mutex, a defer that logs zero and an interface that is nil and not nil at once. Each one comes with the reason from the language internals or the docs, and the fix.
+
+It is a dense checklist talk. Mid-level Go developers will recognise at least two of these from their own git history.
+
+## Why does append inside a function not change my slice?
+
+A slice is a small struct, a pointer to an array plus length and capacity, and Go passes it by value. Writing to index zero inside a function changes the shared array, so the caller sees it. But if the slice is full (length equals capacity), append allocates a new array and the slice inside the function now points there; later writes never reach the caller. The same sharing bites when you reslice and append into the original's spare capacity. The built-in copy gives you an independent slice.
+
+The memory version is sneakier. A news scraper keeps the first 100 runes of every article as a preview. The preview slice is 100 elements long, but its capacity, and the whole article behind it, stays alive in the cache. Hello, memory leak.
+
+Why runes at all? Strings are UTF-8 bytes, so slicing and len work on bytes, and the first two bytes of a Chinese greeting are not two characters. Converting to runes fixes that, at the cost of keeping two copies of the text.
+
+## Who should close a channel, and when?
+
+Reading from a closed channel is fine; writing to it or closing it twice panics. So the writer closes. And only close when the reader needs to know, for example a for-range loop over the channel, which otherwise waits forever. ""There is nothing wrong with leaving the channel unclosed,"" Dmitry Korolev said at Conf42 Golang 2024; the garbage collector takes care of it.
+
+## Why does time.After leak memory in a select loop?
+
+The classic: select on an event channel, with a time.After of 15 minutes to warn when nothing arrives. Every loop iteration creates a new timer channel, and per the docs the underlying timer is not recovered by the garbage collector until it fires. With about a million events, at roughly 200 bytes per channel, that is about 200 MB held for 15 minutes. The docs' fix: use NewTimer and Stop it when it is no longer needed.
+
+## The goroutine bugs hiding in one example
+
+The goroutine example starts five goroutines that add 1 to 5 into a sum, expecting 15. The closure captures the loop variable, not its value, so the goroutines often see the last one. Go 1.21 shipped an experiment and Go 1.22 changed loop-variable semantics so it no longer happens, but older code still has it. The same code has a second bug: wg.Add is called inside the goroutine, so Wait can return before some goroutines have even started.
+
+Then a counter struct with a mutex and a map, with methods on a value receiver. Each call copies the struct, mutex included, the copies stop protecting anything and the program dies with fatal error: concurrent map writes. sync types carry a noCopy marker so go vet can flag the copy. Atomics have their own trap: ""Operations with atomics are atomic individually, but not atomic collectively,"" as Dmitry put it. Check that a number is even, print it, and you can print 287.
+
+## Defer, nil interfaces and vendoring
+
+A deferred log of a named return value prints zero, because deferred arguments are evaluated when the defer statement runs, not when the function returns. Wrap it in a closure and it reads the final value.
+
+An interface is a type plus a data pointer, and it equals nil only when both are empty. Return a typed nil pointer as an interface and you get a value that prints nil but fails the nil check.
+
+Last, go mod vendor copies only the packages needed to build and test your module, not the whole library. Dmitry reads that as a hint: a library that hides the calls to an external service inside itself takes control away from the services consuming it.
+
+## Who should watch?
+
+Go developers past the tutorial stage, reviewers who want a list of things to look for, and anyone whose service eats more RAM than it should. Seniors can treat it as a quiz.
+
+## Related Conf42 talks
+
+- Jesus Espino on [dissecting slices, maps and channels](https://www.conf42.com/Golang_2022_Jesus_Espino_dissecting_slices_maps_channels) at Conf42 Golang 2022.
+- Liam Hampton on [memory management in Go](https://www.conf42.com/Golang_2023_Liam_Conroy_Hampton_memory_management).
+- Kirill Parasotchenko on [system design mistakes](https://www.conf42.com/Golang_2024_Kirill_Parasotchenko_system_design_mistakes) at the same event.
+
+[Watch Dmitry Korolev's talk](https://www.conf42.com/Golang_2024_Dmitry_Korolev_common_mistakes)
+
+[Watch the talk on YouTube](https://youtu.be/DMOFOIRZ42g).
+",talk,golang2024,talk:golang2024/Dmitry Korolev,,Conf42,,queued,"go, best-practices, concurrency, memory-leaks, debugging"
+,"GoFr, a Go framework that ships metrics and traces before your first route","Aryan Mehrotra (GoFr.dev) at Conf42 Golang 2024 on GoFr, an opinionated Go microservice framework with built-in metrics, tracing, logging and data sources",2024-04-06,golang2024/gofr-opinionated-go-microservice-framework,,"Most Go services spend their first week wiring the same things: config, logging, a database pool, Prometheus metrics, OpenTelemetry. At Conf42 Golang 2024, Aryan Mehrotra, Software Developer at GoFr.dev, demos GoFr, an opinionated open source framework that does that wiring for you, so a hello-world service already logs every request with a correlation ID, exposes metrics and can export traces.
+
+Honest scope: Aryan works on GoFr, so this is a maintainer showing his framework. It is also a well-paced live demo that shows exactly what you get out of the box.
+
+## What does GoFr include?
+
+The feature list: built-in observability (traces and metrics, plus custom ones), authentication with OAuth, basic auth and API keys, fine-grained log levels that can change on the fly without a restart or redeploy, REST and gRPC APIs, configuration management, database integrations and migrations, and a circuit breaker for calls between services, so a dead dependency does not get hammered with retries. For data, it supports MySQL, Postgres and other SQL databases, Redis and MongoDB, and pub/sub over Kafka, Google Cloud Pub/Sub and MQTT.
+
+## What does hello world look like?
+
+Two lines are in every GoFr app: gofr.New, which initialises logging, metrics and data sources from configuration, and app.Run, which starts the HTTP server with health-check and metrics routes already registered. ""By default, it starts the server on the port 8000, which we can override using the configs,"" Aryan Mehrotra said at Conf42 Golang 2024.
+
+A route is a path plus a handler that takes GoFr's context and returns a value and an error. Return hello world and the response comes back as JSON wrapped in a data field, with a 200 status set by the framework according to REST conventions. That wrapper is deliberate: every service built with GoFr answers in the same shape. Every request also gets a log line with a correlation ID, the status code and how long it took.
+
+## How much work is a database?
+
+Config, mostly. Aryan starts MySQL in Docker, copies the connection settings from the docs into the .env file in the configs directory, and on the next start the app is connected. The handler reaches the database through the context and runs show databases. Moving to Postgres means changing the dialect in config, not the code. Turn the log level to debug and the executed queries show up in the logs, handy for tuning.
+
+## What do you get for observability?
+
+Metrics on a separate port, 2121 by default and configurable, with the basics already there: SQL connections in use and open, and request duration histograms by path, method and status. You can add your own counters, up-down counters, histograms and gauges from the context.
+
+Tracing uses OpenTelemetry. Point the config at a Zipkin exporter and every request shows up as a trace from router to handler, findable by its correlation ID. With two services, one using Redis, the trace follows the call from the first service to the second and back. The demo ends on GoFr's public Grafana dashboards, imported into a local Grafana and fed by one of the repo's example servers under generated load: request counts, latencies, status codes, outbound SQL queries and Redis commands.
+
+His closing argument is that by taking care of database connections and tracing, the framework leaves developers to focus on core functionality, which means less time to production, easier debugging and more productive developers.
+
+## Who should watch?
+
+Teams starting several Go microservices who want them to look and behave the same, and developers who are tired of copying observability boilerplate from the last project. If you prefer assembling your own stack from the standard library, this shows what you would be signing up for in exchange for convention.
+
+## Related Conf42 talks
+
+- Divya Darshana on [GoFr and gRPC observability](https://www.conf42.com/Observability_2025_Divya_Darshana_clarity_gofr_grpc) at Conf42 Observability 2025.
+- Divya Darshana on [HTTP communication between APIs](https://www.conf42.com/Golang_2025_Divya_Darshana_http_communication_apis).
+- Herve Ah Leung on [successful microservices architecture](https://www.conf42.com/Golang_2022_Herve_AhLeung_successful_microservices_architecture).
+
+[Watch Aryan Mehrotra's talk](https://www.conf42.com/Golang_2024_Aryan_Mehrotra_revolutionize_gofr_observable)
+
+[Watch the talk on YouTube](https://youtu.be/ArHN3gGBtak).
+",talk,golang2024,talk:golang2024/Aryan Mehrotra,,Conf42,,queued,"go, microservices, observability, opentelemetry, frameworks"
+,"LangChainGo, from one prompt to a RAG pipeline on Qdrant","Alexandre Evangelista de Souza (Indev Web) at Conf42 Golang 2024 on LangChainGo, a Go port of LangChain, from simple prompts to RAG over a PDF with Qdrant",2024-04-05,golang2024/langchaingo-rag-qdrant-go,,"LangChain is usually a Python or JavaScript conversation. At Conf42 Golang 2024, Alexandre Evangelista de Souza, CEO and Founder of Indev Web, shows its Go port, LangChainGo, in a short code-first session: call a model, swap providers by changing three options, stream a response, and then build a small retrieval-augmented generation (RAG) pipeline that answers questions about a PDF stored in Qdrant.
+
+It is a quick tour from a developer based in Brazil, and it reflects the library as it stood in early 2024. Treat it as a map of what LangChainGo covers, not a reference.
+
+## What is LangChainGo?
+
+A port of LangChain to Go. Alexandre's first warning is that the documentation was new and incomplete at the time, so the GitHub repo is where the real picture lives. The building blocks are familiar if you know the Python version: models, vector stores, document loaders, agents, memory and chains. The integration list he reads out is long, including OpenAI, Ollama, Mistral, Google AI, llama.cpp, llamafile, NVIDIA and Perplexity, plus a model from Brazil, with Whisper on the way.
+
+## How little code does a first call take?
+
+Import the packages, create an OpenAI LLM instance and call it with a context and a prompt. Options include temperature and stop words. His test prompt is the start of a sentence about the first man to walk on the moon, so the model only has to finish it.
+
+The useful trick is that anything with an OpenAI-compatible API plugs into the same client. For Groq he sets the model, the token and the base URL, and the rest of the code stays the same. NVIDIA's endpoint works the same way, with a catch he points out: used like that, it could not give him embeddings, so it is no good for the RAG half. He also shows message-based calls with a system message and a human message, a max-tokens setting and a streaming function that prints tokens as they arrive.
+
+## How does the RAG demo work?
+
+The classic pipeline: load a document (a PDF here, though it could be a text file or a database), split it into chunks, embed and save the chunks in a vector store, retrieve the relevant ones for a question, and send them with the prompt to the model.
+
+His vector store is Qdrant Cloud, configured with a URL, an API key and a collection name, though other vector stores would do the job. A helper loads the PDF and splits it into documents, and a second function sends them to Qdrant. Then the lesson every first RAG demo teaches: run the ingest twice and you have stored everything twice. So he splits the program into ingest, which runs once, and query, which only grabs the existing vector store and runs a similarity search.
+
+The query side sets an explicit model (in that version, he warns, do not rely on the defaults), creates an OpenAI embedder, retrieves the matching chunks, adds them to the context and answers through a conversational ReAct agent wrapped in a chain, with a low temperature. Asked about the book in the PDF, it answers with the number it found there. ""Very simple, very easy. Thank you for watching,"" Alexandre Evangelista de Souza said at Conf42 Golang 2024, and for a working RAG loop in Go that is a fair summary.
+
+## Who should watch?
+
+Go developers who want to see whether they can build LLM features without adding a Python service next to their Go one. It is short and moves fast, so keep the LangChainGo repo open alongside it; APIs have moved since.
+
+## Related Conf42 talks
+
+- Stephen Batifol on [how vector databases work](https://www.conf42.com/Machine_Learning_2024_Stephen_Batifol_vector_databases_work) at Conf42 Machine Learning 2024.
+- Zain Hasan on [vector databases](https://www.conf42.com/Machine_Learning_2023_Zain_Hasan_vector_databases).
+- Pratim Bhosale on [speech-to-text transcriptions with Whisper and Go](https://www.conf42.com/Golang_2023_Pratim_Bhosale_speechtotext_transcriptions_whisper).
+
+[Watch Alexandre Evangelista de Souza's talk](https://www.conf42.com/Golang_2024_Alexandre_Evangelista_de_Souza_langchain)
+
+[Watch the talk on YouTube](https://youtu.be/mMg1gmmIYLQ).
+",talk,golang2024,talk:golang2024/Alexandre Evangelista de Souza,,Conf42,,queued,"llm, langchain, rag, go, vector-databases"
+,"Writing and querying InfluxDB 3.0 from Go, over Arrow Flight","Anais Dotis-Georgiou (InfluxData) at Conf42 Golang 2024 on the InfluxDB 3.0 Go client, line protocol, upserts and SQL queries over Arrow Flight",2024-04-03,golang2024/influxdb3-go-client-arrow-flight,,"A single temperature reading is boring. Ten thousand of them per second from one vibration sensor is a database problem. At Conf42 Golang 2024, Anais Dotis-Georgiou, Developer Advocate at InfluxData, explains why time series needs its own kind of database, how InfluxDB 3.0 is built on Apache Arrow and friends, and how to write and query it from Go with the influxdb3-go client, which wraps the Arrow Flight client.
+
+Honest scope: the abstract talks about building a client on Arrow Flight, but the talk is about using the official Go client that already does that for you. It is a vendor talk and a practical getting-started guide.
+
+## Why does time series need its own database?
+
+Time series data is anything with a timestamp, from stock prices to sensors measuring vibration, temperature or pressure, to the DevOps and network monitoring data the virtual world produces. The catch, as Anais Dotis-Georgiou said at Conf42 Golang 2024, is that ""individual points are not really that valuable."" The trend is what matters, which makes it a different shape from relational data, where one row usually holds everything you need.
+
+She splits it into metrics, which arrive at regular intervals (an accelerometer read every second), and events, which do not (a machine fault). Count faults per day and the event becomes a metric.
+
+A time series database then needs four things: timestamped ingest with time-ordered queries, very high write throughput, fast aggregations over time ranges, and horizontal scalability. Her throughput example: an industrial vibration sensor can produce up to 10 kHz, that is 10,000 points per second, and you rarely have just one.
+
+## What is InfluxDB 3.0 built on?
+
+Open Apache projects. DataFusion is the query engine, which is why you can query with SQL. Apache Arrow is the in-memory columnar format, a good fit because monitoring data repeats a lot (room temperature rarely changes), so columns compress cheaply, and finding a minimum or maximum over millions of points does not mean scanning every row. Parquet is the durable file format, with Iceberg support on the way. The pitch is interoperability rather than lock-in, unlike older data historians.
+
+## How do you write data from Go?
+
+You need an InfluxDB Cloud 3.0 account (the free tier works), a database, also called a bucket, which in InfluxDB carries a retention policy (30 days by default), and an API token, either all-access or scoped to a bucket. Then go get the influxdb3-go package and create the client from the host URL, token and database, read from environment variables.
+
+Writes go through the write endpoint in line protocol: a measurement, tags, fields and an optional timestamp, generated at write time if missing. Her example is a stat measurement with a unit tag set to temperature and avg and max fields. Tags are for metadata and fields for the values, though both end up as columns, so the distinction is mostly organisational. Go users will more likely build points with NewPoint and pass one or many to WritePoints; writes are synchronous.
+
+The one rule worth remembering: a field can be upserted, a tag cannot. Write the same measurement, tags and timestamp with new field values and the old values are overwritten. Change a tag value and you have created a new series instead, which makes sense when the tag is a sensor ID.
+
+## And queries?
+
+SQL by default: select from stat for the last five minutes where unit is temperature, call Query, iterate over the rows. QueryWithOptions lets you pick the query type explicitly, Flight SQL or InfluxQL, the SQL-like language v1 users know, for example to run SHOW MEASUREMENTS. Under the hood, Arrow Flight over gRPC gives efficient serialisation and bidirectional streaming, which is what makes pulling large result sets fast.
+
+## Who should watch?
+
+Go developers starting with InfluxDB 3.0, and anyone curious how Arrow, DataFusion and Parquet fit together in a real database. Full examples live in the InfluxCommunity organisation on GitHub.
+
+## Related Conf42 talks
+
+- Anais Dotis-Georgiou on [Apache Arrow Flight and InfluxDB from Python](https://www.conf42.com/Python_2024_Anais_DotisGeorgiou_apache_flight_influxdb) at Conf42 Python 2024.
+- Anais Dotis-Georgiou on [time series database application architecture](https://www.conf42.com/Python_2023_Anais_DotisGeorgiou_time_series_database_application_architecture).
+- Joe Karlsson on [data-intensive applications in Go](https://www.conf42.com/Golang_2022_Joe_Karlsson_dataintensive_applications).
+
+[Watch Anais Dotis-Georgiou's talk](https://www.conf42.com/Golang_2024_Anais_DotisGeorgiou_leveraging_apache_flight)
+
+[Watch the talk on YouTube](https://youtu.be/CgZ_vvhj6LU).
+",talk,golang2024,talk:golang2024/Anais Dotis-Georgiou,,Conf42,,queued,"influxdb, time-series, apache-arrow, go, databases"
+,"Lacrosse as a graph problem, with Go and Neo4j doing the scouting","Rangarajan Lakshminarayanachar (Capital One) at Conf42 Golang 2024 on modelling players, plays and opponents as a Neo4j graph queried from Go",2024-04-02,golang2024/graph-sports-analytics-go-neo4j,,"Box scores tell you who won. A graph tells you why the star player keeps fading in the playoffs. At Conf42 Golang 2024, Rangarajan Lakshminarayanachar, Senior Manager, Software Engineering at Capital One, pitches sports analytics as a graph problem: model players, coaches, games and plays as nodes and relationships in Neo4j, query them with Cypher, and drive it all from Go.
+
+It is a lightning talk and he is upfront that it is a blueprint and a thought-provoker, not a finished product. The spark was his daughter's love of lacrosse, which he describes as a fun mix of badminton, butterfly catching and a bit of hockey.
+
+## Why model a sports team as a graph?
+
+He opens with Moneyball, the film that made sabermetrics mainstream, and the point that what happens on the field depends on decisions made off it. Then two cases.
+
+Player focus: a player who excels in regular-season games but chokes in the playoffs. Coaches added training that simulated pressure. In graph form the coach, the player and the playoff games are nodes, and the analysis, the simulation drills and the actual games are the edges. ""A graph says a million words,"" Rangarajan Lakshminarayanachar said at Conf42 Golang 2024, and the point is that a coach wants a cheat sheet, not a data dump.
+
+Team focus: the Chicago Cubs' 2016 World Series win against Cleveland's strong pitching, where pushing pitch counts up early was part of the plan. Again, a handful of nodes and relationships capture what a spreadsheet hides.
+
+From there he widens out: these small graphs are drops in the ocean of knowledge graphs, which he sees becoming the norm behind AI engines and analytics systems across industries.
+
+## Why Cypher and not Gremlin?
+
+Readability. Cypher's syntax is ASCII art for graphs: a person node, an arrow, a city node, and you can see the pattern in the query itself. Gremlin can do the job, he says, but tends to get overly complex. When the people reading the output are coaches, clarity in the query language helps the engineers too.
+
+## What does the architecture look like?
+
+The 10,000-foot view is cloud native. A Neo4j instance in an AWS cluster stores the graph. Go Lambdas, chosen for concurrency and performance, run the analytics modules and serve mobile and web users. The official Neo4j Go driver speaks the Bolt protocol. On scale he quotes Neo4j's own published case studies claiming it runs up to 1000x faster than SQL for greenfield systems, so file that one under vendor numbers.
+
+## Show me the Go
+
+The snippets are short on purpose. The model is a set of Cypher create and update statements for teams, players and the relationships between them. Connecting from Go is a few lines with the Bolt driver and basic auth, then a parameterised insert for any entity. The lacrosse model adds the sport's vocabulary as relationships: a low submarine shot, a rainbow pass, turnovers and saves.
+
+The teaser for more advanced work is cosine similarity between nodes. A graph database lets you compare opponents, games and players against each other. In a league with 30 teams, some will play similarly, for example in relief pitching or stolen-base percentages, and finding the lookalikes helps you prepare for scenarios before they happen.
+
+## Why does anyone pay for this?
+
+Betting. He cites daily fantasy sports in 2014, when about 1.5 million Americans paid more than a billion dollars in tournament entry fees and FanDuel grew active customers by about 300%. Analytics is the backbone of that business, and he argues Go fits the high-concurrency side of it.
+
+## Who should watch?
+
+Go developers who want a first look at graph modelling with Neo4j, and anyone who has tried to answer a relationship question with five SQL joins. Do not expect benchmarks or a production system. The model and similarity query are in [rangarajl/graph-and-go](https://github.com/rangarajl/graph-and-go).
+
+## Related Conf42 talks
+
+- Venkateswarlu Boggavarapu on [fraud detection with graph databases](https://www.conf42.com/Machine_Learning_2025_Venkateswarlu_Boggavarapu_fraud_detection_db_graph) at Conf42 Machine Learning 2025.
+- Anton Kalik on [AI with Node.js for custom sports activity](https://www.conf42.com/JavaScript_2023_Anton_Kalik_ai_nodejs_custom_sports_activity).
+- Paul Marsicovetere on [combat sports principles for SRE](https://www.conf42.com/Site_Reliability_Engineering_2022_Paul_Marsicovetere_combat_sports_principles_sre).
+
+[Watch Rangarajan Lakshminarayanachar's talk](https://www.conf42.com/Golang_2024_Rangarajan_Lakshminarayanachar_strategic_playbooks_mapped_lacrosse)
+
+[Watch the talk on YouTube](https://youtu.be/u53vvq_kTa0).
+",talk,golang2024,talk:golang2024/Rangarajan Lakshminarayanachar,,Conf42,,queued,"graph-databases, neo4j, sports-analytics, go, cypher"
+,"Worker pools made it 4x faster and wrong, fan-out made it right","Chinmay Naik (One2N) at Conf42 Golang 2024 on a Go pipeline replaying 3.6M MongoDB oplogs into PostgreSQL, from 9h20m to about 1.5 hours",2024-03-31,golang2024/mongo-oplog-postgres-goroutine-fan-out,,"The fastest version of Chinmay Naik's data pipeline was also the one that corrupted data. At Conf42 Golang 2024, the founder of One2N walks through a Go program that migrates MongoDB into PostgreSQL by replaying the oplog, and how its concurrency design evolved: sequential at 9 hours 20 minutes, worker pools at 4x faster but broken, and a fan-out by database and collection that ended up both correct and kind to Postgres.
+
+It is one of the clearest practical concurrency talks in the Go track: real problem, real numbers, and a mistake shown on purpose.
+
+## How do MongoDB documents become rows?
+
+First the mapping. A student document's top-level keys become columns of a student table. A nested array of addresses becomes rows in a student_address table, and a nested phone object a row in student_phone, each linked back by a logical foreign key. One Mongo document turns into N SQL statements. Updates become UPDATE statements, or ALTER TABLE when a new key appears, since Mongo has no fixed schema and Postgres does. Deletes are deletes.
+
+The migration had to support both a one-time bulk copy and streaming changes, because nobody stops production Mongo for a weekend. The answer for both is the oplog, the capped collection in the local database that works as Mongo's write-ahead log: every insert, update and delete, with an op code, a namespace (database plus collection) and the object.
+
+## The sequential pipeline
+
+The first version, a program he calls oplog-to-SQL, is three goroutines connected by channels: one reads oplogs, one converts each into SQL statements (creating schema and table only the first time a namespace appears, so it keeps a bit of state), one executes them on Postgres. On 3.6 million oplogs on his MacBook it took 9 hours 20 minutes.
+
+## Why did the worker pool break things?
+
+The converter was clearly doing the most work, so the obvious move was a worker pool there, then a second round of parallelism on the SQL side. Runtime dropped to about 2 hours 18 minutes, a 4x improvement. Then the catch: independent goroutines do not preserve order. An insert followed by an update of the same document can come out as update then insert, and the update fails. ""So we need to always write correct program first. Then we can make it performant,"" Chinmay Naik said at Conf42 Golang 2024. Throwing worker pools at a problem without understanding the domain bought speed and lost data integrity.
+
+## Fan out where order does not matter
+
+Order only matters within a document, so the pipeline can split along namespaces. An orchestrator goroutine fans oplogs out to one channel per database. Each database goroutine fans out again per collection. Each database and collection pair gets its own converter and writer, so ordering holds where it has to and everything else runs in parallel. That version ran in 1 hour 36 minutes 30 seconds.
+
+Then he counted. With 16 databases of 128 collections each, one writer per pair means 2,048 Postgres connections, which is a good way to meet your DBA in person. The final design fans back in on the write side: all converters for a database feed one channel and one writer, so 16 connections instead of 2,048. Runtime improved only a little, resource use improved a lot.
+
+## What are the takeaways?
+
+Understand the domain first. Build the working sequential version first. Find the parts that can actually run in parallel, and do not apply patterns blindly. Keep Amdahl's law in mind, and the Universal Scalability Law beyond it: past a certain point, simplicity is worth more than the next speedup.
+
+## Who should watch?
+
+Anyone writing Go pipelines with goroutines and channels, and especially anyone about to add a worker pool to something that processes ordered events. The problem is broken into small exercises on One2N's [playbook](https://playbook.one2n.in) if you want to build it yourself.
+
+## Related Conf42 talks
+
+- Jayaganesh Kalyanasundaram on [Go concurrency for beginners](https://www.conf42.com/Golang_2021_Jayaganesh_Kalyanasundaram_concurrency_for_beginners) at Conf42 Golang 2021.
+- Raghav Roy on [coroutines and Go](https://www.conf42.com/Golang_2024_Raghav_Roy_coroutines), concurrency without parallelism.
+- Joe Karlsson on [MongoDB schema design](https://www.conf42.com/JavaScript_2020_Joe_Karlsson_mongodb_schema_design).
+
+[Watch Chinmay Naik's talk](https://www.conf42.com/Golang_2024_Chinmay_Naik_concurrency_gigabyte_realworld)
+
+[Watch the talk on YouTube](https://youtu.be/mV8LIhCz9D4).
+",talk,golang2024,talk:golang2024/Chinmay Naik,,Conf42,,queued,"go, concurrency, mongodb, postgresql, data-pipelines"
+,"Coroutines in Go, from 190 ns channel switches to 20 ns","Raghav Roy (VMware) at Conf42 Golang 2024 on full coroutines, building them from goroutines and channels, and runtime changes that make switches ~10x faster",2024-03-30,golang2024/coroutines-in-go-without-parallelism,,"Go has goroutines, channels and a scheduler that made concurrency feel cheap, yet it has no coroutines. At Conf42 Golang 2024, Raghav Roy, R&D Software Engineer at VMware who works on the ESXi hypervisor, explains what a full coroutine is, builds one out of goroutines and channels in a few dozen lines, and walks through the runtime changes that take a switch from about 190 ns down to 20.
+
+It is a concepts talk with code, closely following Russ Cox's research post Coroutines for Go, which Raghav credits openly. If you read that post and want a guided tour with history, this is it.
+
+## What is a coroutine, exactly?
+
+A subroutine can do two things: suspend itself to call another function, or terminate and return to its caller. A coroutine can also suspend itself and hand control back to whoever resumed it, keeping its local variables and its place. Raghav's framing: functions that return multiple times and keep their state.
+
+His example is comparing two binary trees. The usual answer traverses both, collects values, then compares. With coroutines, two visitors walk the trees in order, each yielding one value at a time, and the comparison loop checks them pairwise in a single pass.
+
+## Where did the idea come from?
+
+1958, the COBOL compiler and punched cards. The lexer (the basic symbol reducer) ate cards and wrote tokens to tape, then the parser (the name reducer) read the tape and wrote another one, leaving a stack of tapes nobody needed. Melvin Conway's insight was that the two could just pass control back and forth, which gave a one-pass compiler. Raising the level of abstraction made things cheaper, a negative-cost abstraction.
+
+So why did coroutines not take over? No agreed definition for years (Marlin's doctoral thesis later became the reference), and ALGOL 60's stack-based block scope, which turns coroutines into side stacks that start to look like heavy multithreading.
+
+## Why are Python's and Kotlin's coroutines not full ones?
+
+Raghav classifies them on three axes. Symmetric (one transfer operation) versus asymmetric (resume and yield); asymmetric is enough, because it can implement symmetric and is easier to write. First-class versus constrained: you should be able to store, pass and return a coroutine. And stackfulness: a stackful coroutine can yield from inside nested calls. Python's and Kotlin's are stackless, so only the top frame can yield, which is why they are not full coroutines.
+
+The Go motivation is Rob Pike's Lexical Scanning in Go talk, where lexer and parser ran as goroutines connected by a channel. Goroutines brought parallelism nobody asked for, and with it races. ""Coroutines provide concurrency without parallelism,"" Raghav Roy said at Conf42 Golang 2024. When one runs, the others do not.
+
+## Building coro.New from parts you already have
+
+The construction uses two unbuffered channels, cin and cout. coro.New starts a goroutine blocked on cin and returns resume, which sends on cin and waits on cout. yield is the mirror image: send on cout, wait on cin. Only one side ever runs, so there is still no parallelism. Ten goroutines from go statements add ten parallel flows; ten coro.New calls add ten control flows and leave parallelism at one.
+
+Then the edge cases. Resuming a finished coroutine would deadlock, so a running flag is cleared when the function returns, and with only one side running, that shared flag cannot race. A panic inside the coroutine would leave the caller blocked forever, so a deferred function notices running is still true and passes the panic out through cout. And a caller that leaves early needs a cancel function that sends a special error into cin, which yield turns into a clean shutdown.
+
+## How fast can it get?
+
+The numbers come from Russ Cox's measurements on a 2019 MacBook Pro. Channel-based coro.New took about 190 ns per switch, the same order as a goroutine switch. Having the compiler mark send-receive pairs so the runtime fuses them and jumps straight to the other coroutine, skipping the scheduler, cut that to about 118 ns, 38% faster. A direct coroutine switch in the runtime, no channels at all, took 20 ns, roughly 10x faster than the original.
+
+## Who should watch?
+
+Go developers who like knowing why the runtime works the way it does, and anyone who has written a goroutine-plus-channel pipeline that was really just an iterator in disguise. Then read Russ Cox's post, top of Raghav's reference list.
+
+## Related Conf42 talks
+
+- Piyush Verma on [Go concurrency primitives](https://www.conf42.com/Golang_2021_Piyush_Verma_concurrency_primitives) at Conf42 Golang 2021.
+- Jesus Espino on [dissecting slices, maps and channels](https://www.conf42.com/Golang_2022_Jesus_Espino_dissecting_slices_maps_channels).
+- Chinmay Naik on [Go concurrency in a gigabyte-scale data pipeline](https://www.conf42.com/Golang_2024_Chinmay_Naik_concurrency_gigabyte_realworld).
+
+[Watch Raghav Roy's talk](https://www.conf42.com/Golang_2024_Raghav_Roy_coroutines)
+
+[Watch the talk on YouTube](https://youtu.be/NqdDgxP7rsE).
+",talk,golang2024,talk:golang2024/Raghav Roy,,Conf42,,queued,"go, coroutines, concurrency, runtime, goroutines"
+,"TinyGo plus Spin, a serverless Go app with no container inside","Thorsten Hans (Fermyon) at Conf42 Golang 2024 on building serverless Go apps with TinyGo and Spin, and running them on Fermyon Cloud or SpinKube",2024-03-28,golang2024/tinygo-spin-serverless-webassembly,,"A container image for a Go web app ships the app plus a slice of an operating system. A WebAssembly module ships the app. At Conf42 Golang 2024, Thorsten Hans, Senior Cloud Advocate at Fermyon, builds serverless Go apps with TinyGo and the open source Spin framework, from hello world to a CRUD API on SQLite, and then deploys the same module to Fermyon Cloud and to Kubernetes with SpinKube.
+
+Fair warning on scope: Thorsten works for the company behind Spin, and the deployment targets are Fermyon's. Spin and SpinKube are open source, and the Go code is plain net/http style.
+
+## Why WebAssembly on the server at all?
+
+Wasm is a binary instruction format executed by a stack-based virtual machine. It was invented for the browser (Adobe Photoshop in a tab is his example), but the strict sandbox and near-native speed are what pulled it onto servers. Thorsten lists four properties. Small, because the distributable is just the app, no web server baked in. Secure, because every module runs sandboxed and gets nothing by default, not even read access to a temp folder, until you grant it. Fast, with near-native performance (freaking fast, in his words). Portable, which is his favourite: x64 or ARM64 stops mattering. ""We compile it once and we run it everywhere,"" Thorsten Hans said at Conf42 Golang 2024, a promise Java fans will recognise, this time with a sandbox.
+
+## What does Spin give a Go developer?
+
+Three pillars: a CLI for the inner loop, lightweight language SDKs so you are not coding against raw Wasm APIs, and a runtime for local runs built on Wasmtime. The demo starts with spin new from the http-go template. You get the usual go.mod and main.go plus a spin.toml manifest, where triggers decide which event invokes which component (here, an HTTP trigger on every route).
+
+spin build runs tinygo build targeting WASI, the WebAssembly System Interface, and spits out a .wasm file. spin up serves it on port 3000, spin watch gives hot reload. The handler is registered inside init by convention and uses the same http.ResponseWriter and http.Request you have used for a decade.
+
+From there he adds the Spin SDK's router with a route parameter, returns a 400 when the parameter is missing, and encodes a JSON response with the standard library's encoder. The point: the Go standard library and third-party packages work as usual.
+
+## A real CRUD API on SQLite
+
+The bigger sample is a full CRUD API backed by SQLite, using Google's uuid package and sqlx for struct scanning. The app has to be explicitly granted access to a database named default in the manifest, which is the sandbox showing its teeth. Handlers validate input and shape responses; a persistence package owns the SQL, with separate create and read models so clients cannot pick their own IDs. A migrations file seeds the table at startup, with items such as dog mode, full self driving and sentry mode, which is either a feature list or a confession about his car.
+
+## Where can you run it?
+
+Three places. Fermyon Cloud: spin cloud deploy uploads the app, notices it wants a database, offers to create one (it was called affectionate-melon) and has everything live in seconds; a spin cloud sqlite command runs the migrations. SpinKube, the open source stack for running Spin apps next to containers on any cluster: push the app as an OCI artifact (to ttl.sh, which keeps it for 24 hours), point a runtime config at a libSQL server already in the cluster, scaffold the manifest and pipe it into kubectl apply. Two replicas come up behind a service via a containerd shim. And Fermyon Platform for Kubernetes, the commercial option for denser packing.
+
+His design choice is nice: SpinKube's scaffold prints YAML and stops, so you can use kubectl, Helm or GitOps as you like.
+
+## Who should watch?
+
+Go developers curious about Wasm beyond the browser, and platform teams wondering whether functions-on-Kubernetes can be lighter than a pod per service. The samples are at [ThorstenHans/conf42-golang-samples](https://github.com/ThorstenHans/conf42-golang-samples).
+
+## Related Conf42 talks
+
+- Alex Casalboni on [WebAssembly from cloud to edge](https://www.conf42.com/Golang_2025_Alex_Casalboni_cloud_edge_webassembly) at Conf42 Golang 2025.
+- Sohan Maheshwar on [WebAssembly and the future of cloud](https://www.conf42.com/Cloud_Native_2024_Sohan_Maheshwar_future_cloud_webassembly).
+- Deepu K Sasidharan on [containerless Kubernetes with WebAssembly](https://www.conf42.com/Rustlang_2024_Deepu_K_Sasidharan_kubernetes_containerless_webassembly).
+
+[Watch Thorsten Hans's talk](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly)
+
+[Watch the talk on YouTube](https://youtu.be/cU0oUbg5xsA).
+",talk,golang2024,talk:golang2024/Thorsten Hans,,Conf42,,queued,"webassembly, serverless, tinygo, spin, kubernetes"
+,"Kubernetes from Go with client-go, from a node list to a CRD","Mohamed Abdelrhman (Kotal) at Conf42 Golang 2024 on driving Kubernetes from Go with client-go, api and apimachinery, up to CRDs and operators",2024-03-27,golang2024/client-go-pods-deployments-crds,,"Everything kubectl does, your Go program can do too, and that is where Kubernetes tooling starts. At Conf42 Golang 2024, Mohamed Abdelrhman, Senior Software Engineer at Kotal, live-codes the path from an empty directory to a Go program that lists nodes, creates a pod and a deployment, and then defines a brand new resource type with a CRD.
+
+It is a beginner-friendly, hands-on talk. If you have written YAML for years but never touched the Go client, this is the gentle on-ramp.
+
+## Which libraries do you actually need?
+
+Three, and the talk opens by untangling them. client-go is the primary library for talking to the API server: create, modify, delete. k8s.io/api is where the Kubernetes object types are defined, so when client-go creates a pod it is building one of those types. apimachinery is the utility belt around both: selectors, schemes, list and create options, object metadata.
+
+## How does a Go program connect to the cluster?
+
+Mohamed's version: build the kubeconfig path from your home directory, turn it into a REST config with clientcmd's BuildConfigFromFlags, and hand that to kubernetes.NewForConfig to get a clientset. No cluster handy? He recommends kind, which runs a cluster on your machine in Docker. There are many ways to get a clientset, he admits, this is simply the one he is most comfortable with, and in a real tool you would make it a singleton instead of rebuilding it on every call.
+
+The smoke test lists nodes through the CoreV1 interface and prints their names, matching what kubectl get nodes shows. One small trap appears right away: several packages are called v1, so the apimachinery one gets imported as metav1.
+
+## Pods, then deployments, and the one tricky bit
+
+Creating a pod is a struct literal (object metadata with the name demo, a spec with a single nginx container) passed to the pods client of the default namespace with create options. kubectl get pods confirms it is running.
+
+The deployment is the same idea with more nesting: two replicas (passed as a pointer to an int32, because of course), a label selector matching app: demo, and a pod template carrying the labels and an nginx container called web. If you have written the YAML, the shape is familiar. What is not familiar is which package each piece comes from. ""The tricky here is to know which interface to use with which,"" Mohamed Abdelrhman said at Conf42 Golang 2024: the deployment spec is apps/v1, object metadata is metav1, the template is core/v1. Get that mapping into your head and secrets, services and watchers all follow the same pattern.
+
+## When the built-in resources are not enough
+
+The best demo of the talk is a CRD for a resource called BurgerStand, with properties for location, capacity and whether it is open, namespaced, with a short name for kubectl. Applying an instance before the CRD exists fails, because the API server has never heard of a burger stand. Apply the CRD first and the same manifest goes through, and kubectl get returns your new kind like any other object.
+
+A CRD alone only stores desired state. To act on it you need a custom controller, which Mohamed leaves as homework with a pointer to Kubebuilder (and controller-runtime in his resources). Controller plus CRD gives you an operator, and he closes on OperatorHub.io, where ready-made ones such as cert-manager live.
+
+## Who should watch?
+
+Go developers about to write their first Kubernetes tool, CLI or operator, and platform engineers who want to know what sits under the operators they install. If you already ship controllers, you will not learn much new. The code is in [mohamed-abdelrhman/conf42-k8-with-go](https://github.com/mohamed-abdelrhman/conf42-k8-with-go).
+
+## Related Conf42 talks
+
+- Rohit Mishra on [Kubernetes operators in depth](https://www.conf42.com/DevOps_2024_Rohit_Mishra_deepdive_kubernetes_operators) at Conf42 DevOps 2024.
+- Natalie Pistunovich on [a Kubernetes operator for a distributed database](https://www.conf42.com/Cloud_Native_2021_Natalie_Pistunovich_k8s_operator_distributed_database).
+- Matan Cohen on [local Kubernetes development with Skaffold and Helm](https://www.conf42.com/Golang_2021_Matan_Cohen_skaffold_helm_kubernetes_local_development).
+
+[Watch Mohamed Abdelrhman's talk](https://www.conf42.com/Golang_2024_Mohamed_Abdelrhman_kubernetes)
+
+[Watch the talk on YouTube](https://youtu.be/gnWkTtprFsc).
+",talk,golang2024,talk:golang2024/Mohamed Abdelrhman,,Conf42,,queued,"kubernetes, client-go, operators, crd, go"
+,"Testcontainers in Go, then a module of your own in one function","Julien Breux (Google Cloud) at Conf42 Golang 2024 on testing Go code against real Redis, Microcks mocks and a homemade Nginx Testcontainers module",2024-03-26,golang2024/testcontainers-go-write-your-own-module,,"If your integration tests start with a reminder to run Redis on your laptop first, they are not really tests yet. At Conf42 Golang 2024, Julien Breux, Kubernetes and Serverless specialist at Google Cloud, shows how Testcontainers for Go replaces that sticky note with code: start the dependency from the test, point the client at it, assert, clean up. Then he goes one step further and writes his own Testcontainers module in a single function.
+
+It is a short, demo-only talk: a terminal, an editor and three examples that get progressively more interesting.
+
+## What problem does Testcontainers solve?
+
+Julien's pitch is simple. ""Test containers is a framework that makes testing the dependencies of your backend application really easy,"" Julien Breux said at Conf42 Golang 2024. The important part for him is that everything is written in the language you already use, so the setup lives next to the test instead of in a Compose file someone forgot to update. Containers bring the rest: they are easy to ship, immutable and identical on every machine.
+
+His starting point is a deliberately retro visitor counter, an HTTP server that increments a key in Redis on every request. Testing it by hand means running Redis in the background, starting the app and curling it. It works, and it is exactly the kind of setup that breaks in CI.
+
+## How much code does a real Redis in a test take?
+
+One line, more or less. Testcontainers ships ready-made modules (Redis, MongoDB and plenty more, browsable per language on the project's site), and the Redis module's run function starts the container without even asking for an image name, which is optional. The test grabs the container's endpoint, builds a Redis client on it and calls the same increment function the app uses. Julien's tip: seed the counter with a value you pick, say 20, so the assertion proves the increment happened rather than matching a default.
+
+Swap Redis for MongoDB and the pattern stays the same, because a module exists for that too.
+
+## What about the service you call over HTTP?
+
+The second example is a microservice that calls the first one. Running twenty real services to test one is how test suites die, so Julien brings in Microcks, which mocks APIs from their OpenAPI description and keeps the contract between services honest. The Microcks container loads the counter API spec as its main artifact (with a small script that generates the incrementing response), the test asks it for the REST mock endpoint, and the client code under test talks to the mock as if it were the real service. testify's require keeps the error checks short.
+
+Two projects in one video, as he puts it, because both have earned a place in his everyday toolbox.
+
+## How do you write your own module?
+
+This is the part worth the click. Since it was late and, in his words, his imagination was limited, Julien builds an Nginx module. The convention: declare a Go package with a run container function that takes a context and a list of customizers (options). Inside, build a container request with the image and exposed ports, wrap it in a generic container request with started set to true, and create a generic container. Leave started out and your users get a container that never comes up, which is a fun bug to debug at 6pm.
+
+The module then reads the host and mapped port and builds the URI. He adds one custom option that replaces Nginx's default index file with your own, so the test can serve a page containing the word conf42, fetch it and compare. The first run fails on purpose, BDD style, then passes once the expected value is fixed. The test also registers the container cleanup.
+
+The takeaway is that a module is not magic: it is a thin, typed wrapper over generic containers, so wrapping your own internal dependency for the rest of the team is an afternoon's work.
+
+## Who should watch?
+
+Go developers whose integration tests depend on a shared database or a teammate's goodwill, and anyone who has heard of Testcontainers but never tried it. If you already use it daily, jump to the custom module part. Julien's code is on GitHub at [JulienBreux/conf42-2024](https://github.com/JulienBreux/conf42-2024).
+
+## Related Conf42 talks
+
+- Manuel de la Peña on [integration testing in Go with Dockerized services](https://www.conf42.com/Golang_2025_Manuel_de_la_Pena_testing_go_integration) at Conf42 Golang 2025.
+- Nikolay Kuznetsov on [testing Go services](https://www.conf42.com/Golang_2025_Nikolay_Kuznetsov_testing_go_services).
+- Mohammad Quanit on [test-driven development in Go](https://www.conf42.com/Golang_2023_Mohammad_Quanit_test_driven_development).
+
+[Watch Julien Breux's talk](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container)
+
+[Watch the talk on YouTube](https://youtu.be/BkPDbFEMmbs).
+",talk,golang2024,talk:golang2024/Julien Breux,,Conf42,,queued,"testing, testcontainers, docker, integration-tests, go"
 ,Your cloud SIEM caught 30 secret reads and missed the batch call,Kennedy Torkura (Mitigant) at Conf42 Cloud Native 2024 on testing cloud threat detections by emulating real attacker techniques,2024-03-22,cloud2024/emulate-attack-find-detection-gap,,"The best moment in this talk is a detection that works 30 times and then misses the one call that matters. At Conf42 Cloud Native 2024, [Kennedy Torkura](https://www.conf42.com/Cloud_Native_2024_Kennedy_Torkura_threat_informed_defense), Co-Founder and CTO of Mitigant, made the case for threat-informed defense: pick the attacker techniques relevant to you, build detections for them, then emulate those techniques in your own cloud to prove the detections fire. His AWS example found a gap that a single new API call walked straight through.
 
 It is a sponsor talk with a demo of Mitigant's cloud attack emulation product at the end, but the method in the middle needs nothing more than CloudTrail, a detection rule and an afternoon.
