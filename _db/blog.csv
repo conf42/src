@@ -73218,6 +73218,59 @@ Backend developers who own features end to end, SREs whose dashboards are all gr
 
 [Watch the talk on YouTube](https://youtu.be/j5gZlJqZcto).
 ",talk,kubenative2024,talk:kubenative2024/Or Rozenzweig,,Conf42,,queued,"observability, monitoring, grafana, prometheus, business-kpis"
+,The best fix for money-moving race conditions is no concurrency at all,Nikita Melnikov (Atlantic Money) at Conf42 Platform Engineering 2024 on replacing row locks and distributed locks with Kafka-backed actors in Go,2024-09-04,platform2024/actor-model-kafka-kills-lost-updates,,"A transfer that is cancelled by compliance and marked as paid in the same second is not an edge case in fintech; it is a Tuesday. At Conf42 Platform Engineering 2024, Nikita Melnikov, VP of Engineering at Atlantic Money (and formerly of Tinkoff Bank and Tinkoff Investments, where he worked on systems handling 300,000 requests per second), walks through why database locks and distributed locks struggle with this, and how his team models each transfer as an actor fed by Kafka instead.
+
+The thesis is in the abstract: ""the best concurrency is no concurrency."" Rather than coordinating many writers, make sure each transfer only ever has one.
+
+## Where does the lost update come from?
+
+The example is Atlantic Money's own flow. A customer sends $100 to have €90 delivered. Between ""wait for dollars"" and ""send euros"" sit a stack of steps: record payment details, screen sanction lists, run anti-fraud, check limits, calculate fees, exchange currencies.
+
+Meanwhile, the compliance service decides to cancel the transfer. Two transactions both select the transfer with status `CREATED`, one sets `CANCELLED`, the other sets `PAYMENT_RECEIVED`, both commit. Read the row afterwards and the status is whichever write landed last. For a payments company, undefined status is not an acceptable answer.
+
+## Why not just SELECT FOR UPDATE?
+
+It works, and it is simple: no new tools, no new abstractions, Postgres blocks the second transaction until the first commits. The problem is arithmetic. With an average processing time of five seconds and 100 operations a second, you have 500 active transactions, most of them idle while calling external services or writing audit data.
+
+That costs resources and, worse, eats connection pools. With a pool of 16 connections and concurrent work on the same transfer, each request grabs a connection and waits on the lock until the pool is empty and nothing else, including unrelated customers, can be served.
+
+## And locks?
+
+A Go `sync.Mutex` per transfer works until you run more than one node. Then a pay request on node 1 and a cancel request on node 2 each hold their own perfectly valid lock, which is to say no lock at all.
+
+Distributed locks via Hazelcast, ZooKeeper, etcd, Consul or Redis fix that and bring a new list of problems: ordering (nodes in different zones reach the lock manager at different speeds, so who gets the lock is hard to reason about), acquisition timeouts, holding timeouts, what to do when you lose the lock mid-process or crash holding it with partial state, and deadlocks when you need locks on the transfer, the customer and the recipient in different orders. Melnikov is candid that he knows no way to guarantee freedom from deadlocks other than testing, ""but testing is super complex in distributed systems,"" he said at Conf42 Platform Engineering 2024.
+
+## Treat the transfer as a state machine
+
+The pivot is modelling. A transfer is a finite state machine: `created`, `payment_received`, `checks_sent`, `checks_pending`, then approved or rejected. State transitions happen only through commands (`ReceivePayment`, `SendChecksForProcessing`, `ApplyCheckResult`), each state allows only certain commands, and a command can trigger effects such as sending the next command. You cannot jump from payment received back to waiting for payment because the domain does not allow it.
+
+That gives three requirements: communication through messages, durable message storage, and one-at-a-time handling per transfer.
+
+## How Kafka and actors deliver that
+
+Kafka covers the first two. Using the transfer ID as the message key routes every command for a transfer to the same partition, and `acks=all` buys durability at the cost of latency. Consumer groups cover the third: each partition is consumed by exactly one instance, so each transfer is processed sequentially, while consumers still scale horizontally.
+
+On top sits the actor model, explicitly as a concept rather than a full Erlang or Akka implementation (no supervision trees, no location transparency). The Go interfaces are small: a `Storage` to get and put state by key, an `Actor` with `Receive(state, command)`, a mailbox and a command producer. The Kafka consumer loads state, calls the actor and saves the new state.
+
+Two production details stop it from being a toy:
+
+- **The double-write problem.** Write to Postgres and then crash before producing to Kafka, and you are inconsistent. The fix is the outbox pattern: save new state and outgoing effects in one Postgres transaction, then let Debezium stream the outbox table into topics like `compliance.commands`, `payments.commands` and `transfer.events`.
+- **Toxic messages.** A bad format, wrong version, logic error or unexpected state should not block a partition forever. Those go to a dead-letter topic.
+
+## Who should watch
+
+Backend engineers building anything with money, inventory or bookings, where two writers on one record is a correctness bug, and Go developers curious about actors without adopting a framework. The first half is a clear tour of why the usual fixes break; the Kafka and actor design is the payoff.
+
+## Related Conf42 talks
+
+- Lorna Mitchell on [going big with Apache Kafka](https://www.conf42.com/Golang_2021_Lorna_Mitchell_go_big_apache_kafka_open_source) at Conf42 Golang 2021.
+- Bogdan Sucaciu on [demystifying event-driven architectures with Apache Kafka](https://www.conf42.com/Enterprise_Software_2021_Bogdan_Sucaciu_event_driven_architectures_apache_kafka).
+- Alexandr Kolobov on [high-load systems in social network development](https://www.conf42.com/Platform_Engineering_2024_Alexandr_Kolobov_highload_systems_development), the same event.
+
+[Watch Nikita Melnikov's talk](https://www.conf42.com/Platform_Engineering_2024_Nikita_Melnikov_concurrency_actor_financial)
+
+[Watch the talk on YouTube](https://youtu.be/F7P_NuoFYsk).
+",talk,platform2024,talk:platform2024/Nikita Melnikov,,Conf42,,queued,"concurrency, actor-model, kafka, golang, fintech"
 ,Milvus splits a vector database into pods so it can scale like one,"Tim Spann (Zilliz) at Conf42 Kube Native 2024 on Milvus, the open source vector database built cloud native, from pip install to billions of vectors",2024-09-03,kubenative2024/milvus-vector-database-kubernetes-scale,,"A vector search library is fine until you need durability, replication, deletes and a thousand people querying at once. At Conf42 Kube Native 2024, Tim Spann, Principal Developer Advocate at Zilliz, makes the case for Milvus, the open source vector database whose architecture looks a lot like any other well-behaved Kubernetes application: stateless proxies, separate workers for querying, data and indexing, a message log in the middle and object storage underneath.
 
 Tim works for the company behind Milvus and its managed version, Zilliz Cloud, and says so. The talk is half architecture, half live demos, with plenty of cats.
@@ -73258,6 +73311,113 @@ Platform engineers asked to run a vector database for an AI team, and developers
 
 [Watch the talk on YouTube](https://youtu.be/X5fR2SIS8x8).
 ",talk,kubenative2024,talk:kubenative2024/Tim Spann,,Conf42,,queued,"vector-databases, milvus, rag, kubernetes, open-source"
+,"Run the postmortem before launch, and ban the engineers from fixing anything",Laurent Parenteau (Grow Great) at Conf42 Platform Engineering 2024 on running a pre-mortem that finds project risks without becoming a fix-it session,2024-09-03,platform2024/run-the-postmortem-before-launch,,"Postmortems are excellent, and they all share one flaw: they happen after the outage. At Conf42 Platform Engineering 2024, Laurent Parenteau, software engineering coach and mentor at Grow Great, makes the case for the pre-mortem, a group exercise where you pretend the project has already failed and work backwards to why, while there is still time to do something about it.
+
+It is a short, practical talk with no tooling, and the most useful part is the list of ways to run one badly.
+
+## Why bother?
+
+Parenteau opens with a sobering figure from the Standish Group: 74% of all IT projects fail. He is careful about the definition. Most failures do not end in flames; they are delays, missing features, or a rough launch followed by a few weeks of firefighting. All of it is cheaper to prevent than to fix.
+
+## What is a pre-mortem, exactly?
+
+A risk discovery technique in two steps:
+
+1. **Set up a hypothetical future.** If the project launches on May 4th, the group declares it is now the week after May 4th, and the launch was a complete wreck.
+2. **Ask what went wrong.** Then brainstorm, as in a postmortem, but before anything has broken.
+
+The framing is the trick. The slides cite University of Colorado research finding this kind of prospective hindsight increases the ability to identify reasons for future outcomes by 30%, compared with simply asking what could go wrong.
+
+## How do you run one well?
+
+Parenteau's dos and don'ts come from his own sessions:
+
+- **Keep the group small.** As with any brainstorm, bigger groups mean fewer people speak and less airtime for each.
+- **Mix perspectives.** Three DevOps engineers will produce one DevOps engineer's worth of risks. Bring a project manager, someone from sales, engineers from different parts of the stack, anyone relevant.
+- **Do not problem solve.** This is the one engineers break first. Someone names a risk, and an engineer immediately starts designing the fix. Stop them. ""So you keep note of the problem, but you prevent people from solving it,"" Parenteau said at Conf42 Platform Engineering 2024. The goal at this stage is volume.
+- **Do not reject anything yet.** Tell people an idea is stupid and they go quiet. His example from a past session: the CEO dies before launch. Not much an engineer can do about it, but it goes on the list.
+- **Keep asking why.** Vague risks hide several specific ones. ""The server crashed"" could mean overload, a hardware fault, an application failure, or a spike in logins or account creation at launch. Dig until you get the specific ones.
+- **Remind everyone of the goal.** A room listing every way a project can burn down gets gloomy. Repeat that listing a risk does not mean it will happen, and that naming it now is how you stop it.
+
+## Then what?
+
+The output is a long, messy list, so the follow-up matters as much as the session:
+
+1. **Group and clean up.** Merge items that describe the same problem in different words, and group different causes that end in the same failure. Go back to whoever raised an unclear item.
+2. **Assess the risk.** Use judgement on likelihood and impact. Mitigating everything would take forever, so address the most likely ones and park the rest.
+3. **Share the mitigation plan**, above all with the people who took part. Close the loop: here is what we found, here is who owns what.
+
+That last step has a benefit beyond risk reduction. A team that sees its fears written down with an owner and a plan next to each one is more confident and more motivated, and Parenteau argues that morale alone improves the odds of success.
+
+## Who should watch
+
+Tech leads, engineering managers and platform teams about to launch something with a date attached. If you already run pre-mortems, the dos and don'ts are a quick sanity check; if you only run postmortems, this is a low-cost habit to add.
+
+## Related Conf42 talks
+
+- Julie Gunderson on [postmortems, continuous learning and blameless culture](https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture) at Conf42 Chaos Engineering 2021.
+- Yury Nino on [postmortem culture](https://www.conf42.com/Chaos_Engineering_2020_Yury_Nino_postmortem_culture) at Conf42 Chaos Engineering 2020.
+- Leslie Martinich on [engaged leaders and empowered teams](https://www.conf42.com/Platform_Engineering_2024_Leslie_Martinich_future_work_teams), the same event.
+
+[Watch Laurent Parenteau's talk](https://www.conf42.com/Platform_Engineering_2024_Laurent_Parenteau_hack_premortem_success)
+
+[Watch the talk on YouTube](https://youtu.be/WBufyPvZq7U).
+",talk,platform2024,talk:platform2024/Laurent Parenteau,,Conf42,,queued,"pre-mortem, risk-management, project-management, engineering-culture"
+,Every multiplayer cursor is pub/sub plus a WebSocket,"Vitor Norton (SuperViz) at Conf42 Platform Engineering 2024 on the code behind live cursors and presence: rooms, channels, pub/sub and WebSockets",2024-09-03,platform2024/multiplayer-cursors-are-pubsub-websockets,,"Those little coloured cursors gliding across a Figma or Miro board look like magic, and the code underneath is surprisingly small. At Conf42 Platform Engineering 2024, Vitor Norton, Developer Advocate at SuperViz and a ten-time Microsoft MVP, takes a mouse-pointer component apart layer by layer: a room, a channel, a pub/sub event broker, and finally the WebSocket that makes it work across machines.
+
+It is a beginner-friendly, code-on-screen talk. Norton says plainly that the snippets are for demonstration, not the source of Miro or Figma, which is the right framing: you come away knowing how the pattern works, not with a production library.
+
+## What counts as a collaboration component?
+
+Norton, who admits his whole brain lives in his productivity tools (""If I lose my account on notion, I'm dead,"" he said at Conf42 Platform Engineering 2024), starts with four examples:
+
+- **Form elements** synced as people type, handy when a support agent fills a form with a customer on the phone.
+- **Who-is-online** presence indicators.
+- **Mouse pointers**, including following a colleague's cursor.
+- **Contextual comments** pinned to any element of a page, even a 3D scene.
+
+His bet is that any application shipped to the world without features like these is missing something.
+
+## Rooms first, then pointers
+
+The top-level API is a room: a group of participants sharing an ID, such as a meeting URL or a document. A room does nothing on its own. You construct a mouse-pointer component and add it to the room, optionally with conditions (the host might not see pointers, say). In React you would typically wrap the room as a provider.
+
+Inside the pointer, there are three jobs:
+
+1. **See when someone else moves.** Subscribe to a `mouse-moved` event on a channel, and in the callback set the stored x and y. It works much like `addEventListener` on an HTML element.
+2. **Tell everyone where you are.** Listen to the document's own mouse-move event, wrap `clientX` and `clientY` in a position object, and publish it to the channel.
+3. **Keep it smooth without flooding the wire.** Throttle with the browser's `requestAnimationFrame`, around 30 frames per second, so the pointer does not look laggy and you do not blow through rate limits by sending more data than needed.
+
+## What is the channel, really?
+
+This is where the talk earns its title. The channel is a real-time event broker added to the room, and you can open as many as you like: one for pointers, one for typing indicators, one for live locations.
+
+Stripped down, it is a pub/sub with two methods over an events object. `subscribe(event, callback)` creates an empty array for the event name if it does not exist and pushes the callback onto it. `publish(event, data)` loops over that event's callbacks and calls each with the data. Norton relates it to the observer pattern, the same family of ideas behind Redux.
+
+The catch: everything so far only works inside one browser tab. Pub/sub on its own has no idea there are other devices in the room.
+
+## Why WebSockets and not HTTP?
+
+The missing piece is a WebSocket, a persistent, bidirectional channel between client and server. With plain HTTP, every update means opening a connection, sending a request, reading the response and closing it. Doing that about 30 times a second per user is the kind of design that eventually takes your server down. A WebSocket opens once, carries messages both ways for the life of the page, and closes when you leave, giving the low latency that games, live updates and stock tickers need.
+
+## Where you have already seen it
+
+The examples are everyday: Uber and WhatsApp live location (the driver publishes, you subscribe and redraw the map), Microsoft Teams meeting status and attendee presence, typing indicators in chat apps (only a true/false flag travels, not your keystrokes), collaborative whiteboards like Miro, and Gather's virtual office where audio and video fade in as avatars get close.
+
+## Who should watch
+
+Front-end and full-stack developers who have used real-time features but never built one, and platform engineers who need a quick mental model before choosing a real-time backend. If you have already implemented pub/sub over WebSockets, this is a refresher. For further reading Norton recommends Addy Osmani's Learning JavaScript Design Patterns.
+
+## Related Conf42 talks
+
+- Vladi Stevanovic on why [every Node.js app should have real-time collaboration features](https://www.conf42.com/JavaScript_2023_Vladi_Stevanovic_nodejs_app_realtime_collaboration) at Conf42 JavaScript 2023.
+- Mohammed Zubair Ahmed on [real-time chat performance with 100k active users](https://www.conf42.com/JavaScript_2024_Mohammed_Zubair_Ahmed_41_realtimechat_performance_100kusers) at Conf42 JavaScript 2024.
+- Venkata Sai Manoj Pasupuleti on [microfrontends for complex web applications](https://www.conf42.com/Platform_Engineering_2024_Venkata_Sai_Manoj_Pasupuleti_microfrontends_platforms_applications), the same event.
+
+[Watch Vitor Norton's talk](https://www.conf42.com/Platform_Engineering_2024_Vitor_Norton_code_collaboration_realtime)
+
+[Watch the talk on YouTube](https://youtu.be/RUreD6HcOYk).
+",talk,platform2024,talk:platform2024/Vitor Norton,,Conf42,,queued,"websockets, pubsub, real-time, javascript, design-patterns"
 ,"Health insurance claims run in nightly batches, and Kubernetes fits that shape",Shiva Kumar Chinnam (Rialtic) at Conf42 Kube Native 2024 on moving healthcare claims processing from Ansible on bare metal to EKS and Argo CD,2024-09-02,kubenative2024/healthcare-claims-ansible-to-argocd-eks,,"Health insurers collect claims all day and process them in one big batch overnight, which means infrastructure that sits idle for most of the day. At Conf42 Kube Native 2024, Shiva Kumar Chinnam, Senior Cloud Engineer at the insurance technology startup Rialtic, walks through how a large health insurer moved its claims processing from Ansible scripts on bare metal to Amazon EKS with Argo CD, and halved its downtime in the process.
 
 The case study comes from a conversation with a colleague at a large health insurance company rather than from Shiva's own employer, and the talk is a gentle introduction, so expect the migration story and the reasoning rather than configs.
@@ -73304,6 +73464,119 @@ Engineers new to healthcare who need the claims pipeline explained in ten minute
 
 [Watch the talk on YouTube](https://youtu.be/cbdqw-X0ZXg).
 ",talk,kubenative2024,talk:kubenative2024/Shiva Kumar Chinnam,,Conf42,,queued,"kubernetes, healthcare, gitops, argo-cd, aws-eks"
+,A private team GenAI assistant on AWS serverless for $19 a month,"Samuel Baruffi (AWS) at Conf42 Platform Engineering 2024 on an open-source, serverless Bedrock assistant with shared prompt templates for platform teams",2024-09-02,platform2024/private-genai-assistant-for-19-dollars,,"Fifty engineers, five prompts a day each, Claude 3 Haiku behind it: $19.32 a month, everything included. At Conf42 Platform Engineering 2024, Samuel Baruffi, Principal Global Solutions Architect at AWS, walks through an open-source GenAI assistant that runs entirely in your own AWS account on serverless services and Amazon Bedrock, and shows why the interesting feature is not the chat box but shared prompt templates.
+
+He is upfront that this is an AWS sample, not a product to deploy and forget: ""It's not a full fledged solution,"" Baruffi said at Conf42 Platform Engineering 2024. Treat it as an architecture pattern to fork.
+
+## Why would a platform team build its own?
+
+Baruffi's pitch is aimed at platform engineers specifically. Developer self-service, navigating a stack where AWS alone has more than 200 services, and consistent security and compliance all benefit from GenAI. The argument for hosting it yourself rather than buying a subscription is control: authentication, authorisation, data retention and encryption all live in your account, under your policies.
+
+The solution is called Improve Employee Productivity with a GenAI Assistant, in the aws-samples GitHub organisation.
+
+## What can users actually do?
+
+- **Playground:** pick a model, send a prompt, get a streamed answer. Nothing new, as he says himself.
+- **Templates:** the real value. A template stores a model choice, a system prompt and user data with a `${variable}` placeholder. Templates are private (creator only) or public, which here means visible to every authenticated user of your deployment, not the internet. A team can curate a product-naming or Python bug-fix template once and everyone reuses it, with advanced users able to inspect the system prompt and tweak temperature, top-k and top-p.
+- **Multimodal input:** all the Claude 3 models used support images, so a template can take a photo alongside text.
+- **Chat with templates:** conversations keep context, so you can fix buggy Python, ask for a Node.js rewrite, then a summary.
+- **History:** every interaction is stored in a database you own.
+
+The demo also shows code-aware formatting with copy buttons, generating a CloudFormation template for an EC2 instance and a VPC.
+
+## How is it built?
+
+Everything is pay-as-you-go; nothing is provisioned for months ahead. The nine services and their jobs:
+
+- **CloudFront + S3 + AWS WAF:** host the React UI, terminate HTTPS, and filter DDoS, SQL injection, XSS or whole countries.
+- **Amazon Cognito:** sign-in, integrated with both APIs so unauthenticated calls are denied by API Gateway.
+- **API Gateway REST + Lambda:** templates, history and the rest of CRUD, with functions in Python and JavaScript.
+- **API Gateway WebSocket + Lambda:** the streaming path. The browser holds a WebSocket, a Lambda calls Bedrock, and the gateway routes tokens back to the right connection.
+- **DynamoDB:** chats, templates and history, encrypted by default, with retention you control.
+- **S3** again for uploaded images, which the streaming Lambda fetches at inference time.
+- **Amazon Bedrock:** one API to the models, billed per input and output token. Baruffi states that Bedrock does not store prompts or use them to train models.
+
+Deployment uses AWS SAM (CloudFormation underneath) driven by a single `deploy.sh` that takes a region and an admin email, deploys back end, front end and default templates, and creates the first user. CloudShell or Cloud9 work if you would rather not install Python, SAM, Node.js and jq locally.
+
+## What does it cost?
+
+The estimate in the talk, for us-east-1, 50 users, five uses a day, 500 input and 200 output tokens per request, with $16.51 of non-Bedrock services in every row:
+
+- Claude 3 Haiku: $19.32 a month
+- Claude 3 Sonnet or Claude 3.5 Sonnet: $50.26
+- Claude 3 Opus: $185.26
+
+He compares Haiku's total with a single person's $20-plus chat subscription. The caveat he gives himself is fair: prices change, regions differ, and Bedrock was not in the AWS pricing calculator at the time, so check the numbers for your own setup. The talk was recorded in August 2024, so the model line-up has moved on since.
+
+## Who should watch
+
+Platform teams asked to provide a sanctioned internal AI assistant, and anyone who wants a worked example of streaming LLM responses through API Gateway WebSockets. It is an AWS-centric talk by an AWS architect, so expect AWS services throughout.
+
+## Related Conf42 talks
+
+- Murali Mallina on [building a serverless GenAI platform](https://www.conf42.com/Platform_Engineering_2024_Murali_Mallina_serverless_genai_platform), the same event.
+- Omer Farooq on [LLM SecOps](https://www.conf42.com/Platform_Engineering_2024_Omer_Farooq_llm_secops), for the security side of the same kind of app.
+- Baruffi's earlier [tour of AWS networking](https://www.conf42.com/Platform_Engineering_2023_Samuel_Baruffi_aws_networking_simplified_a_comprehensive_tour_of_key_featu) at Conf42 Platform Engineering 2023.
+
+[Watch Samuel Baruffi's talk](https://www.conf42.com/Platform_Engineering_2024_Samuel_Baruffi_aws_serverless_amazon_bedrock)
+
+[Watch the talk on YouTube](https://youtu.be/ihTsMpOiwpU).
+",talk,platform2024,talk:platform2024/Samuel Baruffi,,Conf42,,queued,"generative-ai, amazon-bedrock, aws-serverless, prompt-engineering, platform-engineering"
+,"One YAML claim, 285 lines of Crossplane, zero tickets","Piotr Zaniewski (Loft Labs) at Conf42 Platform Engineering 2024 on designing a platform as an API, demoed with Port, Argo CD, Crossplane and vCluster",2024-09-02,platform2024/platform-as-kubernetes-api-crossplane,,"The complexity of cloud infrastructure never disappears; a good platform just decides who gets to look at it. At Conf42 Platform Engineering 2024, Piotr Zaniewski, Head of Engineering Enablement at Loft Labs, argues that the way to build an internal infrastructure platform is to design it as an API, and then proves it with a live demo where a developer clicks one button and gets an app, an Azure storage account, a Grafana dashboard and a private virtual Kubernetes cluster.
+
+The talk is roughly half principles, half demo, and the demo is the reason to watch.
+
+## Which kind of platform is this about?
+
+Zaniewski separates three kinds. Business platforms like Uber or DoorDash connect consumers and vendors. Domain-specific platforms wrap cross-cutting business functions, such as a mapping service handling geofencing and address translation. Domain-agnostic platforms are the building blocks underneath, infrastructure or security, and that is his subject.
+
+Why build one if you already have AWS or Azure? Because the cloud is built for every customer at once, so it exposes far more than your developers need. A platform isolates the useful parts so developers do not have to learn Kubernetes or a catalogue of cloud services before shipping.
+
+His six building blocks: a self-service portal (which can be a web UI, a script or a bare API), an abstraction layer of programmatic APIs over existing ones, automated GitOps-style workflows, monitoring and observability with rollbacks and canaries, security and governance including tenant isolation and audit trails, and a product organisation that keeps the platform evolving.
+
+## Why Kubernetes as the contract?
+
+The key principle is API-driven design, the way every successful cloud exposes itself. Zaniewski frames an API as a pipeline: developers on one end with whatever interface they like, outbound processes on the other talking to Argo, Kubernetes or a cloud.
+
+In the demo, platform and developers agree on the Kubernetes-style API. Kubernetes already exists, has a strong ecosystem, and lends itself to custom APIs via CRDs. The developer's entire request is a small YAML file, an app claim custom resource, with a spec holding three parameters (a connection string name, an image, a port) and a namespace hard-coded for the team.
+
+## What happens after the click?
+
+The flow, step by step:
+
+1. The developer picks an action in Port, a developer portal similar to Backstage, and accepts the defaults.
+2. Port kicks off a CI pipeline that opens a pull request with the claim against an apps-deployment repository.
+3. The platform team reviews and merges (optional, but shown).
+4. Argo CD picks up the change and applies it to the cluster.
+5. Crossplane, with its Azure provider and functions for Kubernetes, Helm and HTTP, reconciles everything: an Azure resource group and storage account, the app's three replicas, an ingress, a vCluster and a Grafana dashboard scoped to the team's namespace.
+6. A Slack notification tells the developer the app is up and how to connect to their vCluster.
+
+The developer then creates a blob with `kubectl apply` on another tiny YAML, refreshes, and the Node.js app reads it. Deleting is the mirror image: another Port action, another PR, and Argo CD and Crossplane remove both the Kubernetes resources and the cloud infrastructure.
+
+The best detail: the whole thing ran on a local kind cluster on his laptop. AKS, EKS or GKE would work the same way.
+
+## Where did the complexity go?
+
+Into a Crossplane composition of 285 lines of YAML, owned by the platform team. That is the honest trade: developers write ten lines, platform engineers maintain the composition that turns them into an account, a service, an ingress, a deployment, a namespace, a vCluster and a container.
+
+He calls out two wins beyond speed. Ticket waits vanish because the vCluster gives developers admin-level freedom in a sandbox, so they stop asking for ingress controllers to try out. And it follows zero-trust thinking: developers never needed Azure access at all. Pull requests double as the messaging system between teams: actionable messages that developers send and the platform team reviews.
+
+His closing quip lands well for 2024: ""we didn't even mention AI once,"" Zaniewski said at Conf42 Platform Engineering 2024.
+
+## Who should watch
+
+Platform engineers choosing between a portal-first and an API-first design, and anyone who wants to see Crossplane, Argo CD, Port and vCluster wired end to end without slides doing the heavy lifting. If you already run Crossplane compositions in production, the principles section will be familiar; the demo is still a tidy reference.
+
+## Related Conf42 talks
+
+- Yuriy Bezsonov on [Kubernetes deployment from platform to API](https://www.conf42.com/Platform_Engineering_2024_Yuriy_Bezsonov_kubernetes_deployment_api), the same event.
+- Harel Safra on [creating Terraform providers when infrastructure as code ends](https://www.conf42.com/Platform_Engineering_2024_Harel_Safra_terraform_providers_guide).
+- Leonardo Murillo on [multi-cloud GitOps with Crossplane and Flux 2](https://www.conf42.com/Cloud_Native_2021_Leonardo_Murillo_gitops_multicloud_crossplane_flux2) at Conf42 Cloud Native 2021.
+
+[Watch Piotr Zaniewski's talk](https://www.conf42.com/Platform_Engineering_2024_Piotr_Zaniewski_cloudnative_kubernetes_platforms)
+
+[Watch the talk on YouTube](https://youtu.be/HQNeAZUXzbk).
+",talk,platform2024,talk:platform2024/Piotr Zaniewski,,Conf42,,queued,"platform-engineering, kubernetes, crossplane, gitops, vcluster"
 ,"A one-line enum change, a locked table, and five ways to avoid both","Rotem Tamir (Ariga) at Conf42 Kube Native 2024 on reliable database schema migrations with schema-as-code, tests and migration linting in Atlas",2024-09-01,kubenative2024/atlas-five-strategies-schema-migrations,,"The pull request was ten lines of migration and one line of model change. It passed CI, the tech lead approved it, and it took production down. At Conf42 Kube Native 2024, Rotem Tamir, Co-Founder and CTO of Ariga and co-maintainer of the open source projects Ent and Atlas, uses that story to argue that schema migrations need the same automation and testing we already give application code, and demos five strategies to get there with Atlas.
 
 It is a vendor talk in the sense that every demo uses Atlas, Ariga's database schema management tool. The strategies themselves are portable.
@@ -73344,6 +73617,50 @@ Backend developers who own their migrations, platform teams wiring databases int
 
 [Watch the talk on YouTube](https://youtu.be/utBgBSpKLVI).
 ",talk,kubenative2024,talk:kubenative2024/Rotem Tamir,,Conf42,,queued,"databases, schema-migrations, ci-cd, testing, atlas"
+,"Your developer portal knows the plan, not what production did",Amir Krayden (Senser) at Conf42 Platform Engineering 2024 on feeding real-time runtime topology back into the IDP so platform and SRE share one view,2024-09-01,platform2024/idp-needs-runtime-topology,,"An internal developer portal is a beautifully maintained record of intent: the schema, the service catalog, the requests and limits someone typed in. Production rarely reads it. At Conf42 Platform Engineering 2024, Amir Krayden, co-founder and CEO of Senser, argues that the missing half of every IDP is the runtime, and that a continuously discovered, real-time topology is the shared language that closes the loop between platform engineers and SREs.
+
+Senser is an AIOps company built on eBPF and machine learning, and the talk includes views from its product. The argument, though, stands without it, and the closing advice is tool-agnostic.
+
+## What does the IDP miss?
+
+Krayden's list is specific. Resources behave differently at runtime than their requests and limits suggest, because the node has its own ideas about what it can give. APIs and the interactions between services are hard to model statically. Third-party dependencies, from public APIs to payment gateways, often never make it into the schema at all. And runtime misconfiguration happens, such as someone changing the cloud console directly and bypassing the IDP, leaving it confidently describing a world that no longer exists.
+
+The reason this is hard is structural. Static configuration is a tree you can traverse. ""The runtime environment is a live, moving, changing graph,"" Krayden said at Conf42 Platform Engineering 2024, fed by infrastructure events, application behaviour and the deployment pipeline all at once.
+
+## Security already solved this once
+
+The best part of the talk is the analogy. Application security went through the same split: a static catalog (vulnerabilities, open-source components, secrets, auth and encryption frameworks) on one side, and the runtime questions on the other. Is it actually deployed? Is it internet-exposed? Is it behind a WAF? Is it misconfigured at runtime?
+
+Joining those two views is what made shift-left workable. It gave an accurate attack surface, let teams prioritise real risk instead of drowning in every CVE, and allowed guardrails to move earlier in the SDLC. Krayden's claim is that platform engineering needs the same join, and the runtime half comes from topology.
+
+## Three places runtime context pays off
+
+He structures the payoff around three use cases:
+
+- **Anticipating reliability impact.** Topology turns tribal knowledge about past deployments into data points: which services were affected, what happened to downstream SLOs and SLAs, and what a service really costs to spin up in CPU and memory. His example is a service deployed for high-volume transactions that, at peak hours, overloads memory and takes down downstream services like a customer account dashboard and transaction confirmations.
+- **Verifying deployments in real time.** IDP guardrails such as memory, CPU, latency and bandwidth limits are usually set during development, often on intuition. Runtime data shows whether they are too low or too high and flags deviations, such as a new service suddenly burning excessive CPU, with the context of who is talking to whom.
+- **Investigating issues.** The service catalog is a fine starting point for root cause analysis, but it only extends through provisioning and orchestration. Matching it against the runtime catalog is how a team finds out whether a degrading service is its own fault or a third party's.
+
+## Pitfalls and a sane way to start
+
+The pitfalls are honest. Closing the loop is a first step, and maintaining it needs real resourcing. Runtime context must be complete across resources, APIs and third parties, which costs both time and tooling; eBPF-based auto-discovery reduces the toil of wiring a million dashboards. And a static snapshot of topology is just documentation with better graphics: it must be discovered and updated continuously.
+
+To get started: build the topology (observability tools help but need extensive configuration; some platforms auto-discover with eBPF), integrate it with the IDP through the observability and incident integrations most portals already have, prioritise quick wins such as real-time deployment verification on your most failure-prone services, then scale step by step to prove value internally.
+
+## Who should watch
+
+Platform teams whose IDP is drifting from reality, and SREs tired of being the only people who know what production looks like. Expect a conceptual talk with some product screens, not a build-it-yourself tutorial.
+
+## Related Conf42 talks
+
+- Neel Shah on [the importance of observability in platform engineering](https://www.conf42.com/Platform_Engineering_2024_Neel_Shah_observability_platform_engineering), the same event.
+- Justin Reock on [DevOps, 12-factor and platform engineering](https://www.conf42.com/Platform_Engineering_2024_Justin_Reock_devops_12factor_engineering).
+- Siddhartha Khare on [the road ahead for Istio observability](https://www.conf42.com/Platform_Engineering_2024_Siddhartha_Khare_istio_observability_road).
+
+[Watch Amir Krayden's talk](https://www.conf42.com/Platform_Engineering_2024_Amir_Krayden_topology_engineering_sre)
+
+[Watch the talk on YouTube](https://youtu.be/c4r9d8RLOXg?si=8N14eUwGsebbRu4P).
+",talk,platform2024,talk:platform2024/Amir Krayden,,Conf42,,queued,"internal-developer-platform, sre, observability, ebpf, service-catalog"
 ,Kanister turns your backup scripts into Kubernetes custom resources,"Daniil Fedotov (Kasten by Veeam) at Conf42 Kube Native 2024 on Kanister, the CNCF project that runs application-consistent backup and restore as CRDs",2024-08-31,kubenative2024/kanister-blueprints-actionsets-backup-restore,,"Every team has a backup script that only one person understands. At Conf42 Kube Native 2024, Daniil Fedotov, Senior Open Source Engineer at Kasten by Veeam, shows how Kanister, a CNCF sandbox project, moves that script into Kubernetes: Blueprints describe what to do, ActionSets run it and keep a log, and Profiles say where the data goes. The demo backs up an Amazon RDS Postgres database to S3, drops a table, and brings it back.
 
 ## Why back up Kubernetes at all?
@@ -73390,6 +73707,113 @@ Platform engineers running stateful services on Kubernetes, anyone with database
 
 [Watch the talk on YouTube](https://youtu.be/AB-b4ScpPNQ).
 ",talk,kubenative2024,talk:kubenative2024/Daniil Fedotov,,Conf42,,queued,"kubernetes, backup, data-protection, kanister, stateful-workloads"
+,"Five security layers, four breach stories, one misconfigured firewall","Venukumar Chirlawar (Amazon) at Conf42 Platform Engineering 2024 on layered cloud defence, threat intelligence, IDS choices and breach lessons",2024-08-31,platform2024/cloud-security-five-layers-and-breaches,,"The Capital One breach did not need a zero-day. A misconfigured web application firewall and weak access controls were enough to expose data on more than 100 million customers from Amazon S3. At Conf42 Platform Engineering 2024, Venukumar Chirlawar, Senior Software Development Engineer at Amazon, uses that story and three others to make the case for multi-layered cloud protection plus advanced threat detection, and to show where each layer earns its keep.
+
+Set expectations correctly: this is a structured survey of cloud security, not a close look at any one tool. If you want a map of the territory, with the jargon unpacked, it does that job well.
+
+## Why layers instead of one big wall?
+
+The premise is defence in depth. ""This approach ensures that even if one layer is compromised, others remain intact to protect the system,"" Chirlawar said at Conf42 Platform Engineering 2024. With cloud spending expected to reach $1.3 trillion by 2025, he argues, traditional perimeter models no longer cover environments that are dynamic and distributed by design.
+
+His step-by-step build has five layers:
+
+1. **Network:** firewalls, intrusion detection and prevention, secure protocols.
+2. **Application:** secure coding, regular vulnerability assessments, patch management.
+3. **Data:** encryption at rest and in transit with strong, current algorithms. AES-256 leads usage in cloud environments, ahead of RSA and TLS.
+4. **Identity and access:** IAM, role-based access control, multi-factor authentication.
+5. **Endpoint:** antivirus and EDR on laptops, phones and servers, which he calls the last line of defence.
+
+The pitfalls list is short and familiar: overlooking endpoints, skipping employee training, and letting protocols go stale. He also stresses understanding the shared responsibility model with your cloud provider, which is exactly where the Capital One story went wrong.
+
+## What does advanced threat detection add?
+
+Layers stop known attacks; advanced persistent threats, zero-days and targeted attacks are designed to slip past them. Chirlawar walks through the stages of an APT from reconnaissance onward, with the point that early detection is what limits the damage.
+
+Two tool families get the most time. A threat intelligence platform (TIP) aggregates feeds from open source, commercial vendors and internal logs, analyses them with correlation engines and machine learning, and turns the result into actionable intelligence: updated policies, IDS configuration, automated responses.
+
+The intrusion detection section is the most useful for anyone choosing a product. Network-based IDS watches traffic across the infrastructure; host-based IDS watches individual machines and is better for insider threats. Signature-based detection catches known threats and misses novel ones; anomaly-based detection finds the unknown and pays for it in false positives. Passive IDS alerts a human; active IDS, better known as an IPS, blocks automatically. A hybrid that combines both detection methods and integrates with TIPs, SIEMs and firewalls gives the broadest coverage. Performance matters too: an IDS that adds latency under high traffic is a cost, not a control.
+
+The architecture ties it together: IDS feeds the TIP, the TIP feeds intelligence back, the SIEM stores and correlates logs from both, and SOAR tools trigger predefined responses.
+
+## What do the case studies teach?
+
+- **Capital One, 2019:** more than 100 million customers exposed, an $80 million fine from the Office of the Comptroller of the Currency. Lesson: audit cloud configurations and tighten access controls.
+- **Netflix:** fully on AWS, multi-layered security with continuous monitoring, internal tools Security Monkey and Lemur, and chaos engineering that simulates failures and breaches.
+- **Sony PlayStation Network, 2011:** 77 million accounts including card details, 23 days offline, losses estimated at $171 million. Lesson: patch software and encrypt sensitive data.
+- **Dropbox:** two-factor authentication, encryption at rest and in transit, regular audits, penetration testing and a bug bounty programme.
+
+## What comes next?
+
+Chirlawar names container escapes, misconfigured serverless permissions and supply chain attacks as the emerging threats, with zero trust, frequent audits and vendor risk management as the mitigations. Looking further out: AI-driven threat detection, and quantum-resistant encryption, since quantum computers could break RSA and ECC. His advice is to inventory current encryption now and plan the transition, including key management, before it is urgent.
+
+## Who should watch
+
+Platform and application engineers who own a slice of cloud security without being security specialists, and anyone who needs a vocabulary refresher before an IDS or TIP procurement. Seasoned security engineers will find little new.
+
+## Related Conf42 talks
+
+- Chirlawar's [companion talk on multi-layered cloud security and threat detection](https://www.conf42.com/Kube_Native_2024_Venukumar_Chirlawar_cloud_security_threat_detection_multilayered) at Conf42 Kube Native 2024.
+- Aleksandra Drobnjak on [Kubernetes threat detection with Falcosidekick](https://www.conf42.com/Kube_Native_2024_Aleksandra_Drobnjak_kubernetes_security_falcosidekick_threat_detection).
+- Atif Siddiqui on [cloud network segmentation in pursuit of zero trust](https://www.conf42.com/Platform_Engineering_2023_Atif_Siddiqui_cloud_network_segmentation_in_pursuit_of_zero_trust).
+
+[Watch Venukumar Chirlawar's talk](https://www.conf42.com/Platform_Engineering_2024_Venukumar_Chirlawar_cloud_security_protection)
+
+[Watch the talk on YouTube](https://youtu.be/sZlDzAXI5Mg).
+",talk,platform2024,talk:platform2024/Venukumar Chirlawar,,Conf42,,queued,"cloud-security, defense-in-depth, threat-detection, intrusion-detection, zero-trust"
+,The safest email attachment is the one you never attach,"Gaurav Mittal (ThermoFisher Scientific) at Conf42 Platform Engineering 2024 on replacing PII attachments with zipped, password-locked, expiring S3 links",2024-08-31,platform2024/email-attachments-become-expiring-links,,"Every company that emails customers their insurance documents, medical receipts or e-visas is one wrong forward away from leaking someone's PII. At Conf42 Platform Engineering 2024, Gaurav Mittal, a data science manager at ThermoFisher Scientific, shows a small, all-AWS pattern that takes the attachment out of the email entirely: password-protect the file, park it in S3, and send a pre-signed link that expires.
+
+It is a short, practical talk with one architecture and one piece of code. No new product, no framework, just four building blocks most teams already have access to.
+
+## What goes wrong with a plain attachment?
+
+Mittal's scenario is the everyday one: an insurer sending a renter's insurance document, a hospital sending receipts, a country sending an e-visa that carries passport details. The risks he lists are man-in-the-middle interception, insecure email servers, and missing or inadequate encryption that lets anyone with access to the transmission read the attachment.
+
+User education and antivirus help on the receiving end. His focus is the sender's side: what an organisation can do so that a misdirected email is useless to whoever receives it.
+
+## Layer one: a password the customer already knows
+
+The first layer is a password-protected zip built with pyminizip, an open-source Python library. Its compress call takes the source file, the destination, a password and a compression level.
+
+The neat bit is the choice of password. Mittal suggests something only the recipient knows, such as their date of birth or the last four digits of their phone number. The fraudster who receives a mis-forwarded email cannot open it, and the legitimate customer is not emailing support for a password reset.
+
+To run it in AWS Lambda, install the library locally with `pip install pyminizip -t .`, zip it, and upload it as a Lambda layer so the function's code can import it.
+
+## Layer two: links that die on schedule
+
+The second layer is access control through S3 pre-signed URLs, which grant time-limited access to an object without touching the bucket policy or handing out AWS credentials. How long a URL can live depends on what signed it:
+
+- an IAM instance profile: up to 6 hours
+- AWS Security Token Service: up to 36 hours
+- an IAM user (Signature Version 4): up to 7 days
+
+After that, the link simply stops working. Mittal's demo uses an IAM user to get the full seven days.
+
+## Sending it with SES, politely
+
+The email goes out through Amazon SES, which needs a verified sender identity and can send to verified or unverified recipients. The constraint he calls out is a sending rate of 40 emails per second, so his final code puts a one-second `time.sleep` between sends to stay clear of throttling. He notes that the right pacing depends on your own implementation.
+
+The full flow fits in one Lambda: generate the CSV, compress it with a password, store it in S3, generate the pre-signed URL, send the email through SES.
+
+## Why it beats attaching the file
+
+Three wins, in his words and order. A wrong recipient lacks the password. The link has a time limit. And the email itself carries nothing: ""if you look in the emails, there is no attachment,"" Mittal said at Conf42 Platform Engineering 2024. That last one also has a cost angle: attaching files from Lambda takes time, sending a URL does not, and Lambda bills for duration.
+
+A fair caveat the talk does not dwell on: a password built from a birth date is guessable for anyone who knows the customer, and zip encryption strength varies by tool. Treat it as a strong improvement over a bare attachment, not as end-to-end encryption.
+
+## Who should watch
+
+Engineers at insurers, healthcare providers or any business that emails documents with PII, especially if those emails come out of a Lambda today. It is a quick watch and the pattern can be shipped in an afternoon.
+
+## Related Conf42 talks
+
+- Sharath Chandra Adupa on [protecting PII in cloud environments](https://www.conf42.com/Golang_2025_Sharath_Chandra_Adupa_security_pii_cloud) at Conf42 Golang 2025.
+- Natalia Grybovska on [building privacy-aware infrastructure](https://www.conf42.com/Platform_Engineering_2024_Natalia_Grybovska_privacy_aware_infrastructure), the same event.
+- Durgaprasad Budhwani on [serverless, scalable apps with gqlgen and AWS Lambda](https://www.conf42.com/Golang_2023_Durgaprasad_Budhwani_serverless_scalable__costeffective_apps_gqlgen_aws_lambda).
+
+[Watch Gaurav Mittal's talk](https://www.conf42.com/Platform_Engineering_2024_Gaurav_Mittal_email_attachment_security)
+
+[Watch the talk on YouTube](https://youtu.be/VWVP6PTq0SU).
+",talk,platform2024,talk:platform2024/Gaurav Mittal,,Conf42,,queued,"email-security, aws, s3, data-protection, serverless"
 ,"The frugal EKS playbook is see the spend with Kubecost, then let Karpenter act",Piyush Mattoo and Dariush Azimi (AWS) at Conf42 Kube Native 2024 on cutting Amazon EKS costs with Kubecost visibility and Karpenter autoscaling,2024-08-30,kubenative2024/frugal-eks-kubecost-karpenter,,"The Amazon EKS control plane costs the same whether you run three nodes or three thousand; it is everything else that sneaks up on you. At Conf42 Kube Native 2024, Piyush Mattoo and Dariush Azimi, both Senior Solutions Architects at AWS, take Werner Vogels' Frugal Architect keynote from re:Invent 2023 and apply it to Kubernetes: get granular visibility into where the money goes with Kubecost, then act on it with Karpenter.
 
 It is a conversational, two-person session with two live demos, and the speakers cheerfully admit it is not scripted. That works in its favour: the questions one asks the other are the ones you would ask.
@@ -73434,6 +73858,105 @@ EKS operators who have Cluster Autoscaler running and a bill that keeps growing,
 
 [Watch the talk on YouTube](https://youtu.be/YeWxAjUFHQ8).
 ",talk,kubenative2024,talk:kubenative2024/Piyush Mattoo,,Conf42,,queued,"kubernetes, aws-eks, karpenter, cost-optimization, finops"
+,The million-dollar platform is a spreadsheet before it's a portal,"Krzysztof Halasa (BlueSoft) at Conf42 Platform Engineering 2024 on why a platform is an org change, and the $1.44M a year it saves",2024-08-30,platform2024/platform-engineering-million-dollar-math,,"Every developer team that spends release week begging another team for a Kafka topic is burning money nobody budgeted for. At Conf42 Platform Engineering 2024, Krzysztof Halasa, IT Management Advisor at BlueSoft, puts a number on it: for a company spending about $5 million a year on IT, the lack of a platform costs roughly $1.44 million annually, and a well-built platform gets most of that back.
+
+It is a short talk aimed at managers more than at people writing Terraform, and it says so up front: platform engineering is mostly an organisational change with some technology attached.
+
+## Why call it an organisational change?
+
+Halasa draws on four years of building internal developer platforms, as a manager of several and an advisor to teams doing it for the first time. His definition is refreshingly unglamorous. ""If you treat your developers as you normally treat your clients,"" Halasa said at Conf42 Platform Engineering 2024, and design services around their needs, you have become a platform engineer.
+
+The preconditions he lists are about authority, not tooling. Responsibilities must be clearly defined for the platform team and every other team. The platform team needs the mandate to implement those responsibilities across the DevOps toolset, so the same job is not done three times by three teams. Only then come orchestrators and SecOps tooling. His summary: platform engineers focus on developers' needs, not on DevOps tools.
+
+The process is plain product development. Analyse the users (developers), plan the architecture, define services, choose an interface, then deploy by changing team structures, setting business metrics and agreeing SLAs. The analysis phase is where he puts the weight, and the one line worth pinning above the planning board: ""You shouldn't tailor organization to fit the platform.""
+
+## What does a good platform feel like on day one?
+
+The example is the strongest part. A new stream-aligned team posts a request through the platform's channel: a Java application, a data store, exposure to the public network, integrations with a core banking system and a regulatory system, about a thousand transactions a day, mostly from Polish locations.
+
+Minutes later, with no platform engineer in the loop, the team has a repository containing a demo service in their language. The demo service already has CI/CD pipelines deploying into their own Kubernetes space (a namespace, a dedicated cluster, or occasionally a VM), is wired into logging, monitoring and tracing, talks to a database, exposes an API, and publishes and consumes topics. Instructions come attached. The team can ship to end users on the first day instead of spending week one collecting network requirements.
+
+## Three layers, and the portal is optional
+
+On the technology side Halasa describes three layers. At the bottom is the DevSecOps layer most large companies already have, though rarely organised, deduplicated or automated. Platform engineering adds an orchestration layer, the definitions of platform services plus the scripts that change each underlying tool (create the namespace, the database, the observability index, the repository, copy in the demo service). On top sits the interface layer.
+
+He is pragmatic about that top layer: it does not have to be a Backstage instance or even a portal. Simple APIs or Jira tickets work, though dedicated tools pay off as the platform matures. He also expects AI and chatbots to show up in the interface layer soon.
+
+## Where the $1.44 million comes from
+
+The closing calculation is simple enough to redo with your own numbers, which is the point:
+
+- 10 application teams, about six developers each
+- an average rate of $50 an hour
+- one release per team per month, 12 a year
+- one week of team effort per release on non-feature work: environments, observability hookups, security, network integration, and chasing the people who create databases and topics
+
+That is 10 × 6 × $50 × 40 hours × 12 releases, or $1,440,000 a year. Halasa puts it at 15 to 20 percent of the IT budget in such a company, and argues the saving scales with size. Long-lived applications need less than a week per release and new teams need far more; the week is his blended figure.
+
+## Who should watch
+
+Engineering managers and heads of platform who need to justify a platform team to someone holding a budget. If you already run a mature IDP, the content is familiar, but the cost model is a handy template for the next budget meeting. Halasa also mentions his online course on platform engineering for managers, so expect a brief plug.
+
+## Related Conf42 talks
+
+- Robert Kelly on why [platforms must be small, regardless of their size](https://www.conf42.com/Platform_Engineering_2024_Robert_Kelly_size_small_platforms), the same event.
+- Cansu Kavili Ornek and Val Yonchev on [Team Topologies applied to platform engineering](https://www.conf42.com/Platform_Engineering_2024_Cansu_Kavili_Ornek_Val_Yonchev_topologies_principles_engineering).
+- Vaibhav Chopra on [optimising your platform cost](https://www.conf42.com/Platform_Engineering_2023_Vaibhav_Chopra_optimise_your_platform_cost) at Conf42 Platform Engineering 2023.
+
+[Watch Krzysztof Halasa's talk](https://www.conf42.com/Platform_Engineering_2024_Krzysztof_Halasa_1mln_worth_change)
+
+[Watch the talk on YouTube](https://youtu.be/DMUaFNGxyCI).
+",talk,platform2024,talk:platform2024/Krzysztof Halasa,,Conf42,,queued,"platform-engineering, internal-developer-platform, developer-productivity, engineering-management"
+,"Secure LLM apps like data routers, with the pipelines you already own",Omer Farooq (Auxin) at Conf42 Platform Engineering 2024 on securing LLM apps by reusing DevSecOps pipelines and treating prompt logs as privileged,2024-08-30,platform2024/llm-apps-are-data-routers,,"The fastest way to make a GenAI feature expensive is to build a brand-new security programme for it. At Conf42 Platform Engineering 2024, Omer Farooq, founder and security engineer at Auxin Security, argues the opposite: an LLM application is a cloud-native app that happens to route a lot of data, so secure it with the SAST, DAST, SCA and threat-detection tooling you already run, plus a few LLM-specific additions.
+
+His formula is on the label: LLM SecOps is LLM applications plus LLMOps plus LLM security. The goal is to add GenAI to existing products without raising operating costs or re-engineering delivery, integration and security.
+
+## What does an LLM application actually look like?
+
+Farooq walks through a common reference architecture rather than a product. A query becomes an embedding, the embedding is looked up in a vector database, the retrieved data is injected into a prompt, the prompt is optimised and sent to a model API (sometimes via a cache), and the response passes a content filter before it goes back to a user or a machine.
+
+His framing is that these apps are data routers. They pull from near-real-time systems, IoT and OT equipment, search engines and catalogues, and that is exactly what makes them both useful and risky. Every integration needs a secure network path, delegated access, and a check that the user asking the question is entitled to the data the semantic search is about to fetch.
+
+## One secured backend, many front ends
+
+The architectural advice that carries the most weight is decoupling. Keep the UI or machine interface separate from the LLM backend, and build one multi-tenant backend with detailed rights management for data and assets. Bots, translation services, summarisation and middleware can all sit in front of it.
+
+The security payoff is that front ends get secured with the non-LLM models you already use, while the new LLM-specific controls are built once, in the backend. Front ends can even be low-code; the slides name Streamlit and Gradio, alongside data-router frameworks such as LangChain, Semantic Kernel and LlamaIndex.
+
+He also flags model choice as a security decision: an open-source model pulled from the public internet comes with different consequences than a managed, curated one.
+
+## What changes in the pipeline?
+
+Less than you might fear. The backend is still cloud native, so secrets, tokens and service accounts should be injected and rotated the way they are today. The differences Farooq calls out:
+
+- **Model APIs are metered services.** Use delegated access and the end user's identity where possible, rather than one shared credential at department level, and keep token and metered usage tracking outside the service.
+- **New detections in your existing SecOps tools.** A user repeatedly attempting prompt injection is a threat scenario you need to write, and threat-intelligence feeds should cover LLM application types.
+- **The vector database is a database.** Protect it as you would a relational or NoSQL store, even though its purpose differs.
+
+## Why your prompt logs are the crown jewels
+
+The point most teams miss is about logging. Users type personal details, PII and company-sensitive material into prompts, so the logged questions and answers need encryption at rest, in transit and in use, with column-level or double encryption on the prompt and response columns and tight access to audit trails. ""This can be considered equally privileged as two people's conversation,"" Farooq said at Conf42 Platform Engineering 2024.
+
+He maps the main threats to existing controls: content filtering for ethical concerns, data rights management and column encryption for data leakage, SecOps and threat intelligence for adversarial attacks (including attacks that try to induce hallucination), and input validation, throttling and content filtering for prompt injection and model poisoning.
+
+## The tactical checklist
+
+The closing list is practical: run LLM code, including config-heavy serverless functions, through the same secure coding practices and SAST/SCA scans as everything else, focusing on the chains; filter content in both directions; make sure data ingested into the model is classified, labelled and tagged; test rights management with DAST; and log end to end, correlating AI service logs with compute, storage and network logs, so you can trace abuse, illegal data use, hallucinations or injection after the fact.
+
+## Who should watch
+
+Security and platform engineers who have been told to ""add AI"" to an existing product and want a mental model that fits their current pipelines. It is a strategic overview with architecture talk, not a demo, and there is no tool-by-tool walkthrough of the scanners.
+
+## Related Conf42 talks
+
+- Eugene Neelou's [gentle introduction to LLM security](https://www.conf42.com/Large_Language_Models_LLMs_2024_Eugene_Neelou_gentle_introduction_llm_security) at Conf42 Large Language Models 2024.
+- Akshay Sekar Chandrasekaran on [cybersecurity governance with GenAI](https://www.conf42.com/Platform_Engineering_2024_Akshay_Sekar_Chandrasekaran_cybersecurity_governance_genai), the same event.
+- Samuel Baruffi on [a secure, scalable GenAI solution with AWS Serverless and Amazon Bedrock](https://www.conf42.com/Platform_Engineering_2024_Samuel_Baruffi_aws_serverless_amazon_bedrock).
+
+[Watch Omer Farooq's talk](https://www.conf42.com/Platform_Engineering_2024_Omer_Farooq_llm_secops)
+
+[Watch the talk on YouTube](https://youtu.be/UYXCPvNbVhw).
+",talk,platform2024,talk:platform2024/Omer Farooq,,Conf42,,queued,"llm-security, devsecops, llmops, generative-ai, data-protection"
 ,"KubeVirt runs your stubborn VMs as pods, and Flux can ship them","Koray Oksay (Kubermatic) and Batuhan Apaydin at Conf42 Kube Native 2024 on KubeVirt, running VMs as Kubernetes workloads and deploying them with GitOps",2024-08-29,kubenative2024/kubevirt-vms-as-pods-gitops-demo,,"Every container migration has that one app that refuses to move. At Conf42 Kube Native 2024, Koray Oksay, Kubernetes Consultant and trainer at Kubermatic, and Batuhan Apaydin, organiser of KCD Istanbul, show how KubeVirt lets that app stay a virtual machine while living in the same cluster, under the same tools, as everything else, then deploy a Fedora VM end to end with Flux and a Helm chart.
 
 The abstract sets the stakes with the CNCF Annual Survey 2023: only 39% of respondents said they run containers for most or all production applications. The rest have a lot of VMs.
