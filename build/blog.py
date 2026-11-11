@@ -384,6 +384,20 @@ def _date(value):
     return dateutil.parser.parse(value).date() if (value or "").strip() else None
 
 
+def _card_title(post, linked):
+    """Event posts without a speaker (roundups) show the conference on a tinted pill under the card and drop it from the
+    card title (Marek 2026-11-11); the post page keeps the full title."""
+    title, event = post.get("Title") or "", (linked or {}).get("event")
+    if not event or (linked or {}).get("talk"):
+        return "", title
+    pill = "Conf42 %s %s" % (event.get("name"), event.get("year"))
+    m = re.match(r"\s*Conf42\b[^:\u2013\u2014]*?\b%s\b(?:\s+roundup)?\s*(?::|\s[-\u2013\u2014])\s*" % event.get("year"), title, re.I)
+    if m and title[m.end():]:
+        rest = title[m.end():]
+        title = rest[0].upper() + rest[1:]
+    return pill, title
+
+
 def load_posts(context, base_folder, today=None, path=BLOG_CSV):
     """-> (visible posts newest first, [(ShortURL, reason)] of the rows kept off the site)."""
     today = today or datetime.datetime.now(datetime.timezone.utc).date()
@@ -430,6 +444,7 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         except (ValueError, OverflowError):
             updated = date
         post["linked"] = linked
+        post["conf_pill"], post["card_title"] = _card_title(post, linked)
         post["Date"] = datetime.datetime.combine(date, datetime.time())
         post["date_iso"] = date.isoformat()
         post["updated_iso"] = updated.isoformat()
