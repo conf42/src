@@ -661,9 +661,11 @@ def replace(args):
 
 def release(args):
     """Status=queued holds a written post back (Marek 2026-11-09: big backfills go out over 2-3 days, not at once).
-    Newest first: recent events are what readers (and crawlers) care about most."""
+    Sponsored posts first (Marek 2026-11-11), then newest first: recent events are what readers (and crawlers) care
+    about most."""
     rows = read_blog_rows()
-    queued = sorted([r for r in rows if (r.get("Status") or "").strip().lower() == "queued"], key=lambda r: r.get("Date") or "", reverse=True)
+    queued = sorted([r for r in rows if (r.get("Status") or "").strip().lower() == "queued"],
+                    key=lambda r: ((r.get("Type") or "") == "sponsored", r.get("Date") or ""), reverse=True)
     for r in queued[:args.n]:
         r["Status"] = ""
         print("released", r.get("ShortURL"))
