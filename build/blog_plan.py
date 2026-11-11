@@ -134,6 +134,8 @@ def sister_events():
                       or ("https://%s/photos/%s" % (domain, hero.split("/")[-1]) if domain and hero else ""),
                 past="/past/" in meta, talks_csv=os.path.relpath(talks_csv, HERE) if os.path.exists(talks_csv) else "",
             ))
+    for e in out:
+        e["card"] = _card_copy(e["image"])
     out.sort(key=lambda e: (e["date"], e["ref"]))
     return out
 
@@ -150,6 +152,80 @@ def _og_image(url):
         return ""
     m = re.search(r'<meta property="og:image" content="([^"]+)"', html)
     return m.group(1) if m else ""
+
+
+CARD_DIR = "docs/assets/blog/sisters"
+
+
+def _card_copy(url):
+    """the sister cover for the blog card without its FREE / discount ball (Marek 2026-11-11: the 16:9 crop cut it to
+    "FRE"): docs/assets/blog/sisters/<hash>.jpg, made once per cover; "" when there is no ball or the cover can't be
+    read (the card then shows the cover as it is)"""
+    import hashlib
+    import urllib.request
+    if not url or "/og/" not in url:
+        return ""
+    out = "%s/%s.jpg" % (CARD_DIR, hashlib.sha1(url.encode()).hexdigest()[:16])
+    if os.path.exists(os.path.join(HERE, out)):
+        return out.replace("docs/", "./", 1)
+    try:
+        from PIL import Image
+        raw = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "conf42-blog"}), timeout=20).read()
+        clean = remove_corner_ball(Image.open(io.BytesIO(raw)))
+    except Exception:
+        return ""
+    if clean is None:
+        return ""
+    os.makedirs(os.path.join(HERE, CARD_DIR), exist_ok=True)
+    clean.save(os.path.join(HERE, out), quality=88, optimize=True)
+    return out.replace("docs/", "./", 1)
+
+
+def remove_corner_ball(im):
+    """-> image without the white sticker ball touching the top-right corner, or None when there is none."""
+    from PIL import Image, ImageDraw, ImageFilter
+    im = im.convert("RGB"); W, H = im.size; px = im.load()
+    def white(p): return min(p) > 225
+    # flood fill the white connected to the corner, within the top-right quarter
+    x0, y1 = int(W * .62), int(H * .5)
+    seed = next(((x, y) for y in range(0, 6) for x in range(W - 1, W - 7, -1) if white(px[x, y])), None)
+    if not seed:
+        return None
+    seen = {seed}; stack = [seed]
+    while stack:
+        x, y = stack.pop()
+        for nx, ny in ((x+1,y),(x-1,y),(x,y+1),(x,y-1)):
+            if x0 <= nx < W and 0 <= ny < y1 and (nx, ny) not in seen and white(px[nx, ny]):
+                seen.add((nx, ny)); stack.append((nx, ny))
+    if len(seen) < W * H * .01:
+        return None
+    # the ball's text is in the background colour: fill each row of the region from its leftmost white pixel to the edge
+    rows = {}
+    for x, y in seen:
+        rows[y] = min(rows.get(y, W), x)
+    mask = Image.new("L", (W, H), 0); d = ImageDraw.Draw(mask)
+    for y, x in rows.items():
+        d.line([(x, y), (W, y)], fill=255)
+    mask = mask.filter(ImageFilter.MaxFilter(15))          # the anti-aliased rim
+    m = mask.load(); out = im.copy(); o = out.load(); last = None
+    for y in range(H):
+        xs = [x for x in range(x0 - 10, W) if m[x, y]]
+        if not xs:
+            continue
+        left = xs[0] - 4
+        sample = [px[x, y] for x in range(max(0, left - 12), left)]
+        c = tuple(sorted(s[i] for s in sample)[len(sample) // 2] for i in range(3))
+        # the sky to the left of the ball is flat; a row that runs into line art (a tower top) keeps the sky above it
+        lum = [sum(s) / 3 for s in sample]
+        if last and (max(lum) - min(lum) > 18 or sum(c) / 3 > sum(last) / 3 + 12):
+            c = last
+        last = c
+        for x in xs:
+            o[x, y] = c
+    # soften the patched rows so the fill blends with the sky gradient
+    blur = out.filter(ImageFilter.GaussianBlur(6))
+    out.paste(blur, mask=mask.filter(ImageFilter.GaussianBlur(4)))
+    return out
 
 
 def write_sister_json(events):

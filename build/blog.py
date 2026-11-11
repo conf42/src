@@ -282,6 +282,8 @@ def _image(post, linked, base_folder):
     if webinar and webinar.get("Splash"):
         return pick_picture_file(base_folder + "/", SPLASH_FOLDER + webinar["Splash"])
     sister = linked.get("sister")
+    if sister and sister.get("card") and os.path.exists(os.path.join(base_folder, sister["card"])):
+        return sister["card"]   # the cover without its FREE / discount ball (blog_plan._card_copy)
     if sister and sister.get("image"):
         return sister["image"]
     return ""
