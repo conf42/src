@@ -115040,6 +115040,62 @@ Globant is a digitally native technology services company; Schroeder works there
 
 [Watch the talk on YouTube](https://youtu.be/inPkJkPBfas).
 ",sponsored,golang2022,sponsor:golang2022/globant/Walter Demian Schroeder,globant,Conf42,,queued,"workflows, orchestration, microservices, go, google-cloud"
+,What Go actually does when you listen on port 0,"Kazuki Higashiguchi (Autify) at Conf42 Golang 2022 on tracing net.Listen down to bind, listen and getsockname, and why port 0 means an ephemeral port",2022-04-01,golang2022/port-zero-bind-ephemeral-syscalls,,"Pass port 0 to net.Listen and Go hands you a free port, a trick every httptest server relies on. At Conf42 Golang 2022, Kazuki Higashiguchi, Software Engineer at Autify, followed that call through the Go 1.18 standard library down to the system calls, and the answer to where the port comes from turns out to live in your operating system, not in Go.
+
+It is a short, focused code-reading talk: about ten minutes, one question, one stack of functions.
+
+## Why read the source for a one-liner?
+
+Because the one-liner hides infrastructure decisions. Kazuki said at Conf42 Golang 2022: ""Knowing the internal specification will help you make more profound design decisions."" His examples: which infrastructure can run a server like this, and which range of ports it will end up on.
+
+The documented behaviour is simple. The net package docs say that if the port in the address is empty or 0, a port number is chosen automatically. The standard library uses this itself: httptest.NewServer calls an unexported newLocalListener, which listens on TCP port 0.
+
+## The call chain, step by step
+
+Kazuki walks the path one function at a time:
+
+1. **net.Listen** delegates to **ListenConfig.Listen**. A daily-life tip from the talk: use ListenConfig directly when you want to pass a context.
+2. ListenConfig.Listen calls the **DefaultResolver** to resolve the address list.
+3. The resolver calls **LookupPort**, which is exported, so you can try it yourself. Give it 0 and it returns 0. Go deliberately does not choose a port; it leaves it at zero.
+4. For TCP, a **sysListener** calls **listenTCP**.
+5. listenTCP calls **internetSocket**, which returns a network file descriptor ready for asynchronous I/O via the network poller, using socket type SOCK_STREAM. A UDP server would get SOCK_DGRAM instead.
+6. For stream sockets, the code calls **listenStream**.
+7. listenStream runs three system calls in order: **bind**, **listen** and **getsockname**.
+
+The first argument to net.Listen matters along the way too: tcp4 is IPv4 only, tcp6 is IPv6 only, and plain tcp accepts either.
+
+## So who picks the port?
+
+The kernel, during bind. Bind assigns the socket address, listen marks the socket passive so accept can take connections, and getsockname reads back the address the kernel actually assigned. With a zero port, Linux binds to an ephemeral (dynamic) port, basically 49152 to 65535, the range IANA defines. Windows Vista and later use the same range; Windows Server 2003 and earlier used 1025 to 5000.
+
+## What to check before relying on it
+
+Kazuki ends with three practical checks:
+
+- **Confirm the bind specification** of the OS you deploy to.
+- **Check your infrastructure can use an ephemeral port.** His example is AWS Fargate, where you cannot bind one this way.
+- **Check the ephemeral port range**, since firewall rules may need to allow it if you use this on a remote server.
+
+## Who should watch
+
+Go developers who use httptest every day and never wondered how it finds a port, and anyone who wants a gentle, guided tour of the net package internals. Short enough for a coffee break.
+
+## Related Conf42 talks
+
+- Adelina Simion and Andy Kuszyk on [load testing with F1](https://www.conf42.com/Golang_2022_Adelina_Simion_Andy_Kuszyk_load_testing_f1) at Conf42 Golang 2022.
+- Julien Breux on [testing with Testcontainers](https://www.conf42.com/Golang_2024_Julien_Breux_test_testcontainers_container) at Conf42 Golang 2024.
+- Divya Darshana on [HTTP communication and APIs in Go](https://www.conf42.com/Golang_2025_Divya_Darshana_http_communication_apis) at Conf42 Golang 2025.
+
+[Watch Kazuki Higashiguchi's talk](https://www.conf42.com/Golang_2022_Kazuki_Higashiguchi_http_server_on_random_available_port)
+
+## From Autify
+
+Kazuki introduces Autify as a no-code, AI-powered test automation platform: it records a user's actions on the service under test, turns them into a test scenario, and uses AI to update scenarios as the application changes. It comes in two products, Autify for Web and Autify for Mobile.
+
+- Autify: [autify.com](https://autify.com/?utm_campaign=conf42s&utm_source=conf42&utm_medium=conf42)
+
+[Watch the talk on YouTube](https://youtu.be/bYSo78dwgH8).
+",sponsored,golang2022,sponsor:golang2022/autify/Kazuki Higashiguchi,autify,Conf42,,queued,"go, networking, syscalls, tcp, testing"
 ,Ghost assets are gone from AWS but alive in your Terraform,"Naor Paz (Firefly) at Conf42 Cloud Native 2022 on ghost assets, the top five types in 100+ AWS accounts, and how to detect, fix and prevent them",2022-03-31,cloud2022/ghost-assets-haunt-terraform-state,,"Drift gets all the attention, but the scarier case is the resource that no longer exists at all. At Conf42 Cloud Native 2022, Naor Paz, Director of Product at Firefly, defines ghost assets (cloud resources created by Terraform, deleted by hand or by API, and still sitting in the code and state file) and ranks the five types that turn up most often across more than 100 AWS production accounts.
 
 ## How is a ghost different from drift?
@@ -115185,6 +115241,115 @@ Form3 is a payments technology provider with an all-Go codebase; at the time of 
 
 [Watch the talk on YouTube](https://youtu.be/yKJ_h0K6liM).
 ",sponsored,golang2022,sponsor:golang2022/form3/Adelina Simion,form3,Conf42,,queued,"load-testing, go, performance-testing, open-source, sqs"
+,"One Go publisher, one JavaScript MQTT subscriber, same broker","Tamimi (Solace) at Conf42 Golang 2022 on fitting Go into event-driven architecture, from Paho MQTT and Watermill to a multi-protocol broker",2022-03-31,golang2022/gopher-mqtt-solace-event-mesh,,"Your Go service speaks one protocol, the browser app speaks MQTT, the legacy system speaks JMS, and somehow they all need the same order event. At Conf42 Golang 2022, Tamimi, Developer Advocate in the Office of the CTO at Solace, walked a cartoon gopher through three ways to make Go talk in an event-driven system: a raw protocol library, an abstraction framework, and a broker that translates protocols for you.
+
+It is a light, introductory talk with two live demos, and the second one shows Solace's then brand-new PubSub+ Messaging API for Go.
+
+## What is an event-driven architecture, briefly?
+
+Applications communicate asynchronously by publishing and subscribing to events over a broker, using a messaging protocol. Publishers send to a topic, subscribers listen on topics, and the broker handles routing. Tamimi's real-world example is a single tap on a mobile shopping app: one order event fans out to inventory, payment authorisation, shipping, a loyalty programme and the customer data platform, all in real time. The catch is that the producers and consumers are written in different languages, speak different protocols, and run on premises, in public cloud and in private cloud.
+
+## Option one: pick a protocol and a library
+
+The first demo uses MQTT, the lightweight OASIS-standard pub/sub protocol popular with IoT devices, via the Eclipse Paho MQTT library for Go. The code is short: initialise a module, go get the Paho package, configure the client with a broker address (port 1883), credentials and callbacks for connect, connection lost and incoming messages. A publish function sends ten numbered messages a second apart to a conf42/go topic, and the subscriber listens on conf42/# using MQTT's multi-level wildcard. Run it and the subscriber prints zero to nine.
+
+That works, as long as everyone speaks MQTT.
+
+## Option two: abstract the messaging API
+
+For Go teams that want to swap the underlying system, Tamimi points to Watermill, a Go library that hides the messaging implementation behind two interfaces, a Publisher and a Subscriber. You create, say, an AMQP publisher and call the same Publish method you would on any other integration. The limitation he flags: you only get the integrations Watermill supports, and it only helps Go applications. Your JavaScript and Java services are on their own.
+
+## Option three: let the broker translate
+
+For true multi-language, multi-protocol systems he argues for an advanced broker that does protocol interoperability and translation. The second demo makes the case concretely. A Go program built with the Solace PubSub+ Messaging API for Go (a builder-pattern API: create a messaging service, build a direct message publisher, build messages) publishes a sequence-numbered greeting every second to a dynamic topic under conf42/solace/go. Shutdown uses Go channels: block on a channel listening for an OS interrupt, then terminate the publisher and the service cleanly.
+
+On the other side, a browser-based MQTT client written in JavaScript (the HiveMQ web client) connects to the same Solace Cloud broker and subscribes to conf42/>, the Solace multi-level wildcard. The messages from the Go native API arrive in the MQTT client. Different language, different protocol, same stream. The Go API was released on April 1, 2022, the day after the talk; the slides add that this was not an April Fools joke.
+
+## Why pub/sub is the easy part
+
+Tamimi closes by zooming out. At enterprise scale you face hybrid, multi-cloud and multi-region deployments; a mix of microservices, IoT, cloud-native services, iPaaS and legacy ESB and ERP; and demands for performance, reliability, scalability, WAN optimisation, security and compliance. On top of that come event design, discovery, governance and access control. Tamimi said at Conf42 Golang 2022: ""It can feel daunting at first, but it's all necessary to do this well.""
+
+## Who should watch
+
+Go developers new to messaging who want a quick map from raw MQTT to frameworks to brokers, with runnable code. If you already run Kafka or NATS in production, the architecture section will be familiar, but the cross-protocol demo is a neat 30-second argument for broker-side translation.
+
+## Related Conf42 talks
+
+- Lorna Mitchell on [Go and Apache Kafka](https://www.conf42.com/Golang_2021_Lorna_Mitchell_go_big_apache_kafka_open_source) at Conf42 Golang 2021.
+- James Eastham on [building an event-driven system](https://www.conf42.com/Cloud_Native_2024_James_Eastham_event_driven_system) at Conf42 Cloud Native 2024.
+- Grace Jansen on [living in an event-driven world](https://www.conf42.com/Enterprise_Software_2021_Grace_Jansen_event_driven_world) at Conf42 Enterprise Software 2021.
+
+[Watch Tamimi's talk](https://www.conf42.com/Golang_2022_Tamimi_eventdriven_playground)
+
+## From Solace
+
+The talk demos Solace PubSub+ as the protocol-translating broker and the PubSub+ Messaging API for Go as its native Go client. Solace also runs a developer community and the EDA Summit.
+
+- Solace: [solace.com](https://solace.com/?utm_source=golang&utm_medium=referral&utm_content=website-banner-golang&utm_campaign=field_2022)
+- Solace Community: [solace.community](https://solace.community/)
+- EDA Summit: [edasummit.com](https://edasummit.com/)
+
+[Watch the talk on YouTube](https://youtu.be/XBkBpFYAHiw).
+",sponsored,golang2022,sponsor:golang2022/solace/Tamimi,solace,Conf42,,queued,"go, event-driven-architecture, mqtt, messaging, pub-sub"
+,Scala cold starts of one to two seconds pushed a telecom team to Go,"Herve Ah-Leung (Smartnumbers) at Conf42 Golang 2022 on moving a fraud prevention team from Scala to Go microservices, and what Go did and did not fix",2022-03-31,golang2022/scala-to-go-cold-starts-telephony,,"When your service sits in the path of a phone call, a one-second cold start is not a performance footnote. At Conf42 Golang 2022, Herve Ah-Leung, Senior Software Engineer at Smartnumbers, told how his fraud prevention team moved an almost-monolithic Scala system to Go microservices, starting with serverless cold starts that dropped from one to two seconds to milliseconds.
+
+He is clear about the scope: this is a team's journey and its lessons, not a pitch for microservices or for Go.
+
+## Why is latency the constraint that matters here?
+
+Smartnumbers builds telecom software: fraud prevention, call management, telecoms migration and mobile solutions. Herve works on fraud prevention, where every millisecond a service adds is a millisecond a caller waits. Herve said at Conf42 Golang 2022: ""So if a person is trying to contact emergency services, you can't wait forever to process the call.""
+
+## The microservices bill, itemised
+
+Before praising anything, Herve lists what microservices cost, using his team's own AWS X-Ray service map as Exhibit A:
+
+- **Communication complexity and cognitive load.** With 100 services, nobody remembers what each one does.
+- **Latency.** Service A calls B calls C, and the hops add up.
+- **Change propagation.** Adding or removing a field in a request or response means finding every consumer, across dev, UAT and production, without breaking any.
+- **Shared library patches.** A security fix in a common library means 100 redeploys for 100 services.
+
+Any language would face these. The question he asks is how to get the most out of Go against them.
+
+## How much did Go cut the cold starts?
+
+Three years before the talk, the team ran serverless functions in Scala on AWS Lambda. Cold start length depends on the language, the package size, and whether the function sits in a private network. On the JVM they saw cold starts of one to two seconds, and a Scala function calling another Scala function could chain them. A trial in Go brought cold starts down to milliseconds, which he puts down to lightweight Go binaries that the provider can fetch and provision quickly. That first latency win convinced them to move fully to Go.
+
+## What else made the move easier?
+
+His other reasons are less dramatic but just as practical. None of the team had Go experience, yet SDKs for AWS, GCP and Azure and a large supply of tutorials let them write HTTP and GraphQL servers, mocks, hashing and database code from scratch. The standard library covers crypto, encoding, errors, fmt, os, strings, sync and time without a single download, which he contrasts with picking between moment and date-fns, or between Mocha, Sinon and Cypress, in JavaScript. Go modules replaced dep once Go 1.13 arrived.
+
+The third-party picks: Gomega and Ginkgo for testing, GoReleaser to build and version the shared libraries every microservice depends on, and gqlgen to generate a GraphQL server from a schema. He also gives GoLand a quick mention.
+
+The new-joiner story is the nicest data point. Go has few keywords and explicit syntax, and a few months into the move a junior engineer presented Go to the whole engineering department. Juniors spend their energy on where a service fits in the fleet, not on the language.
+
+## Where did Go get in the way?
+
+Package layout first. The team started with an MVC-style split (controllers, services, models) that grew into large, meaningless packages, then reorganised by business context (order, customer) with one, at most two, levels of nesting. That also showed which packages to extract as shared libraries and which to leave alone.
+
+Then the language itself: pointers, which confused newcomers and, after one misuse broke production, led the team to avoid them unless needed and lean towards immutability; and implicit interfaces, which beginners find hard to grasp.
+
+Next on their list: Protocol Buffers for schema-validated, low-latency service contracts, the generics that had just landed in Go 1.18, and, half joking, writing infrastructure, pipelines, task runners and docs in Go so nobody has to write YAML.
+
+## Who should watch
+
+Teams weighing a JVM-to-Go move for latency-sensitive or serverless workloads, and leads onboarding engineers new to Go. It is a war story with practical lessons, not a benchmark study.
+
+## Related Conf42 talks
+
+- Lerna Ekmekcioglu on [moving from a monolith to microservices on AWS](https://www.conf42.com/Cloud_Native_2022_Lerna_Ekmekcioglu_monolith_microservices_aws) at Conf42 Cloud Native 2022.
+- Bhaskara Beeraka on [scaling telecom microservices](https://www.conf42.com/Golang_2025_Bhaskara_Beeraka_telecom_microservices_scaling) at Conf42 Golang 2025.
+- Savas Ziplies on [running Go web apps on AWS Lambda](https://www.conf42.com/Golang_2022_Savas_Ziplies_serverless) at Conf42 Golang 2022.
+
+[Watch Herve Ah-Leung's talk](https://www.conf42.com/Golang_2022_Herve_AhLeung_successful_microservices_architecture)
+
+## From Smartnumbers
+
+Smartnumbers is a telecom software company covering fraud prevention, call management, telecoms migration and mobile solutions; Herve works on its fraud prevention products.
+
+- Smartnumbers: [the Smartnumbers website](https://hubs.ly/Q016xG910)
+
+[Watch the talk on YouTube](https://youtu.be/ycKBGzOHBgQ).
+",sponsored,golang2022,sponsor:golang2022/smartnumbers/Herve Ah-Leung,smartnumbers,Conf42,,queued,"go, microservices, serverless, cold-starts, developer-experience"
 ,Golang event is live!,May the Gophers be with you...,2022-03-30,2022-03-30-may-the-gophers-be-with-you,./assets/splash/GOLANG2022_Event_Splash.png,"#A treat for our fellow Gophers!
 
 [Agnes Muthoni](https://www.linkedin.com/in/agnesmuthoni/) is here to talk to you about Andela, the help you might need to put your career path on the right track. This team, [Adelina Simion](https://www.linkedin.com/in/adelina-simion/) and [Andy Kuszyk](https://www.linkedin.com/in/andy-kuszyk/), will walk you through what Load Testing is, why it’s so important and what some of its limitations are. Listen to [Walter Demian Schroeder](https://www.linkedin.com/in/walter-demian-schroeder/) talking about Workflows with Go and [Liam Hampton](https://www.linkedin.com/in/liam-conroy-hampton/) explaining how to get started with IoT devices. Finally, [Tamimi](https://www.linkedin.com/in/atamimi1/) will introduce you to event-driven architecture and how it’s used in real life. This powerful set is only the beginning of this Golang adventure, come and [join](https://www.conf42.com/golang2022)!
@@ -115279,6 +115444,107 @@ Andela is the talent marketplace Muthoni describes in the talk, connecting vette
 
 [Watch the talk on YouTube](https://youtu.be/GK91Q5vLHjc).
 ",sponsored,golang2022,sponsor:golang2022/andela/Agnes Muthoni,andela,Conf42,,queued,"remote-work, careers, hiring, talent-marketplace"
+,"Deploy apps to Lambda, not fifty single-purpose functions","Savas Ziplies (elipZis) at Conf42 Golang 2022 on running a full Fiber app on AWS Lambda with AWS SAM, one codebase that also runs locally",2022-03-30,golang2022/fiber-on-lambda-apps-not-functions,,"Serverless tutorials start with one hello-world function, and by function number fifty you are testing a distributed system on your laptop. At Conf42 Golang 2022, Savas Ziplies, Managing Director and founder of elipZis, showed the alternative he calls framework as a service: write an ordinary Go web app with Fiber, run it locally, and let AWS SAM deploy the same code to Lambda as a handful of apps instead of a swarm of functions.
+
+He is upfront that this is not a sales pitch for serverless. His last answer to whether you need it is: try it and find out.
+
+## What is wrong with function-by-function serverless?
+
+Nothing, for small jobs. Savas walks through the native path first: a Google Cloud Function is just an HTTP handler with no main, while AWS Lambda needs lambda.Start and requests proxied in from API Gateway. Then the AWS CLI routine: build for Linux, zip, create an IAM role, create the function, invoke it, rinse and repeat per user story.
+
+His list of pros: quick to start, simple development, an easy single-purpose pattern. His list of cons: the code differs per vendor so you are locked in immediately, single-purpose functions can be too micro-service for an app, local development and testing get tedious once there are dozens of functions with dependencies on each other, and familiar structure such as routing is gone.
+
+## Think in apps, route in your own code
+
+The fix is to keep routing inside the application. His template repository (elipZis/go-serverless on GitHub) has a build folder for provider configuration, a cmd folder where each serverless app lives as a full Go program (an API, a queue handler, a web app), shared code alongside, plus environment files and Docker Compose for local work. Every cmd becomes one configurable Lambda function, so you can start with one app and split out an endpoint later, for example when it needs more memory.
+
+The single point of entry is main.go. It reads a SERVER_ENV variable: on AWS it starts the Lambda handler, anywhere else it starts a normal local Fiber server. AWS's own aws-lambda-go-api-proxy library supplies the adapter that turns the Lambda event back into a Fiber context, and it has adapters for Gin and Echo too. After that line, it is just Fiber development.
+
+## What does AWS SAM do here?
+
+SAM, the Serverless Application Model, models the application rather than the infrastructure. In template.yaml, each app is an AWS::Serverless::Function whose code URI points at its cmd folder, with memory size and timeout set per app (his advice: start low, because low is cheap). One API event with a catch-all proxy path sends every request into the app, so the app does the routing, not API Gateway.
+
+Because the template is CloudFormation underneath, it can also declare an RDS database, SQS queues, DynamoDB or Redis and inject their endpoints as environment variables, so nobody copies URLs out of the console. For extra binaries, his example adds a Chromium build as a versioned Lambda layer for scraping JavaScript-heavy pages. samconfig.toml then holds the deployment settings, with separate profiles for default, dev, staging and production in one file. Savas said at Conf42 Golang 2022: ""So you're now deploying apps instead of functions.""
+
+## What does it cost you?
+
+The honest part. The ops layer is tied to SAM, though it is swappable for another vendor's tooling. A framework adds boot and execution overhead, which matters when you pay per millisecond of reserved memory. You get no insight into the hardware, and on AWS you cannot set CPU directly: at the time, you got one vCPU per 768 MB of memory, so more CPU means paying for more memory. A runaway invocation with a five-minute timeout and 1 GB reserved bills you for all of it, every time, so monitoring and limits are mandatory. Constantly busy endpoints may be cheaper on warm, classic instances. And you are only as scalable as your smallest resource: Lambda may absorb a marketing spike that your smallest database cannot.
+
+## Who should watch
+
+Go developers with an existing web app who want to try Lambda without rewriting it into functions. Teams already deep into Lambda will find the SAM template walkthrough and the cost caveats the most useful parts.
+
+## Related Conf42 talks
+
+- Thorsten Hans on [serverless WebAssembly with Go](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly) at Conf42 Golang 2024.
+- Gunnar Grosch on [chaos for serverless with AWS Fault Injection Simulator](https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator) at Conf42 Chaos Engineering 2022.
+- Luciano Mammino on [writing Lambdas in Rust](https://www.conf42.com/Cloud_Native_2023_Luciano_Mammino_lambdas_rust) at Conf42 Cloud Native 2023.
+
+[Watch Savas Ziplies's talk](https://www.conf42.com/Golang_2022_Savas_Ziplies_serverless)
+
+## From elipZis
+
+elipZis is the software company Savas founded and runs. The serverless template from the talk is on GitHub as elipZis/go-serverless.
+
+- elipZis: [elipzis.com](https://elipzis.com)
+- The go-serverless template: [github.com/elipZis/go-serverless](https://github.com/elipZis/go-serverless)
+
+[Watch the talk on YouTube](https://youtu.be/dO6hM1PsyZk).
+",sponsored,golang2022,sponsor:golang2022/elipzis/Savas Ziplies,elipzis,Conf42,,queued,"go, serverless, aws-lambda, aws-sam, fiber"
+,TinyGo turns a Go developer into an IoT hobbyist without learning C,"Liam Hampton (Microsoft) at Conf42 Golang 2022 on using TinyGo to put plain Go on an Arduino, from a soil moisture sensor to a letterbox alarm",2022-03-30,golang2022/tinygo-arduino-dead-plants-and-post,,"A year before his talk, Liam Hampton knew nothing about IoT, had never written C or MicroPython, and owned a pile of freshly bought Arduinos. At Conf42 Golang 2022 the Microsoft Cloud Advocate showed how TinyGo let him skip learning a new language entirely: the code he flashes onto the boards is ordinary Go, plus one package.
+
+It is a beginner-friendly, hobbyist talk with a live demo, not a deep compiler tour, and it is honest about that.
+
+## Where does a Go developer even start with microcontrollers?
+
+On Google, like everyone else. Liam said at Conf42 Golang 2022: ""I didn't want to learn a new language, so I ended up like every other developer would, went onto Google and said, how do I put go on an Arduino?""
+
+The answer was TinyGo, whose tagline he says you will see on the website, the GitHub repo and every blog post about it. In his words, ""it is a compiler for small places, it's still a go compiler."" It keeps the parts of the standard library that make sense on tiny hardware (bytes, archive and zip, for example) and drops what does not, such as html/template and the net package. Under the hood it uses LLVM to target architectures like x86, ARM and PowerPC.
+
+## What is TinyGo actually used for?
+
+Liam names three uses, in order of how often you will meet them:
+
+- **Microcontrollers**: Arduino, micro:bit, Adafruit boards, even a smartwatch. TinyGo supported over 70 boards at the time of the talk, up from about 50 when he started a year earlier.
+- **WebAssembly**: compile TinyGo to Wasm and have the browser run it, for example a dashboard.
+- **Small CLIs**: less common by 2022, he says, but still around.
+
+## The projects: dead plants and a long walk downstairs
+
+His motivation was domestic. After a month away he came home to a wilted plant, so he built a soil moisture sensor that reports a reading through the Arduino in human-readable form (71% on the day he showed it; the plant wants 50% or more). The next phase is a self-watering pump he can trigger remotely from a dashboard.
+
+The second project fixes a problem anyone in a tall block of flats will recognise: walking down every day to check a letterbox that is often empty. Phase one is an Arduino Uno R3 on a breadboard with a photoresistor and a few LEDs. When the postie opens the letterbox, light gets in, and that is the trigger. Phase two is sending the notification somewhere useful, through something like Azure IoT Hub or a pub/sub setup.
+
+## What does the code look like?
+
+Exactly like Go, which is the point. The demo ran in Visual Studio Code with the TinyGo extension, Go 1.17 and TinyGo 0.22. The extension's status bar lets you pick the target board from a long dropdown. The one unusual import is the machine package, which gives you the pins: the light sensor on ADC0 and LEDs on D7 to D10, all configured as outputs in a loop over a slice.
+
+The logic is a plain if/else: above a light reading of 8000 (a threshold he tuned to his room, unit unconfirmed) the LEDs go off, otherwise on, followed by a one-second sleep so the sensor does not flood him with data. To flash it, he listed the serial ports under /dev, found the USB modem, and ran tinygo flash with the Arduino target, the port and the file. Flashing took a second or two, and covering the sensor lit the LEDs on camera.
+
+## What's next on the bench
+
+Three more projects: a macro pad on an RP2040 board for streaming shortcuts, a spinning Lego wheel for GitHub notifications (because emails and texts are too easy to ignore), and a hallway dashboard tying the home sensors, the plant and the letterbox together. If you do not want to buy hardware first, the TinyGo playground at play.tinygo.org simulates boards in the browser, much like the Go playground.
+
+## Who should watch
+
+Go developers curious about embedded work who have been put off by C toolchains. If you already ship firmware, this is a pleasant 20 minutes rather than new material.
+
+## Related Conf42 talks
+
+- Thorsten Hans on [serverless WebAssembly with Go](https://www.conf42.com/Golang_2024_Thorsten_Hans_serverless_webassembly) at Conf42 Golang 2024.
+- Pradeep Kumar Vattumilli on [TinyML at the edge](https://www.conf42.com/Golang_2025_Pradeep_Kumar_Vattumilli_edge_tinyml_ai) at Conf42 Golang 2025.
+- Antoinette Hodes on [IoT devices and saving toasters](https://www.conf42.com/DevOps_2024_Antoinette_Hodes_iot_devices_saving_toasters) at Conf42 DevOps 2024.
+
+[Watch Liam Hampton's talk](https://www.conf42.com/Golang_2022_Liam_Hampton_to_the_edge)
+
+## From Microsoft
+
+Liam is a Microsoft Regional Cloud Advocate based in the UK. For the cloud end of projects like his letterbox alarm, he points to Azure IoT Hub.
+
+- Microsoft: [microsoft.com](https://www.microsoft.com/en-ie/)
+
+[Watch the talk on YouTube](https://youtu.be/xM8myEOM2yQ).
+",sponsored,golang2022,sponsor:golang2022/microsoft/Liam Hampton,microsoft,Conf42,,queued,"go, tinygo, iot, arduino, webassembly"
 ,"Before you containerise it, ask why five times","Rajalakshmi Srinivasan (Site24x7, Zoho Corp.) at Conf42 Cloud Native 2022 on Kubernetes adoption, its real costs and what a container monitoring tool must cover",2022-03-29,cloud2022/kubernetes-monitoring-start-with-why,,"Moving a monolith to containers is easy on a whiteboard and expensive in production if you skip the question of why. At Conf42 Cloud Native 2022, Rajalakshmi Srinivasan, Director of Product Management at Site24x7 (Zoho Corp.), walks from client-server to serverless, puts numbers on Kubernetes adoption, and lists what a monitoring tool has to do before you trust your cluster to it.
 
 It is an overview talk with 22 years of industry experience behind it, and it ends with her own product, so expect a vendor close.
@@ -115441,7 +115707,7 @@ _This blog was written on behalf of Microsoft by Juarez Junior, Azure Developer 
 
 _Microsoft Ireland is a Gold sponsor of Conf42 Golang 2022._
 
-![](./assets/sponsors/microsoft.png)",,,,,,,,
+![](./assets/sponsors/microsoft.png)",,,,,,,replaced:golang2022/tinygo-arduino-dead-plants-and-post,
 ,Andela <> Conf42 Golang 2022,Build remote engineering teams with Andela,2022-03-22,2022-03-22-andela-sponsor-announcement,./assets/splash/BLOG_2022_Andela_Golang_2022.png,"####Andela was created with one thing in mind: Brilliance is evenly distributed, but opportunity isn’t. Our platform bridges that gap.
 We specialize in helping our highly-skilled, global technology talent community in emerging markets, connect with hundreds of leading companies like InVision, Cloudflare, and ViacomCBS who leverage Andela to scale their technology teams quickly and cost-effectively. Our talent spans six continents and Andela is backed by investors including Generation Investment Management, SoftBank, Chan Zuckerberg Initiative, Spark Capital, and Google Ventures.
 
@@ -115674,6 +115940,61 @@ Formidable is a consultancy that partners with companies to build for the modern
 
 [Watch the talk on YouTube](https://youtu.be/UbugZS4eK4s).
 ",sponsored,ce2022,sponsor:ce2022/formidable/Paul Marsicovetere,formidable,Conf42,,queued,"chaos-engineering, incident-response, kubernetes, mttr, documentation"
+,Chaos experiments become a release gate when SLOs decide the result,"Ana Margarita Medina (Gremlin) at Conf42 Chaos Engineering 2022 on continuous reliability with Keptn, SLO quality gates and a chaos stage before production",2022-03-11,ce2022/keptn-slo-quality-gates-chaos-stage,,"Run a chaos experiment in a pipeline and someone has to decide whether the result is good enough to ship. At Conf42 Chaos Engineering 2022, Ana Margarita Medina, Senior Chaos Engineer at Gremlin and a Keptn advisory board member, argued that nobody should have to: define SLOs as code, let the CNCF project Keptn evaluate them as quality gates at every stage, and the experiment's verdict becomes a pass or a fail.
+
+Her recipe for continuous reliability is three words: automation, standardisation and experimentation.
+
+## What problem is this solving?
+
+Complexity outran the tooling. Ana traces the path from one on-premises service and an annual release to hundreds or thousands of microservices, cloud regions you cannot name, and daily (sometimes Friday) deploys. Failures got more complex with them, and SREs still spend nights hunting dashboards and running runbooks and shell scripts by hand. The talk shows a this-is-fine stick figure for a reason.
+
+## What does Keptn do here?
+
+Keptn, a CNCF sandbox project, is a control plane for DevOps automation of cloud-native applications, declarative and GitOps-based, and not limited to Kubernetes. Out of the box it brings observability, dashboards and SLO-based alerting per service, multi-stage delivery, and operations and remediation under one roof.
+
+The anchor is SLOs. Ana's slide example: the SLI is web request latency under 500 ms; the SLO is 95% of requests under 500 ms over a rolling month; the SLA is 90% under 500 ms for the month, or the customer gets money back. Keptn standardises SLOs across tools and stages, and they live in YAML files (an sli.yaml and an slo.yaml) with pass and warning criteria and an overall score. She calls the result test-driven operations: developers see how their change moves the reliability metric before it reaches customers. She credits Keptn contributor Andreas Grabner for much of the SLO material.
+
+## What did the demo show?
+
+Following the Keptn full tour tutorial with Dynatrace (Prometheus also works), she installs Keptn for the continuous delivery use case, onboards a sock shop project with three stages (development, staging, production), and deploys a carts service with its database. Version one goes green all the way to production.
+
+Version two fails the gate in staging: the 95th percentile response time comes in at 1,052 ms, the evaluation fails, and the release is not promoted, so production stays on version one. Version three fixes the response time and rolls through dev, staging and production. When a production SLO is breached, Keptn can also run a declared remediation action, such as toggling a feature flag, re-evaluate the SLO, and close the issue if it passes.
+
+## Where do chaos experiments fit?
+
+Ana offers three placements:
+
+- **Every stage**: run experiments in dev and staging before anything reaches production.
+- **A dedicated chaos stage**: development, staging, then chaos as the last quality gate before production.
+- **Alongside performance testing**: she describes doing load tests and chaos engineering together at Uber to prepare for peak days such as Halloween and New Year's, when a trip depends on about 50 microservices.
+
+The decision logic is simple. SLO met: promote. SLO not met: did we find a weakness? Fix, release again, repeat. Nobody needs to argue in a meeting about whether the experiment result is acceptable for customers, because the SLO already says so.
+
+## The part that is not about a tool
+
+Her closing is the most quotable bit. Ana said at Conf42 Chaos Engineering 2022: ""You can't bring in just a new tool that's going to promise you more nines of reliability. Those don't exist."" Reliability comes from processes you automate and keep running: experiments, SLOs, game days, failovers, and runbooks exercised often enough not to rot.
+
+## Who should watch
+
+SREs and platform teams who already run some chaos experiments and want them wired into delivery with an objective pass/fail, and anyone who needs a crisp SLI/SLO/SLA explainer for their team.
+
+## Related Conf42 talks
+
+- Uma Mukkara on [continuous SLO validation using chaos engineering](https://www.conf42.com/Site_Reliability_Engineering_2021_Uma_Mukkara_continuous_SLO_validation_using_chaos_engineering) at Conf42 SRE 2021.
+- Akram Riahi on [chaos engineering with Litmus and Jenkins](https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins) at Conf42 Chaos Engineering 2022.
+- Fred Moyer on [SLOs and error budgets at scale](https://www.conf42.com/Observability_2023_Fred_Moyer_slos_error_budgets_scale) at Conf42 Observability 2023.
+
+[Watch Ana Margarita Medina's talk](https://www.conf42.com/Chaos_Engineering_2022_Ana_Margarita_Medina_continuous_reliability)
+
+## From Gremlin
+
+Ana closes by pointing to Gremlin's chaos engineering certification, offered at two levels: Practitioner, covering chaos engineering fundamentals, and Professional, for advanced chaos engineering.
+
+- Gremlin: [gremlin.com](https://www.gremlin.com)
+- Gremlin certification: [gremlin.com/certification](https://www.gremlin.com/certification)
+
+[Watch the talk on YouTube](https://youtu.be/5NJk7wc5WII).
+",sponsored,ce2022,sponsor:ce2022/gremlin/Ana Margarita Medina,gremlin,Conf42,,queued,"chaos-engineering, slos, keptn, continuous-delivery, sre"
 ,Test your ransomware defences before the ransom note does,"Kennedy Torkura (Mitigant) at Conf42 Chaos Engineering 2022 on using security chaos engineering to verify cloud ransomware controls, backups and runbooks",2022-03-10,ce2022/ransomware-drills-with-security-chaos,,"Most ransomware playbooks end with restore from backup, and almost nobody checks whether the backup restores. At Conf42 Chaos Engineering 2022, Kennedy Torkura, co-founder and CTO of Mitigant, argued that security chaos engineering is how you find out: treat each ransomware countermeasure as a hypothesis, inject the attack's steps into your own cloud, and see which controls fire. His sharpest point is about timing: incident response usually starts at the very end of an attack that took many earlier steps to set up.
 
 ## How big is the problem he describes?
@@ -115722,6 +116043,119 @@ Mitigant describes itself as a continuous security verification platform, applyi
 
 [Watch the talk on YouTube](https://youtu.be/y_Ve7jiHDFA).
 ",sponsored,ce2022,sponsor:ce2022/mitigant/Kennedy Torkura,mitigant,Conf42,,queued,"security-chaos-engineering, ransomware, aws, cloud-security, incident-response"
+,"When 100,000 agents check in, the agent is the riskiest part","Zach Wasserman (Fleet) at Conf42 Chaos Engineering 2022 on keeping osquery agents and self-hosted Fleet servers resilient at 100,000-device scale",2022-03-10,ce2022/osquery-fleet-agent-chaos-experiments-per-week,,"An endpoint agent that takes down the production server it was installed to protect has failed at its one job. At Conf42 Chaos Engineering 2022, Zach Wasserman, CTO of Fleet and co-creator of osquery, explained how Fleet ranks the risks in an agent-plus-server system, why the agent is high risk and the server only medium, and the metric that drives their testing: how many experiments can we run per week?
+
+A grounded talk: every mitigation comes with its downside.
+
+## What are osquery and Fleet?
+
+Osquery, which Zach helped create at Facebook and which is now a Linux Foundation project, exposes the operating system's internals on macOS, Linux and Windows as a relational database you can query. It is read-only by design, which narrows the blast radius. Fleet is the open-core management server that runs osquery across 100,000+ devices. It has two very different kinds of client: osquery agents checking in for configuration and sending data, and API clients, usually a human in the UI or a script. The agent traffic is orders of magnitude larger, so the two get treated differently.
+
+## How do you decide where to spend reliability effort?
+
+Zach's order of priorities is availability, then data integrity, then cost, and he applies the Pareto principle and Amdahl's law: a small part of the system generates most of the load, so focus there.
+
+On the agent side, the stakes add up to high risk: it runs on production servers that make the company money, on workstations people need to do their jobs, it must not miss security events, and at that scale a small percentage increase in resource use becomes a large compute bill. The Fleet server scores medium: availability and integrity of monitoring data matter, latency a bit less, and even a big scale-up of a few dozen servers plus MySQL and Redis costs little next to a few percent across every endpoint.
+
+## How does osquery avoid hurting the host?
+
+Each mitigation comes with its trade-off:
+
+- **Watchdog.** A worker/watcher process pair. If a query exceeds CPU or memory limits, it is terminated and blocked for 24 hours. That protects production and workstations, at the cost of monitoring gaps.
+- **Linux cgroups.** The kernel enforces hard CPU and memory limits as a final backstop. Linux only.
+- **Query profiling before deploy.** Osquery's tooling estimates user time, system time, memory and file accesses per query, so you know which queries would trip the watchdog and what they will cost.
+- **Query performance monitoring.** Fleet records real execution statistics from every host and shows them in the UI, so operators can check reality against expectations.
+
+## And the server?
+
+Standard scaling practice: several Fleet processes behind a load balancer, clustered MySQL and Redis with failover, cloud autoscaling. The less elastic dependencies need proper sizing or costs creep. The more interesting piece is backpressure: agents buffer data locally and only clear it after the server acknowledges receipt. Pushing a little storage to the clients, who vastly outnumber the servers, buys a lot of availability, though latency can rise and an overflowing buffer eventually drops old data.
+
+## Self-hosted means chaos you do not control
+
+Customers run everything: agents, servers and dependencies. That means inconsistent environments (MySQL 5.7 or 8, MariaDB or Aurora; Redis in cluster, Sentinel or single-host mode), slow deploys outside Fleet's control, outdated versions, and slow debugging loops. Fleet pushes consistency with Terraform and reference architectures that pin MySQL versions, task counts and memory.
+
+On testing, Zach said at Conf42 Chaos Engineering 2022: ""the more experiments that we run, the more different combinations of things we can try, things going wrong, things going right, the more edge cases we'll encounter"". Generic HTTP load tools do not know your hot path, so Fleet built its own: osquery-perf, a Go simulator of osquery agents that runs tens or hundreds of thousands of fake agents on one virtual machine, with templated host data to inject randomness. Varied hosts, staggered start-ups, degraded networks: each is a cheap experiment.
+
+For debugging, the rule is collect first, ask questions later. One command, fleetctl debug archive, gathers memory allocations, errors, concurrency and CPU profiles and database status including locks. It serves both load tests and production, and it saves round trips with self-hosting users.
+
+## Who should watch
+
+Anyone building agents, SDKs or self-hosted software that runs in environments they do not own, and Go developers who need a model for load-testing a check-in-heavy server.
+
+## Related Conf42 talks
+
+- Zach Wasserman on [securing endpoints with open software](https://www.conf42.com/DevSecOps_2023_Zach_Wasserman_securing_endpoint_open_software) at Conf42 DevSecOps 2023.
+- Adelina Simion and Andy Kuszyk on [load testing with F1](https://www.conf42.com/Golang_2022_Adelina_Simion_Andy_Kuszyk_load_testing_f1) at Conf42 Golang 2022.
+- Vishnu Vardhan Chikoti on [using results from chaos experiments](https://www.conf42.com/Chaos_Engineering_2022_Vishnu_Vardhan_Chikoti_utilising_results_from_chaos_experiments) at Conf42 Chaos Engineering 2022.
+
+[Watch Zach Wasserman's talk](https://www.conf42.com/Chaos_Engineering_2022_Zach_Wasserman_glitches_in_the_matrix__or_taming_agent_chaos)
+
+## From Fleet
+
+Fleet is the open-core osquery management server shown throughout the talk, with the fleetctl CLI, Terraform modules and published reference architectures for self-hosted deployments.
+
+- Fleet: [fleetdm.com](https://fleetdm.com/)
+- Fleet source code: [github.com/fleetdm/fleet](https://github.com/fleetdm/fleet)
+- Reference architectures: [fleetdm.com/docs](https://fleetdm.com/docs/deploying/reference-architectures)
+
+[Watch the talk on YouTube](https://youtu.be/hBtYFm2m2Lo).
+",sponsored,ce2022,sponsor:ce2022/fleet/Zach Wasserman,fleet,Conf42,,queued,"chaos-engineering, osquery, load-testing, resilience, go"
+,"Security chaos needs a steady state, so borrow one from CIS and ATT&CK",Sakshyam Shah (Teleport) at Conf42 Chaos Engineering 2022 on defining steady states for security chaos experiments from CIS benchmarks and MITRE ATT&CK,2022-03-10,ce2022/security-chaos-steady-state-from-benchmarks,,"Classic chaos engineering has a convenient steady state: a million requests per second, a latency graph, a CPU chart. Security has no such number, since nobody can say a system is 90% secure. At Conf42 Chaos Engineering 2022, Sakshyam Shah, Developer Relations Engineer at Teleport, proposed a way around that: take the steady state and the hypotheses from security benchmarks and frameworks your organisation already follows, such as CIS controls and MITRE ATT&CK.
+
+The pay-off he is after is adoption. Experiments that map to existing security processes are ones a security team and its executives will actually sign off on.
+
+## Why do security teams need chaos experiments at all?
+
+Sakshyam's parallel: developers write unit, integration and end-to-end tests, reach full coverage, and production still crashes, which is why chaos engineering exists. Security teams buy next-gen firewalls, run vulnerability assessments, pen tests and red teams, and train everyone, and breaches keep coming. Security chaos engineering applies the same idea: experiment to validate assumptions and find the unknowns, testing whether controls already in place actually work.
+
+The assumptions he lists will sound familiar. A new infrastructure service can be running in under five minutes. Patches go out as soon as they are available. Credentials, API keys and certificate authorities can be rotated without downtime. The WAF policy will catch cross-site scripting. The SIEM will catch credential compromise and lateral movement. A compromised application can reach only its own database. Over time, configuration drift and new workflows quietly break some of these.
+
+## Where does resilience come into security?
+
+Through dependencies. His example is an infrastructure access solution, which looks like a bastion or VPN but depends on identity providers, certificate authorities, MFA providers, hardware security modules, approval systems, routers, firewalls and switches. Shut down containers or VMs, disconnect network interfaces or mock a dependency outage, and see whether access keeps working, and keeps working securely.
+
+## Why is the steady state the hard part?
+
+Sakshyam said at Conf42 Chaos Engineering 2022: ""The problem with testing these type of assumptions when it comes to security chaos engineering is how can you define and measure a steady state appropriately?"" A WAF that catches XSS today faces endless bypass cheat sheets tomorrow, and there is no metric that says the current state is the best possible one. Teams then struggle with what to test, which variables to introduce, and where this fits next to compliance.
+
+## How do benchmarks supply the steady state?
+
+His answer is to treat benchmarks and frameworks as the definition of normal: CIS benchmarks, cloud vendor IAM best practices from AWS, Azure and Google Cloud, compliance controls such as PCI DSS, HIPAA and SOC, and frameworks such as MITRE ATT&CK, the Cyber Kill Chain and the NIST Cybersecurity Framework.
+
+From CIS Controls v8 access control, a team may have processes for granting and revoking access, MFA for externally exposed apps, remote network access and admin access, and role-based access control. An auditor checks that these exist. A security chaos experiment checks that they hold: can another policy override the MFA requirement, and if someone deploys a new app without MFA on admin access, is it detected?
+
+From ATT&CK's enterprise matrix, he picks credential access and the sub-technique of modifying the authentication process. Hypothesis: the SOC is alerted when authentication changes. Experiment: switch authentication from SAML to OAuth while the log server is down for 20 minutes, then restore it. Then ask the SOC whether they saw it. If not, the log shipper probably lacks retries, and an attacker's change could slip through unnoticed.
+
+## How is this different from a pen test?
+
+He compares the practices on a just-in-time (JIT) access request system. Vulnerability scanning looks for known vulnerabilities in it, vulnerability research for unknown ones, and a pen test for a way to bypass it through exploits, logic flaws or social engineering. Security chaos asks a different question: if the JIT system crashes, does a degraded, insecure fallback kick in that someone can misuse? It closes gaps the other practices leave rather than replacing them.
+
+## When should a team start?
+
+Late, by his reckoning. Using a maturity model such as SP-CMM, he argues that without baselines and hardening in place you would just be firing experiments everywhere. Security chaos works best for finding the unknowns once the knowns are implemented.
+
+## Who should watch
+
+Security engineers curious about chaos engineering, and chaos practitioners who want to pitch security experiments to a sceptical security team in language it already uses.
+
+## Related Conf42 talks
+
+- Yury Nino and Jhonnatan Gil Chaves on [chaos engineering for cloud security](https://www.conf42.com/Chaos_Engineering_2021_Yury_Nino_Jhonnatan_Gil_Chaves_cloud_security_chaos_engineering) at Conf42 Chaos Engineering 2021.
+- Kim Carter on [OWASP PurpleTeam](https://www.conf42.com/Chaos_Engineering_2022_Kim_Carter_owasp_purpleteam) at Conf42 Chaos Engineering 2022.
+- Kennedy Torkura on [defeating ransomware attacks](https://www.conf42.com/Chaos_Engineering_2022_Kennedy_Torkura_defeating_ransomware_attacks) at Conf42 Chaos Engineering 2022.
+
+[Watch Sakshyam Shah's talk](https://www.conf42.com/Chaos_Engineering_2022_Sakshyam_Shah_steady_states_developing_hypotheses)
+
+## From Teleport
+
+Sakshyam describes Teleport as passwordless access to infrastructure: SSH servers, Windows servers, Kubernetes clusters, databases and web applications across all environments, the same kind of access system his resilience example is built on.
+
+- Teleport: [goteleport.com](https://goteleport.com/)
+- About Teleport: [goteleport.com/about](https://goteleport.com/about)
+- Teleport blog: [goteleport.com/blog](https://goteleport.com/blog)
+
+[Watch the talk on YouTube](https://youtu.be/cYx5gVYj97Q).
+",sponsored,ce2022,sponsor:ce2022/teleport/Sakshyam Shah,teleport,Conf42,,queued,"security-chaos-engineering, chaos-engineering, cis-benchmarks, mitre-attack, compliance"
 ,Your CVE scanner will not catch npm malware,"Feross Aboukhadijeh (Socket) at Conf42 Chaos Engineering 2022 on npm supply chain attacks, from typosquats to install scripts, and why CVE scans miss them",2022-03-09,ce2022/npm-malware-is-not-a-cve,,"A vulnerability is a mistake by the good guys; malware is a decision by the bad ones, and the tools most teams run only look for the first kind. At Conf42 Chaos Engineering 2022, Feross Aboukhadijeh, founder of Socket, creator of WebTorrent and StandardJS and a lecturer on web security at Stanford, took apart a real npm compromise and the three ways attackers get code into your `node_modules`. His argument: known-vulnerability scanning is no longer enough, because malware has to be caught before install, not weeks after.
 
 ## What happened to ua-parser-js?
@@ -115816,6 +116250,114 @@ Postman is an API collaboration platform for designing, mocking, documenting and
 
 [Watch the talk on YouTube](https://youtu.be/LI8ZBjGT0YA).
 ",sponsored,ce2022,sponsor:ce2022/postman/Arlemi Turpault,postman,Conf42,,queued,"api-first, openapi, contract-testing, mock-servers, api-design"
+,Self-healing systems start with knowing which errors matter,"Nick Hodges (Rollbar) at Conf42 Chaos Engineering 2022 on self-healing SaaS systems, where grouped critical errors trigger rollbacks or flag flips",2022-03-09,ce2022/self-healing-needs-error-fingerprints,,"A self-healing system cannot heal what it cannot see, and a log file full of colourless errors is a poor pair of eyes. At Conf42 Chaos Engineering 2022, Nick Hodges, Developer Advocate at Rollbar, argued that error tracking is the thread that runs through both the problem and the cure: group errors well enough to trust which ones are critical, and a system can roll itself back or switch off a feature flag before anyone's phone rings at 2am.
+
+It is a conceptual talk, light on code and heavy on metaphors, from a Delphi veteran and former naval intelligence officer who reports that intelligence work is far more boring than TV suggests.
+
+## What counts as self-healing?
+
+Nick's working definition: a system that recognises it is not working right and fixes itself without outside help. Fixing here does not mean rewriting the bug. It means getting back to a known working state, by turning off a feature flag or rolling back to the previous release.
+
+He frames it as three levels. Level one is fully manual: a customer reports a bug, someone opens a debugger, ships a fix. Level two adds some automation, such as monitoring that tells you something broke but not where, followed by a manual fix and deploy. Level three, fully automated detection and restoration, is what he calls self-healing. It became possible with SaaS: when you control the backend and the web client, you no longer have to reproduce a customer's machine to find a bug.
+
+## What does a system need before it can heal itself?
+
+Three requirements: it is always up (a deploy that needs downtime rules it out), it is monitored (no signal, no healing), and it has a restoration mechanism. On top of those, he lists the characteristics:
+
+- **Cattle, not pets.** Deploy to any server in a cloud fleet, not a hand-fed machine with a name.
+- **Zero-downtime deploys**, typically blue-green behind a load balancer.
+- **Dynamic capacity**: watch CPU and network load and spin up machines as demand rises.
+- **Real-time service monitoring and reaction to failure**, which he identifies as the chaos engineering part.
+- **Acting on predictable futures**, such as scaling up ahead of a known Monday 9am spike.
+
+## Why a circuit breaker beats a dashboard light
+
+The best section is a run of three metaphors for error detection. Old series-wired Christmas lights: one bad bulb and the whole string goes dark, and you swap bulbs one at a time to find it, the works-on-my-machine era of desktop software. A car's overheating light: you know there is a problem, not why. A household circuit breaker: it stops the fire and tells you exactly which circuit failed. That last one is his model for self-healing. A critical error firing is the breaker snapping, and the automated response is the rollback or the flag flip.
+
+His caution is sensible. Nick said at Conf42 Chaos Engineering 2022: ""You can't automate the response for every error, but you can automate the response for some errors."" The ones you automate are the ones you trust are truly critical.
+
+## Why grouping errors is the hard part
+
+In a busy SaaS application, errors arrive almost constantly, many harmless, a few urgent. Traditional monitoring and log files give humans a firehose that people are bad at reading. Nick's point is that you need errors grouped and classified as new, reactivated, resolved, critical or informational before any automation can act on them.
+
+He ties this to how development changed: from boxed software on CDs that had to be perfect before shipping, to agile teams that fix the bugs that matter most first and ship continuously (he cites Amazon deploying thousands of times a day). That speed only works with automated releases and automated feedback.
+
+## Who should watch
+
+Engineering managers and SREs sketching the case for automated remediation, and anyone who wants a clear, metaphor-driven vocabulary for it. Engineers looking for implementation detail, thresholds or code will not find it here.
+
+## Related Conf42 talks
+
+- Leonid Belkind on [generic mitigations for self-healing systems](https://www.conf42.com/Chaos_Engineering_2021_Leonid_Belkind_generic_mitigations_self_healing_systems) at Conf42 Chaos Engineering 2021.
+- Matthew Schillerstrom on [feature flags for reliability and agile response](https://www.conf42.com/Chaos_Engineering_2024_Matthew_Schillerstrom_feature_flags_reliability_agile_response) at Conf42 Chaos Engineering 2024.
+- Ayelet Sachto on [minimising incident impact](https://www.conf42.com/Chaos_Engineering_2022_Ayelet_Sachto_reliable_systems_minimize_incidents_impact) at Conf42 Chaos Engineering 2022.
+
+[Watch Nick Hodges's talk](https://www.conf42.com/Chaos_Engineering_2022_Nick_Hodges_self_healing_systems)
+
+## From Rollbar
+
+In the talk, Rollbar is the error tracking layer: it uses machine learning to give each error a fingerprint and group occurrences, flags critical ones, and fires a webhook so a pipeline can roll back a release, turn off a feature flag, and notify the developer through email, Slack or PagerDuty.
+
+- Rollbar: [rollbar.com](https://rollbar.com/signup/?utm=conf42)
+
+[Watch the talk on YouTube](https://youtu.be/UBqouRXnslA).
+",sponsored,ce2022,sponsor:ce2022/rollbar/Nick Hodges,rollbar,Conf42,,queued,"self-healing, error-tracking, feature-flags, rollback, reliability"
+,"Microsoft's chaos lesson - test failure scenarios, not single faults","John Engel-Kemnetz (Microsoft) at Conf42 Chaos Engineering 2022 on how 50+ Microsoft teams use Azure Chaos Studio, and why chaos often belongs in pre-production",2022-03-09,ce2022/azure-chaos-studio-scenarios-over-faults,,"The folk wisdom says chaos engineering belongs in production. At Conf42 Chaos Engineering 2022, John Engel-Kemnetz, Principal Program Manager on the Azure Chaos Studio team at Microsoft, explained why that advice fits poorly for many mission-critical services, and what over 50 Microsoft cloud service teams learned running chaos with Azure Chaos Studio, the same product Azure sells to customers.
+
+The talk is mostly about practice and culture, with Chaos Studio as the vehicle, not a feature tour.
+
+## Why is resilience a shared job in the cloud?
+
+John starts with the stakes. Disruption ranges from a full blackout to brownouts such as higher latency or a slight dip in availability, and the cost goes beyond revenue: financial institutions must give regulators audit evidence that they can recover from disaster, and emergency services increasingly run on cloud providers.
+
+Cloud makes resilience harder in two ways. Architectures such as Azure Kubernetes Service or App Service are distributed and less familiar, so resilience patterns are less mature in many organisations. And a serverless app may sit three, four or five layers of compute above the physical data centre, which sometimes leaves you hoping the platform is stable. Hence shared responsibility, as with security: a provider with perfect availability cannot save a consumer with no resilience practices, and the reverse holds too.
+
+## Is production really the place to start?
+
+Often not, he argues. John frames the choice between running chaos in a CI/CD pipeline and running it later (shift right) by traffic: if a load test can generate what you need on demand, put the experiment in the pipeline as a deployment gate; if you need real or very realistic customer traffic, shift right.
+
+Shifting right still does not have to mean production. Teams early in a journey, say just starting with availability zones, have not built the confidence to cause that failure in production yet, so production becomes the final checkbox. And some services cannot accept the risk at all: his example is a healthcare provider deciding whether emergency prescriptions are issued.
+
+## What does Chaos Studio do?
+
+It is a fully managed Azure service, in public preview at the time, so there is no tooling to install, update or secure. Experiments deploy the way your infrastructure does, through Azure Resource Manager, Azure Policy and Bicep, with the same access control. It integrates with observability tooling and has a growing fault library, with an aim to ship experiment templates that replicate the most severe Azure outages so customers can test their defences against them.
+
+The faults are real, not simulated: a shut-down VM is really shut down, and CPU pressure on an AKS cluster really happens. So safety comes from permissions: restrictions on which resources can be targeted, which faults can be used on each, and what the experiment itself may access.
+
+## How does Microsoft use it internally?
+
+Two priorities. First, failure scenarios over individual faults: incident analysis showed that what matters is a region failure, an inability to scale, a network configuration change, an availability zone going down, or an Azure Active Directory or DNS outage, and faults are just the ingredients. Second, shifting high-blast-radius scenarios left, with the goal that every new Azure deployment validates specific failure scenarios as a pre-production gate.
+
+The examples are concrete. The Power Platform team shut down all compute in a region, found that failover to a secondary region did not come up, and fixed it; recreating an outage also showed where their monitoring was too thin. The Azure Key Vault team ran availability zone and scale-up experiments and found, in pre-production, an autoscale rule that had drifted so the virtual machine scale set stopped scaling under stress.
+
+## Lessons for everyone else
+
+- **Mature tooling and process first**: observability, backups, live-site process, troubleshooting guides, automatic mitigations. John said at Conf42 Chaos Engineering 2022: ""chaos engineering is not suitable for a case where you're learning something you already knew.""
+- **Quantify and analyse past outages.** Put a currency figure on downtime to get stakeholders invested, then start with high-blast-radius and high-frequency incidents.
+- **Build confidence in pre-production.** Azure runs two canary regions closed to customers, where almost every service has a stamp and must bake before production; Microsoft's own Teams traffic runs through a dogfood environment there.
+- **Make quality everyone's job**, including product managers and leadership. Quality is in the core priorities of every employee in the Azure division.
+
+## Who should watch
+
+Teams on Azure weighing Chaos Studio, and anyone in a regulated or safety-critical domain who has been told chaos must run in production and suspects otherwise.
+
+## Related Conf42 talks
+
+- Peter De Tender on [stress testing with Azure Chaos Studio](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Peter_De_Tender_stresstesting_azure_chaos) at Conf42 SRE 2024.
+- Gunnar Grosch on [hypothesis development and resilience modelling](https://www.conf42.com/Chaos_Engineering_2024_Gunnar_Grosch_hypothesis_development_resilience_modeling) at Conf42 Chaos Engineering 2024.
+- Kyle Shelton on [disaster recovery preparedness](https://www.conf42.com/Chaos_Engineering_2022_Kyle_Shelton_disaster_recovery_preparedness) at Conf42 Chaos Engineering 2022.
+
+[Watch John Engel-Kemnetz's talk](https://www.conf42.com/Chaos_Engineering_2022_John_EngelKemnetz_azure_chaos_studio)
+
+## From Microsoft
+
+Azure Chaos Studio is the managed chaos engineering service the talk is built around; John points to its page for documentation, getting started and customer studies.
+
+- Microsoft: [microsoft.com](https://www.microsoft.com/en-ie/)
+- Azure Chaos Studio: [aka.ms/AzureChaosStudio](https://aka.ms/AzureChaosStudio)
+
+[Watch the talk on YouTube](https://youtu.be/c63JZRgRxIQ).
+",sponsored,ce2022,sponsor:ce2022/microsoft/John Engel-Kemnetz,microsoft,Conf42,,queued,"chaos-engineering, azure, resilience, pre-production, cloud"
 ,Rollbar <> Conf42 Chaos Engineering 2022,Continuously Improve Your Error Resolution Time with Rollbar,2022-03-08,2022-03-08-rollbar-sponsor-announcement,./assets/splash/BLOG_Rollbar_Chaos2022.png,"# [Rollbar](https://try.rollbar.com/chaos-eng2022/?utm_campaign=chaoseng) is the Diamond Sponsor of [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022)!
 
 Continuously Improve Your Error Resolution Time
@@ -115832,7 +116374,7 @@ Enjoy lunch on us while you learn how Rollbar can help you; Deploy, monitor, ale
 * [Get in touch with the Dev Community](https://dev.to/rollbar)
 * [Rollbar blog](https://rollbar.com/blog) 
 
-#### RSVP for FREE to attend [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022#register)!",,,,,,,,
+#### RSVP for FREE to attend [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022#register)!",,,,,,,replaced:ce2022/self-healing-needs-error-fingerprints,
 ,"Call it payment_avocado and keep coding, on the choice paradox","Fabricio Buzeto (bxblue) at Conf42 Chaos Engineering 2022 on beating developer choice paralysis by storing, delaying and modelling decisions",2022-03-07,ce2022/choice-paradox-for-developers,,"Pick PayPal and you now have to pick a queue; pick Kafka and you now have to pick a language. At Conf42 Chaos Engineering 2022, [Fabricio Buzeto](https://www.conf42.com/Chaos_Engineering_2022_Fabricio_Buzeto_learning_to_overcome_the_choice_paradox), CTO at bxblue, argues that every engineering decision spawns more of them, and that the cure for freezing up is less about willpower and more about giving your brain somewhere safe to park what it's worried about.
 
 It is a human-side talk with code examples, built on Barry Schwartz's The Paradox of Choice and David Rock's Your Brain at Work. No chaos experiments here, unless you count your own head.
@@ -116005,7 +116547,7 @@ Free course @ Microsoft LEARN! Learn all things about how to safeguard your clou
 
 #### [Microsoft](https://aka.ms/MicrosoftAzureAtConf42ChaosEngineering) - Gold Sponsor of [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022)
 
-",,,,,,,,
+",,,,,,,replaced:ce2022/azure-chaos-studio-scenarios-over-faults,
 ,Why a startup might pay its data collectors in tokens,"Ignas Galvelis (Sky) at Conf42 Chaos Engineering 2022 on using blockchain incentives, ordering and on-chain governance to crowdsource data",2022-03-03,ce2022/blockchain-incentives-for-crowdsourced-data,,"Google gets its data handed to it in a convenient format; a startup has to go and fetch it. At Conf42 Chaos Engineering 2022, [Ignas Galvelis](https://www.conf42.com/Chaos_Engineering_2022_Ignas_Galvelis_application_for_blockchain_in_crowdsourcing_data), Software Developer at Sky, argues that a crowd, paid in tokens and coordinated on a blockchain, can collect and analyse data that a small team never could, and gives a quick tour of which chains suit the job.
 
 Expect an introduction. It is a conceptual walk through blockchain properties and trade-offs, with no code or architecture, and it sits at the edge of a chaos engineering lineup: the resilience here is about a data supply that survives a messy world.
