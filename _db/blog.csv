@@ -120968,6 +120968,453 @@ Java developers who still picture cloud native as something done to other langua
 
 [Watch the talk on YouTube](https://youtu.be/uTX_rsBCNys).
 ",talk,cloud2021,talk:cloud2021/Elder Moraes,,Conf42,,queued,"java, quarkus, kubernetes, service-mesh, kafka"
+,Terraform can't see the drift it doesn't manage,"Stephane Jourdan (CloudSkiff) at Conf42 Cloud Native 2021 on infrastructure drift, three AWS stories Terraform missed, and IaC coverage with driftctl",2021-04-24,cloud2021/terraform-cannot-see-drift,,"A clean terraform plan says your code matches the resources Terraform knows about. It says nothing about the access key someone created by hand on a Saturday. At Conf42 Cloud Native 2021, [Stephane Jourdan](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift), CTO of CloudSkiff, co-author of the Infrastructure as Code Cookbook and co-founder of the open-source tool driftctl, told three short AWS stories where drift went unnoticed, and demoed how to measure it.
+
+The talk grew out of user interviews: asked about their biggest pain with infrastructure as code, DevOps engineers, SREs and CTOs kept naming drift. Stephane Jourdan said at Conf42 Cloud Native 2021 that the one thing to remember is ""almost everyone experienced infrastructure drift recently, and that drifts can have major consequences, including security.""
+
+## What counts as drift?
+
+His definition: what happens when reality and expectations don't match. Your AWS account holds a set of actual resources. Terraform manages part of it. The difference is the drift. The usual sources: manual changes in the console, authenticated Lambdas, microservices and nightly scripts that create or modify resources, another team using another tool, a service your Terraform provider version doesn't support yet, and the new project on a new cloud that nobody had time to automate. The security problem is simple: you can't fix a misconfiguration on a resource you don't know exists.
+
+## Three stories Terraform didn't catch
+
+**The IAM key.** A weekend incident on a freshly deployed microservice. On-call deactivated its access key, created a new one, then attached a broader policy on top of the read-only one. It started working a few minutes later, and the report back on Monday never happened. Terraform applied cleanly forever after, because a new access key and a new policy attachment are new objects outside its state, not changes to managed ones. In the demo, driftctl scanned 59 resources and flagged the unmanaged key on that user.
+
+**The security group.** Early in the pandemic, a couple of people couldn't reach the company network from home, and a manager with enough credentials added an all-traffic rule from anywhere, IPv4 and IPv6, to a group that only allowed SSH from the local network. He named it temp. Terraform ran in CI every hour or so and still reported nothing, because the way the rules were written, an added rule is a separate object. driftctl showed the unmanaged rule and IaC coverage dropping from 85% to 66%. The group stayed open for a very long time.
+
+**The S3 bill.** A London team of about 100 developers uploaded hundreds of gigabytes of throwaway plugin builds to S3 every day. A compliance team in another country agreed not to enable versioning on that bucket, then ran a script whose exception list didn't work and enabled it everywhere. The bucket was declared in Terraform, yet terraform apply reported nothing, and the refresh quietly wrote versioning into the state. As the slides put it, only billing noticed.
+
+## Measuring drift like test coverage
+
+The useful idea is to treat drift like test coverage: a percentage of your cloud that your IaC actually describes. driftctl reports it and can emit JSON, so you can pull the coverage figure out with jq and graph it on a dashboard or a pull request. Filters (JMESPath expressions) narrow a scan to one resource type, such as security group rules. A .driftignore file, modelled on .gitignore, lets you park known unmanaged resources while you import or delete them, and you can bake it into your own image built on the official Docker image.
+
+Once the first report is clean, run it in CI or as a cron job, every hour or so for a modest account. He has seen it used in two opposite places: after terraform apply, to catch the mess left by the scripts that run after it, or before apply, as a safety check so a refresh doesn't silently rewrite state. It also runs happily in parallel with terraform plan, since one looks inside Terraform's scope and the other outside it.
+
+At the time of the talk driftctl was months old: written in Go, Apache 2.0, supporting AWS and GitHub, reading state locally, from S3 or over HTTP, with the next cloud provider chosen by community vote.
+
+## Who should watch
+
+Anyone running Terraform on an account humans can also log into, which is everyone. The demos are short and the stories are painfully familiar.
+
+## Related Conf42 talks
+
+- Naor Paz on [ghost assets and infrastructure drift](https://www.conf42.com/Cloud_Native_2022_Naor_Paz_ghost_assets_infrastructure_drift) at Conf42 Cloud Native 2022.
+- Hila Fish on [Terraform practices](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices) at Conf42 Cloud Native 2022.
+- Ashish Rajan on [cloud security assessments](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021), at the same event.
+
+[Watch Stephane Jourdan's talk](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift)
+
+[Watch the talk on YouTube](https://youtu.be/--DgCAQwFVY).
+",talk,cloud2021,talk:cloud2021/Stephane Jourdan,,Conf42,,queued,"infrastructure-as-code, terraform, drift, aws, devsecops"
+,How Honeycomb moved to Graviton2 by testing on its dogfood first,Shelby Spees (Honeycomb.io) at Conf42 Cloud Native 2021 on how SLOs and a dogfood environment made Honeycomb's Graviton2 migration safe and 40% cheaper,2021-04-23,cloud2021/honeycomb-graviton2-dogfood-first,,"Honeycomb cut the AWS bill for its highest-volume service by 40% by moving it to ARM, and the interesting part is how they knew the move was safe. At Conf42 Cloud Native 2021, [Shelby Spees](https://www.conf42.com/Cloud_Native_2021_Shelby_Spees_graviton2_honeycomb_infra_spend_highestvolume_service), Developer Advocate at Honeycomb.io, told the story of one of the early production adoptions of AWS Graviton2: the measurement first, then a gradual A/B rollout, then one change that went wrong.
+
+Her first rule is not to do it because it is new and shiny. Have a measurable outcome.
+
+## Why would a startup risk changing CPU architecture?
+
+Because, as she put it, infrastructure is Honeycomb's second biggest expense after people, and it scales with traffic. Landing large customers means more traffic, so cost per event matters. Shelby Spees said at Conf42 Cloud Native 2021: ""Technical decisions are business decisions.""
+
+But only if reliability holds. Honeycomb already ran on service level objectives (the home page loads quickly with data, queries return fast, ingested data is stored fast and successfully) with error budgets and burn-rate alerts. A stable stretch of SLOs is what gave them room to experiment, and the same SLOs are how they judged the experiment.
+
+## Dogfood, then kibble, then prod
+
+The setup is the best idea in the talk. Honeycomb runs the same git hash in three environments. Production takes customers' telemetry. Dogfood takes production's telemetry, so Honeycombers query real production data the way customers do; it is not staging. Kibble observes dogfood. The services are dog-themed too: Shepherd for ingest, Retriever for the columnar store and query engine, Poodle for the web front end.
+
+They started with Shepherd: the highest traffic, stateless, scales on CPU only, optimised for throughput then latency. Being a Go shop helped. The port was mostly setting arm64 as a compile target and adding a build step to the CircleCI config. Her teammate Liz started it as a side project and saw compelling results within a few idle afternoons.
+
+## What did the A/B test show?
+
+One Graviton2 instance in the dogfood Shepherd autoscaling group, then more via Terraform as confidence grew. At 20% they let it sit for a couple of weeks. The Graviton instances had lower latency and less tail latency, with median latency about 10% faster. CPU utilisation topped out around 60% on the old architecture and closer to 85% on Graviton, so they got more work per vCPU. After the cutover and some tuning, the cost graph was, in her words, her favourite graph so far.
+
+Production Shepherd followed with a similar saving. For Retriever, the goal was speed, not savings: they spent a little more to get double the cores, and with each arm64 core handling 50% more load than the Intel equivalent, ended up with triple the performance. Since then traffic on Retriever has approached triple, with P99 latency holding steady.
+
+## The snags
+
+Spot capacity ran out: scaling up in production used every available Graviton2 spot instance of the type they needed. They paused, reached out to the Graviton2 team, and capacity was shifted within a few hours.
+
+The bigger lesson was Kafka, which sits between Shepherd and Retriever. They tried Graviton2 for Kafka before even Confluent had, while also moving to Confluent tiered storage and AWS Nitro. Shelby Spees said at Conf42 Cloud Native 2021: ""we ended up changing too many variables at once."" They reverted it and published a blog post and a full incident report. At the time of the talk, four of the five biggest services were fully on Graviton2.
+
+## Take care of the people running the migration
+
+The closing section is about humans. Encourage people to escalate when they are tired, push them to take time off after off-hours incident work, and write the unspoken rules down. One that came out of these incidents: people handling incidents can expense meals for themselves and their families. ""One of our values at honeycomb is that we hire adults, and adults have responsibilities outside of work."" Isolate variables, keep feedback loops tight, and accept that some migrations, like Kafka, take longer than planned.
+
+## Who should watch
+
+Teams weighing an ARM migration, and anyone planning a big infrastructure change who wants a template for doing it safely. The dogfood-observes-prod setup alone is worth stealing.
+
+## Related Conf42 talks
+
+- Marco Coulter on [why you will spend more on cloud native](https://www.conf42.com/Cloud_Native_2021_Marco_Coulter_spend_more_on_cloud_native), at the same event.
+- Michael Sickles on [telemetry in a polyglot environment](https://www.conf42.com/Cloud_Native_2021_Michael_Sickles_telemetry_polyglot_environment), also at Conf42 Cloud Native 2021.
+- Tom Granot on [the on-call developer](https://www.conf42.com/Cloud_Native_2021_Tom_Granot_on_call_developer).
+
+[Watch Shelby Spees's talk](https://www.conf42.com/Cloud_Native_2021_Shelby_Spees_graviton2_honeycomb_infra_spend_highestvolume_service)
+
+[Watch the talk on YouTube](https://youtu.be/kq07tygRWAk).
+",talk,cloud2021,talk:cloud2021/Shelby Spees,,Conf42,,queued,"aws, graviton2, slos, migrations, observability"
+,"Moving HBase to Kubernetes meant fixing upgrades, leaders and DNS","Dhiraj Hegde (Salesforce) at Conf42 Cloud Native 2021 on running HBase and HDFS on Kubernetes in public cloud, with a custom StatefulSet controller",2021-04-22,cloud2021/hbase-on-kubernetes-statefulsets,,"Kubernetes grew up running stateless web servers behind a load balancer. HBase is the opposite: clients that need to know exactly which server holds which data, and cache that knowledge. At Conf42 Cloud Native 2021, [Dhiraj Hegde](https://www.conf42.com/Cloud_Native_2021_Dhiraj_Hegde_hbase_hdfs_kubernetes_public_cloud), Architect at Salesforce, explained how his team moved HBase and the Hadoop file system from bare metal into Kubernetes on public cloud, and the four places where Kubernetes needed help.
+
+The scale behind it: Salesforce ran HBase on thousands of machines in its own data centers, with petabytes of data and billions of queries a day, managed in place with Puppet and Ambari.
+
+## Why Kubernetes for a database?
+
+Three reasons. **Immutability:** in-place installs on thousands of hosts leave some half-upgraded, and engineers fixing an incident edit configs by hand and forget. A container restarts from its image, so drift disappears. **Availability and elasticity:** pods move off failed hosts and scale up and down, which is the point of being in the cloud. **Consistency across clouds:** they started on AWS but expected Azure and GCP. Dhiraj Hegde said at Conf42 Cloud Native 2021: ""Kubernetes is actually very opinionated."" It dictates how compute, storage and network are managed, so deployment processes built for one cloud carry over to the others.
+
+## StatefulSets get you most of the way
+
+A StatefulSet gives each pod a stable name and DNS entry, and a persistent volume claim (a 1 TB SSD in his example) that follows the name. When a host dies, the pod comes back on another host with the same hostname and the same disk. The IP address, though, changes. Data servers and metadata servers each became a StatefulSet.
+
+## Fix one, upgrades: a custom controller
+
+The StatefulSet controller upgrades pods strictly from the highest ordinal down, one at a time. With hundreds of pods that each take around five minutes to boot and set up Kerberos keytabs, that is far too slow.
+
+Kubernetes is extensible, so they wrote a custom controller that works alongside the stock one using the OnDelete update strategy. The custom controller decides which pods to delete next. The StatefulSet controller recreates them with the new spec. That gave them:
+
+- **Batch upgrades**, deleting pods in groups instead of one by one.
+- **Unhealthy pods first.** With a pod disruption budget of one and two pods already unhealthy, the default order would block forever, because replacing a healthy pod adds a third disruption. Replacing the broken pods first unblocks the rollout.
+- **Leader last.** Kubernetes knows nothing about leader election, so a naive rollout can hit the leader again and again as it gets re-elected onto old pods. A sidecar in each pod publishes a leader label, and the controller upgrades the leader once, at the end.
+
+## Fix two and three, DNS
+
+Old Hadoop and HBase code grew up where IPs never changed. Dhiraj Hegde said at Conf42 Cloud Native 2021 that ""there was a lot of bugs in this code base where it would resolve DNS hostname to IP address and cache that information for literally forever in its code."" Data servers lost their metadata servers every time a metadata pod moved.
+
+Rather than wait until every such bug was found, they put a Kubernetes service, a virtual load balancer with a static IP, in front of each metadata server pod, and fixed the bugs in parallel. Recreating the stateless pattern for just those servers bought them breathing room.
+
+The second DNS problem is that clients usually live outside the cluster and use a global DNS, not the cluster's CoreDNS. The open-source ExternalDNS tool copies the records out, but it runs periodically, about once a minute. So a booting data server checks that its record is visible in global DNS before it declares itself ready for traffic.
+
+## Fix four, surviving an availability zone
+
+They spread pods across three availability zones with affinity and anti-affinity rules on zone labels. For the data, they reused Hadoop's rack topology: a script tells HDFS that each zone is a rack, so the three replicas of every block land in different zones. Metadata servers are spread the same way. Lose a whole zone to a power or network outage, and the software and its data keep serving.
+
+## Who should watch
+
+Anyone putting a mature stateful system, Cassandra, Kafka, ZooKeeper or HBase itself, onto Kubernetes. The problems are generic to software designed for static hosts, and the fixes are clear enough to reuse.
+
+## Related Conf42 talks
+
+- Mary Grygleski on [stateful microservices with Open Liberty on Kubernetes](https://www.conf42.com/Cloud_Native_2021_Mary_Grygleski_stateful_microservices_open_liberty_kubernetes), at the same event.
+- Natalie Pistunovich on [a Kubernetes operator for a distributed database](https://www.conf42.com/Cloud_Native_2021_Natalie_Pistunovich_k8s_operator_distributed_database), also at Conf42 Cloud Native 2021.
+- Stephen Atwell on [continuous delivery for stateful applications](https://www.conf42.com/Database_DevOps_2026_Stephen_Atwell_cd_stateful_applications) at Conf42 Database DevOps 2026.
+
+[Watch Dhiraj Hegde's talk](https://www.conf42.com/Cloud_Native_2021_Dhiraj_Hegde_hbase_hdfs_kubernetes_public_cloud)
+
+[Watch the talk on YouTube](https://youtu.be/T3_UMV6_tKw).
+",talk,cloud2021,talk:cloud2021/Dhiraj Hegde,,Conf42,,queued,"kubernetes, hbase, hdfs, stateful-applications, public-cloud"
+,Security teams can't be gatekeepers in a pipeline that ships hourly,"Matt Jarvis (Snyk) at Conf42 Cloud Native 2021 on building security into every pipeline stage, from IDE to admission control, for code, containers and IaC",2021-04-20,cloud2021/security-teams-are-toolsmiths-now,,"Most of the vulnerable code in your application was written by someone you have never heard of, two dependencies removed from anything you chose. At Conf42 Cloud Native 2021, [Matt Jarvis](https://www.conf42.com/Cloud_Native_2021_Matt_Jarvis_conunuous_security_pipelines), Senior Developer Advocate at Snyk, argued that a security review at the end of the deploy process cannot keep up with continuous delivery, and mapped where security checks belong instead.
+
+His starting point is that application, container and infrastructure are now one thing, declared as code and owned by the same team. Security, in many organisations, still behaves as if it were an external step after deployment.
+
+## What exactly are we securing?
+
+Three classes of thing, and he gives each a number or an example:
+
+- **Open source dependencies.** Modern apps are a small core of homegrown code on top of a huge tree of third-party modules. Matt Jarvis said at Conf42 Cloud Native 2021 that ""typically over 70% of all security vulnerabilities are found in these indirect dependencies,"" the ones you have least control over. His example is an npm package from 2018 that claimed to parse HTTP headers and was actually about 40 lines of remote code execution, hidden behind other dependencies until it ended up under a widely downloaded mail parser.
+- **Container images.** Upstream images and full-OS base images bring large numbers of vulnerabilities, and images that were clean at build time pick up new CVEs in production. The fixes are usually cheap: over 40% of Docker image vulnerabilities can be fixed by upgrading the base image, and around 20% just by rebuilding.
+- **Infrastructure as code.** Kubernetes YAML, Helm charts and Terraform, often copied from public repos by people who don't fully know what each line does. Big breaches tend to combine an application bug with an infrastructure misconfiguration that widens the blast radius.
+
+On Kubernetes he is blunt: ""kubernetes really doesn't give you any guardrails. It's insecure by default."" No resource limits by default, so one pod can starve a node. Containers allowed to run as root, with many public images built to do so. Writable root filesystems and the runtime's full set of Linux capabilities, most of which your app never needs.
+
+## Where do the checks go?
+
+He walks the pipeline from left to right:
+
+1. **The developer's machine.** CLI tools and IDE integrations that report severity, exploitability and a fix, not just a list of CVEs, before code reaches a repo.
+2. **Git.** Two-factor auth, key hygiene, keeping git updated, no unencrypted config in repos (even local ones), gitignore, strong reviews, pre-commit hooks.
+3. **Pull requests and repos.** Automated scans on every PR, plus ongoing monitoring, because a dependency that was clean at commit time may not be today.
+4. **Registries.** Use built-in scanning, and keep scanning images you haven't changed, since their base images have.
+5. **CI/CD.** Scan in the build, catching upstream changes on every rebuild.
+6. **Production.** Scan running containers, enforce policy at admission with Open Policy Agent (for example, refuse unscanned images), and watch the emerging runtime anomaly-detection tools.
+
+## The new job description for security teams
+
+The organisational point is the one worth the half hour. With deployment in developers' hands, Matt Jarvis said at Conf42 Cloud Native 2021, ""security teams aren't gatekeepers anymore."" Their role becomes advisor and toolsmith: pick tools that fit developer workflows with as little friction as possible, automate the checks at every stage, and let teams keep their velocity.
+
+## Who should watch
+
+Platform and security engineers designing a DevSecOps pipeline, and developers who want the reasoning behind the scanners they are asked to run. It is a vendor talk, and Snyk gets a mention at the developer stage and at the end, but most of the advice is tool-agnostic.
+
+## Related Conf42 talks
+
+- Brian Vermeer on [breaking into containers](https://www.conf42.com/Cloud_Native_2021_Brian_Vermeer_containers_breaking_in), at the same event.
+- Ara Pulido on [policy as code with OPA Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper), the admission control stage in practice.
+- Mofizur Rahman's [Kubernetes security jumpstart](https://www.conf42.com/Cloud_Native_2021_Mofizur_Rahman_kubernetes_security_jumpstart), also at Conf42 Cloud Native 2021.
+
+[Watch Matt Jarvis's talk](https://www.conf42.com/Cloud_Native_2021_Matt_Jarvis_conunuous_security_pipelines)
+
+[Watch the talk on YouTube](https://youtu.be/VhUYRuhm5pA).
+",talk,cloud2021,talk:cloud2021/Matt Jarvis,,Conf42,,queued,"devsecops, ci-cd, container-security, kubernetes, dependencies"
+,"Global active-active serverless works best as read local, write global","Jorge Fonseca (AWS) at Conf42 Cloud Native 2021 on a multi-region serverless reference architecture with CQRS, the saga pattern and async replication",2021-04-19,cloud2021/read-local-write-global-serverless,,"Users in Europe calling a backend in Australia pay roughly 300 extra milliseconds on every dynamic request, and a CDN cannot cache that away. At Conf42 Cloud Native 2021, [Jorge Fonseca](https://www.conf42.com/Cloud_Native_2021_Jorge_Fonseca_global_activeactive_serverless), Senior Solutions Architect at AWS, built a multi-region active-active serverless architecture for one specific workload, layer by layer, and landed on a pattern that sidesteps most write conflicts.
+
+He is upfront about the cost of the exercise. Jorge Fonseca said at Conf42 Cloud Native 2021: ""building and successfully running a multiregion active active architecture is hard.""
+
+## Why go multi-region at all?
+
+Latency first. ""Amazon has reported a drop of 1% in sales for each additional 100 milliseconds in load time,"" he notes, and games, banking and interactive apps cannot absorb an extra 300 ms. Other legitimate reasons: disaster recovery, data residency, and tenant isolation for SaaS.
+
+He also lists the anti-patterns. High availability inside one region is a job for availability zones, not regions. And edge services are often enough to fix latency without the complexity. The talk assumes you have weighed those and still chose multi-region.
+
+The use case is concrete: an HTTP API over relational data, heavy on reads, light on writes, with writes that must be transactional across several microservices, third-party services and on-premises systems.
+
+## The network layer
+
+- **AWS Transit Gateway** in each region, peered into a full mesh over the AWS backbone at up to 100 Gbps, encrypted and off the public internet.
+- **AWS Direct Connect** from data centers to the nearest region for production, with site-to-site and client VPN as the internet-based alternatives.
+- **Amazon CloudFront** in front of the APIs to accelerate dynamic calls and websockets, plus **Amazon Route 53** latency, geolocation and geoproximity routing to send each user to the nearest region under the same URL.
+
+## Sync or async replication?
+
+Synchronous replication keeps regions consistent but makes them depend on each other: one region fails, they all fail. Asynchronous replication survives regional outages but invites write conflicts. He picks async and then designs the conflicts out.
+
+The data stores he weighs: DynamoDB global tables (he cites up to 10 trillion requests a day and peaks of 20 million requests per second, with single-digit millisecond replication), ruled out as the system of record because the use case is relational and transactional. Aurora Global Database, which can promote a secondary region in under a minute, giving an RTO of 1 minute and an RPO of 1 second. And S3 replication, with 99.99% of objects replicated within 15 minutes.
+
+## CQRS and read local, write global
+
+Command query responsibility segregation fits the read-heavy shape. Writes go to normalised relational models. A denormalised copy lands in DynamoDB in exactly the shape the API returns, so reads are cheap. He shows it with API Gateway and Lambda, an asynchronous variant with a queue plus websocket notifications when the write completes, and an AWS AppSync GraphQL version that gives real-time subscriptions straight from DynamoDB without code.
+
+Across regions, reads are served locally from DynamoDB global tables, and mutations happen only in the primary region; secondaries forward their writes. ""This pattern is called read local, write global,"" and it removes cross-region data conflicts at the cost of extra write latency from secondary regions, which barely matters for a read-heavy API.
+
+## Transactions across microservices: the saga
+
+For writes that span services, third parties and on-premises components, he uses the saga pattern on AWS Step Functions. His example is checkout: pre-authorise the card, then charge it, then update the customer record, each step with single responsibility while the orchestration and failure handling live in the state machine. Amazon EventBridge carries the asynchronous mutations.
+
+## What happens when a region fails?
+
+A secondary region fails: Route 53 health checks move its users elsewhere, they notice a bit more latency, and data resyncs automatically when the region returns. The primary region fails: the application drops to read-only. If the business can live with that for the expected outage, wait. If not, promote a secondary and run the disaster recovery procedure.
+
+## Who should watch
+
+Architects with a real reason to leave a single region. It is a dense, well-ordered reference architecture walkthrough, published on the AWS Architecture Center, with no live demo.
+
+## Related Conf42 talks
+
+- Eduardo Janicas on [static stability with availability zones](https://www.conf42.com/Cloud_Native_2021_Eduardo_Janicas_stability_availability), the in-region half of the story, at the same event.
+- Ana Van Straaten on [going multi-region](https://www.conf42.com/Cloud_Native_2022_Ana_Van_Straaten_going_multi_region) at Conf42 Cloud Native 2022.
+- Christian Elsen and Lerna Ekmekcioglu on [reliable multi-region architectures](https://www.conf42.com/Site_Reliability_Engineering_2022_Christian_Elsen_Lerna_Ekmekcioglu_reliable_multiregion_arch) at Conf42 SRE 2022.
+
+[Watch Jorge Fonseca's talk](https://www.conf42.com/Cloud_Native_2021_Jorge_Fonseca_global_activeactive_serverless)
+
+[Watch the talk on YouTube](https://youtu.be/f2NOsHOwkNo).
+",talk,cloud2021,talk:cloud2021/Jorge Fonseca,,Conf42,,queued,"serverless, multi-region, aws, cqrs, saga-pattern"
+,Static stability means the capacity is already there when a zone dies,"Eduardo Janicas (AWS) at Conf42 Cloud Native 2021 on static stability, why EC2 avoids control plane dependencies in recovery, and zonal services",2021-04-18,cloud2021/static-stability-overprovision-before-failure,,"If your plan for losing an availability zone is to autoscale in the other two, your recovery depends on the most complicated part of the cloud working perfectly during an outage. At Conf42 Cloud Native 2021, [Eduardo Janicas](https://www.conf42.com/Cloud_Native_2021_Eduardo_Janicas_stability_availability), Solutions Architect at AWS, explained static stability, the pattern AWS uses to avoid exactly that, and how Amazon EC2 itself is built around it.
+
+The lesson he opens with is short. Eduardo Janicas said at Conf42 Cloud Native 2021 that one lesson AWS has learned is to ""be ready for impairments before they happen.""
+
+## Control plane versus data plane
+
+The whole talk rests on a split borrowed from networking. The control plane makes changes: for EC2, launching an instance means finding a physical server that respects placement groups and tenancy, allocating a network interface from the subnet, preparing an EBS volume, generating IAM role credentials, installing security groups and propagating all of it. The data plane is the daily business of resources that already exist: routing packets by VPC route tables, reading and writing EBS volumes.
+
+The data plane is far simpler, runs at orders of magnitude higher volume, and matters more to customers. A running instance staying up is worth more to most people than the ability to launch a new one. The control plane has more moving parts, so it is statistically more likely to be impaired. Hence the rule: separate the two, and let the data plane keep its last known state and keep working when the control plane cannot reach it.
+
+## Why is autoscaling into the surviving zones the weaker plan?
+
+Not because you won't be able to launch instances, he says, but because recovery now takes an immediate dependency on the EC2 control plane plus everything your app needs to become useful: downloading config, registering with service discovery, fetching credentials. All of that has to work while something is already broken.
+
+The statically stable version provisions ahead. Stateless fleets behind a load balancer run across three or more zones, overprovisioned so the remaining zones carry the load. As he put it, ""when you use three availability zones, we over provision by 50%,"" which means each zone runs at only 66% of the level it was load tested for. When a zone fails, instances there fail health checks, the load balancer shifts traffic, and nobody does anything. Elastic Load Balancing itself is built this way, and the same pattern works for workers pulling from an SQS queue.
+
+Stateful services get active-standby: Amazon RDS keeps a standby in a different zone and repoints DNS on failover, and leader-based clusters elect a new leader from a standby that is already running instead of launching a replacement just in time.
+
+## The arithmetic behind zonal services
+
+The best part is a probability argument. Take a regional service that calls another regional service, both spread over three zones, with one zone suffering a grey failure the load balancer cannot see. The request avoids the bad zone with probability 2/3 at each hop, so 4/9 over two hops: in his words, ""the request has worse than even odds of steering clear of the event."" With N regional services in the path it is (2/3) to the power of N.
+
+If the downstream service is zonal, so each caller talks to the endpoint in its own zone, the odds stay at 2/3 however long the chain. That is why the EC2 NAT gateway is a zonal resource that customers create per zone rather than a regional, VPC-wide gateway: an impairment in one zone should stay in that zone.
+
+EC2 applies the same independence to deployments. Software for servers, edge devices, DNS resolvers and the launch path follows a zonal deployment calendar, so two zones in a region get a given change on different days, after the usual one-box-then-more rollout. A bad deploy hits one zone and gets rolled back there.
+
+## Which pattern should you pick?
+
+Regional calling regional is the simpler default and the right choice for most external and internal services. AWS uses it for higher-level services such as Amazon API Gateway. Regional calling zonal, or zonal calling zonal, is for data path infrastructure, and it has a side benefit he mentions in passing: keeping traffic inside a zone has favourable network cost characteristics on AWS.
+
+## Who should watch
+
+Architects running multi-AZ workloads who have never written down what happens in the first ten minutes of a zone failure. It is a lecture, not a demo, and he points to the Amazon Builders' Library for more on the same ideas.
+
+## Related Conf42 talks
+
+- Andrew Robinson on [health checks, fail open and dependency management](https://www.conf42.com/Cloud_Native_2021_Andrew_Robinson_improving_reliability_health_check_dependency_management), at the same event.
+- Jorge Fonseca on [global active-active serverless](https://www.conf42.com/Cloud_Native_2021_Jorge_Fonseca_global_activeactive_serverless), going one level up to multiple regions.
+- Christian Elsen and Lerna Ekmekcioglu on [reliable multi-region architectures](https://www.conf42.com/Site_Reliability_Engineering_2022_Christian_Elsen_Lerna_Ekmekcioglu_reliable_multiregion_arch) at Conf42 SRE 2022.
+
+[Watch Eduardo Janicas's talk](https://www.conf42.com/Cloud_Native_2021_Eduardo_Janicas_stability_availability)
+
+[Watch the talk on YouTube](https://youtu.be/dlIYKB8GUuA).
+",talk,cloud2021,talk:cloud2021/Eduardo Janicas,,Conf42,,queued,"reliability, availability-zones, aws, static-stability, architecture"
+,Deep health checks need a fail-open escape hatch,"Andrew Robinson (AWS) at Conf42 Cloud Native 2021 on deep health checks, soft dependencies with static fallbacks, and when a load balancer should fail open",2021-04-16,cloud2021/deep-health-checks-fail-open,,"A health check that only returns 200 tells you the process is up. A health check that also calls your dependencies tells you much more, and can take your whole fleet down when that dependency gets slow. At Conf42 Cloud Native 2021, [Andrew Robinson](https://www.conf42.com/Cloud_Native_2021_Andrew_Robinson_improving_reliability_health_check_dependency_management), Principal Solutions Architect on the AWS Well-Architected team, walked through both sides of that trade with a small Python web app and the load balancer setting that rescues it.
+
+## The demo workload
+
+The app is a recommendation engine: users come in through an internet gateway to an Elastic Load Balancer, which spreads requests over three EC2 instances in an Auto Scaling group, one per availability zone. Recommendations come from an external API backed by Amazon DynamoDB, reached through NAT gateways, one per zone, so a network failure in one zone does not cut the others off. Moving the recommendation call outside the app is the first, simplest piece of loose coupling. Queues or streams would go further.
+
+## From shallow to deep health checks
+
+The shallow version answers the load balancer on a health check path with HTTP 200. It proves the instance and the application are running and nothing more.
+
+The deep version sets an is-healthy flag to false first, then calls the recommendation service inside a try block as part of the check. Only a valid response flips the flag. Healthy returns 200 with some metadata. Anything else returns a 503 with the exception traceback, so whoever looks at the failure has something to go on. The load balancer marks that instance unhealthy and stops sending it traffic. Andrew Robinson said at Conf42 Cloud Native 2021: ""This is a behavior that we call fail closed.""
+
+## Why would you ever send traffic to unhealthy instances?
+
+Because a deep check couples every instance to the same dependency. If that dependency is slow, instances start flapping, and the failure-count threshold that would replace a single bad host never trips cleanly. In his words, ""you may end up with all of the instances flapping at the same time, all go unhealthy at the same time, and then your application isn't available.""
+
+So when every target in the pool fails its check, the load balancer fails open and sends requests to all of them. That is the safety net: automation handles single failures, and when everything looks broken at once, the system keeps serving and a human gets to diagnose it. He pairs it with rate-limited thresholds or circuit breakers to turn the automation off before it removes the whole fleet. Test both checks, the shallow and the deep one, and test the failure modes of each.
+
+## Hard dependency, soft dependency, I Love Lucy
+
+The same thinking applies to the request path. Calling the recommendation API directly makes it a hard dependency: if the call fails, the user gets a 502 or 503 and the page is dead. Wrapping it in a try block with a fallback makes it soft. When the call fails, the app serves a predetermined static answer, and his choice of default is excellent: ""we'd recommend the tv show I love Lucy to them.""
+
+The page also tells the user the recommendation is not personalised right now and shows the error code. Nobody gets their perfect show, but everyone gets a working page, and in a larger application the rest of it keeps working too.
+
+## The rules he leaves you with
+
+- Components should keep working, degraded, when their dependencies are unhealthy. No dynamic answer, then a static one.
+- Health checks belong at the application layer (the data plane), not on the underlying infrastructure.
+- Fail closed for one bad instance, fail open when all of them fail.
+- Use multiple layers of checks, from lightweight to deep, because servers and software fail for very different and very weird reasons.
+- Put tracebacks in error responses to cut the cognitive load on the engineer on call.
+
+## Who should watch
+
+Anyone who owns a load balancer config or has written a health endpoint and wondered what it should actually check. The code is short and explained for non-developers. The full architecture and code live in the open-source AWS Well-Architected labs on GitHub, part of a collection of over 100 labs, and he points to the Amazon Builders' Library article on implementing health checks for more depth.
+
+## Related Conf42 talks
+
+- Eduardo Janicas on [static stability with availability zones](https://www.conf42.com/Cloud_Native_2021_Eduardo_Janicas_stability_availability), the AWS design pattern one level down.
+- Tanveer Gill on [graceful degradation when everything goes wrong](https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong) at Conf42 Chaos Engineering 2023.
+- Uma Mukkara on [reliability of cloud native systems](https://www.conf42.com/Cloud_Native_2021_Uma_Mukkara_reliability_cloud_native_systems), also at Conf42 Cloud Native 2021.
+
+[Watch Andrew Robinson's talk](https://www.conf42.com/Cloud_Native_2021_Andrew_Robinson_improving_reliability_health_check_dependency_management)
+
+[Watch the talk on YouTube](https://youtu.be/ltOeI7W2Gok).
+",talk,cloud2021,talk:cloud2021/Andrew Robinson,,Conf42,,queued,"reliability, health-checks, aws, graceful-degradation, load-balancing"
+,"A passed cloud audit means you convinced an auditor, not that you're secure","Ashish Rajan (Cloud Security Podcast) at Conf42 Cloud Native 2021 on how real cloud security assessments differ from the docs, and why CSPM alone falls short",2021-04-15,cloud2021/compliance-certificate-is-not-security,,"Every cloud provider publishes a Well-Architected framework, and almost nobody's account looks like one. At Conf42 Cloud Native 2021, [Ashish Rajan](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021), producer and host of the Cloud Security Podcast and a former cloud security consultant, told the practitioner's version of running cloud security assessments. His real title for the talk, he admits, would have been documentation versus reality.
+
+The sharpest line comes at the end. Ashish Rajan said at Conf42 Cloud Native 2021: ""a successful compliance certification doesn't really mean you're secure. It just does mean that you were able to convince an auditor that you are ticking all the boxes.""
+
+## What does the documentation assume?
+
+The expected client, per the docs: one or two cloud providers, everything defined in CloudFormation or another code repository, cloud native services, several deploys a day, and nobody with SSH or RDP into production.
+
+What he actually found as an auditor:
+
+- **A single tenancy that hides hundreds of services.** A single network hosting many applications, a mix of containers, Kubernetes and VMs, monoliths carried over from a decade ago next to microservices.
+- **A YAML file instead of access.** Teams deep into infrastructure as code who asked him to audit the template and gave him no access to the accounts.
+- **Too much access.** A 25-person startup that handed him full admin out of trust. His advice: don't give admin access to an external auditor.
+- **Account sprawl.** One business unit with 20+ accounts, because account separation was recommended and accounts are free.
+
+The good counterexample: an enterprise with a central team that provisions every tenancy with security defaults, which gave him read-only access and asked him to bring his automation. He ran tools during the interviews and finished in about half the time.
+
+So his first question in any engagement is which kind of migration this was, lift and shift or a real transformation, and how far along it is. And his warning about leaning only on the provider's own tooling: ""don't just rely on cloud native and stop drinking the kool aid.""
+
+## Where does initial access come from?
+
+He uses the MITRE ATT&CK cloud matrix but focuses on initial access, since everything else assumes it. The techniques collapse into three buckets: an exploited public-facing application (a bucket made public, a Kubernetes API open to the internet), stolen credentials (cloud IAM sharing the corporate password with no SSO or MFA, plus machine identities whose keys work while you sleep), and third parties, every CSPM, monitoring or other vendor you have handed a credential into your account.
+
+## Point in time versus continuous
+
+The argument he most wants to land is that you need both. Point-in-time assessments, by an auditor with a checklist or a practitioner with automation, produce an actionable backlog. Continuous tools, CSPM and CASB, give visibility against a standard such as CIS or NIST, but they are API-driven checklists without context. A public bucket that is meant to be public, or one covered by an account-level block, still shows up red. New services arrive in the tools later than in the console. The result is the wall of red that hides the real findings he would hand you on day one.
+
+He points to Checkov from Bridgecrew and the infrastructure-as-code scanners as the next generation, catching problems at commit time. Open source tools come with the same lag on new services, so someone on the team has to keep them current. And hire an auditor who understands that cloud compute is ephemeral and IPs change under autoscaling.
+
+## Who should watch
+
+Anyone about to commission, run or survive a cloud audit, and CSPM owners staring at a dashboard full of alerts. It is opinionated and specific, from someone who has sat on both sides of the table.
+
+## Related Conf42 talks
+
+- Stuart Green on [why cloud threats depend on cloud maturity](https://www.conf42.com/Cloud_Native_2021_Stuart_Green_loud_thread_landscape_2021), at the same event.
+- Vandana Verma on [secure architecture reviews in the cloud](https://www.conf42.com/Cloud_Native_2021_Vandana_Verma_secure_architecture), also at Conf42 Cloud Native 2021.
+- Stephane Jourdan on [infrastructure drift](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift) and what Terraform cannot see.
+
+[Watch Ashish Rajan's talk](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021)
+
+[Watch the talk on YouTube](https://youtu.be/LMa3gQR1jFU).
+",talk,cloud2021,talk:cloud2021/Ashish Rajan,,Conf42,,queued,"cloud-security, security-assessment, cspm, compliance, iac"
+,Your biggest cloud threat depends on how new you are to cloud,"Stuart Green (Check Point Software Technologies) at Conf42 Cloud Native 2021 on how cloud maturity decides which threats bite, and why visibility comes first",2021-04-14,cloud2021/cloud-threats-depend-on-maturity,,"Ask a cloud security architect what the biggest cloud threat is and the honest answer is unsatisfying. At Conf42 Cloud Native 2021, [Stuart Green](https://www.conf42.com/Cloud_Native_2021_Stuart_Green_loud_thread_landscape_2021), Cloud Security Architect at Check Point Software Technologies working with customers across the UK and Ireland, opened with exactly that. Stuart Green said at Conf42 Cloud Native 2021: ""I'll start with a vague answer, which is, it depends.""
+
+What it depends on, he argues, is the customer's maturity. Everyone faces the same risks, but in a different order, and the talk is a tour of the three kinds of customer he meets every week and what goes wrong for each.
+
+One note on scope: the abstract promises Check Point Research findings and COVID-19 threat statistics. The talk itself is a field report from customer conversations, and he promises up front not to pitch any product. He keeps the promise.
+
+## Three customers, three different problems
+
+**The reluctant mover.** A traditional organisation, often public sector, with servers in a data center and a mandate from someone somewhere to go to the cloud. No education, no budget, no enthusiasm. They browse the console, find compute and databases, and recreate what they had. Expect misconfiguration.
+
+**The square peg.** A business with a real driver, usually cost, that treats cloud as the fix for everything and lifts and shifts what it ran on premises. He is careful here: cloud can be more cost effective, but cheaper is a misconception. The typical failures are architectures that do not behave the way they did in the data center, and security controls that were left behind with a plan to add them later.
+
+**The cloud native.** Teams that have never racked a server and never want to. For them it is all about native tools, APIs and the speed of the next change to production. A ticket for a firewall rule change is a blocker, and security that slows them down gets routed around.
+
+His request to the experts in the audience: don't look down on the first group. You made the same mistakes when you were new.
+
+## Who owns security when there is no perimeter?
+
+The middle of the talk walks the maturity curve from data center to serverless and names what changes. Change rates go from one or two requests a week to dozens or hundreds a day. Control shifts from the network, firewall and security teams to the developer, who now writes the code, deploys it and hopefully thought about open ports and dependency scanning on the way. And the perimeter fragments: ask where the firewall goes in a serverless architecture and the answer is that it doesn't.
+
+## Misconfiguration, IAM, visibility
+
+His top three:
+
+- **Misconfiguration**, mostly storage (S3, Azure storage accounts), networks and databases. He quotes Gartner moving its estimate from about 95% to up to 99% of cloud security failures being the customer's fault through 2025. Automation is his answer, with a warning from the field: one team automated storage permissions, got them wrong, and produced hundreds if not thousands of badly configured services at once. They caught it early and fixed it with the same templating.
+- **IAM**, which he calls the area with no magic product. Attackers who got in through a vulnerable workload have used over-broad permissions to move laterally until they could get data out. Use groups rather than per-user grants, use AWS permissions boundaries, and use the MITRE ATT&CK framework to decide where to focus.
+- **Visibility**, the one executives care about. Logging is often off by default because storage costs money, and multi-cloud multiplies the number of consoles to dig through. His line on it: ""If you don't know what you've deployed in public cloud, you have pretty much no hope of securing it.""
+
+The agility that makes cloud attractive becomes a threat when security is parked for later, because later tends to arrive as someone else finding the deployment first. Stuart Green said at Conf42 Cloud Native 2021: ""Security needs to be a primary consideration when you're moving to cloud. It shouldn't be an afterthought.""
+
+## Who should watch
+
+Security people who sell, advise or audit, and anyone who has to explain cloud risk to a mixed audience. It is a non-technical, people-first talk: no demos, plenty of pattern recognition.
+
+## Related Conf42 talks
+
+- Ashish Rajan on [running cloud security assessments](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021), at the same event.
+- Josh Stella on [cloud security and IAM](https://www.conf42.com/Cloud_Native_2021_Josh_Stella_security_iam), also at Conf42 Cloud Native 2021.
+- Vishnuvardhana Reddy Veeraballi on [cloud security posture management](https://www.conf42.com/Golang_2025_Vishnuvardhana_Reddy_Veeraballi_cloud_security_cspm) at Conf42 Golang 2025.
+
+[Watch Stuart Green's talk](https://www.conf42.com/Cloud_Native_2021_Stuart_Green_loud_thread_landscape_2021)
+
+[Watch the talk on YouTube](https://youtu.be/tDq2viQr5ZU).
+",talk,cloud2021,talk:cloud2021/Stuart Green,,Conf42,,queued,"cloud-security, misconfiguration, iam, visibility, aws"
+,"Before you move to the cloud, assume your network is hostile","Vandana Verma (IBM) at Conf42 Cloud Native 2021 on secure architecture reviews, threat modelling and shared responsibility before a cloud move",2021-04-12,cloud2021/assume-your-network-is-hostile,,"A pen test tells you whether the front door is locked. It does not tell you whether the house was designed with a door at all. At Conf42 Cloud Native 2021, [Vandana Verma](https://www.conf42.com/Cloud_Native_2021_Vandana_Verma_secure_architecture), Security Architect at IBM and a member of the OWASP global board of directors, made the case for a secure architecture review as the first step of any cloud move, and for starting that review from one uncomfortable premise.
+
+Vandana Verma said at Conf42 Cloud Native 2021: ""the first thing that we have to understand that our network is hostile, completely hostile, before even moving to the cloud.""
+
+## Why bother with a review when you already pen test?
+
+Her framing is the pandemic rush of 2020 and 2021: organisations that were still planning a cloud migration suddenly found themselves on one. Lift and shift was the default, and she is blunt about legacy applications copied into containers without changes. They carry their overhead with them, plus new budget and support questions.
+
+The numbers she cites are from the IBM and Ponemon research of the time: security breaches up 11% since 2018 and 67% since 2014, an attack every 39 seconds on average, and an average of 206 days to identify a breach in 2019. A regular pen test gives some assurance, she argues, but it does not look at the overall architecture design, and that is where an open bucket or database credentials committed to a public repo come from. Her point on the second one: change the password all you like, the code that was public stays cached.
+
+## What does the review actually cover?
+
+The methodology is a sequence rather than a checklist:
+
+- **Data flow diagrams** first, to map the high-level cloud architecture and draw the trust boundaries.
+- **Threat modelling** on top of them. She names STRIDE, PASTA and Trike, and says she has been working with STRIDE a lot. The tooling matters less than you think: ""the tool is less important than the data recorded.""
+- **A risk-based plan** for what moves, what gets protected and where it lands.
+- **Gap analysis** for visibility into your own environment, because many teams moving to the cloud do not know what they run today.
+
+And for the threat modelling sessions themselves, her preference is refreshingly low-tech: ""Whiteboarding is my favorite.""
+
+## The tenant analogy for shared responsibility
+
+The shared responsibility model gets the most airtime. Her analogy: moving to the cloud is like renting out a house. The tenant calls you when something breaks, but you still own the house, so read the agreement, and get lawyers or auditors who understand its language. Whatever the service model, IaaS, PaaS or serverless, the data is always yours to protect, and so is your application code and its repositories.
+
+Concrete items she lists for the plan: boundary protection and a WAF for internal applications too (HR tools and learning portals get attacked as well), MFA for everyone rather than only privileged users, least privilege, encryption at rest and in transit with proper key management, and audit logging with a decided retention and protection story. She also asks about the right to audit your provider, which many providers answer with their own reports instead.
+
+On credentials she tells a story from an older project where developers were working with the cloud root credentials. Her summary of why that keeps security people awake: ""cloud is like, if I get your credentials, especially root credentials, I can own your network.""
+
+## Who should watch
+
+Architects and engineering leads planning a migration, or living with one that happened in a hurry. This is a methodology and checklist talk, not a tool demo, and it closes with a nudge toward zero trust and a cloud access security broker (CASB) at the cloud edge for shadow IT and SaaS monitoring.
+
+## Related Conf42 talks
+
+- Ashish Rajan on [what cloud security assessments look like in practice](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021), at the same event.
+- Josh Stella on [cloud security and IAM](https://www.conf42.com/Cloud_Native_2021_Josh_Stella_security_iam).
+- Darren Richardson on [threat modelling CI/CD environments](https://www.conf42.com/DevSecOps_2022_Darren_Richardson_threat_modelling_cicd_environments) at Conf42 DevSecOps 2022.
+
+[Watch Vandana Verma's talk](https://www.conf42.com/Cloud_Native_2021_Vandana_Verma_secure_architecture)
+
+[Watch the talk on YouTube](https://youtu.be/7qNlwtiY43I).
+",talk,cloud2021,talk:cloud2021/Vandana Verma,,Conf42,,queued,"cloud-security, threat-modeling, architecture-review, shared-responsibility, iam"
 ,Enterprise Software lands on Earth!,"My name is Apache Kafka, but everybody calls me Kafka",2021-03-25,2021-03-25-enterprise-software,./assets/splash/ENTERPRISE2021_Session_Splash.png,"# How do you feel about enterprise software? A big fan? Shy but curious? Or maybe just neutral? Whichever the case, we’ve got something for you!
 
 Listen to 21 epic talks covering some Java lifehacks, how to react in a world full of events, all about building your own Dependency Injection framework and many, many more! Our keynote speaker, [Liran Haimovitch](https://www.conf42.com/Enterprise_Software_2021_Liran_Haimovitch_understandability_wrong), will talk you through the most important idea in software, the underrated concept of understandability. 
