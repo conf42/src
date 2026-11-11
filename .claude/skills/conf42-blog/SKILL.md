@@ -35,7 +35,7 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 | `sponsored` | `sponsor:<short_url>/<sponsor id>/<Name1>` | day 0 / -1,0 / round robin -1,0,+1 | Only sponsors who deliver a talk. Informative first: the problem, the approach, what the speaker showed. Ends with a "From <Sponsor>" links block (sponsors.csv url + subpages.csv links) |
 | `roundup` | `event:<short_url>` | event + 1 | The conference summary: themes with the talks that carried them (linked), sponsors who joined in (linked), the event page and playlist |
 | `plug` | `sister:<repo>/<folder>` | in-person event -14d | SREday/LLMday/PLATFORMday/PEC: who's speaking (companies), topics, venue, date, Luma link. Paid events: **CONF42 = 42% off**. Free events (`registration_free: true` - Chennai, Warsaw 2027, Tel Aviv - and PLATFORMday except London 2027 Q2): no code, "it's free, register" |
-| `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop doc. "webinar", never "workshop" (that's in-person) |
+| `webinar` | `webinar:<WEBINARS.csv Slug>` | the webinar's day | Recap of an online webinar (Harness, Reliaburger, ...) from its Snoop trace (Gemini notes + transcript). "webinar", never "workshop" (that's in-person) |
 
 **Transcript first** (Marek 2026-11-10): talk and sponsored posts are written only for talks whose transcript is in
 the repo (`assemblyai/<YouTubeId>.json` or `srt/<short_url>_<Name1>.srt`). `plan` doesn't propose the others; it
@@ -88,9 +88,12 @@ splash, webinar -> its splash, plug -> the sister event's own splash = the og:im
    - roundup: every talk of the event (titles, companies, summaries), `metadata.yml` sponsors + playlist_url.
    - plug: the sister event's `metadata.yml` and `_db/talks.csv` (companies, titles, tracks); venue per
      [[venue-company-hq]] ("X HQ"); Luma link `https://luma.com/event/<luma_evt>`.
-   - webinar: Drive connector on the **work account** (mark@sreday.com), folder `Snoop`, doc titled
-     `YYYY-MM-DD HH:MM · <title>` (summary, next steps, transcript); plus the WEBINARS.csv row. No doc yet -> skip,
-     the plan keeps listing it.
+   - webinar (Marek 2026-11-11: every webinar is recorded with Snoop): the Snoop trace is the source - Drive
+     connector on the **work account** (mark@sreday.com), folder `Snoop`, doc titled `YYYY-MM-DD HH:MM · <title>`
+     (Gemini notes: summary + next steps, and the Gemini transcript); plus the WEBINARS.csv row. Snoop also lists the
+     upcoming Luma webinars (its Luma tab). No doc yet -> skip, the plan keeps listing it. The one exception: the
+     first webinar (Reliaburger 0.2.0, 2026-10-28) predates Snoop and was written generically from the Reliaburger
+     repo at tag v0.2.0 and the WEBINARS.csv invite - no quotes, nothing claimed as said live.
 4. Write each post as `blog/drafts/<ShortURL>.md` (front matter: Title, Description <=160 chars, Date, ShortURL,
    Type, Event, Ref, Sponsor (sponsored), Tags; then the Markdown body, starting with prose - no `#` heading, the
    page prints the Title). **ShortURL:** posts of an event (talk, sponsored, roundup) live under it -
