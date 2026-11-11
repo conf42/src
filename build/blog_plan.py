@@ -163,10 +163,10 @@ def write_sister_json(events):
 def transcript_paths(event, talk):
     paths = []
     yid = talk.get("YouTubeId")
-    if yid and os.path.exists("./assemblyai/%s.json" % yid):
+    if yid and os.path.exists("./assemblyai/%s.json" % yid) and os.path.getsize("./assemblyai/%s.json" % yid) > 2:   # an empty file is no transcript
         paths.append("assemblyai/%s.json" % yid)
     srt = ("srt/%s_%s.srt" % (event["short_url"], talk.get("Name1", ""))).replace(" ", "_")
-    if os.path.exists(srt):
+    if os.path.exists(srt) and os.path.getsize(srt) > 2:
         paths.append(srt)
     return paths
 
