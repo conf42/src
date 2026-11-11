@@ -184,6 +184,7 @@
 
 ## December 2024
 - [Where the physical world joins the internet](https://www.conf42.com/2024-12-19-internet-of-things.md): And starts responding
+- [Twenty WAFs in a row won't save a server that is down at layer 4](https://www.conf42.com/devsecops2024/waf-alone-wont-save-your-server.md) (Conf42 DevSecOps 2024): Lukasz Karwacki (Gcore) at Conf42 DevSecOps 2024 on why web app protection and L3/L4 DDoS protection only work together
 - [When security stops being a checkpoint](https://www.conf42.com/2024-12-05-devsecops.md): And becomes part of the workflow
 
 ## November 2024
@@ -205,6 +206,7 @@
 - [This one is a real Dino-Mite!](https://www.conf42.com/2024-06-13-dino-mite.md): Some ‘roarsome’ talks going live today
 
 ## May 2024
+- [Real-time AI has a half-second budget, and the network eats it first](https://www.conf42.com/ml2024/half-second-budget-edge-inference.md) (Conf42 Machine Learning 2024): Michele Taroni (Gcore) at Conf42 Machine Learning 2024 on serving models at the edge to keep end-to-end inference under half a second
 - [Machine Learning is back!](https://www.conf42.com/2024-05-30-machine-learning-is-back.md): Fresh talks available now
 - [SRE 2024 coming in hot](https://www.conf42.com/2024-05-09-sre-space-invaders.md): Defend your systems against intergalactic invaders!
 
@@ -213,27 +215,49 @@
 - [Large Language Models are back](https://www.conf42.com/2024-04-11-LLMs-are-back.md): All talks available now
 
 ## March 2024
+- [Your cloud SIEM caught 30 secret reads and missed the batch call](https://www.conf42.com/cloud2024/emulate-attack-find-detection-gap.md) (Conf42 Cloud Native 2024): Kennedy Torkura (Mitigant) at Conf42 Cloud Native 2024 on testing cloud threat detections by emulating real attacker techniques
+- [5,000 serverless apps on one Kubernetes node is a WebAssembly argument](https://www.conf42.com/cloud2024/webassembly-serverless-density-cold-starts.md) (Conf42 Cloud Native 2024): Sohan Maheshwar (Fermyon) at Conf42 Cloud Native 2024 on why serverless WebAssembly beats containers and microVMs on density and cold starts
+- [An internal developer platform where a git push buys you a database](https://www.conf42.com/cloud2024/database-as-a-service-idp-operators.md) (Conf42 Cloud Native 2024): George Hantzaras and Dan Mckean (MongoDB) at Conf42 Cloud Native 2024 on Kubernetes operators as the engine of an internal developer platform
 - [Cloud Native 2024 is going live tomorrow!](https://www.conf42.com/2024-03-21-cloud-native-head-in-the-clouds.md): Keep that head up in them clouds
+- [Test serverless code locally against the real cloud, then throw the stack away](https://www.conf42.com/cloud2024/remocal-testing-ephemeral-environments.md) (Conf42 Cloud Native 2024): Yan Cui (Lumigo) at Conf42 Cloud Native 2024 on remocal tests, plain zip deployments and ephemeral environments for faster serverless work
+- [Just don't do it, says the title. Then he tells you to do it](https://www.conf42.com/cloud2024/postgres-in-kubernetes-dba-in-a-box.md) (Conf42 Cloud Native 2024): Jan Karremans (CYBERTEC) at Conf42 Cloud Native 2024 on why Postgres belongs in Kubernetes once an operator plays the DBA
 
 ## February 2024
 - [Capybara…](https://www.conf42.com/2024-02-29-python-capybara.md): Capybara capybara capybara capybara
 - [Chaos Engineering 2024 kicks off tomorrow!](https://www.conf42.com/2024-02-14-chaos-engineering-valentine's-day.md): Let's talk chaos by candlelight
 
 ## January 2024
+- [Put tech debt at the top of every sprint, and stop over-analysing the rest](https://www.conf42.com/devops2024/tech-debt-top-of-backlog-good-enough.md) (Conf42 DevOps 2024): Ewald Verhoeven (TestCoders) at Conf42 DevOps 2024 on why teams slow down, paying tech debt every sprint, and scoring decisions with AHP and Pugh
+- [Observability standards stop at data exchange, and that's the problem](https://www.conf42.com/devops2024/netdata-monitoring-without-the-query-language.md) (Conf42 DevOps 2024): Costa Tsaousis (Netdata) at Conf42 DevOps 2024 on why open standards don't fix monitoring, and Netdata's per-second, zero-config, ML-at-the-edge answer.
+- [MariaDB started as a MySQL fork and kept going](https://www.conf42.com/devops2024/mariadb-more-than-a-mysql-fork.md) (Conf42 DevOps 2024): Alejandro Duarte (MariaDB) at Conf42 DevOps 2024 on how MariaDB grew from a MySQL fork into pluggable storage engines, MaxScale and automatic failover.
+- [How Kong made its gateway faster, and how it proves it every day](https://www.conf42.com/devops2024/kong-gateway-performance-rust-router-lmdb.md) (Conf42 DevOps 2024): Wenchao Xiang (Kong) at Conf42 DevOps 2024 on Kong Gateway's Rust router, LMDB config store, plugin fixes and daily performance tests
+- [DevOps engineers should enable more and do less](https://www.conf42.com/devops2024/devops-engineers-enable-not-do.md) (Conf42 DevOps 2024): Michael Zion (MeteorOps) at Conf42 DevOps 2024 on a CTO's DevOps handbook - developers operate, DevOps enables, and knowing when to do what.
+- [AI writes code faster than security can read it](https://www.conf42.com/devops2024/ai-code-security-cant-keep-up.md) (Conf42 DevOps 2024): Arshan Dabirsiaghi (Pixee) at Conf42 DevOps 2024 on why LLM coding tools outrun AppSec, and three ways to scale - paved roads, RASP and fix-bots.
+- [Driver assistance runs on chips rated in hundreds of TOPS](https://www.conf42.com/devops2024/adas-sensors-chips-and-autonomy-levels.md) (Conf42 DevOps 2024): Rajesh Reddy (ECARX) at Conf42 DevOps 2024 on ADAS and autonomous driving - the sensors, the compute, the software stack and the L0-L5 levels.
 - [“Sharks in Space” starring Jason Statham…](https://www.conf42.com/2024-01-25-devops-sharks-in-space.md): Just kidding, it’s DevOps
+- [Move the heavy loop to a Web Worker and the button clicks again](https://www.conf42.com/devops2024/web-workers-keep-the-main-thread-free.md) (Conf42 DevOps 2024): Kevin Uehara (iFood) at Conf42 DevOps 2024 on Web Workers - moving heavy client-side processing off the main thread in plain vanilla JavaScript.
+- [Start your software factory with a catalog, not a cloud](https://www.conf42.com/devops2024/software-factory-idea-to-demo-in-a-day.md) (Conf42 DevOps 2024): Murali Mallina (Softrams) at Conf42 DevOps 2024 on software factories that take an idea to a deployed demo in a day, and why you shouldn't build your own cloud.
+- [A forgotten debug counter cost YQL half its join speed](https://www.conf42.com/devops2024/perf-found-yql-join-slowdowns.md) (Conf42 DevOps 2024): Alexey Ozeritskiy (YDB) at Conf42 DevOps 2024 on tuning the YQL distributed SQL engine with TPC-H, perf and stackcount - and the bugs they found.
+- [Most Kubernetes misconfigurations are one-line fixes nobody made](https://www.conf42.com/devops2024/kubernetes-benchmark-one-line-fixes.md) (Conf42 DevOps 2024): Joe Pelletier (Fairwinds) at Conf42 DevOps 2024 on what 330,000 scanned workloads say about Kubernetes cost, reliability and security hygiene
 
 ## December 2023
 - [All I want for Christmas is…](https://www.conf42.com/2023-12-14-iot-festive-vibes.md): “Alexa, play festive vibes!”
 
 ## November 2023
+- [Terabit DDoS attacks are built from unpatched IoT devices](https://www.conf42.com/devsecops2023/iot-botnets-terabit-ddos-attacks.md) (Conf42 DevSecOps 2023): Andrey Slastenov (Gcore) at Conf42 DevSecOps 2023 on how insecure IoT and 5G devices power terabit-scale botnet DDoS attacks, and how to stop them.
 - [Check out our DevSecOps event kicking off today!](https://www.conf42.com/2023-11-30-devsecops-eagle-eye.md): Asset secured. Over.
 - [JavaScript 2023 is here!](https://www.conf42.com/2023-11-16-javascript-that-will-croc-your-world.md): 30+ talks that will ‘croc’ your world
 
 ## October 2023
+- [A postmortem without action items is a wasted hour](https://www.conf42.com/im2023/postmortems-premortems-team-resilience.md) (Conf42 Incident Management 2023): Dor Amram (SimilarWeb) at Conf42 Incident Management 2023 on building teams that absorb an incident, handle it, and come out of it better.
+- [An incident drill where your teammates are language models](https://www.conf42.com/im2023/incident-drills-with-generative-ai-teammates.md) (Conf42 Incident Management 2023): Mahdi Jelodari (Uptime Labs) at Conf42 Incident Management 2023 on training incident managers in a simulated outage run by generative AI characters.
 - [Spooky season with Incident Management](https://www.conf42.com/2023-10-19-incident-management.md): Shh… Just make it look like an ‘incident’
+- [No alerts can mean your EDR missed it - test with Atomic Red Team](https://www.conf42.com/im2023/atomic-red-team-test-your-edr.md) (Conf42 Incident Management 2023): Christopher Haller (Strong Crypto Innovations) at Conf42 Incident Management 2023 on testing EDR against real threat actor procedures with Atomic Red Team.
 
 ## September 2023
+- [Keeping 100k reverse tunnels alive across six EKS regions](https://www.conf42.com/kubenative2023/teleport-cloud-100k-reverse-tunnels-six-regions.md) (Conf42 Kube Native 2023): Stephen Levine (Teleport) at Conf42 Kube Native 2023 on the ingress, rollout and networking choices behind Teleport Cloud's multi-cluster Kubernetes.
 - [Prepare yourself for cuteness overload](https://www.conf42.com/2023-09-27-kube-native-cute-seal.md): (This seal is absolutely too adorable!)
+- [From an empty folder to a rate-limited API, mostly by asking ChatGPT](https://www.conf42.com/platform2023/apiops-chatgpt-deck-github-actions.md) (Conf42 Platform Engineering 2023): Rick Spurgeon (Kong) at Conf42 Platform Engineering 2023 on APIOps with ChatGPT, decK and GitHub Actions, from OpenAPI spec to a gateway via pull requests.
 - [Platform Engineering 2023 awaits!](https://www.conf42.com/2023-09-07-platform-engineering.md): All the talks are available online now!
 
 ## August 2023
@@ -242,16 +266,28 @@
 ## June 2023
 - [Quantum computing strikes back!](https://www.conf42.com/2023-06-27-quantum-computing-strikes-back.md): Get ready to jump into the sub-atomic world with us
 - [The Impact of Quantum Computing on Cybersecurity: Threats and Opportunities](https://www.conf42.com/2023-06-15-impact-quantum-computing-cybersecurity-myrtle-bautista.md): guest post by Myrtle Bautista
+- [Use your traces as test assertions and delete the mocks](https://www.conf42.com/obs2023/trace-based-testing-instead-of-mocks.md) (Conf42 Observability 2023): Adnan Rahic (Tracetest) at Conf42 Observability 2023 on observability-driven development, with OpenTelemetry spans as integration test assertions.
+- [The database bugs your unit tests are built not to see](https://www.conf42.com/obs2023/database-guardrails-unit-tests-miss.md) (Conf42 Observability 2023): Adam Furmanek (Metis) at Conf42 Observability 2023 on database guardrails in CI, using execution plans and OpenTelemetry to catch bad SQL before production.
 - [Observability 2023 is on!](https://www.conf42.com/2023-06-08-new-perspective-on-observability.md): Ready for some fresh perspective?
+- [Your SQL query has a debugger, it's called EXPLAIN ANALYZE](https://www.conf42.com/obs2023/debug-sql-with-execution-plans.md) (Conf42 Observability 2023): Eyal Trabelsi (Bigabid) at Conf42 Observability 2023 on reading execution plans to find SQL bugs, empty joins and duplicates, not only slow queries.
 
 ## May 2023
+- [Ship the sentiment model to the data, as a Rust Wasm UDF](https://www.conf42.com/ml2023/rust-sentiment-udf-webassembly-in-database.md) (Conf42 Machine Learning 2023): Akmal Chaudhri (SingleStore) at Conf42 Machine Learning 2023 on compiling a Rust VADER sentiment analyser to WebAssembly and running it inside SQL.
+- [An Airflow ML pipeline that wakes up when an MRI lands in S3](https://www.conf42.com/ml2023/airflow-datasets-brain-mri-classifier-pipeline.md) (Conf42 Machine Learning 2023): Tamara Janina Fingerlin (Astronomer) at Conf42 Machine Learning 2023 on orchestrating data and ML in one Airflow pipeline, from S3 to a fine-tuned ResNet-50.
 - [Machine Learning time!](https://www.conf42.com/2023-05-18-ml-time-to-get-serious.md): Time to get serious
+- [Stop benchmarking vector databases on speed, build better vectors](https://www.conf42.com/ml2023/vector-ops-one-vector-many-signals.md) (Conf42 Machine Learning 2023): Daniel Svonava (Superlinked) at Conf42 Machine Learning 2023 on packing recency, popularity and topic into one vector for search and recommendations
+- [The cloud isn't broken, it just needs an edge for its ML models](https://www.conf42.com/ml2023/mlops-at-the-edge-cloud-needs-friends.md) (Conf42 Machine Learning 2023): Alejandro Cantos (Barbara) at Conf42 Machine Learning 2023 on when ML models belong at the edge, and what it takes to run MLOps across thousands of devices.
+- [For now turns into forever, so make admin access expire](https://www.conf42.com/sre2023/just-in-time-access-replaces-admin-accounts.md) (Conf42 Site Reliability Engineering 2023): Travis Rodgers (Teleport) at Conf42 Site Reliability Engineering 2023 on replacing standing admin accounts with approved, expiring just-in-time access
 - [Three words: Site. Reliability. Engineering.](https://www.conf42.com/2023-05-04-sre-event.md): No introduction needed
 
 ## April 2023
+- [Skip the paid speech API, call whisper.cpp from Go](https://www.conf42.com/golang2023/whisper-cpp-go-bindings-transcription.md) (Conf42 Golang 2023): Pratim Bhosale (SurrealDB) at Conf42 Golang 2023 on building an open source transcription CLI in Go with whisper.cpp and its Go bindings
 - [They fly now?](https://www.conf42.com/2023-04-20-golang-is-here.md): What the actual...
+- [Reorder three struct fields, save eight megabytes: Go micro-optimisations](https://www.conf42.com/golang2023/squeezing-go-functions-benchmark-first.md) (Conf42 Golang 2023): Jesus Espino (Mattermost) at Conf42 Golang 2023 on benchmark-first Go micro-optimisations, from early returns to escape analysis and goroutine counts
 
 ## March 2023
+- [When QA has less than one environment, give everyone their own](https://www.conf42.com/cloud2023/environments-as-a-service-remote-dev-debug.md) (Conf42 Cloud Native 2023): Sorin Dumitrescu (Bunnyshell) at Conf42 Cloud Native 2023 on environments as a service, from Docker Compose to remote development and debugging in Kubernetes
+- [ChatGPT as the pair programmer for your runbook automations](https://www.conf42.com/cloud2023/chatgpt-pair-programmer-runbook-actions.md) (Conf42 Cloud Native 2023): Doug Sillars (unSkript) at Conf42 Cloud Native 2023 on growing runbooks into automations, with ChatGPT drafting the Python actions that get you there
 - [Keep your head in the Cloud!](https://www.conf42.com/2023-03-09-hop-on-the-cloud-nine-with-us.md): Kick start this spring with some fresh learning
 - [Snap! Python again?](https://www.conf42.com/2023-03-09-python-event-discover-the-unknown.md): Discovering things you never knew you wanted to know!
 
