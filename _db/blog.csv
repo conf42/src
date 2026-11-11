@@ -99360,6 +99360,224 @@ Go beginners, and anyone sitting on their first open source contribution and won
 
 [Watch the talk on YouTube](https://youtu.be/peSUrYj8bhs).
 ",talk,golang2023,talk:golang2023/Lais Lima,,Conf42,,queued,"go, cli, open-source, concurrency, fsnotify"
+,A placeholder pod turned a four-minute scale-up into seven seconds,Chris Nesbitt-Smith (UK Government) at Conf42 Cloud Native 2023 on keeping a spare Kubernetes node warm with low-priority placeholder pods,2023-03-13,cloud2023/placeholder-pods-proactive-autoscaling,,"Cluster Autoscaler only adds a node once a pod is already pending, so every scale-up starts with a wait. At Conf42 Cloud Native 2023, Chris Nesbitt-Smith, a consultant to UK government who has run Kubernetes in production since version 0.4, shows a cheap hack around that: a big, low-priority placeholder pod that holds a spare node and gets evicted the moment real work needs the room. In his live demo, the second node's pod went from about three to four minutes to 7 seconds.
+
+## Where do the minutes go?
+
+Nesbitt-Smith starts from scheduler basics and one rule he would settle for if you remember nothing else: set requests and limits on every container. ""So if you don't specify requests and limits, Kubernetes will play completely blind,"" Chris Nesbitt-Smith said at Conf42 Cloud Native 2023. Nodes get oversubscribed and you end up firefighting.
+
+With requests set, Kubernetes looks like a reasonably skilled Tetris player, fitting app blocks onto node boards. The catch is that the board is smaller than the box says. An 8 GB, 2 CPU node won't fit four 1.5 GB pods, because memory and CPU are reserved for the operating system, the kubelet and the eviction threshold. His AWS example: about 255 MB for the kubelet plus 11 MB per pod the instance can run, 100 MB for the OS and another 100 MB for eviction. The fourth pod goes pending and a new node is ordered.
+
+Then the timeline, starting from a traffic spike: roughly 90 seconds for the HPA to decide to add pods, about 30 seconds for Cluster Autoscaler to request a node, three to four minutes for the machine to boot, another 30 seconds to join the cluster, and then an image pull onto a cold node.
+
+## Is failing a few requests really that bad?
+
+To make the trade-off tangible, he built a fake Kubernetes scheduler library that simulates days of scaling in milliseconds, and a game on top of it called Black Friday: you are the SRE team for a retailer with a three-tier app facing spikes on Black Friday and Cyber Monday. In his run, under-provisioning cost $1,154 in SLA penalties while the company still came out about $15,000 ahead of having no autoscaling at all. The point is that just enough infrastructure, not maximum safety, wins the game.
+
+His other way to stack the odds is not to scale at all: size nodes so the workload fits, using an instance calculator his team built to compare how efficiently different instance types pack a given pod shape, with or without DaemonSets and agents.
+
+## How does the placeholder trick work?
+
+Run a placeholder pod sized to fill a whole node, so nothing real can share it, with a PriorityClass of -1. Every other pod, even ones with default priority, outranks it. When real pods need space, the scheduler evicts the placeholder, the real pods start right away on the warm node, and the now-pending placeholder makes Cluster Autoscaler order the next node. You are always one node ahead.
+
+The live demo on Linode is honest about live demos: one cluster's timer never loaded and he fell back to a second cluster. Without the placeholder, scaling from one replica to five filled the first node within seconds and left the fifth pod waiting about three minutes. With the placeholder, the fifth pod was running in 7 seconds.
+
+A recorded HPA run tells the same story under load. Without the placeholder, served requests per second flatten for roughly four minutes while nodes boot. With it, the curve keeps climbing. Traffic sometimes outpaces even the spare node, so new nodes fill before a placeholder can land, but there is always a node request in flight and no requests fail.
+
+## What does it cost?
+
+A node doing nothing but holding a placeholder is money spent on purpose, the same logic as a hot spare in a RAID array. His suggestion for getting value back: replace the placeholder with real low-priority work that can stop and start, such as housekeeping, analytics or machine learning jobs, or less critical services, so the shopping cart preempts the internal tools. Asked about oversubscribing VMs underneath Kubernetes, his answer is short: you are in for a bad day.
+
+## Who should watch
+
+Anyone whose HPA reacts fine but whose users still wait minutes during spikes, and teams sizing node pools for the first time. It works with any cloud's Cluster Autoscaler; no extra tooling needed.
+
+## Related Conf42 talks
+
+- Samuel Baruffi on [just-in-time nodes for EKS with Karpenter](https://www.conf42.com/Cloud_Native_2023_Samuel_Baruffi_aws_eks_cluster_karpenter) at the same event.
+- Yael Grossman on [scaling Kubernetes clusters without losing your mind or your money](https://www.conf42.com/Cloud_Native_2023_Yael_Grossman_scaling_k8s_clusters_losing_money), also at Conf42 Cloud Native 2023.
+- Rob Richardson on [horizontal autoscaling with Kubernetes](https://www.conf42.com/Kube_Native_2022_Rob_Richardson_horizontal_autoscaling) at Conf42 Kube Native 2022.
+
+[Watch Chris Nesbitt-Smith's talk](https://www.conf42.com/Cloud_Native_2023_Chris_NesbittSmith_proactive_cluster_autoscaling_kubernetes)
+
+[Watch the talk on YouTube](https://youtu.be/sVLGhZWDZ-k).
+",talk,cloud2023,talk:cloud2023/Chris Nesbitt-Smith,,Conf42,,queued,"kubernetes, autoscaling, cluster-autoscaler, capacity-planning, sre"
+,"A string parsed as a long cost $10,000 and nobody noticed for 12 hours",Yoav Nordmann (Tikal Knowledge) at Conf42 Cloud Native 2023 on catching data anomalies in minutes with Apache Pinot and StarTree ThirdEye,2023-03-12,cloud2023/anomaly-detection-apache-pinot-thirdeye,,"One new field, one wrong data type, one phone model. At Conf42 Cloud Native 2023, Yoav Nordmann, a tech lead and group leader at Tikal Knowledge, opens with an ad tech incident: a parameter sent as a string and parsed as a long, only for one iPhone model, in a pipeline handling a million events per second. The talk is about making sure that kind of silent data break shows up in minutes, using Apache Pinot as the fast store and StarTree ThirdEye on top for anomaly detection and root cause analysis.
+
+## Why do data anomalies go unnoticed?
+
+The cost of the original bug is the hook. ""Needless to say, that this problem went unrecognized for 12 hours, after which we lost about $10,000 of billing data,"" Yoav Nordmann said at Conf42 Cloud Native 2023. Five days of work to recover it went nowhere.
+
+Nordmann describes the usual fate of a data issue as a black hole. Most issues are never noticed. Some are noticed but nobody finds the root cause, so they come back. Only a few get both found and fixed. His goals are to remove the black hole, cut time to detect, and cut time to resolution. A second example from the same company: one user's daily bulk download slowed everyone else's queries, and the team learned about it a day later, when a batch job finally parsed the previous day's latency logs.
+
+## Why does the store matter as much as the detector?
+
+ThirdEye is an anomaly detection, monitoring and interactive root-cause analysis platform, and it queries its data source constantly, so that source has to answer in under a second. That source is Apache Pinot, a real-time distributed OLAP datastore.
+
+Nordmann explains the problem Pinot solves with slice and dice. Three dimensions give 7 combinations, five give 31, seven give 127, and real data has many more. Keep data raw and you get flexibility but high latency; pre-aggregate or cube it and you get speed but lose flexibility. Pinot aims for the middle, between joined and aggregated data, through pluggable indexes: inverted, forward, range, text, JSON, geospatial, timestamp, Bloom filters and the star-tree index.
+
+Its credentials come from LinkedIn, where it started as an internal analytics database and grew to serve user-facing analytics. The LinkedIn figures he quotes, about a year old at the time: 200,000+ queries per second, a peak ingestion rate of over 1 million events per second, and over 20 billion records scanned per second.
+
+On licensing: Pinot is open source. ThirdEye comes from StarTree, which offers both as SaaS, under a community license that lets you use it freely but not resell it as a SaaS product.
+
+## How does ThirdEye define an anomaly?
+
+Three layers. An alert template is detection boilerplate (create an anomaly if a metric exceeds a maximum). An alert fills it in (revenue above 20,000, checked hourly). An anomaly is what the pipeline finds (revenue was 30,000 on a given Thursday between 9pm and 10pm). Detectors include threshold, mean-variance, percentage and absolute change rules, plus a proprietary Holt-Winters rule in the commercial edition; you can plug in your own.
+
+Root cause analysis compares the anomalous period with a baseline as a heat map, deep red for big drops and intense blue for big rises, with top contributors listed. Subscription groups push anomalies to email, Slack or a webhook. And for the skeptic's question, what if the baseline was a holiday, you record events (holidays, releases) so they show up in the analysis.
+
+## What does the demo show?
+
+A K3s cluster on his laptop running Kafka, Pinot and ThirdEye from StarTree's quick start. Telegraf sends the laptop's CPU metrics to Kafka; a real-time Pinot table ingests them, over 10,000 rows and growing every few seconds. In ThirdEye, an alert using the StarTree threshold template sums system CPU usage against a threshold of 170, evaluated every minute, which is the shortest interval ThirdEye supports. He opens a live anomaly, compares it against a baseline, marks one as not an anomaly (the count drops from 16 to 15) and shows the merge settings that fold nearby anomalies into one.
+
+## Who should watch
+
+Data engineers who have shipped a schema change and found out from finance. The demo is small, one laptop's CPU, so treat it as a tour of the concepts rather than a benchmark.
+
+## Related Conf42 talks
+
+- Mark Needham on [a real-time analytics dashboard with Streamlit, Apache Pinot and Apache Kafka](https://www.conf42.com/Python_2022_Mark_Needham_realtime_analytics_dashboard_streamlit_apache_pinot_apache_kafka) at Conf42 Python 2022.
+- Ron Lyle Dagdag on [anomaly detection for JavaScript apps](https://www.conf42.com/JavaScript_2021_Ron_Lyle_Dagdag_Spidey_Senses_Anomaly_detection) at Conf42 JavaScript 2021.
+- Anais Dotis-Georgiou on [anomaly detection and forecasting with Quix, Hugging Face and InfluxDB](https://www.conf42.com/Machine_Learning_2024_Anais_DotisGeorgiou_quix_hugging_face) at Conf42 Machine Learning 2024.
+
+[Watch Yoav Nordmann's talk](https://www.conf42.com/Cloud_Native_2023_Yoav_Nordmann_anomaly_detection_apache_pinot_thirdeye)
+
+[Watch the talk on YouTube](https://youtu.be/45MJYw_iDMg).
+",talk,cloud2023,talk:cloud2023/Yoav Nordmann,,Conf42,,queued,"anomaly-detection, apache-pinot, data-engineering, observability, kubernetes"
+,"Keep your Postgres, add a compute layer, call it distributed",Trista Pan (SphereEx) at Conf42 Cloud Native 2023 on turning existing PostgreSQL or MySQL into a sharded database with Apache ShardingSphere,2023-03-11,cloud2023/shardingsphere-distributed-postgres-kubernetes,,"You don't have to migrate to a new distributed database to get one. At Conf42 Cloud Native 2023, Trista Pan, Co-Founder and CTO of SphereEx and a PMC member of Apache ShardingSphere, shows how to treat your existing PostgreSQL, MySQL, SQL Server or Oracle instances as storage nodes and put ShardingSphere in front of them as the compute layer, deployed on Kubernetes with one Helm command.
+
+It is an architecture talk for people who still love their monolithic database and are running out of room in it.
+
+## Why not just pick a NewSQL database?
+
+Pan sets the scene with big data's five Vs (value, veracity, volume, velocity, variety) and the usual split between OLAP, analysing large datasets quickly, and OLTP, many users writing transactions, which is where MySQL, PostgreSQL and Oracle live and where this talk stays.
+
+The pressure is familiar. Services became microservices on Kubernetes that scale in and out; the database is still one machine, struggling with terabytes and petabytes. Distributed databases such as CockroachDB solve that if you start fresh. ""But I guess most of us are still in the progress of the evolution, right?"" Trista Pan said at Conf42 Cloud Native 2023. Most teams have years of PostgreSQL or MySQL, the tools and the DBAs who know them, and no appetite for overturning all of it.
+
+## Where does the ""distributed"" part come from?
+
+Her answer borrows the design most distributed databases already use: separate compute from storage. Your existing database instances become the storage nodes; they persist data and do local computing. What's missing is a global compute layer that knows where each row lives, and that's the role of Apache ShardingSphere.
+
+The benefits on her slide: reuse the databases you have, upgrade at low cost, keep the mature ecosystem around them, gain SQL audit, traffic governance and elastic scaling, and avoid lock-in. It also helps with moving to the cloud gradually: storage can stay on premises or in RDS while the compute nodes run on Kubernetes.
+
+ShardingSphere, an Apache top-level project open source for more than six years, comes in two flavours:
+
+- **ShardingSphere-JDBC**, a lightweight driver that Java applications use through the standard JDBC interface.
+- **ShardingSphere-Proxy**, a database proxy any application can connect to.
+
+Both offer data sharding across instances, distributed transactions, read/write splitting (updates and deletes go to the primary, selects spread across replicas with random or round-robin strategies, no separate load balancer), and data masking and encryption: because the layer sits between application and database, it can encrypt on the way in and decrypt on the way out, so the database never stores plain text.
+
+## What does a sharded table look like?
+
+The demo design uses two PostgreSQL clusters, each a primary and a replica, deployed with the Bitnami chart, plus two ShardingSphere-Proxy compute nodes and a governance component, installed from the shardingsphere-on-cloud Helm charts. You register the PostgreSQL resources with the proxy, then create a sharding table in ShardingSphere's DistSQL dialect.
+
+The example table `t_user` uses a hash-mod strategy on its sharding column to split into four physical tables spread over the two clusters. The application sees one logical table. The proxy parses each query, routes it to the shard that holds the rows, and sends selects to replicas, which is where the higher QPS comes from.
+
+One caveat: Pan runs out of time before the live demo and leaves the eight steps on her slides (deploy, register, create the table, show metadata, insert, preview routing, run a select) to do yourself. The talk explains the design; the slides carry the commands.
+
+## Who should watch
+
+Teams with a large PostgreSQL or MySQL estate who are being asked to scale out without a rewrite, and platform engineers wondering how a database can live partly on Kubernetes. Pan gave related ShardingSphere talks at Conf42 Golang 2023 and SRE 2023 if you want more depth.
+
+## Related Conf42 talks
+
+- Trista Pan on [scalability and high availability for database infrastructure on Kubernetes](https://www.conf42.com/Site_Reliability_Engineering_2023_Trista_Pan_achieve_scalability_availability_database_infrastructur) at Conf42 SRE 2023.
+- Natalie Pistunovich on [building a Kubernetes operator for a distributed database](https://www.conf42.com/Cloud_Native_2021_Natalie_Pistunovich_k8s_operator_distributed_database) at Conf42 Cloud Native 2021.
+- Jan Karremans with the counterpoint, [Just don't do it: databases in Kubernetes](https://www.conf42.com/Cloud_Native_2024_Jan_Karremans_databases_kubernetes), at Conf42 Cloud Native 2024.
+
+[Watch Trista Pan's talk](https://www.conf42.com/Cloud_Native_2023_Trista_Pan_automatically_shard_scaleout_databases_kubernetes)
+
+[Watch the talk on YouTube](https://youtu.be/ndg5GT4j5Dk).
+",talk,cloud2023,talk:cloud2023/Trista Pan,,Conf42,,queued,"databases, sharding, kubernetes, postgresql, shardingsphere"
+,Watch Karpenter shrink an EKS cluster you forgot to shrink,Samuel Baruffi (AWS) at Conf42 Cloud Native 2023 on installing Karpenter on EKS and letting consolidation pick cheaper nodes live,2023-03-11,cloud2023/karpenter-consolidation-eks-demo,,"Scaling up is the easy half of autoscaling; the money leaks out on the way down. At Conf42 Cloud Native 2023, Samuel Baruffi, Senior Global Solutions Architect at AWS, explains why Cluster Autoscaler struggles on EKS and then spends the second half of the talk in a terminal, installing Karpenter and watching its consolidation feature move pods onto fewer, cheaper nodes without being asked.
+
+## Where does Karpenter sit among the autoscalers?
+
+Baruffi starts from EKS basics: a managed, single-tenant control plane per cluster, data plane nodes in your VPC as self-managed or managed node groups, four supported Kubernetes versions at a time. Then the three Kubernetes autoscalers: HPA adds pods, VPA resizes them, and Cluster Autoscaler adds nodes by bumping an Auto Scaling group when pods go pending.
+
+That works for most workloads, but AWS hears the same three complaints. Node group sprawl, because Cluster Autoscaler can only add more of the same instance type, so GPU jobs, web apps and batch each get their own group, and Spot and On-Demand can't share one managed node group. Slow response for spiky work such as ETL or GPU training, where slow scale-up delays data scientists and slow scale-down wastes expensive accelerators. And the difficulty of balancing utilisation, availability and cost across AZs. His slide puts a number on it: nearly half of AWS Kubernetes customers say configuring cluster autoscaling is challenging.
+
+## What does Karpenter change?
+
+Karpenter replaces Cluster Autoscaler and has no groups. It watches for unschedulable pods, bin-packs them, and calls the EC2 Fleet API for just-in-time capacity that fits their requests and constraints. Going straight to Fleet avoids Auto Scaling group API limits, and Karpenter binds pods to the new node early, so image pulls start before the node reports ready, which shaves seconds off startup. ""The goal is to launch 1000 pods within 30 seconds,"" Samuel Baruffi said at Conf42 Cloud Native 2023.
+
+Configuration is two objects: a Provisioner (what may be launched) and an AWSNodeTemplate (how: subnets, security groups, tags, AMI). His Provisioner examples:
+
+- **Capacity type**: allow Spot and On-Demand together, and Karpenter favours Spot, falling back to On-Demand only when Spot isn't available.
+- **Architecture**: arm64 Graviton and amd64 in one provisioner, chosen per pod.
+- **Instance shape**: restrict sizes, families, generations and CPUs; restrict AZs.
+- **Expensive hardware**: a separate GPU provisioner with a taint, so only pods with the matching toleration land there.
+
+For removal there are two mutually exclusive options. `ttlSecondsAfterEmpty` deletes a node that has run only DaemonSets for N seconds. Consolidation, which he recommends, also replaces underused nodes with cheaper ones. `ttlSecondsUntilExpired` rotates nodes after a set age, a handy way to roll out new AMIs.
+
+## What does the demo show?
+
+The setup is a small managed node group to host Karpenter itself, plus eks-node-viewer, an open source tool that shows each node's instance type and the cluster's cost per hour and month as it changes. Karpenter installs from a Helm chart; Spot interruption handling needs an SQS queue and EventBridge rules created beforehand. It runs as a two-replica Deployment in active/standby, not a DaemonSet (he first tails the standby pod's logs and finds nothing, a mistake everyone makes once).
+
+The first Provisioner is Spot-only, Linux, amd64, 2xlarge and up, C, M and R families, capped at 1,000 CPUs and 8 TB of memory, with a 30-second empty TTL. A pause-container deployment scaled from 0 to 1 to 10 replicas brings up Spot nodes within about a minute, the logs showing each step: found provisionable pods, computed new nodes, discovered the security group and AMI, created a launch template, launched. Scale to zero and the nodes vanish 30 seconds later.
+
+Then he switches to On-Demand with consolidation enabled. Scale to 10 replicas and a second node appears. Scale down to 6 and Karpenter notices everything fits on the bigger node, moves the pods and deletes the smaller one. Scale to 3 and the remaining node sits at 40% utilisation, so Karpenter cordons it, launches a cheaper instance, moves the pods, and only then removes the expensive one.
+
+## Who should watch
+
+EKS operators who want to see Karpenter's behaviour before trusting it with production, especially consolidation. His takeaways: use Spot for stateless workloads spread across nodes and AZs, avoid it for single-pod stateful apps, keep a broad default provisioner plus specific ones for constraints like GPUs, and pair Karpenter with HPA. At the time Karpenter supported only AWS as a provider.
+
+## Related Conf42 talks
+
+- Yael Grossman on [groupless autoscaling with Spot and Graviton](https://www.conf42.com/Cloud_Native_2023_Yael_Grossman_scaling_k8s_clusters_losing_money) at the same event.
+- Chris Nesbitt-Smith on [proactive cluster autoscaling](https://www.conf42.com/Cloud_Native_2023_Chris_NesbittSmith_proactive_cluster_autoscaling_kubernetes), also at Conf42 Cloud Native 2023.
+- Chakkree Tipsupa on [scaling, optimising and upgrading Kubernetes with Karpenter](https://www.conf42.com/Kube_Native_2024_Chakkree_Tipsupa_karpenter_kubernetes_scaling) at Conf42 Kube Native 2024.
+
+[Watch Samuel Baruffi's talk](https://www.conf42.com/Cloud_Native_2023_Samuel_Baruffi_aws_eks_cluster_karpenter)
+
+[Watch the talk on YouTube](https://youtu.be/TMgpgW2_Ht0).
+",talk,cloud2023,talk:cloud2023/Samuel Baruffi,,Conf42,,queued,"kubernetes, karpenter, eks, autoscaling, aws"
+,"Karpenter deletes the node group, and that is the whole trick","Yael Grossman (AWS) at Conf42 Cloud Native 2023 on groupless Kubernetes autoscaling with Karpenter, Spot and Graviton",2023-03-10,cloud2023/karpenter-groupless-autoscaling-spot-graviton,,"If you have ever maintained twelve Auto Scaling groups so that Cluster Autoscaler can tell a 4xlarge from an 8xlarge, this talk is for you. At Conf42 Cloud Native 2023, Yael Grossman, Specialist Solutions Architect for Flexible Compute at AWS, explains why Karpenter drops node groups entirely and asks EC2 for exactly the instances your pending pods need, and how that makes Spot and Graviton easy to adopt.
+
+## What are we actually optimising?
+
+Grossman defines efficient autoscaling as three related goals plus one constraint. Scale: pay only for what the business needs right now. Density: pick the right instance and bin-pack containers into it. Flexibility: be willing to use whichever of many instance types is cheapest, which is where Spot and Graviton come in. The constraint is operational overhead, because the platform engineer choosing an autoscaler already has a ton of other tasks.
+
+She also decodes the EC2 naming convention on the way: in m6g.xlarge, the family sets the CPU-to-memory ratio, the size sets the CPU count, and the g says Graviton.
+
+## Why is Cluster Autoscaler hard to configure?
+
+The Kubernetes scheduler matches pods to nodes, but it doesn't create nodes. Cluster Autoscaler fills that gap by bridging pods to Auto Scaling groups: a pod goes pending, Cluster Autoscaler picks a group, bumps its desired count, waits for the instance to bootstrap and join, and the pod schedules.
+
+The catch is in how it picks. It simulates how much capacity each group will return, so every group must be homogeneous. ""So you need to run each auto scaling group with homogeneous instance types,"" Yael Grossman said at Conf42 Cloud Native 2023. You can mix c5.2xlarge and c6.2xlarge, but not 2xlarge with 4xlarge. Need small and large nodes, multiple availability zones, On-Demand and Spot? Multiply the groups, and then keep their AMIs and configuration up to date. Her slides show the result: a cluster with a dozen groups across two AZs, and a note that nearly half of AWS Kubernetes customers say configuring cluster autoscaling is challenging. It also fights Spot best practice, which wants you diversified across sizes as well as families.
+
+## How does Karpenter do it differently?
+
+Karpenter watches for unschedulable pods too, but then calls the EC2 Fleet API directly with a request built from those pods' requirements. No pre-built list of instance types, no group in the middle. Scaling decisions happen in seconds even in large clusters, and different applications can share infrastructure.
+
+Configuration is a Kubernetes custom resource, the Provisioner. Left at defaults it can choose from all 600+ EC2 instance types (metal excluded). You can narrow it by attributes, cap the resources a team's workloads may provision, or set a time-to-live after which nodes are replaced. Karpenter reads the usual pod constraints: resource requests, node selectors, affinity, taints and tolerations, topology spread.
+
+Grossman describes three layouts:
+
+- **Single provisioner** for many workloads, mixing Spot and On-Demand or Graviton and x86, maximising sharing.
+- **Multiple provisioners** for isolation: GPU nodes you don't want shared because they're expensive, security boundaries, team separation, different AMIs.
+- **Prioritised (weighted) provisioners**, for example running 30% of a deployment on Graviton and the rest on x86.
+
+## Why does this make Spot and Graviton easier?
+
+Spot instances can be interrupted with a two-minute notice, so the workload must tolerate moving. Modernised containers usually do: stateless, fault tolerant, bin-packed across sizes and AZs. Karpenter bakes in the Spot playbook: all instance types by default, the price-capacity-optimized allocation strategy that picks the deepest capacity pools, and built-in interruption handling. The discount is up to 90%.
+
+For Graviton, AWS quotes up to 40% better price performance, list prices around 15-20% lower than equivalent x86 instances, and up to 60% better energy efficiency. If you already build multi-architecture images, a provisioner that allows Graviton, Intel and AMD lets Karpenter pick whichever is cheapest, and the container runtime pulls the matching image.
+
+## Who should watch
+
+EKS operators still running Cluster Autoscaler with a pile of node groups, and anyone who wants to try Spot without hand-building the diversification. It is a conceptual talk from AWS, with no live demo; for a hands-on install, the companion Karpenter talk at the same event goes further.
+
+## Related Conf42 talks
+
+- Samuel Baruffi on [just-in-time nodes for EKS with Karpenter](https://www.conf42.com/Cloud_Native_2023_Samuel_Baruffi_aws_eks_cluster_karpenter) at the same event.
+- Raja Ganesan on [why cluster autoscaling with Karpenter is worth the bother](https://www.conf42.com/Cloud_Native_2022_Raja_Ganesan_cluster_autoscaling_karpenter) at Conf42 Cloud Native 2022.
+- Shelby Spees on [how Honeycomb cut infra spend by 40% with Graviton2](https://www.conf42.com/Cloud_Native_2021_Shelby_Spees_graviton2_honeycomb_infra_spend_highestvolume_service) at Conf42 Cloud Native 2021.
+
+[Watch Yael Grossman's talk](https://www.conf42.com/Cloud_Native_2023_Yael_Grossman_scaling_k8s_clusters_losing_money)
+
+[Watch the talk on YouTube](https://youtu.be/mInIQ8fHhzI).
+",talk,cloud2023,talk:cloud2023/Yael Grossman,,Conf42,,queued,"kubernetes, karpenter, autoscaling, aws, cost-optimization"
 ,"Snap! Python again?
 ",Discovering things you never knew you wanted to know!,2023-03-09,2023-03-09-python-event-discover-the-unknown,./assets/splash/PYTHON2023_Event_Splash.png,"#Discovering things you never knew you wanted to know!
 
@@ -99371,6 +99589,193 @@ The real question though, should be not ‘How many more?’, but ‘Why so litt
 
 I guess it’s safe to assume that your dinner plans for today with that ex-friend of yours were canceled. So why not join us for our [Python 2023](https://www.conf42.com/python2023) event? All the knowledge is available now and waiting to be discovered!
 ",,,,,,,,
+,SolarWinds shows why CI can't be your only security scan,"Sven Ruppert (JFrog) at Conf42 Cloud Native 2023 on software supply chain security, SLSA, SAST vs DAST, and scanning binaries before CI",2023-03-09,cloud2023/supply-chain-security-scan-before-ci,,"Sven Ruppert recorded this one on a multi-day hike through the Swedish woods, and the trail ends at a lake just as the talk does. At Conf42 Cloud Native 2023, the JFrog Developer Advocate makes the case that software supply chain attacks have changed who gets targeted, that your dependencies are the low-hanging fruit, and that the CI pipeline is too late to be the first place you scan.
+
+## Why would anyone attack a 20-person company?
+
+Ruppert opens with geopolitics. Attacks used to be about money: a big company, a ransom. Now groups and even governments are involved, and ransomware increasingly wants to cause damage rather than collect payment. Big targets have hardened their own systems, so attackers walk down the supply chain to the weakest link. ""Now you are target because you are a political target,"" Sven Ruppert said at Conf42 Cloud Native 2023. If you deliver software to a large company that some government dislikes, your 20-person shop is in scope.
+
+## What does SLSA give you?
+
+For the developer view of the chain, he leans on SLSA, the Linux Foundation project that maps the path from source to production: code review against malicious commits, a hardened source server, a build system that could be compromised or fed overlaid source, a repository of dependencies and binaries, then delivery. Between those steps he wants a zero trust environment. What developers directly control is narrower: the source code they write, and the binaries they produce and consume.
+
+SLSA itself is documentation, not an implementation: levels from zero to four to calibrate where you are and what the next step is, plus a catalogue of source, build and dependency threats with real examples. It was in alpha at the time, and he recommends it anyway. He also points to Pyrsia, a decentralised package network started by JFrog in which randomly selected peer nodes build the same commit and compare fingerprints before a binary is distributed. Compromising exactly those nodes is hard.
+
+## Which kind of testing first?
+
+Ruppert walks through four approaches:
+
+- **SAST** (static) scans source, configuration and binaries without running anything. It sees everything you give it and can start with the first line of code, but has no runtime context.
+- **DAST** (dynamic) attacks a running system from outside through its API, like a hacker would. No knowledge of internals needed, but it only reaches what the API exposes.
+- **IAST** (interactive) combines the two, a kind of security debugging. You can't just buy it; you need highly skilled people, or you'll test something and wrongly believe it's secure.
+- **RASP** (runtime protection) is an agent in production that spots attacks and either alerts or shuts the system down. It is the last layer, never the only one.
+
+His recommendation: start with static scanning, and start with dependencies. You write thousands of lines; you import millions. Add the base image in your Dockerfile's `FROM`, Helm charts, the operating system, and the binaries of the CI and dev tools themselves.
+
+## Why isn't CI enough?
+
+He calls CI ""a security gateway for everything"", and you should scan there on every build. But the SolarWinds case shows its limit. Attackers didn't steal data from SolarWinds; they modified the CI environment that built the Orion platform, so every build produced a compromised binary, and the automatic updates shipped it. By Ruppert's account, Orion had 300,000 customers, and within days over 15,000 networks were infected. That led to the US executive order on cybersecurity and the SBOM requirement for software used by the US government.
+
+The lesson he draws is that you defend in two directions: don't consume malicious or vulnerable components, and don't distribute them. So scan earlier as well.
+
+## What does scanning earlier look like?
+
+This part shows JFrog's tooling. Keep every binary (Maven, NuGet, Debian, Docker) behind one central repository, Artifactory, instead of pulling straight from Docker Hub or Maven Central, and scan there with Xray, which uses the dependency managers' metadata (transitive dependencies, scopes, linking) instead of looking at a lone binary. Build Info, which JFrog had before SBOMs were mandatory, stores each build's dependencies, environment and agent next to the binary, so a CVE published tomorrow points at the Helm chart in production without rescanning anything.
+
+Earlier still: a free IDE plugin that shows the dependency tree and vulnerabilities the moment you add a line to your POM, a CLI audit of a freshly cloned repository, and on-demand scans of a local Docker image or JAR whose reports can be shared with colleagues. Wherever you scan, read the CVSS base metrics, which describe the worst case, and adjust them for your environment: a network-exploitable flaw matters less on an air-gapped system.
+
+## Who should watch
+
+Developers who want the supply chain vocabulary (SLSA, SBOM, SAST versus DAST) in one sitting, and teams deciding where to put scanners. The second half is JFrog-specific; the first half works with any tool stack.
+
+## Related Conf42 talks
+
+- Ciara Carey on [making SBOMs actionable](https://www.conf42.com/DevSecOps_2022_Ciara_Carey_software_bill_of_materials_sboms_actionable) at Conf42 DevSecOps 2022.
+- Marek Najmajer and Aleksander Baranowski on [vulnerability risk assessment beyond SBOM](https://www.conf42.com/DevSecOps_2023_Marek_Najmajer_Aleksander_Baranowski_beyond_sbom_risk_assessment) at Conf42 DevSecOps 2023.
+- Melissa McKay on [security at every stage of the software supply chain](https://www.conf42.com/DevOps_2024_Melissa_McKay_addressing_security_concerns) at Conf42 DevOps 2024.
+
+[Watch Sven Ruppert's talk](https://www.conf42.com/Cloud_Native_2023_Sven_Ruppert_supply_chain_security_opensource_projects)
+
+[Watch the talk on YouTube](https://youtu.be/fkCu75rn85E).
+",talk,cloud2023,talk:cloud2023/Sven Ruppert,,Conf42,,queued,"supply-chain-security, devsecops, sbom, slsa, vulnerability-scanning"
+,"Security writes the zero trust policy, platform teams make it real","Steve Judd (Jetstack, a Venafi Company) at Conf42 Cloud Native 2023 on why platform engineers should implement zero trust in Kubernetes",2023-03-09,cloud2023/zero-trust-kubernetes-platform-teams,,"Zero trust in Kubernetes stalls less on tooling than on ownership. At Conf42 Cloud Native 2023, Steve Judd, Chief Architect at Jetstack, a Venafi Company, argues that security teams know which policies a cluster needs but rarely have the Kubernetes depth to implement them, and that the people who do are the platform engineers. His answer to ""shift left"" is to shift sideways, to the platform team.
+
+It is a short talk built on conversations Judd has as a consultant with security teams trying to bring zero trust into Kubernetes estates. Treat it as a framing talk, not a tutorial.
+
+## What does zero trust actually mean?
+
+Judd starts with Forrester's definition: a security model that denies access to applications and data by default, and grants access to networks and workloads only through policy informed by continuous, contextual, risk-based verification of users and their devices. His short version: never trust, always verify, every time.
+
+Four principles sit under it:
+
+- **Least privilege.** Give a requester exactly the access the request needs. His example: don't hand everyone cluster-admin, because for sure they don't need it.
+- **Per-request authentication and authorisation.** Every call, not once per session.
+- **Identity-based.** Machines need identities as much as people do: servers, VMs, IoT devices, pods. In practice that means X.509 certificates.
+- **Context-based.** Where is the request coming from, and is that normal for this identity? A UK-based user suddenly calling from Russia should change the answer.
+
+The goal of all four is to stop lateral movement: an attacker who lands on one server shouldn't be able to wander on to the next.
+
+## Why is it hard in a cloud native estate?
+
+Judd lists four challenges. Machine identities are multiplying fast (pods, jobs, services), and if each needs a certificate that is issued, renewed and revoked, doing it by hand is not an option. Access control raises questions of level, updates and enforcement. Shift-left security sounds right, but development teams have competing priorities. And someone has to own governance: who defines the policies and checks they are enforced?
+
+## What does Kubernetes give you out of the box?
+
+Three native features. RBAC, which can be very granular about what a workload may do. Network policies, which define which pod talks to which pod on which port, provided your CNI driver implements them, and not all do. And pod security, where the manifest declares the constraints containers must run under and the Pod Security Admission controller refuses pods that don't comply.
+
+Then three add-ons. cert-manager, which Judd calls the de facto tool for X.509 certificates inside a cluster.  A service mesh such as Linkerd or Istio for mutual TLS between workloads and traffic policies that go beyond network policies. And policy-based admission controllers such as Kyverno and Gatekeeper for richer rules every deployment must meet.
+
+## So who should hold the pen?
+
+This is the talk's real point. ""Security teams deeply understand what security policies need to be introduced, what they look like, but they aren't necessarily the right people for actually implementing those policies,"" Steve Judd said at Conf42 Cloud Native 2023.
+
+Platform engineers already have three things the job needs: Kubernetes expertise, automation know-how, and familiarity with the tools that run, or should run, in the cluster, Istio, Linkerd and cert-manager among them. Security keeps the lead on defining policy; platform engineering implements and probably enforces it. The closing slide puts the onus on security teams to reach out first and collaborate.
+
+It is a tidy answer to the governance question too: the team that owns the golden paths is also the team that can make the secure path the default one.
+
+## Who should watch
+
+Security leads planning a zero trust programme for Kubernetes and wondering why tickets to app teams go nowhere, and platform teams who want vocabulary for the conversation. If you want YAML, pair it with one of the hands-on talks below.
+
+## Related Conf42 talks
+
+- Ara Pulido on [policy-as-code with OPA and Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper) at Conf42 Cloud Native 2021.
+- Atif Siddiqui on [cloud network segmentation in pursuit of zero trust](https://www.conf42.com/Platform_Engineering_2023_Atif_Siddiqui_cloud_network_segmentation_in_pursuit_of_zero_trust) at Conf42 Platform Engineering 2023.
+- Md Azmal on [Istio ambient mesh for zero trust](https://www.conf42.com/Kube_Native_2023_Md_Azmal_ambient_mesh_sidecar_zero_trust) at Conf42 Kube Native 2023.
+
+[Watch Steve Judd's talk](https://www.conf42.com/Cloud_Native_2023_Steve_Judd_zero_to_hero_platform_engineers)
+
+[Watch the talk on YouTube](https://youtu.be/z_CuM68jIHM).
+",talk,cloud2023,talk:cloud2023/Steve Judd,,Conf42,,queued,"zero-trust, kubernetes, platform-engineering, security, cert-manager"
+,"The OWASP Serverless Top 10, mapped to five open source tools","Shlomi Kushchi (Jit) at Conf42 Cloud Native 2023 on covering the OWASP Serverless Top 10 with ZAP, dependency-check, Gitleaks, Prowler and AirIAM",2023-03-08,cloud2023/owasp-serverless-top-10-open-source-tools,,"Ten risks, five free tools, one table. At Conf42 Cloud Native 2023, Shlomi Kushchi, System Architect at Jit, takes the OWASP Serverless Top 10 and assigns each risk to an open source scanner: OWASP ZAP, OWASP dependency-check, Gitleaks, Prowler and AirIAM. The takeaway is that a handful of scheduled scans covers most of the list, as long as you know which tool watches which door.
+
+He frames it with a Home Alone metaphor: your application is the house, the family has left, and you need to know where the burglars will try first.
+
+## What changes when the app goes serverless?
+
+Kushchi starts with a typical AWS serverless shape: users hit an API gateway, static assets come from S3, logic runs in Lambda functions, data sits in managed databases. Compared with a classic app, four things differ. The shared responsibility model shifts so that the cloud provider handles the OS, network and platform, leaving you mostly responsible for the application logic. Functions are ephemeral. The attack surface grows, because every function, bucket and third-party service is another entry point. And you get finer-grained control, which is only a benefit if you use it.
+
+The perimeter to protect includes the CI/CD pipeline, user and admin access (MFA, least privilege), public resources such as IPs and buckets, and third-party services.
+
+## How does the Top 10 group?
+
+The list Kushchi uses is the OWASP Serverless Top 10, which reuses the 2017 web Top 10 categories. He sorts the ten into four domains:
+
+- **Your code**: injection, XML external entities, cross-site scripting, insecure deserialization, components with known vulnerabilities.
+- **Identity and access**: broken authentication, broken access control.
+- **Data**: sensitive data exposure.
+- **Logging and monitoring**: security misconfiguration, insufficient logging.
+
+A detail worth stealing from the misconfiguration slide: the risk includes denial of wallet, not only DDoS. Max concurrency and timeouts on a function are a security setting when someone else can trigger it a million times on your bill.
+
+## Which tool covers what?
+
+- **OWASP ZAP** attacks your web app and API from outside, finds SQL injection, XSS and friends, and takes a Swagger/OpenAPI spec. Its blind spot: it only tests what sits behind an API gateway, so async flows go untested.
+- **OWASP dependency-check** compares your packages against the NVD. Kushchi's argument for scheduled dependency scans is blunt: because it's open source, it's scanned all the time. ""And common threats are common,"" he adds.
+- **Gitleaks** finds secrets in git history. The debug password that slipped into a commit is there forever once pushed. ""If you find them, you need to make sure you mitigate it properly, replace the secrets, invalidate them,"" Shlomi Kushchi said at Conf42 Cloud Native 2023, then check whether anything was compromised and add a pre-commit hook so the next one never leaves the laptop.
+- **Prowler** scans the cloud account itself, AWS and Azure, with roughly 200 checks and AWS Organizations support. It covers what ZAP can't see: internal resources, async flows without an API gateway, unencrypted storage, missing CloudTrail logs.
+- **AirIAM** from Bridgecrew compares IAM roles and policies with what CloudTrail says was actually used, and flags the excess.
+
+Least privilege shows up in almost every row. For injection, ZAP detects the missing input validation and AirIAM limits the blast radius if one slips through. The same few tools keep reappearing across risks, which is the point: you don't need ten products for ten risks.
+
+## Where does Jit come in?
+
+The last few minutes are the vendor part: Jit orchestrates these same open source tools as a security plan defined as code, per environment, triggered by events or schedules, with guidance on fixing what they find. It is brief, and everything before it works without Jit.
+
+## Who should watch
+
+Teams running Lambda-style workloads who want a starter security checklist with a free tool per line. Security specialists will find the material familiar; the value is the mapping, which makes a good one-page plan for a team that has none.
+
+## Related Conf42 talks
+
+- Tal Melamed's [Serverless Security Top 10](https://www.conf42.com/Cloud_Native_2022_Tal_Melamed_serverless_security) at Conf42 Cloud Native 2022.
+- Tal Melamed on [automatic serverless security testing](https://www.conf42.com/DevSecOps_2021_Tal_Melamed_serverless_security_testing_secure_apps) at Conf42 DevSecOps 2021.
+- Kenneth DuMez on [why static shared secrets in GitHub Actions are a bad idea](https://www.conf42.com/DevOps_2023_Kenneth_DuMez_static_shared_secrets_github_actions) at Conf42 DevOps 2023.
+
+[Watch Shlomi Kushchi's talk](https://www.conf42.com/Cloud_Native_2023_Shlomi_Kushchi_defending_apps_serverless_top_10)
+
+[Watch the talk on YouTube](https://youtu.be/MkRb16rBCC8).
+",talk,cloud2023,talk:cloud2023/Shlomi Kushchi,,Conf42,,queued,"serverless, security, owasp, aws, devsecops"
+,Your NetworkPolicy does nothing until your CNI says so,"Reza Ramezanpour (Tigera) at Conf42 Cloud Native 2023 on securing Kubernetes with small images, private registries, Calico policies and monitoring",2023-03-07,cloud2023/kubernetes-network-policy-calico-private-registry,,"A Kubernetes NetworkPolicy is a polite request. At Conf42 Cloud Native 2023, Reza Ramezanpour, Developer Advocate at Tigera, walks from the container image to the cluster network to monitoring, and builds a locked-down three-node lab on camera: images from a private registry, a default-deny policy, and Prometheus metrics that are off until you turn them on. The core lesson is that each layer has a default that works against you.
+
+It is an introductory talk with a long demo, and it is Calico-centric, since Ramezanpour works on Project Calico. The title promises ten best practices; the talk delivers them as themes rather than a numbered list.
+
+## What does Calico actually bring?
+
+Ramezanpour opens with the project: an open source networking and network security layer for containers, VMs and host workloads, on x86 and ARM64, with four pluggable data planes. The standard one uses iptables; the eBPF one can replace kube-proxy entirely, preserve source IPs and do direct server return; a Windows data plane builds on Microsoft HNS; and VPP was in beta at the time. The project counted 9,000+ Slack members, 550+ contributors and over 2,000,000 nodes running Calico every day.
+
+## Start with the image: smaller is safer
+
+The container section has three rules: put the application in an image, include as little as possible, and scan it. The demo makes this concrete. He compiles the same hello world application twice, once on `ubuntu:latest` and once on `scratch`, then scans both with the Tigera image scanner. The Ubuntu image comes back with two vulnerabilities in a program that prints one line. The scratch image has none, because it contains nothing he didn't put there, and it is much smaller too.
+
+Then registries. Public ones are convenient and cheap; private ones give the control that banks and government agencies need for compliance and data protection. Most manifests on the internet point at a public registry (the Tigera operator manifest pulls from quay.io), so the demo mirrors every Calico component, and later the node exporter image, into a private registry on another Multipass VM. The Calico Installation resource has a `registry` field that redirects the whole install there, and a `describe` on a Calico pod proves the image came from the private side.
+
+## Who enforces the policy?
+
+Here is the trap in plain Kubernetes. ""Kubernetes doesn't enforce these policies on its own, and it delegates the responsibility to the CNI plugins,"" Reza Ramezanpour said at Conf42 Cloud Native 2023. Pick a CNI without policy support and your carefully written YAML is decoration.
+
+Even with enforcement, the built-in resource has gaps he lists: no explicit action attribute (allow or deny is implied), no node-specific policies, and nothing that applies to the cluster as a whole. Calico adds its own NetworkPolicy (namespaced), GlobalNetworkPolicy (cluster-wide) and host endpoint policies that cover non-namespaced things such as host processes and network interfaces. Segmentation, in his framing, combines namespaces, labels, security policies and RBAC, so a compromised pod can't wander laterally.
+
+In the demo he creates a monitoring namespace, a ClusterRole, a ServiceAccount and the binding, then applies policies: one letting host-network pods reach the local host IP, then the classic default deny that blocks all namespaced traffic except DNS lookups to CoreDNS.
+
+## Monitoring is off by default
+
+The last layer is visibility, split into infrastructure monitoring (host, network, storage) and application monitoring (leaks, errors, crashes). Calico components can expose Prometheus metrics, but the default configuration disables them; two configuration values and a Service per component fix that. Node exporter, installed by Helm from the private registry, covers the VMs, and the Prometheus UI confirms both feeds.
+
+## Who should watch
+
+Engineers new to Kubernetes networking who want to see image hygiene, private registries and default-deny policies wired together in one lab. Everything in the demo is in a public GitHub repository (frozenprocess/Tigera-Presentations), so you can rerun it at your own pace. If you already run Calico with GlobalNetworkPolicies in production, this will be familiar ground.
+
+## Related Conf42 talks
+
+- Mofizur Rahman's [Kubernetes Security Jumpstart](https://www.conf42.com/Cloud_Native_2021_Mofizur_Rahman_kubernetes_security_jumpstart) at Conf42 Cloud Native 2021.
+- Deepu K Sasidharan on [Kubernetes security from containers to clusters](https://www.conf42.com/DevSecOps_2024_Deepu_K_Sasidharan_kubernetes_security_containers) at Conf42 DevSecOps 2024.
+- Shahar Azulay on [Kubernetes observability with eBPF](https://www.conf42.com/Cloud_Native_2023_Shahar_Azulay_kubernetes_observability_ebpf) at the same event.
+
+[Watch Reza Ramezanpour's talk](https://www.conf42.com/Cloud_Native_2023_Reza_Ramezanpour_kubernetes_security_policy_design_top10)
+
+[Watch the talk on YouTube](https://youtu.be/86tf66ici0s).
+",talk,cloud2023,talk:cloud2023/Reza Ramezanpour,,Conf42,,queued,"kubernetes, security, network-policy, calico, containers"
 ,"Kubernetes Secrets sit in etcd as base64, so run Vault next to them",Michael Levan at Conf42 Cloud Native 2023 on why default Kubernetes Secrets aren't safe and how to install and unseal HashiCorp Vault with Helm,2023-03-06,cloud2023/vault-helm-install-unseal-aks,,"Anyone who can read etcd can read your Kubernetes Secrets. At Conf42 Cloud Native 2023, Kubernetes trainer and consultant [Michael Levan](https://www.conf42.com/Cloud_Native_2023_Michael_Levan_kubernetes_secret_management_vault) made the short case for moving secrets to a third-party store, picked HashiCorp Vault for a reason more teams should use (it's the boring, heavily supported option), and installed and unsealed it live on a managed cluster.
 
 Set expectations: this is a short, hands-on session, and it stops once Vault is running and unsealed. The title promises secret management the right way; what you get is the first step, done cleanly. Injecting secrets into pods is left for another day.
@@ -99413,6 +99818,52 @@ Kubernetes users who have never deployed Vault and want to see the minimum path 
 
 [Watch the talk on YouTube](https://youtu.be/uar5n0HsU-s).
 ",talk,cloud2023,talk:cloud2023/Michael Levan,,Conf42,,queued,"kubernetes, secrets-management, hashicorp-vault, helm"
+,"An IP address, a port and IMDSv1 were all the attackers needed","Nader Zaveri and Brandan Schondorfer of Mandiant (Google Cloud) at Conf42 Cloud Native 2023 on how attackers chain SSRF with IMDSv1, and how to shut it",2023-03-06,cloud2023/imdsv1-ssrf-cloud-metadata-abuse,,"The attackers in this story never needed a username or a password. At Conf42 Cloud Native 2023, Nader Zaveri (Senior Manager, Incident Response & Remediation) and Brandan Schondorfer of Mandiant (Google Cloud) walk through a real intrusion where an SSRF bug plus the AWS instance metadata service in version 1 handed over EC2 role credentials, and the S3 data went out shortly after. The fix is a setting most environments still haven't flipped: require IMDSv2.
+
+## What is the metadata service, and why is it a target?
+
+Every cloud VM can ask a link-local address (169.254.169.254) about itself: IP, subnet, availability zone, and on AWS the temporary credentials of the instance role plus any user data script. AWS, Azure and GCP all have one. The address is not routable, so on its own it is harmless. Pair it with an application that can be tricked into making requests for you (server-side request forgery) and the outside world can read it.
+
+Zaveri's point is that your vulnerability scanner stays quiet about it. He cites a Datadog study published just before the talk: 93% of EC2 instances across 600+ organisations still allowed IMDSv1, and 95% of those organisations had at least one such instance. Version 2 exists since November 2019, shipped after the Capital One breach used exactly this trick, but v1 stays enabled by default. ""This is not a vulnerability. It is a misconfiguration,"" Nader Zaveri said at Conf42 Cloud Native 2023.
+
+User data makes it worse. Startup scripts written in Bash or PowerShell routinely carry clear-text passwords, and anyone who can query the metadata service can read them.
+
+## How did the attack actually go?
+
+Schondorfer covers the forensics. A CVE in Adminer, the database management tool, disclosed in February 2021, allowed SSRF, and a proof of concept followed. Within about three months, a group Mandiant tracks as UNC2903 was spraying it across AWS address space; Mandiant's threat intel matched around 2,100 IP addresses scanning for the same thing. The attacker ran the PoC on an operational relay box, pointed the vulnerable Adminer login (with the driver set to Elasticsearch) at it, and the credentials came back on screen. From there it was the AWS CLI: list the buckets, copy the data. Reconnaissance to exfiltration took roughly three hours.
+
+The demo reproduces this with IMDSv1 on, then repeats it with IMDSv2 required. The second run errors out: v2 needs a PUT to get a session token first, rejects requests carrying an X-Forwarded-For header, and the relay can't do either.
+
+## Why is it so hard to investigate?
+
+There is no HTTP log of who asked the metadata service for a token, and nothing you can turn on to get one. The team stitched the story together from three sources: web logs showing a 302 redirect and a 403 (which looked like failures and were the opposite), VPC flow logs showing the EC2 instance unexpectedly talking to the internet, and S3 object-level data events lining up with the copies. GuardDuty's InstanceCredentialExfiltration findings (inside and outside AWS) fired, but after the credentials were already taken. An alert, Zaveri notes, is not prevention.
+
+Azure and GCP get partial credit: both require a metadata header and reject forwarded requests, though Zaveri points to research on abusing Azure managed identities and on adding SSH keys at GCP project level once you are on the box.
+
+## What should you do on Monday?
+
+The talk ends with a checklist:
+
+- **Find it.** Security Hub, a CloudWatch metric for IMDSv1 use, an AWS Config rule, or open source tools such as Prowler, Metabadger and CloudMapper. `describe-instances` shows `HttpTokens: optional` for the exposed ones.
+- **Remove or restrict it.** If nothing needs the metadata service, disable the endpoint. If something does, require tokens, limit the hop count to 1, and restrict access with iptables and IAM.
+- **Keep it fixed.** Service control policies that refuse to launch instances without IMDSv2, the same guard in Terraform or CloudFormation, or IAM policies for single-account shops. Scan user data for secrets with Scout Suite.
+
+There is also a side lesson on patching priority. Zaveri tells of a vulnerability disclosed on October 21, a PoC on the 27th, and a client breached on the 28th. ""So it's only so much you can be ahead of these vulnerabilities,"" he said, which is why a published proof of concept should move a CVE to the top of the queue, and why the configuration fix matters more than any single patch.
+
+## Who should watch
+
+Anyone running EC2 who hasn't checked `HttpTokens` lately, and incident responders who want to know which AWS logs will and won't help them. It is a practical, front-line talk with two short demos, not a theory lecture.
+
+## Related Conf42 talks
+
+- Ashish Rajan on [running cloud security assessments](https://www.conf42.com/Cloud_Native_2021_Ashish_Rajan_Cloud_Security_Assessments_in_2021) at Conf42 Cloud Native 2021.
+- Tanya Janca on [incident response for developers](https://www.conf42.com/Incident_Management_2023_Tanya_Janca_incident_response_developers) at Conf42 Incident Management 2023.
+- Chris Webber on [achieving a higher level of cloud security](https://www.conf42.com/DevSecOps_2022_Chris_Webber_data_abyss_cloud_security) at Conf42 DevSecOps 2022.
+
+[Watch Nader Zaveri and Brandan Schondorfer's talk](https://www.conf42.com/Cloud_Native_2023_Nader_Zaveri_Brandan_Schondorfer_cloud_metadata_abuse_threat_actors)
+
+[Watch the talk on YouTube](https://youtu.be/1W7Ss9AaOn0).
+",talk,cloud2023,talk:cloud2023/Nader Zaveri,,Conf42,,queued,"cloud-security, aws, imds, incident-response, ssrf"
 ,"Exploits arrive in 30 days, fixes in 246. Security as code closes the gap",Christoph Hartmann (Mondoo) at Conf42 Cloud Native 2023 on security as code: one policy checked from the IDE through CI/CD to production,2023-03-05,cloud2023/security-as-code-policy-local-to-prod,,"Most security tooling only notices a public bucket once it's public. At Conf42 Cloud Native 2023, [Christoph Hartmann](https://www.conf42.com/Cloud_Native_2023_Christoph_Hartmann_security_as_code), Co-Founder and CTO of Mondoo and co-creator of InSpec, argued that security as code should do for security what Terraform did for infrastructure: one policy, written once, that checks the Terraform file in your IDE, the pipeline in CI and the live AWS account in production.
 
 It's a vendor talk that ends in Mondoo's open-source cnspec, but most of it is the case for why the current split between platform and security teams keeps failing, and that part is worth hearing whatever tools you use.
