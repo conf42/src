@@ -2,7 +2,7 @@
 
 A talk at [Conf42 Incident Management 2024](https://www.conf42.com/im2024) by [Arsalan Sheikh](https://www.conf42.com/speaker_Arsalan_Sheikh) (Treasury & Capital Markets @ ex-Oracle). Page: https://www.conf42.com/Incident_Management_2024_Arsalan_Sheikh_7_ai_python_financial
 
-Video: https://www.youtube.com/watch?v=CubcodsKgSo
+Video: https://www.youtube.com/watch?v=9IwiCaoqGEI
 
 ## Abstract
 
