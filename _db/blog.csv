@@ -109643,6 +109643,107 @@ Anyone running a large JVM fleet, or anyone who has tuned a rate limiter per ser
 
 [Watch the talk on YouTube](https://youtu.be/7s-mx-IEEkc).
 ",talk,sre2022,talk:sre2022/Bryan Barkley,,Conf42,,queued,"load-shedding, overload, microservices, jvm, resilience"
+,The biggest base image ended up the safest container,"Martin Wimpress (Slim.ai) at Conf42 Site Reliability Engineering 2022 on container hardening, comparing base images by CVEs, and slimming a Python image",2022-05-20,sre2022/ubuntu-beats-alpine-for-python-containers,,"Smaller is safer, says the adage, and Martin Wimpress spent his Conf42 Site Reliability Engineering 2022 talk testing it. Wimpress, Senior Director of Developer Relations and Community at Slim.ai, built the same small Python Flask app on four base images, scanned each one, and found that Ubuntu 22.04, the largest of the four, had no critical or high vulnerabilities. After slimming it with the open-source DockerSlim, it came out within 5 MB of a slimmed Alpine image with zero known vulnerabilities.
+
+It is a vendor talk (the analysis runs in Slim.ai's SaaS and Docker Desktop extension), but the practices and measurements hold up without the product. The title promises five practices; Wimpress admits at the end that he gave you more than five.
+
+## The Dockerfile basics that matter for security
+
+His starting Dockerfile already follows the usual rules: official base image, a work directory, layers ordered to minimise cache invalidation, files copied only when needed, an exposed port, an ENTRYPOINT for proper signal handling. Then the security-specific changes:
+
+- **Run as nobody.** Without a USER line the app runs as root, and an attacker who gets in has the container and every tool shipped in it. The unprivileged nobody account exists in Debian, Ubuntu, RHEL, Alpine and distroless.
+- **Pin the base image.** The latest tag means no single source of truth for your bill of materials and surprise major-version bumps. He pins to a specific distro and language version (python:3.9.13-slim-bullseye) and lets security scanning drive updates.
+- **Do run apt-get upgrade.** The old advice was to avoid it. His point: vendors refresh base images under the same tag, but there can be days between a fix landing in the package repositories and the new image reaching the registry. On a pinned, stable base, upgrades are security and severe bug fixes only.
+- **Watch the layer cache.** Docker reuses a cached layer if the command text hasn't changed, so your apt-get line keeps installing old packages after the distro has shipped fixes. Keep your normal build, and add a nightly rebuild with the pull and no-cache flags.
+- **Skip recommended packages.** On Ubuntu, installing Python with the no-install-recommends option saved about 266 MB.
+
+## What is actually in the image?
+
+Scan every production image and generate SBOMs in the pipeline. For the talk he used docker scan (powered by Snyk) and docker sbom (powered by Syft), and mentions Trivy, Grype and Clair as alternatives worth trying.
+
+""Knowing what's inside your container is critical to securing your software supply chain,"" Wimpress said at Conf42 Site Reliability Engineering 2022.
+
+## Four base images, scanned
+
+The regular python:3.9.13-bullseye image is 915 MB. With the app and its eleven pip dependencies, the slimmer candidates came to 62 MB on Alpine 3.15, 72 MB on distroless, 135 MB on python slim-bullseye and 139 MB on Ubuntu 22.04. The vulnerability counts don't follow the sizes:
+
+- Alpine: 0.
+- Ubuntu 22.04: 15, none critical or high.
+- Distroless (Debian 11): 46, three critical and seven high, and with no apt-get inside, hard to patch.
+- python slim-bullseye (Debian 11): 84, thirteen critical and three high, all in system packages.
+
+Why does Ubuntu beat its own parent? Wimpress, a Debian contributor himself, credits the commercial security team: Canonical commits to SLAs for mitigating critical and high vulnerabilities over a release's supported life, as do Red Hat and SUSE, while Debian is a community project doing its best. He gives one example: the glibc CVE-2021-3999 was still present in the Debian 11 images, already mitigated in Ubuntu, and never present in Alpine because it uses musl.
+
+## So why not just use Alpine?
+
+Because of musl. Python, Node and some other languages can build much more slowly on Alpine and hit runtime bugs that come from musl versus glibc.
+
+""Personally, I do not recommend using Alpine for Python apps, but it can be great for Go and Rust,"" Wimpress said.
+
+## Slimming: Ubuntu's patching with Alpine's footprint
+
+DockerSlim analyses what the app actually uses, through static and dynamic tracing, and builds a new single-layer image containing only those files. On this simple app the reductions were 3 to 6 times (Ubuntu went from 139 MB to 25 MB); he says complex applications often see 10 to 30 times. Slim.ai's report on the top 100 public container images found more and more test, QA and infrastructure tooling left in production images, which is exactly what an attacker wants to find.
+
+The catch: scanners often can't assess a slimmed image because the package metadata is gone, so checking is manual. In the demo he searches the Ubuntu image for the Python mailcap module, which carried two of the low-severity findings, finds it in the original and not in the slimmed one. The app never used it, so the vulnerability left with it. The same check cleared the medium findings in e2fsprogs, libsqlite3 and perl-base.
+
+## Who should watch
+
+Anyone who writes Dockerfiles for production, especially Python teams that picked Alpine for its size. The base-image table and the layer-caching point are worth the time even if you never touch Slim.ai.
+
+## Related Conf42 talks
+
+- Rob Richardson on [container scanning](https://www.conf42.com/DevSecOps_2021_Rob_Richardson_container_scanning_run_fast_stay_safe) at Conf42 DevSecOps 2021.
+- Ciara Carey on [making SBOMs actionable](https://www.conf42.com/DevSecOps_2022_Ciara_Carey_software_bill_of_materials_sboms_actionable) at Conf42 DevSecOps 2022.
+- Brian Vermeer on [breaking into containers](https://www.conf42.com/Cloud_Native_2021_Brian_Vermeer_containers_breaking_in) at Conf42 Cloud Native 2021.
+
+[Watch Martin Wimpress's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Martin_Wimpress_security_best_practices_production_ready_container)
+
+[Watch the talk on YouTube](https://youtu.be/TDm-EN_afuY).
+",talk,sre2022,talk:sre2022/Martin Wimpress,,Conf42,,queued,"containers, docker, container-security, sbom, python"
+,"A bootstrap team, an SRE in every squad, and predictions over pages",Rohit Sinha (T-Systems International) at Conf42 Site Reliability Engineering 2022 on rolling out SRE in a services company with bootstrap SREs and ML predictions,2022-05-19,sre2022/bootstrap-sres-in-every-squad,,"A product company can stand up a central SRE team and spread the practice from there. A services company, where every customer unit runs its own P&L and behaves like its own little firm, can't. Rohit Sinha, Director of Cloud Application Services at T-Systems International, described at Conf42 Site Reliability Engineering 2022 how his organisation dealt with that: a small bootstrap team of experienced SREs mentoring a designated SRE in every squad, plus data science that predicts failures so engineers stop waiting for incidents.
+
+His framing is that SRE is a cultural and data shift more than a technology one, and the talk is honest that the predictive part was still work in progress.
+
+## How do you roll out SRE across customer units that act like separate companies?
+
+Each customer unit delivers similar services slightly differently, at different levels of tooling and SRE maturity. The answer was the bootstrap site reliability engineer: a group of ten to twelve SREs, mostly hired from outside because they had done it before, acting as the ideological mentors of the whole SRE community. Sinha calls them the horizontal SREs. The vertical ones are designated SREs inside every squad of every customer unit, trained by the bootstrap group, which also introduces the new tooling and the analytics. In a company Sinha puts at $5 billion, that is a lot of squads. Ideally everyone would be an SRE, he says, but that is a maturity target, not reality.
+
+## Why does he call automation an output?
+
+He lists four transformation drivers (cultural shift, technology refresh, data and visibility engineering, process and automation) and insists the first is the hardest. Culture here means throwing a lot of not-my-problem out of the window, reskilling people, and replacing consequence management (finding the culprit) with a culture that accepts failure.
+
+Automation comes last on purpose. ""Automation is after you know what you need to do and then automation does what it does,"" Sinha said at Conf42 Site Reliability Engineering 2022. Analysis decides what is worth automating. He also wants processes measured and, where needed, removed: too many stage gates turn structure into shackles.
+
+## What is visibility engineering?
+
+It is his name for the data layer that gives SREs something better than Excel. The first stage was ITSM analysis: a machine learning model, with separate pipelines per customer because each has different incident thresholds and ways of working, that categorises incidents automatically from historical records, showing what the problem is rather than where. The data is integrated across customers rather than centralised, because GDPR and many different toolchains rule out one big data lake. Sinha is explicit: they are not building a data lake.
+
+The second stage is log analysis with dynamic, moving-average thresholds and predictions, correlating dependent and independent variables across component and system data. The abstract adds the details the talk skips: ARIMA as an example model, data captured every five minutes, and a correlation matrix of around 20 to 30 parameters per machine.
+
+## What does an operator do with a prediction?
+
+This is the question most AIOps pitches dodge, and the best part of the talk. ITIL is built around incident and change management, and problem management is reactive. If a prediction says something will break eight to ten hours from now, what is the standard procedure? Their answer: when a prediction says it will go wrong (Sinha mentions a 75% mark), the squad's SRE leads a project to bend the trend down before it becomes an incident. That only works if the predictions are accurate, which is why he says organisations need to invest in data science.
+
+The second process change was a failure budget for application change management. Each team gets credits based on its historical change performance; while it has credits it can move through the quality gates freely, and after a breach or two it goes back to the full gates. It is a neat way of rewarding teams that have earned the right to take risk.
+
+## What went wrong?
+
+His challenges list is candid: people use transformations to chase numbers when the return is long-term, heavy governance gets in the way, organisations work from spreadsheets instead of tools, and leaders avoid bold decisions. His closing analogy for error budgets is a smartwatch: you look at the numbers every day to see whether you are improving.
+
+## Who should watch
+
+Leaders rolling out SRE in a large IT services or managed-services organisation, and anyone wondering how ML predictions fit into an ITIL world. Engineers looking for implementation detail on the models will find the talk light on it.
+
+## Related Conf42 talks
+
+- Niladri Choudhuri on [SRE anti-patterns](https://www.conf42.com/Site_Reliability_Engineering_2022_Niladri_Choudhuri_sre_antipatterns), also at Conf42 SRE 2022.
+- Christopher Harrison on [changing culture, not just tools](https://www.conf42.com/DevOps_2023_Christopher_Harrison_change_culture__not_just_tools) at Conf42 DevOps 2023.
+- Michele Dodic on [chaos experiments under the lens of AIOps](https://www.conf42.com/Chaos_Engineering_2022_Michele_Dodic_chaos_experiments_under_the_lens_of_aiops).
+
+[Watch Rohit Sinha's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Rohit_Sinha_transformation_cultural_shift_data_science)
+
+[Watch the talk on YouTube](https://youtu.be/SQ1esrAJk9g).
+",talk,sre2022,talk:sre2022/Rohit Sinha,,Conf42,,queued,"sre-adoption, culture, aiops, error-budgets, itil"
 ,It’s Machine Learning Time!,"Stronger than ever
 ",2022-05-18,2022-05-18-machine-learning-stronger-than-ever,./assets/splash/ML2022_Event_Splash.png,"#Should we be worried about AI?
 
@@ -109656,6 +109757,370 @@ Sounds exciting? All the [talks](https://www.conf42.com/ml2022) are available no
 Also, a huge shoutout to our Gold sponsor, [Globant](https://www.globant.com/#utm_source=mediapart&utm_medium=org&utm_campaign=a:ebr_r:eme_bo:ebr_co:multiple_ci:multipleeb-generic_s:mediapart_m:org_o:bra_bi:nap_f:img3_id:100023_ac:ao_t:conf42-golang-2022), we thank you for your support!
  
 ",,,,,,,,
+,"LMAO, or how not to burn out on a 365-day pager","Richard Lewis (3Cloud) at Conf42 Site Reliability Engineering 2022 on LMAO, logs, metrics, alerts and an observability tool, plus playbooks and drills",2022-05-18,sre2022/lmao-logs-metrics-alerts-observability,,"In his first IT job, around 2011, Richard Lewis was on call 365 days a year, 16 hours a day, with a physical pager, no remote access and no logging framework. He burned out in six months. At Conf42 Site Reliability Engineering 2022, Lewis, now a Senior DevOps Consultant at 3Cloud, turned what he and his boss built after that into a short, fast acronym for anyone carrying a pager: LMAO, for logs, metrics, alerts and an observability tool.
+
+It is a short talk with more war stories than tooling, aimed at on-call engineers and the people who schedule them.
+
+## What fixed the burnout?
+
+He didn't quit; he told his boss what was wrong, and the boss listened. They added a logging framework first (log4net) and then fixed the rotation by hiring and spreading the load. The first lesson of the talk is the scheduling one.
+
+""You can't have a person on call 24 hours a day, 365 days a year,"" Lewis said at Conf42 Site Reliability Engineering 2022. If you try, they leave, and they take their tribal knowledge with them.
+
+## L and M: what happened and when
+
+Logs and metrics answer the basic questions: what happened, how many errors, how many requests, when, and for how long. It is the briefest section; the interesting parts are about what you do with them.
+
+## A: pages, tickets and alert fatigue
+
+Lewis splits alerts into pages (the network is down, the website is offline) and tickets (the disk behind the website is at 80% and climbing, the e-commerce site is slow but up). Managing them well comes down to four habits: schedule people sensibly, avoid alert fatigue, collect data on the alerts you send and keep reducing them, and be careful adding new ones.
+
+The reduction ideas are practical. If CPU alerts keep firing, look at autoscaling. If traffic rises at the same hours every day, autoscale for that. If a disk fills up, write a runbook that heals it automatically. Every alert should exist to make someone act.
+
+## O: one dashboard, or nine
+
+He pulls up the monitoring section of the Cloud Native Computing Foundation's product map and counts about nine products on it that he regularly recommends to clients, with the caveat that there is no single right tool, only the right tool for the cost and the moment. Two dashboards illustrate what good looks like. A New Relic one lines up policy violations, synthetic check failures and errors per minute next to deployment notes, so the first question in an incident (what did we just change?) has an answer on screen. A Grafana one embeds wiki links, documentation, an architecture diagram, service up/down history and the 200 versus 500 status codes, so whoever is on call has everything in one place.
+
+## Playbooks: where you keep them matters
+
+Every application should have its own playbook. His contents list: links to the observability tools for that application, its golden signals and their normal range, notes from previous outages and postmortems, the application owner's contacts, and third-party escalation paths such as cloud premium support or your payment provider.
+
+The placement advice is the subtle bit. If the playbook lives inside a network that you reach through Azure AD and Azure AD is the thing that's down, you can't read the playbook. He prefers somewhere outside the network but still behind single sign-on: Confluence, a hosted wiki, SharePoint or a Microsoft Teams wiki.
+
+## Practise like a tornado drill
+
+Growing up in the US Midwest, Lewis did tornado drills at school until crouching in the hallway was muscle memory. That is his case for chaos engineering: controlled experiments that find single points of failure early and test your documentation and processes. He points to Gremlin and to Microsoft's chaos engineering service for tooling.
+
+After real outages, run the postmortem within a day or so while memories are fresh: what went right, what went wrong, where you got lucky. He likes the Google SRE book line that the cost of failure is education. Then update the playbooks and put a revision date on them. A playbook untouched for six months means either a quiet system or an undocumented one.
+
+## Who should watch
+
+On-call engineers early in their career and managers who build rotations. Experienced SREs know the ideas, but the burnout story is worth sending to whoever is planning your next rotation.
+
+## Related Conf42 talks
+
+- Julie Gunderson on [postmortems, continuous learning and blameless culture](https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture) at Conf42 Chaos Engineering 2021.
+- Ricardo Castro on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies), also at Conf42 SRE 2022.
+- Lisa Karlin Curtis on [how incidents level up teams](https://www.conf42.com/Site_Reliability_Engineering_2022_Lisa_Karlin_Curtis_incidents_levelup_teams).
+
+[Watch Richard Lewis's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Richard_Lewis_lmao_outages)
+
+[Watch the talk on YouTube](https://youtu.be/cxMG6lfwjKo).
+",talk,sre2022,talk:sre2022/Richard Lewis,,Conf42,,queued,"on-call, alert-fatigue, observability, playbooks, postmortems"
+,Stop bolting reliability onto every API endpoint,"Navendu Pottekkat (API7.ai) at Conf42 Site Reliability Engineering 2022 on moving API auth, rate limits, canaries and circuit breakers into an API gateway",2022-05-16,sre2022/api-reliability-belongs-in-the-gateway,,"If every microservice carries its own copy of auth, rate limiting and monitoring, written in whichever language that team picked, reliability work scales with the number of services. Navendu Pottekkat, Developer Advocate at API7.ai and a contributor to Apache APISIX, argued at Conf42 Site Reliability Engineering 2022 that this is the core reliability problem of traditional API architectures, and that the fix is to move those concerns into an API gateway and manage them in one place.
+
+He keeps it vendor-neutral on purpose: APISIX gets a mention at the start and the end, but the practices apply to any open-source gateway or a cloud provider's.
+
+## Isn't reliability just uptime?
+
+His first move is to widen the definition. A 99.9% uptime SLA is a myopic view; for an API, reliability also means consistency (clients get reproducible results), availability, low latency, security and status (both the team and API consumers can see whether it is up and whether redirects are in place).
+
+""A service with a high latency is almost equal to service that is not working,"" Pottekkat said at Conf42 Site Reliability Engineering 2022. For the client app waiting on your response, slow and down look the same.
+
+## What goes wrong without a gateway?
+
+Every improvement has to be added to each service separately. The endpoints may use different languages and libraries, so nothing is plug and play, and the reliability tooling has to scale with the API. Monitoring means instrumenting every service, security and authentication mean configuring each one, and releases become stressful because you are aiming for zero downtime with no request dropped mid-transition. The gateway turns that into one common entry point that routes to back-end services by configuration.
+
+## The practices, one at a time
+
+**Authentication.** The gateway authenticates every request, from basic schemes such as a JWT or a cookie in a header to external identity providers such as Active Directory, then passes what it learned to the services behind it. Authenticated requests also make monitoring finer-grained.
+
+**Rate limiting.** He files it under security and reliability both: it stops intentional and accidental misuse, denial of service included, and protects the back end from sudden traffic spikes. Excess requests are either rejected with an error status or, if clients can tolerate the latency, delayed until the services can take them.
+
+**Monitoring and observability.** Instrument the gateway and you see all traffic: metrics for reliability and scaling decisions, plus logs and traces that follow one request from the gateway through the services and back. The point he stresses is avoiding silent failures.
+
+**Canary releases.** All traffic goes to the version 1 upstream; when version 2 is ready, the gateway sends it a small share, increasing it as results stay good, possibly automatically. If something breaks, version 1 is still on standby and rollback is a configuration change.
+
+**Circuit breaking.** With several upstreams behind the gateway acting as a load balancer, one that is down or slow must be cut off. Otherwise requests pile up on it, retries exhaust resources, and the failure spreads to the healthy upstreams like dominoes. The gateway routes around the failed upstream, periodically checks it, and sends traffic back when it recovers.
+
+**Changing paths.** Renaming an endpoint normally means chasing every client to update code. Instead, configure the gateway to redirect the old path to the new one, return a redirect status, and add a deprecation message. Old clients keep working while they migrate.
+
+## Who should watch
+
+Teams with a growing number of services that still handle auth and rate limiting in application code, and SREs making the case for a gateway. If you already run Kong, APISIX or a cloud gateway with these features on, the talk is a checklist rather than news.
+
+## Related Conf42 talks
+
+- Bobur Umurzokov on [API gateway plugins](https://www.conf42.com/Observability_2023_Bobur_Umurzokov_api_gateway_plugins) at Conf42 Observability 2023.
+- Wei Jin on [the Apache APISIX ingress controller](https://www.conf42.com/Cloud_Native_2022_Wei_Jin_apache_apisix_ingress) at Conf42 Cloud Native 2022.
+- Bryan Barkley and Vivek Deshpande on [Hodor, LinkedIn's overload protection](https://www.conf42.com/Site_Reliability_Engineering_2022_Bryan_Barkley_Vivek_Deshpande_hodor_overload_linkedin), also at Conf42 SRE 2022.
+
+[Watch Navendu Pottekkat's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Navendu_Pottekkat_sre_best_practices_api_design)
+
+[Watch the talk on YouTube](https://youtu.be/YwR7a7cCLAU).
+",talk,sre2022,talk:sre2022/Navendu Pottekkat,,Conf42,,queued,"api-gateway, api-design, reliability, circuit-breaking, canary-releases"
+,New on the ops team? Write the runbook nobody has yet,Kazuki Higashiguchi (Autify) at Conf42 Site Reliability Engineering 2022 on three habits that get a new team member into on-call and troubleshooting fast,2022-05-15,sre2022/new-on-the-team-write-the-runbook,,"The newest person on a DevOps team is the one least able to judge whether an alert matters, and often the best placed to write down how things work. Kazuki Higashiguchi, a backend engineer at Autify, turned that into three habits in his Conf42 Site Reliability Engineering 2022 talk: open problem reports even when you don't understand them, write down what you learn, and write the runbooks your team is missing.
+
+It is a short, practical talk aimed at engineers joining a team, built on his own experience at Autify (an AI-based test automation platform, where backend engineers also handle infrastructure, incidents and on-call) and on a well-chosen shelf of SRE books.
+
+## Why is joining operations so hard?
+
+He starts from the troubleshooting model in Google's *Site Reliability Engineering* book: a problem report, then telemetry and logs, then the current state, possible causes, a controlled change and the observed result. The process is generic; the knowledge isn't.
+
+Take an alert that CPU utilisation is over 90%. Before deciding whether to act, you need answers you don't have yet: has the team seen this before, which workflow uses the server, do customers hit it or is it internal, is it a known issue? Mike Julian's *Practical Monitoring* splits alerts into those meant to wake someone up (all web servers down) and those that are FYI (an overnight backup failed, look at it next business day). Telling them apart depends on knowing the system's failure patterns. The same gap shows up in diagnosis: when queue processing stops and waiting events pile up, you need to know what the queue carries, the known causes, and whether retries are implemented.
+
+## Tip one: open the alert anyway, with a timer
+
+Click into problem reports even when you can't fix them. Each one teaches you a failure pattern. The guard rail is a time box.
+
+""It's a good idea to set a time box, in other words a time limit, for example 30 minutes, as too much time may interfere with your main work,"" Higashiguchi said at Conf42 Site Reliability Engineering 2022.
+
+## Tip two: make your learning visible
+
+After digging into an alert, open a blank page (Autify uses Notion for knowledge and Datadog for observability, so sometimes it is a Datadog investigation note) and write down the architecture you discovered, related metrics, and similar past cases. The notes help you, and they show your peers how much of the system you understand, which is how you earn their trust for on-call.
+
+He also leans on Lorin Hochstein's chapter in *97 Things Every SRE Should Know*: the best skill transfer comes from watching experts solve real problems and documenting how they did it. Autify works remotely, so his version is asking a colleague on Slack how they investigated an issue after the fact, then writing it up.
+
+## Tip three: write the runbook
+
+A runbook turns knowledge held by subject-matter experts into a shared asset, and writing one is how you take over an operation. It also attacks the anti-pattern Jeffery D. Smith's *Operations Anti-Patterns, DevOps* calls Only Brent knows: knowledge pooling around a few key people who become valuable and overloaded at once.
+
+Higashiguchi cites *Software Engineering at Google* on timing: the first time you learn something is the best time to improve the docs, before you forget what was confusing. Of the questions *Practical Monitoring* says a good runbook answers, he recommends newcomers take two: what dependencies the service has, and what its infrastructure looks like. Both force you to organise your picture of the architecture. And for the fear of writing something imperfect, he quotes *Seeking SRE* on Anne Lamott's idea that a rough first draft beats a perfect document that doesn't exist.
+
+## Who should watch
+
+Engineers in their first months on a team with on-call, and leads planning onboarding. Senior SREs won't learn new techniques, but might steal the reading list and the idea of making the new hire own the runbook gaps.
+
+## Related Conf42 talks
+
+- Einat Mahat on [effective on-call practices](https://www.conf42.com/Incident_Management_2023_Einat_Mahat_oncall_heroes_effective_practices) at Conf42 Incident Management 2023.
+- Anurag Gupta on [generative AI to fix runbooks](https://www.conf42.com/Incident_Management_2023_Anurag_Gupta_generative_ai_fix_runbooks).
+- Lisa Karlin Curtis on [how incidents level up teams](https://www.conf42.com/Site_Reliability_Engineering_2022_Lisa_Karlin_Curtis_incidents_levelup_teams), also at Conf42 SRE 2022.
+
+[Watch Kazuki Higashiguchi's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Kazuki_Higashiguchi_join_operational_works_devops_team)
+
+[Watch the talk on YouTube](https://youtu.be/VV99Ls11HKo).
+",talk,sre2022,talk:sre2022/Kazuki Higashiguchi,,Conf42,,queued,"onboarding, runbooks, on-call, troubleshooting, devops"
+,"Alert on how fast the error budget burns, not on CPU",Ricardo Castro (Anova) at Conf42 Site Reliability Engineering 2022 on going from metric thresholds to multi-window burn-rate alerts and error budget policies,2022-05-14,sre2022/alert-on-burn-rate-not-thresholds,,"A CPU at 80% at 3am is not an incident if no user notices. Ricardo Castro, Lead SRE at Anova, used his Conf42 Site Reliability Engineering 2022 talk to walk the whole ladder from metric thresholds to multi-window, multi-burn-rate SLO alerts, and then to the part most teams skip: an error budget policy that says in advance what happens when the alert fires.
+
+If you have read the Google SRE workbook chapter on alerting, this is the same progression, explained patiently with good examples. If you haven't, it is one of the clearer half-hour introductions to it.
+
+## Why does an IoT company care?
+
+Anova runs industrial IoT services: data from industrial sensors, processed, stored and fed into machine learning and applications for its customers. Castro gives the (admittedly dated, he says) figures of more than 2,000 customers in more than 80 countries and over a million monitored assets. That is a lot of things that can be quietly unreliable.
+
+He borrows his definition from Alex Hidalgo's *Implementing Service Level Objectives*: a service is reliable if it does what its users need it to do. His warm-up analogy is a supermarket as a microservices architecture, where a half-hour queue at the till is latency and an expired yoghurt is an error.
+
+## From metric to SLA in five steps
+
+The foundations come with concrete examples worth reusing:
+
+- **Metric**: a measurement of an event, such as request duration or how old a message is when it reaches a Kafka cluster.
+- **SLI**: a binary good/bad judgement on that event, such as served within 200 ms, not a 500, Kafka message younger than five minutes.
+- **SLO**: how often the SLI must be good over a time window, such as 99% of requests within 200 ms over 30 days, or 99.99% of Kafka messages younger than five minutes over 24 hours.
+- **Error budget**: 100% minus the SLO.
+- **SLA**: an SLO with consequences, like a 30% discount or a fine.
+
+""SLAs are nothing more than an SLO that has consequences when that SLO is not met,"" Castro said at Conf42 Site Reliability Engineering 2022. SLAs should be looser than SLOs, so a broken SLO still leaves time to fix things before the contract is breached.
+
+## Why each alerting approach falls short
+
+This is the core of the talk. Metric thresholds page you for things users don't feel. Alerting when the SLI drops below the SLO target is better, but by then users are already unhappy.
+
+Alerting on budget consumed is the next step, and Castro shows routing by level: 25% burned sends an email to the team, 50% posts in Microsoft Teams, 75% goes to PagerDuty. The flaw is that it says nothing about speed. If you would still finish the window with budget left, why get woken at 3am?
+
+Burn rate fixes that. A burn rate of one spends the whole budget exactly by the end of the window; a burn rate of two over a four-week window empties it in two weeks. But a single burn-rate check has its own blind spot: evaluate it hourly, and a budget burned in 30 minutes produces no alert at all.
+
+The last rung is multi-window, multi-burn-rate alerting. A fast-burn alert over short five-minute windows at a burn rate of ten catches the catastrophic spike; a slow-burn alert over a 24-hour window, checked every five minutes, at a burn rate of two catches the steady leak.
+
+## The policy is what makes the alert mean something
+
+An alert you trust still needs an agreed response. Castro's error budget policy examples: if the service exceeded its budget over the preceding four weeks, freeze changes and releases except P0 issues and security fixes until it is back within SLO, and possibly move people from features to reliability; if one incident consumes more than 20% of the budget in four weeks, hold a postmortem with at least one P0 action item. He walks through the example policy document from Google's SRE book: authors, reviewers, approvers, revision date, scope, goals and non-goals, what counts as missing the SLO, and outage and escalation policies.
+
+The payoff, as he frames it, is less alert fatigue, a shared language for reliability between engineering and product, and a clear rule for when reliability work beats feature work.
+
+## Who should watch
+
+Teams that have SLOs on a dashboard but still page on CPU. Experienced SLO practitioners can skip to the burn-rate section and the policy document.
+
+## Related Conf42 talks
+
+- Fred Moyer on [SLOs and error budgets at scale](https://www.conf42.com/Observability_2023_Fred_Moyer_slos_error_budgets_scale) at Conf42 Observability 2023.
+- Niladri Choudhuri on [SRE anti-patterns](https://www.conf42.com/Site_Reliability_Engineering_2022_Niladri_Choudhuri_sre_antipatterns), also at Conf42 SRE 2022.
+- Ricardo Castro again, on [rebranding the operations team as an SRE anti-pattern](https://www.conf42.com/Site_Reliability_Engineering_2023_Ricardo_Castro_antipattern_roadblocks_rebranding_operations_team) at Conf42 SRE 2023.
+
+[Watch Ricardo Castro's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies)
+
+[Watch the talk on YouTube](https://youtu.be/30s_Jsa29M0).
+",talk,sre2022,talk:sre2022/Ricardo Castro,,Conf42,,queued,"slos, error-budgets, alerting, burn-rate, sre"
+,"Stale dashboards are downtime too, so data needs its own SRE","Miriah Peterson (Weave) at Conf42 Site Reliability Engineering 2022 on data reliability engineering, data downtime and SLOs for pipelines",2022-05-13,sre2022/data-downtime-needs-its-own-sre,,"Web services brag about five nines; data rarely gets close. Miriah Peterson, Senior Data Reliability Engineer at Weave, argued at Conf42 Site Reliability Engineering 2022 that the fix is to treat data systems as an engineering problem and borrow the SRE playbook: define data downtime, measure it with the golden signals, and wrap pipelines in SLAs, SLOs and SLIs. Her second claim is about people: the pipelines in the middle of a modern data stack need a specialist who is neither a DBA nor a classic SRE.
+
+It is a short, clear introduction, about twenty minutes, with one worked example you can copy.
+
+## What counts as data downtime?
+
+Reliable data is more than an available database. Peterson lists accuracy, freshness, latency, availability, duplication and missing data. For downtime she uses the definition from Barr Moses, CEO of the data observability company Monte Carlo: any period when your data is partial, erroneous, missing or otherwise inaccurate. A dashboard that loads fine but shows last Tuesday's numbers is down.
+
+As with services, the target is not 100%. She quotes *Database Reliability Engineering* by Laine Campbell and Charity Majors on systems without failures becoming brittle, and argues for error budgets that give a trained team room to respond before consumers notice.
+
+## The golden signals, applied to data
+
+Latency, traffic, errors and saturation map neatly onto data services: queries on a store taking too long, a model taking too long to train, a data gateway with unexpected latency, an API gateway returning 400s and 500s it shouldn't, a service with more or less traffic than expected. Metrics and metadata become the picture; anomalies become alerts worth investigating.
+
+## A pipeline SLO you can steal
+
+Her example is a pipeline that pulls CRM data, trains a lead-scoring model and publishes revenue dashboards for sales leaders.
+
+- **SLA**: the revenue dashboard has data no older than one day.
+- **SLO**: the pipeline extracts from the CRM and completes transforms, training and analysis at least once a day, and can be triggered manually if something fails.
+- **SLIs**: errors in the pipeline (training didn't finish, a transform didn't run, the CRM connection failed) and timeouts on the CRM or on writes to the data store, each alerting someone that manual intervention is needed.
+
+The point of the gap between SLO and SLA is time: the automation fails, the alert fires, and a human reruns the job before the 24 hours are up and anyone in sales notices.
+
+## Who owns reliability for which data?
+
+Peterson splits data work into three stacks. The **software data stack** (databases behind microservices, caches, browser storage) belongs to SREs. The **enterprise data stack** (large distributed databases, warehouses for BI, SAP and Oracle) belongs to DBAs or database reliability engineers who can shard and tune queries. The **modern data stack** is everything else: ETL for data scientists, ML pipelines, data gateways guarding golden datasets in a data mesh. That is where she places the data reliability engineer, with skills in ingress and egress, streaming and batch transformations, storage varieties, governance, analysis, automation, monitoring and architecture. Her phrase is data in motion rather than data at rest.
+
+""Any service that relies on data to function needs to have some kind of data reliability in place,"" Peterson said at Conf42 Site Reliability Engineering 2022. As analytics data ends up inside software products and ML models ship to production with back-end teams, she says the work can move from trivial to a hard requirement quickly.
+
+## Who should watch
+
+Data engineers being paged for stale dashboards, and SREs who have just inherited a pipeline. If you already run data SLOs, the talk is a quick confirmation; if you don't, the CRM example is a template for your first one.
+
+## Related Conf42 talks
+
+- Agita Jaunzeme on [DataOps and data mesh best practices](https://www.conf42.com/DevOps_2023_Agita_Jaunzeme_best_practices_dataops_mesh) at Conf42 DevOps 2023.
+- David Joyce on [scalable data pipelines with Argo Workflows](https://www.conf42.com/Kube_Native_2022_David_Joyce_scalable_data_pipelines_argo_workflows).
+- Ricardo Castro on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies), also at Conf42 SRE 2022.
+
+[Watch Miriah Peterson's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Miriah_Peterson_data_reliability_engineering)
+
+[Watch the talk on YouTube](https://youtu.be/XKMpl2b4jOk).
+",talk,sre2022,talk:sre2022/Miriah Peterson,,Conf42,,queued,"data-reliability, data-engineering, slos, observability, data-pipelines"
+,Fail over on the data plane and keep a big red button,Christian Elsen and Lerna Ekmekcioglu (AWS) at Conf42 Site Reliability Engineering 2022 on fast multi-region routing and failover with no control plane dependency,2022-05-12,sre2022/multi-region-failover-big-red-button,,"A multi-region architecture only helps if users reach the nearest region quickly and you can move them off a broken one while half of the cloud's APIs are struggling. At Conf42 Site Reliability Engineering 2022, AWS solutions architects Christian Elsen (Principal, networking specialist) and Lerna Ekmekcioglu (Senior) showed how to do both with AWS Global Accelerator and Amazon Route 53 Application Recovery Controller. Their summary: minimise hops before the AWS backbone, remove control plane dependencies from disaster recovery, and build a big red button for manual failover.
+
+It is an AWS talk about AWS services, with three recorded demos. The control plane versus data plane idea travels well beyond AWS.
+
+## Why not just let users cross the public internet?
+
+Every hop between a user and your endpoint adds latency. Global Accelerator hands you two static anycast IP addresses, announced from AWS edge locations at the same time, so a user in Jakarta enters the AWS network at the Jakarta edge and rides the backbone the rest of the way. The talk puts the network at 96 points of presence in 84 cities across 46 countries. The headline figure: about 60% faster p50 download time for a 100 KB object, from third-party real-user measurements. The accelerator sits in front of ALBs, NLBs, EC2 instances or Elastic IPs.
+
+## Blue/green across two regions with traffic dials
+
+Global Accelerator has two controls. A traffic dial per endpoint group (a region) runs from 0% to 100%, default 100%, and applies only to traffic already headed to that group by proximity and health. Endpoint weights inside a group run from 0 to 255 (default 128), so traffic splits by each endpoint's share of the total.
+
+That makes a multi-region blue/green deployment simple. Both regions serve live traffic at version 1. Dial us-west-2 to 0%: Japanese users still enter at Tokyo or Osaka but get routed to us-east-1, and you upgrade us-west-2 to version 2. Then do the same for us-east-1, then dial it back to 100%. Nobody's connection changes entry point, only where the backbone takes it. The demo shows a CloudWatch dashboard moving from a 50/50 split to 100% on one side and back over two to three minutes per shift. One gotcha from the demo: the dials act on traffic already directed to the group, so a 50/50 split means setting both regions to 50% explicitly.
+
+## What should a failover depend on?
+
+Here the talk gets more interesting. Every AWS service has a control plane (create, modify, delete: launching an EC2 instance, changing a security group) and a data plane (keep running what exists: reading an EBS volume, routing packets by existing VPC routes). The analogy is a flight: takeoff and landing need the control tower, but a plane in the air has its fuel and instruments and keeps flying if the tower goes quiet. Data planes are built for availability, control planes favour consistency, so recovery should lean on the data plane.
+
+Route 53 Application Recovery Controller applies that. It has readiness checks (configuration drift, capacity, routing policies across replicas, or cells), routing controls (on/off switches for manual failover of a whole stack), and safety rules, such as refusing to switch every routing control off at once and stop all traffic. Each routing control maps to a Route 53 health check, and health checks live on the Route 53 data plane with a 100% uptime SLA. So even when you cannot edit the public hosted zone, flipping a routing control forces the health check unhealthy and the failover DNS record answers with the standby region. The controller itself runs as a cluster with endpoints in five AWS regions; one reachable endpoint is enough to change state.
+
+""We can imagine each of these routing controls to be like a circuit breaker,"" Christian Elsen said at Conf42 Site Reliability Engineering 2022, in a demo that fails a tic-tac-toe game over from us-east-1 to us-west-2 with one switch.
+
+## Why a manual button?
+
+The talk makes the case that a regional failover is often a conscious human choice, based on application metrics or a gray failure that automation cannot judge well. Routing controls also cover maintenance traffic shifts and the case where your monitoring is what failed. The target audience they name, regulated industries such as payments and trading, is exactly where a reliable manual lever matters.
+
+## Who should watch
+
+Cloud and SRE teams running, or about to run, active/active or active/standby on AWS. If you are not on AWS, the control plane versus data plane section is still worth twenty minutes of your DR planning.
+
+## Related Conf42 talks
+
+- Ana Van Straaten on [going multi-region](https://www.conf42.com/Cloud_Native_2022_Ana_Van_Straaten_going_multi_region) at Conf42 Cloud Native 2022.
+- Lerna Ekmekcioglu and Jack Iu on [multi-region deployments with Terraform](https://www.conf42.com/Chaos_Engineering_2022_Lerna_Ekmekcioglu_Jack_Iu_multi_region_terraform_deployments_with_terraform_b).
+- Kyle Shelton on [disaster recovery preparedness](https://www.conf42.com/Chaos_Engineering_2022_Kyle_Shelton_disaster_recovery_preparedness).
+
+[Watch Christian Elsen and Lerna Ekmekcioglu's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Christian_Elsen_Lerna_Ekmekcioglu_reliable_multiregion_arch)
+
+[Watch the talk on YouTube](https://youtu.be/EyHejt7WUTI).
+",talk,sre2022,talk:sre2022/Christian Elsen,,Conf42,,queued,"aws, multi-region, disaster-recovery, blue-green-deployments, networking"
+,Renaming your ops team to SRE is anti-pattern number one,"Niladri Choudhuri (Xellentro) at Conf42 Site Reliability Engineering 2022 on the SRE anti-patterns he keeps meeting, from renamed ops teams to tiered support",2022-05-11,sre2022/renaming-ops-to-sre-is-the-first-antipattern,,"The quickest way to adopt SRE is to change the job titles on the operations team and carry on as before. Niladri Choudhuri, CEO of Xellentro, opened his Conf42 Site Reliability Engineering 2022 talk with exactly that as the first of ten anti-patterns he sees when talking to teams that say they practise SRE. The rest of the list is a tour of the ways organisations keep the vocabulary and skip the change.
+
+It is a talk of principles and stories rather than tooling, and a fast one: each anti-pattern gets a few minutes.
+
+## Why isn't a renamed ops team doing SRE?
+
+Choudhuri goes back to why Google created the role: growth that traditional operations could not keep up with. SRE is about reliability *as the system scales*, whether that is new users (Zoom after lockdown started), a rising incident count, new technology or a faster stream of features. SREs automate to cut toil so people can spend their time on making the system more reliable, and they need the psychological safety to break things and learn, because a failure is the system's problem, not the person's. He also cites Google's 2020 book *Building Secure and Reliable Systems*: a system that is not secure is not reliable either.
+
+## Should users find the outage before you do?
+
+No, and the fix is SLOs plus alerts you can act on, on the service rather than on individual metrics. His analogy is the cockpit: hundreds of gauges, and the pilots watch four or five. Everything should be logged and traced, not everything should page. The goal is a shorter MTTR, which needs a shorter MTTD, which needs end-to-end knowledge of the system and of what normal looks like for each customer persona.
+
+""Everything doesn't need to be alerted, everything needs to be logged, everything needs to be traced, but not alerted,"" Choudhuri said at Conf42 Site Reliability Engineering 2022.
+
+## Measuring only up to your own edge
+
+Four nines on your servers mean little if the customer reaches you over mobile data with 95% availability. He argues for SLOs set with product teams from real data, and never 100% unless you build pacemakers or aircraft. Customer experience is a journey: Spotify sells a listening experience, not a song; Uber sells a trip from booking to payment.
+
+His best story here came from Mehdi Daoudi, founder of Catchpoint. A client saw slow responses from California on AWS; AWS sent server logs showing all was well. Only the Catchpoint end-user data convinced AWS to dig, and it took five days to find that a change had routed Californian traffic to a server in Asia instead of North America. The server metrics were green the whole time.
+
+## Alerts: fewer, specific, and carrying evidence
+
+Three anti-patterns cover alerting. False positives are worse than no alerts. A pager that rings all the time burns productivity, since nobody actually multitasks. And an alert that only says something is wrong wastes the responder's first minutes: it should carry the health information needed to diagnose, because a long MTTR eats the error budget that would have paid for features, security patches and chaos engineering.
+
+## Pets, cattle and poultry
+
+The configuration management trap gets the talk's best anecdote. Early in his career he asked for a memory upgrade from 4 MB to 8 MB; the engineer took the 4 MB chip out of the desktop of a colleague who was away at a client for a month. When the colleague came back his machine would not boot, and nobody remembered why. Multiply that by millions of components and you get the case for infrastructure as code and immutable infrastructure: pets (named servers), then cattle (VMs), then poultry (containers), replaced rather than changed.
+
+## Incidents without tiers, fixes beyond the point
+
+SREs belong in incident response, but not in an L1-to-L4 ladder. He wants one cross-functional team that owns the system end to end and swarms an incident, with Google's incident command roles for the big ones, and blameless postmortems shared across the organisation. He points to Monzo publishing a postmortem openly, which brought a reply from maintainers of the open-source component involved.
+
+From there: think beyond point fixing (no release ships without a tested rollback script), stop treating the root cause as the place where you stop asking questions, and don't become a production-readiness gatekeeper that slows the flow. The final anti-pattern is treating SRE as automation alone: hiring developers to automate everything without measuring whether the automation helped. He has seen automation that made the work take longer than before.
+
+## Who should watch
+
+Managers and team leads starting an SRE practice, or anyone who suspects their SRE team is the old ops team with new titles. Practitioners will know most of the list, but the Catchpoint story is a good one to bring to the next SLO meeting.
+
+## Related Conf42 talks
+
+- Ramon Medrano Llamas on [postmortem culture at Google](https://www.conf42.com/Site_Reliability_Engineering_2022_Ramon_Medrano_Llamas_postmortem_culture_google), also at Conf42 SRE 2022.
+- Ricardo Castro on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies).
+- Mandi Walls on [automation and toil](https://www.conf42.com/Site_Reliability_Engineering_2021_Mandi_Walls_automation_toil) at Conf42 SRE 2021.
+
+[Watch Niladri Choudhuri's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Niladri_Choudhuri_sre_antipatterns)
+
+[Watch the talk on YouTube](https://youtu.be/57qGmSsLAgs).
+",talk,sre2022,talk:sre2022/Niladri Choudhuri,,Conf42,,queued,"sre, anti-patterns, alerting, incident-response, slos"
+,Observability starts with a user who feels awesome,"Rajalakshmi Srinivasan (Site24x7, Zoho Corp.) at Conf42 Site Reliability Engineering 2022 on why user experience is the reason to observe anything",2022-05-10,sre2022/observability-starts-with-the-user-feeling-awesome,,"Most observability talks open with a dashboard. Rajalakshmi Srinivasan, Director of Product Management at Site24x7 (Zoho Corp.), opened hers at Conf42 Site Reliability Engineering 2022 with a book about users: Kathy Sierra's *Badass: Making Users Awesome*. Her argument is that metrics, traces and logs only matter because a happy user stays, and that the job of an SRE team is to keep that user feeling capable rather than stuck on a spinner.
+
+It is an introductory talk with a vendor close, and it says so: the last few minutes are about Site24x7's own platform.
+
+## Why does a book on product design open an SRE talk?
+
+Sierra asks whether you want users to feel the product is awesome, the company is awesome or the brand is awesome. Her answer is none of those: you want them to feel that *they* are awesome. Users who feel that way evangelise, tolerate problems, resist the competition and answer each other's questions before your support team gets there.
+
+Srinivasan backs the point with figures from a Forbes roundup of digital experience statistics: 89% of companies have adopted a digital-first strategy, 86% think cloud technology is critical for digital transformation, 67% of consumers will pay more for a great experience, and 83% of enterprise workloads run in the cloud. Her conclusion is that the experience you give customers now shows up directly in the business, which is what she means by an experience-driven economy.
+
+## Observability, monitoring, analysis: a three-layer stack
+
+Her model is a stack. Observability is the bottom layer: a system has to expose some API or protocol before anyone can watch it. Monitoring sits on top and collects the metrics that fit the component. Analysis sits on top of that, and without it the first two layers are a storage bill.
+
+""If you're not going to do anything with the data that you're collecting, do not collect it,"" Srinivasan said at Conf42 Site Reliability Engineering 2022. That sentence alone would save a fair number of observability budgets.
+
+## Where do DevOps and SRE split?
+
+She tells the familiar story of developers throwing builds over the wall to operators, and adds a number from her own shop: Site24x7 went from roughly one build every three months to three or four builds a day, which is what forced the two roles together. DevOps then picks up security and becomes DevSecOps.
+
+Her short version of the difference: ""if DevOps is about principles of what to be done, SRE is about how you do things."" In Java terms, she says, SRE implements DevOps. The SRE needs end-to-end visibility from the end user through the application and platform down to the infrastructure, because the outage can come from a customer's ISP, an endless loop in the code, a database connection nobody closed or a bad switch port.
+
+## The three pillars, with a cost column
+
+The pillars section is a tour more than a revelation, but it is a well-organised one. Metrics change with the component (CPU and memory for a server, response time and call counts for an application, connections and slow queries for a database), and she groups them as availability, security, performance, scalability and cost. Two numbers she gives: the industry expects about two seconds of response time, and surveys suggest around 30% of purchased cloud resources go unused, which is the case for watching cost as closely as uptime.
+
+Traces exist because microservices in short-lived containers, each possibly in its own language, turn one slow call into a cascade. Logs are where everyone looks first anyway; log management, in her phrase, is turning unstructured data into structured data, with audit trails as a side benefit when a customer asks who changed what and when.
+
+## What AIOps is supposed to add
+
+The closing section lists what AI can do on top of the pillars: forecasting capacity from past traffic (the next new-year sale), routing alerts by severity, correlating data across tools and test results, dynamic thresholds per transaction, and chatbot integrations into Slack or Microsoft Teams. Her caveat is the useful part: an AI system is only as good as its training data, and the point is to stop false alerts, not create new ones. The goal she names is moving from reactive to proactive.
+
+## Who should watch
+
+Engineers new to observability, or managers who need the user-experience argument for funding it. Seasoned SREs will know the pillars already; stay for the build-cadence number and the cost-metrics framing.
+
+## Related Conf42 talks
+
+- Dotan Horovits on [DevOps observability in 2022](https://www.conf42.com/Site_Reliability_Engineering_2022_Dotan_Horovits_devops_observability_in_2022), also at Conf42 SRE 2022.
+- Michael McAllister on [the four golden signals](https://www.conf42.com/Site_Reliability_Engineering_2022_Michael_McAllister_four_golden_signals_monitoring_health_service).
+- Michele Dodic on [chaos experiments under the lens of AIOps](https://www.conf42.com/Chaos_Engineering_2022_Michele_Dodic_chaos_experiments_under_the_lens_of_aiops).
+
+[Watch Rajalakshmi Srinivasan's talk](https://www.conf42.com/Site_Reliability_Engineering_2022_Rajalakshmi_Srinivasan_observability_experiencedriven_economy)
+
+[Watch the talk on YouTube](https://youtu.be/yexDfQAgLDQ).
+",talk,sre2022,talk:sre2022/Rajalakshmi Srinivasan,,Conf42,,queued,"observability, aiops, monitoring, user-experience, sre"
 ,Final countdown to Cloud Native 2022!,Going above and beyond,2022-04-25,2022-04-25-cloud-native-above-and-beyond,./assets/splash/CLOUD2022_Event_Splash.png,"#What’s the secret to making our events so exciting? Having the best speakers!
 
 Get ready for having your mind blown with our 6 fabulous keynotes. You will have a look into the very promising future of Cloud Native with [Ciara Carey](https://www.linkedin.com/in/ciara-carey-7540173/). [Nick Bergam](https://www.linkedin.com/in/nicholas-bergam/) will share his insights with you on how to secure your cloud resources from the dangers of the digital world. There will also be talks on such fascinating topics as service mesh, serverless security and how to optimise your non-coding time. 
