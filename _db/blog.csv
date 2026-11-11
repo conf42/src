@@ -78896,6 +78896,50 @@ Product managers who feel buried in dashboards, and engineers who want to unders
 
 [Watch the talk on YouTube](https://youtu.be/oonsb29WAUg).
 ",talk,ml2024,talk:ml2024/Quoc Cuong Nguyen,,Conf42,,queued,"product-discovery, product-management, metrics, experimentation, data-driven"
+,Four ML workers per GPU cut the bill by 4x,"Chinmay Naik (One2N) at Conf42 SRE 2024 on scaling eKYC ML models to 2 million+ requests a day on Nomad, GPUs and a cloud-agnostic stack",2024-05-07,sre2024/mlops-two-million-requests-nomad-gpus,,"A GPU running one ML worker at 20% utilisation is an expensive space heater. At Conf42 SRE 2024, Chinmay Naik, founder of One2N, walked through scaling a set of eKYC machine learning APIs to more than 2 million requests a day, and the best moments are the two production incidents, one of which cut GPU cost by four times.
+
+The first few minutes map MLOps onto the DevOps loop (data preparation, training, model registry, serving, monitoring, with continuous training added to CI/CD). Then it turns into a case study, which is where the value is.
+
+## What was being scaled?
+
+The client sold eKYC APIs to B2B customers in sectors such as insurance and telecom, called through a mobile SDK: face matching between two images with a score from 0 to 1, face liveness detection, and OCR that pulls name, date of birth and address from an ID card photo. Requests went through a load balancer to an API layer, onto RabbitMQ, to GPU-backed ML workers, with results in Postgres and Redis and images in object storage.
+
+The targets: 99% availability during business hours, under 3 seconds latency at the 95th percentile, and costs kept under control.
+
+## Why cloud-agnostic, and why Nomad?
+
+Every component had a portable option: S3, GCS or MinIO for images; self-hosted Redis or ElastiCache; RabbitMQ rather than SQS; Postgres on RDS or Cloud SQL. The point was to run the same code on any cloud, on premises, at a customer site or air-gapped. Chinmay Naik said at Conf42 SRE 2024 that ""we could package the same wine in a different bottle"". HashiCorp Nomad was the orchestrator, not Kubernetes, because the team needed something simple to run on premises and had Nomad experience, not self-hosted Kubernetes experience.
+
+## Removing single points of failure
+
+RabbitMQ ran as a three-node cluster with queue replication across availability zones. ML workers were spread across zones too, except the cloud provider offered GPUs in only two of the three, so autoscaling and deployment automation had to learn about a two-zone exception. Redis and Postgres went to managed services: stateless is easy, stateful is hard, and the ML side was hard enough.
+
+## Autoscaling with linear regression and a manual override
+
+Capacity planning started at the bottleneck, the ML workers, with long load tests per model to find how many requests one GPU node sustains. The autoscaler is refreshingly simple. A capacity predictor runs every 20 minutes, takes the request rate, its growth and the current node count, and uses linear regression to predict the desired node count. The autoscaler updates Nomad and posts the change to Slack. Time-based rules pre-warm the fleet before stores open, and a manual override covers marketing campaigns. He says it has run for years without trouble.
+
+## Incident one: the 20% GPU
+
+With Nomad's Docker driver they ran one ML worker per GPU and saw about 20% utilisation. After digging through Nomad GitHub issues (#6708 is still open, he notes), they switched to the raw_exec driver running Docker Compose, which fit four workers on one GPU at about 80% utilisation. ""It straight away brought our cost down by four x."" The price is that Nomad no longer handles graceful shutdown for you, so they wrote scripts to tear the containers down properly.
+
+## Incident two: 25-second responses with idle workers
+
+During a rollout to new stores, response times went above 25 seconds against a 3-second target. Workers had no queue depth and no processing lag. The culprit was on the API side: only 5 goroutines consumed result messages from RabbitMQ. Raising that to 30 brought responses back under 3 seconds. The lesson in his words: ""our preconceived notion and the first response was to look at workers as a problem"". They added cross-service latency tracking afterwards.
+
+## Who should watch
+
+SREs inheriting ML workloads, and anyone paying for GPUs that sit mostly idle. His other lessons: data quality matters most, operations work is a first-class citizen, and collaboration with data scientists shrank the model image from about 10 GB to under 3 GB, which made new nodes ready much faster.
+
+## Related Conf42 talks
+
+- Chinmay Naik on [real-world Go concurrency](https://www.conf42.com/Golang_2024_Chinmay_Naik_concurrency_gigabyte_realworld) at Conf42 Golang 2024.
+- Noa Goldman's [hitchhiker's guide to MLOps](https://www.conf42.com/Machine_Learning_2023_Noa_Goldman_hitchhiker_guide_mlops_experience) at Conf42 Machine Learning 2023.
+- Tomas Fernandez on [MLOps from Jupyter to production](https://www.conf42.com/Machine_Learning_2024_Tomas_Fernandez_mlops_jupyter_production) at Conf42 Machine Learning 2024.
+
+[Watch Chinmay Naik's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Chinmay_Naik_devops_mlops_scaling)
+
+[Watch the talk on YouTube](https://youtu.be/Au73jDVCoNg).
+",talk,sre2024,talk:sre2024/Chinmay Naik,,Conf42,,queued,"mlops, gpu, nomad, autoscaling, capacity-planning"
 ,Your data project failed before you picked Snowflake,"Jesse Anderson (Big Data Institute) at Conf42 Machine Learning 2024 on why 85% of data projects fail, and the who, what, when, where and how that prevent it",2024-05-06,ml2024/data-projects-fail-on-people-not-tech,,"Social media will tell you a data project failed because someone picked Snowflake over Databricks, or Python over Rust. Jesse Anderson, Managing Director of Big Data Institute and author of the book Data Teams, disagrees. At Conf42 Machine Learning 2024 he starts from Gartner's figure that 85% of data projects fail, which matches his own experience, and argues that technology is only one small, if important, piece. The rest is who, what, when, where and how.
 
 ## Who: three teams, in the right ratio
@@ -78996,6 +79040,46 @@ Engineers building RAG or search who picked HNSW because a tutorial did. It's a 
 
 [Watch the talk on YouTube](https://youtu.be/x0rVU3DnZcc).
 ",talk,ml2024,talk:ml2024/Stephen Batifol,,Conf42,,queued,"vector-databases, embeddings, milvus, similarity-search, rag"
+,Uptime is the wrong SLO for event-driven systems,"Ricardo Castro (FanDuel) at Conf42 SRE 2024 on SLOs for event-driven systems built on freshness, availability and correctness, checked by synthetics",2024-05-06,sre2024/slos-freshness-availability-correctness-events,,"In an event-driven system every service can be up while the data is late, missing or wrong. At Conf42 SRE 2024, Ricardo Castro, Principal Engineer, SRE at FanDuel, proposed three SLO dimensions for event-based architectures (freshness, availability and correctness) and synthetic monitoring as the way to measure the ones you cannot observe directly.
+
+It is a short, high-level talk; Castro says outright that the implementation details are for later talks. What it gives you is a clean mental model for SLOs on asynchronous flows.
+
+## Freshness: how old is this event when it arrives?
+
+Think of a stock trading system with delayed price updates, or a self-driving car reading a stale sensor. Ricardo Castro said at Conf42 SRE 2024 that ""Freshness is measured by the time an event creation takes to be consumed."" Real time is relative: the acceptable threshold depends on the use case.
+
+With two services exchanging events, freshness is the time from service one to service two, self-reported by the consumer as a histogram. When one event triggers a cascade of others, you measure the same way at several points, each with its own threshold.
+
+## Availability: did the event actually get there?
+
+Uptime does not cut it here. In his words, ""Availability is not just about if a system is online or offline, it centers on whether core functionality is accessible within acceptable time frames."" A consumer can fail and processing can slow while every component reports healthy.
+
+In the two-service case, availability means the event emitted by service one arrived at service two, which is easy to check. In a cascade, it has to be measured at several points, and doing that online may not be feasible. His answer is synthetic monitoring: ""Think of it as using a robot to continuously test your system like a real event would."" Scheduled synthetic events give predictable, controlled tests; real user monitoring gives messier truth. He recommends both together.
+
+## Correctness: garbage in, garbage out, at scale
+
+An event can arrive on time and still be wrong. A bad sensor reading or an invalid transaction propagates silently and can end in inaccurate reports or irreversible actions. Correctness means the event reached service two in the right format, and, in a cascade, that correlated but different downstream events are right too.
+
+Synthetic tests help again, because they can assert on outputs, not just responses: send specific event data and check that the calculation came out right or the database update actually happened. The catch is overhead. Validation costs latency, so the rigour has to be balanced against the system's speed requirements.
+
+## SLOs are a conversation, not a number
+
+He closes on process. Start with the most impactful metric for each of the three dimensions and refine it over time so it tracks real user experience and business goals, in close dialogue between engineers and the people who understand what the system is for.
+
+## Who should watch
+
+Engineers running Kafka-style pipelines or event-driven microservices who have SLOs on their HTTP endpoints and nothing on their queues. It is a short overview, so pair it with something hands-on.
+
+## Related Conf42 talks
+
+- Ricardo Castro's earlier talk on [alerting on SLOs and error budget policies](https://www.conf42.com/Site_Reliability_Engineering_2022_Ricardo_Castro_alerting_slos_error_budget_policies) at Conf42 SRE 2022.
+- Henrik Rexed on [observability for event-driven systems with OpenTelemetry](https://www.conf42.com/Observability_2023_Henrik_Rexed_event_driven_observability_opentelemetry) at Conf42 Observability 2023.
+- James Eastham on [building an event-driven system](https://www.conf42.com/Cloud_Native_2024_James_Eastham_event_driven_system) at Conf42 Cloud Native 2024.
+
+[Watch Ricardo Castro's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Ricardo_Castro_slos_eventbased_navigating)
+
+[Watch the talk on YouTube](https://youtu.be/Y54wK5rZufw).
+",talk,sre2024,talk:sre2024/Ricardo Castro,,Conf42,,queued,"slos, event-driven-architecture, synthetic-monitoring, sre"
 ,"Insights nobody acts on are worth nothing, so tell a story","Ambili T (Rittman Mead) at Conf42 Machine Learning 2024 on turning data into stories, with a live Oracle Analytics demo from raw table to storyboard",2024-05-05,ml2024/data-storytelling-oracle-analytics-demo,,"Self-service BI gave everyone the power to find insights, and most of those insights now sit unread. At Conf42 Machine Learning 2024, Ambili T, Principal Consultant for Analytics at Rittman Mead, argues the missing step is communication: frame the data as a story, or watch the insight-to-value conversion rate drop. She then builds one live in Oracle Analytics, from a raw dataset to a storyboard for management.
 
 Honest scope: Rittman Mead is an Oracle data and analytics consultancy and the demo is Oracle's product, so half the talk is a product walkthrough. The storytelling half applies to any tool.
@@ -79041,6 +79125,46 @@ Analysts and BI developers who present to executives, and teams evaluating Oracl
 
 [Watch the talk on YouTube](https://youtu.be/WlqD_-HZYgI).
 ",talk,ml2024,talk:ml2024/Ambili T,,Conf42,,queued,"data-storytelling, data-visualization, oracle-analytics, business-intelligence, analytics"
+,Carbon intensity should be the fifth golden signal,Pini Reznik (re:cinq) at Conf42 SRE 2024 on adding Software Carbon Intensity to the golden signals and running carbon budgets like error budgets,2024-05-05,sre2024/carbon-intensity-fifth-golden-signal,,"Latency, traffic, errors and saturation tell you whether a service is healthy. None of them tells you what it costs the planet. At Conf42 SRE 2024, Pini Reznik, co-founder and CEO of re:cinq, argued that SREs are the people best placed to fix that: add Software Carbon Intensity as a fifth golden signal and treat emissions with the same SLO machinery that already governs reliability.
+
+## Why should an SRE care about carbon?
+
+Reznik builds the case quickly. The world emits about 56 billion tons of carbon equivalent a year. COVID cut that by about 5% in 2020, and a year later it was as if it never happened. The IT industry emits roughly 3 to 5% of the total, more than aviation, and on current trends that could reach 14% by 2040 as AI and cloud grow.
+
+Regulation is catching up. The EU's Fit for 55 commits member states to cut emissions by 55% by 2030, and CSRD reporting is now required of large enterprises. Reporting is only the first step: his expectation is fines and carbon taxes on whoever does not reduce. And because your cloud provider's scope 1 and 2 emissions become your scope 3, you will need detailed, near real-time numbers from your suppliers, more like a nutrition label than an annual report.
+
+## What does not work
+
+He names three traps. Greenwashing, now under a new EU directive that requires companies to prove their claims. Carbon offsets, most of which, he says, are not real. And follow the sun, chasing greener grids across regions, which sounds good but needs spare capacity in each region, ignores embodied carbon and idle energy, and gets worse if everyone moves to Norway at once.
+
+## SCI, measured like an SLI
+
+The core proposal uses the Green Software Foundation's Software Carbon Intensity specification: energy consumed by the software, times the carbon intensity of the grid (Poland runs about 80% on coal, Norway and Sweden almost entirely on green energy), plus embodied hardware emissions, per functional unit such as an API call. Pini Reznik said at Conf42 SRE 2024 that we should ""start using the fifth golden signal"", and then run it like an SLO: measure today's emissions and set that as the initial target, eliminate the obvious waste, lower the target step by step, and nudge teams when they break it. An error budget, only the budget is carbon.
+
+Measurement is the hard part, and he is honest about the tooling. Kepler exports Kubernetes energy consumption to Prometheus using eBPF; Scaphandre works at the bare-metal and kernel level. re:cinq's own open source Aether converts energy and embodied carbon in cloud and on-prem systems into emissions using the live grid mix. Below that, profilers can attribute energy down to the line of code.
+
+## Where are the cheap wins?
+
+His advice is to ""kill the zombies, descale your clusters"", right-size everything, autoscale, and consider ARM over x86. Running stable services and spiky batch jobs in the same cluster over-provisions it; splitting them can shrink a cluster sometimes by 50%. Do not spin up an environment for every commit nobody tests. Do not buy availability the business does not need: more nines mean more redundancy and more emissions. Ask whether you need Cassandra when a small Postgres would do.
+
+Hardware lifespan matters too, because embodied carbon is spent before the server is switched on. He cites Amazon extending server life to six years and saving $900 million along with the emissions. His rule of thumb from re:cinq's work: about 50% off by removing infrastructure waste, then another 20 to 30% from optimising software.
+
+And the bananas from his opening question? About 110 grams of CO2 each. Not that bad. Air-freighted asparagus is the real villain.
+
+## Who should watch
+
+SREs and platform engineers who will be asked for carbon numbers before long, and anyone who wants a reason to delete idle clusters that finance will also like. His closing homework: read Building Green Software and start measuring.
+
+## Related Conf42 talks
+
+- Neel Shah on [green and sustainable software](https://www.conf42.com/DevOps_2024_Neel_Shah_green_sustainable_software) at Conf42 DevOps 2024.
+- Clifton Reddy on [green code](https://www.conf42.com/DevSecOps_2024_Clifton_Reddy_green_code_sustainable) at Conf42 DevSecOps 2024.
+- Julia Ziebinska on [reducing the web's carbon emissions](https://www.conf42.com/JavaScript_2023_Julia_Ziebinska_better_web_reducing_carbon_emissions) at Conf42 JavaScript 2023.
+
+[Watch Pini Reznik's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pini_Reznik_error_carbon_empowering)
+
+[Watch the talk on YouTube](https://youtu.be/9S7A--sNdPc).
+",talk,sre2024,talk:sre2024/Pini Reznik,,Conf42,,queued,"sustainability, green-software, slos, kubernetes, finops"
 ,The best model changed three times while he wrote the talk,"Richard Finlay Tweed (Thought Machine) at Conf42 Machine Learning 2024 on rolling out LLM tools without overcommitting, from local models to RAG",2024-05-04,ml2024/llm-tools-dont-overcommit-build-examples,,"If your company is about to sign a three-year contract with one LLM vendor, Richard Finlay Tweed would like a word. At Conf42 Machine Learning 2024, the Senior Site Reliability Engineer at Thought Machine shares the system patterns he has seen work for rolling out LLM tools inside a business: don't overcommit, build a small library of working examples, let teams self-serve, make the right thing easy, and respect the limits.
 
 He opens with a tl;dl list and the evidence for his first point: between starting the script and recording it, ""The best model changed three times,"" Richard Finlay Tweed said at Conf42 Machine Learning 2024.
@@ -79085,6 +79209,50 @@ Platform, SRE and IT teams asked to provide LLM tooling for the rest of the comp
 
 [Watch the talk on YouTube](https://youtu.be/KeAO1lgzoBQ).
 ",talk,ml2024,talk:ml2024/Richard Finlay Tweed,,Conf42,,queued,"llm, rag, developer-productivity, local-llm, platform-engineering"
+,Every platform feature you ship is a support ticket you'll answer,"Adam Gardner (CNCF) at Conf42 SRE 2024 on platform engineering for 1,000 developers at Dynatrace, treated as a product and kept small on purpose",2024-05-04,sre2024/platform-feature-is-tomorrows-support-ticket,,"Platform teams rarely fail for lack of features; they drown in them. At Conf42 SRE 2024, Adam Gardner, CNCF Ambassador, told the story of a nine-month platform engineering effort at Dynatrace that started as a hands-on training demo and grew into a testing ground for 1,000 developers, and his main lesson is to build less.
+
+## How does a conference workshop become a company platform?
+
+It began when Andreas Grabner asked Gardner for an observable platform engineering hands-on session at Perform, Dynatrace's yearly conference in Las Vegas. The instructors played the platform team; each attendee played an application team. They ran six of these sessions, and the whole thing is public: it spins up in a GitHub Codespace.
+
+The stack reads like a CNCF project list. GitLab on the cluster as the source of truth, so attendees needed no outside accounts. Argo CD, Argo Workflows and Argo Rollouts for the GitOps side. Backstage as the platform UI. Keptn watching what Argo deploys and generating DORA metrics. OpenTelemetry and the collector, cert-manager, OpenFeature for feature flags, CloudEvents, NGINX ingress, and security scanners such as kube-hunter and kube-bench. Observability starts at boot: the platform emits an OpenTelemetry trace of its own startup to show it came up healthy.
+
+The platform offered exactly two things: onboard a new application (name, version, DORA metrics, security scans, dashboards, next, next, deploy), and a feedback form that packaged answers as a CloudEvent, so the platform team saw feedback in real time.
+
+The surprise came on day two. Sales engineering, post-sales, R&D and support all came to ask about it. Sales engineers wanted disposable demo environments. New hires wanted templates, a Spring Boot app or a Dynatrace app. Everyone wanted infrastructure on demand. And support wanted a reproducible environment per ticket, thrown away once the ticket closes.
+
+## Platforms are products, and time is money
+
+Gardner's first lesson: even with no money changing hands, someone has to fund a team, so treat the platform like a product. That means a roadmap, a product manager and an outreach programme, because other teams have finite attention. Platforms are abstractions that turn the complex into a commodity, and they are a place to nudge. His onboarding form shows a yes or no box for security scans, pre-selected to yes. You do not need to understand the scanner to accept a sensible default.
+
+## Bloat is a security problem, not just a taste problem
+
+Bloat leads to security, performance, compliance and maintenance issues. As Adam Gardner said at Conf42 SRE 2024, ""A feature today that you implement is a support ticket tomorrow.""
+
+He admits he fell for it himself. After the first version shipped, he filed issues for feature flagging, Kyverno, chaos tools and compliance tooling. The response: ""And actually, there were no comments. Nobody wanted this stuff."" He closed every issue. No demand is a signal.
+
+## MVP or MVSP?
+
+He recommends the Minimum Viable Secure Product checklist, backed by Salesforce, Google, CISA and Okta among others. His exception: something temporary, throwaway and kept away from customer or production data can stay a plain MVP, because you can assume a breach and lose nothing real. For reading, he points to the CNCF App Delivery TAG's platforms white paper and its platform engineering maturity model.
+
+## Where Dynatrace went next
+
+The work produced a supported OpenTelemetry Collector distribution from Dynatrace, a new Backstage plugin, work on cloud native standards for pipeline observability (pipeline started, finished, errored), a look at Crossplane or operators to replace the Monaco tooling for configuration as code, and dev containers as the standard for disposable environments.
+
+## Who should watch
+
+Anyone about to start a platform team, or running one that keeps growing features nobody asked for. The demo repo alone is worth the visit if you want a working Backstage plus Argo plus OpenTelemetry setup to poke at.
+
+## Related Conf42 talks
+
+- Gal Bashan on [platform engineering as a product](https://www.conf42.com/DevOps_2023_Gal_Bashan_platform_engineering_product) at Conf42 DevOps 2023.
+- Caio Medeiros Pinto on [smooth platform engineering adoption](https://www.conf42.com/DevOps_2024_Caio_Medeiros_Pinto_smooth_platform_engineering_adoption) at Conf42 DevOps 2024.
+- Serg Hospodarets on [platform engineering](https://www.conf42.com/DevOps_2023_Serg_Hospodarets_platform_engineering) at Conf42 DevOps 2023.
+
+[Watch Adam Gardner's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Adam_Gardner_reality_platform_engineering)
+
+[Watch the talk on YouTube](https://youtu.be/poy6W3ULKPA).
+",talk,sre2024,talk:sre2024/Adam Gardner,,Conf42,,queued,"platform-engineering, backstage, gitops, developer-experience"
 ,"In fintech, AI should be the answer to a question",Adhikar Babu (Worldpay) at Conf42 Machine Learning 2024 on where AI pays off in financial services and why it must start from a real problem,2024-05-03,ml2024/fintech-ai-needs-a-problem-first,,"An AI toothbrush is a good sign the hype train has left the station. At Conf42 Machine Learning 2024, Adhikar Babu, Senior Product Manager at Worldpay, gives a product manager's map of AI in financial services: where it already works, where it is heading, and the four ways it goes wrong. His core rule: ""AI is a means to a problem and not the opposite way,"" Adhikar Babu said at Conf42 Machine Learning 2024.
 
 It's a short strategy talk, aimed at people deciding what to build rather than how to build it.
@@ -79131,6 +79299,46 @@ Product managers and engineering leads in payments, banking or fintech who need 
 
 [Watch the talk on YouTube](https://youtu.be/39lxJEWFf1U).
 ",talk,ml2024,talk:ml2024/Adhikar Babu,,Conf42,,queued,"fintech, generative-ai, product-management, financial-services, ai-strategy"
+,Put Kafka between your OpenTelemetry collectors and scale on lag,Pranay Prateek (SigNoz) at Conf42 SRE 2024 on putting Kafka between OpenTelemetry collectors so ingestion spikes queue up instead of dropping data,2024-05-03,sre2024/kafka-buffer-for-opentelemetry-collectors,,"An OpenTelemetry Collector that receives a 10x traffic spike has two options: scale up in time or drop data. At Conf42 SRE 2024, Pranay Prateek, co-founder of SigNoz, explained how SigNoz Cloud stopped betting on the first option by putting Kafka between its gateway collectors and each tenant's collector, then scaling the tenants on consumer lag.
+
+It is a production architecture walkthrough from people who run an observability backend for paying customers, which makes it more useful than the usual forum thread on whether to use Kafka with OpenTelemetry at all.
+
+## What is wrong with collectors talking straight to collectors?
+
+Prateek recaps the OpenTelemetry Collector as a pipeline of receivers (more than 90 of them, from host metrics to Kafka), processors (attribute changes, filtering) and exporters (ClickHouse, Kafka, a vendor backend). SigNoz, an open source observability platform with 17K+ GitHub stars, has been OpenTelemetry-native since it started in 2021.
+
+In the original single-tenant design of SigNoz Cloud, a load balancer sent each customer's data straight to that tenant's collector. Two failure modes followed. If the tenant or its database went down, agents got 5xx responses and data was lost after a few minutes. And if a customer's ingestion jumped 10x within minutes, the tenant could not scale fast enough and rejected data until its database caught up.
+
+## Kafka as a six-hour shock absorber
+
+The fix: customers hit a fleet of gateway collectors, which use the Kafka exporter to write into Kafka; each tenant's collector reads with the Kafka receiver. A spike lands in the queue, and the tenant keeps consuming at its own pace while it scales. The setup he showed has a 6-hour retention period, a replication factor of 3 and a 10 MB maximum message size.
+
+There is a bonus he clearly enjoys. Collectors are stateless and horizontally scaled, so the spans of one trace can land on different instances, which makes tail-based sampling awkward. With Kafka you can use the trace ID as the partition key, so all spans of a trace go to one partition and the sampling decision gets easy. Dropping every health-check trace becomes a filter, not a distributed systems problem.
+
+## Consumer lag is the scaling signal
+
+SigNoz monitors SigNoz with SigNoz (the monitor monitoring itself): records produced and consumed per tenant, producer-to-consumer latency, and consumer lag. Pranay Prateek said at Conf42 SRE 2024 that ""consumer lag is like one of the pointers which helps you decide what to and when to scale the tenants"". When lag on a partition crosses a threshold, they get alerted and scripts add consumers. The ceiling is partition count, since partitions are Kafka's unit of parallelism, so more tenant collectors also means more partitions.
+
+Batching pays off too: because collectors send data in batches, they see a compression factor of 10 to 15 before it enters Kafka.
+
+## What is still unfinished?
+
+He is candid about the gaps. Partitions are not yet added automatically as a topic's ingestion grows. A tenant collector that hits a permanent failure can leave a partition stuck; the plan is to drop after a few retries or send the message to a dead letter queue. They want the tenant pipeline (Kafka receiver, processors, exporter) to be synchronous, so offsets are committed only after the write to the database succeeds. And exactly-once delivery across the whole write path stays on the wish list, which anyone who has tried it will recognise.
+
+## Who should watch
+
+Teams running OpenTelemetry Collectors at a scale where a single customer can flood a pipeline, and anyone designing a multi-tenant telemetry backend. A short talk with a real configuration.
+
+## Related Conf42 talks
+
+- Dave McAllister on [OpenTelemetry for production apps](https://www.conf42.com/Site_Reliability_Engineering_2022_Dave_McAllister_opentelemetry_production_apps) at Conf42 SRE 2022.
+- Nicolas Frankel on [tracing with OpenTelemetry](https://www.conf42.com/DevOps_2023_Nicolas_Frankel_opentelemetry_tracing) at Conf42 DevOps 2023.
+- Natan Silnitsky on [migrating to multi-cluster managed Kafka with zero downtime](https://www.conf42.com/Cloud_Native_2022_Natan_Silnitsky_migrating_multi_cluster_managed_kafka_0_downtime) at Conf42 Cloud Native 2022.
+
+[Watch Pranay Prateek's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pranay_Prateek_scaling_opentelemetry_kafka)
+
+[Watch the talk on YouTube](https://youtu.be/2DeKVSMtRvQ).
+",talk,sre2024,talk:sre2024/Pranay Prateek,,Conf42,,queued,"opentelemetry, kafka, observability, scaling"
 ,Stop drawing home icons and ship the design system,Elena Shabanova (PolyAI) at Conf42 Machine Learning 2024 on building a design system on a startup clock with prioritisation and AI Figma plugins,2024-05-02,ml2024/design-system-on-a-startup-clock,,"Startups need a design system most when they have the least time to build one. At Conf42 Machine Learning 2024, Elena Shabanova, Senior Product Designer at PolyAI with nine-plus years in product design and design system work at SberTech, Gett and SpatialChat, lays out how to build one under a dense roadmap: prioritise ruthlessly, buy what you can, and let Figma plugins and AI do the tedious parts.
 
 Her framing is economic. ""Using design system is all about saving time and money,"" Elena Shabanova said at Conf42 Machine Learning 2024, and she cites industry figures such as design systems reducing time on design tasks by 30-50% and allowing reuse of up to 70% of code.
@@ -79177,6 +79385,47 @@ Designers and frontend engineers at startups who keep postponing a design system
 
 [Watch the talk on YouTube](https://youtu.be/Bh-XYmuHKNI).
 ",talk,ml2024,talk:ml2024/Elena Shabanova,,Conf42,,queued,"design-systems, figma, product-design, startups, ai-tools"
+,Ten review comments will hurt even a ten-year veteran,"German Urikh at Conf42 SRE 2024 on code review that catches bugs without wrecking morale, from comment tone to arguments",2024-05-02,sre2024/code-review-without-emotional-damage,,"Code review is the one place where engineers grade each other in public, and most teams never discuss how to do it well. In a lightning talk at Conf42 SRE 2024, German Urikh, a Senior Software Engineer, argues that a review has two jobs, catching bugs and keeping the author productive, and that the second fails far more often than the first.
+
+It is short and practical: no tooling pitch, just habits you can adopt on your next merge request.
+
+## Why bother reviewing at all?
+
+Urikh starts with the sceptic's question: reviewers could be writing features instead. His answer comes in three parts. More eyes on code means more chances to catch bugs, privacy and security issues before they turn into production downtime, regulator problems or lost customer trust. Review spreads best practices and code style across a project, and juniors learn approaches they did not know. And review stops unintended workflows: one developer should not be able to push to production and verify their own change, so review doubles as a security layer.
+
+## Deep review or syntax pass: say which one you did
+
+For a thorough review he checks out the author's branch locally, so the editor flags syntax errors and he can jump between files to keep the context. When it matters he books a calendar slot and puts on headphones.
+
+The opposite mode is legitimate too. With several merge requests a day, a pass over syntax and obvious bugs may be all you have time for. The rule is to tell the author you skipped the business logic, so nobody mistakes your approval for a deep review.
+
+## Adapt the comment to the person
+
+His favourite tip. For a junior colleague, someone new to the project or a more sensitive person, he writes a polite request with the full reason: why the code was needed once and why it is not needed now. For a senior colleague who already has the context, a bare two-word note that it is not needed is enough, and they will ask if they want more. Same change, two comments, both correct for their reader.
+
+## Too many comments trip the ego, even a seasoned one
+
+Urikh has more than ten years of experience and still reacts badly to a wall of feedback. Receiving ten or more comments, he admits, ""my first reaction is to, I don't know, to try to protect myself"". His fix: keep only the most significant comments and move the rest offline.
+
+He also asks reviewers to say when they like something. A one-line thank-you costs nothing. As German Urikh said at Conf42 SRE 2024, ""happy developer means, after all, more productive developer, right?""
+
+## Stop the comment ping-pong
+
+A review thread is a public space, so a disagreement there feels like a public attack. Two rounds of replies in, the goal is no longer the code: ""it eventually becomes a battle of egos, like whose comment is going to be the last?"" Move it to Slack or a call, then leave a note on the thread, saying it was discussed offline, so later readers know a decision was made and whom to ask.
+
+## Who should watch
+
+Tech leads and senior engineers who review a lot, and anyone who has ever opened a merge request to find thirty comments. It is a lightning talk, so expect five minutes of habits, not a review framework.
+
+## Related Conf42 talks
+
+- Israel Heringer on [efficient code reviews in a large codebase](https://www.conf42.com/DevOps_2024_Israel_Heringer_efficient_code_reviews_codebase) at Conf42 DevOps 2024.
+- Victor Rentea on [code review](https://www.conf42.com/Enterprise_Software_2021_Victor_Rentea_code_review) at Conf42 Enterprise Software 2021.
+
+[Watch German Urikh's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_German_Urikh_code_review_tips)
+
+[Watch the talk on YouTube](https://youtu.be/wpgmR6j4cjI).
+",talk,sre2024,talk:sre2024/German Urikh,,Conf42,,queued,"code-review, engineering-culture, collaboration, developer-experience"
 ,Your battery icon was the first dynamic UI,"Yashwanth Kotha (SHL) at Conf42 Machine Learning 2024 on AI-driven interfaces that personalise and adapt to how users feel, plus the ethics",2024-05-01,ml2024/emotion-aware-interfaces-adapt-in-real-time,,"Interfaces that change based on who you are and how you feel sound like science fiction, until you notice you've been using one for years. At Conf42 Machine Learning 2024, Yashwanth Kotha, Senior UX Designer at SHL, walks through how AI and machine learning are turning static screens into dynamic, personalised and emotion-aware experiences, and what designers owe users in return.
 
 It's a designer's tour of the idea, from the command line to brain-computer interfaces, with case studies along the way.
