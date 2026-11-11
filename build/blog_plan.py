@@ -166,7 +166,7 @@ def transcript_paths(event, talk):
     if yid and os.path.exists("./assemblyai/%s.json" % yid) and os.path.getsize("./assemblyai/%s.json" % yid) > 2:   # an empty file is no transcript
         paths.append("assemblyai/%s.json" % yid)
     srt = ("srt/%s_%s.srt" % (event["short_url"], talk.get("Name1", ""))).replace(" ", "_")
-    if os.path.exists(srt) and os.path.getsize(srt) > 2:
+    if "#" not in talk_ref(event, talk) and os.path.exists(srt) and os.path.getsize(srt) > 2:
         paths.append(srt)
     return paths
 
@@ -235,6 +235,18 @@ def talk_brief(event, talk):
     )
 
 
+def talk_ref(event, talk):
+    """"<event>/<Name1>" for a Ref; a speaker's 2nd+ talk at the same event (CSV order) gets "#<YouTubeId>",
+    so each of their talks has its own post (Resolver.talk matches it)."""
+    ref = "%s/%s" % (event["short_url"], talk["Name1"])
+    for t in event.get("talks_raw") or []:
+        if t is talk:
+            return ref
+        if _norm(t.get("Name1")) == _norm(talk["Name1"]):
+            return ref + "#" + (talk.get("YouTubeId") or "")
+    return ref
+
+
 # ---------------------------------------------------------------- the plan
 
 def spread(n, start, end):
@@ -266,7 +278,7 @@ def wanted_posts(ctx, sisters, since, today):
         offsets = [0] if len(sponsored) == 1 else [-1, 0] if len(sponsored) == 2 else [-1, 0, 1]
         for i, (t, sid) in enumerate(sponsored):
             s = sponsors_by_id.get(sid) or {}
-            want.append(dict(ev, type="sponsored", ref="sponsor:%s/%s/%s" % (su, sid, t["Name1"]),
+            want.append(dict(ev, type="sponsored", ref="sponsor:%s/%s/%s" % (su, sid, talk_ref(event, t).split("/", 1)[1]),
                              date=d + datetime.timedelta(days=offsets[i % len(offsets)]), sponsor=sid,
                              sponsor_name=s.get("name"), sponsor_url=s.get("url"),
                              image=splash_for_sponsor(event, sid, sponsors_by_id), sources=talk_brief(event, t),
@@ -277,7 +289,7 @@ def wanted_posts(ctx, sisters, since, today):
         dates = spread(len(plain), start, d - datetime.timedelta(days=1)) if plain else []
         for (t, _), date in zip(plain, dates):
             # only once the transcript is in the repo (Marek 2026-11-10): posts are written from what was said
-            want.append(dict(ev, type="talk", ref="talk:%s/%s" % (su, t["Name1"]), date=date, image="",
+            want.append(dict(ev, type="talk", ref="talk:" + talk_ref(event, t), date=date, image="",
                              sources=talk_brief(event, t), ready=bool(transcript_paths(event, t))))
     for s in sisters:
         if s["past"] or _date(s["date"]) < today:
