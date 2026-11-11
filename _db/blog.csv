@@ -110645,6 +110645,90 @@ Teams running Lambda, Step Functions-style event flows or anything heavy on mana
 
 [Watch the talk on YouTube](https://youtu.be/3FnXPE3cSsI).
 ",talk,cloud2022,talk:cloud2022/Erez Berkner,,Conf42,,queued,"serverless, observability, distributed-tracing, dynamodb, aws"
+,"One Slack-like messenger, three ways to spread its data across the globe","Denis Magda (Yugabyte) at Conf42 Cloud Native 2022 on designing geo-distributed apps for latency, resilience and GDPR with three multi-region data modes",2022-04-24,cloud2022/geo-distributed-messenger-three-data-modes,,"Pick the wrong region pair and every request pays for it: on Google Cloud, Oregon to Mumbai is about 220 ms round trip, Oregon to Tokyo about 90. At Conf42 Cloud Native 2022, Denis Magda, Director of Developer Relations at Yugabyte, designed a Slack-like corporate messenger that serves users worldwide, survives region outages and keeps European data in Europe. The useful part: each microservice gets the multi-region data mode that matches its needs, not one mode for everything.
+
+The talk is language-agnostic architecture; the data layer is the speaker's own YugabyteDB.
+
+## What do regions and zones actually cost you?
+
+He grounds everything in Google Cloud numbers. From Oregon, a round trip to North Virginia takes about 60 ms, to Tokyo about 90 ms, and to Mumbai about 220 ms, with London in between, because inter-region links are not equal. Inside a region, zones are separate physical locations with round trips under 5 ms, so three zones let you survive a zone outage cheaply. Local zones and edge nodes in big metros such as Seattle, Atlanta, London and New York exist for single-digit-millisecond latency, mostly gaming and streaming.
+
+## Why not just ship it in one zone?
+
+The default deployment, one region and one zone, fails three ways. The zone goes down and so does the app. Six months in, the startup expands to Europe and has to meet GDPR with an architecture that cannot. A year and a half in, users in Japan, Singapore or India get a slow app because every request crosses an ocean. Multi-zone fixes the first; multi-region fixes all three at the price of higher latency on average.
+
+## Match the data mode to the microservice
+
+The messenger has four services: messaging and profile (mission-critical), plus reminders and status (utilities). YugabyteDB, a distributed SQL database that reuses PostgreSQL's query layer on top of its own sharded storage, offers three multi-region layouts, and each service gets one.
+
+- **Geo-partitioned single cluster, for messaging and profile.** One cluster spans continents, with groups of nodes pinned to geographies. Tables are partitioned on a country column, so rows for UK, France, Italy or Germany live on European nodes. Writes stay transactional, Europeans read and write locally, and GDPR residency comes from the schema. Denis Magda said at Conf42 Cloud Native 2022: ""We cannot afford losing any message.""
+- **Primary cluster with read replicas, for reminders.** Writes go to the primary in North America; a user in South Korea creating a reminder has the write forwarded there. Reads hit local replicas. A worker next to each replica wakes every minute, bulk-reads the reminders that just expired, and notifies those users, so bulk reads never cross the ocean.
+- **Standalone clusters with async replication, for status.** Statuses change rarely, everyone reads them often, and nobody minds if a colleague's ""in a meeting"" shows up five or ten seconds late in another region. Each region gets its own cluster, with uni- or bidirectional asynchronous replication.
+
+## Then the boring, essential layers
+
+Every microservice runs an instance in North America, Europe and Asia, co-located in the same region as the database nodes it talks to, to keep that under-5 ms hop. How you run them (App Engine, an AWS or Azure equivalent, or Kubernetes, which he expects most will choose) and how they talk (message brokers, gRPC, sidecars) is left to you.
+
+In front sits a global cloud load balancer with a single anycast IP. A European user's request goes to the European service instance, which reads from European nodes. If that region fails, the balancer redirects traffic to the next-nearest location.
+
+His closing argument is to design for this before you need it. Denis Magda said at Conf42 Cloud Native 2022: ""then you will become the victim of your own success."" An app that starts in one region across three zones but can stretch to Europe next month is in a far better place than one that needs a redesign. For further reading he recommends Architecting for Scale and Designing Data-Intensive Applications, and there is a Gitpod sandbox for trying the deployment modes.
+
+## Who should watch
+
+Architects of apps that will outgrow one region, and anyone who needs GDPR residency without running a separate product per continent. It is a design talk using YugabyteDB as the example; the patterns apply to any distributed SQL database.
+
+## Related Conf42 talks
+
+- Ana Van Straaten on [going multi-region](https://www.conf42.com/Cloud_Native_2022_Ana_Van_Straaten_going_multi_region) at the same event.
+- Christian Elsen and Lerna Ekmekcioglu on [reliable multi-region architecture](https://www.conf42.com/Site_Reliability_Engineering_2022_Christian_Elsen_Lerna_Ekmekcioglu_reliable_multiregion_arch) at Conf42 SRE 2022.
+- Alexey Ozeritskiy on [distributed SQL database optimization](https://www.conf42.com/DevOps_2024_Alexey_Ozeritskiy_distributed_sql_database_optimization) at Conf42 DevOps 2024.
+
+[Watch Denis Magda's talk](https://www.conf42.com/Cloud_Native_2022_Denis_Magda_geodistributed_apps_global_cloud_infra_speed_compliance)
+
+[Watch the talk on YouTube](https://youtu.be/nz4fF6Pviz4).
+",talk,cloud2022,talk:cloud2022/Denis Magda,,Conf42,,queued,"distributed-databases, multi-region, yugabytedb, gdpr, cloud-architecture"
+,"Infrastructure as code builds the Lego bricks, not the toy","Adarsh Shah (zLifecycle) at Conf42 Cloud Native 2022 on how software engineering history shaped infrastructure, and why environment as code comes next",2022-04-23,cloud2022/environment-as-code-after-iac,,"Your Terraform is declarative and idempotent; the Jenkins pipeline that runs twelve Terraform stacks in the right order is neither. At Conf42 Cloud Native 2022, Adarsh Shah, founder and CEO of zLifecycle, traced how each big software engineering practice eventually reached infrastructure, and argued that the next step is environment as code: one declarative definition of a whole environment, reconciled by a Kubernetes-style controller.
+
+## Which software practices has infrastructure already borrowed?
+
+He starts by noting that software itself borrows: waterfall from construction, lean from Toyota, incident handling from airlines. Then he walks a timeline of six practices, roughly dated: version control in the 1970s, deployment pipelines around 1991, microservices around 2005, containers around 2013, Kubernetes in 2014 and GitOps in 2017. The first three have already reached infrastructure through infrastructure as code.
+
+- **Version control.** Application code stopped living on whoever deployed last long before infrastructure did, which kept being clicked together in consoles. IaC put it in source control. His advice: everything goes in, even the bash script you run once in a while.
+- **Pipelines.** IaC pipelines bring static analysis and unit tests, then temporary environments for compliance, integration, security and smoke tests, then production deployment and another smoke test. Changes become repeatable and auditable.
+- **Microservices.** One Terraform root with networking, EC2, S3 and the database means one state file and slower runs as you grow. Splitting into separate runs (networking, then compute or Kubernetes or Postgres, then Kubernetes add-ons) gives loosely coupled pieces you can change alone.
+
+## Where does micro-IaC break down?
+
+The split creates a dependency graph, and someone has to walk it. With today's tools that means hand-rolled pipeline logic in Jenkins or CircleCI that runs networking first, then the cluster, then the add-ons, and also handles teardown and partial failures. Adarsh Shah said at Conf42 Cloud Native 2022: ""You have to write a lot of custom code to provision an entire environment.""
+
+He is careful about scope: for a simple setup, plain IaC and a pipeline do the job. The pain starts with many divergent environments, each with networking, databases, SageMaker, Kubernetes clusters and buckets, and it typically ends with a dedicated team babysitting pipelines.
+
+## What is environment as code?
+
+His definition: an abstraction over IaC that declares an entire environment, paired with a control plane that tracks state for the whole environment and the relationships inside it, detects drift and reconciles, keeping loose coupling, idempotency and immutability at the environment level. Adarsh Shah said at Conf42 Cloud Native 2022: ""So infrastructure as code automates various Lego pieces."" Environment as code automates how the pieces connect into the toy, and the toy is what a product team wants.
+
+## Borrowing package managers, Kubernetes and GitOps
+
+The remaining three practices map onto that idea.
+
+- **Package managers.** Containers, Helm and Kustomize tamed dependencies between microservices. Environment as code packages every component in an environment with the dependencies between them. His example is zLifecycle's own format, a Kubernetes custom resource listing the environment name, team and components, each with a type (Terraform here) and a `dependsOn`, such as EKS depending on networking.
+- **Kubernetes controllers.** A control loop observes the environment, detects drift from the desired state in Git and reconciles, running each Terraform component in order with its own state while tracking state for the environment as a whole. He recommends an approval step showing the plan first, because reconciliation can mean destroying things, and you do not want that happening to a database unreviewed.
+- **GitOps.** Push the environment definition to a branch, run validation, open a pull request, get it approved, merge; the control plane watches the repository and builds the environment.
+
+## Who should watch
+
+Platform teams running many environments out of a tangle of Terraform stacks and pipeline glue. It is a conceptual talk with a clear timeline and one example format from the speaker's own company, not a product demo or a tool comparison.
+
+## Related Conf42 talks
+
+- Adarsh Shah's earlier talk [from IaC to environment as code](https://www.conf42.com/DevSecOps_2021_Adarsh_Shah_From_IaC_to_Environment_as_Code) at Conf42 DevSecOps 2021.
+- Hila Fish on [Terraform practices, the good, the bad and the ugly](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices) at the same event.
+- Robert Hoffmann on [coding infrastructure instead of configuring it](https://www.conf42.com/Cloud_Native_2022_Robert_Hoffmann_configuring_infrastructure_coding) at the same event.
+
+[Watch Adarsh Shah's talk](https://www.conf42.com/Cloud_Native_2022_Adarsh_Shah_history_application_development_infrastructure)
+
+[Watch the talk on YouTube](https://youtu.be/HNdF8wlwL34).
+",talk,cloud2022,talk:cloud2022/Adarsh Shah,,Conf42,,queued,"infrastructure-as-code, environment-as-code, gitops, kubernetes, terraform"
 ,"Your ML pipeline is an attack surface, not just a workflow",Joshua Arvin Lat (NuWorks Interactive Labs) at Conf42 Machine Learning 2022 on how ML systems get hacked and the layers that stop it,2022-04-22,ml2022/ml-pipelines-attack-surface-you-forgot,,"A model file you downloaded can open a port on your training server. Joshua Arvin Lat, CTO of NuWorks Interactive Labs, AWS Machine Learning Hero and author of Machine Learning with Amazon SageMaker Cookbook, spends his Conf42 Machine Learning 2022 talk showing where ML systems get compromised, then lists the defences, most of them cheap or free.
 
 The examples lean on AWS (SageMaker, EC2, Lambda, Amazon Inspector), but the attack paths apply to any cloud or a rack in the basement.
@@ -110697,6 +110781,242 @@ ML engineers and data scientists who deploy their own models, and platform teams
 
 [Watch the talk on YouTube](https://youtu.be/lR3xPifpHSc).
 ",talk,ml2022,talk:ml2022/Joshua Arvin Lat,,Conf42,,queued,"ml-security, mlops, sagemaker, aws, network-isolation"
+,Cloud agnostic starts with the database you didn't pick,Handoyo Sutanto (Lyrid) at Conf42 Cloud Native 2022 on four engineering decisions for cloud-agnostic apps and what portability costs up front,2022-04-22,cloud2022/four-decisions-for-cloud-agnostic-apps,,"The lock-in usually arrives on day one, the day you pick a database that only one cloud runs. At Conf42 Cloud Native 2022, Handoyo Sutanto, CEO and CTO of Lyrid, laid out the four engineering decisions his company made to run on several public clouds at once: control your stack, hide cloud APIs behind abstraction libraries, design microservices to be replaceable, and rehearse your migration every month. He also lists what that costs.
+
+He defines cloud agnostic as using two or more public clouds for your workloads, and comes to it as a platform engineer with more than 15 years of building cloud systems, from data centres up.
+
+## Why bother with more than one cloud?
+
+His case for it: freedom over tooling, choice on region and price, scaling that follows the workload (Lyrid leans on Kubernetes autoscaling), and long-term savings because you can switch providers when a better deal appears. Those are the promises; the useful part of the talk is how to earn them.
+
+## Decision one: a stack you control
+
+Before writing any code, pick technologies that exist everywhere. Compute, storage, database and network are, in his words, the lifeblood of the application. The classic trap is a managed database that only runs on one vendor: the easiest to integrate, the hardest to move. His advice is to start small with a distributed database you run yourself, open source, with high availability and redundancy, which can grow without downtime and spread across clouds later.
+
+## Decision two: abstraction libraries everywhere
+
+Wrap anything that might need to move behind a generic interface. ORMs are the familiar example (Prisma for Node.js, SQLAlchemy for Python, Entity Framework for .NET), and Lyrid applies the same idea to messaging. Its job distribution runs on Google Pub/Sub but can switch to AWS SQS or a self-hosted Redis pub/sub, which is how the team moves workloads that need global distribution or on-premises deployment.
+
+## Decision three: replaceable microservices
+
+Embrace distributed architecture and small components that run on any system, with distributed storage that keeps copies for durability and recovery. During development he asks one test question of every service. Handoyo Sutanto said at Conf42 Cloud Native 2022: ""Can this same code or API run on another cloud platform? If not, why is that?"" Then fix the answer before production.
+
+## Decision four: rehearse the move
+
+Most teams end up on one region and one provider anyway. The fourth decision is a plan B: pick a target cloud or technology and run the migration as a test about once a month, starting small with the pieces that move easily.
+
+## What does Lyrid's own stack look like?
+
+Kubernetes as the base, MongoDB and MinIO for data and object storage. A MongoDB instance inside each Kubernetes cluster acts as a globally distributed read-only cache. Build and deploy jobs are spread through Google Pub/Sub, with Redis pub/sub as the drop-in for development and for customers who need more security.
+
+The demo is his own product. He deploys a Next.js template whose `package.json` has no cloud SDK at all, just a Lyrid definition file. The source lands in MinIO, container builds run on Lyrid's cluster, and the platform creates the cloud-specific services, for example AWS Lambda. After adding an IAM role for each cloud account and setting the execution policy to all clouds, refreshing the endpoint shows requests load balancing between AWS, Google Cloud and Lyrid's own Kubernetes cluster.
+
+## What does portability cost?
+
+He is upfront about it. Without one provider's security model, zero trust becomes the baseline: never trust, always verify, HTTPS everywhere, with cert-manager and Let's Encrypt between machines, plus container scanning, hardening and RBAC on the clusters. Every extra cloud costs integration time because providers differ in small ways; on AWS his team found Kubernetes ingress load balancers come with public DNS names instead of public IPs. Monitoring is cloud-specific, so they standardised on Prometheus and Grafana. And there is complexity, a slightly higher upfront cost, and data transfer charges that are hard to predict.
+
+Handoyo Sutanto said at Conf42 Cloud Native 2022: ""Just like everything else in the world, nothing is perfect, not even cloud agnostic.""
+
+## Who should watch
+
+Architects weighing multi-cloud against the convenience of one provider's managed services, and anyone writing the ""can we leave AWS?"" section of a risk register. Expect principles plus a vendor demo, not a migration war story.
+
+## Related Conf42 talks
+
+- Gilbert Cabillic on [instant provisioning and hot migration across clouds](https://www.conf42.com/Cloud_Native_2022_Gilbert_Cabillic_instant_provisioning_hot_migration_multicloud_environment) at the same event.
+- Abhay Dutt Paroha on [building a cloud-agnostic application](https://www.conf42.com/Cloud_Native_2024_Abhay_Dutt_Paroha_cloud_agnostic_application) at Conf42 Cloud Native 2024.
+- Leonardo Murillo on [multi-cloud GitOps with Crossplane and Flux](https://www.conf42.com/Cloud_Native_2021_Leonardo_Murillo_gitops_multicloud_crossplane_flux2) at Conf42 Cloud Native 2021.
+
+[Watch Handoyo Sutanto's talk](https://www.conf42.com/Cloud_Native_2022_Handoyo_Sutanto_freedom_flexibility_going_cloud_agnostic)
+
+[Watch the talk on YouTube](https://youtu.be/2H_2tEfZeeY).
+",talk,cloud2022,talk:cloud2022/Handoyo Sutanto,,Conf42,,queued,"multi-cloud, kubernetes, cloud-architecture, portability, vendor-lock-in"
+,Strangling a monolith one URI path at a time with Refactor Spaces,"Lerna Ekmekcioglu (AWS) at Conf42 Cloud Native 2022 on the strangler fig pattern, moving a Spring Boot shop's basket to Lambda with Refactor Spaces",2022-04-22,cloud2022/strangler-fig-unicorn-shop-refactor-spaces,,"Nobody gets to rewrite the monolith in one go, so the question is which piece leaves first and how its callers never notice. At Conf42 Cloud Native 2022, Lerna Ekmekcioglu, Senior Solutions Architect at AWS, answered with the strangler fig pattern: put a reverse proxy in front of a Spring Boot monolith, then route one URI path at a time to new services. The demo moves a shopping basket to AWS Lambda and DynamoDB using AWS Migration Hub Refactor Spaces, which builds the proxy and networking for you.
+
+## What does an overgrown monolith cost?
+
+The speaker, who brings 18 years in technology and financial services, lists the symptoms from personal experience. Many developers push through one shared release pipeline, so upgrading a shared library means convincing everyone to upgrade at once, and an urgent fix ships alongside everybody else's changes. Feature requests pile up. Releases happen a couple of times a year, so each one is huge, risky to deploy and risky to roll back. Lerna Ekmekcioglu said at Conf42 Cloud Native 2022: ""So you may typically see in this scenario teams prefer to fix forward, which is pretty high risk as well, but it's easier.""
+
+The fix is not a big bang. Refactor incrementally, and only where it buys the business something: speed, agility, or independent scaling.
+
+## Why move the basket first?
+
+Lerna Ekmekcioglu said at Conf42 Cloud Native 2022: ""Independent deployment is the heart of microservices."" That brings a smaller blast radius per deployment, teams that choose their own stack, and the chance to scale the busy functions without scaling the whole app.
+
+The sample is the Unicorn Shop: Spring Boot, MySQL and a Bootstrap front end, on EC2 in its own VPC. It has controllers for inventory, basket, users and health, and three tables: unicorns, users, and an association table for basket contents. The basket is the business-critical part that has to survive Black Friday, so it goes first.
+
+Before cutting, the speaker lists the questions to answer: which stack suits the new service, how existing MySQL data moves to the new store, what extra network chatter between monolith and microservice does to performance, and how to switch over without breaking the existing REST contract.
+
+## A proxy keeps the API contract
+
+The contract is the monolith's REST API: POST to a user path to register, POST to a login path, GET on unicorns for the home page, and the basket actions all hanging off one basket path. Step one is a reverse proxy that sends everything to the monolith. Step two is the new service behind the same proxy, with only the basket path routed to it. Clients see the same URLs throughout.
+
+You could build that with Amazon API Gateway by hand, defining every resource and method. Refactor Spaces does the plumbing instead:
+
+1. Create an environment in an account that becomes the environment owner; it gets a Transit Gateway in your own account, which you can customise.
+2. Add the accounts that hold the monolith and the new services.
+3. Create an application, which provisions the proxy: API Gateway, a VPC link and a Network Load Balancer.
+4. Add services; Transit Gateway bridges their VPCs across accounts.
+5. Add routes: a default route to the monolith, then specific paths to the new service.
+
+## Routes are path plus HTTP verb
+
+The new basket is three Lambda functions (add, remove, get) on DynamoDB, serverless so it scales for spiky sales days and you pay for what you use. Routing matches the basket URI path combined with the verb: GET goes to the get-cart function, DELETE to remove-cart, and additions to add-to-cart. Everything else falls through to the monolith on EC2. In the shop, basket actions now hit Lambda while browsing and login still hit Spring Boot, and users cannot tell.
+
+The demo runs everything in one account for simplicity, but the recommendation is one account per application per environment: a contained blast radius, isolation by security and data profile, and separate service quotas per workload. Adding the next microservice later means sharing the environment with its account, defining the service and adding its routes.
+
+## Who should watch
+
+Teams that have lifted and shifted a monolith to AWS and now need a safe first cut, especially in regulated industries. It is a clear walkthrough of an AWS service with a workshop you can follow in your own account (and clean up afterwards), not a discussion of domain boundaries or data migration in depth.
+
+## Related Conf42 talks
+
+- JJ Asghar on [the stumbling blocks of migrating a monolith to cloud native](https://www.conf42.com/Site_Reliability_Engineering_2021_JJ_Asghar_migrating_monolith_cloudnative_stumbling_blocks) at Conf42 SRE 2021.
+- Hareesh Iyer on [modernizing monoliths into microservices](https://www.conf42.com/Cloud_Native_2024_Hareesh_Iyer_modernize_monoliths_microservices) at Conf42 Cloud Native 2024.
+- Rajani Jayantha on [deciding between monolith and microservices](https://www.conf42.com/Platform_Engineering_2025_Rajani_Jayantha_monolith_microservices_decision) at Conf42 Platform Engineering 2025.
+
+[Watch Lerna Ekmekcioglu's talk](https://www.conf42.com/Cloud_Native_2022_Lerna_Ekmekcioglu_monolith_microservices_aws)
+
+[Watch the talk on YouTube](https://youtu.be/gLOLcVQasYQ).
+",talk,cloud2022,talk:cloud2022/Lerna Ekmekcioglu,,Conf42,,queued,"microservices, aws, strangler-fig, serverless, modernization"
+,Terraform's ugly side is a huge state and a nervous Ctrl+C,"Hila Fish (Wix) at Conf42 Cloud Native 2022 on Terraform practices from quick wins to long-haul structure, and how Wix runs Terraform as a platform",2022-04-21,cloud2022/terraform-good-bad-ugly-at-wix,,"You change resource X, run a plan, and Terraform announces it will change Y. At Conf42 Cloud Native 2022, Hila Fish, Senior DevOps Engineer at Wix, sorted Terraform habits into the good, the bad and the ugly, from fixes that take a minute to code structure you have to plan for. Her main point: small states and a structure planned ahead are what let Wix run Terraform as a platform for every team.
+
+She works with open-source Terraform only and uses AWS examples, but says the practices apply to any cloud provider.
+
+## Which quick wins pay off in minutes?
+
+Three, each in good, bad and ugly flavours.
+
+- **Version locks.** Lock Terraform, provider and module versions, the way `requirements.txt` or a package lock does. Bad is a constraint loose enough to let breaking changes through. Ugly is no lock at all; Hila Fish said at Conf42 Cloud Native 2022: ""Trust me, it is really really ugly.""
+- **Tags.** Tag everything so costs can be filtered by owner and project. Set defaults such as `managed_by` at provider level so every resource inherits them, and fail pull requests that skip tags. Inconsistent tags are bad; none at all is ugly, and the FinOps team will not thank you.
+- **Remote state.** Keep state in a remote backend such as S3, secured (it holds secrets), versioned, and locked during writes. Local, unbacked-up or unlocked state is the ugly version.
+
+## What should be second nature?
+
+Use official community modules before writing your own: they are battle-tested, maintained by someone else and come with linters and formatters already wired up. If you must write one, keep it stateless, generic and DRY.
+
+On variables and locals, she gives module variables a default or validation so a missing input does not break the module, and uses locals as constants that enforce conventions, such as a bucket naming scheme. The live layer, where modules are called, should hold no logic, use tfvars files per region or other breakdown, and reuse environment variables that already exist. File layout follows community modules: `main.tf`, variables, data and outputs, with side resources such as security groups in their own file, and sub-modules once `main.tf` gets crowded (the community IAM and EKS modules split node pools out this way).
+
+Terraform is not a programming language, but the usual code rules apply: source control, KISS, DRY, idempotent modules. She points out that HashiCorp moved the same way: until Terraform 0.13, released in August 2020, you could not use `for_each` on modules.
+
+## How Wix structures Terraform for the long haul
+
+Wix lays out its live code by team, project, cloud provider and region, so a path reads like `bi/airflow/aws/us-east-1`. Each state covers one project in one region, which keeps it small, and each folder has its own CODEOWNERS entry so teams approve their own pull requests. That is what makes it Terraform as a platform: independence for teams, less load on the DevOps group. Accounts are currently handled at region level, which she admits is not great, and a restructure is under way.
+
+The ugly alternative is a structure that allows huge states, which breed surprise dependencies. Hila Fish said at Conf42 Cloud Native 2022: ""I'm like what? I changed x not Y.""
+
+Workspaces isolate state and suit the same code for many customers (one GCP project per customer) or one service in many regions. But they hide each other from anyone who forgets to list them, and HashiCorp's own documentation says they are not a suitable isolation mechanism between staging and production. If you use them, wrap Terraform in a script that selects the workspace for you. The one use everyone agrees on: a throwaway workspace to test a change before applying it to default.
+
+## Never Ctrl+C a running apply
+
+Run Terraform remotely so there are no local credentials and there is an audit trail. Apply from a saved plan file so you know exactly what lands. Set a timeout: she once had an apply waiting on an auto scaling group of spot instances until the price dropped. Hila Fish said at Conf42 Cloud Native 2022: ""And the ugly here is to execute locally and click control c while terraform is running."" Interrupted applies corrupt state and cause conflicts.
+
+## Enforcement is the one with no bad side
+
+The community AWS autoscaling module runs a checklist on every pull request: docs, `terraform fmt`, lint, end-of-file checks. Copy that for internal modules with pre-commit hooks or CI, add drift alerts to Slack, and make main the source of truth. At Wix, a push runs checks and a plan, and `atlantis apply` both applies and merges, so what is merged is what is deployed.
+
+## Who should watch
+
+Anyone whose Terraform codebase grew faster than its structure, and platform teams about to open Terraform to other teams. Dense, practical and opinionated, with a real company layout to borrow.
+
+## Related Conf42 talks
+
+- Jim Sheldon on [Terraform and GitOps for Kubernetes](https://www.conf42.com/Cloud_Native_2022_Jim_Sheldon_terraform_gitops_kubernetes_manage_infrastructure_aac) at the same event.
+- Dmytro Prekrasnyi on [managing multiple Terraform projects](https://www.conf42.com/DevOps_2024_Dmytro_Prekrasnyi_multiple_terraform_projects) at Conf42 DevOps 2024.
+- Andrew Kirkpatrick on [self-service, PR-based Terraform](https://www.conf42.com/Site_Reliability_Engineering_2021_Andrew_Kirkpatrick_selfservice_PRbased_Terraform) at Conf42 SRE 2021.
+
+[Watch Hila Fish's talk](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices)
+
+[Watch the talk on YouTube](https://youtu.be/xGYPbrbHBls).
+",talk,cloud2022,talk:cloud2022/Hila Fish,,Conf42,,queued,"terraform, infrastructure-as-code, devops, aws, platform-engineering"
+,"Apache Pulsar for Python people, where the consumer picks the semantics","Tim Spann (StreamNative) at Conf42 Cloud Native 2022 on Apache Pulsar basics for Python developers, from schemas and functions to Presto and Flink SQL",2022-04-20,cloud2022/pulsar-for-python-people,,"In most messaging systems the shape of the topic decides how you consume it. At Conf42 Cloud Native 2022, Tim Spann, Developer Advocate at StreamNative, gave a Pulsar 101 for Python developers whose most useful idea is the opposite: in Apache Pulsar the consumer chooses whether a topic behaves like a Kafka-style ordered stream or a free-for-all work queue. Around that he shows schemas as plain Python classes, serverless functions, and SQL over live topics with Presto and Flink.
+
+## Why one messaging platform instead of three?
+
+Pulsar started at Yahoo, which could not find a single system that met all its needs and did not want to run several. The architecture separates compute from storage. Brokers route messages, cache and load-balance topic segments, and need little disk, so they scale up and down cheaply. Apache BookKeeper ""bookies"" hold the messages and cursors. Old data can tier off to S3-style object storage or HDFS, so replaying years of events does not mean buying years of SSDs. The metadata store is pluggable, with ZooKeeper, RocksDB and etcd implementations at the time.
+
+## The consumer decides how a topic behaves
+
+Subscriptions are where the flexibility lives. Exclusive and failover subscriptions give guaranteed order with a single active consumer and a standby, which is how you get Kafka-style streaming. Shared subscriptions turn the topic into a work queue: a thousand small apps grabbing whatever is next, order be damned. Key_Shared splits the difference with many active consumers but order per key; his example is change data capture with the table name as key, so every table's rows arrive in sequence.
+
+Tim Spann said at Conf42 Cloud Native 2022: ""But remember it's the consumer that decides that."" The producer never has to know.
+
+He also argues for always setting a message key, auto-generated if nothing better exists, plus properties for metadata and a producer name so you know who sent what when debugging.
+
+## A schema is just a class
+
+The Python demo is short. Install the `pulsar-client` library with pip, define a schema by writing a class with the weather fields, and pass it to the producer as a JSON schema; switching to Avro is a one-word change. Topic names follow Pulsar's multi-tenant layout of tenant, namespace and topic, which is how one cluster carries hundreds of thousands of topics and keeps teams apart. A loop reads a sensor, builds a record, and sends it with a key.
+
+## Functions, protocol handlers and SQL on topics
+
+Pulsar Functions are the Lambda or database-trigger equivalent, written in Java, Python or Go. His sentiment-analysis function parses incoming JSON and returns a sentiment to an output topic. The demo wires it to an HTML form over WebSockets: type a question, a function scores it, a separate consumer pushes the answer back to the page. By default functions run inside the broker; Function Mesh runs them on Kubernetes instead.
+
+Protocol handlers implement MQTT, Kafka, AMQP and others in full, not as thin converters. Tim Spann said at Conf42 Cloud Native 2022: ""And what's cool is it doesn't matter how your data gets into or out of pulsar, you pick the library you're comfortable with.""
+
+For queries, Pulsar SQL is Presto (Trino) underneath and reaches data already in tiered storage, including metadata such as event time, message ID and key; his count query ticks from 81 to 83 rows as the sensor keeps sending. Flink SQL runs the same select continuously, and a Flink catalog lets you join topics with other stores. Spark covers micro-batch ETL.
+
+## Who should watch
+
+Python developers who need messaging and have only seen Kafka, and anyone comparing streaming platforms who wants to see Pulsar's moving parts in 30 minutes. It is a 101 with a vendor advocate's enthusiasm, and the demos run live, including a slightly too warm 82-degree room.
+
+## Related Conf42 talks
+
+- Mary Grygleski on [event streaming with Apache Pulsar](https://www.conf42.com/Cloud_Native_2022_Mary_Grygleski_event_streaming_processing_apache_pulsar) at the same event.
+- David Kjerrumgaard on [cloud-native Pulsar apps](https://www.conf42.com/Golang_2023_David_Kjerrumgaard_cloud_native_pulsar_apps) at Conf42 Golang 2023.
+- Tim Spann on [real-time Pulsar apps on Kubernetes](https://www.conf42.com/Kube_Native_2022_Tim_Spann_realtime_pulsar_apps_k8) at Conf42 Kube Native 2022.
+
+[Watch Tim Spann's talk](https://www.conf42.com/Cloud_Native_2022_Tim_Spann_apache_pulsar_development_101_python)
+
+[Watch the talk on YouTube](https://youtu.be/RFdafFaLvBw).
+",talk,cloud2022,talk:cloud2022/Tim Spann,,Conf42,,queued,"apache-pulsar, python, streaming, messaging, apache-flink"
+,"A Kubernetes cluster is a bunch of YAML, so manage the fleet from Git","JJ Asghar (IBM) at Conf42 Cloud Native 2022 on GitOps for fleets of Kubernetes and OpenShift clusters, pull versus push, and a live Argo CD demo",2022-04-20,cloud2022/gitops-fleet-of-openshift-clusters,,"Everyone was told to run one big cluster with namespaces, and almost everyone ended up with separate dev, QA and production clusters on different clouds anyway. At Conf42 Cloud Native 2022, JJ Asghar, Developer Advocate at IBM, made the case that GitOps is how you keep that sprawl consistent, explained why pull beats push, and installed Argo CD live on an OpenShift cluster to prove the point. His summary: GitOps is the CD half that most teams claiming CI/CD never finished.
+
+## CI is standard, CD is not
+
+He separates the two terms people say in one breath. Continuous integration is everywhere: GitHub Actions, Travis, CircleCI, low overhead, peace of mind. Continuous delivery is a mature process most teams have not reached, where green tests on main mean the code simply goes out. In his framing, GitOps is that missing CD portion, applied to cluster configuration as well as applications.
+
+He is blunt that it is not something you dip a toe into. When you choose GitOps you change your deployment process and mechanisms completely, which is also what buys you a true history of every deployment.
+
+## Why should a cluster pull instead of being pushed to?
+
+A traditional pipeline pushes the new build to the servers. GitOps flips that: an agent inside the cluster polls the Git repository and pulls changes in at its own rate. The consequences he draws out:
+
+- Your application has to tolerate being updated at any time, which is an engineering problem and a reason to keep QA in the loop.
+- Air-gapped clusters become possible: the agent pulls from a security-scanned cache instead of the open internet.
+- A pull can refuse to apply a change that breaks things, where a push lands on top of whatever is running.
+
+JJ Asghar said at Conf42 Cloud Native 2022: ""Because what is a Kubernetes cluster but a bunch of yaml."" Which makes fleet management a text-editing problem with an audit trail.
+
+## Flux, Jenkins X or Argo CD?
+
+He names three tools. Flux CD is the lightweight, CLI-based one he calls the granddaddy of them all, and he is impressed by it. Jenkins X is the next generation of the Jenkins ecosystem, a natural fit if you already live there, but prescriptive about how you work. Argo CD is the one that made GitOps click for him, so the demo uses it.
+
+## Two commands and a link to Google
+
+Installing Argo CD on his 17-day-old OpenShift cluster is a namespace plus one `kubectl apply` of the stable manifests. JJ Asghar said at Conf42 Cloud Native 2022: ""Argo CD is just two commands, which is always fun."" It does not need to be exposed to the internet; he reaches the UI through a port forward. By default it gets cluster-admin rights, worth knowing before you copy the demo into production.
+
+The use case is deliberately small: a ConsoleLink resource, managed with Kustomize, that adds a menu link in the OpenShift console. He creates an Argo CD application against his GitOps tutorial repository with automatic sync and self-heal, syncs it, and the link to Google appears. He edits the YAML in Git to point at Bing, Argo CD flags the app out of sync, and the change lands. On a fleet, every cluster running Argo CD with that configuration would pick it up without anyone logging in, which is the point he wants you to imagine at scale: an internal privacy page or a logo change across every cluster.
+
+He ran out of time for the second demo, a small Flask app in the same repository, and points to Christian Hernandez's Argo CD tutorials at Red Hat, on which his own repository is based.
+
+## Is GitOps DevOps 2.0?
+
+No, he says. GitOps is a natural progression with real strengths, and he believes it will be how fleets of clusters are maintained, but DevOps covers much more than keeping infrastructure in line. The lesson he carries over from configuration management is consistency: developers touching many clusters expect the same interface and the same things installed on each.
+
+## Who should watch
+
+Teams with two or more clusters who still deploy by pushing from CI, and OpenShift users who want to see Argo CD on their platform. It is an introduction with a live, unrehearsed install, small demo and all.
+
+## Related Conf42 talks
+
+- Jim Sheldon on [Terraform and GitOps for Kubernetes](https://www.conf42.com/Cloud_Native_2022_Jim_Sheldon_terraform_gitops_kubernetes_manage_infrastructure_aac) at the same event.
+- Ismael Hommani and Clement Loiselet comparing [Flux and Argo CD](https://www.conf42.com/DevOps_2023_Ismael_Hommani_Clement_Loiselet_flux_argocd) at Conf42 DevOps 2023.
+- Yuriy Bezsonov on [multi-cluster Kubernetes with GitOps](https://www.conf42.com/Kube_Native_2024_Yuriy_Bezsonov_multicluster_kubernetes_gitops) at Conf42 Kube Native 2024.
+
+[Watch JJ Asghar's talk](https://www.conf42.com/Cloud_Native_2022_JJ_Asghar_leveraging_gitops_wrangle_clusters_projects)
+
+[Watch the talk on YouTube](https://youtu.be/LeMzz9qJtbY).
+",talk,cloud2022,talk:cloud2022/JJ Asghar,,Conf42,,queued,"gitops, argo-cd, openshift, kubernetes, continuous-delivery"
 ,Homer imagined self-driving ships before anyone said AI,"Vasco Veloso (ING Bank) at Conf42 Machine Learning 2022 on 2,800 years of AI in myth and fiction, and why explainability is the real lesson",2022-04-19,ml2022/homer-imagined-self-driving-ships,,"Artificial intelligence is not a new idea, only a new name. Vasco Veloso, Senior Software Engineer at ING Bank, makes that case at Conf42 Machine Learning 2022 by walking from Homer's Iliad to the Terminator, and then lands somewhere far less mythical: biased training data and why explainable models matter.
 
 It is a history-and-ideas talk, not a technical one. No code, no benchmarks. What it offers instead is perspective, which is rarer in a machine learning track than it should be.
@@ -110743,6 +111063,151 @@ Anyone who wants a well-told history of AI as an idea, and teams that need a non
 
 [Watch the talk on YouTube](https://youtu.be/ccE6gL2StMo).
 ",talk,ml2022,talk:ml2022/Vasco Veloso,,Conf42,,queued,"ai-history, explainability, algorithmic-bias, science-fiction"
+,"300 lines of CloudFormation YAML, or under 30 lines of CDK","Robert Hoffmann (AWS) at Conf42 Cloud Native 2022 on replacing hand-written infrastructure templates with code, using AWS CDK and its level 2 constructs",2022-04-19,cloud2022/300-lines-of-yaml-vs-30-lines-of-cdk,,"A load balancer in front of an auto scaling group of EC2 instances sounds like a whiteboard sketch. At Conf42 Cloud Native 2022, Robert Hoffmann, Senior Solutions Architect at AWS, showed that it took him more than 300 lines of CloudFormation YAML, and under 30 lines with the AWS Cloud Development Kit. His argument: general-purpose languages beat configuration languages because of the abstractions that come with them, not because of the syntax.
+
+## Where did 300 lines of YAML come from?
+
+The architecture fits on a slide: internet, load balancer, several VMs for resilience. Robert Hoffmann said at Conf42 Cloud Native 2022: ""But the thing that stuck out to me most was that I had to write over 300 lines of yaml.""
+
+The hidden cost is everything around the boxes on the diagram. A VPC needs subnets, routing and internet connectivity. The load balancer needs a security group and a target. The auto scaling group needs a launch template, a scaling policy and an IAM role for its instances. Each of those is its own resource, wired to the others by hand. He frames the history as a career path: the lucky engineer who did it manually, the bash engineer, the YAML engineer, and finally the software engineer who models infrastructure in code. As a former web developer working in JavaScript and TypeScript, he knew which one he wanted to be.
+
+## How does CDK turn code into a deployment?
+
+You write a CDK app in TypeScript, JavaScript, Python, Java or C# (Go was in developer preview at the time). The app contains stacks, and the stacks contain constructs: classes that represent resources, such as an S3 bucket. `cdk synth` runs your program and produces a CloudFormation template, which the CloudFormation service then deploys. It is one more step than writing the template yourself, but you only ever touch the code. Pulumi takes a similar approach, and he says most of the talk applies to it too.
+
+## Level 2 constructs do the busy work
+
+Constructs come in three layers:
+
+- **Level 1**: generated one-to-one from CloudFormation resources. No savings, just types.
+- **Level 2**: hand-written representations of AWS services with sane defaults and best practices built in.
+- **Level 3**: opinionated patterns that cover a whole architecture, such as load balancer plus auto scaling group in one class.
+
+The demo stays on level 2. One line creates a VPC with public and private subnets, routing and internet connectivity, spread over two availability zones. The auto scaling group takes the VPC, an instance type picked from an enum (so no typo-driven failed deployment), a machine image and the subnets. The load balancer gets `addListener` on a port, `addTargets` pointing at the auto scaling group, and a convenience call that opens the default port to any IPv4 address and configures the security groups to match.
+
+## Infrastructure code that reads like a story
+
+The best part of the talk is a small detour into Robert C. Martin's Clean Code: code that is easy to read is easy for someone else to extend. The listener and target calls read as one sentence: the load balancer takes traffic on port 80 and sends it to the instances, while CDK writes the wiring underneath. Robert Hoffmann said at Conf42 Cloud Native 2022: ""You can really tell a story by code if you write good code.""
+
+His celebration got a mixed review at home. Robert Hoffmann said at Conf42 Cloud Native 2022: ""So you can come home from work earlier today and do the dishes.""
+
+## When should you not use it?
+
+He is honest about the trade-off: if your team is fluent in CloudFormation or Terraform and not keen on debugging code, CDK may not be your thing. You do not have to choose, though. A platform team can stay on Terraform while a product team builds its new application in CDK. And CDK is not only for AWS: cdk8s generates Kubernetes manifests and CDK for Terraform writes Terraform in your language of choice, with shared constructs on Construct Hub at constructs.dev. For a hands-on start he points to cdkworkshop.com.
+
+## Who should watch
+
+Developers who have been handed infrastructure work and dread the YAML, and teams weighing CDK or Pulumi against Terraform. It is an introduction with one worked example, which is exactly right for that audience.
+
+## Related Conf42 talks
+
+- Roy Tal on [infrastructure as code with CDK](https://www.conf42.com/Cloud_Native_2022_Roy_Tal_cdk_iac) at the same event.
+- Ran Isenberg on [AWS CDK best practices](https://www.conf42.com/Cloud_Native_2023_Ran_Isenberg_aws_cdk_best_practices) at Conf42 Cloud Native 2023.
+- Robert Hoffmann on [cdk8s for Kubernetes YAML](https://www.conf42.com/Kube_Native_2023_Robert_Hoffmann_yaml_software_cdk8s) at Conf42 Kube Native 2023.
+
+[Watch Robert Hoffmann's talk](https://www.conf42.com/Cloud_Native_2022_Robert_Hoffmann_configuring_infrastructure_coding)
+
+[Watch the talk on YouTube](https://youtu.be/sEsapRQRx0A).
+",talk,cloud2022,talk:cloud2022/Robert Hoffmann,,Conf42,,queued,"infrastructure-as-code, aws-cdk, cloudformation, typescript, aws"
+,"Your production container has no vim, and that is fine","Shai Almog (Lightrun) at Conf42 Cloud Native 2022 on debugging Kubernetes in production with kubectl debug, KoolKits images and developer observability",2022-04-18,cloud2022/kubectl-debug-koolkits-and-production-snapshots,,"You `kubectl exec` into a misbehaving pod to change one log level and find there is no editor, no htop and no debugger. At Conf42 Cloud Native 2022, Shai Almog, Developer Advocate at Lightrun, showed three answers in increasing order of scale: `kubectl debug` with ephemeral containers, the open-source KoolKits images that fill those containers with tools, and developer observability for bugs you cannot pin to one pod.
+
+## Why is Kubernetes harder to debug than a box?
+
+He names three problems. Scale: the failure might be on any of hundreds of pods. Depth: it can sit in the orchestrator, the container or the code, and each layer needs a different skill set. And the bare-bones container: lean images are good practice, but once you are inside one, there is nothing to work with except luck with the logs.
+
+Installing tools by hand inside the live pod is the obvious fix and the wrong one. Shai Almog said at Conf42 Cloud Native 2022: ""We don't want people in production just installing packages left and right, even if it's cleaned up."" A pod's state should be described by its manifest, not by whoever ran `apt-get` last.
+
+## Ephemeral containers: bring your own toolbox
+
+`kubectl debug` adds an ephemeral container to a running pod. It vanishes when the pod is destroyed, it works on crashed pods and on bare images, and it can come from a completely different image with a full distro inside. He notes the feature arrived in Kubernetes 1.23, so hosted clusters need checking first.
+
+His demo starts with the `busybox` image that the `kubectl debug` docs reference. Technically you are now in a new container rather than the app's, and you still have no vim. You could build your own debug image, but as he points out, everyone wants roughly the same tools.
+
+## KoolKits: one opinionated image per runtime
+
+That is the gap KoolKits fills: curated, platform-specific images for `kubectl debug`, built on Ubuntu so you get a desktop-grade distribution. There are four:
+
+- **Go**: a Go debugger, pprof and friends.
+- **JVM**: SDKMAN!, jmxterm, honest-profiler, VisualVM.
+- **Node.js**: nvm, 0x, vtop.
+- **Python**: pyenv, ipdb, IPython.
+
+All of them add the basics (vim, htop), networking tools such as traceroute and nmap, and clients for PostgreSQL, MySQL and Redis. With access to the main container's file system and process namespace, he edits the log level from INFO to ERROR with vim, and mentions profiling, GDB or JDB, and JMX operations through jmxterm. The package list is open to pull requests.
+
+## What about bugs on a hundred pods at once?
+
+A debugger only helps if you know which server shows the bug, and attaching one in production risks a stuck breakpoint or an expensive condition. Shai Almog said at Conf42 Cloud Native 2022: ""JDWP itself is literally an open invitation for hacking."" Logs rarely contain the line you need, and APM-style observability is built for the big picture, not for one variable in one method.
+
+His answer is what he calls developer observability. Shai Almog said at Conf42 Cloud Native 2022: ""With developer observability, we flip that, we ask questions and then instrument based on those questions.""
+
+This part is a demo of his employer's product, Lightrun, with an agent in every pod and actions created from the IDE. Unlike `kubectl debug`, the agent has to be installed before the problem happens. He shows:
+
+- **Injected logs** with expressions in curly braces; expressions that are too expensive or change state are rejected, and a log point pauses itself when CPU use crosses a threshold.
+- **Snapshots**: stack trace and variables like a breakpoint, without stopping the server.
+- **Conditional snapshots** that fire for one user ID only, for the bug only one customer sees.
+- **Metrics**: counters per line, method duration, and timing for a code block, piped to StatsD or Prometheus.
+- **Tags** that group agents (production, green, blue) so one action runs across many pods.
+
+## Who should watch
+
+Developers who own services on Kubernetes but do not live in it, and platform teams deciding what debugging access to give them. The first half is vendor-neutral and immediately useful; the second half is a product demo, clearly labelled as such.
+
+## Related Conf42 talks
+
+- Michael Schilonka on [debugging containers with Gefyra](https://www.conf42.com/Cloud_Native_2022_Michael_Schilonka_debugging_container_sidecar_kubernetes_gefyra) at the same event.
+- Shai Almog's follow-up on [kubectl debug and observability](https://www.conf42.com/Cloud_Native_2023_Shai_Almog_debugging_containers_kubectl_debug_observabilit) at Conf42 Cloud Native 2023.
+- Pravar Agrawal on [debugging a cluster on call](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pravar_Agrawal_debugging_cluster_oncall) at Conf42 SRE 2024.
+
+[Watch Shai Almog's talk](https://www.conf42.com/Cloud_Native_2022_Shai_Almog_debugging_containers_kubectl_debug_koolkits)
+
+[Watch the talk on YouTube](https://youtu.be/eY4hyuaJEWI).
+",talk,cloud2022,talk:cloud2022/Shai Almog,,Conf42,,queued,"kubernetes, debugging, observability, containers, kubectl"
+,"Kubernetes policy that runs on your laptop, in CI and in the cluster","Noaa Barki (Datree) at Conf42 Cloud Native 2022 on enforcing Kubernetes policy with OPA, Conftest, Gatekeeper and Argo CD, from local test to cluster",2022-04-18,cloud2022/kubernetes-policy-from-laptop-to-cluster,,"One missing memory limit is enough to take every node in a cluster out of memory. At Conf42 Cloud Native 2022, Noaa Barki, Developer Advocate at Datree, walked through the policy-enforcement stack that stops that kind of mistake: Open Policy Agent as the engine, Conftest on the laptop and in CI, Gatekeeper inside the cluster, and Argo CD to make Git the only way in. Her takeaway: validate Kubernetes resources like source code, as early as possible, and then treat the policies themselves as something that has to be managed.
+
+## Which manifest would you deploy?
+
+She opens with a game: two manifests side by side, pick the safe one. A CronJob with `concurrencyPolicy` set to allow, so failed runs pile up instead of being replaced; she tells the story of Target, whose one failing CronJob created thousands of constantly restarting pods and pulled a few hundred CPUs into the cluster. A CronJob where the right setting sat in the wrong place in the YAML, which she says took Zalando's API server down. A pod with no memory limit, the Blue Matador story. The point of the quiz is that all three look harmless in review.
+
+Noaa Barki said at Conf42 Cloud Native 2022: ""Trust me, nobody is immune to Kubernetes misconfiguration."" Before Datree launched, she says, the team read more than 100 Kubernetes failure stories, and the pattern behind them was missing policy enforcement.
+
+## Why the CI check should also be a local test
+
+Her two beliefs are shift left and GitOps: every config file goes through CI exactly like application code. The less obvious argument is cultural. If the policy check runs as a local testing library, developers use it the way they already use unit tests: run it on their machine, open a pull request, expect CI to run it again. That lets the DevOps team hand responsibility to developers instead of guarding every manifest themselves.
+
+## OPA is the engine, Conftest makes it usable
+
+OPA is a general-purpose policy engine that decouples policy decisions from the services that enforce them. You can embed it as a Go package or run it as a daemon and query it over HTTP with JSON input. Policies are written in Rego, which she notes is inspired by Datalog.
+
+For Kubernetes, raw OPA is a lot of work. Noaa Barki said at Conf42 Cloud Native 2022: ""And I do enjoy crossfit training and I do enjoy heavy lifting, but not when it comes to my Kubernetes cluster.""
+
+Conftest is the lighter option: write Rego rules (her examples block running as root and require an app label on every deployment), put them in a `policy` folder, and run `conftest test` against your files. It handles JSON, XML, Dockerfiles and YAML, and it can push and pull policy bundles to a Docker registry, which is how her GitHub Actions example shares one policy set across repos.
+
+## CI is not enough while kubectl exists
+
+Anyone with cluster access can still run `kubectl apply` and skip the pipeline. Gatekeeper closes that gap: it is a validating admission webhook, so every create, update or delete goes through OPA before it reaches etcd. Policies live in a ConstraintTemplate CRD with the Rego inside, and a separate Constraint says which kinds it applies to; her example requires an owner label on every namespace.
+
+The cost is duplication. The same rule now exists as a Rego file for Conftest and as a ConstraintTemplate for Gatekeeper, across many repositories. Rego itself gets hard once a rule needs ranges, unit checks or comparisons across files, so her advice is to start from policies someone has already written.
+
+## Or make Git the only door
+
+The alternative to guarding the cluster is to stop people writing to it. With Argo CD, the cluster pulls from a Git repository and overrides manual changes when it drifts, so a separate GitOps repository (config apart from application code) becomes the single source of truth. Run Conftest in that repository's CI and policy enforcement covers everything that can reach production.
+
+She ends on centralised policy management: who may change a policy, which ones fail most, and whether developers know how to fix a failure. Git and email do not answer those. That is where she brings in Datree's open-source CLI, which ships built-in rules for Kubernetes and Argo CD, runs locally, in CI or as a pre-commit hook, and checks each file in three steps (valid YAML, valid Kubernetes or Argo CD resource, policy). The final section is a pitch for her employer's tool; the first three quarters are a vendor-neutral tour.
+
+## Who should watch
+
+Platform and DevOps engineers about to roll out policy as code for Kubernetes, and anyone deciding between CI checks, admission control and GitOps. It is an overview with configuration examples, not a Rego tutorial.
+
+## Related Conf42 talks
+
+- Ara Pulido on [policy as code with OPA Gatekeeper](https://www.conf42.com/Cloud_Native_2021_Ara_Pulido_poilcyascode_kubernetes_opa_gatekeeper) at Conf42 Cloud Native 2021.
+- David Melamed on [Open Policy Agent as a control engine](https://www.conf42.com/Cloud_Native_2022_David_Melamed_open_policy_agent_control_engine) at the same event.
+- Reza Ramezanpour on [Kubernetes security policy design](https://www.conf42.com/Cloud_Native_2023_Reza_Ramezanpour_kubernetes_security_policy_design_top10) at Conf42 Cloud Native 2023.
+
+[Watch Noaa Barki's talk](https://www.conf42.com/Cloud_Native_2022_Noaa_Barki_open_policy_agent_conftest_gatekeeper_kubernetes_policy_in_action)
+
+[Watch the talk on YouTube](https://youtu.be/1F5sGy3ONW4).
+",talk,cloud2022,talk:cloud2022/Noaa Barki,,Conf42,,queued,"kubernetes, policy-as-code, open-policy-agent, gitops, devsecops"
 ,"Epsagon forked OpenTelemetry, regretted it, and became a distribution",Yosef Arbiv (Cisco) at Conf42 Cloud Native 2022 on Epsagon's path from proprietary tracing SDKs via OpenTelemetry forks to an OpenTelemetry distribution,2022-04-17,cloud2022/epsagon-opentelemetry-forks-to-distribution,,"Forking an open source project feels like a shortcut right up to the moment upstream ships its next release. At Conf42 Cloud Native 2022, Yosef Arbiv, R&D Team Leader at Cisco and lead of the SDK team at Epsagon, told the story of how Epsagon went from proprietary tracing SDKs to forks of OpenTracing and OpenTelemetry, and finally to building on OpenTelemetry as a distribution and contributing upstream, with a lesson at the end of each act.
 
 It is a short, honest talk about how a vendor should use open source, and the mistakes are the useful part.
