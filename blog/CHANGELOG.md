@@ -3,6 +3,22 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-11 - Backfill 2020+ written, rolling out
+- Every conference since 2020 has its roundup (61 new) and every talk with a transcript its talk or sponsored post:
+  ~2,800 posts written by parallel writers over two days, all `queued`. blog-rollout.yml releases 36 every 4 h
+  (216/day), so the queue drains in about 13 days.
+- Dedupe: the new roundup/sponsored post replaces the old announcement post of its event (99 replaced; sponsors
+  without a talk point at the roundup). One recording at two events = one post (Tom Granot: Enterprise 2021 kept,
+  Cloud Native 2021 skipped). A speaker's 2nd+ talk at one event has Ref `...#<YouTubeId>` (js2020, oss2020, sre2020,
+  python2023 had such speakers).
+- Wrong videos fixed in the sheet + CSVs: Abby Bangser (Cloud Native 2023), Tortuyaux & Chowdhury (DevSecOps 2021),
+  Elliott Clark (Platform Engineering 2024); earlier Arsalan Sheikh, Ovidiu Ionescu.
+- Set aside after safety stops on live-exploit demos: Brian Contos (DevSecOps 2023), Filipi Pires (Python 2022),
+  Josh Stella (OSS 2020 attack demo), Brian Vermeer (Enterprise 2021 live hacking).
+- Waiting for a transcript: Ovidiu Ionescu (Rust 2023), Mayank Aggarwal (IoT 2023), Abby Bangser, Tortuyaux &
+  Chowdhury, all of Rust 2024. Runner transcription is blocked by YouTube; needs a local run.
+- Next: watch the slices land; sheet clean-ups listed in blog/drafts/_jobs/SKIPPED.txt.
+
 ## 2026-11-10 - Agent commands folded into the footer
 - "For developers & AI agents" on /blog and every post is now a closed <details> at the foot of the footer, in the
   footer's own style (was a dark band in the media kit's style).
