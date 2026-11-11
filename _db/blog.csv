@@ -123251,6 +123251,292 @@ We’re very pleased to add [Google](https://sre.google/), [Digital Lab](https:/
 
 Looking forward to the event? The [talks](https://www.conf42.com/sre2020) are already available on our website, so don’t be shy and check them out!
 ",,,,,,,,
+,Tinkerbell provisions bare metal with Docker containers and a YAML template,Aman Parauliya (InfraCloud) at Conf42 Site Reliability Engineering 2020 on how Tinkerbell turns bare metal provisioning into templated workflows,2020-08-22,sre2020/tinkerbell-bare-metal-workflows,,"Provisioning a rack of servers can look a lot like running a CI pipeline: a template of steps, each step a Docker container. At Conf42 Site Reliability Engineering 2020, [Aman Parauliya](https://www.conf42.com/Site_Reliability_Engineering_2020_Aman_Parauliya_tinkerbell_provisionning_engine), Senior Software Engineer at InfraCloud and a core contributor to Tinkerbell, the open-source bare metal provisioning engine started by the Packet team, explained how it works and ran a workflow live.
+
+The first third is a primer on bare metal; the rest is Tinkerbell's architecture and a CLI demo, rough edges included.
+
+## Why bare metal at all?
+
+Parauliya's two pictures of bare metal are a data center rack and a Raspberry Pi, and Tinkerbell aims to cover both. A server needs network interfaces with IPMI support, storage (with RAID if you want to survive disk loss) and a boot environment that supports iPXE for network boot. Network booting means PXE or iPXE, DHCP for addresses, TFTP for the initial file system, and NFS when the hardware has no storage of its own, like a Pi whose microSD card just died.
+
+The reasons to stay on metal: existing data centers companies want to use, data security for things like bank account balances, lower latency, and consistent, predictable performance, because on your own hardware you know exactly what adding RAM will do.
+
+The price is complexity. ""Increase of control comes with the increase of complexity,"" Aman Parauliya said at Conf42 Site Reliability Engineering 2020. Hundreds of servers, Intel x86 and Arm64 CPUs, half the fleet on CentOS and half on Ubuntu.
+
+## What are Tinkerbell's moving parts?
+
+A provisioner machine runs the control plane, every service in Docker containers:
+
+- **Tink**: the workflow engine, as tink-server, tink-cli for operators, and tink-worker on the machine being provisioned.
+- **Boots**: DHCP and TFTP.
+- **Hegel**: serves each machine's metadata.
+- **OSIE**: not a service but the set of files for the network-booted install environment, a minimal Alpine.
+- **PBnJ**: power and boot control, such as switching a machine to boot from iPXE.
+- **Postgres** for hardware, template and workflow data and events, a **private Docker registry** holding the tink-worker image and every action image, and Nginx serving the boot files.
+
+## How does a workflow come together?
+
+Three objects. Hardware data is JSON per machine: a unique ID, at least one DHCP interface with a MAC address, hostname, architecture, the IP it should get, and netboot flags allowing PXE and workflows. UEFI was no longer required at the time of the talk.
+
+A template is YAML with a version, a name, a global timeout, and tasks made of actions. Each action names an image from the private registry and can have its own timeout; a disk wipe that doesn't finish in 90 seconds fails the workflow. A typical OS install runs disk wipe, disk partition, install the root file system, then install GRUB, so the CentOS and Ubuntu templates differ only in the last image. Volumes and environment variables, like a mirror host, can be set per task or per action.
+
+A workflow binds a template to a machine: `tink workflow create` takes the template ID and maps the template's device key to a MAC address. The worker only receives the workflow when a request arrives from that MAC.
+
+## Does the demo work?
+
+Eventually, which is the honest version of a live demo. The provisioner runs in a Vagrant VirtualBox VM. Parauliya pushes a third hardware record and shows that pushing the same ID again overwrites it. He creates a second template, a hello world action named server partitioning with a 600-second global timeout, and a workflow at 0% and pending.
+
+The first worker boots over iPXE, gets an IP and the OSIE files, then errors because of the tink-worker image. He tags and pushes the latest tink-worker into the local registry, destroys the worker and boots it again. The workflow goes to 100%, state success, and the worker's log shows the action image pulled from the private registry rather than Docker Hub, each action in its own container, printing hello from Docker.
+
+## Who should watch
+
+Infrastructure engineers who own physical fleets or edge devices and want provisioning in version control. If you only know cloud VMs, the bare metal primer is a useful refresher on what PXE and TFTP do. Docs and setup guides are on tinkerbell.org and the GitHub organisation, plus community projects such as Alex Ellis's tinkerbot.
+
+## Related Conf42 talks
+
+- Bharath Nallapeta on [cluster provisioning at scale](https://www.conf42.com/Cloud_Native_2025_Bharath_Nallapeta_cluster_provisioning_scale).
+- Gilbert Cabillic on [instant provisioning and hot migration across clouds](https://www.conf42.com/Cloud_Native_2022_Gilbert_Cabillic_instant_provisioning_hot_migration_multicloud_environment).
+- Stephane Jourdan on [infrastructure drift](https://www.conf42.com/Cloud_Native_2021_Stephane_Jourdan_infrastructure_drift).
+
+[Watch Aman Parauliya's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Aman_Parauliya_tinkerbell_provisionning_engine)
+
+[Watch the talk on YouTube](https://youtu.be/tMow4OAWkwY).
+",talk,sre2020,talk:sre2020/Aman Parauliya,,Conf42,,queued,"bare-metal, provisioning, tinkerbell, pxe, open-source"
+,Most of your app's resilience lives in code you don't own,Uma Mukkara (Chaos Native) at Conf42 Site Reliability Engineering 2020 on raising Kubernetes resilience with declarative chaos experiments run through GitOps,2020-08-17,sre2020/litmus-chaos-kubernetes-resilience-gitops,,"Your application's uptime depends mostly on things your team didn't write: nodes, kubelets, DNS, Prometheus, Envoy, databases. At Conf42 Site Reliability Engineering 2020, [Uma Mukkara](https://www.conf42.com/Site_Reliability_Engineering_2020_Uma_Mukkara_kubernetes_resilience_sre), CEO of Chaos Native, argued that SREs on Kubernetes should check resilience continuously with chaos experiments, written as YAML and shipped through GitOps, and demoed it with LitmusChaos.
+
+Mukkara is closely involved with Litmus, and the second half of the talk is a Litmus walkthrough. The first half stands on its own.
+
+## Why does Kubernetes make resilience harder?
+
+His definition: resilience is a system's ability to absorb a fault and recover automatically without hurting user-facing services. Pods get evicted, nodes go NotReady (more common on large cloud setups), containers leak memory. Faults will happen however careful you are.
+
+Two things make it worse on Kubernetes. Everything changes faster: with microservices and strong CI/CD, a database that used to upgrade every six months or a year now upgrades every quarter. And your app sits on a stack of dependencies, from platform services through Kubernetes itself to the cloud-native services around it.
+
+""So to summarize, 90% of resilience of your application really depends on the components that you are not developing or you don't own,"" Uma Mukkara said at Conf42 Site Reliability Engineering 2020.
+
+So you can't check once. Know your steady state, inject the fault yourself instead of waiting for it, and verify the steady state holds. If not, you found a weakness.
+
+## What does cloud-native chaos look like?
+
+Do it the way you already run Kubernetes: declaratively, through Git. Mukkara's four principles are open-source infrastructure with a community you can rely on, chaos APIs as CRDs, bring your own chaos model so you aren't locked into one style of experiment, and community-contributed experiments, because no single team can write them all.
+
+Litmus maps onto that. At the time it was a CNCF sandbox project with more than 10,000 installations and maintainers and contributors from Intuit, Amazon, RingCentral and Container Solutions, among others. It had 30-plus experiments on its ChaosHub: infrastructure faults such as node CPU, memory and disk, Kubernetes faults such as network loss, packet duplication and a kubelet service kill (a community contribution, for the day Kubernetes itself goes down), and application-specific ones such as making a database unavailable or taking down a Kafka broker. There is an SDK in Go, Python and Ansible for writing your own.
+
+## How do you automate and scale it?
+
+Three YAML pieces: the experiment custom resource, a ChaosEngine that ties it to the target application, and a schedule. Commit them to Git, let Flux or Argo CD apply them on merge, and Litmus emits results, Prometheus metrics for alerting, and events for correlation when you go to debug.
+
+To scale, embed experiments in Argo Workflows: two faults in parallel in different namespaces, wait, two more, then drain a node. Mukkara says the same pattern stretches to hundreds of experiments on clusters with thousands of nodes.
+
+His rollout advice is to start small: small experiments in short-lived CI pipelines, deeper ones on long-running test beds, more in staging, and production last, once management and developers are on board. Developers resist; letting them test their own services first is how SREs win them over.
+
+## What does the demo show?
+
+A two-node Amazon EKS cluster running the Sock Shop microservices demo, with Litmus in admin mode. Two Argo workflows fire every five and ten minutes: a CPU hog on the catalog pod and a memory hog on the orders pod, tuned through Git. A Grafana dashboard marks each injection, and you can watch catalog and orders performance dip with it. The Litmus Portal for managing workflows end to end was an early version at the time, expected around the end of 2020.
+
+## Who should watch
+
+SREs running Kubernetes who want chaos experiments that live in the same Git repo as everything else. Teams already happy with another chaos tool can skim the Litmus parts and keep the GitOps pattern.
+
+## Related Conf42 talks
+
+- Mikolaj Pawlikowski on [why SREs love chaos engineering](https://www.conf42.com/Site_Reliability_Engineering_2020_Mikolaj_Pawlikowski_sre_chaos_engineering) at the same event.
+- Akram Riahi on [chaos engineering alongside Litmus and Jenkins](https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins).
+- Jintao Zhang on [a robust Apache APISIX ingress controller with Litmus Chaos](https://www.conf42.com/Chaos_Engineering_2023_Jintao_Zhang_building_robust_apache_apisix_ingress_controller_litmus_chaos).
+
+[Watch Uma Mukkara's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Uma_Mukkara_kubernetes_resilience_sre)
+
+[Watch the talk on YouTube](https://youtu.be/eY6NguDGuo0).
+",talk,sre2020,talk:sre2020/Uma Mukkara,,Conf42,,queued,"chaos-engineering, kubernetes, litmus, gitops, resilience"
+,Your model works in winter. It still recommends coats in summer,"Ryan Dawson (Seldon) at Conf42 Site Reliability Engineering 2020 on why running ML in production differs from DevOps, from training to drift detection",2020-08-12,sre2020/mlops-intro-why-models-need-more,,"A model can be bug-free and still go wrong because the world changed. At Conf42 Site Reliability Engineering 2020, [Ryan Dawson](https://www.conf42.com/Site_Reliability_Engineering_2020_Ryan_Dawson_machine_learning_in_production), an engineer on the Seldon open-source team, gave SREs an introduction to MLOps: how the build, deploy and monitor loop for machine learning differs from the DevOps one, and which tools sit at each stage.
+
+It's a 101 aimed at ops people, and a clear one. Dawson works on Seldon Core, so expect its examples in the serving section.
+
+## Why isn't MLOps just DevOps with bigger files?
+
+""Fundamentally, MLops is different from DevOps because machine learning is different from programming,"" Ryan Dawson said at Conf42 Site Reliability Engineering 2020.
+
+Programs codify rules. Models capture patterns from data and reapply them to new data, so the training data becomes part of the artifact. He cites surveys suggesting 80% to 90% of models never make it to live, and points to the Hidden Technical Debt in Machine Learning Systems paper, where the ML code is a tiny box surrounded by data collection, processing, infrastructure and monitoring.
+
+His worked example: a salary benchmark model built with scikit-learn. One prediction is easy. Then the business wants it every year, then another department wants it, and suddenly you need a predict function behind a REST API, in a Docker image that shouldn't contain the training data. Hence the common pattern of pickling the model to a file and loading it into a separate serving app.
+
+## How is the workflow different?
+
+In DevOps the trigger is a code change in Git, Jenkins builds, an executable in a Docker image gets promoted. In ML the trigger might be new data, which won't live in Git once it reaches gigabytes, and the work is exploratory: a slice of data on a laptop, longer experiments in a hosted environment, Jupyter notebooks, a serialised model at the end. Dawson focuses on offline training, the more common case, where training is separate from prediction.
+
+Organisational silos make it harder. A data scientist hands notebooks to a DevOps team, and the DevOps team's reaction is, roughly, what is this? Mature setups have data engineers, data scientists and ML engineers with clear handoffs.
+
+## Where do the tools fit?
+
+He splits the lifecycle into data prep, training, serving, and rollout plus monitoring, and the tool sprawl gets easier to read:
+
+- **Training**: Kubeflow Pipelines, MLflow, Polyaxon. Pipelines look like CI, but they are also parameterised experiments: run the same pipeline with different step sizes and pick the best model, which means you need an automated definition of best.
+- **Serving**: TensorFlow Serving, TorchServe, cloud offerings, and framework-agnostic Seldon Core and KFServing, both in the Kubeflow ecosystem. In Seldon, a Kubernetes custom resource points at a storage bucket URI and names the toolkit.
+- **Rollout**: A/B tests over a statistically significant sample, shorter canaries as a sanity check, and shadowing, where the new model gets all the traffic but only the live model's answers go back. In Seldon you set a traffic percentage per model in the manifest.
+- **Monitoring**: Prometheus metrics and Grafana dashboards out of the box, plus asynchronous request logging to Elasticsearch for audits and for comparing a shadow with the live model.
+
+## What can go wrong after deploy?
+
+The interesting part. Outliers: models can be overconfident on data far from the training distribution, giving high probabilities to answers that are completely wrong. Drift: the whole input distribution moves, like a fashion recommender trained on winter purchases that keeps pushing coats into the summer. Detectors fed asynchronously from live traffic can flag both, and can also watch for adversarial inputs.
+
+Then governance: explaining why a loan was denied, spotting bias, and reproducing exactly what was trained when. That last one is harder than in DevOps, because you need the data, every transformation, the parameters, and luck with randomness.
+
+## Who should watch
+
+SREs and platform engineers about to inherit their first model in production. Data scientists curious what their ops colleagues worry about will get the other half of the picture. If you already run Seldon or KFServing, skip to the drift section.
+
+## Related Conf42 talks
+
+- Tomas Fernandez on [taking MLOps from Jupyter to production](https://www.conf42.com/Machine_Learning_2024_Tomas_Fernandez_mlops_jupyter_production).
+- Noa Goldman's [hitchhiker's guide to MLOps](https://www.conf42.com/Machine_Learning_2023_Noa_Goldman_hitchhiker_guide_mlops_experience).
+- Sudarshan Kasera on [monitoring drift in models](https://www.conf42.com/Machine_Learning_2026_Sudarshan_Kasera_monitoring_drift_models).
+
+[Watch Ryan Dawson's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Ryan_Dawson_machine_learning_in_production)
+
+[Watch the talk on YouTube](https://youtu.be/UlmCJl8ZsT4).
+",talk,sre2020,talk:sre2020/Ryan Dawson,,Conf42,,queued,"mlops, machine-learning, model-serving, kubernetes, monitoring"
+,The paid firewall caught 60% of bad port changes. Config management caught all,Aaron Rinehart (Verica) and Jamie Dicken (Cardinal Health) at Conf42 Site Reliability Engineering 2020 on security chaos engineering in practice,2020-08-07,sre2020/security-chaos-engineering-firewall-sixty-percent,,"Inject a misconfigured port change on purpose, and you learn how good your security tooling really is. At Conf42 Site Reliability Engineering 2020, [Aaron Rinehart](https://www.conf42.com/Site_Reliability_Engineering_2020_Aaron_Rinehart_Jamie_Dicken_applied_security_resilient_distributed), CTO and founder of Verica, and Jamie Dicken, Manager of Security Engineering at Cardinal Health, presented security chaos engineering: the same experiments SREs run for availability, aimed at security controls, before an attacker runs them for you.
+
+Rinehart brings the origin story (he pioneered the practice at UnitedHealth Group). Dicken brings what a new team did with it inside a Fortune 20 healthcare company.
+
+## Why can't you just threat model the diagram?
+
+Because the diagram is wrong. Dicken walks through how documentation is written before the system exists, or afterwards from someone's memory, and is rarely updated. Integration points, downstream effects and people quietly scripting against your APIs never make it in. Threat modelling a stale picture means missing the problems you didn't anticipate.
+
+Rinehart frames the alternative as continuous learning rather than continuous fixing. Legacy systems become stable through a series of painful surprises; chaos experiments let you learn the same lessons on purpose, when nobody is panicking. That matters, he says, because people think badly during an active incident, worried about blame and their jobs.
+
+""I've always said, in general, that engineers don't believe in two things. They don't believe in hope or luck,"" Aaron Rinehart said at Conf42 Site Reliability Engineering 2020.
+
+## What did the port experiment find?
+
+ChaoSlingr, the open-source tool Rinehart's team wrote at UnitedHealth Group about four years before the talk (now deprecated on GitHub, its experiment framework still there), shipped an example called PortSlingr. The hypothesis: an unauthorised, misconfigured port change on AWS gets detected and blocked by the firewall immediately, and the security operations centre gets a useful event.
+
+Three things came back. The firewall caught it only about 60% of the time. The cloud-native configuration management tool, which they weren't paying extra for, caught and blocked it every time. And the SOC got the event but couldn't tell which AWS account it came from, commercial or non-commercial. Mapping an IP back to an account might take 30 minutes or 3 hours, which is a long time mid-incident. The fix was adding metadata to the event, and they found a drift problem between environments along the way, all without an outage.
+
+The use cases they list: incident response, security control validation, observability (are the logs any good?) and compliance, since every experiment leaves evidence.
+
+## How did Cardinal Health start?
+
+Dicken's team, named Applied Security, formed in the summer of 2019 with five people covering software development, architecture, privacy, risk and networking. Their mission was to find unknown technical security gaps and drive them to remediation first. They chose security control validation as the first use case and built a five-step process called continuous verification and validation (CVV):
+
+1. Pick the security control to validate.
+2. Set benchmarks the company already agreed to, from the security architecture team's standards approved by the CISO.
+3. Implement continuous checks, usually custom scripts against tool APIs and configurations, after looking for open-source or commercial options.
+4. Build a dashboard of real-time compliance with those benchmarks.
+5. When adherence drops, log it in the risk register so the risk team drives remediation.
+
+Dicken calls CVV the systems-level equivalent of a scheduled automated test suite, and wants to go further: write the security chaos tests while the standards are being defined, test-driven style.
+
+""Like Aaron said, the problem with incident response is that it's always a response,"" Jamie Dicken said at Conf42 Site Reliability Engineering 2020.
+
+## Where do you begin?
+
+Small. Break PortSlingr into separate tests: config management access, whether the alert fires, or simply turning off a log source to see if the detection notices. Her advice is to be the right kind of lazy and automate the checks you already do by hand on weekends.
+
+## Who should watch
+
+Security engineers who want something more empirical than threat models, and SREs who already run chaos experiments and wonder what their security team could borrow. Expect stories and process, no live demo.
+
+## Related Conf42 talks
+
+- Yury Niño on [security chaos engineering, game days and experiments](https://www.conf42.com/Site_Reliability_Engineering_2020_Yury_Nino_security_chaos_engineering_gamedays__experiments__cybera) at the same event.
+- Yury Niño and Jhonnatan Gil Chaves on [cloud security chaos engineering](https://www.conf42.com/Chaos_Engineering_2021_Yury_Nino_Jhonnatan_Gil_Chaves_cloud_security_chaos_engineering).
+- Joyce Lin on [who is responsible for chaos](https://www.conf42.com/Chaos_Engineering_2020_Joyce_Lin_who_is_responsible_for_chaos).
+
+[Watch Aaron Rinehart and Jamie Dicken's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Aaron_Rinehart_Jamie_Dicken_applied_security_resilient_distributed)
+
+[Watch the talk on YouTube](https://youtu.be/Sb7T997maRw).
+",talk,sre2020,talk:sre2020/Aaron Rinehart,,Conf42,,queued,"security-chaos-engineering, chaos-engineering, security, incident-response, compliance"
+,"100 ms of database delay, 500 ms for the user",Mikolaj Pawlikowski (Bloomberg LP) at Conf42 Site Reliability Engineering 2020 on using chaos engineering to verify SRE assumptions and SLOs,2020-08-02,sre2020/chaos-engineering-verifies-sre-assumptions,,"Add 100 milliseconds of latency between a blog engine and its database, and users wait about 500 more. At Conf42 Site Reliability Engineering 2020, [Mikolaj Pawlikowski](https://www.conf42.com/Site_Reliability_Engineering_2020_Mikolaj_Pawlikowski_sre_chaos_engineering), Software Engineer Project Lead at Bloomberg LP, argued that chaos engineering is how SREs check the assumptions behind their SLOs, and showed it in two short demos.
+
+It's an introduction: definitions first, then a plug for his book, then the demos. The demos are the reason to watch.
+
+## Is chaos engineering just breaking things in production?
+
+No, and he spends some time on why the Chaos Monkey reputation hurts. Randomly killing VMs makes a good headline, and it also makes people say they would never do that here. His definition is more modest and more useful.
+
+""What we're after is experimenting to verify hypothesis about our system's behavior in the presence of failure,"" Mikolaj Pawlikowski said at Conf42 Site Reliability Engineering 2020.
+
+You inject failure you reasonably expect, in controlled amounts, and either confirm the system behaves as you think or learn what needs fixing. Production is the holy grail because no staging environment is a perfect copy, but it isn't the entry fee. His book, Chaos Engineering: Crash Test Your Applications (in Manning early access at the time), starts from a single process on a single machine, blocking system calls to see whether the error handling and retries you assumed are actually there. It then climbs through network failures, JVM bytecode injection, Docker, Kubernetes and front-end JavaScript.
+
+On the SRE side he walks through SLIs, SLOs and SLAs with a meme API whose 99th percentile response time should stay between 100 and 200 milliseconds, and defines SRE as operations with software engineering used to automate the toil away.
+
+## What does the Docker demo show?
+
+Ghost, the blogging engine, runs on Docker Swarm next to MySQL 5.7. Apache Bench with concurrency 1 for 10 seconds gives the steady state: after a cache warm-up, about 50 milliseconds per request.
+
+Then Pumba, an open-source tool that wraps the Linux tc traffic control utility, adds 100 milliseconds of delay to the database container's network for 120 seconds. It runs tc from a separate container attached to the target, so the database image needs no changes. Per-request time jumps to roughly 500 milliseconds, from about 200 requests in 10 seconds down to 18.
+
+The lesson is the multiplier. Ghost talks to the database several times per page, so the delay compounds. By the same reasoning, a one-second database delay would probably cost users closer to five seconds. That's the kind of fact you want before the incident, not during it.
+
+## What does the Kubernetes demo show?
+
+On a single-node minikube cluster, Pawlikowski uses PowerfulSeal, a Kubernetes chaos tool he wrote. Policies are YAML scenarios of steps and checks. The first one, about twenty lines, matches pods in every namespace, filters out the running ones and asserts the count is zero: 11 pods matched, none failing. Flip the filter and it fails as expected. PowerfulSeal can fail fast or run continuously and expose metrics for scraping.
+
+The second policy encodes a real deployment SLO: a new deployment and service must answer within 30 seconds. It applies a Goldpinger deployment (his other tool, which builds a connectivity graph between nodes), waits 30 seconds, hits the service with an HTTP probe and cleans up after itself. Run continuously, it tells you whether that 30-second promise still holds. PowerfulSeal also has drivers for AWS, Azure, OpenStack and Google Cloud for node-level actions such as stopping a master.
+
+## Who should watch
+
+SREs who have heard of chaos engineering but filed it under Netflix-only. Anyone with an SLO they have never tested will get an afternoon project out of it. If you already run chaos experiments, the demos will feel familiar.
+
+## Related Conf42 talks
+
+- Uma Mukkara on [Kubernetes resilience with Litmus](https://www.conf42.com/Site_Reliability_Engineering_2020_Uma_Mukkara_kubernetes_resilience_sre) at the same event.
+- Adrian Hornsby on [getting chaos engineering out of the starting blocks](https://www.conf42.com/Chaos_Engineering_2020_Adrian_Hornsby_getting_out_of_the_starting_blocks).
+- Long Zhang on [chaos engineering for the JVM](https://www.conf42.com/Chaos_Engineering_2020_Long_Zhang_jvm).
+
+[Watch Mikolaj Pawlikowski's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Mikolaj_Pawlikowski_sre_chaos_engineering)
+
+[Watch the talk on YouTube](https://youtu.be/9pBMn3DwHNY).
+",talk,sre2020,talk:sre2020/Mikolaj Pawlikowski,,Conf42,,queued,"chaos-engineering, sre, kubernetes, slos, docker"
+,When SRE stopped owning binaries and started owning Google Ads,Nikolaus Rath (Google) at Conf42 Site Reliability Engineering 2020 on moving an SRE team from supporting services to supporting whole products,2020-07-28,sre2020/sre-supports-products-not-binaries,,"Your SRE team can keep every supported service inside its SLO while the product is down. At Conf42 Site Reliability Engineering 2020, [Nikolaus Rath](https://www.conf42.com/Site_Reliability_Engineering_2020_Nikolaus_Rath_application_product_ownership), Tech Lead of an SRE team at Google in London, explained how his team stopped supporting individual binaries and started supporting products, with SLOs rewritten around what users actually do.
+
+It's a story about an engagement model, not a tool. Rath says so himself: this was first a cultural and philosophical change, and only then a technical one.
+
+## Who is this team?
+
+Forty people split between London and the US west coast, with two on-call rotations so at least two people hold the pager at any time. The team is more than a decade old. It started with AdWords and now covers most of Google's advertiser and publisher front ends: the interfaces where publishers sell ad inventory and advertisers buy it. By the end of 2019 that meant roughly 200 executables and microservices.
+
+Their time splits about 30% interrupt work, 20% routine service maintenance and 50% project work. Rath is upfront that this was ""complaining at a high level"": the products were reliable, and the change was an efficiency play. He also argues they could only afford it because nothing was on fire.
+
+## Why does per-service support stop working?
+
+Automation got very good. Moving a service to another data center used to take days; it became a small commit and a state machine that works out how to reach the desired state. Every binary exports metrics out of the box, and alerting infers basic alerts from each service's SLO. But the cost per service never reaches zero, so SRE support went only to the most important services, and importance needs a human judgment call that keeps going stale.
+
+Onboarding a service meant a long production readiness review. Offboarding was technically easier and socially worse: it means telling a developer team their service no longer matters much.
+
+Worse, nobody knew what a failing service meant for users. Rath's example page says a service's error ratio is above 0.5 for 15 minutes, and he admits he can mitigate it and root-cause it without ever learning what users saw. The real reliability bottleneck ends up in the services SRE doesn't support, and the team is badly placed to even find them.
+
+""Typically when we have an incident, we spend at least as much time to figure out the user impact than we spend time fixing the issue,"" Nikolaus Rath said at Conf42 Site Reliability Engineering 2020.
+
+## What did they change?
+
+Three steps. First, critical user interactions (CUIs): a user action that succeeds or fails, measured as close to the user as possible, usually in browser JavaScript, then logged on the server. SLOs were rewritten against CUIs, so SRE answers for product features rather than services.
+
+Second, developers own and run all services. SRE becomes the second line of defence, gets involved when CUIs are at risk, and takes on time-limited engagements to fix a specific reliability issue or teach a skill. Rath's analogy is a production doctor: SRE can diagnose and treat, but the patient has to follow the advice.
+
+Third, tooling. Hand-drawn architecture diagrams were useless because everything talks to everything, so the team generates them from RPC traces per CUI. Select two failing CUIs and the diagram shows only the services in their intersection. They also built a CI for production that continuously checks what runs against their best practices, plus a written production curriculum of the skills developers need.
+
+""SRE support means that the product is operated efficiently and works well for its users,"" Nikolaus Rath said at Conf42 Site Reliability Engineering 2020, replacing the old feeling that SRE support meant developers never had to worry about ops.
+
+## Did it work?
+
+The pages read differently now: some publishers can't preview video ads, error budget exhausted in 78 minutes. Per-service metrics still matter, but only once SRE is engaged. The change was welcomed, with some worry further down the dev org about extra work. Still open at the time of the talk: CUI coverage for every product, retiring the legacy supported-service status, and alerting granular enough to tell a fully broken feature from a few affected users.
+
+## Who should watch
+
+SRE leads whose team has scaled by automation and now supports more services than anyone understands. Product-facing SLO people will find the CUI section the most useful. Expect no code: it's a well-told organisational case study.
+
+## Related Conf42 talks
+
+- Daniel Spoonhower on [service ownership and distributed tracing](https://www.conf42.com/Site_Reliability_Engineering_2020_Daniel_Spoons_Spoonhower_service_ownership_distributed_tracing) at the same event.
+- Josh Armitage on [lean product development and SLOs](https://www.conf42.com/Site_Reliability_Engineering_2021_Josh_Armitage_lean_product_development_SLOs).
+- Fred Moyer on [SLOs and error budgets at scale](https://www.conf42.com/Observability_2023_Fred_Moyer_slos_error_budgets_scale).
+
+[Watch Nikolaus Rath's talk](https://www.conf42.com/Site_Reliability_Engineering_2020_Nikolaus_Rath_application_product_ownership)
+
+[Watch the talk on YouTube](https://youtu.be/mZfIHxkonxg).
+",talk,sre2020,talk:sre2020/Nikolaus Rath,,Conf42,,queued,"sre, slos, engagement-model, critical-user-interactions, google"
 ,Open Source 2020,Open Source Showcase,2020-06-30,2020-06-25-open-source-2020,./assets/splash/OSS2020_Session_Splash.png,"# 7 insightful talks at your service!
 
 From wiki-based platforms and open-source frameworks, all the way to Cloud Security and taking control over your data. Get ready, as [Sebastián Ramírez](https://www.conf42.com/Open_Source_Showcase_2020_Sebastin_Ramrez_cryptpad_collaboration_suite) is going to introduce you to the FastAPI world, the world of simplicity and high-performance. It’s a must-watch! 
