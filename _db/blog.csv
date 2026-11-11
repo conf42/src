@@ -87861,6 +87861,158 @@ Engineers new to chaos engineering on AWS, or anyone who needs a short internal 
 
 [Watch the talk on YouTube](https://youtu.be/nkEIsHJuWmo).
 ",talk,ce2024,talk:ce2024/Kiranpreet Chawla,,Conf42,,queued,"chaos-engineering, aws-fis, well-architected, ec2, reliability"
+,"Your unit tests check the rows, not the query plan","Adam Furmanek (Metis) at Conf42 DevOps 2024 on database guardrails - query plans via OpenTelemetry from laptop to production, so slow SQL never ships",2024-01-20,devops2024/unit-tests-cant-see-slow-queries,,"A query that fetched one user read nearly 300,000 rows and ran for 25 seconds, and every test in the suite was green. At Conf42 DevOps 2024, Adam Furmanek, DevRel at Metis, argues that automated tests can't catch database performance problems because they only check what comes back, and makes the case for database guardrails: capture execution plans from the developer's laptop, CI and production, and tell developers about the slow query before it ships.
+
+The last part of the talk demos Metis, his employer's product. The first two thirds, on what breaks in SQL databases and why tests miss it, stand on their own for any Postgres or MySQL shop.
+
+## Why does this need a new approach?
+
+His framing is organisational. Microservices moved complexity from deployment into operations: everything talks to everything, logs are scattered, and the order of events is unclear. Conway's law says teams mirror architecture, cross-team communication is the slow part, and so a good DevOps culture minimises the reasons to communicate. For databases that means developers can't keep waiting on DBAs. They need to own their databases and self-serve the troubleshooting, which requires tools that tell a story instead of dashboards that present lots of data but lack any information.
+
+## What breaks in SQL databases?
+
+Three areas, he says: code changes, schema changes, and the one teams miss, the same query being executed differently over time because statistics, indexes or configuration changed.
+
+- **Joins that explode.** The 25-second query joined many tables for one user, multiplying rows the ORM then discarded to build a single entity. Splitting it into eight small queries and joining in application code brought it down to milliseconds.
+- **Readable rewrites that cost you.** On a boarding passes table of about 8 million rows, the same logic ran in 8 seconds with plain joins and 13 seconds as a CTE. Same results, so every test stays green.
+- **Schema migrations** that rewrite a table and take it offline in production, are hard to stop midway, and are never exercised by unit tests, which run against the database before or after the migration, never during.
+- **Indexes** that speed reads and slow every insert, update and delete, or that a query quietly stops using six months later.
+- **ORMs**, with N+1 queries in lazy mode, the giant join in eager mode, and hidden choices about transactions, caching, pooling and migrations. Some ORMs have even dropped a production table when they couldn't reconcile the schema.
+
+The root problem, in his words at Conf42 DevOps 2024: ""We do assertions on the content that we extracted from the database, but we do not assert the way the data was extracted."" Locally you have a few hundred rows, so nothing looks slow.
+
+## Aren't load tests for this?
+
+They help, but too late and at a cost. A meaningful load test takes hours, needs its own fleet, and needs production-like data you have to anonymise under GDPR. It runs at the end of the pipeline, so a failure sends you back to the whiteboard, code review and pre-prod. Then there is configuration: trigram or JSONB indexes, pgvector or a separate vector database, vacuuming, fragmentation, noisy tenants, old database editions.
+
+## Database guardrails, stage by stage
+
+His solution starts from the planner. Prefix a query with EXPLAIN and the engine returns its plan: each row an operation (scan, join, sort, filter) with a cost, an arbitrary measure of how hard it is. That tells you whether an index is used.
+
+Then wire it into the lifecycle with OpenTelemetry, which you can enable without changing code by dropping in the libraries and setting environment variables:
+
+1. **Locally**, the app sends traces to a collector, which asks the database for the plan of each query it ran and forwards it to a central platform that flags inefficient queries.
+2. **In CI**, the same capture runs during tests, plus analysis of schema migrations, with a warning on the pull request.
+3. **In production**, a tool pulls metrics, configuration, extensions, schemas, data shape and plans, so the platform can say the query was fine on your laptop but will not fly against the production row count.
+
+He separates monitoring (alerts, raw data, thresholds set by hand) from observability (what happened and why). His example of the story you want: you deployed a change on Wednesday, the query stopped using an index, and Saturday's peak traffic made the database slow.
+
+The Metis demo shows that loop: an API call mapped to its SQL, table scans flagged with a fix, and a pull request warning not to drop an index that production used over 6,000 times in the last seven days.
+
+## Who should watch
+
+Backend developers who own their schema and ORM code, and platform engineers deciding how much database knowledge to push into product teams. If you already gate PRs on EXPLAIN output, the first half is a good list of failure modes to check against.
+
+## Related Conf42 talks
+
+- Prathamesh Sonpatki on [OpenTelemetry metrics](https://www.conf42.com/DevOps_2024_Prathamesh_Sonpatki_handbook_opentelemetry_metrics), at the same event.
+- Alexey Ozeritskiy on [distributed SQL database optimization](https://www.conf42.com/DevOps_2024_Alexey_Ozeritskiy_distributed_sql_database_optimization), at the same event.
+- Roni Dover on [OpenTelemetry from code to prod](https://www.conf42.com/DevSecOps_2023_Roni_Dover_opentelemetry_code_prod) at Conf42 DevSecOps 2023.
+
+[Watch Adam Furmanek's talk](https://www.conf42.com/DevOps_2024_Adam_Furmanek_observability_postgresql_mysql)
+
+[Watch the talk on YouTube](https://youtu.be/ncIB34MzRIY).
+",talk,devops2024,talk:devops2024/Adam Furmanek,,Conf42,,queued,"database-observability, postgresql, opentelemetry, shift-left, orm"
+,Secure code is not enough when 114 dependencies ride along,"Melissa McKay (JFrog) at Conf42 DevOps 2024 on why supply chain security goes past your own code - dependencies, base images, pinned versions, least privilege",2024-01-19,devops2024/supply-chain-security-beyond-your-own-code,,"Melissa McKay took the secure coding courses, learned SQL injection and CSRF, and thought she was set. Then she ran a Maven dependency tree on one microservice and found 114 direct and indirect dependencies, seven layers deep, in an application of seven microservices. At Conf42 DevOps 2024, the Developer Advocate at JFrog (also a Java Champion and Docker Captain) walks the software supply chain from the developer's laptop to production and shows how many attacks never touch the code you wrote.
+
+The talk grew out of a JFrog and NGINX discussion series she ran with Damien Curry of F5, following an application's journey episode by episode. This is the security episode, told from a developer's point of view.
+
+## Why should a developer care beyond their own code?
+
+The stakes first. Equifax, March to July 2017, was an Apache Struts vulnerability that was known but not patched in time: $1.4 billion in cleanup costs, $1.38 billion in consumer claims, 143 million customers. Log4Shell had every Java developer cringing; she cites Stephen Magill of Sonatype estimating about 70,000 open source projects using log4j directly and about 174,000 transitively. The MOVEit Transfer hacks of 2023 hit Zellis, British Airways, the BBC, PokerStars (110,000 users) and IBM-managed systems holding data on 4.1 million Colorado patients. IBM put the global average cost of a breach in 2023 at $4.45 million, up 15% over three years.
+
+Writing secure code is still your job. She recommends OWASP's sarcastic essay on how to write insecure code (default deny means denying your code can ever be broken; mix as many languages as possible so nobody can learn all the security rules). But SolarWinds is the counterexample: 18,000 customers received a digitally signed update with a backdoor, which suggests the binary was swapped after compilation, likely in the build or distribution pipeline. No amount of careful coding prevents that.
+
+## Where can an attacker get in?
+
+Everywhere an artifact or dependency moves, which is why she points to SLSA (Supply-chain Levels for Software Artifacts) as a way to measure progress. Two developer-controllable examples get the most time.
+
+**Dependency confusion.** Alex Birsan showed that internal package names leak (npm requests reveal them) and version requirements accept the specified version or anything greater. Publish a public package with the same name and a higher version, and a misconfigured package manager pulls it instead of the internal one. His bug bounties for this came to $130,000. The fix is to configure your artifact manager so internal package requests resolve only from internal repositories, because that is not the default.
+
+**Left-pad.** After a naming dispute with the messaging company kik, npm sided with the company, and the developer unpublished his kik package along with 272 others, including left-pad. A short padding function, depended on transitively by half the JavaScript world, vanished. Cameron Westland republished an identical version as 1.0.0, but projects pinned to 0.0.3 stayed broken. No malicious code involved: just the trap of relying solely on public repositories.
+
+## The Dockerfile that has every problem
+
+Her contrived Dockerfile is a checklist in nine lines. An untrusted parent image pulled from Docker Hub by default, with no tag or SHA. Even a tag is not enough, she argues, because it is ""more of a pointer than anything"" and can be overwritten. Packages installed with no version, or with an old, possibly vulnerable one, which bites hardest when a new developer builds from a fresh cache. A `curl | bash` of an external script, which in her own team broke builds twice when the vendor first changed it to an incompatible version and then moved it. And running as root: Sysdig's 2022 report found 76% of 3 million containers ran as root, and its 2023 report found 83% of 7 million. We are getting worse.
+
+## Is there any hope?
+
+Her list of fixes:
+
+- **Educate yourselves** and mix seniors with juniors so mentorship happens. OWASP cheat sheets and the OpenSSF trio of free secure software development courses on edX are her picks.
+- **Don't rely solely on public repos.** Save every artifact your builds need in a local artifact management system. She works for JFrog and mentions Artifactory, but says open source options exist and the point is to have one.
+- **Pin explicit versions**, with SHAs for Docker images and where appropriate for npm.
+- **Manage permissions.** Sysdig found 90% of granted permissions are not used.
+- **Scan regularly, keep systems maintained, and have a plan** for the production security incident, because it will happen.
+
+Melissa McKay said at Conf42 DevOps 2024: ""Make sure that you're keeping track of your dependencies so that you don't have broken builds for unknown reasons.""
+
+## Who should watch
+
+Developers who think security is the security team's job, and anyone writing Dockerfiles from copied examples. Security engineers will know the incidents; the Dockerfile walk-through is still a good thing to show a team.
+
+## Related Conf42 talks
+
+- Danish Tariq and Hassan Khan Yusufzai on [npm supply chain attacks](https://www.conf42.com/DevSecOps_2023_Danish_Tariq_Hassan_Khan_Yusufzai_supply_chain_npm_attacks) at Conf42 DevSecOps 2023.
+- Ciara Carey on [making SBOMs actionable](https://www.conf42.com/DevSecOps_2022_Ciara_Carey_software_bill_of_materials_sboms_actionable) at Conf42 DevSecOps 2022.
+- Sven Ruppert on [supply chain security for open source projects](https://www.conf42.com/Cloud_Native_2023_Sven_Ruppert_supply_chain_security_opensource_projects) at Conf42 Cloud Native 2023.
+
+[Watch Melissa McKay's talk](https://www.conf42.com/DevOps_2024_Melissa_McKay_addressing_security_concerns)
+
+[Watch the talk on YouTube](https://youtu.be/tFC_xKIyB7g).
+",talk,devops2024,talk:devops2024/Melissa McKay,,Conf42,,queued,"supply-chain-security, dependencies, containers, devsecops, open-source"
+,"Of 932 vulnerable dependencies, only 12 were reachable","Kyle Kelly (Semgrep) at Conf42 DevOps 2024 on triaging open source vulnerabilities with reachability, semver easy wins, and ignoring most transitive CVEs",2024-01-19,devops2024/reachability-cuts-dependency-alerts-to-tens,,"Your dependency scanner says 2,500 vulnerabilities. Kyle Kelly, Security Researcher at Semgrep and founder of the CramHacks supply chain security newsletter, argues at Conf42 DevOps 2024 that almost all of them are noise: code-scanning reachability cuts hundreds of version-matched alerts down to the tens your code can actually hit, and semantic versioning turns much of what is left into an upgrade button.
+
+He works on Semgrep's supply chain product and says so, so the reachability section is partly a product explanation. The research numbers and the remediation advice stand on their own.
+
+## How big is the open source pile?
+
+Over 90% of organisations use open source, GitHub recorded 52 million new open source projects in 2022, and 70-90% of an application's stack is said to be open source. He adds a caveat to that last figure: counting code that actually executes, the share is far smaller, since for any imported dependency you are likely using about 10% of its functionality.
+
+Vulnerabilities: just over 28,000 CVEs in 2023, though many are for commercial products, and the GitHub Security Advisory database is the more useful source for open source. Coverage is uneven by ecosystem: his slide counts 4,445 advisories for Maven and 3,277 for npm, against 33 for Swift, 24 for Erlang/Elixir and 8 for Dart and Flutter. If you live in the small ones, an SCA tool has little to tell you. In his experience, anything below high severity can usually wait while highs and criticals exist. EPSS and CISA's KEV catalogue help less than you would hope, because both lean towards commercial products.
+
+## What does reachability actually mean?
+
+The word means different things in different tools. CycloneDX's cdxgen calls a dependency reachable if your code uses it at all; others call a vulnerability reachable if it hits a direct dependency or a public-facing app. Semgrep's version scans your code for the specific vulnerable usage described in the advisory, using Semgrep rules researchers write per vulnerability.
+
+The funnel on his slide: thousands of new vulnerabilities, hundreds that match your dependency versions, tens that result in actual vulnerable usage. The evidence:
+
+- An NC State study comparing SCA tools found only 2.1% of roughly 2,500 alerts were reachable through static analysis.
+- Semgrep's internal study of 1,100 open source projects found 932 vulnerable packages by version, and only 12 were reachable.
+
+Results vary by language: JavaScript and Python benefit most because of their modularity, C# less so. Why static over dynamic analysis? Build reproducibility is often a nightmare, static analysis does not need your code to run, and it scales to thousands of projects without per-project tuning.
+
+He has a favourite category of wasted effort too: ""it's a regular expression denial of service vulnerability, and it's on an internal application."" His verdict on that kind of finding, as he said at Conf42 DevOps 2024: ""Don't spend valuable security engineering time fixing these ridiculous vulnerabilities.""
+
+## Fixes exist, people just don't take them
+
+Sonatype's 2023 report found 96% of known vulnerable downloads had a fixed version available. Log4j is the sharpest example: over 300 million vulnerable downloads since December 2021, and roughly 25% of downloads in the last seven days he checked were still vulnerable versions.
+
+So the easy wins:
+
+- **Use semver.** Of 200 vulnerabilities, maybe 100 are patch upgrades (hit the button) and 50 minor (look a little closer). Read the changelog for majors. Semver is not enforced: a Maven Central study found roughly 20% of non-major releases were breaking, so 80% were safe.
+- **Keep the manifest honest.** Exact versions, `~` for patches, `^` for minor and patch, `*` for anything. Give broad ranges to well-maintained packages you use lightly, and tight ones to load-bearing ones. A large-scale npm study found over 87% of dependencies were set to receive updates automatically, but they only arrive if you regenerate the lock file.
+
+## The spicy take: ignore transitive vulnerabilities
+
+GitHub's 2020 Octoverse report put the average JavaScript project with ten direct dependencies at 683 transitive ones, and more than 90% of vulnerable dependencies are transitive. His position: usually ignore them. You cannot realistically patch five levels down, static reachability does not follow the one function you imported, and respectable packages issue their own advisory when a transitive vulnerability affects them, which turns it into a direct one. If one direct dependency drags in a mass of transitive vulnerabilities, that tells you something about its maintenance.
+
+His three takeaways: reachability can reduce false positives by up to 98%, build reproducibility and semver solve many headaches, and transitive vulnerabilities can usually be ignored.
+
+## Who should watch
+
+AppSec engineers drowning in Dependabot alerts and developers asked to fix them, especially in JavaScript and Python. Those running strict compliance regimes may find the transitive take too spicy, which is a good reason to watch and argue.
+
+## Related Conf42 talks
+
+- Henrik Plate on [open source vulnerability management at the source](https://www.conf42.com/DevSecOps_2022_Henrik_Plate_opensource_vulnerability_management_source) at Conf42 DevSecOps 2022.
+- Anthony Laiuppa on [vulnerability management for developers](https://www.conf42.com/DevSecOps_2024_Anthony_Laiuppa_vulnerability_management_developers) at Conf42 DevSecOps 2024.
+- Melissa McKay on [security in every stage of the software supply chain](https://www.conf42.com/DevOps_2024_Melissa_McKay_addressing_security_concerns), at the same event.
+
+[Watch Kyle Kelly's talk](https://www.conf42.com/DevOps_2024_Kyle_Kelly_minefield_opensource_software)
+
+[Watch the talk on YouTube](https://youtu.be/02AQKHY9smY).
+",talk,devops2024,talk:devops2024/Kyle Kelly,,Conf42,,queued,"supply-chain-security, sca, open-source, vulnerability-management, semver"
 ,Hand an LLM the architecture diagram and it drafts your chaos plan,"Indika Wimalasuriya (Virtusa) at Conf42 Chaos Engineering 2024 on generative AI for each stage of chaos engineering, from dependencies to blast radius",2024-01-18,ce2024/llm-reads-architecture-diagram-writes-chaos,,"Testers test what they know, and outages come from what nobody knew. Indika Wimalasuriya, Senior Systems Engineering Manager at Virtusa, used his [Conf42 Chaos Engineering 2024 talk](https://www.conf42.com/Chaos_Engineering_2024_Indika_Wimalasuriya_smart_chaos_generative_AI) to show generative AI filling in the stages of chaos engineering that people still do by hand: give a model the architecture diagram and it lists dependencies, steady state, hypotheses, test cases and blast radius. He calls the end-to-end version Smart Chaos.
 
 It is a walkthrough of prompts and their outputs on one example system, built in AWS PartyRock, plus a proposed pipeline. Not a production story.
@@ -87905,6 +88057,60 @@ Chaos and SRE leads wondering which parts of experiment planning an LLM can draf
 
 [Watch the talk on YouTube](https://youtu.be/1HapyDruZeU).
 ",talk,ce2024,talk:ce2024/Indika Wimalasuriya,,Conf42,,queued,"chaos-engineering, generative-ai, llm, aws, hypothesis"
+,"Your fish tank thermometer needs prevention, not a detection alert","Antoinette Hodes (Check Point Software Technologies) at Conf42 DevOps 2024 on why IoT devices need preventive, zero tolerance security built into the device",2024-01-18,devops2024/iot-security-prevent-dont-detect,,"By the time a detective control spots the compromised doorbell, it is already a jump host into your network. At Conf42 DevOps 2024, Antoinette Hodes, Security Evangelist at Check Point Software Technologies, argues that IoT and OT devices need a zero tolerance security architecture: preventive controls hardened into the device itself, so it keeps working as intended against today's attacks and tomorrow's zero-days.
+
+It is a vendor evangelist's talk and a strategic one: a tour of the 2023 threat timeline, the regulations arriving, and the business case, rather than an implementation guide.
+
+## Why prevention over detection?
+
+""IoT devices require prevention, preventative security controls rather than detective security controls,"" Antoinette Hodes said at Conf42 DevOps 2024. Her reasons are the things compromised IoT devices actually do: act as a stepping stone into the network (HVAC administrators connecting straight in from the internet), get ransomed (OT devices included, in the context of Russia and Ukraine), spread laterally through propagation attacks where an infected device hunts for others, steal data, and kick off the cyber kill chain.
+
+The example that sticks is the casino whose smart fish tank thermometer was used as a jump host to extract sensitive data. Nobody threat-modelled the fish.
+
+She frames zero tolerance as three verbs: protecting with preventive controls, ensuring the device is safe (no misuse, no accident, mitigated physical risk) and preserving its intended behaviour. A Ring doorbell and an infusion pump need different postures, but both hold sensitive information.
+
+She also opens with history: the first cyber attack, in 1834, when François and Joseph Blanc manipulated data on France's telegraph system, the equivalent of an internet stock fraud.
+
+## What did 2023 look like?
+
+Her IoT and OT threat timeline for the year:
+
+- **January**: Ghostsec claims the first ransomware encryption of a remote terminal unit (RTU), the kind used by energy companies.
+- **March**: Sandworm's CaddyWiper disrupts the Ukrainian power grid, erasing data and causing a massive blackout.
+- **June**: the RSOCKS proxy botnet, 350,000 compromised assets from doorbells and garage doors to industrial IoT and phones, built on known vulnerabilities and weak credentials and sold as high-quality proxies.
+- **October**: a Wyze Cam vulnerability allowing a reverse shell and takeover.
+- **November**: Cybernews researchers hijack 27,044 printers and make them print a five-step guide to securing a printer, the most polite breach of the year. Also November: an attack on Danish critical infrastructure through vulnerable Zyxel devices, with remote code execution and buffer overflows.
+
+The Colonial Pipeline attack is on the list too, and she is careful about it: it was not an IoT attack but an unpatched VPN that shut down operations. Her warning on credentials is practical: default-password lists for IoT, IIoT and OT devices are public, and combined with Shodan or Google dorks, attackers automate the rest.
+
+## Why is IoT so hard to secure?
+
+Complex interconnection, a massive attack surface, devices spanning smart homes to industrial plants, tiny hardware budgets and no standardisation at all. Then there is the data: at rest on the device (the doorbell recording, ideally encrypted), in transit (the video on its way to the cloud) and in use, which she calls the most vulnerable, open to memory manipulation and remote code execution.
+
+Manufacturers are squeezed from both sides. The factory has source repos, build and release management and device security (secure debug lock, root of trust, secure key storage, secure identity). The market has competition, cost against functionality, scaling and supply chain disruptions.
+
+## Regulation is coming, and it says the same three things
+
+Her slide lists the EU Cyber Security Act, Cyber Resilience Act, Radio Equipment Directive, DORA, NIS2, ETSI EN 303 645, the UK PSTI regime and the US Cyber Trust Mark. Their common key elements: secure access and access control, authentication and authorisation (including brute-force protection), and data protection. Security embedded on the device covers all three.
+
+The numbers behind the urgency, from 2022: 26,448 vulnerabilities in total, 4,135 of them critical, which works out to 72 a day with 11 critical ones every day. Twenty-five years ago, she recalls, a 7 or 8 severity put her team in panic mode.
+
+She closes with the Robert Mueller line: ""There are only two companies, those that have been hacked and those that will be hacked"". Check Point, she adds, has a third category: those that have been hacked and still don't know.
+
+## Who should watch
+
+Security architects and DevOps teams shipping connected devices or running fleets of them, and anyone who needs the regulatory map for IoT in one place. Engineers wanting firmware hardening recipes will find the why here and need to look elsewhere for the how.
+
+## Related Conf42 talks
+
+- Brian Contos on [cameras, CACs and clocks in enterprise IoT](https://www.conf42.com/Incident_Management_2022_Brian_Contos_cameras_cacs_clocks_enterprise_iot) at Conf42 Incident Management 2022.
+- Andrey Slastenov on [IoT and 5G devices in the DDoS threat picture](https://www.conf42.com/DevSecOps_2023_Andrey_Slastenov_iot_5g_devices_ddos_threat_landscape) at Conf42 DevSecOps 2023.
+- Jonathan Williams on [IoT security threats](https://www.conf42.com/DevSecOps_2021_Jonathan_Williams_IoT_Security_Threats) at Conf42 DevSecOps 2021.
+
+[Watch Antoinette Hodes's talk](https://www.conf42.com/DevOps_2024_Antoinette_Hodes_iot_devices_saving_toasters)
+
+[Watch the talk on YouTube](https://youtu.be/eWOOH_QMcok).
+",talk,devops2024,talk:devops2024/Antoinette Hodes,,Conf42,,queued,"iot-security, ot-security, zero-trust, security-architecture, regulation"
 ,"With eBPF in the kernel, your chaos experiment has nowhere to hide","Francesco Sbaraglia and Michele Dodic (Accenture) at Conf42 Chaos Engineering 2024 on eBPF and GenAI to observe, design and seed chaos experiments",2024-01-17,ce2024/ebpf-sees-your-chaos-experiments,,"A chaos experiment you cannot observe is just an outage you scheduled. Francesco Sbaraglia, SRE Tech Lead at Accenture, and his colleague Michele Dodic used their [Conf42 Chaos Engineering 2024 talk](https://www.conf42.com/Chaos_Engineering_2024_Francesco_Sbaraglia_Michele_Dodic_accelerating_resilience_ebpf) to argue that eBPF fixes the observing part: it watches every system call on a Kubernetes node, which lets you see the experiment, stop it, and even replay a real incident as a new one. A GenAI copilot then turns that data into the next hypothesis.
 
 They are upfront about the angle: the focus is security observability, not security itself.
@@ -87946,6 +88152,106 @@ Platform engineers and SREs running chaos on Kubernetes who want better proof of
 
 [Watch the talk on YouTube](https://youtu.be/VcTYEkCL8aE).
 ",talk,ce2024,talk:ce2024/Francesco Sbaraglia,,Conf42,,queued,"chaos-engineering, ebpf, kubernetes, security-observability, genai"
+,A passing test can be the most dangerous result in your pipeline,"Mesut Durukal (Indeed) at Conf42 DevOps 2024 on QA in DevOps - fast, reliable, maintainable tests, plus test design that catches the bugs coverage misses",2024-01-17,devops2024/green-tests-can-hide-silent-horrors,,"Everyone complains about the red test that shouldn't be red. Mesut Durukal, QA Lead at Indeed, spends part of his Conf42 DevOps 2024 talk on the opposite case: the green test sitting on top of a real bug. His frame for QA in DevOps is two axes, speed and quality, and he shows how test execution time, flakiness and maintainability decide the first, while test design and learning from escaped bugs decide the second.
+
+It is a broad, practitioner-level tour of what a QA lead measures and fixes, aimed at teams moving from seasonal releases to continuous delivery.
+
+## Why does QA belong inside DevOps rather than after it?
+
+His picture of QA is a bridge between the customer, product owners and developers: find out what users actually expect, find out what the developers actually built, and get both on the same page. Continuous delivery raises the stakes. Every release candidate needs checking for performance, usability and maintainability, not only functional correctness, and that only scales with automation and early QA involvement. Leave QA out of the process and those quality dimensions go unchecked until production.
+
+He ties QA metrics to the DORA view of the product: speed of delivery and quality of delivery. On the speed side his slides list features waiting for test, average execution duration and flaky test retries. On the reliability side: escaped bugs, customer feedback and incidents from production.
+
+## Speed: slow, flaky and fragile tests all stop the pipeline
+
+- **Execution time.** ""So execution of test cases is directly affecting the delivery time,"" Mesut Durukal said at Conf42 DevOps 2024. Profile the slow tests, delete unnecessary waits, and make tests independent so the suite can be split and run in parallel.
+- **Reliability.** Flaky tests mean retries, and retries mean a longer run. Every failing test also halts the pipeline while someone decides whether it is a real bug or a false alarm.
+- **Maintainability.** While a broken test is being fixed, delivery waits. His example is UI automation: when a page layout changes, locators kept outside the spec files (his slide shows a `data-test-id` selector) get updated in one place. Remove duplication so every fix has a single source of truth.
+
+## The four boxes of a test report
+
+His reliability grid is worth keeping on a sticky note. The feature is fine and the test passes: no problem. The feature is broken and the test fails: real bug. The feature is fine and the test fails: false alarm. The feature is broken and the test passes: what he calls a silent horror, the case that ships the bug to production and costs more later.
+
+Both bad boxes usually trace back to test smells, the test-code equivalent of code smells, around coverage and maintainability. His fix is quality gates for test code as well as product code: static analysis and peer review before a new test is merged into the framework.
+
+## Quality: coverage numbers don't catch escaped bugs
+
+You can have fast tests and 100% coverage and still get bugs reported from production. His explanation is the verification versus validation gap: checking what was implemented is not the same as checking what was supposed to be implemented. The remedies he lists:
+
+- Keep test scope current after every feature and every refactor.
+- Vary test data: not only integers and strings but doubles, not only positive values but negative ones, and run on the browsers, devices and operating systems users actually have.
+- Use test design techniques such as equivalence partitioning and boundary value analysis for the corner cases.
+- Try persona-based testing. His slide has three: an 83-year-old in APAC using a voice assistant (accessibility tests), a 34-year-old gamer in the EU who hates slow pages (functionality and performance), and a 19-year-old in the Americas juggling several browsers on mobile (cross-browser tests).
+
+## Listen to your bugs
+
+The last section is about monitoring. Chart bugs by severity and by component on dashboards, because raw data is hard to read. Then run postmortems on them: a bug carries information about a weakness in the process, and QA's job is not only to find bugs but to stop the next batch from being written.
+
+## Who should watch
+
+QA engineers and SDETs making the case for test-code quality, and DevOps engineers whose pipelines spend more time on retries than on deploys. It is a survey rather than a case study with numbers, so treat it as a checklist for your own suite.
+
+## Related Conf42 talks
+
+- Mike Morgan on [strategies for flaky tests](https://www.conf42.com/DevOps_2025_Mike_Morgan_testing_flaky_strategies) at Conf42 DevOps 2025.
+- Mesut Durukal again on [test automation in agile teams](https://www.conf42.com/DevOps_2025_Mesut_Durukal_agile_automation_test) at Conf42 DevOps 2025.
+- Siva Yachamaneni on [integration test automation](https://www.conf42.com/Machine_Learning_2025_Siva_Yachamaneni_testing_integration_automation) at Conf42 Machine Learning 2025.
+
+[Watch Mesut Durukal's talk](https://www.conf42.com/DevOps_2024_Mesut_Durukal_quality_assurance_touchstone)
+
+[Watch the talk on YouTube](https://youtu.be/RsGZudfRbio).
+",talk,devops2024,talk:devops2024/Mesut Durukal,,Conf42,,queued,"quality-assurance, test-automation, flaky-tests, devops, ci-cd"
+,Fault tolerance starts with deciding what is allowed to break,"Maria Rogova (Meta) at Conf42 DevOps 2024 on fault-tolerant systems - rank features first, then test your tools, degrade gracefully and add redundancy",2024-01-17,devops2024/fault-tolerance-starts-with-priorities,,"You cannot protect everything, so the first design decision in a fault-tolerant system is which parts are allowed to fail. At Conf42 DevOps 2024, Maria Rogova, Software Engineer at Meta, walks through resilience in two halves: the system design (modularity, graceful degradation, redundancy) and the tooling and process needed to keep that design honest once it ships, because a well-designed system with poor maintenance still falls over.
+
+It is a compact checklist talk, a good refresher or a first map of the territory rather than a war story from Meta's infrastructure.
+
+## Do you really need fault tolerance everywhere?
+
+She starts with the failure types: hardware, network, human error (which she notes happens quite often), environmental disasters such as floods or lightning, and security breaches. Then comes the question most teams skip. With unlimited engineers, time and money you could build the perfect system; in the real world you prioritise, and you ask whether each protection is worth it from a business perspective.
+
+Her exercise: list every feature and rank them against each other. In a food delivery shop, a broken checkout stops the business. Broken search suggestions do not. That ranking tells you which parts to duplicate and which to leave alone.
+
+## Test the tools you will lean on during the outage
+
+The process half has a few points that are easy to nod along to and rarely done:
+
+- **Monitoring with automatic detection**: thresholds, false positives and all, because nobody can watch dashboards day and night.
+- **A test environment as close to production as possible**, such as a small copy of the cluster, plus stress tests for your Black Friday.
+- **Test your tools.** Maria Rogova said at Conf42 DevOps 2024: ""Test that your monitoring system is actually monitoring, test that your recovery script is actually working.""
+- **Automate recovery and write runbooks**, so that mid-incident nobody is guessing a command's parameters and a new joiner can still act.
+- **Chaos engineering**, run as a controlled process you can roll back. Her example: a system spread across three data centres but designed to run on two, so disconnect one and check.
+- **Incremental rollout**: ship to a small percentage of users, wait, watch metrics, expand. A critical bug then hits a few people instead of everybody.
+
+## Ask what happens when each box goes down
+
+On design, she wants systems modular, distributed and scalable, and then she proposes an exercise for the finished draft: go component by component and ask what happens if this one goes down. The database, this service, that process. The answer should be that the system is okay. If it is that everything goes down, you have found a single point of failure. External dependencies count too: if a third-party API starts returning errors, does your system still work?
+
+Graceful degradation is the part she finds most interesting. Under memory pressure, return a simplified response instead of failing. And think about the UI: if the ""find similar"" feature behind a product button is down, decide in advance whether you grey the button out or hide it.
+
+## Diversity and redundancy, with their costs
+
+Diversity means more maintenance, she admits, but it protects you. If the company chat runs on the same internal infrastructure that just went down, engineers cannot coordinate the recovery, so keep a backup channel. Likewise consider a second cloud provider, not only a second data centre.
+
+Then the redundancy catalogue: hardware (RAID, hot standby), software (process replication, and N-version programming, where a critical function is implemented several times and the outputs compared), multiple network paths, data mirroring and backups, and geographic spread across data centres or countries.
+
+## The improbable happens
+
+She closes with reminders that low-probability failures are not zero-probability: four successive lightning strikes on a Google data centre on 13 August 2015, and Twitter and Instagram both having problems on 14 July 2022 for unrelated reasons. Her most recent example, from January 2024, involved external APIs again: Amazon product descriptions replaced with an LLM's ""I apologize but I can't fulfill this request"" because sellers had automated them with ChatGPT.
+
+## Who should watch
+
+Engineers moving into system design or on-call ownership who want a structured checklist, and team leads who need a vocabulary for arguing that the checkout path deserves more redundancy than search. Experienced SREs will know most of it; the feature-ranking and test-your-tools points are still worth stealing.
+
+## Related Conf42 talks
+
+- Adrian Hornsby on [getting started with chaos engineering](https://www.conf42.com/Chaos_Engineering_2020_Adrian_Hornsby_getting_out_of_the_starting_blocks) at Conf42 Chaos Engineering 2020.
+- Vilas Veeraraghavan on [resilience adoption](https://www.conf42.com/Chaos_Engineering_2020_Vilas_Veeraraghavan_resilience_adoption) at Conf42 Chaos Engineering 2020.
+- Nick Hodges on [self-healing systems](https://www.conf42.com/Chaos_Engineering_2022_Nick_Hodges_self_healing_systems) at Conf42 Chaos Engineering 2022.
+
+[Watch Maria Rogova's talk](https://www.conf42.com/DevOps_2024_Maria_Rogova_faulttolerant_systems)
+
+[Watch the talk on YouTube](https://youtu.be/KqVoKeOPATQ).
+",talk,devops2024,talk:devops2024/Maria Rogova,,Conf42,,queued,"resilience, fault-tolerance, chaos-engineering, system-design, sre"
 ,Your chaos hypothesis should come out of a resilience model,"Gunnar Grosch (AWS) at Conf42 Chaos Engineering 2024 on building a resilience model first, so every chaos experiment tests a hypothesis worth testing",2024-01-16,ce2024/resilience-model-before-chaos-hypothesis,,"Most chaos engineering talks are about the fun part: picking a tool, injecting a fault, watching the graphs. Gunnar Grosch, Principal Developer Advocate at AWS, spent his [Conf42 Chaos Engineering 2024 talk](https://www.conf42.com/Chaos_Engineering_2024_Gunnar_Grosch_hypothesis_development_resilience_modeling) on the step before that: building a resilience model, so the hypothesis you test is one that actually matters. His takeaway is simple. Time spent anticipating failure before the experiment makes the experiment worth far more.
 
 ## Why bother modelling before you break things?
@@ -87990,6 +88296,180 @@ Teams that already run chaos experiments and suspect they are testing whatever w
 
 [Watch the talk on YouTube](https://youtu.be/Ed6g6yFUE5E).
 ",talk,ce2024,talk:ce2024/Gunnar Grosch,,Conf42,,queued,"chaos-engineering, resilience-modeling, hypothesis, aws, failure-modes"
+,"The CEO wanted his own VMs, so Bitovi turned GitHub into the platform",Leo Diaz Longhi (Bitovi) at Conf42 DevOps 2024 on wrapping Terraform and Ansible in GitHub Actions so any developer can deploy infrastructure from a workflow,2024-01-16,devops2024/ceo-wanted-a-vm-github-actions,,"It started with the CEO asking the infrastructure team to set up a VM for him, and then asking why he had to ask. At Conf42 DevOps 2024, Leo Diaz Longhi, Platform Engineer at Bitovi, tells how that request turned into a catalogue of open source GitHub Actions that let a developer deploy anything from a static site to an EKS cluster by adding a workflow and a few inputs.
+
+The point is not Bitovi's tooling in particular. It is that GitHub Actions, used with a bit of discipline, already gives you the pieces of a platform: an interface (inputs and outputs), an implementation you can hide (the action's steps), and an audit trail (the repository).
+
+## How did they get from scripts to a platform?
+
+He walks the evolution in three steps. No DevOps: sysadmins with Bash or Python scripts, config files and documentation, plus a lot of clicking in cloud consoles. Slow and easy to get wrong. DevOps: Terraform and Ansible brought standards and automation, but every environment still needed variables set and settings tweaked by hand, and someone from DevOps had to step in.
+
+Bitovi's first answer was BitOps, an open source tool that bakes the IaC tools, automation scripts and pre/post hooks into a Docker container, so nothing needs installing. That still left config files to write, a repository layout to follow, and a Docker engine to run it on. GitHub Actions closed the gap: the scripts that generate what BitOps needs moved into the actions, and the configuration moved into workflow inputs.
+
+He is clear that BitOps is not required. Some of their most popular actions don't use it at all.
+
+## An action is a Terraform module with a nicer front door
+
+From the DevOps engineer's side, `action.yaml` declares inputs and outputs and lists the steps: a command, a script or a call to another action. It wraps the IaC tools and isolates the developer from them, exposing only what you choose. He makes the comparison himself: if you know Terraform, it looks a lot like handling inputs and outputs in a module.
+
+From the developer's side, deploying to an EC2 instance is one more workflow next to the lint and test ones. Deploying Storybook to GitHub Pages collapses to a single step. And each action offers an input variable to download an artifact with the generated Ansible and Terraform code, so the curious can see exactly what ran, while the repository itself stays free of scripts and Terraform files.
+
+## Sensible defaults from the repo itself
+
+The trick that made reuse bearable: instead of setting a dozen Terraform variables per deployment, the actions derive them from repository specifics such as the repo name or the branch, and fall back to sane defaults for the rest. Need a bigger instance, a database proxy or an exposed port? Change one input.
+
+""That way you can get your resource up and running with little to no intervention in just a few minutes,"" Leo Diaz Longhi said at Conf42 DevOps 2024.
+
+Building one action per need got slow, so they pulled the shared code into a common layer for all actions. That is the Commons framework his colleague Karamveer Kaur Sangha demos in her talk at the same event.
+
+## What does the platform engineer see?
+
+Environments as repositories. His example has three infrastructure repos, dev, QA and prod, each with a workflow per resource: an EFS volume, an RDS database, Docker on EC2. Copy the dev repo, change the variables, and you have QA in minutes. Workflows can run on manual triggers or schedules, and the repo history doubles as a record of what was deployed when.
+
+The catalogue they built in a few months includes React and Storybook to GitHub Pages, static sites to S3 with a CDN and Route 53, Docker build-tag-publish, Prometheus and Grafana, ECS and EKS clusters, Aurora, RDS and Redis, EFS and self-hosted GitHub runners.
+
+## Who should watch
+
+Small platform teams, or DevOps engineers who keep getting the same infrastructure request, and anyone weighing whether they need a developer portal before they need a good set of reusable workflows. It is short and conceptual; pair it with Karamveer Kaur Sangha's demo to see the moving parts.
+
+## Related Conf42 talks
+
+- Karamveer Kaur Sangha on [deploying Prometheus with a GitHub Action](https://www.conf42.com/DevOps_2024_Karamveer_Kaur_Sangha_platform_engineering_github_actions_prometheus) at the same event.
+- Andrew Kirkpatrick on [self-service, PR-based Terraform](https://www.conf42.com/Site_Reliability_Engineering_2021_Andrew_Kirkpatrick_selfservice_PRbased_Terraform) at Conf42 SRE 2021.
+- Ranjan Mohan on [managing GitHub Actions across multiple projects](https://www.conf42.com/DevSecOps_2022_Ranjan_Mohan_setting_up_managing_github_actions_multiple_projects) at Conf42 DevSecOps 2022.
+
+[Watch Leo Diaz Longhi's talk](https://www.conf42.com/DevOps_2024_Leo_Diaz_Longhi_github_platform_engineering)
+
+[Watch the talk on YouTube](https://youtu.be/8gcnuy3p5ZI).
+",talk,devops2024,talk:devops2024/Leo Diaz Longhi,,Conf42,,queued,"platform-engineering, github-actions, terraform, ansible, developer-experience"
+,"Kafka or RabbitMQ? Apache Pulsar's pitch is both, in one broker","Julien Jakubowski (StreamNative) at Conf42 DevOps 2024 on Apache Pulsar as one platform for both work queues and data streaming, scaled by layer",2024-01-15,devops2024/pulsar-queue-and-stream-one-broker,,"Most event-driven stacks end up with two brokers: Kafka for the ordered, replayable streams and RabbitMQ for the work queues. At Conf42 DevOps 2024, Julien Jakubowski, developer advocate at StreamNative, makes the case for Apache Pulsar as one platform that covers both semantics, and spends most of the talk on why its split compute-and-storage architecture scales without partition rebalances.
+
+Honest scope: StreamNative was founded by Pulsar's original creators and sells a managed Pulsar service, so this is an advocate's tour of Pulsar's features rather than a neutral bake-off. It is still a clear explanation of when you need a queue and when you need a stream.
+
+## Queue or stream: what is the actual difference?
+
+He separates the two cleanly. Data streaming means events processed in order, large ingestion volumes, retention, and big catch-up reads; think real-time analytics, fraud detection, ingestion. Kafka and Amazon Kinesis live here.
+
+Message queuing is about decoupling task execution. His example is push notifications to Alice's and Bob's iPhones: nobody cares who gets theirs first. What you need is adding and removing workers on the fly, not blocking the queue when one consumer is busy or fails, redelivering failed messages later, and a dead letter queue for the undeliverable ones. That is RabbitMQ and Amazon SQS territory, and a streaming platform is not built for it.
+
+Pulsar implements both. As he said at Conf42 DevOps 2024: ""So you have only one SDK to learn as a developer and you have only one broker to manage in production.""
+
+## Scale by the bottleneck you actually have
+
+The core of the talk is three levels of elasticity, each tied to a bottleneck:
+
+- **Messages piling up in a topic** (the most common one): add consumers to a shared or key_shared subscription. With Kafka, adding an active consumer to a group means adding a partition on the broker side and rebalancing data, which he warns can cost performance or even cause downtime. Pulsar has no partitions to add, and key_shared keeps the ordering guarantee.
+- **Too many producers, consumers or topics**: add broker nodes. Brokers are stateless; a new one takes load migrated from the others, connections move transparently, and no data moves.
+- **Storage capacity**: add bookies, the Apache BookKeeper storage nodes. A new bookie gets new messages right away, with no rebalance to wait for.
+
+All three scale back down too, which is where the infrastructure savings come from. For Kubernetes, StreamNative's operators define clusters as manifests, under a free-to-use community license.
+
+## Durability, offload and geo-replication
+
+Topics are made of segments spread across bookies, a different storage model from Kafka's partitions. With a replication factor of three, every segment sits on three bookies, so killing one loses nothing. Old segments can be offloaded to cheaper cloud storage; a consumer replaying a topic reads some messages from object storage and some from bookies without noticing. Geo-replication between regions is built in and bidirectional, mostly a matter of configuration.
+
+## Can I keep my Kafka and RabbitMQ clients?
+
+Multi-tenancy is native: tenants and namespaces let several teams share one cluster with isolated data. His line: ""This is a built in feature."" For existing estates, protocol handlers let Kafka, RabbitMQ and MQTT clients talk to Pulsar, so you do not rewrite thousands of lines of microservices to migrate.
+
+The community numbers he quotes: more than 600 contributors, 10,000 Slack members and 1,000+ organisations using it. Pulsar started at Yahoo in 2012 as its cloud messaging service, went open source in 2016 and became a top-level Apache project in 2018.
+
+## Who should watch
+
+Teams running both Kafka and RabbitMQ and wondering whether they need two, and anyone who has scheduled a partition rebalance for a quiet Sunday. If you want benchmarks or failure stories from production, this talk points you to StreamNative's resources rather than showing them.
+
+## Related Conf42 talks
+
+- Mary Grygleski on [event streaming and processing with Apache Pulsar](https://www.conf42.com/Cloud_Native_2022_Mary_Grygleski_event_streaming_processing_apache_pulsar) at Conf42 Cloud Native 2022.
+- Tim Spann on [Apache Pulsar development 101 with Python](https://www.conf42.com/Cloud_Native_2022_Tim_Spann_apache_pulsar_development_101_python) at Conf42 Cloud Native 2022.
+- Mary Grygleski on [the event-driven data capture pattern with Pulsar](https://www.conf42.com/Cloud_Native_2023_Mary_Grygleski_eventdriven_data_capture_pattern_apache_pulsar) at Conf42 Cloud Native 2023.
+
+[Watch Julien Jakubowski's talk](https://www.conf42.com/DevOps_2024_Julien_Jakubowski_right_messaging_platform_rabbitmq)
+
+[Watch the talk on YouTube](https://youtu.be/mEV6yThWCCM).
+",talk,devops2024,talk:devops2024/Julien Jakubowski,,Conf42,,queued,"apache-pulsar, kafka, rabbitmq, event-driven, messaging"
+,Platform teams fail when they don't use their own platform,"Caio Medeiros Pinto (Citi) at Conf42 DevOps 2024 on three practices for platform team adoption - customer-centric leads, dogfooding and home-grown champions",2024-01-15,devops2024/caio-three-practices-platform-teams,,"A platform team that doesn't run its own workloads on its own platform is guessing. At Conf42 DevOps 2024, Caio Medeiros Pinto, DevOps & EE Lead at Citi, argues that platform engineering adoption comes down to three practices: a lead who treats stream-aligned teams as customers, a team that eats its own cooking, and champions grown in-house instead of hired at market rates.
+
+It is a people-and-process talk, not a tooling one. He draws on leading a platform team that ran a DevOps toolchain (versioning, builds, deploys, scanning, test automation) for the product teams around it.
+
+## Why do DevOps adoptions need a platform team at all?
+
+He opens with the first line of *The DevOps Handbook* (Gene Kim, John Willis, Patrick Debois, Nicole Forsgren): product owners, developers, QA, IT ops and infosec working together without silos. The catch is that each of those roles brings its own tools. Without aligned management, teams pick different platforms for the same job. He has seen one company where one team built on Jenkins and another on Travis CI, so neither could share fixes or lessons.
+
+Platform engineering, as Team Topologies by Matthew Skelton and Manuel Pais frames it, puts an internal team in charge of that toolchain as a product: templates, golden paths, and platforms kept reliable and stable. He lists three payoffs: standardisation with boundaries rather than removed freedom, lower cognitive load (you no longer need to hire product engineers who can also babysit a CI server), and fewer blockers in the delivery lifecycle. Without it, someone on the product team ends up restarting the Jenkins instance or tending the Kubernetes and Grafana stack instead of building the product.
+
+## Why is the adoption hard?
+
+Three challenges. Lack of time against rising demand: everyone is busy, and the moment one team succeeds with the platform, every manager wants it, which means more users, more doubts and more requests. Ways of working: teams arrive with their own habits and toolchains from previous jobs, plus compliance flows, overly specific requirements and, in globally distributed teams, language barriers. And keeping the platform team engaged, because cognitive load and burnout hit them too.
+
+## Practice 1: lead like the stream-aligned teams are customers
+
+Each platform team needs a lead with a design thinking mindset who identifies the internal customers, learns their real objectives and lets those set priorities. Two companies building the same kind of platform will find different needs. His concrete tools: empathy maps, proto-personas and user personas, made visible to the whole team.
+
+## Practice 2: practice what you preach
+
+This is the one with teeth. He has seen platform teams that did not use their own platform, and it was a mess because they did not know what was really happening in production. His fix: shared metrics to track whether the team actually uses the platform, internal and external usability testing before a release, showcases and demo days, and lightning talks to spread the knowledge.
+
+## Practice 3: don't search for experts, form them
+
+A platform is never one tool. His slide shows Kibana, Kubernetes and Grafana, each owned by someone. Everyone on the team is T-shaped: general knowledge across the whole toolbox, plus one platform they own, with its documentation, configuration and bugs. Experts on the market are expensive; formed ones stay. Career paths aligned to team needs, certification and training paths, game days and chaos engineering sessions where the team breaks the platform on purpose, and a calendar of tech talks led by the champions.
+
+""So the knowledge needed to manage all these platforms is crazy, right?"" Caio Medeiros Pinto said at Conf42 DevOps 2024, which is as honest a job description for a platform team as any.
+
+## Who should watch
+
+Engineering managers and leads about to stand up a platform team, or running one that adoption has stalled on. If you want Backstage plugins or Terraform modules, this is the wrong talk; it is about the team. His own further reading: Manuel Pais on platform as a product, Mallory Haigh's *DevOps ain't dead but... we gotta talk*, Puppet's State of DevOps Report 2023, Lucas Galante's nine steps to platform engineering hell, and Nicki Watt on people, process and platform.
+
+## Related Conf42 talks
+
+- Gal Bashan on [platform engineering as a product](https://www.conf42.com/DevOps_2023_Gal_Bashan_platform_engineering_product) at Conf42 DevOps 2023.
+- Serg Hospodarets on [platform engineering](https://www.conf42.com/DevOps_2023_Serg_Hospodarets_platform_engineering) at Conf42 DevOps 2023.
+- Leo Diaz Longhi on [GitHub as a platform engineering platform](https://www.conf42.com/DevOps_2024_Leo_Diaz_Longhi_github_platform_engineering) at the same event.
+
+[Watch Caio Medeiros Pinto's talk](https://www.conf42.com/DevOps_2024_Caio_Medeiros_Pinto_smooth_platform_engineering_adoption)
+
+[Watch the talk on YouTube](https://youtu.be/pjwmSKQpV5g).
+",talk,devops2024,talk:devops2024/Caio Medeiros Pinto,,Conf42,,queued,"platform-engineering, devops, team-topologies, developer-experience"
+,Prometheus and Grafana on EC2 from one GitHub Action call,Karamveer Kaur Sangha (Bitovi) at Conf42 DevOps 2024 on hiding Terraform and Ansible behind a GitHub Action so a workflow file is the whole platform,2024-01-14,devops2024/prometheus-grafana-one-github-action,,"What if the developer-facing side of your platform was a single workflow file, and everything with Terraform in it lived somewhere else? At Conf42 DevOps 2024, Karamveer Kaur Sangha, DevOps Consultant at Bitovi, deploys Prometheus and Grafana to an AWS EC2 instance by committing one change to a repository that calls Bitovi's open source ""Deploy Prometheus"" GitHub Action, then opens up the action to show where the infrastructure as code went.
+
+It is a short, demo-led talk. The takeaway is the layering: the user writes a workflow, the action holds the opinions, and a framework underneath, Bitovi's Commons, runs the IaC tools so nobody has to install them.
+
+## What does the user actually write?
+
+Very little. The deployment repository holds an observability folder with the Prometheus scrape targets and a Grafana data source, plus a workflow that calls the action. The required inputs are an AWS access key ID and secret access key. Optional ones set the AWS region and the EC2 instance type, and one input points the action at the config folder.
+
+For the demo she comments out a line in the workflow and commits straight to main. That commit is the deployment. By the end of the talk the run is green, Prometheus answers on port 9090 at the instance's IP, and the scrape target shows up and healthy.
+
+## Three repositories, three jobs
+
+While the workflow runs, she walks the stack from the top:
+
+- **Deployment repo**: owned by the user. Workflow plus config, nothing else.
+- **Action repo**: Bitovi's Deploy Prometheus action. Its action file exposes the inputs developers may set and defines the steps, such as copying the Prometheus and Grafana configuration to the right destination before calling Commons.
+- **Commons repo**: Bitovi's open source framework, a wrapper around BitOps, which has Terraform and Ansible baked in as containers. It merges the deployment and action repositories into the order BitOps expects, runs the tools, and exposes outputs so they can be reused.
+
+The action tells Commons where its Ansible code lives through an input parameter, and the same pattern exists for Terraform and Helm. As she put it, Commons ""would make sure that your deployments are ready without you to concern about deploying or installing terraform, ansible or any IAC tools.""
+
+That is the platform engineering idea in its smallest form: the golden path is a `uses:` line, and the IaC complexity sits in two repositories the platform team owns.
+
+## Is it only Prometheus?
+
+No. Prometheus is the example; the same structure backs a catalogue of Bitovi actions on the GitHub Actions Marketplace. The ones she lists include deploying Docker to EC2, an EKS or ECS cluster, Helm to EKS, Aurora and RDS databases, a Redis cluster, EFS, a self-hosted GitHub runner, StackStorm on a single VM, and static sites to S3 with a CDN and Route 53.
+
+## Who should watch
+
+Platform and DevOps engineers who want a concrete picture of what self-service can look like without building a portal first, and anyone already living in GitHub Actions who wonders how far `with:` inputs can stretch. It is a quick demo plus a repo tour, not a line-by-line read of Commons, so expect to read the repositories afterwards.
+
+## Related Conf42 talks
+
+- Her Bitovi colleague Leo Diaz Longhi on [GitHub as a platform engineering platform](https://www.conf42.com/DevOps_2024_Leo_Diaz_Longhi_github_platform_engineering), at the same event.
+- Rob Earlam on [multicloud deployments with GitHub Actions](https://www.conf42.com/Cloud_Native_2023_Rob_Earlam_multicloud_deployments_github_actions) at Conf42 Cloud Native 2023.
+- Samuel Arogbonlo on [logs and metrics with Prometheus](https://www.conf42.com/Site_Reliability_Engineering_2022_Samuel_Arogbonlo_logmetrics_prometheus) at Conf42 SRE 2022.
+
+[Watch Karamveer Kaur Sangha's talk](https://www.conf42.com/DevOps_2024_Karamveer_Kaur_Sangha_platform_engineering_github_actions_prometheus)
+
+[Watch the talk on YouTube](https://youtu.be/Nyj383NOXN0).
+",talk,devops2024,talk:devops2024/Karamveer Kaur Sangha,,Conf42,,queued,"platform-engineering, github-actions, prometheus, infrastructure-as-code, grafana"
 ,"Many clients, many IPs, one GitHub Actions matrix of Gatling runs",Kaye Alvarado (Asurion) at Conf42 DevOps 2024 on load testing from many client IPs by running Gatling in parallel GitHub Actions runners,2024-01-13,devops2024/gatling-load-tests-from-parallel-github-runners,,"A load test from one machine tells you how your platform treats one very enthusiastic client. Real traffic comes from many clients with many IP addresses. At Conf42 DevOps 2024, Kaye Alvarado, DevOps Engineer at Asurion, showed [the low-ceremony fix her team used](https://www.conf42.com/DevOps_2024_Kaye_Alvarado_loadtesting_pipeline): write the load test as code in Gatling, then trigger the same workflow in parallel on several GitHub Actions runners, each with its own IP.
 
 It's a short talk, and that's the point. The closing advice is to keep things simple, and the talk takes its own medicine.
