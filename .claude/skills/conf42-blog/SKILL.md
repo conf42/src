@@ -41,6 +41,10 @@ The planner reads the four sister repos as siblings of the conf42 checkout; one 
 the repo (`assemblyai/<YouTubeId>.json` or `srt/<short_url>_<Name1>.srt`). `plan` doesn't propose the others; it
 counts them per event under `waiting_transcript`, and they show up as missing once the factory uploads the transcript.
 Never write a talk post from the abstract alone - abstract-only posts have little substance next to transcript ones.
+**Missing transcript -> Descript** (Marek 2026-11-11): `python -m build.blog_plan descript` looks every talk of a
+finished event that has no transcript up in the event's Descript project (`Conf42 <name> <year>`, one composition per
+talk named after its speakers) and exports it to `srt/<event>_<Name1>.srt`. The rollout workflow runs it every 4 h
+(secret DESCRIPT_API_TOKEN); run it yourself before `plan` when you have the token. Not in Descript -> no post, skip it.
 The 58 written that way before the rule (53 MLOps 2026, 1 SRE 2026, 2 Feature Flags 2026, 1 LLMs 2026, 1 Platform
 Engineering 2025) are `Status: waiting`: off the site, never released by the rollout. Once a talk's transcript lands,
 `plan` lists the row under `rewrite`: rewrite it from the transcript with the SAME ShortURL, `add`, then set its

@@ -1,0 +1,1661 @@
+1
+00:00:00,041 --> 00:00:05,574
+Everyone, I'm Ishan Shah, and I'm here
+to talk about how can feature flags
+
+2
+00:00:05,772 --> 00:00:08,243
+be helpful in an incident evidence.
+
+3
+00:00:09,659 --> 00:00:13,291
+A feature flag got changed, and
+we see a latency in checkout.
+
+4
+00:00:13,887 --> 00:00:17,343
+An AI agent would recommend, "Let's
+just go ahead and roll back."
+
+5
+00:00:18,114 --> 00:00:19,015
+Do we approve it?
+
+6
+00:00:20,291 --> 00:00:21,053
+Not yet, right?
+
+7
+00:00:21,635 --> 00:00:25,382
+Timing gives us a hypothesis,
+not a permission to just go
+
+8
+00:00:25,384 --> 00:00:27,082
+ahead and act as required.
+
+9
+00:00:28,113 --> 00:00:31,435
+Today, I'll show how feature
+flags can become reliable incident
+
+10
+00:00:31,437 --> 00:00:35,715
+evidence while policy and human
+judgment still remain in control.
+
+11
+00:00:35,988 --> 00:00:36,744
+Human in the loop.
+
+12
+00:00:37,798 --> 00:00:40,640
+Beacon by itself is
+broader than feature flags.
+
+13
+00:00:40,882 --> 00:00:44,827
+It is an evidence-first incident
+reasoning workflow that connects
+
+14
+00:00:45,013 --> 00:00:48,087
+telemetry, Kubernetes, and
+deployment state, repository
+
+15
+00:00:48,087 --> 00:00:52,119
+history, service context, operator
+decisions, and remediation handoff.
+
+16
+00:00:53,019 --> 00:00:56,879
+For this talk, I am zooming in on
+one part inside that larger system.
+
+17
+00:00:57,572 --> 00:01:00,753
+Where should feature flags enter
+the incident workflow, and what
+
+18
+00:01:00,813 --> 00:01:02,507
+authority should they have?
+
+19
+00:01:03,105 --> 00:01:05,191
+Here is a problem behind that decision.
+
+20
+00:01:06,096 --> 00:01:09,942
+Imagine checkout latency rising
+after several nearby changes.
+
+21
+00:01:10,677 --> 00:01:14,815
+A deployment lands, the tax V2
+lookup reaches full rollout,
+
+22
+00:01:15,234 --> 00:01:18,846
+database pressure changes, and a
+downstream dependency becomes noisy.
+
+23
+00:01:19,684 --> 00:01:24,723
+The nearest change that is to
+roll back is tempting, but is
+
+24
+00:01:24,723 --> 00:01:26,103
+not automatically the cause.
+
+25
+00:01:26,822 --> 00:01:30,825
+What follows is a design position
+backed by a small prototype.
+
+26
+00:01:31,509 --> 00:01:34,604
+The prototype implements a smaller
+version of the full design.
+
+27
+00:01:35,479 --> 00:01:41,809
+An evidence-first agent should reserve
+all the four explanations instead of
+
+28
+00:01:41,825 --> 00:01:43,477
+jumping to the most convenient one.
+
+29
+00:01:44,568 --> 00:01:46,707
+A timeline narrows the search.
+
+30
+00:01:46,866 --> 00:01:52,631
+It doesn't still prove the cause
+for the failure So, there are four
+
+31
+00:01:52,631 --> 00:01:56,967
+different hypotheses, four different
+evidence paths that we consider.
+
+32
+00:01:58,556 --> 00:02:01,119
+Each hypothesis needs a
+different evidence path.
+
+33
+00:02:01,821 --> 00:02:05,553
+A deployment regression needs
+repository history, Kubernetes
+
+34
+00:02:05,571 --> 00:02:07,378
+rollout state, and pod behavior.
+
+35
+00:02:08,366 --> 00:02:12,786
+A feature flag hypothesis needs
+the provider audit event, targeting
+
+36
+00:02:12,810 --> 00:02:14,989
+rule, and evaluated cohort.
+
+37
+00:02:16,150 --> 00:02:19,981
+Database saturation needs connection
+pool and resource metrics.
+
+38
+00:02:20,815 --> 00:02:24,893
+And a tag service hypothesis
+needs dependency latency, errors,
+
+39
+00:02:24,991 --> 00:02:27,511
+retry behavior, everything
+that we know about the service.
+
+40
+00:02:28,271 --> 00:02:32,964
+The agent may rank this hypothesis
+to find what the cause is, but
+
+41
+00:02:32,964 --> 00:02:37,828
+ranking cannot replace the evidence
+needed to rule each one in or out.
+
+42
+00:02:38,737 --> 00:02:43,358
+This avoids a common failure mode
+where every nearby change is forced
+
+43
+00:02:43,383 --> 00:02:45,518
+into the same generic telemetry story.
+
+44
+00:02:46,589 --> 00:02:47,072
+Rollback.
+
+45
+00:02:47,636 --> 00:02:53,160
+For root cause analysis, for finding
+out whether a flag event is on or
+
+46
+00:02:53,178 --> 00:02:57,462
+off, yes, it tells us that we enabled
+something which caused the failure,
+
+47
+00:02:57,773 --> 00:03:00,251
+and it helps us roll back immediately.
+
+48
+00:03:01,099 --> 00:03:04,111
+But just relying on on
+or off might be too weak.
+
+49
+00:03:04,905 --> 00:03:09,118
+We need to preserve the transition
+timestamp environment, the actor
+
+50
+00:03:09,126 --> 00:03:13,301
+acting on it, targeting rule,
+cohort, reason, and source event.
+
+51
+00:03:14,148 --> 00:03:19,041
+Keep the observed outcome as separate
+telemetry evidence, so the flag record
+
+52
+00:03:19,196 --> 00:03:22,697
+does not smuggle into a cause conclusion.
+
+53
+00:03:23,674 --> 00:03:27,774
+Beacon currently has typed evidence
+and evaluated flag context.
+
+54
+00:03:28,260 --> 00:03:33,122
+The richer audit history fields show
+here are the production design target,
+
+55
+00:03:33,492 --> 00:03:35,936
+not a claim about the current adapter.
+
+56
+00:03:37,112 --> 00:03:45,998
+So what a flag cannot tell us A
+provider audit event has hard limits.
+
+57
+00:03:46,170 --> 00:03:50,276
+Its timestamp is not necessarily the
+moment every SDK picked up the change.
+
+58
+00:03:51,208 --> 00:03:55,507
+Polling, streaming, caches, and client
+state can all create propagation lag.
+
+59
+00:03:56,577 --> 00:04:00,594
+A 10% rollout does not identify
+the cohort unless targeting and
+
+60
+00:04:00,614 --> 00:04:02,582
+evaluation contexts are preserved.
+
+61
+00:04:03,383 --> 00:04:05,936
+Other flags may have also
+changed in the same window.
+
+62
+00:04:06,655 --> 00:04:11,042
+Most importantly, a flag cannot--
+can change without the affected
+
+63
+00:04:11,071 --> 00:04:12,941
+code path ever being evaluated.
+
+64
+00:04:14,457 --> 00:04:19,572
+A good root cause analysis keeps the
+audit event, evaluation evidence, and
+
+65
+00:04:19,611 --> 00:04:21,635
+observed behavior as separate records.
+
+66
+00:04:22,475 --> 00:04:28,306
+A flag event is not proof that the traffic
+evaluated the flag pa- flagged path.
+
+67
+00:04:28,845 --> 00:04:32,456
+So let's see, like we've, we've been
+talking about the timeline changes, right?
+
+68
+00:04:33,015 --> 00:04:38,134
+So when you talk about an agent into
+this, the incident timeline should
+
+69
+00:04:38,171 --> 00:04:40,341
+combine type changes from every source.
+
+70
+00:04:41,102 --> 00:04:42,527
+What were the deployment events?
+
+71
+00:04:42,631 --> 00:04:43,966
+What were the flag transitions?
+
+72
+00:04:44,238 --> 00:04:45,986
+What are the configuration changes?
+
+73
+00:04:46,253 --> 00:04:47,911
+Were there any scaling events?
+
+74
+00:04:48,356 --> 00:04:49,683
+And what was the first symptom?
+
+75
+00:04:50,858 --> 00:04:54,586
+Notice that the configuration and
+scaling events occur after the flag
+
+76
+00:04:54,589 --> 00:04:56,385
+transition but before the symptom.
+
+77
+00:04:57,014 --> 00:05:00,226
+The flag is not even the nearest
+change that caused the outage.
+
+78
+00:05:01,144 --> 00:05:03,921
+This still does not establish
+the cause of the problem.
+
+79
+00:05:04,597 --> 00:05:09,102
+It does establish ordering and gives
+any agent a bounded search window.
+
+80
+00:05:10,022 --> 00:05:15,147
+Source type and observation time
+remain attached, so a rollout event
+
+81
+00:05:15,255 --> 00:05:19,328
+cannot be confused with telemetry
+or with a larger operator action
+
+82
+00:05:21,256 --> 00:05:24,793
+So if we can talk further on the
+architecture, what an evidence-first
+
+83
+00:05:24,833 --> 00:05:26,333
+architecture would look like.
+
+84
+00:05:26,984 --> 00:05:31,327
+So this is the broader Beacon
+architecture in one short view.
+
+85
+00:05:32,196 --> 00:05:36,297
+Metrics, logs, Kubernetes and
+deployment state, repository
+
+86
+00:05:36,297 --> 00:05:37,640
+history, and feature flags.
+
+87
+00:05:38,092 --> 00:05:43,024
+These are all the live signals that
+you get for a given incident, and
+
+88
+00:05:43,025 --> 00:05:48,111
+they become type evidence by, by
+kind of aggregating everything,
+
+89
+00:05:48,135 --> 00:05:50,059
+building evidence objects out of it.
+
+90
+00:05:50,481 --> 00:05:54,288
+So you're no longer relying on
+just raw logs or raw metrics that
+
+91
+00:05:54,292 --> 00:05:55,496
+you got from different sources.
+
+92
+00:05:56,586 --> 00:06:01,538
+The reasoner produces ranked hypothesis
+contradictions, calls out missing
+
+93
+00:06:01,580 --> 00:06:05,796
+evidence request and conditions
+that could disprove a hypothesis.
+
+94
+00:06:06,977 --> 00:06:09,707
+Why is missing evidence
+very important in this?
+
+95
+00:06:10,267 --> 00:06:16,233
+Because many times when you don't have
+the evidence or you don't have the metrics
+
+96
+00:06:16,233 --> 00:06:20,068
+that are required, we end up saying
+that, "Okay, yeah, this is the problem."
+
+97
+00:06:20,960 --> 00:06:26,358
+Or an agent may hallucinate and
+assume or generate some mock
+
+98
+00:06:26,398 --> 00:06:28,261
+data, and we don't want that.
+
+99
+00:06:28,664 --> 00:06:33,529
+We want our incident agent to explicitly
+call out when there's missing evidence.
+
+100
+00:06:34,560 --> 00:06:39,765
+And based on this too, on, for
+a given model, a confidence
+
+101
+00:06:39,794 --> 00:06:41,017
+moves the workflow state.
+
+102
+00:06:42,086 --> 00:06:46,779
+But the authority always stays
+with the operator, and the
+
+103
+00:06:46,779 --> 00:06:48,439
+operator is the human in the loop.
+
+104
+00:06:48,525 --> 00:06:53,560
+We don't want an incident agent to see
+that, okay, this feature flag was enabled,
+
+105
+00:06:53,972 --> 00:06:58,451
+which caused this outage, and it just
+goes and auto rolls, rolls it back.
+
+106
+00:06:59,285 --> 00:06:59,512
+Nope.
+
+107
+00:06:59,767 --> 00:07:01,049
+We still need a human in the loop.
+
+108
+00:07:01,857 --> 00:07:07,879
+So a flag enters first as evidence and
+only later behind a separate boundary
+
+109
+00:07:08,454 --> 00:07:14,210
+could become a possible rollback candidate
+as part of the ranked hypothesis, which
+
+110
+00:07:14,210 --> 00:07:17,508
+still requires an approval from the human.
+
+111
+00:07:18,438 --> 00:07:25,003
+So as any agent and most of the agents
+that are there for incident management
+
+112
+00:07:25,021 --> 00:07:30,127
+nowadays have this issue where it doesn't
+understand the context of the service.
+
+113
+00:07:31,117 --> 00:07:35,099
+So we need service-based context, which
+happens through knowledge scaffolding.
+
+114
+00:07:35,876 --> 00:07:38,976
+So runtime evidence explains
+what the system is doing.
+
+115
+00:07:39,521 --> 00:07:42,851
+Service context explains how
+the service is supposed to work.
+
+116
+00:07:43,717 --> 00:07:47,316
+So Beacon retrieves runbooks,
+architecture nodes, ownership,
+
+117
+00:07:47,317 --> 00:07:51,084
+service conven-conventions within
+the affected service boundary.
+
+118
+00:07:51,788 --> 00:07:55,072
+So when we know an issue is
+happening for a checkout, we
+
+119
+00:07:55,072 --> 00:08:02,517
+don't need data for A different
+indexing or cart-related service.
+
+120
+00:08:03,486 --> 00:08:08,182
+So the operator should s-see
+why each document was retrieved
+
+121
+00:08:08,577 --> 00:08:09,726
+and whether it is stale.
+
+122
+00:08:10,467 --> 00:08:15,382
+So retrieved context supports interpre-
+supports interpretation, it does not
+
+123
+00:08:15,449 --> 00:08:19,509
+outrank current telemetry, and it does
+not become evidence of what happened.
+
+124
+00:08:20,089 --> 00:08:25,360
+What happened is through evidence what
+or how the service is expected to work
+
+125
+00:08:25,900 --> 00:08:29,172
+is through the knowledge scaffolding.
+
+126
+00:08:29,947 --> 00:08:35,701
+So, let's go through a smaller demo on
+what Beacon is about, what Beacon can do.
+
+127
+00:08:36,209 --> 00:08:41,546
+again, this is just a prototype on
+how incident management, using AI
+
+128
+00:08:41,636 --> 00:08:46,986
+is going to be helpful, and it does
+cover more scenarios than just the
+
+129
+00:08:46,986 --> 00:08:52,996
+feature flags So this is basically
+a prototype UI, that I built.
+
+130
+00:08:53,185 --> 00:08:55,810
+Again, kind of wipe coded
+the entire application.
+
+131
+00:08:56,202 --> 00:09:00,502
+So we can see that in an incident
+review queue, how many incidents
+
+132
+00:09:00,504 --> 00:09:02,429
+are open, what state they are in.
+
+133
+00:09:02,789 --> 00:09:07,020
+So the workflow that an incident
+goes through is queue, investigate,
+
+134
+00:09:07,100 --> 00:09:09,214
+operator decision, and governance.
+
+135
+00:09:09,653 --> 00:09:15,074
+So governance and operator decision stay
+kind of on top of whatever happens inside
+
+136
+00:09:15,074 --> 00:09:19,610
+the system, and they are explicitly
+outside the model in a way where
+
+137
+00:09:19,636 --> 00:09:23,602
+whatever we do is controlled separately.
+
+138
+00:09:25,240 --> 00:09:29,294
+So we can see in, in this, screen
+right now that what are the
+
+139
+00:09:29,295 --> 00:09:32,663
+different incidents that have
+happened, what state they are in.
+
+140
+00:09:34,118 --> 00:09:38,173
+So let's, let's see an example of
+an incident which happened, and
+
+141
+00:09:38,174 --> 00:09:42,215
+then using the typed, evidence
+objects, we can determine what the
+
+142
+00:09:42,219 --> 00:09:43,709
+remediation path could look like.
+
+143
+00:09:44,800 --> 00:09:48,989
+And when you talk about the on-call,
+one of the issues that the on-call
+
+144
+00:09:48,989 --> 00:09:52,969
+always faces is kind of trying to
+tackle through 10 different tabs
+
+145
+00:09:53,319 --> 00:09:56,162
+while the service is still down,
+business is still losing money.
+
+146
+00:09:56,819 --> 00:10:01,193
+So in Beacon, through the architecture
+that I was trying to show before, we
+
+147
+00:10:01,195 --> 00:10:06,325
+kind of aggregate all these metrics into
+typed evidence objects, and we can see
+
+148
+00:10:06,328 --> 00:10:11,183
+that through Datadog monitor, Datadog
+lo- Datadog logs, and then the Datadog
+
+149
+00:10:11,239 --> 00:10:16,748
+event that caused this alert are kind of
+all c- aggregated into a singular view.
+
+150
+00:10:18,197 --> 00:10:21,412
+Then basically based on that, we
+determine the criticality of the
+
+151
+00:10:21,412 --> 00:10:26,549
+incident, what service is this incident
+associated to, which helps us with
+
+152
+00:10:26,555 --> 00:10:30,246
+the knowledge scaffolding that we
+need to kind of aggregate for that.
+
+153
+00:10:31,528 --> 00:10:36,932
+So we can see that the checkout API
+latency, sorry, checkout API P95 latency
+
+154
+00:10:36,937 --> 00:10:40,989
+was high in the last thirty minutes,
+and the Datadog, alert got triggered.
+
+155
+00:10:42,190 --> 00:10:45,302
+In the same Beacon, we can also
+see the logs that were considered
+
+156
+00:10:45,302 --> 00:10:46,747
+for the specific service.
+
+157
+00:10:47,092 --> 00:10:50,670
+So when we are generating the evidence
+objects, we are not generating
+
+158
+00:10:50,670 --> 00:10:52,652
+just based on one specific metric.
+
+159
+00:10:53,602 --> 00:10:55,906
+And then the event
+which caused this alert.
+
+160
+00:10:56,184 --> 00:11:01,234
+So a Datadog alert based on the metrics,
+logs that created a PagerDuty alert
+
+161
+00:11:01,568 --> 00:11:05,841
+that would kind of tell an on-call
+agent that an issue has happened.
+
+162
+00:11:06,944 --> 00:11:09,613
+Now, when we go inside the
+incident, we talked about
+
+163
+00:11:09,613 --> 00:11:11,177
+something called ranked hypothesis.
+
+164
+00:11:11,366 --> 00:11:16,077
+What are the evidence objects
+that we've created for this
+
+165
+00:11:16,077 --> 00:11:18,124
+service or for this alert?
+
+166
+00:11:18,714 --> 00:11:22,811
+So we can see that the analysis
+engine used was Gemini.
+
+167
+00:11:23,219 --> 00:11:27,720
+What was a prompt used to determine
+what the cause of this incident was?
+
+168
+00:11:28,392 --> 00:11:33,293
+What were the different inputs or
+signals that the re- system received?
+
+169
+00:11:34,293 --> 00:11:39,448
+So as we see over here, we can see
+that some chaos testing generated
+
+170
+00:11:39,448 --> 00:11:44,606
+metrics that showed P95 latency and
+error rate going up, and also the retry
+
+171
+00:11:44,622 --> 00:11:49,200
+for that specific service reaching a
+value higher than what the service is.
+
+172
+00:11:49,252 --> 00:11:52,374
+And this comes through the service context
+that's part of the knowledge scaffold.
+
+173
+00:11:53,488 --> 00:11:58,397
+And it's trying to say that, okay, as
+part of this incident, these are some
+
+174
+00:11:58,397 --> 00:12:00,682
+of the components that are impacted.
+
+175
+00:12:01,947 --> 00:12:04,692
+What were the evidences that
+were considered for this
+
+176
+00:12:04,706 --> 00:12:06,638
+hypothesis to be generated?
+
+177
+00:12:07,171 --> 00:12:12,138
+So we can see that metrics was considered
+where we see that the P95 latency was
+
+178
+00:12:12,142 --> 00:12:17,508
+this, the error rate was this high,
+there were 16 retries, and we also
+
+179
+00:12:17,512 --> 00:12:22,944
+get the runtime logs, which is through
+Kubernetes or Kind or could be Splunk.
+
+180
+00:12:23,366 --> 00:12:27,306
+So what are some of the necessary
+signals that are required for
+
+181
+00:12:27,308 --> 00:12:29,323
+us to nail down the issue?
+
+182
+00:12:30,293 --> 00:12:31,584
+What was the deployment state?
+
+183
+00:12:31,602 --> 00:12:33,944
+So was there any deployment that happened?
+
+184
+00:12:33,963 --> 00:12:36,052
+Was there a newer artifact
+that was rolled out?
+
+185
+00:12:37,061 --> 00:12:40,243
+And then this is the thing that we'll
+be focusing on, is the feature flag.
+
+186
+00:12:41,174 --> 00:12:44,954
+Was there any feature flag change
+which could have caused this incident?
+
+187
+00:12:45,514 --> 00:12:49,650
+So all together is what helps us
+in determining what the incident is
+
+188
+00:12:51,315 --> 00:12:53,272
+And this is all the live signals.
+
+189
+00:12:53,737 --> 00:12:57,538
+Now, when we talk about the knowledge
+base, so we base the knowledge base
+
+190
+00:12:57,567 --> 00:13:02,237
+on the infrastructure document for a
+given service so we can see what are the
+
+191
+00:13:02,245 --> 00:13:05,836
+monitor context, what are the runbooks,
+what are the playbooks, what are some
+
+192
+00:13:05,836 --> 00:13:10,051
+of the rollback, documents that the
+team has kind of built over the years.
+
+193
+00:13:10,069 --> 00:13:14,835
+So live metrics, plus what their
+service is about is what helps us
+
+194
+00:13:14,838 --> 00:13:17,013
+in building the evidence object.
+
+195
+00:13:17,715 --> 00:13:21,019
+And we see that we have eighty-four
+percent confidence on the
+
+196
+00:13:21,021 --> 00:13:23,833
+hypothesis that we've determined.
+
+197
+00:13:24,483 --> 00:13:28,993
+So once the human in the loop, basically
+the operator, can approve, reject.
+
+198
+00:13:29,285 --> 00:13:32,317
+If they approve it, we want
+the on-call to be lazy.
+
+199
+00:13:32,635 --> 00:13:36,624
+So we go ahead and generate a
+remediation PR, or could be turning
+
+200
+00:13:36,626 --> 00:13:40,429
+off the feature flag, depending on what
+the operator approves or rejects on.
+
+201
+00:13:41,112 --> 00:13:45,363
+In this scenario, we see that the
+operator approved the rollback of a
+
+202
+00:13:45,364 --> 00:13:49,936
+specific change, and then we can went
+ahead and create a remediation PR
+
+203
+00:13:50,846 --> 00:13:52,568
+that can roll back the entire change.
+
+204
+00:13:52,981 --> 00:14:00,191
+And again, when we talk about an incident
+management agent, we want it to help
+
+205
+00:14:00,201 --> 00:14:02,069
+the on-call get a faster decision.
+
+206
+00:14:02,427 --> 00:14:04,403
+We don't want it to take the decision.
+
+207
+00:14:04,743 --> 00:14:10,471
+So once the PR is generated, it is
+still in a draft mode, which the
+
+208
+00:14:10,491 --> 00:14:16,276
+team can review, leave feedback on,
+choose to close, or can merge and
+
+209
+00:14:16,333 --> 00:14:18,475
+deploy it to roll back the issue.
+
+210
+00:14:20,003 --> 00:14:25,094
+This is when an incident was
+confidence about the hypothesis
+
+211
+00:14:25,111 --> 00:14:25,994
+that it had generated.
+
+212
+00:14:26,475 --> 00:14:29,996
+Now, let's talk about an example
+where the system didn't have enough
+
+213
+00:14:30,033 --> 00:14:34,548
+metrics to get a confidence factor
+closer to what a human can approve.
+
+214
+00:14:35,857 --> 00:14:40,034
+So if you see this example, we can
+see that based on the hypothesis,
+
+215
+00:14:40,072 --> 00:14:44,962
+metrics, and the context that the
+agent has, it's only forty-five
+
+216
+00:14:44,968 --> 00:14:47,416
+percent confident on the hypothesis.
+
+217
+00:14:47,866 --> 00:14:49,489
+And what are some of the reasons for that?
+
+218
+00:14:50,330 --> 00:14:54,208
+It can see that it found some rollout
+evidence, but no code defixure.
+
+219
+00:14:54,952 --> 00:14:59,867
+So there are certain signals that
+are missing because of which the
+
+220
+00:14:59,870 --> 00:15:03,845
+agent cannot determine the exact
+root cause for this failure.
+
+221
+00:15:04,262 --> 00:15:05,310
+And that's what we want.
+
+222
+00:15:05,588 --> 00:15:09,252
+If something is missing, we want
+it to be explicitly called out.
+
+223
+00:15:10,197 --> 00:15:14,767
+And if you see this, we don't get
+good enough logs for this specific
+
+224
+00:15:14,908 --> 00:15:18,617
+issue or incident that happened, and
+that's one reason, which is one of
+
+225
+00:15:18,617 --> 00:15:24,161
+the critical signal that the agent
+requires to get a correct hypothesis.
+
+226
+00:15:24,622 --> 00:15:27,711
+And that's why it, it would say that
+it's only forty-five percent confident.
+
+227
+00:15:28,357 --> 00:15:30,665
+And then the operator can
+choose to approve or reject.
+
+228
+00:15:30,857 --> 00:15:35,660
+If it rejects, it goes ahead and
+closes the incident on Datadog
+
+229
+00:15:35,738 --> 00:15:38,803
+as well as PagerDuty, as well
+as on the Beacon prototype.
+
+230
+00:15:40,591 --> 00:15:46,616
+Now, let's think of a scenario where
+we have something which is crucial or
+
+231
+00:15:46,618 --> 00:15:52,635
+critical data like PII data or a service
+for which we are doing chaos testing, or
+
+232
+00:15:52,663 --> 00:15:57,099
+we are running some synthetic data, and we
+don't want it to be processed by a model.
+
+233
+00:15:57,582 --> 00:16:01,089
+Because when we generate the ranked
+hypothesis, it is through a model.
+
+234
+00:16:01,949 --> 00:16:06,055
+So how can I exclude certain
+incidents to be not even
+
+235
+00:16:06,113 --> 00:16:08,279
+considered to be sent to a model?
+
+236
+00:16:09,006 --> 00:16:10,407
+And that comes through governance.
+
+237
+00:16:11,323 --> 00:16:16,409
+So if you see in this incident, it
+matched some of the rules that we had,
+
+238
+00:16:17,228 --> 00:16:21,982
+we had enabled, and it says that RCA
+gets rejected, the incident stays gated.
+
+239
+00:16:22,526 --> 00:16:29,981
+So in this scenario, the-- nothing
+is sent from the beacon to any model.
+
+240
+00:16:30,894 --> 00:16:36,753
+So the incident explicitly stays gated
+because it is not allowed to operate on
+
+241
+00:16:36,754 --> 00:16:42,101
+this incident So this has some of the
+different governance rules, and it's,
+
+242
+00:16:42,103 --> 00:16:47,786
+basically a free config where you can say
+that any low severity alerts should be
+
+243
+00:16:47,786 --> 00:16:52,837
+skipped, any services which are sandboxed
+should be skipped, any data that contains
+
+244
+00:16:52,842 --> 00:16:55,067
+something synthetic can be skipped.
+
+245
+00:16:56,409 --> 00:17:00,687
+Now, one thing where I've been burned
+in the past is that an agent does
+
+246
+00:17:00,687 --> 00:17:04,815
+something and it says, "Oh sorry, it
+cannot roll back because it has no audit
+
+247
+00:17:04,819 --> 00:17:06,408
+trail or history it can go back to."
+
+248
+00:17:07,185 --> 00:17:12,331
+So when we talk about incident
+management agent, we want each and every
+
+249
+00:17:12,335 --> 00:17:17,614
+decision taken as part of workflow,
+workflow or by a human to be audited.
+
+250
+00:17:18,123 --> 00:17:20,006
+And that's what we do in this audit trail.
+
+251
+00:17:20,510 --> 00:17:24,379
+We can see which was the governance
+rule that got applied, for which
+
+252
+00:17:24,381 --> 00:17:27,758
+the incident got gated, what were
+some of the human decisions that
+
+253
+00:17:27,761 --> 00:17:31,287
+were taken, whether to approve the
+hypothesis or reject the hypothesis.
+
+254
+00:17:31,760 --> 00:17:37,317
+So-- And AI incident management cannot
+be a black box where it can just
+
+255
+00:17:37,321 --> 00:17:38,939
+go ahead and do what it likes to.
+
+256
+00:17:39,447 --> 00:17:43,569
+Even that system needs to be kind
+of treated as a production system.
+
+257
+00:17:44,175 --> 00:17:47,637
+So what does the seeded
+prototype actually produce?
+
+258
+00:17:48,195 --> 00:17:51,487
+These are the complete crops
+from the seeded beacon prototype
+
+259
+00:17:51,490 --> 00:17:52,950
+run we just went through.
+
+260
+00:17:53,522 --> 00:17:57,796
+Notice what the system recommended, a
+deployment rollback, not a flag mutation.
+
+261
+00:17:58,332 --> 00:18:00,659
+This is not a detour from
+the feature flag story.
+
+262
+00:18:01,118 --> 00:18:02,447
+It is the point of the story.
+
+263
+00:18:02,991 --> 00:18:06,923
+The workflow did not force a
+flag rollback simply because
+
+264
+00:18:07,118 --> 00:18:08,374
+this is a feature flag talk.
+
+265
+00:18:08,931 --> 00:18:12,242
+The evidence determined the
+recommendation, and the flag
+
+266
+00:18:12,454 --> 00:18:15,637
+was one of the sig-signal
+among several other signals.
+
+267
+00:18:16,189 --> 00:18:20,045
+The artifact shows a scoped chain
+set and a pull request-shaped
+
+268
+00:18:20,092 --> 00:18:21,541
+output after approval.
+
+269
+00:18:22,101 --> 00:18:25,093
+It demonstrates the governed
+handoff in the prototype.
+
+270
+00:18:25,528 --> 00:18:29,929
+It does not establish production
+effectiveness, an MTTR improvement,
+
+271
+00:18:30,259 --> 00:18:33,124
+or a benchmark result, right?
+
+272
+00:18:33,188 --> 00:18:35,894
+We, we didn't went and just roll it back.
+
+273
+00:18:35,939 --> 00:18:40,752
+Yes, we considered that signal that
+this could be one of the cause for the
+
+274
+00:18:40,752 --> 00:18:42,867
+failure, but was not the main cause.
+
+275
+00:18:44,108 --> 00:18:49,621
+So cohort logic changes with the rollout
+stage, like when we compare a ten percent
+
+276
+00:18:49,624 --> 00:18:51,209
+rollout versus a hundred percent rollout.
+
+277
+00:18:51,628 --> 00:18:55,761
+So at ten percent rollout, the
+cleanest comparison is flagged versus
+
+278
+00:18:55,821 --> 00:18:59,803
+unflagged traffic in the same window
+with equivalent request and user
+
+279
+00:18:59,804 --> 00:19:01,411
+characteristics wherever possible.
+
+280
+00:19:02,785 --> 00:19:07,804
+Percentage rollouts are commonly
+deterministic for a targeting key, so
+
+281
+00:19:07,869 --> 00:19:13,091
+we may able to reconstruct, but only if
+we preserve the key, the rule, and the
+
+282
+00:19:13,093 --> 00:19:20,910
+rule set version But at 100% rollout,
+the unflagged control no longer exists.
+
+283
+00:19:22,048 --> 00:19:27,256
+We need to use a pre versus post
+comparison with explicit caveats or
+
+284
+00:19:27,445 --> 00:19:31,848
+request a policy-approved partial
+rollback to recreate a bounded control.
+
+285
+00:19:32,903 --> 00:19:35,589
+Neither design proves cause alone.
+
+286
+00:19:36,182 --> 00:19:42,322
+At full rollout, the control is gone
+So we, we saw a positive scenario,
+
+287
+00:19:42,343 --> 00:19:46,684
+but what about kind of challenging
+the hypothesis before acting, right?
+
+288
+00:19:47,435 --> 00:19:51,727
+So we need to interpret the
+test rather than the intent.
+
+289
+00:19:52,259 --> 00:19:57,728
+So we need to observe the outcome,
+compare the pre versus post, check the
+
+290
+00:19:57,728 --> 00:20:02,824
+alternatives if it were required, update
+the hypothesis as required so we can
+
+291
+00:20:02,829 --> 00:20:04,716
+preserve the result as new evidence.
+
+292
+00:20:06,530 --> 00:20:11,678
+If it's a s-- low confidence case, as we
+saw in the second one, the cause bundle
+
+293
+00:20:11,808 --> 00:20:17,088
+remained incomplete, so the system should
+not create any rollback package, and
+
+294
+00:20:17,088 --> 00:20:19,656
+that refusal is a very valid result.
+
+295
+00:20:20,036 --> 00:20:24,552
+We generally only look for signals
+where there's approvals, but even
+
+296
+00:20:24,557 --> 00:20:28,657
+refusal when there's not even
+confidence data is a good signal.
+
+297
+00:20:30,044 --> 00:20:33,575
+So should we mitigate first
+or preserve the experiment?
+
+298
+00:20:34,362 --> 00:20:37,239
+Sometimes the right answer
+is to turn off the flag.
+
+299
+00:20:38,047 --> 00:20:42,509
+If the customer impact is active,
+the change is recent, rollback
+
+300
+00:20:42,513 --> 00:20:48,377
+is reversible and scoped, and the
+likely downside of waiting exceeds
+
+301
+00:20:48,377 --> 00:20:51,978
+the information of preserving
+the rollout, we need to mitigate.
+
+302
+00:20:52,978 --> 00:20:57,048
+But mitigation and diagnosis
+are different objectives.
+
+303
+00:20:57,414 --> 00:21:00,679
+Yes, when there's a burning
+P0, we want mitigation first,
+
+304
+00:21:01,068 --> 00:21:02,481
+but we also need the diagnosis.
+
+305
+00:21:03,481 --> 00:21:07,932
+So before changing the exposure, we
+need to snapshot the audit event, the
+
+306
+00:21:07,932 --> 00:21:12,356
+targeting rule, the relevant telemetry,
+and record who authorized the change
+
+307
+00:21:12,374 --> 00:21:17,826
+and why, and then treat recovery or the
+absence of recovery as new evidence.
+
+308
+00:21:18,611 --> 00:21:20,937
+A rollback is also an incident action.
+
+309
+00:21:21,586 --> 00:21:25,019
+It is not retroactive proof that
+the flag caused the incident.
+
+310
+00:21:25,748 --> 00:21:28,491
+We are doing that because
+that's the fastest mitigation
+
+311
+00:21:28,496 --> 00:21:29,570
+that we can do right now.
+
+312
+00:21:30,538 --> 00:21:34,132
+Mitigation can be correct
+without proving the diagnosis.
+
+313
+00:21:34,688 --> 00:21:39,203
+But still, we need a control
+when it comes to whether it's
+
+314
+00:21:39,208 --> 00:21:41,147
+mitigation or experimentation.
+
+315
+00:21:41,868 --> 00:21:45,368
+We need a policy, and as you saw in
+the architecture as well as the, in the
+
+316
+00:21:45,368 --> 00:21:48,227
+demo, policy decides what happens next.
+
+317
+00:21:48,956 --> 00:21:52,147
+A recommendation to reduce
+rollout is only a proposal.
+
+318
+00:21:52,953 --> 00:21:56,606
+Policy checks the evidence
+completeness, reversibility, and scope.
+
+319
+00:21:57,261 --> 00:21:58,630
+The operator decides.
+
+320
+00:21:59,516 --> 00:22:04,114
+So even during an active customer
+impact, the same chain still applies.
+
+321
+00:22:04,701 --> 00:22:09,638
+But an incident policy can define
+a pa-faster approval path for
+
+322
+00:22:09,641 --> 00:22:14,178
+a pre-authorized action The
+model never owns that change.
+
+323
+00:22:14,620 --> 00:22:16,922
+Policy decides, operator acts.
+
+324
+00:22:17,851 --> 00:22:22,439
+So we do not need Beacon to
+make flag evidence usable.
+
+325
+00:22:23,835 --> 00:22:27,766
+We need to start with the, OpenTelemetry
+feature flag evaluation vocabulary
+
+326
+00:22:28,766 --> 00:22:33,661
+and including the feature flag key,
+the result value, variant, and the
+
+327
+00:22:33,666 --> 00:22:36,276
+reason, and the flag set identifier.
+
+328
+00:22:38,114 --> 00:22:41,630
+Open feature hooks provide lifecycle
+points before evaluation, after
+
+329
+00:22:41,630 --> 00:22:43,898
+evaluation, or error-- or on error.
+
+330
+00:22:44,748 --> 00:22:46,176
+The practical test is simple.
+
+331
+00:22:46,311 --> 00:22:49,358
+If you cannot answer who
+received the new path, you cannot
+
+332
+00:22:49,419 --> 00:22:51,085
+compare during the incident.
+
+333
+00:22:51,662 --> 00:22:54,293
+Where does-- So we talked
+about all the happy paths, but
+
+334
+00:22:54,297 --> 00:22:55,358
+where does this still fail?
+
+335
+00:22:56,611 --> 00:22:59,948
+The design still fails when the
+flag provider has no durable audit
+
+336
+00:22:59,956 --> 00:23:04,925
+trail, when metadata is missing, when
+multiple changes remain correlated,
+
+337
+00:23:05,425 --> 00:23:10,567
+when stale flags obscure ownership,
+or when telemetry cannot identify
+
+338
+00:23:10,570 --> 00:23:12,273
+whether the flag path was evaluated.
+
+339
+00:23:13,298 --> 00:23:15,770
+Governance does not
+repair missing evidence.
+
+340
+00:23:16,238 --> 00:23:21,259
+The correct system behavior is to expose
+the gap, lower confidence, request
+
+341
+00:23:21,280 --> 00:23:26,405
+more evidence, and refuse production
+mutation when the case is weak.
+
+342
+00:23:26,998 --> 00:23:31,736
+So I leave with this-- l-leave it
+with this, that Beacon's larger
+
+343
+00:23:31,750 --> 00:23:34,050
+goal is governed incident reasoning.
+
+344
+00:23:34,703 --> 00:23:40,201
+Feature flags are one important change
+source inside that workflow, and they
+
+345
+00:23:40,201 --> 00:23:42,271
+expose the boundary especially clearly.
+
+346
+00:23:43,553 --> 00:23:48,667
+I leave it with five rules: preserve
+transition and context, challenge
+
+347
+00:23:48,702 --> 00:23:55,102
+cause with contradictions, separate
+observation from mutation, keep policy
+
+348
+00:23:55,135 --> 00:23:59,844
+outside the model always, and record
+change behavior as new evidence.
+
+349
+00:24:00,799 --> 00:24:04,000
+Feature flag history can
+inform the root cause analysis.
+
+350
+00:24:04,319 --> 00:24:07,409
+Authority still says-- stays explicit.
+
+351
+00:24:08,466 --> 00:24:08,713
+Thank
+
+352
+00:24:08,713 --> 00:24:10,010
+you.
+
