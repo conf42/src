@@ -78863,6 +78863,250 @@ Product and UI designers deciding which AI tools to try first, and engineering l
 
 [Watch the talk on YouTube](https://youtu.be/Ej-O2WoAJV8).
 ",talk,ml2024,talk:ml2024/Kirill Sidorets,,Conf42,,queued,"ai-design, generative-ai, product-design, creativity, design-tools"
+,Six resilience patterns a fintech team uses to sleep at night,"Dmitrii Pakhomov (Tinkoff) at Conf42 SRE 2024 on bulkheads, in-memory caches, reloadable config, fallbacks, retries and circuit breakers in Scala",2024-04-30,sre2024/fintech-resilience-patterns-scala,,"One slow backend can exhaust a shared connection pool and take every feature down with it. Dmitrii Pakhomov, Architect and Scala Tech Lead at Tinkoff, opened his Conf42 SRE 2024 talk with that scenario, then worked through the six patterns his team relies on for high-load systems that move user money: bulkhead, in-memory cache, reloadable config, fallback, retry and circuit breaker.
+
+""Resilience patterns are practices that help software survive when things go wrong,"" Pakhomov said at Conf42 SRE 2024. None of the patterns is new; the value is in his recipes for when each pays off and where it bites back.
+
+## Why does one slow backend break everything?
+
+His example app calls three backends through HTTP clients that share one connection pool, plus CPU and RAM. If backend one turns slow, its requests sit waiting and fill the pool, so calls to healthy backends two and three can't go out. One failure becomes a total outage.
+
+The bulkhead, named after a ship's watertight compartments, gives each HTTP client its own limit on concurrent requests, so only features tied to the slow backend degrade. The same idea isolates any resource: cap background jobs, or cap incoming requests so a traffic surge (say, from an upstream service losing its caches) gets errors instead of crashing your app with out-of-memory. In Scala he builds it from two semaphores, one limiting concurrency and one forming a queue of pending requests to absorb short spikes.
+
+## Can a cache make you more reliable than your backends?
+
+Yes, he argues, and the reasoning is neat. If an operation needs several backends and each fails independently, your error rate is higher than any one of theirs. An in-memory cache takes the network out of the path: ""Caches stored in memory have zero chance of error."" Fewer network calls and lower latency come along for free, and your app can end up with a lower error rate than its dependencies.
+
+That is easy for non-personalised data like news feeds. For per-user data, you need requests from a user to land on the same instance, and he says you don't need a heavy sticky-session system for it: a stable load-balancing algorithm such as consistent hashing on user ID is enough, and when a node fails only that node's users get rebalanced.
+
+For data every request needs, like access policies or subscription plans, even a cached source is a critical dependency. If it's small, replicate it fully: load a snapshot at startup and stream updates from a topic. Every read then comes from memory.
+
+## What about the twelve-factor fast-startup rule?
+
+Replicating data at startup breaks the twelve-factor disposability principle of fast startup. Pakhomov's view is that fast startup mostly exists so platforms can move workloads, and Kubernetes already copes with slow starters via startup probes. The real cost is slow rolling updates when you need to change a timeout or cache TTL in a hurry.
+
+His fix is reloadable config: keep configuration in a concurrent variable refreshed by a background thread, so changes apply without restarts. The hard part is that HTTP or database clients may need reinitialising for new timeouts to apply, though some, like the Cassandra Java driver, already reload their configuration on the fly. As a bonus, the same mechanism gives you feature flags.
+
+## Fallbacks, retries and the circuit breaker
+
+A fallback serves a lower-quality backup instead of an error, often a fallback cache holding the last successful response. A stale balance with a delayed-update note beats a big red error box, and it buys the owning team time to fix the backend.
+
+Retries cut error rates too, and they're simpler than caches because there is no cache invalidation, one of the famously hard problems. But retrying against a failing backend multiplies its traffic and makes things worse, so retries must come with a circuit breaker: when the error rate passes a threshold, block calls for a while, then let a few through to test recovery.
+
+His last point is the most opinionated. Retries and circuit breakers often live in load balancers, but infrastructure lacks error context: it can't always tell whether an error is retryable, or whether it should count towards the breaker's threshold. So sometimes they belong inside the application. And don't skip telemetry, since good logs and metrics make all of this tunable.
+
+## Who should watch
+
+Backend engineers on high-availability services, Scala or not, who want a practical refresher on resilience patterns with trade-offs attached. It's short and focused, and pairs well with a longer distributed systems talk.
+
+## Related Conf42 talks
+
+- Aleksei Popov on [practical strategies for complexity in distributed systems](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Aleksei_Popov_maze_complexity_distributed_systems), from the same event.
+- Tanveer Gill on [graceful degradation when everything goes wrong](https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong).
+- Praful Konduru on [resilience, scalability and fault tolerance](https://www.conf42.com/Cloud_Native_2025_Praful_Konduru_resilience_scalability_faulttolerance).
+
+[Watch Dmitrii Pakhomov's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Dmitrii_Pakhomov_resilience_fintech_strategies)
+
+[Watch the talk on YouTube](https://youtu.be/00erK_Js9Yg).
+",talk,sre2024,talk:sre2024/Dmitrii Pakhomov,,Conf42,,queued,"resilience, fintech, scala, microservices, fault-tolerance"
+,"Before you trust your SLO, price your risks in bad minutes",Jaiprakash Pherwani (Tata Consultancy Services) at Conf42 SRE 2024 on testing SLOs against a risk catalog of bad minutes per year,2024-04-29,sre2024/risk-catalog-before-you-trust-slos,,"An SLO is a promise, and most teams never check whether their architecture can keep it. Jaiprakash Pherwani, Offerings Lead at Tata Consultancy Services, used his Conf42 SRE 2024 talk to show how to answer that with a risk catalog: list what can go wrong, estimate how long it takes to detect and repair, convert each risk into bad minutes per year, and compare the total against your error budget.
+
+""Risks are very, very vital for any SRE,"" Pherwani said at Conf42 SRE 2024. The talk is short and practical, built around the risk analysis approach from Google's SRE material, which is the right place to start if your SLOs were picked by gut feel.
+
+## Are your SLOs realistic?
+
+He opens with an application made of services, each with sub-services, and a list of uncomfortable questions. Is detection and alerting in place? Can the architecture deliver the response times and user experience you promised? What happens when the underlying cloud infrastructure disappears for a moment? Is there auto-healing? If a release breaks something, can you roll back?
+
+Risk analysis is how you answer them. It covers dependencies, capacity, monitoring, operations and release processes, and measures each risk by mean time to detect (MTTD), mean time to repair (MTTR), the percentage of users affected, and how often it happens (MTBF).
+
+## What goes into a risk catalog?
+
+A risk catalog is a structured list of every risk per service, built by brainstorming across teams: developers, system engineers and cloud architects. It should span infrastructure and software and include SLIs, MTTD, MTTR and MTBF. Two inputs matter most. Map the customer journey (in a retail example: browse the catalogue, pick a product, add to cart, check out, ship) and note which services each step touches. And mine your history: ""Past incidents give you a lot of data to define and include it in your risk catalog.""
+
+The sample catalog he walks through, credited to Google's SRE playbook, shows how concrete it gets:
+
+| Risk | MTTD | MTTR | Bad mins/year |
+|---|---|---|---|
+| Config mishap reduces capacity, causing overload | 30 min | 120 min | 91 |
+| New release breaks a small set of requests, unnoticed for a day | 1,440 min | 40 min | 120 |
+| Operator accidentally deletes the database, restore from backup | 5 min | 510 min | 129 |
+| Cloud provider regional VM/network outage | 2 min | 30 min | 16 |
+
+Each row also carries the share of users affected (20% for the config mishap, 100% for the database deletion) and the time between failures, which gives incidents per year. The database deletion is rare, about once every four years, but its 510-minute restore makes it the most expensive risk on the list. The numbers start as estimates and get refined as production incidents add real data.
+
+## Which risks can you accept?
+
+Rank the risks by bad minutes and compare them against the error budget. The slides use three bands. Red risks cannot be accepted: a single occurrence would exceed the error budget for one risk. Amber risks should not be accepted, since they are major consumers of the budget, though you might live with a hard-to-fix amber risk by fixing some cheaper green ones to buy budget back. Green risks are acceptable: in aggregate they don't push you over budget, though fixing them adds headroom for the unexpected.
+
+The output is a decision list: is the SLO achievable given these risks, how will you reach it, and which engineering work goes first because it removes an unacceptable risk. That last part is where product management may need to approve the extra engineering effort.
+
+Rating also points at the levers. Better observability, log ingestion and log management shrink time to detect; automation shrinks time to repair; more stable releases stretch the time between failures.
+
+## Where does chaos engineering fit?
+
+As the calibration tool. Estimates of MTTD and MTTR are guesses until you inject faults (infrastructure, application, network) and measure how long detection and recovery actually take. Chaos experiments also surface blind spots: risks nobody would have written down. Feed those back into the catalog, re-rank, and adjust the SLOs and the engineering plan.
+
+## Who should watch
+
+SREs and service owners setting their first SLOs, or inheriting ones nobody can justify. It is a brisk walkthrough of a method rather than a deep case study, and the slides make a good template to copy into a spreadsheet.
+
+## Related Conf42 talks
+
+- Ricardo Castro on [SLOs for event-based systems](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Ricardo_Castro_slos_eventbased_navigating), from the same event.
+- Hareesh Iyer on [practical chaos engineering](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Hareesh_Iyer_chaos_engineering_practical), from the same event.
+- Evgenii Korneev on [SRE habits for teams without an SRE team](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Evgenii_Korneev_resilient_teams_blueprint).
+
+[Watch Jaiprakash Pherwani's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Jaiprakash_Pherwani_manage_service_risk)
+
+[Watch the talk on YouTube](https://youtu.be/fLlI72gv-k0).
+",talk,sre2024,talk:sre2024/Jaiprakash Pherwani,,Conf42,,queued,"sre, slo, risk-management, error-budget, chaos-engineering"
+,Your platform team is a product team whose customers can just leave,"Marco Pierobon (Thoughtworks) at Conf42 SRE 2024 on the challenges platform teams face and how product thinking, MVPs and team topologies fix them",2024-04-28,sre2024/platform-teams-are-product-teams,,"Developers rarely file a bug against an internal tool they dislike; they quietly stop using it. Marco Pierobon, Lead Developer at Thoughtworks, built his Conf42 SRE 2024 talk around that kind of problem: the specific challenges platform teams face across developer experience, business, technology and their own way of working, and the practices that address each, with the overall prescription of running the platform as a product.
+
+It is a structured, consultant's-eye view rather than a single case study, and a useful checklist for platform leads.
+
+## What makes platform work hard?
+
+Pierobon groups the challenges into four buckets.
+
+**Developer experience.** Developers must be at the centre, with a consistent experience across services, so they barely notice moving from one to another. Feedback is scarce: when a tool doesn't fit, developers drop it and look elsewhere. Simplicity and usability pull against each other, and ""whenever there's a trade off between the two, we should always favor usability,"" Pierobon said at Conf42 SRE 2024, meaning easy to use with extra power for advanced users, not bare-bones.
+
+**Business.** Platform teams often lack insight into organisational strategy and product roadmaps, so features arrive late or untested. Senior stakeholders may distrust platform technologies, which slows cloud moves and initiatives like carbon footprint measurement. And many organisations misread the operating model, treating the platform team as a support desk or a CI/CD squad.
+
+**Technology.** Cognitive load is high, with CI/CD, monitoring, instrumentation and database tooling all needing experts. The roadmap gets eaten by firefighting, escalations, business requests and acting as the point of contact for third-party vendors. Sitting at least two levels away from the business, the team can feel disconnected from the outcome.
+
+**Platform teams themselves.** They support many stacks (Java, Kotlin, .NET, Go, Python) and many vendors, must keep up with fast-moving tools for security and to catch new features, sometimes have to plug gaps where a chosen service isn't enterprise grade or doesn't meet the company's SLAs and SLOs, and live with vendor lock-in from choices made years ago.
+
+## How do you overcome them?
+
+The fixes mirror the buckets. For developer experience: research and segment your internal users, build Personas, ship the smallest feature that meets the need and iterate, offer an internal developer portal with documentation and fast service creation, write troubleshooting docs so teams need less help, and collect continuous feedback, including scoring how useful the platform team's help was.
+
+For business alignment: attend business all-hands, align the platform roadmap with product roadmaps on timelines as well as features, and provide a strong foundation of governance, security by default, SRE practices, FinOps and carbon reduction.
+
+For technology: treat the platform as one integrated ecosystem even when it's built from several vendors; adopt evaluation techniques the organisation approves, scoring enterprise readiness, SLAs, extensibility, industry adoption and the vendor's reputation; give each platform product a lifecycle with criteria for creation, maintenance and retirement; and prefer vendor-agnostic tools. His example is Terraform over CloudFormation or Bicep, since the same tool can also manage something like Okta configuration.
+
+For the team: tie the roadmap to business strategy, showcase delivered value, and make product teams independent with self-service, onboarding and playgrounds. His aspirational North Star: a developer who joins a team can commit and deploy to production on their first day.
+
+## What does product thinking look like inside a platform team?
+
+The final section is the meatiest. Define who the client is (usually internal development teams) and how those teams differ. Work towards MVPs and balance competing priorities. Measure success both qualitatively and with numbers: faster paths to production, fewer production accidents, smoother onboarding.
+
+Give the platform a real SDLC. ""It shouldn't be an excuse that infrastructure is harder to test,"" he argued, pointing to Terraform's frameworks for unit, integration and end-to-end tests and a test pyramid like any codebase. Use feature toggles to ship to production early and expose features to specific users. Pick the right level of abstraction, since leaky ones force users to understand the layer below anyway. And define done: is a feature finished when merged, deployed, released as a library, or when every team has upgraded? Track who runs which version and give teams a reason to update.
+
+From Team Topologies he takes the enabler role, used case by case and with an agreed end date so the development team becomes self-sufficient, plus core building blocks, DDD-style platform domains to cut context switching, and independent dev streams. From portfolio management: only build abstractions over third-party products when they add value, encode organisational rules as strong defaults, and track each platform product's cost, adoption, usage and ROI, ready to pivot if the return doesn't materialise.
+
+## Who should watch
+
+Platform engineering managers and leads who want a framework to explain their team's problems upward, and engineers moving from a support-style ops team to a product-style platform team.
+
+## Related Conf42 talks
+
+- Adam Gardner on [the reality of platform engineering](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Adam_Gardner_reality_platform_engineering), from the same event.
+- Robert Kelly on [right-sizing small platforms](https://www.conf42.com/Platform_Engineering_2024_Robert_Kelly_size_small_platforms).
+- Caio Medeiros Pinto on [practices for smooth platform engineering adoption](https://www.conf42.com/Platform_Engineering_2023_Caio_Medeiros_Pinto_3_practices_to_ensure_a_smooth_platform_engineering_ad).
+
+[Watch Marco Pierobon's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Marco_Pierobon_challenges_platform_tips)
+
+[Watch the talk on YouTube](https://youtu.be/zKnW0FkP0EQ).
+",talk,sre2024,talk:sre2024/Marco Pierobon,,Conf42,,queued,"platform-engineering, developer-experience, team-topologies, product-thinking"
+,"Too much data for one chart? Sample it, shrink it, then nest it","Serter Kazim Solak (Yapı Kredi) at Conf42 SRE 2024 on visualising large, complex datasets with sampling, dimensionality reduction and interactive charts",2024-04-27,sre2024/visualizing-large-datasets-sample-reduce-nest,,"A chart of ten million points shows you a blob. Serter Kazim Solak, Head of Data Warehouse and Data Mining Development at Yapı Kredi, used his Conf42 SRE 2024 talk to cover how to make large, complex datasets readable: pick the right chart type, make it interactive, and shrink the data first with sampling, aggregation, dimensionality reduction and clustering, then show structure with hierarchical views.
+
+It is an introductory survey rather than a tooling demo: no specific library or product appears, and the abstract's promise of pipelines and model tuning doesn't really feature. What it does offer is a compact checklist for anyone whose dashboards have outgrown a single line chart.
+
+## Why visualise at all?
+
+Solak lists five benefits: complex information becomes easier to understand, visuals are more engaging and memorable than raw tables, they cross language and expertise barriers, interactive views give faster insight than traditional analysis, and they tell a story. That last one he ranks as the most important. ""Visualization helps convey the story behind the data,"" Solak said at Conf42 SRE 2024.
+
+The chart menu is the familiar one: pie charts and histograms, line and area charts, scatter plots and bubble charts, Gantt charts and heat maps, network and tree diagrams.
+
+## What does interactivity buy you?
+
+His case for interactive visualisation is that it lets people explore rather than just read. In practice that means:
+
+- **Highlighting** key points by changing colour, size, shape or opacity, and adding annotations, labels and tooltips for context.
+- **Focus** by zooming, panning and filtering out noise.
+- **Filtering and selecting** categories, data points or time windows.
+- **Drill-down and drill-up** between detailed records and higher-level summaries.
+- **Sorting and ranking** by value, frequency or name to spot top performers and outliers.
+- **Exploratory analysis**, where users change the view and parameters to test hypotheses and find hidden patterns.
+
+For SRE readers, that list doubles as a decent spec for an incident dashboard.
+
+## How do you visualise a dataset that's too big?
+
+This is the core of the talk, a multi-phase approach in four parts.
+
+**Sampling and aggregation.** Random sampling works when the population is homogeneous; stratified sampling splits the population into groups (by age or location, say) and samples each so every subgroup is represented. Then aggregate the sample into summary statistics such as averages and counts, which cuts the computational cost while keeping the trends.
+
+**Data reduction and summarisation.** Reduce the number of variables with dimensionality reduction (principal component analysis is his example) or with feature selection, which can be supervised or unsupervised depending on whether it uses a target variable. Then summarise with medians, standard deviations, percentiles, histograms and box plots, which also expose outliers.
+
+**Clustering and dimensionality reduction.** Clustering groups similar points, such as customers with similar buying behaviour, with k-means, hierarchical or density-based algorithms depending on the data. Projecting high-dimensional data down to two or three dimensions makes it plottable.
+
+**Hierarchical and nested visualisations.** Treemaps, dendrograms, nested pie and bar charts show data at several levels of granularity and support drilling down through the hierarchy.
+
+## Best practices, in order
+
+His four rules: know your audience and match their expertise; choose the visualisation that carries your message, considering data type and what the audience already understands; tell a story with a clear narrative flow; and simplify, with clear labels and annotations and nothing extra. His closing takeaways compress it further: clear data for good information, storytelling, a goal behind every function, and the right visual metaphor.
+
+## Who should watch
+
+Data engineers and analysts building their first dashboards over large tables, and SREs who want a quick refresher on why their 400-series time-series panel is unreadable. Experienced visualisation practitioners will find it basic.
+
+## Related Conf42 talks
+
+- Robert Hodges on [monitoring with open source analytics and visualisation](https://www.conf42.com/DevSecOps_2023_Robert_Hodges_monitoring_open_source_analytics_visualization).
+- Erwin de Keijzer on [GitOps dashboards with Perses](https://www.conf42.com/Kube_Native_2024_Erwin_de_Keijzer_gitops_perses_dashboard_visualization).
+- Mark Needham on [a real-time analytics dashboard with Streamlit, Apache Pinot and Kafka](https://www.conf42.com/Python_2022_Mark_Needham_realtime_analytics_dashboard_streamlit_apache_pinot_apache_kafka).
+
+[Watch Serter Kazim Solak's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Serter_Kazim_Solak_visualization_techniques_datasets)
+
+[Watch the talk on YouTube](https://youtu.be/Exx3BOZz8MM).
+",talk,sre2024,talk:sre2024/Serter Kazim Solak,,Conf42,,queued,"data-visualization, data-engineering, dashboards, analytics"
+,"No Terraform provider for your database? Write one, it's mostly CRUD","Harel Safra (Riskified) at Conf42 SRE 2024 on writing a Terraform provider from zero, learning Go, the Plugin Framework, debugging and publishing",2024-04-26,sre2024/write-your-own-terraform-provider,,"When infrastructure as code stops at the edge of your database, the fix is a Terraform provider you write yourself. Harel Safra, Data Platform Engineering Team Lead at Riskified, used his Conf42 SRE 2024 talk to walk from zero (no provider, manual scripts, a lot of Confluence pages) to a published provider in the Terraform Registry, with a toy provider and a live debugging demo along the way.
+
+There were more than 4,100 published providers at the time of recording, and Safra's point is that you don't need to be the vendor to add one. ""The main point is that anyone can create more providers,"" Safra said at Conf42 SRE 2024. All you need is an API you can talk to.
+
+## How does a provider fit into Terraform?
+
+After a quick refresher (declarative tools like Terraform versus imperative ones like Pulumi), he lays out the architecture. Terraform core, the binary you run with `terraform plan`, talks to the provider over RPC. The provider uses a client library in-process to speak the infrastructure's native protocol, which might be HTTP, but just as well gRPC, SQL or system calls. So step one is understanding your infrastructure's API and finding a Go client for it. Without one, you are reverse engineering the protocol, which he describes as a bit annoying.
+
+## Do you need to know Go?
+
+Some. Providers are written in Go, and Safra learned it via the step-by-step Tour of Go: control structures, interfaces, enough to be productive. He likes that it's simple and compiled, so problems surface before production. The one trap for anyone coming from languages with exceptions is that Go has none: check every returned error or your provider will fail in confusing ways. For Terraform specifics he used HashiCorp's plugin documentation in the developer portal, reading the overview first and the rest on demand.
+
+## What does the code actually look like?
+
+His demo provider manages lines in text files under a base path set in the provider configuration. One resource type, a file with a name and a list of lines, deliberately limited because real APIs are limited too. You start by cloning the terraform-provider-scaffolding-framework repo and build on the Plugin Framework, the recommended way, which hides most of the protocol with Terraform core.
+
+Each managed resource implements four operations: create, read, update and delete. Each one changes the infrastructure and also tells core how to amend the state. Read fetches the real current state; update changes only mutable attributes; for immutable ones, core destroys and recreates. Every method follows the same shape: take what core sent, do the work through the API, return a response so state is updated correctly.
+
+Schemas map configuration to code. Attributes have types (primitives, or lists, maps and objects), properties such as required, optional or sensitive, and optional validators: his filename attribute is checked with a regex, and the lines list must hold at least two elements. Write descriptions everywhere, because the documentation generator copies them straight into the provider's docs. One more gotcha: framework types aren't native Go types, since they carry null and unknown states, so you call methods like `IsNull`, `ValueString` or `ElementsAs` to get at the values.
+
+## How do you debug and test it?
+
+Locally, a dev overrides block in the Terraform CLI config points the registry address at your build, so nothing needs publishing. Logs do for simple cases; for the rest, run the provider under a debugger with the debug flag, export the environment variable it prints, and run `terraform plan`. The demo breaks inside the read method once per file while Terraform waits for the provider's answer.
+
+Acceptance tests sit next to each resource in a `_test` file, run with `make testacc` locally and in GitHub Actions on deploy. State changes are checked for you; anything on the infrastructure side you validate yourself, as in his checks of a file's name and first line.
+
+## How do you publish?
+
+Create a GPG key and add the private key and passphrase as repo secrets. Then the detail that cost him time: tags must be named like `v0.1.0` for the release automation to pick them up. Add the repo in the Terraform Registry once; webhooks and a default GitHub Action handle each new tag after that.
+
+His real-world result was a provider managing users in Aerospike, which didn't exist before, and which people appear to be using.
+
+## Who should watch
+
+Platform and database engineers with a system Terraform can't manage, who have been putting off the Go learning curve. Expect a practical walkthrough with code, not a Terraform intro.
+
+## Related Conf42 talks
+
+- Harel Safra's companion [Terraform providers guide](https://www.conf42.com/Platform_Engineering_2024_Harel_Safra_terraform_providers_guide) at Conf42 Platform Engineering 2024.
+- Hila Fish on [Terraform practices](https://www.conf42.com/Cloud_Native_2022_Hila_Fish_terraform_practices).
+- Peter O'Neill on [securing terraform apply with Open Policy Agent](https://www.conf42.com/Site_Reliability_Engineering_2022_Peter_ONeill_terraform_apply_secured_open_policy_agent).
+
+[Watch Harel Safra's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Harel_Safra_infrastructure_ends_practical)
+
+[Watch the talk on YouTube](https://youtu.be/oWSn7EQRWqM).
+",talk,sre2024,talk:sre2024/Harel Safra,,Conf42,,queued,"terraform, infrastructure-as-code, go, platform-engineering"
 ,The Gophers are messing around again…,"Wait, is that a space monster?",2024-04-25,2024-04-25-golang-gophers-messing-around,./assets/splash/GOLANG2024_Event_Splash.png,"#Wait, is that a space monster?
 
 It’s hard not to love those little, um… I wanna say ‘beavers’? But like in space and blue. And in general, inducing very mixed feelings.
@@ -78875,6 +79119,257 @@ Check out our [talks](https://www.conf42.com/golang2024), waiting for you just a
 
 I’d recommend having a look soon - even we don’t know what those gophers are up to!
 ",,,,,,,,
+,A field guide to the ways distributed systems lie to you,"Aleksei Popov (Stenn Technologies) at Conf42 SRE 2024 on distributed systems failure modes and a fix for each, from idempotency keys to fencing tokens",2024-04-25,sre2024/distributed-systems-failure-modes-field-guide,,"Networks drop requests, clocks drift, garbage collectors freeze the world, and followers serve yesterday's data. Aleksei Popov, Software Engineering Manager at Stenn Technologies, used his Conf42 SRE 2024 talk to catalogue those failure modes one by one and pair each with a concrete pattern, then zoomed out to cybernetics, service types and SRE principles for keeping a growing microservice estate under control.
+
+It is a dense, wide survey, closer to a guided tour of *Designing Data-Intensive Applications* than a war story, and useful precisely because it puts so many patterns side by side.
+
+## Why go distributed at all?
+
+Popov starts with the case for leaving the monolith: you can't scale modules independently, complexity is harder to contain, every change means redeploying everything, one huge codebase lacks enforced rules, and you're locked into one runtime. Microservices buy horizontal scalability, high availability, geographic distribution, technology choice and easier architecture control. The price is a list of troubles: unreliable networks, unreliable clocks, process pauses, eventual consistency, observability and evolvability.
+
+## What do you do when the network loses your request?
+
+A request can be lost, queued, hit a crashed or paused node, or be processed while the response is lost or delayed. You can't tell which. His sequence of fixes:
+
+- **Timeouts** on the caller side, which is often fine for back-office tools.
+- **Retries**, since most network issues are temporary.
+- **Idempotency keys**, because a retry of a request the server already processed can create duplicate orders or payments. The server checks the key and returns the previous response.
+- **Circuit breakers**, to fail fast instead of hammering a service that is already struggling and triggering cascading failures.
+
+## How do you stop concurrent writes eating each other?
+
+""Concurrency is one of the most intricate challenges in distributed systems,"" Popov said at Conf42 SRE 2024. Two operations updating the same account balance without protection means the last write wins and money goes missing. In ACID databases the practical answer is snapshot isolation, built on MVCC, which most popular SQL databases offer and which detects lost writes. Many NoSQL stores trade ACID for BASE, so he shows compare-and-set, using Cassandra's lightweight transactions with `IF NOT EXISTS` and `IF` conditions. For exclusive access to a resource there's the lease, which expires automatically if its holder dies.
+
+## The dual write problem
+
+Write to the database, then publish to Kafka, and one of the two can fail. Publish first and commit second, and other systems react to a transaction that never happened, which, as he dryly notes, leads to interesting conversations with the legal team. The fix is the transactional outbox: write events to an outbox table in the same transaction and let a relay poll and publish them, giving at-least-once delivery (consumers must be idempotent anyway). The alternative is log tailing, reading changes from the database's transaction log with connectors: less application code, more coupling to the database.
+
+## Clocks, leaders and pauses
+
+""Unreliable clocks is one of the most tricky problems in distributed systems,"" he said. Time-of-day clocks drift with NTP; monotonic clocks are fine for durations but can't be compared across machines. Precision Time Protocol exists for regulated or real-time cases, at significant cost.
+
+When a leader dies, followers need consensus to elect a new one. He walks through Raft: heartbeats, elections, log replication, and commits once half the followers acknowledge. Read-after-write surprises from eventual consistency get the simple fix of reading from the leader for the user who just wrote. Matters like sanctions checks can't tolerate the lag at all.
+
+Process pauses (GC stop-the-world, VM suspension, context switches, I/O delays) break leases: a paused client wakes up still believing it holds a lease that has already gone to someone else. Fencing fixes it with a monotonically increasing token that the data store checks, rejecting writes with a stale one.
+
+## Keeping it evolvable
+
+Observability gets distributed tracing with Jaeger, plus a preference for orchestration over choreography for visibility (with the orchestrator made highly available, since it is otherwise a single point of failure). Then cybernetics: systems thinking, feedback loops, adaptability, goal-oriented design via domain-driven design, and hierarchy. He argues the fallacy is that all microservices are the same, and proposes service types: public apps and APIs, backend-for-frontend, product workflows, reusable domain components such as KYC or payments, gateways and adapters, and platform components, grouped behind macro-domain APIs at scale.
+
+The SRE section covers embracing risk, SLAs/SLOs/SLIs, automating toil, monitoring everything and simplifying, plus infrastructure as code and Jepsen-style fault injection. He closes with Gall's Law and three ways to measure complexity: cyclomatic complexity, time to train a new engineer, and explanation time.
+
+## Who should watch
+
+Backend engineers moving from a monolith to services, and SREs who want a vocabulary for the failure modes their developers keep rediscovering. Each pattern gets a slide's worth of time, so treat it as a map and go deeper on the ones that bite you.
+
+## Related Conf42 talks
+
+- Dmitrii Pakhomov on [Scala strategies for fault-tolerant fintech](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Dmitrii_Pakhomov_resilience_fintech_strategies), from the same event.
+- Prathamesh Sonpatki on [policies and contracts in distributed systems](https://www.conf42.com/Site_Reliability_Engineering_2023_Prathamesh_Sonpatki_policies_contracts_distributed_systems).
+- Dmytro Hlotenko on [distributed systems resilience](https://www.conf42.com/Cloud_Native_2026_Dmytro_Hlotenko_distributed_systems_resilience).
+
+[Watch Aleksei Popov's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Aleksei_Popov_maze_complexity_distributed_systems)
+
+[Watch the talk on YouTube](https://youtu.be/hm9Yt_dQ5jo).
+",talk,sre2024,talk:sre2024/Aleksei Popov,,Conf42,,queued,"distributed-systems, architecture, consistency, sre, microservices"
+,On-call for Kubernetes clusters is a runbook and automation problem,"Pravar Agrawal (IBM) at Conf42 SRE 2024 on debugging common Kubernetes cluster issues on call, with runbooks, ChatOps bots and in-cluster scripts",2024-04-24,sre2024/kubernetes-on-call-runbooks-bots-automation,,"SSH-ing into worker nodes one by one is not an on-call strategy. Pravar Agrawal, Senior DevOps Engineer at IBM working on the IBM Cloud Kubernetes Service, used his Conf42 SRE 2024 talk to walk through the cluster issues that keep paging Kubernetes SREs, a debugging order for them, and the automation that turns a long investigation into a single command.
+
+It is a compact talk, pitched at engineers who are new to on-call or about to join a rotation, and it says so.
+
+## What does being on call actually involve?
+
+Agrawal defines on-call plainly: for a set period you are available to respond to production incidents with urgency, and every company implements it differently. The rules are the same everywhere: acknowledge and verify the alert, analyse the impact, communicate with the teams involved through the proper channels, then apply a corrective action or a fix. He lists PagerDuty, Jira, Opsgenie and ServiceNow as the usual incident management tools, and frames the whole cycle as deploy, troubleshoot, alert, escalate and track it all in tickets.
+
+## Which cluster issues keep coming back?
+
+His list will look familiar to anyone who has run Kubernetes in production, on one cluster or many:
+
+- Problems with services running on the node itself, where manually SSH-ing in to check isn't always possible.
+- Pods stuck in Pending (poor schedulability onto nodes) or Terminating (often when the application stops responding after a delete).
+- API endpoints down or slow, either at the application level or in Kubernetes core components.
+- One or two etcd pods unavailable out of an HA set.
+- Worker node reloads that are impractical to do by hand.
+- Disks hitting capacity, with alerts around the 90% mark.
+- Failing health checks, including readiness and liveness probes.
+
+## How should you approach the debugging?
+
+There's no golden rule, he says, but there are right ways. Start with the error message and work out the blast radius: how many services and components are affected. The smaller it is, the easier the diagnosis. Use monitoring tools such as Prometheus and LogDNA to see the last recorded healthy state, from both application and cluster logs. If it's a Kubernetes problem, get cluster access fast and check the master components, etcd and the other core pieces: pod logs if they run as pods, service logs if they run under systemd. If the issue is wide, isolate the service by restricting its usage.
+
+## Where does automation help most?
+
+The goal is cutting the time to respond and to get infrastructure statistics. Agrawal wants automation that fetches cluster stats, runs real-time commands, handles node reboots and core service restarts, queries historical data for recurring patterns, and runs scheduled clean-up jobs so you don't hit a resource crunch at the worst moment.
+
+His shades of automation, roughly from simplest to most ambitious:
+
+- **Runbooks** that are well documented and point the on-call engineer to the relevant Jenkins job or a GitHub issue from a similar past incident.
+- **ChatOps bots** in Slack, Teams or Mattermost that gather live cluster statistics, run kubectl commands and, if authorised, reboot or reload worker nodes. He names the open source Botkube as an example.
+- **In-cluster scripts** deployed as DaemonSets, sidecars or custom resources that trigger on a condition, such as cleaning a disk when it fills up.
+- **AI-based analysers** to pull more detailed information from the cluster.
+- **Curated dashboards** built on your existing monitoring tools for both a holistic and a detailed view.
+
+## Advice for new on-call engineers
+
+The closing section is aimed at beginners: exposure is what seasons you, so learn the whole architecture well enough to connect components during an incident, keep runbooks close, and study recent outages and the alerts that preceded them. His last line is the one worth pinning above the pager. Agrawal said at Conf42 SRE 2024 that ""if the alert auto resolves, it doesn't always mean that there is nothing wrong, so it's better to look anyways.""
+
+## Who should watch
+
+Engineers about to start their first Kubernetes on-call rotation, and team leads writing an onboarding checklist for one. Seasoned cluster operators will recognise everything here; the value is a tidy map of the territory.
+
+## Related Conf42 talks
+
+- Dan Slimmon on [clinical troubleshooting](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Dan_Slimmon_clinical_troubleshooting_diagnose), from the same event.
+- Anurag Gupta on [fixing runbooks with generative AI](https://www.conf42.com/Incident_Management_2023_Anurag_Gupta_generative_ai_fix_runbooks).
+- Spiros Economakis on [a platform with self-serve powers using ChatOps](https://www.conf42.com/Platform_Engineering_2023_Spiros_Economakis_building_a_platform_with_selfserve_powers_using_chatops_).
+
+[Watch Pravar Agrawal's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pravar_Agrawal_debugging_cluster_oncall)
+
+[Watch the talk on YouTube](https://youtu.be/tp_2ZTXLiM8).
+",talk,sre2024,talk:sre2024/Pravar Agrawal,,Conf42,,queued,"kubernetes, on-call, sre, automation, runbooks"
+,Run your incident call like a ward round with three columns in a doc,"Dan Slimmon (D2E) at Conf42 SRE 2024 on clinical troubleshooting, a symptoms-hypotheses-actions loop for faster collaborative diagnosis",2024-04-22,sre2024/clinical-troubleshooting-symptoms-hypotheses-actions,,"The fix for a chaotic incident call is a shared doc with three headings. Dan Slimmon, Managing Partner at D2E, spent his Conf42 SRE 2024 talk on clinical troubleshooting, the method he built over 16 years and thousands of production issues (previously at HashiCorp and Etsy): list the symptoms, brainstorm hypotheses, pick actions that rule hypotheses out, repeat. His promise is shorter and less stressful incidents, and the demo makes a good case for it.
+
+""Clinical troubleshooting is a scientific procedure for collaborative diagnosis,"" Slimmon said at Conf42 SRE 2024. As the name suggests, it borrows from how a team of doctors works a difficult case.
+
+## What does a bad incident call look like?
+
+Slimmon tells it as two timelines of the same outage. The flower service's throughput drops by 40% mid business day, from about 1,000 to about 600 pollen tokens per second. Barb, an SRE who knows a little about the service, gets paged and starts building a house of cards in her head: graphs, error messages, source code, half-baked theories.
+
+Alice from another team joins and offers help. Barb, not ready to explain things she hasn't explained to herself, asks her to sit tight. Then the honeybee service starts erroring, Alice wanders off to look at that, and the call splits into two independent investigations. Seth, their grand-boss, arrives firing questions about customer impact and the plan. Support joins with customer reports. Two more developers join and need context. Twenty minutes in, there is still no plan, and everyone who arrives has to interrupt Barb to find out what's going on. Anyone who has carried a pager will recognise every beat.
+
+## The same outage, with a structured diagnosis
+
+In the second timeline, Barb answers Alice by opening a shared doc with headings for symptoms, hypotheses and actions, and putting it on screen. Two symptoms go in: throughput dropped, and latency dropped at the same moment. Barb's first hypothesis is that flower crashes on certain slow requests that then never get logged, which would explain both. Two actions get explicit owners: check the kernel logs for crashes, and read the flower service's readme.
+
+The readme gives Alice a second hypothesis: an upstream client is sending less traffic, so the over-provisioned service answers the rest faster. The honeybee page becomes a symptom rather than a distraction and suggests a third: connections being dropped at the TCP level, perhaps by the Nginx proxy in front of flower. Then a rule-out action pays off. Comparing graphs shows honeybee's error rate growing linearly before flower's throughput fell, so honeybee is earlier in the causal chain, and hypotheses one and three are dead.
+
+When Seth arrives this time, most of his answers are already on screen, so he lurks. Support's customer reports go on the symptom list, and they go back to updating the status page. The call's bandwidth stays with the people diagnosing.
+
+## What makes a good symptom, and a good hypothesis?
+
+The tips section is where the talk earns its keep.
+
+**Symptoms** are statements of fact about observed behaviour, as quantitative as possible, with no supposition. The flower service throughput dropped by about 40% at a given time is a good symptom: numbers on two dimensions and no theory attached. The flower service is dropping requests is a bad one, because it smuggles in a hypothesis; in the example, flower wasn't dropping anything.
+
+**Hypotheses** must explain one or more symptoms and be falsifiable: you should be able to imagine an action that would prove them wrong. A downstream service is bottlenecked, so less traffic reaches flower qualifies. The flower service is crashing doesn't: depending on your stack you may never be able to prove it isn't, and it doesn't say why throughput and latency would fall. ""It's really all about ruling things out, not proving things,"" he said, and he admits that is a mental shift.
+
+**Actions** come in three kinds. Rule-out actions eliminate hypotheses and move you towards a diagnosis. Research actions, like reading the readme, rule nothing out but generate new symptoms and hypotheses. The best are diagnostic interventions: clearing honeybee's cache when you suspect a bad cached object either fixes the incident or kills that hypothesis, so you win both ways.
+
+He adds two facilitation habits. Assemble the most diverse group you can (specialists from different parts of the stack, support, solutions engineers), because more perspectives produce more hypotheses. And keep pulling the conversation back to the doc, filing what people say under the right heading.
+
+## Who should watch
+
+Every on-call engineer and incident commander, especially on teams where incidents become a single hero's monologue. It's a short, story-driven talk, and you can use the method on your next page without asking anyone's permission.
+
+## Related Conf42 talks
+
+- Ivan Merrill on [incident response: let's do science instead](https://www.conf42.com/Platform_Engineering_2023_Ivan_Merrill_incident_response_lets_do_science_instead).
+- Maria Ashby on [a troubleshooting workflow, demystified](https://www.conf42.com/Kube_Native_2023_Maria_Ashby_troubleshooting_demystified_workflow).
+- Pravar Agrawal on [debugging cluster issues as an on-call SRE](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pravar_Agrawal_debugging_cluster_oncall), from the same event.
+
+[Watch Dan Slimmon's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Dan_Slimmon_clinical_troubleshooting_diagnose)
+
+[Watch the talk on YouTube](https://youtu.be/ImMph1w04ho).
+",talk,sre2024,talk:sre2024/Dan Slimmon,,Conf42,,queued,"incident-response, troubleshooting, sre, on-call, debugging"
+,Agile sprints ship code; reliability lives in everything else,"David Argent (Salesforce) at Conf42 SRE 2024 on how Agile's short-term focus hurts online services, and what to lock in before the first sprint",2024-04-21,sre2024/agile-sprints-forget-the-non-code,,"A control plane that can replace one host at a time is fine, right up until it runs a 10,000-node database. David Argent, Senior SRE at Salesforce and a veteran of Microsoft and Amazon, opened his Conf42 SRE 2024 talk with that war story, then spent half an hour on why Agile's short planning cycles quietly produce exactly this kind of design, and how to keep the benefits without becoming what he calls an Agile victim.
+
+His core point: Agile is a set of principles, not a methodology, and favouring working software over documentation or change over plans does not mean ignoring architecture, failure modes or everything that isn't code.
+
+## How do Agile teams set themselves up to fail?
+
+Argent builds it as a failure curriculum. Failure 101 is having no definition of success: if you can't measure what makes people use the product, or what would make you stop building it, you can't tell whether you delivered. Failure 201 is not planning for success. Features rarely live in a vacuum, and behind them sits a long list of invisible requirements: data integrity, security, a zero-downtime deployment profile, performance and scalability floors, monitoring, incident management, disaster recovery.
+
+Failure 301 is not planning for Murphy. ""There is no such thing as a safe change,"" Argent said at Conf42 SRE 2024, and he has the scars to show it: a change aimed at non-production, carrying a default config value that filtered through to production and took it down. Partners, networks, hardware, power and cooling will all fail you at some point. Planning for failure is not enough either; he wants teams to know how to recover from a complete outage, because coming up cold with empty caches while live traffic keeps arriving is a different beast from a partial outage. He cites Prime Day 2018, carrying the pager for a database service, as the place he learned that.
+
+## What should you decide before writing code?
+
+The cheapest place to change something is before the first line exists. His design checklist has three parts.
+
+**Anticipate failure.** Define what is acceptable and stop there: ""Each nine is somewhere in the ballpark of an order of magnitude more expensive than the one that came before it."" If you need four nines, don't build five; if the target is 200 ms, don't engineer for 25. Design for fast recovery, measure everything, automate responses (cranky, sleep-deprived SREs help nobody), plan for being 100% hard down, and build degraded modes, because serving some traffic beats serving none. Layer your security so attackers face more than one hurdle.
+
+**Anticipate success.** He argues ""the most dangerous thing for an online service is being embarrassingly successful."" Leave the hooks to scale by a couple of orders of magnitude, prefer architectures that scale components independently, avoid processes that scale linearly with people (manual customer onboarding is his example), and know which traffic is high-value enough to protect when resources are tight.
+
+**Anticipate change.** Put APIs and abstractions between business logic and its callers, assume zero-downtime upgrades must be possible, and prefer loose coupling wherever you can afford the asynchrony.
+
+## One-way doors versus two-way doors
+
+The tactics section pairs two rules that look contradictory. Delay non-critical decisions as long as possible, so you learn more about the problem before committing. But get the critical architecture right the first time: scalability, availability, performance, security and data integrity are expensive or impossible to retrofit, and security is the poster child for being bolted on at the last second. If your architecture can't support your customer scenarios, he says, you don't have an architecture yet.
+
+The bridge is the two-way door: make decisions reversible wherever possible, so taking one step back to go three forward is cheap. He also wants SREs and product owners in design reviews, not only coders and architects, since SREs know how services actually run in production.
+
+## Is code really the only deliverable?
+
+No, and this is the section most teams should steal. Service code is the easy part: a dedicated team writes it and it gets engineers promoted. Monitoring, alerting, runbooks, customer documentation, security testing, deployment tools, SLAs, OLAs and SLOs, admin tools and reporting are deliverables too. Put them in the backlog, since the backlog is king in most Agile shops. Consider a release sprint where non-blocking code waits while the team fixes bugs, finishes non-code collateral, runs game days that break non-production to test runbooks and incident response, rehearses deployments and trains operations staff. And reward the engineers who do that work.
+
+## Who should watch
+
+Tech leads, TPMs and SREs who sit in sprint planning and keep losing the argument for reliability work. It is a principles talk with good war stories, not a tooling walkthrough.
+
+## Related Conf42 talks
+
+- Tanveer Gill on [graceful degradation when everything goes wrong](https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong).
+- Giulio Vian on [technical debt as the right metaphor](https://www.conf42.com/DevSecOps_2022_Giulio_Vian_technical_debt_right_metaphor_continuous_update).
+- Matthew Schillerstrom on [feature flags for reliability and agile response](https://www.conf42.com/Chaos_Engineering_2024_Matthew_Schillerstrom_feature_flags_reliability_agile_response).
+
+[Watch David Argent's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_David_Argent_avoid_agile_victim)
+
+[Watch the talk on YouTube](https://youtu.be/_eWEfXOs51M).
+",talk,sre2024,talk:sre2024/David Argent,,Conf42,,queued,"sre, agile, architecture, reliability, planning"
+,"Your startup doesn't need an SRE team yet, it needs SRE habits","Evgenii Korneev (MyGig) at Conf42 SRE 2024 on running SRE without an SRE team, and the five questions that tell you when to hire one",2024-04-20,sre2024/sre-starts-before-sre-team,,"Most small teams think of SRE as a headcount question. Evgenii Korneev, CTO at MyGig, spent his Conf42 SRE 2024 talk arguing the opposite: SRE is a set of habits you can adopt on day one, a weekly developer on-call rotation carries you a long way, and a dedicated SRE hire only makes sense once a short checklist of pressures says so.
+
+""SRE is not about creating a team of on call engineers who will save your service day and night from crashes,"" Korneev said at Conf42 SRE 2024. He is clear the talk is aimed at engineering leads rather than individual engineers, and it is short: a CTO's operating manual, not a deep technical dive.
+
+## What should a small team do first?
+
+Define what down means for your product before you buy any tooling. Korneev's starting list is SLIs first, then SLAs and SLOs, then an error budget. His example SLIs are refreshingly specific: successful user auths at 95% a month, successful payments at 99%, articles posted at 99.5%, front-end availability at 99.8%. The matching availability criteria read like alert rules: more than 50 users an hour failing to authenticate, more than 10 payments an hour failing for internal reasons, the web app unreachable from more than one location for over 10 minutes.
+
+After that come the unglamorous fundamentals:
+
+- Monitoring and alerts wired to those targets, with the team told which metrics matter to the business.
+- Automated builds and deploys from the start. Fewer manual steps, fewer mistakes.
+- Tests, even when launch pressure says skip them, because they speed up later development as well as stabilising it.
+- Restricted production access. Ideally no developer touches the production database; only operations does.
+- Internal tools for running the service: dashboards, admin panels, feature toggles. These are what make the previous point survivable.
+
+His claim is that these principles are enough until the product turns into a sprawling multi-component system.
+
+## How do you run on-call without burning people out?
+
+As the system grows, time to find and fix failures grows with it, and the obvious move is putting developers on call. Korneev describes the dilemma neatly. If the on-call person only answers availability alerts, quiet weeks breed complacency (his example is someone deciding they can pop to the pool at lunch, which is of course exactly when it breaks). Load them up with every production bug instead and each rotation becomes a grind that ends in burnout.
+
+He picks the lighter option and hedges it with a roster. If this week's on-call engineer is unavailable, the next name on the list responds, then the next, and anyone who gets pulled in out of turn moves to the end of the list as a small reward. His team tried daily rotations and went back to weekly: handing over incident analysis mid-failure to the next person was too awkward. The rule that keeps a week bearable is simple: the on-call person responds only to the alerts you defined as significant, and everything else goes through the normal workflow.
+
+## When is it time to hire an SRE?
+
+There is no strict threshold, but he gives five questions:
+
+1. How strict are your availability requirements? A fintech holding user funds sits higher than most.
+2. How heavy is the load, and how popular is the service? Outages at scale cost more reputation.
+3. How well is the development team performing, in productivity and quality? On-call eating everyone's time is a signal.
+4. How complex is the system? Past a point, developers know too little of it to handle incidents alone.
+5. What does the budget allow? Can you afford someone whose peak activity is during major outages?
+
+If at least three point to yes, you probably need SRE. Even then, he suggests checking whether better test coverage or refactoring away complexity would fix the problem first. And watch the budget: the first SRE is usually a developer from the same team, whose seat still needs filling.
+
+## Why communication counts as reliability work
+
+The last third is about people. Work talk belongs in shared team chats rather than private messages, so everyone sees the issues, the decisions and their impact. All-team meetups cover how big tasks were solved; team-lead meetings cover cross-team design. Document at least the hardest parts of the system, put it into onboarding, and check new hires actually understood it after probation. In his summary, he puts it plainly: ""there is no room for secrets in an engineering team.""
+
+He also argues for spending scarce budget on one engineer well above the market's average senior rather than two ordinary hires. Someone with ten-plus years has already met most of the failures your incident plan is guessing at.
+
+## Who should watch
+
+Founders, CTOs and engineering managers at small and mid-sized teams deciding whether to start an on-call rotation or open an SRE role. Experienced SREs will find little new, but may enjoy a crisp checklist to hand to their leadership.
+
+## Related Conf42 talks
+
+- Pravar Agrawal on [debugging cluster issues as an on-call SRE](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Pravar_Agrawal_debugging_cluster_oncall), from the same event.
+- Einat Mahat on [on-call heroes and effective practices](https://www.conf42.com/Incident_Management_2023_Einat_Mahat_oncall_heroes_effective_practices).
+- Sylvain Kalache on [burnout and on-call for SREs](https://www.conf42.com/Observability_2026_Sylvain_Kalache_burnout_oncall_sre).
+
+[Watch Evgenii Korneev's talk](https://www.conf42.com/Site_Reliability_Engineering_SRE_2024_Evgenii_Korneev_resilient_teams_blueprint)
+
+[Watch the talk on YouTube](https://youtu.be/Zjht3YcdF08).
+",talk,sre2024,talk:sre2024/Evgenii Korneev,,Conf42,,queued,"sre, on-call, engineering-management, slo, team-structure"
 ,Large Language Models are back,All talks available now,2024-04-11,2024-04-11-LLMs-are-back,./assets/splash/LLM2024_Event_Splash.png,"#All talks available now
 
 There is so much to learn! Let me give you a quick tour.
