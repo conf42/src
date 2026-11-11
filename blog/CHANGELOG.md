@@ -3,6 +3,11 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-11 - Every post under /blog/
+- Posts are served at conf42.com/blog/<ShortURL> (event posts conf42.com/blog/<event>/<slug>, plugs/webinars
+  conf42.com/blog/<Date>-<slug>), so a post is never taken for a talk page. ShortURL in blog.csv is unchanged.
+- The old URLs (<event>/<slug>, root <Date>-<slug>, replaced posts) are redirect stubs (noindex + canonical).
+
 ## 2026-11-11 - Backfill 2020+ written, rolling out
 - Every conference since 2020 has its roundup (61 new) and every talk with a transcript its talk or sponsored post:
   ~2,800 posts written by parallel writers over two days, all `queued`. blog-rollout.yml releases 36 every 4 h

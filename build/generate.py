@@ -466,32 +466,39 @@ for post in posts:
 
     if post.get("ExternalURL"):
         continue
-    print("Generating blog post subpage for", post.get("ShortURL"))
+    print("Generating blog post subpage for", post.get("path"))
+    # /blog/<ShortURL> (Marek 2026-11-11); the URLs posts had before stay alive as redirect stubs:
+    # <ShortURL> itself (<event>/<slug> or root <Date>-<slug>) and, for event posts, the root <Date>-<slug>
+    os.makedirs(os.path.dirname(BASE_FOLDER + "/" + post["path"]), exist_ok=True)
+    _olds = [post.get("ShortURL")]
     if "/" in post.get("ShortURL"):
-        # <event>/<slug> (Marek 2026-11-09); the old root URL <Date>-<slug> stays alive as a redirect stub
-        os.makedirs(os.path.dirname(BASE_FOLDER + "/" + post.get("ShortURL")), exist_ok=True)
-        _old = BASE_FOLDER + "/" + str(post.get("Date"))[:10] + "-" + post.get("ShortURL").split("/", 1)[1] + ".html"
-        with open(_old, "w") as f:
+        _olds.append(str(post.get("Date"))[:10] + "-" + post.get("ShortURL").split("/", 1)[1])
+    for _old in _olds:
+        os.makedirs(os.path.dirname(BASE_FOLDER + "/" + _old), exist_ok=True)
+        with open(BASE_FOLDER + "/" + _old + ".html", "w") as f:
             f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
                     '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
                     % {"to": post["canonical"]})
-    with open(BASE_FOLDER + "/" + post.get("ShortURL") + ".html", "w") as f:
+    with open(BASE_FOLDER + "/" + post["path"] + ".html", "w") as f:
         template = env.get_template("blog_post.html")
         # "More from <event>" under the post: the 3 newest other posts of its event (else the 3 newest posts)
         _ev = (post.get("linked") or {}).get("event")
         _related = [p for p in (_posts_by_event.get(id(_ev), []) if _ev else posts) if p is not post and not p.get("ExternalURL")][:3]
         f.write(template.render(post=post, related=_related, canonical=post["canonical"], markdown_alt=post["canonical"] + ".md", **context))
-        register_url(post.get("ShortURL").replace(".html",""), lastmod=post["updated_iso"])
+        register_url(post["path"], lastmod=post["updated_iso"])
 
 # replaced posts (Status replaced:<ShortURL>, Marek 2026-11-09): the old URL redirects to the post that superseded it
 _live = {p.get("ShortURL"): p for p in posts}
 for _slug, _why in blog_dropped:
     _to = _why[len("status replaced:"):] if _why.startswith("status replaced:") else None
-    if _to in _live and _slug and "/" not in _slug:
-        with open(BASE_FOLDER + "/" + _slug + ".html", "w") as f:
-            f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
-                    '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
-                    % {"to": _live[_to]["canonical"]})
+    if _to in _live and _slug:
+        # both where the replaced post lived and where it would live now (/blog/<ShortURL>)
+        for _old in (_slug, "blog/" + _slug):
+            os.makedirs(os.path.dirname(BASE_FOLDER + "/" + _old), exist_ok=True)
+            with open(BASE_FOLDER + "/" + _old + ".html", "w") as f:
+                f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
+                        '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
+                        % {"to": _live[_to]["canonical"]})
 
 # TOPIC HUB PAGES
 print(DIVIDER)

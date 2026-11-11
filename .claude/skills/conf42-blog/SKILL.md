@@ -89,10 +89,13 @@ splash, webinar -> its splash, plug -> the sister event's own splash = the og:im
 4. Write each post as `blog/drafts/<ShortURL>.md` (front matter: Title, Description <=160 chars, Date, ShortURL,
    Type, Event, Ref, Sponsor (sponsored), Tags; then the Markdown body, starting with prose - no `#` heading, the
    page prints the Title). **ShortURL:** posts of an event (talk, sponsored, roundup) live under it -
-   `<event short_url>/lowercase-words` (conf42.com/prompt2026/agent-prompt-is-one-layer), Marek 2026-11-09: the
-   conference is always in the URL, so similar talks at two events (Remix re-airs, a sponsor's repeat talk) never
-   look like duplicates. The build writes `docs/<event>/<slug>.html` with `<base href="/">` and a redirect stub at the
-   old root URL `<Date>-<slug>`. Plugs and webinars (no Event) stay `YYYY-MM-DD-lowercase-words` at the root.
+   `<event short_url>/lowercase-words`, Marek 2026-11-09: the conference is always in the URL, so similar talks at
+   two events (Remix re-airs, a sponsor's repeat talk) never look like duplicates. Plugs and webinars (no Event) are
+   `YYYY-MM-DD-lowercase-words`. **Every post is served at conf42.com/blog/<ShortURL>** (Marek 2026-11-11: never
+   confused with a talk page), e.g. conf42.com/blog/prompt2026/agent-prompt-is-one-layer; ShortURL itself stays
+   without `blog/` (it is the key for Refs, `replaced:` and the jobs). The build writes `docs/blog/<ShortURL>.html`
+   with `<base href="/">` and redirect stubs at the older URLs (`<ShortURL>`, and `<Date>-<slug>` for event posts).
+   Link posts as `https://www.conf42.com/blog/<ShortURL>`, never without `blog/`.
 5. Plugs for paid events: CONF42 (42% off) is a **calendar-level** Luma coupon (Marek 2026-11-09), valid on every
    event of the calendar - `list_coupons` with the event's `calendar_id`, not just `event_id`. Only if it is missing
    there: `create_coupon` CONF42, 42% off. Free events: skip.
