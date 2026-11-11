@@ -1,4 +1,4 @@
-# Pushing the boundaries of management and security with Azure Arc
+# Azure Virtual Desktop with Terraform: Infrastructure as Code for a Secure Experience
 
 A talk at [Conf42 DevSecOps 2024](https://www.conf42.com/devsecops2024) by [Carlos Solis Salazar](https://www.conf42.com/speaker_Carlos_Solis_Salazar) (Senior Azure Solutions Architect @ OZ). Page: https://www.conf42.com/DevSecOps_2024_Carlos_Solis_Salazar_azure_management_security
 
