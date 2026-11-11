@@ -3,6 +3,12 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-11 - First webinar post
+- Reliaburger 0.2.0 webinar (2026-10-28) published: blog/2026-10-28-reliaburger-0-2-0-webinar-break-a-cluster, written
+  generically from the Reliaburger repo at v0.2.0 + the WEBINARS.csv invite (it predates Snoop, so no transcript).
+- Rule: later webinars are written from their Snoop trace (Gemini notes + transcript); Snoop lists upcoming Luma
+  webinars.
+
 ## 2026-11-11 - Missing transcripts from Descript
 - New rule: a talk with no transcript is looked up in Descript (`blog_plan descript`, also in every rollout run once
   the DESCRIPT_API_TOKEN secret is set); not in Descript = no post. First run: 5 transcripts (sre2026 David McNerney,
