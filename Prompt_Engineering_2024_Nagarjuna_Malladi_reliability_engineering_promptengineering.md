@@ -1,4 +1,4 @@
-# Harnessing AI-Driven Prompts for Enhanced System Reliability: A Site Reliability Engineering (SRE) Perspective
+# Optimizing Reliability Across Domains: SRE Practices in Various Industries
 
 A talk at [Conf42 Prompt Engineering 2024](https://www.conf42.com/prompt2024) by [Nagarjuna Malladi](https://www.conf42.com/speaker_Nagarjuna_Malladi) (Principal Software Engineer SRE @ Oracle). Page: https://www.conf42.com/Prompt_Engineering_2024_Nagarjuna_Malladi_reliability_engineering_promptengineering
 
