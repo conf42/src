@@ -91994,6 +91994,274 @@ Developers and DBAs who want the vocabulary of ML before their first project, an
 
 [Watch the talk on YouTube](https://youtu.be/AbEoMu7piQ4).
 ",talk,devsecops2023,talk:devsecops2023/Rich Niemiec,,Conf42,,queued,"machine-learning, ai, oracle, databases, beginners"
+,"Building Battleship with React, Socket.IO and an anti-cheat idea","Andrey Makarov (Islamic Coin) at Conf42 JavaScript 2023 on building a Battleship game with React, Node.js and Socket.IO, AI opponent included",2023-10-25,js2023/battleship-with-react-and-socket-io,,"Battleship is a distributed systems problem in disguise: two players, hidden state, and a referee who must not leak it. At Conf42 JavaScript 2023, Andrey Makarov, Lead Software Engineer at Islamic Coin, builds the game in React with a Node.js and Socket.IO backend, shared game logic in between and an AI opponent on the server. It is a weekend-project talk with a clear goal. Andrey Makarov said at Conf42 JavaScript 2023: ""purpose of this video is to inspire you to create your own games.""
+
+## The rules, as code
+
+Each player has a 10 by 10 board. Ships go horizontally or vertically and must not touch, and the fleet is the variant he settled on: one carrier of five cells, two battleships of four, three cruisers of three and four destroyers of two. Hit a ship and you shoot again; miss and the turn passes.
+
+The interesting design choice is the flow. A player's shot goes to the server, the server asks the opponent what is at that position, the opponent answers with the result and its new board state, and the server caches it and returns the result to the shooter. Neither client ever holds the other's board. Cells are unknown, missed, killed or filled, and an opponent's filled cells are reported back as unknown.
+
+## Shared logic, three folders
+
+The repo has client, server and a shared folder used by both sides (he admits a proper package would be cleaner, but this is a demo). The shared code does the heavy lifting:
+
+- **Board generation.** For each ship, find every legal position, pick one at random, place it and mark its surroundings as missed so the next ship can't touch it. Once every ship is placed, clear those markers.
+- **Firing.** A miss on an unknown cell marks it missed. A hit checks the neighbours in every direction; if the whole ship is down, the cells around it become missed automatically.
+- **Sunken ships.** Scan the board for killed cells, follow each ship to its ends and confirm it is surrounded by misses, then sort from biggest to smallest.
+- **Game over.** Check whether any filled cells remain.
+
+## An AI that finishes what it starts
+
+The server-side AI generates its own random board on a new game. On its turn it looks for wrecked ships, ones hit but not sunk, and fires next to them; otherwise it picks a random unknown cell. A game class caches both boards and switches the active player, and Socket.IO handlers cover new game against the AI, fire, and the catch event for answering an opponent's shot. He notes the class could later get observers so third parties can watch a match.
+
+On the React side there are four scenes: setup (generate a board until you like it, then press ready), the game itself (your board and the opponent's side by side), and win and lose screens. In the live run the colours are off, the AI sinks one of his ships, and he wins anyway.
+
+## What is missing, by his own account
+
+Makarov is clear that many aspects aren't covered, real player-against-player multiplayer first among them. His two improvement ideas are the best part of the talk:
+
+- **Stop cheating with a hash.** Each client hashes its board at generation (he suggests MD5 is enough here) and sends it to the backend, which stores both hashes; at the end of the game, a hash that doesn't match the final board exposes a player who moved ships mid-game.
+- **A statistical AI.** After enough games, compute where players most often place ships and start shooting there.
+
+## Who should watch
+
+JavaScript developers who want a small, complete Socket.IO project to learn from, and anyone who agrees with his point that react can be used not only for forms. Experienced game developers will find nothing new; it's a friendly build-along.
+
+## Related Conf42 talks
+
+- Courtney Yatteau on [React and the art of gamification](https://www.conf42.com/JavaScript_2024_Courtney_Yatteau_15_react_gamification_frontend) at Conf42 JavaScript 2024.
+- Mohammed Zubair Ahmed on [real-time chat performance with 100k active users](https://www.conf42.com/JavaScript_2024_Mohammed_Zubair_Ahmed_41_realtimechat_performance_100kusers).
+- Victor Lebrun on [canvas pixel transformation](https://www.conf42.com/JavaScript_2020_Victor_Lebrun_canvas_pixel_transformation) at Conf42 JavaScript 2020.
+
+[Watch Andrey Makarov's talk](https://www.conf42.com/JavaScript_2023_Andrey_Makarov_battleship_game)
+
+[Watch the talk on YouTube](https://youtu.be/g6rL7r69ok8).
+",talk,js2023,talk:js2023/Andrey Makarov,,Conf42,,queued,"react, socket-io, nodejs, game-development, javascript"
+,"React Server Components send objects, not HTML, and here is the proof",Tejas Kumar at Conf42 JavaScript 2023 on building React Server Components from scratch to show how they work,2023-10-24,js2023/react-server-components-from-scratch,,"The most common thing people get wrong about React Server Components is what goes over the wire. At Conf42 JavaScript 2023, Tejas Kumar, a developer relations consultant, builds server components from scratch on Express and Vite, following Dan Abramov's RSC-from-scratch guide, to show that the server sends serialised React elements, then explains how to get a codebase ready for them.
+
+Tejas Kumar said at Conf42 JavaScript 2023: ""A lot of people say they send HTML to the client. They don't do that."" The rest of the talk earns that line.
+
+## React has always been an architecture
+
+Kumar starts with history. React ten years ago meant JSX, view as a function of state, one-way flux data flow and a pile of hand-written webpack and Babel config. Today it is a Vite one-liner and the tooling is invisible. Server components, he argues, put us back in the some-assembly-required era: an architecture built on next-generation tooling that was still experimental and not production ready when he gave the talk, which brings the server in at every level of the tree. A single card or blog post can be a server component while its parent stays a client one, so bulky dependencies like a date formatter or a Markdown parser never ship to the browser.
+
+## Building it, one error at a time
+
+The demo app is a dog breed site with a rotating dog, a name field and full page reloads that wipe both. The build goes in steps, and each failure teaches something:
+
+1. **Add a server.** Express, a dynamic import per path, renderToString of the layout. Now there is HTML, but with holes where the data should be.
+2. **Make components async.** Delete the useState and useEffect plumbing and just await fetch inside the component. React crashes: objects are not valid as a React child, found a Promise.
+3. **Turn JSX into a client object.** A recursive function handles null, strings, numbers, booleans and arrays; for objects it checks $$typeof against Symbol.for('react.element'). If the element's type is a string like div, it processes the props; if it is a function, it calls the component, awaits it and recurses into whatever it returned. The output is one big plain object tree. Render that to HTML on the server and the pages finally have data.
+4. **Hydrate on the client.** Inline the tree into the page as a script so there is no extra network waterfall, then hydrate. It breaks worse, because symbols don't survive JSON.stringify. A replacer swaps the element symbol for a placeholder string on the server, and a reviver passed to JSON.parse swaps it back on the client.
+5. **Client-side navigation.** Intercept link clicks, push history state, fetch the next page with a jsx=true query parameter that returns just the serialised tree, and call root.render with it. The typed name survives, the background colour fades instead of flashing, and the dog never stops spinning.
+
+That is the whole mechanism: a JSX tree becomes an object, gets serialised, crosses the network and React picks it up on the other side. Kumar also widens the meaning of client: anything that consumes the server component output, including React on the server producing HTML.
+
+## Should everything be a server component?
+
+No. ""Client components have their place, server components have their place,"" he says, and the job is to weave them together. His three tips for getting ready:
+
+- **Fetch data early**, as high up as possible and before any state is set, ideally at the server level.
+- **Move interaction boundaries down.** A card with a title, body and button is usually one file, but the onClick handler can't be serialised, so the button must be its own component. Keep interactive pieces in granular modules of their own.
+- **Replace context with server-side cache.** React context is shared across clients on the server, so per-user data like preferences belongs in a cache namespaced by user.
+
+He ends on the community itself, asking for kinder discourse after watching people like Dan Abramov burn out.
+
+## Who should watch
+
+React developers who use Next.js App Router and want to know what it is doing under the hood, and anyone who has nodded along to an RSC explanation without quite following it. It's a long one, mostly live coding; the from-scratch build is the payoff.
+
+## Related Conf42 talks
+
+- Assaf Krintza on [why React is killing your performance](https://www.conf42.com/JavaScript_2021_Assaf_Krintza_React_Performance) at Conf42 JavaScript 2021.
+- Luciano Mammino on [a 0-cost invite-only website with Next.js and Airtable](https://www.conf42.com/JavaScript_2022_Luciano_Mammino_0cost_website_nextjs_airtable).
+- Iniubong Obonguko on [server-side JavaScript with NitroJS](https://www.conf42.com/JavaScript_2024_Iniubong_Obonguko_27_serversidejavascript_nitrojs_supercharging) at Conf42 JavaScript 2024.
+
+[Watch Tejas Kumar's talk](https://www.conf42.com/JavaScript_2023_Tejas_Kumar_react_server_components)
+
+[Watch the talk on YouTube](https://youtu.be/0fHQl40fdcg).
+",talk,js2023,talk:js2023/Tejas Kumar,,Conf42,,queued,"react, react-server-components, ssr, javascript, nodejs"
+,A Node.js service that asks OpenAI for your next workout as JSON,Anton Kalik (Amenitiz) at Conf42 JavaScript 2023 on a Node.js and Express service that turns user indicators into OpenAI workout suggestions,2023-10-23,js2023/openai-workout-suggestions-with-node-express,,"The interesting part of an LLM feature is rarely the API call; it is the contract you force the model to keep. At Conf42 JavaScript 2023, Anton Kalik, Senior Software Engineer at Amenitiz, builds a sports activity service in Node.js and Express that sends a user's indicators and last workout to OpenAI and gets back a structured JSON plan the client app can render. The prompt does most of the work, and the talk shows exactly how it is set up.
+
+## What does the service do?
+
+The loop is simple. A user has indicators (age, weight, height, lifestyle) and a history of activities. When the client asks for a suggestion, the service reads the indicators and the last activity, builds a prompt, calls OpenAI and returns a new activity with a plan. Accomplish it, ask again, and the next suggestion takes the last one into account. A timer on the client decides the cadence: daily, weekly or monthly.
+
+To keep the model from inventing sports, Kalik gives it a fixed list of activity types and asks it to choose one that fits the indicators and the last session.
+
+## The stack
+
+Nothing exotic, which is the point:
+
+- **Express** for routing and controllers, scaffolded with a Node.js app generator.
+- **Postgres** with migrations for three tables: users (name, username, email), indicators (one row per user) and activities (type, duration, user, timestamp).
+- A small base model class that the user, indicator and activity models extend, so controllers reuse find-by-user-id and update-by-user-id methods.
+- **Redis** for sessions and **JWT** middleware, so Postman calls carry a bearer token after sign-up.
+- The official **openai** npm package, version 4 at the time, configured with an API key from an environment file.
+
+There are three routes that matter: auth, GET suggest and an endpoint to update indicators when your weight or lifestyle changes.
+
+## The prompt is the API
+
+The system prompt tells the model it must return JSON and spells out every field: activity type (from the sorted list of allowed activities), duration in minutes, a description, how much water to drink in millilitres, an explanation of why this activity, and a plan array covering how to start, continue and finish. The user message carries the indicators and, if one exists, the last activity.
+
+One of his sample responses suggests 45 minutes of cycling, with an explanation tied to the previous session. Another proposes skiing after a CrossFit day, which prompts the obvious question he asks himself: what if it is summer where the user lives? His answer is that the suggestions are only as good as the prompt, so add region or weather to the context if you need it.
+
+He also explains the request knobs in plain terms. Messages carry roles: system for instructions about how to behave, user for the person, assistant for the model's own replies. Anton Kalik said at Conf42 JavaScript 2023: ""Messages are like the back and forth text between you and the AI."" Temperature controls how surprising replies are, and he runs at 0.9 for variety; lower values give more predictable output. The model is GPT-3.5 Turbo, which he picks as the cheaper and stable option. Max tokens caps how long the response can be.
+
+## The honest shortcut
+
+The demo inserts the suggested activity into the history as soon as it is generated, as if the user had done it. Kalik flags that this is a presentation shortcut: a real app should record only accomplished activities, ideally confirmed from something like a watch, so the next suggestion is based on what actually happened.
+
+## Who should watch
+
+JavaScript developers wiring an LLM into an ordinary CRUD backend for the first time, who want a concrete example of structured output prompts, roles and temperature in a working Express app. If you already validate model output against a schema and retry on failure, you will be ahead of the talk; it doesn't cover validating the JSON that comes back. The project is on his GitHub to run yourself.
+
+## Related Conf42 talks
+
+- Danielle Maxwell on [AI with JavaScript in the browser](https://www.conf42.com/JavaScript_2024_Danielle_Maxwell_19_ai_browser) at Conf42 JavaScript 2024.
+- Alexandre Evangelista de Souza on [LangChain with Go](https://www.conf42.com/Golang_2024_Alexandre_Evangelista_de_Souza_langchain) at Conf42 Golang 2024.
+- Darya Petrashka on [building a Hugging Face agent](https://www.conf42.com/Python_2024_Darya_Petrashka_unlock_power_llm_build_huggingface_agent) at Conf42 Python 2024.
+
+[Watch Anton Kalik's talk](https://www.conf42.com/JavaScript_2023_Anton_Kalik_ai_nodejs_custom_sports_activity)
+
+[Watch the talk on YouTube](https://youtu.be/mRSTh1Oaisc).
+",talk,js2023,talk:js2023/Anton Kalik,,Conf42,,queued,"openai, nodejs, express, postgres, prompt-engineering"
+,Take authorization out of your Node.js code and into a policy engine,Gabriel Liechtman Manor (Permit.io) at Conf42 JavaScript 2023 on moving Node.js authorization out of middleware into policy as code with Cedar and OPAL,2023-10-22,js2023/nodejs-authorization-policy-as-code-opal,,"Your passport proves who you are once per trip; your boarding pass gets checked at every door. At Conf42 JavaScript 2023, Gabriel Liechtman Manor, Director of Growth and DevRel at Permit.io, uses that pair to separate authentication from authorization, then argues that authorization belongs in a dedicated, declarative service rather than in if statements and Express middleware. The demo runs AWS's Cedar policy language behind OPAL, the open-source policy administration layer his team maintains.
+
+## Why is authorization still hand-rolled?
+
+Authentication got easy. OAuth decoupled the auth server from applications, JWTs made tokens verifiable without a round trip, and a SaaS provider gives you MFA, social login, session management and the rest in a few lines of code. Authorization didn't get the same treatment, so most teams still write it themselves.
+
+Manor walks through the usual evolution. First, `if (user.role === 'admin')` inside the handler. Then a rolesRequired middleware, cleaner but only as granular as a role. Then a permissionsRequired middleware next to it. Then the requirement that doesn't fit, such as checking a user's paid tier from another service halfway through the business logic. Add a staging environment where admin should behave like production's superadmin, a Python data app that needs the same rules, and an auditor asking why a decision was made, and the code gets dirtier with every sprint.
+
+His wish list for an authorization service: declarative, generic across permission models, unified in one place, agnostic of language, decoupled from application code, and easy to audit.
+
+## Five steps: model, author, analyze, enforce, audit
+
+**Model.** Every decision has three parts: a principal, an action and a resource. Manor's version: ""Is a monkey allowed to eat a banana?"" The application only enforces; a separate service decides. Enforcement shows up at three levels: feature toggles in the UI or gateway, true-or-false checks in the application logic, and data filtering at the database.
+
+Then pick a model. ACL he calls end of life: fine for firewalls, hard to scale for apps. RBAC is easy to define, use and audit, but it stops at the resource type, so a rule like only the owner may edit this document is out of reach. ABAC decides on attributes of users and resources and is the most granular, though configuration can get hard. ReBAC derives permissions from relationships, like Google Drive's account, folder, document chain, and suits consumer-scale apps.
+
+**Author.** Policy languages, which he describes as more configuration than programming: Open Policy Agent's Rego, AWS's open-source Cedar, and OpenFGA for Zanzibar-style ReBAC. A Cedar rule reads like the model itself, a permit with principal, action and resource, plus a when clause such as the principal being one of the resource's editors.
+
+**Analyze, enforce, audit.** A Cedar agent runs as a sidecar and answers is_authorized calls over HTTP. On the frontend, he points to CASL for feature toggling.
+
+## The demo that changes a rule without a deploy
+
+OPAL ties it together with one Docker Compose file: an OPAL server watching a Git repository of policies plus an external data source (mocked with Nginx, standing in for something like a CRM), and an OPAL client wrapping the Cedar agent next to the app. The Node.js blog API has one middleware that always does the same thing: send principal, action and resource to the agent.
+
+Admins can do anything, plain users only GET, writers can POST and PUT. Then he tightens the rule so writers can publish only with more than 1,000 karma, commits it, and OPAL pushes the new policy to the agent. The 800-karma writer gets access denied; the senior writer creates the article. Gabriel Liechtman Manor said at Conf42 JavaScript 2023: ""I haven't changed any kind of user data or any kind of application code"". A Python app consumes the same service to make the point about language agnosticism.
+
+Permit.io, the commercial layer on top of OPAL with a policy UI, gets a short mention; he says plainly that OPAL is enough to start.
+
+## Who should watch
+
+Backend developers whose Express routes are sprouting permission middleware, and anyone about to add a second service that needs the same rules. The talk is strongest on modelling; the demo shows the policy-as-code loop working in minutes.
+
+## Related Conf42 talks
+
+- Graziano Casto on [a policy-as-code approach to RBAC authorization](https://www.conf42.com/DevSecOps_2024_Graziano_Casto_policy_rbac_authorization) at Conf42 DevSecOps 2024.
+- Federico Maggi on [distributed application-level RBAC with OPA](https://www.conf42.com/Cloud_Native_2022_Federico_Maggi_distributed_application_rbac_opa) at Conf42 Cloud Native 2022.
+- Mohammad Shahbaz Alam on [securing Go APIs with decentralised identity tokens](https://www.conf42.com/Golang_2021_Mohammad_Shahbaz_Alam_API_authorization).
+
+[Watch Gabriel Liechtman Manor's talk](https://www.conf42.com/JavaScript_2023_Gabriel_Liechtman_Manor_building_auth_nodejs)
+
+[Watch the talk on YouTube](https://youtu.be/L1XZgoKOImY).
+",talk,js2023,talk:js2023/Gabriel Liechtman Manor,,Conf42,,queued,"authorization, nodejs, policy-as-code, cedar, opal"
+,"The Node.js event loop, told as a fairy tale with dragons","Lorenzo Pieri (Birdie) at Conf42 JavaScript 2023 on the Node.js event loop as a fairy tale, and why four phases are all you need to reason about",2023-10-21,js2023/nodejs-event-loop-as-a-fairy-tale,,"Somewhere in a server far, far away, the Blocking Dragons roam. At Conf42 JavaScript 2023, Lorenzo Pieri, a full-stack engineer at Birdie (his own title is full stack wizard), explains the Node.js event loop as a fairy tale, then drops the metaphor and boils the loop down to the handful of phases you actually need to reason about. It is billed as an introductory talk, and it is a good first one.
+
+## Once upon a time, threads
+
+The story starts with the Knights of the Thread, who came from kingdoms such as Javadom and Pythonville to fight the dragons that block your code. Each kingdom had its own magic: POSIX threads in one kingdom, the NIO order in Javadom, a scroll called asyncio in Pythonville. Then word spread of the Lands of Promise (the pun is intended), where nothing blocks, because everything works out eventually. Pieri flags *eventually* as the important word.
+
+The Lands of Promise have one rule above all, which Lorenzo Pieri said at Conf42 JavaScript 2023 as ""you shall not block the thread"". The main thread is a single-thread castle at the centre of the land, home to Sir Call Stack, valiant knight of asynchrony who sorts every task into its queue, and the fairy who runs the event loop.
+
+## Where does the heavy work go?
+
+The loop is the heart of each village, the market square where tasks meet and do their synchronous business. A task carrying something heavy knows it can't just stand in the square and block it. It leaves through the Desert of Asynchrony to the Forest of libuv, where elves of the thread pool spawn threads (a limited number of them) to do the heavy work. With their callbacks done, tasks walk back to town and rejoin the queue, and Sir Call Stack applies their results.
+
+The moral, aimed at anyone writing Node.js services: don't fear the dragons, but never underestimate them. One careless synchronous call in the wrong place and the whole village waits.
+
+## The real phases, then the useful ones
+
+Then the fairy tale gives way to the docs. The loop has six phases:
+
+- **Timers**: callbacks from setTimeout and setInterval whose time has come.
+- **Pending callbacks**: I/O callbacks deferred from the previous cycle.
+- **Idle, prepare**: internal housekeeping only.
+- **Poll**: retrieve new I/O events and run their callbacks. This is where the loop spends most of its time, waiting when there is nothing to do.
+- **Check**: setImmediate callbacks.
+- **Close callbacks**: for example a socket closed abruptly.
+
+His practical advice is to ignore two of them. Idle and prepare are internal, and by the time close callbacks matter you are on your way out of the program. That leaves timers, callbacks, poll and check, and the picture he wants you to keep is not a neat circle but a back-and-forth: after each phase, process.nextTick callbacks and promise microtasks run before the loop moves on. Know which phase you are in, and you can predict ordering.
+
+He skips the heap and call-stack diagrams on purpose. Picture a tavern: the heap is where the mead is stored, the call stack is the people at the bar, the calls are the orders. As long as everyone gets the mead they ordered, nobody cares about the cellar.
+
+## The quiz
+
+The talk closes with an exercise: setTimeout with zero delay, setInterval, process.nextTick, setImmediate and console.log are queued in a script. Which runs first? The boring one, console.log, because, in Pieri's words, ""console log is a synchronous operation which never gets inside the loop whatsoever"". Work out the order of the other four yourself; that is the point of the exercise.
+
+## Who should watch
+
+Juniors who have been told not to block the event loop and would like to know what that means, and anyone who has to explain it to them. Seniors will find no new facts, but they may steal the tavern analogy. The simplification is deliberate: the thread-pool story stands in for all async work, which is a fine mental model for a first pass.
+
+## Related Conf42 talks
+
+- Allon Mureinik on [preventing DoS attacks in your Node.js application](https://www.conf42.com/JavaScript_2024_Allon_Mureinik_4_dosattacks_nodejs_prevention) at Conf42 JavaScript 2024, where the event loop is the target.
+- Muhammad Yasir Rafique on [taming memory leaks in Node.js](https://www.conf42.com/JavaScript_2024_Muhammad_Yasir_Rafique_42_memoryleaks_nodejs_diagnostics).
+- Shai Almog on [debugging Node.js applications in production](https://www.conf42.com/JavaScript_2021_Shai_Almog_Debug_NodeJS_Lightrun) at Conf42 JavaScript 2021.
+
+[Watch Lorenzo Pieri's talk](https://www.conf42.com/JavaScript_2023_Lorenzo_Pieri_nodejs_eventloop_fairytale)
+
+[Watch the talk on YouTube](https://youtu.be/-JJouHaovP8).
+",talk,js2023,talk:js2023/Lorenzo Pieri,,Conf42,,queued,"nodejs, event-loop, javascript, libuv, async"
+,What Multiplayer learned adding real-time collaboration with Yjs,"Vladi Stevanovic (Multiplayer) at Conf42 JavaScript 2023 on building real-time collaboration with CRDTs and Yjs, and the four lessons it taught",2023-10-20,js2023/real-time-collaboration-with-yjs,,"Everyone has a folder with design_final_aj.psd and final_aj+tj_design.psd in it. At Conf42 JavaScript 2023, Vladi Stevanovic, Director of Community at Multiplayer, explains how the company built Figma-style real-time collaboration into its product with CRDTs and the open-source Yjs library, behind a central collaboration service, and the four things that turned out harder than the docs suggest.
+
+Multiplayer, Stevanovic clarifies early, is not an MMORPG. It is a collaborative SaaS platform for teams designing and managing distributed systems, which is why collaboration was a core requirement rather than a feature request.
+
+## What counts as real-time collaborative?
+
+Vladi Stevanovic said at Conf42 JavaScript 2023: ""Real time collaboration is now table stakes"". The working definition has four parts: real-time updates that reach every user as near instantly as the network allows, live playback down to each collaborator's cursor, presence and status so you can see who is around, and data integrity, so concurrent changes never silently lose work. That last one is both a UX and a backend problem.
+
+## Why not just broadcast over WebSockets?
+
+The first idea is to take your REST API and broadcast every request and response to all connected clients. That works until two people change the same thing at once, at which point you get the classic symptom: words in the wrong order, characters in odd places. Merging conflicting changes sensibly requires the context of the data and the state of the client making the change, not just the new value.
+
+Two families of technology solve this: operational transformation (what Google Docs uses, which may be too complex for a startup that wants to ship) and conflict-free replicated data types. ""You could still use websockets, but it's just a lot more work and time,"" Stevanovic adds.
+
+CRDTs give strong eventual consistency: even when clients drift because of a flaky connection or high latency, every replica ends up in the same state. Multiplayer chose Yjs because its docs, maps and arrays map onto ordinary JavaScript types, so the app needed no radical refactor. It also brings a big set of ready integrations (code editors, whiteboards, rich text), painless client reconnects, network agnosticism and awareness features out of the box.
+
+## A central peer, on purpose
+
+CRDTs can run peer to peer, but Multiplayer put a central peer in the middle: a collaboration service that serves the latest document to a joining client, shares edits across connected clients and saves snapshots. A directory service cluster decides where sessions run, tracks them and can move them, and collaboration services are deployed close to users to keep latency down. The talk is upfront about the cost: more CPU and memory on the server, and harder scaling, because the central peer must sit near its clients.
+
+Not everything goes through Yjs either. Presence (avatar stacks) uses plain WebSockets because it spans multiple documents at project level. Comments have one owner and aren't temporary, so they are REST calls plus WebSocket notifications. Yjs is reserved for state that needs conflict resolution or temporary state belonging to the document: live updates, co-editing, undo and redo.
+
+## Four lessons from production
+
+1. **Order isn't free.** Yjs arrays don't maintain element order without some work. An integer order field means renumbering everything after each insert, which doesn't scale on long lists. Multiplayer used fractional indexing, the approach Figma uses, backed by an arbitrary-precision library, because JavaScript's built-in number type runs out of precision after enough inserts in the same spot.
+2. **Architecture follows the business.** Snapshotting and keeping data in specific locations for security requirements such as GDPR needed the central service. If you need offline mode, peer to peer fits better.
+3. **Scope the collaboration.** Multiplayer has branches and filtered views of documents, so cursors and avatars only show people on the same document, in the same branch, at the same time. Showing everyone everywhere would only confuse.
+4. **Yjs won't wire dependent views for you.** Rename a component in one view and every document referencing it must update without a refresh, so the team built that propagation by listening for changes on the Yjs documents.
+
+The closing advice: don't reinvent the wheel (Liveblocks gets a mention as a hosted option), and design for collaboration from the start, since bolting it on later is messier, though still far less work with Yjs than with raw WebSockets.
+
+## Who should watch
+
+Developers about to add live presence and co-editing to a Node.js app and wondering whether WebSockets alone will cut it. Expect architecture and lessons rather than a code walkthrough.
+
+## Related Conf42 talks
+
+- Vitor Norton on [the code behind every real-time collaboration tool](https://www.conf42.com/Platform_Engineering_2024_Vitor_Norton_code_collaboration_realtime) at Conf42 Platform Engineering 2024.
+- Mohammed Zubair Ahmed on [real-time chat performance with 100k active users](https://www.conf42.com/JavaScript_2024_Mohammed_Zubair_Ahmed_41_realtimechat_performance_100kusers) at Conf42 JavaScript 2024.
+- Dmitry Khorev on [scalable event-driven applications with NestJS](https://www.conf42.com/JavaScript_2022_Dmitry_Khorev_scalable_eventdriven_applications_nestjs).
+
+[Watch Vladi Stevanovic's talk](https://www.conf42.com/JavaScript_2023_Vladi_Stevanovic_nodejs_app_realtime_collaboration)
+
+[Watch the talk on YouTube](https://youtu.be/2WpA3z0m3yE).
+",talk,js2023,talk:js2023/Vladi Stevanovic,,Conf42,,queued,"crdt, yjs, real-time-collaboration, nodejs, websockets"
 ,Spooky season with Incident Management,Shh… Just make it look like an ‘incident’,2023-10-19,2023-10-19-incident-management,./assets/splash/INCIDENT2023_Event_Splash.png,"#Shh… Just make it look like an ‘incident’
 
 We all know the frustration of trying to pick that stunning Halloween costume. Don’t worry, been there, done that. No one said it was gonna be easy.
@@ -92004,6 +92272,180 @@ We know you don’t have much time (this Michael Jackson’s “Thriller” chor
 
 All content is available now on our [website](https://www.conf42.com/im2023), let’s go! 
 ",,,,,,,,
+,From a Figma card to a live React app with AWS Amplify Studio,Arundeep Nagaraj (AWS) at Conf42 JavaScript 2023 on turning Figma designs into data-bound React components with AWS Amplify Studio,2023-10-19,js2023/figma-to-react-with-amplify-studio,,"Pixel pushing is a real job description, just not one anyone wants. At Conf42 JavaScript 2023, Arundeep Nagaraj, Solutions Architect Manager at AWS who leads the developer experience team for AWS Amplify, shows how Amplify Studio turns a Figma component into a reusable React component, binds it to a GraphQL-backed data model and ships it in a Next.js app. The demo builds a cat reviews app end to end.
+
+This is a vendor talk about AWS's own tooling, and it is honest about being one: the second half is a screen-by-screen build.
+
+## Why does design-to-code keep breaking?
+
+Nagaraj describes the handoff most teams know. Designer hands off to frontend, frontend waits on backend, changes bounce back and forth, some designs turn out to be impossible, and the process spirals. Developers spend months nudging UI until it looks pixel perfect, and the other side isn't happy either: according to AWS's own analysis, ""about 50% of the designers are not satisfied with the implementation."" His summary: ""So designers are not happy and developers are frustrated.""
+
+Amplify Studio's answer is to make the Figma file the source of the component code.
+
+## What is in the Amplify box?
+
+He splits Amplify into five parts:
+
+- **Amplify libraries**, use-case-centric client libraries for cloud-powered web and mobile apps.
+- **Amplify Studio**, a visual environment for the app backend that also syncs Figma designs.
+- **Amplify CLI**, the same capabilities as a command-line toolchain.
+- **Amplify UI**, an open-source design system of themeable, responsive, accessible React components: connected ones like the authenticator (sign up, sign in) and primitives like buttons, text fields and cards.
+- **Amplify Hosting**, managed CI/CD and hosting.
+
+## The cat reviews build
+
+The demo follows a clear sequence, and it is the reason to watch.
+
+1. Create the app in the AWS console under Amplify; while the backend provisions, scaffold a Next.js app with create-next-app (the default had just moved to Next.js 14).
+2. Install the Amplify packages, chiefly the Amplify UI React package, and define a Reviews data model in Studio: name, description, an image, and a rating stored as a float, because a cat can score 4.7. Save and deploy, and Studio creates the GraphQL API on AWS AppSync without you writing a schema by hand.
+3. Open the prebuilt Amplify Figma template, take its review card, delete the price (cats are priceless), add a favourite button, round the corners, then paste the Figma file URL into Studio and sync. The card comes back looking exactly as edited.
+4. Bind the card's fields to the data model (image, name, description, rating) in a point-and-click panel, and tweak the generated create form: the description becomes a text area, the rating a stepper field.
+5. Run amplify pull to bring the generated components into the local project, render the create form, then a collection of review cards.
+6. Subscribe to onCreateReviews, an AppSync subscription over WebSockets, so a new review shows up in the feed in real time.
+
+His closing claim is that a workflow that would have taken hours, days or months comes down to potentially less than an hour. The demo supports that for a CRUD-shaped app built on Amplify's own templates; how it holds up for a heavily custom design system is a question the talk doesn't test.
+
+## Who should watch
+
+Frontend developers who want a full-stack app on AWS without hand-wiring AppSync, auth and hosting, and teams already designing in Figma who want to see the sync loop working. If you need full control of the generated component code or are not on AWS, watch it as a reference for the design-to-code idea rather than a recipe.
+
+## Related Conf42 talks
+
+- Roman Boiko on a [serverless backend for frontend on AWS](https://www.conf42.com/JavaScript_2022_Roman_Boiko_serverless_backend_frontend_aws) at Conf42 JavaScript 2022.
+- Denis Artyuhovich on [infrastructure as code for JS apps on AWS with TypeScript](https://www.conf42.com/JavaScript_2021_Denis_Artyuhovich_IAC_AWS_TypeScript).
+- Luca Mezzalira on [hexagonal architecture with serverless](https://www.conf42.com/JavaScript_2021_Luca_Mezzalira_hexagonal_architecture_serverless) at Conf42 JavaScript 2021.
+
+[Watch Arundeep Nagaraj's talk](https://www.conf42.com/JavaScript_2023_Arundeep_Nagaraj_easy_mode_fullstack_figma_aws_amplify)
+
+[Watch the talk on YouTube](https://youtu.be/a32OpMspmf8).
+",talk,js2023,talk:js2023/Arundeep Nagaraj,,Conf42,,queued,"aws-amplify, figma, react, nextjs, full-stack"
+,Building a Pi Network web3 app with a JavaScript front and any backend,Cesar Cordero Rodriguez (LatinChain) at Conf42 JavaScript 2023 on building Pi Network apps with a JavaScript frontend and a Python or PHP backend,2023-10-18,js2023/pi-network-web3-app-latinchain,,"Most web3 tutorials start with MetaMask and Ethereum. At Conf42 JavaScript 2023, Cesar Cordero Rodriguez, co-founder representative at LatinChain and a senior Odoo technical consultant, starts somewhere else: Pi Network, its own Pi Browser, and the Pi API Platform. The takeaway is an architecture you already know. The frontend catches the payment request in JavaScript, the backend talks to the Pi platform in whatever language you like, and the answer travels back to the user.
+
+It is a short, practical talk, essentially a guided tour of an open-source repository and the official docs, so set expectations accordingly.
+
+## What is the Pi stack?
+
+Three pieces, as he lays them out:
+
+- **Pi Network**, a cryptocurrency based on Stellar that you mine from your phone daily. The talk's abstract puts the network at more than 45 million users.
+- **Pi Browser**, which he describes as something like MetaMask, but specifically for Pi Network. It is where Pi apps run.
+- **Pi API Platform**, the API you build Pi apps against.
+
+His own project, LatinChain, is a Pi app where people play games daily using crypto, and it won the Pi Hackathon 2021. The code is public under the pi-apps organisation on GitHub, in Python, JavaScript and HTML.
+
+## How does a payment flow work?
+
+The heart of the talk is the request loop. The frontend, written in JavaScript or TypeScript, captures the user's request to pay. That request goes to your backend. The backend makes the call to the Pi API Platform, gets the response and returns it to the frontend, so the user gets an answer to what they asked for.
+
+The point he keeps returning to is that the backend is your choice. LatinChain's production backend is Python on Odoo 14, with the models for the games and the Pi integration in the repository. The simpler first-app example in the repo's docs folder pairs client-side JavaScript with a PHP server script, precisely to show, as Cesar Cordero Rodriguez said at Conf42 JavaScript 2023, that ""you can use any backend"". The one thing you must keep in sync is the authentication setup: the same configuration on the client side and the server side, plus your app key from the Pi Browser developer portal.
+
+He separates the two payment directions. User-to-app payments, where an end user pays your app, are covered by the LatinChain examples. App-to-user payments, where the app pays out, are in Pi's official documentation, with examples in Ruby, Node.js, Python, Go, Blazor and C#.
+
+## The licence has a fence around it
+
+One detail worth reading twice before you fork. LatinChain is open source, and you can build new apps on top of it, but only inside Pi Network: the licence does not let you take the system to a competing platform. If you are evaluating it as a starting point, check that the terms fit what you want to build.
+
+## Who should watch
+
+JavaScript developers curious about Pi Network specifically, who want a working reference repo and a map of where the official docs live. If you were hoping for smart-contract internals, chain mechanics or a security review, this isn't that talk; it is a pointer to code and documentation, delivered quickly. The recording ends with a look at Pi apps running inside Pi Browser, LatinChain among them.
+
+## Related Conf42 talks
+
+- Albert Groothedde on a [typesafe client for smart contracts](https://www.conf42.com/JavaScript_2023_Albert_Groothedde_javascript_client_smart_contracts), also at Conf42 JavaScript 2023.
+- Jay McCarthy on [breaking into blockchain development with JavaScript](https://www.conf42.com/JavaScript_2021_Jay_McCarthy_Blockchain_Development) at Conf42 JavaScript 2021.
+- Luis Cardoza Bird on [building blockchains in Go](https://www.conf42.com/Golang_2021_Luis_Cardoza_Bird_building_blockchains) at Conf42 Golang 2021.
+
+[Watch Cesar Cordero Rodriguez's talk](https://www.conf42.com/JavaScript_2023_Cesar_Cordero_Rodriguez_develop_web3_webapp_python)
+
+[Watch the talk on YouTube](https://youtu.be/v6kASIbpmos).
+",talk,js2023,talk:js2023/Cesar Cordero Rodriguez,,Conf42,,queued,"web3, blockchain, javascript, python, pi-network"
+,A 100 KB library that stands in for your whole backend,"Daniele Fontani and Daniele Ciulli (Sintra Digital Business) at Conf42 JavaScript 2023 on Crudit, a multi-tenant REST API over MongoDB in one edge function",2023-10-17,js2023/crudit-mongodb-backend-in-an-edge-function,,"Some apps don't deserve a backend team. At Conf42 JavaScript 2023, Daniele Fontani (CTO) and Daniele Ciulli (Software Developer) of Sintra Digital Business presented Crudit, an open-source JavaScript library of roughly 100 KB that turns an Express handler in a serverless function into a multi-tenant REST API over MongoDB Atlas. The pitch: a frontend developer ships a working app without writing, hosting or operating a backend.
+
+## Who is the modern stack too expensive for?
+
+Fontani opens with an honest accounting of the architecture most of us now default to: a single-page app talking to a fleet of microservices, message queues, a relational store, a cache. He likes it. Best-of-breed tools, teams working in parallel, specialists doing what they do best.
+
+The bill shows up elsewhere. You need several teams or competencies, a single person can no longer do the job, and when something breaks it starts in the backend and surfaces in the frontend, so finding it takes a while. The people who feel this most are low-budget projects, small companies and startups: the quick-and-dirty app that used to take a weekend now needs an org chart. Crudit is the Daniele pair's answer to whether a web app can still be built with ease. Fontani's goals for it: run in the free tiers of Azure, AWS or Vercel, stay easy to customise, and as he put it, ""we want to avoid license fees"".
+
+## What does Crudit actually do?
+
+Ciulli then walks through the features, one config object at a time.
+
+- **CRUD with tenancy built in.** Mount Crudit on an Express app inside a Vercel edge function, give it a database connection, and every request becomes a REST call: POST creates, GET reads, PUT updates, DELETE deletes. Each user writes to their own MongoDB database, and the request path picks the collection. User Daniele posting to a path called prova lands in Daniele's database, in the prova collection, and nobody else can read it.
+- **Custom endpoints.** Override a route with your own handler and a login-required flag. That is how you add login and registration, with whatever auth method you trust.
+- **Server-side validation.** Scope rules to a database and collection by name or by regex (for example, only the admin users' databases), with the schema written in validator.js syntax. Bad data never reaches the collection.
+- **Hooks on events.** Functions that fire on database events and can block the write. His example is a before-save hook that could call a third-party service to check a customer's billing details and throw an error back to the client if they fail; the demo logs who wrote what, and when, into a logs database.
+- **Mutations.** Register a migration once, then apply it to a single database, to one database with every mutation not yet run, or to all databases at once. A flag decides whether one failing mutation stops the run. For a multi-tenant app, that last mode is how you change a document shape across your whole customer base.
+
+The DevOps story is that there isn't one. Crudit runs in any Node.js-compatible runtime: Lambda, Google Cloud Functions, Azure Functions, edge functions. Daniele Ciulli said at Conf42 JavaScript 2023: ""You don't need to think about scaling, you don't need to think about dimensioning your server because it's all handled by the cloud.""
+
+## When should you not use it?
+
+This is the most useful slide in the talk, and plenty of library authors skip it. Crudit is the wrong tool for apps built around media assets (no asset support yet), strongly relational data (it is document-only), heavy business logic, a hard split between business logic and data, or anyone who needs a back-office UI, which you would have to build yourself. It fits frontend-driven full-stack JavaScript apps, Node.js plus MongoDB projects, and exploratory or hobby projects where staying inside the free tiers brings the cost to zero.
+
+The roadmap at the time: configuration imported from YAML and JSON (handy for bulk-editing mutations), media assets stored in a bucket without a custom endpoint, and, of course, more GitHub stars. The package installs with `npm i crudit`.
+
+## Who should watch
+
+Frontend developers who keep writing the same thin Express-plus-Mongo layer for side projects, and anyone building a small multi-tenant tool on a startup budget. If your data model has joins in it, the talk will tell you so itself.
+
+## Related Conf42 talks
+
+- Roman Boiko on a [serverless backend for frontend on AWS](https://www.conf42.com/JavaScript_2022_Roman_Boiko_serverless_backend_frontend_aws) at Conf42 JavaScript 2022.
+- Joe Karlsson on [MongoDB schema design best practices](https://www.conf42.com/JavaScript_2020_Joe_Karlsson_mongodb_schema_design) at Conf42 JavaScript 2020.
+- Gareth McCumskey on [how serverless is changing the world for developers](https://www.conf42.com/JavaScript_2022_Gareth_McCumskey_serverless_changing_world).
+
+[Watch Daniele Fontani and Daniele Ciulli's talk](https://www.conf42.com/JavaScript_2023_Daniele_Fontani_Daniele_Ciulli_frontend_unchained_develop_apis)
+
+[Watch the talk on YouTube](https://youtu.be/_QPC8f_B4EM).
+",talk,js2023,talk:js2023/Daniele Fontani,,Conf42,,queued,"javascript, nodejs, mongodb, serverless, low-code"
+,"Six ways to split a frontend monolith, from iframe to Module Federation",Aleksandr Guzenko (IT_ONE) at Conf42 JavaScript 2023 on when a frontend monolith stops paying off and which of six splitting methods fits,2023-10-17,js2023/six-ways-to-split-a-frontend-monolith,,"The iframe shipped in 1997 and it is still a legitimate way to split a frontend. At Conf42 JavaScript 2023, Aleksandr Guzenko, Tech Lead at IT_ONE, who leads development of a large banking application, lays out six ways to break a frontend monolith, from that old tag to Webpack 5 Module Federation, and closes with a plain table of when each one is the right call.
+
+It is a compact talk, and a refreshingly unideological one: he starts by defending the monolith.
+
+## Is the monolith actually the problem?
+
+Guzenko frames it with the familiar cost-per-line curve. A monolith is cheap early, because everything lives in one place. Micro-architecture costs more up front, for the setup each independent piece needs, but its cost climbs slowly as the codebase grows. The monolith's cost curve bends sharply upward, because every change touches the whole system.
+
+His conclusion is two sentences long: the monolith is not bad, and, as Aleksandr Guzenko said at Conf42 JavaScript 2023, ""monolith is not bad until a certain point"". Spotting that point is subjective, so he gives four triggers:
+
+- Long builds and CI pipelines (his example: a pipeline that needs six hours).
+- Rapidly increasing codebase complexity.
+- A rising entry threshold, where only senior developers can be onboarded efficiently.
+- More than five people on the project, which he admits is the softest one; he knows a 15-person monolith that works well.
+
+## The six options, in order of age
+
+**iframe.** The original frontend micro-service. Still the right answer for embedding a module, such as a map on a landing page, or composing a few simple apps, like an independent sidebar of links.
+
+**Nginx or another proxy server.** Some pages are served as a separate bundle behind a proxy. He calls it the most controversial and non-obvious option: you reload the whole bundle on navigation, lose the single-page-app benefits and duplicate code. It earns its place during a framework migration, where old pages stay on the old app and new pages go to the new one until only one remains.
+
+**Web Components.** Native component encapsulation of styles and logic, browser support and framework independence, so one component can live inside React, Angular or Vue apps. Why didn't it take over? Because people choose React and Angular for their APIs (hooks, context, decorators) and their ecosystems, not only for components. Good for a company-wide UI kit.
+
+**npm packages.** The most common method and, in most cases, the best one. Split the app into packages first; you can turn those packages into micro-frontends later. The costs are real: debugging means rebuild, substitute and rerun the host just to see a console line, and releases go package-first, then version bump, then host deploy. The payoffs are easy implementation, versioning and faster pipelines, because the host no longer runs every package's tests.
+
+**single-spa.** A container that registers applications, gives them lifecycle methods (load, mount, unmount) and maps URLs to apps. Pick it when you must combine apps written in different frameworks.
+
+**Webpack 5 Module Federation.** Only on Webpack 5; on version 4 the plugin is not an option. Each app declares an entry point listing what it exports, which he likes as a public-API pattern, and shared libraries are cached so ten React apps don't load React ten times. Unlike single-spa, you can consume a single module from another app, say just its selectors, rather than the whole application.
+
+## The decision table
+
+His closing slides are the part to screenshot. Proxy server: you are mid-migration, don't want micro-frontends, and can sacrifice performance for a while. npm: you want a smaller codebase and don't want micro-frontends at all. single-spa: mixed frameworks, lifecycle control or URL-based routing between apps. Module Federation: you want to optimise the bundle and you are on Webpack 5.
+
+## Who should watch
+
+Frontend leads arguing about micro-frontends who need a shared vocabulary, and teams who suspect they need them but would be fine with a few npm packages. If you already run Module Federation in production, this is a refresher, not new ground.
+
+## Related Conf42 talks
+
+- Maksim Zemskov argues the other side in [scaling an application without microfrontends](https://www.conf42.com/JavaScript_2023_Maksim_Zemskov_glorious_monolith_scaling_application_microfrontends), also at Conf42 JavaScript 2023.
+- Tomasz Krajewski on [micro frontend foundations](https://www.conf42.com/JavaScript_2021_Tomasz_Krajewski_Micro_Frontends_foundations) at Conf42 JavaScript 2021.
+- Aleksandr Guzenko returned a year later with [preventing architectural debt with Feature-Sliced Design](https://www.conf42.com/JavaScript_2024_Aleksandr_Guzenko_3_architecturaldebt_featuresliceddesign_cleancode).
+
+[Watch Aleksandr Guzenko's talk](https://www.conf42.com/JavaScript_2023_Aleksandr_Guzenko_breaking_monolith_code_splitting_techniques)
+
+[Watch the talk on YouTube](https://youtu.be/kiL0mpjHiXE).
+",talk,js2023,talk:js2023/Aleksandr Guzenko,,Conf42,,queued,"javascript, frontend-architecture, micro-frontends, monolith, webpack"
 ,Prepare yourself for cuteness overload,"(This seal is absolutely too adorable!)
 ",2023-09-27,2023-09-27-kube-native-cute-seal,./assets/splash/KUBE2023_Event_Splash.png,"#(This seal is absolutely too adorable!)
 
