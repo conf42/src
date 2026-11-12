@@ -1,6 +1,6 @@
 # Chaos Validation Made Easy: Plug & Play with Resilience Probes
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Neelanjan Manna](https://www.conf42.com/speaker_Neelanjan_Manna) (Software Engineer @ Harness) and [Sayan Mondal](https://www.conf42.com/speaker_Sayan_Mondal) (Senior Software Engineer @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2024_Neelanjan_Manna_Sayan_Mondal_chaos_validation_resilience_probes
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Neelanjan Manna](https://www.conf42.com/speaker_Neelanjan_Manna) (Software Engineer @ Harness) and [Sayan Mondal](https://www.conf42.com/speaker_Sayan_Mondal) (Senior Software Engineer @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2024_Neelanjan_Manna_Sayan_Mondal_chaos_validation_resilience_probes
 
 Video: https://www.youtube.com/watch?v=_nvpNdvqfvk
 

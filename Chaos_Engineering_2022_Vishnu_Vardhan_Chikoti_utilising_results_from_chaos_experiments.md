@@ -1,6 +1,6 @@
 # Learnings from Chaos experiments
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Vishnu Vardhan Chikoti](https://www.conf42.com/speaker_Vishnu_Vardhan_Chikoti) (Senior SRE Manager @ Fanatics). Page: https://www.conf42.com/Chaos_Engineering_2022_Vishnu_Vardhan_Chikoti_utilising_results_from_chaos_experiments
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Vishnu Vardhan Chikoti](https://www.conf42.com/speaker_Vishnu_Vardhan_Chikoti) (Senior SRE Manager @ Fanatics). Page: https://www.conf42.com/Chaos_Engineering_2022_Vishnu_Vardhan_Chikoti_utilising_results_from_chaos_experiments
 
 Video: https://www.youtube.com/watch?v=H4ZqAkOfTcw
 

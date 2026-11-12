@@ -1,6 +1,6 @@
 # When Gremlins Play with Cockroaches: A Chaos Experiment
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Rain Leander](https://www.conf42.com/speaker_Rain_Leander) (Developer Advocate @ Cockroach Labs). Page: https://www.conf42.com/Chaos_Engineering_2022_Rain_Leander_when_gremlins_play_with_cockroaches_a_chaos_experiment
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Rain Leander](https://www.conf42.com/speaker_Rain_Leander) (Developer Advocate @ Cockroach Labs). Page: https://www.conf42.com/Chaos_Engineering_2022_Rain_Leander_when_gremlins_play_with_cockroaches_a_chaos_experiment
 
 Video: https://www.youtube.com/watch?v=8H7fI7RF-3M
 

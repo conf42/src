@@ -1,6 +1,6 @@
 # Securing the Cloud: Empowering Developers to practice Security Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (DevOps Engineer @ Aval Digital Labs) and [Jhonnatan Gil Chaves](https://www.conf42.com/speaker_Jhonnatan_Gil_Chaves) (DevOps Engineer @ Aval Digital Labs). Page: https://www.conf42.com/Chaos_Engineering_2021_Yury_Nino_Jhonnatan_Gil_Chaves_cloud_security_chaos_engineering
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (DevOps Engineer @ Aval Digital Labs) and [Jhonnatan Gil Chaves](https://www.conf42.com/speaker_Jhonnatan_Gil_Chaves) (DevOps Engineer @ Aval Digital Labs). Page: https://www.conf42.com/Chaos_Engineering_2021_Yury_Nino_Jhonnatan_Gil_Chaves_cloud_security_chaos_engineering
 
 Video: https://www.youtube.com/watch?v=W_wazXG70-Y
 

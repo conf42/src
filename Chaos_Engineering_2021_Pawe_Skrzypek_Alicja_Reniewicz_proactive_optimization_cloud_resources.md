@@ -1,6 +1,6 @@
 # Forecasting based proactive optimization of cloud resources
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Paweł Skrzypek](https://www.conf42.com/speaker_Pawe_Skrzypek) (CTO @ 7bulls.com) and [Alicja Reniewicz](https://www.conf42.com/speaker_Alicja_Reniewicz) (Full Stack Engineer @ 7bulls.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Pawe_Skrzypek_Alicja_Reniewicz_proactive_optimization_cloud_resources
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Paweł Skrzypek](https://www.conf42.com/speaker_Pawe_Skrzypek) (CTO @ 7bulls.com) and [Alicja Reniewicz](https://www.conf42.com/speaker_Alicja_Reniewicz) (Full Stack Engineer @ 7bulls.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Pawe_Skrzypek_Alicja_Reniewicz_proactive_optimization_cloud_resources
 
 Video: https://www.youtube.com/watch?v=LrPYtefkHJ4
 

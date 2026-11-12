@@ -1,6 +1,6 @@
 # Harnessing Chaos Engineering for Scalable, Cost-Efficient, and Secure Cloud Database Systems
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Prashanth Reddy Kora](https://www.conf42.com/speaker_Prashanth_Reddy_Kora) (Cloud Database Engineer @ Centene Corporation). Page: https://www.conf42.com/Chaos_Engineering_2025_Prashanth_Reddy_Kora_chaos_cloud_systems
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Prashanth Reddy Kora](https://www.conf42.com/speaker_Prashanth_Reddy_Kora) (Cloud Database Engineer @ Centene Corporation). Page: https://www.conf42.com/Chaos_Engineering_2025_Prashanth_Reddy_Kora_chaos_cloud_systems
 
 Video: https://www.youtube.com/watch?v=l_GiRFT_aD0
 

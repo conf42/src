@@ -1,6 +1,6 @@
 # Shaping Tomorrow: Exploring the Advancements and Persistent Effects of Industrial Equipment Modeling
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Eugene Lykov](https://www.conf42.com/speaker_Eugene_Lykov) (Senior Software Engineer @ Visionis). Page: https://www.conf42.com/Chaos_Engineering_2024_Eugene_Lykov_shaping_tomorrow_advancements
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Eugene Lykov](https://www.conf42.com/speaker_Eugene_Lykov) (Senior Software Engineer @ Visionis). Page: https://www.conf42.com/Chaos_Engineering_2024_Eugene_Lykov_shaping_tomorrow_advancements
 
 Video: https://www.youtube.com/watch?v=aDTeOh-1n-M
 

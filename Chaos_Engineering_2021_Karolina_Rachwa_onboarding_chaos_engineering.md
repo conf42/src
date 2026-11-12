@@ -1,6 +1,6 @@
 # Onboarding Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Karolina Rachwał](https://www.conf42.com/speaker_Karolina_Rachwa) (Chaos Engineering Practice Lead @ Nuaware). Page: https://www.conf42.com/Chaos_Engineering_2021_Karolina_Rachwa_onboarding_chaos_engineering
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Karolina Rachwał](https://www.conf42.com/speaker_Karolina_Rachwa) (Chaos Engineering Practice Lead @ Nuaware). Page: https://www.conf42.com/Chaos_Engineering_2021_Karolina_Rachwa_onboarding_chaos_engineering
 
 Video: https://www.youtube.com/watch?v=Dxt1SjUtCDk
 

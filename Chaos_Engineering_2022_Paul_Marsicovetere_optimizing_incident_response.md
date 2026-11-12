@@ -1,6 +1,6 @@
 # Optimizing incident response thanks to Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Paul Marsicovetere](https://www.conf42.com/speaker_Paul_Marsicovetere) (Senior Cloud Infrastructure Engineer @ Formidable). Page: https://www.conf42.com/Chaos_Engineering_2022_Paul_Marsicovetere_optimizing_incident_response
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Paul Marsicovetere](https://www.conf42.com/speaker_Paul_Marsicovetere) (Senior Cloud Infrastructure Engineer @ Formidable). Page: https://www.conf42.com/Chaos_Engineering_2022_Paul_Marsicovetere_optimizing_incident_response
 
 Video: https://www.youtube.com/watch?v=UbugZS4eK4s
 

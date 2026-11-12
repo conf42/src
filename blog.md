@@ -177,8 +177,8 @@
 - [Everything in your stack autoscales except the database](https://www.conf42.com/blog/cloud2025/cloud-databases-dont-autoscale.md) (Conf42 Cloud Native 2025): Matan Nataf of Rapydo at Conf42 Cloud Native 2025 on why managing database fleets is broken, and a demo of throttling, blocking and caching queries.
 
 ## February 2025
-- [Conf42 Chaos Engineering 2025: break it on purpose, everywhere](https://www.conf42.com/blog/ce2025/conf42-chaos-engineering-2025-roundup.md) (Conf42 Chaos Engineering 2025): Conf42 Chaos Engineering 2025 roundup - socio-technical experiments, network faults on Fargate, chaos in platforms, mobile apps, AI monitoring and security.
-- [A chaos experiment that tests your on-call, not just your pods](https://www.conf42.com/blog/ce2025/chaos-experiment-tests-the-on-call-steadybit.md) (Conf42 Chaos Engineering 2025): Benjamin Wilms of Steadybit at Conf42 Chaos Engineering 2025 on testing socio-technical resilience, from pod redundancy to Datadog and PagerDuty response.
+- [Conf42 Chaos Engineering 2025: break it on purpose, everywhere](https://www.conf42.com/blog/chaos2025/conf42-chaos-engineering-2025-roundup.md) (Conf42 Chaos Engineering 2025): Conf42 Chaos Engineering 2025 roundup - socio-technical experiments, network faults on Fargate, chaos in platforms, mobile apps, AI monitoring and security.
+- [A chaos experiment that tests your on-call, not just your pods](https://www.conf42.com/blog/chaos2025/chaos-experiment-tests-the-on-call-steadybit.md) (Conf42 Chaos Engineering 2025): Benjamin Wilms of Steadybit at Conf42 Chaos Engineering 2025 on testing socio-technical resilience, from pod redundancy to Datadog and PagerDuty response.
 - [Conf42 Python 2025 roundup: dunders, concurrency, data and agents](https://www.conf42.com/blog/python2025/python-2025-roundup-dunders-concurrency-data.md) (Conf42 Python 2025): Conf42 Python 2025 in review, from dunder methods, asyncio vs threads and FireDucks to fsspec, FastAPI fraud systems, agentic Django and WebAuthn.
 
 ## January 2025

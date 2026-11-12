@@ -1,6 +1,6 @@
 # Revolutionizing Software Development: Integrating Chaos Engineering and Feature Flags for Enhanced Reliability and Agile Response
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Matthew Schillerstrom](https://www.conf42.com/speaker_Matthew_Schillerstrom) (Senior Product Marketing Manager @ Harness / LitmusChaos / OpenFeature). Page: https://www.conf42.com/Chaos_Engineering_2024_Matthew_Schillerstrom_feature_flags_reliability_agile_response
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Matthew Schillerstrom](https://www.conf42.com/speaker_Matthew_Schillerstrom) (Senior Product Marketing Manager @ Harness / LitmusChaos / OpenFeature). Page: https://www.conf42.com/Chaos_Engineering_2024_Matthew_Schillerstrom_feature_flags_reliability_agile_response
 
 Video: https://www.youtube.com/watch?v=kZh1gIM_6Sc
 

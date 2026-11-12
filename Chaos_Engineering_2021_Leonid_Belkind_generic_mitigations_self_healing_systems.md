@@ -1,6 +1,6 @@
 # Chaos Engineering + Generic Mitigations: The Path to Self-Healing Systems
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Leonid Belkind](https://www.conf42.com/speaker_Leonid_Belkind) (CTO @ Stackpulse). Page: https://www.conf42.com/Chaos_Engineering_2021_Leonid_Belkind_generic_mitigations_self_healing_systems
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Leonid Belkind](https://www.conf42.com/speaker_Leonid_Belkind) (CTO @ Stackpulse). Page: https://www.conf42.com/Chaos_Engineering_2021_Leonid_Belkind_generic_mitigations_self_healing_systems
 
 Video: https://www.youtube.com/watch?v=Zl0q_JJzCUQ
 

@@ -1,6 +1,6 @@
 # Why People, Not Yet Another Tool, Hold the Key to Tech Success
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Pierluigi Meloni](https://www.conf42.com/speaker_Pierluigi_Meloni) (Co-Founder & CEO @ Utterskills). Page: https://www.conf42.com/Chaos_Engineering_2025_Pierluigi_Meloni_success_people_tech
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Pierluigi Meloni](https://www.conf42.com/speaker_Pierluigi_Meloni) (Co-Founder & CEO @ Utterskills). Page: https://www.conf42.com/Chaos_Engineering_2025_Pierluigi_Meloni_success_people_tech
 
 Video: https://www.youtube.com/watch?v=GKOMgNMl8g0
 

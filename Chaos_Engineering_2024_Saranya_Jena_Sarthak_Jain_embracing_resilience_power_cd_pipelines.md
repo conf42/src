@@ -1,6 +1,6 @@
 # Embracing Resilience: Unleashing the Power of Chaos Engineering in CD Pipelines
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Saranya Jena](https://www.conf42.com/speaker_Saranya_Jena) (Senior Software Engineer @ Harness) and [Sarthak Jain](https://www.conf42.com/speaker_Sarthak_Jain) (Senior Software Engineering @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2024_Saranya_Jena_Sarthak_Jain_embracing_resilience_power_cd_pipelines
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Saranya Jena](https://www.conf42.com/speaker_Saranya_Jena) (Senior Software Engineer @ Harness) and [Sarthak Jain](https://www.conf42.com/speaker_Sarthak_Jain) (Senior Software Engineering @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2024_Saranya_Jena_Sarthak_Jain_embracing_resilience_power_cd_pipelines
 
 Video: https://www.youtube.com/watch?v=E7olMKjETFY
 

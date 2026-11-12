@@ -1,6 +1,6 @@
 # How to Build a Reliable System Under Unpredictable Conditions
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Benjamin Wilms](https://www.conf42.com/speaker_Benjamin_Wilms) (Co-Founder & CEO @ Steadybit). Page: https://www.conf42.com/Chaos_Engineering_2025_Benjamin_Wilms_reliable_system_unpredictable
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Benjamin Wilms](https://www.conf42.com/speaker_Benjamin_Wilms) (Co-Founder & CEO @ Steadybit). Page: https://www.conf42.com/Chaos_Engineering_2025_Benjamin_Wilms_reliable_system_unpredictable
 
 Video: https://www.youtube.com/watch?v=I4ONmOzUMD4
 

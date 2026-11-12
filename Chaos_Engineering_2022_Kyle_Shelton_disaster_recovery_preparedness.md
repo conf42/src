@@ -1,6 +1,6 @@
 # Disaster Recovery preparedness using Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Kyle Shelton](https://www.conf42.com/speaker_Kyle_Shelton) (Chaos & Reliability Engineering & Builder @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Kyle_Shelton_disaster_recovery_preparedness
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Kyle Shelton](https://www.conf42.com/speaker_Kyle_Shelton) (Chaos & Reliability Engineering & Builder @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Kyle_Shelton_disaster_recovery_preparedness
 
 Video: https://www.youtube.com/watch?v=9den8fe82ck
 

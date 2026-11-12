@@ -1,6 +1,6 @@
 # Postmortems, Continuous Learning and Enabling Blameless Culture
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Julie Gunderson](https://www.conf42.com/speaker_Julie_Gunderson) (Advocating DevOps @ PagerDuty). Page: https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Julie Gunderson](https://www.conf42.com/speaker_Julie_Gunderson) (Advocating DevOps @ PagerDuty). Page: https://www.conf42.com/Chaos_Engineering_2021_Julie_Gunderson_postmortem_continuous_learning_blameless_culture
 
 Video: https://www.youtube.com/watch?v=Gdm96CtmrL0
 

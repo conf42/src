@@ -1,6 +1,6 @@
 # Mastering Seamless Single Sign-On: Design, Challenges, and Implementation
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Rinku Mohan](https://www.conf42.com/speaker_Rinku_Mohan) (Senior Software Engineer @ bettercoach). Page: https://www.conf42.com/Chaos_Engineering_2025_Rinku_Mohan_signon_design_implementation
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Rinku Mohan](https://www.conf42.com/speaker_Rinku_Mohan) (Senior Software Engineer @ bettercoach). Page: https://www.conf42.com/Chaos_Engineering_2025_Rinku_Mohan_signon_design_implementation
 
 Video: https://www.youtube.com/watch?v=cJBVLUoesVM
 

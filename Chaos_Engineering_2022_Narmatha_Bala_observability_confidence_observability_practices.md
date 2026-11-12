@@ -1,6 +1,6 @@
 # Confidence in Chaos - How properly applied observability practices can take the ‘chaos’ out of chaos testing
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Narmatha Bala](https://www.conf42.com/speaker_Narmatha_Bala) (Senior Software Engineering Manager @ Microsoft CSE). Page: https://www.conf42.com/Chaos_Engineering_2022_Narmatha_Bala_observability_confidence_observability_practices
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Narmatha Bala](https://www.conf42.com/speaker_Narmatha_Bala) (Senior Software Engineering Manager @ Microsoft CSE). Page: https://www.conf42.com/Chaos_Engineering_2022_Narmatha_Bala_observability_confidence_observability_practices
 
 Video: https://www.youtube.com/watch?v=KEP0VZUhQ40
 

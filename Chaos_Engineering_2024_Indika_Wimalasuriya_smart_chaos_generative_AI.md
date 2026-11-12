@@ -1,6 +1,6 @@
 # Smart Chaos : Leveraging Generative AI in Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Indika Wimalasuriya](https://www.conf42.com/speaker_Indika_Wimalasuriya) (Senior Systems Engineering Manager @ Virtusa). Page: https://www.conf42.com/Chaos_Engineering_2024_Indika_Wimalasuriya_smart_chaos_generative_AI
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Indika Wimalasuriya](https://www.conf42.com/speaker_Indika_Wimalasuriya) (Senior Systems Engineering Manager @ Virtusa). Page: https://www.conf42.com/Chaos_Engineering_2024_Indika_Wimalasuriya_smart_chaos_generative_AI
 
 Video: https://www.youtube.com/watch?v=1HapyDruZeU
 

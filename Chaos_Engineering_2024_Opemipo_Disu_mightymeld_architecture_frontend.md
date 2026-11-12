@@ -1,6 +1,6 @@
 # MightyMeld Architecture 101: Crafting the Future of Frontend Development
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Opemipo Disu](https://www.conf42.com/speaker_Opemipo_Disu) (Developer Advocate @ Fermyon Technologies). Page: https://www.conf42.com/Chaos_Engineering_2024_Opemipo_Disu_mightymeld_architecture_frontend
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Opemipo Disu](https://www.conf42.com/speaker_Opemipo_Disu) (Developer Advocate @ Fermyon Technologies). Page: https://www.conf42.com/Chaos_Engineering_2024_Opemipo_Disu_mightymeld_architecture_frontend
 
 Video: https://www.youtube.com/watch?v=yoS71NGEgZU
 

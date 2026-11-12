@@ -1,6 +1,6 @@
 # Selling your Company on Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Andrew Benoit](https://www.conf42.com/speaker_Andrew_Benoit) (Sales Leader & G2M Advisor). Page: https://www.conf42.com/Chaos_Engineering_2024_Andrew_Benoit_selling_company
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Andrew Benoit](https://www.conf42.com/speaker_Andrew_Benoit) (Sales Leader & G2M Advisor). Page: https://www.conf42.com/Chaos_Engineering_2024_Andrew_Benoit_selling_company
 
 Video: https://www.youtube.com/watch?v=OWcOrD6JFRE
 

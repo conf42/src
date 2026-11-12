@@ -1,6 +1,6 @@
 # Bring Chaos Engineering to Your Organization in a Fun and Continuous Way
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (Senior SRE @ Electrolux) and [Kristina Kondrashevich](https://www.conf42.com/speaker_Kristina_Kondrashevich) (Product Manager, SRE products @ Electrolux). Page: https://www.conf42.com/Chaos_Engineering_2024_Long_Zhang_Kristina_Kondrashevich_organization_fun_continuous
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (Senior SRE @ Electrolux) and [Kristina Kondrashevich](https://www.conf42.com/speaker_Kristina_Kondrashevich) (Product Manager, SRE products @ Electrolux). Page: https://www.conf42.com/Chaos_Engineering_2024_Long_Zhang_Kristina_Kondrashevich_organization_fun_continuous
 
 Video: https://www.youtube.com/watch?v=_fc0ww_dVE8
 

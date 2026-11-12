@@ -1,6 +1,6 @@
 # Chaos multi-domain scenarios and its business impacts
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Tejendra Bhandari](https://www.conf42.com/speaker_Tejendra_Bhandari) (Cloud security architect @ Nokia). Page: https://www.conf42.com/Chaos_Engineering_2024_Tejendra_Bhandari_multidomain_scenarios
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Tejendra Bhandari](https://www.conf42.com/speaker_Tejendra_Bhandari) (Cloud security architect @ Nokia). Page: https://www.conf42.com/Chaos_Engineering_2024_Tejendra_Bhandari_multidomain_scenarios
 
 Video: https://www.youtube.com/watch?v=Re9sA6aW5iE
 

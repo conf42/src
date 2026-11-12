@@ -1,6 +1,6 @@
 # Why Chaos Engineering Documents Matter?
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (Cloud Infrastructure Engineer @ Google). Page: https://www.conf42.com/Chaos_Engineering_2023_Yury_Nino_documents_matter
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (Cloud Infrastructure Engineer @ Google). Page: https://www.conf42.com/Chaos_Engineering_2023_Yury_Nino_documents_matter
 
 Video: https://www.youtube.com/watch?v=c8umhENDV6g
 

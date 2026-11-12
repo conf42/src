@@ -1,6 +1,6 @@
 # Taming the spatio-temporal-causal uncertainty in Chaos Engineering and Observability
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Mahesh Venkataraman](https://www.conf42.com/speaker_Mahesh_Venkataraman) (Managing Director @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2021_Mahesh_Venkataraman_spatio_temporal_causal_uncertainty_observability
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Mahesh Venkataraman](https://www.conf42.com/speaker_Mahesh_Venkataraman) (Managing Director @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2021_Mahesh_Venkataraman_spatio_temporal_causal_uncertainty_observability
 
 Video: https://www.youtube.com/watch?v=QrdhysXUiJQ
 

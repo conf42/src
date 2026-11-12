@@ -1,6 +1,6 @@
 # Shifting left chaos testing
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Pablo Chacin](https://www.conf42.com/speaker_Pablo_Chacin) (Technical Lead Chaos Engineering @ Grafana Labs / K6). Page: https://www.conf42.com/Chaos_Engineering_2023_Pablo_Chacin_shifting_left_chaos_testing
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Pablo Chacin](https://www.conf42.com/speaker_Pablo_Chacin) (Technical Lead Chaos Engineering @ Grafana Labs / K6). Page: https://www.conf42.com/Chaos_Engineering_2023_Pablo_Chacin_shifting_left_chaos_testing
 
 Video: https://www.youtube.com/watch?v=Lxtr9h0Xkqc
 

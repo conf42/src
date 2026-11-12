@@ -1,6 +1,6 @@
 # Clear the ring for Chaos Engineering at Vertrieb Deutsche Bahn! One year sensations and attractions!
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Maik Figura](https://www.conf42.com/speaker_Maik_Figura) (IT Consultant @ codecentric AG) and [Oliver Kracht](https://www.conf42.com/speaker_Oliver_Kracht) (Implementation Lead @ Deutsche Bahn). Page: https://www.conf42.com/Chaos_Engineering_2021_Maik_Figura_Oliver_Kracht_clear_the_ring_deutsche_bahn
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Maik Figura](https://www.conf42.com/speaker_Maik_Figura) (IT Consultant @ codecentric AG) and [Oliver Kracht](https://www.conf42.com/speaker_Oliver_Kracht) (Implementation Lead @ Deutsche Bahn). Page: https://www.conf42.com/Chaos_Engineering_2021_Maik_Figura_Oliver_Kracht_clear_the_ring_deutsche_bahn
 
 Video: https://www.youtube.com/watch?v=aTs7Rspyb4I
 

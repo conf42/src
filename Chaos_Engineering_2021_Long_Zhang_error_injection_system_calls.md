@@ -1,6 +1,6 @@
 # Maximizing Error Injection Realism for Chaos Engineering with System Calls
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (PhD Student in Computer Science @ KTH Royal Institute of Technology). Page: https://www.conf42.com/Chaos_Engineering_2021_Long_Zhang_error_injection_system_calls
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (PhD Student in Computer Science @ KTH Royal Institute of Technology). Page: https://www.conf42.com/Chaos_Engineering_2021_Long_Zhang_error_injection_system_calls
 
 Video: https://www.youtube.com/watch?v=NbAUmoifzdQ
 

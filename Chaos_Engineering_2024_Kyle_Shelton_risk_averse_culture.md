@@ -1,6 +1,6 @@
 # Implementing Chaos Engineering in a Risk Averse Culture
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Kyle Shelton](https://www.conf42.com/speaker_Kyle_Shelton) (Senior Devops Engineer @ Toyota). Page: https://www.conf42.com/Chaos_Engineering_2024_Kyle_Shelton_risk_averse_culture
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Kyle Shelton](https://www.conf42.com/speaker_Kyle_Shelton) (Senior Devops Engineer @ Toyota). Page: https://www.conf42.com/Chaos_Engineering_2024_Kyle_Shelton_risk_averse_culture
 
 Video: https://www.youtube.com/watch?v=Y4REVW5Zw6Y
 

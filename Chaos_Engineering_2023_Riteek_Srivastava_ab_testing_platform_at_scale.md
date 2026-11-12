@@ -1,6 +1,6 @@
 # A/B testing platform at scale
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Riteek Srivastava](https://www.conf42.com/speaker_Riteek_Srivastava) (Lead Software Engineer @ Gojek Tech). Page: https://www.conf42.com/Chaos_Engineering_2023_Riteek_Srivastava_ab_testing_platform_at_scale
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Riteek Srivastava](https://www.conf42.com/speaker_Riteek_Srivastava) (Lead Software Engineer @ Gojek Tech). Page: https://www.conf42.com/Chaos_Engineering_2023_Riteek_Srivastava_ab_testing_platform_at_scale
 
 Video: https://www.youtube.com/watch?v=PqhRGgZMgn0
 

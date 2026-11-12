@@ -1,6 +1,6 @@
 # Creating a learning culture
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Amir Shaked](https://www.conf42.com/speaker_Amir_Shaked) (Senior VP R&D @ PerimeterX). Page: https://www.conf42.com/Chaos_Engineering_2021_Amir_Shaked_learning_culture
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Amir Shaked](https://www.conf42.com/speaker_Amir_Shaked) (Senior VP R&D @ PerimeterX). Page: https://www.conf42.com/Chaos_Engineering_2021_Amir_Shaked_learning_culture
 
 Video: https://www.youtube.com/watch?v=7Sg3etadb4w
 

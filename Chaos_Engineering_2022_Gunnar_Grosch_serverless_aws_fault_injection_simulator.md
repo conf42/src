@@ -1,6 +1,6 @@
 # Chaos engineering for serverless with AWS Fault Injection Simulator
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Gunnar Grosch](https://www.conf42.com/speaker_Gunnar_Grosch) (Senior Developer Advocate @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Gunnar Grosch](https://www.conf42.com/speaker_Gunnar_Grosch) (Senior Developer Advocate @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Gunnar_Grosch_serverless_aws_fault_injection_simulator
 
 Video: https://www.youtube.com/watch?v=xNhWZkBslUQ
 

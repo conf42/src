@@ -1,6 +1,6 @@
 # Unix shell - We can do better now
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Ilya Sher](https://www.conf42.com/speaker_Ilya_Sher) (CTO @ Beame). Page: https://www.conf42.com/Chaos_Engineering_2024_Ilya_Sher_unix_shell
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Ilya Sher](https://www.conf42.com/speaker_Ilya_Sher) (CTO @ Beame). Page: https://www.conf42.com/Chaos_Engineering_2024_Ilya_Sher_unix_shell
 
 Video: https://www.youtube.com/watch?v=J4_DGkKGWIo
 

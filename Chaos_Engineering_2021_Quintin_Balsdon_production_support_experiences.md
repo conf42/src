@@ -1,6 +1,6 @@
 # Sleeping with one eye open: Experiences with production support
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Quintin Balsdon](https://www.conf42.com/speaker_Quintin_Balsdon) (Expert Software Engineer @ Zuhlke Group). Page: https://www.conf42.com/Chaos_Engineering_2021_Quintin_Balsdon_production_support_experiences
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Quintin Balsdon](https://www.conf42.com/speaker_Quintin_Balsdon) (Expert Software Engineer @ Zuhlke Group). Page: https://www.conf42.com/Chaos_Engineering_2021_Quintin_Balsdon_production_support_experiences
 
 Video: https://www.youtube.com/watch?v=Hb8rRfi7_b0
 

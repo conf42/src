@@ -1,6 +1,6 @@
 # The Road to Reliability
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Julie Gunderson](https://www.conf42.com/speaker_Julie_Gunderson) (Reliability Advocate @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2022_Julie_Gunderson_the_road_to_reliability
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Julie Gunderson](https://www.conf42.com/speaker_Julie_Gunderson) (Reliability Advocate @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2022_Julie_Gunderson_the_road_to_reliability
 
 Video: https://www.youtube.com/watch?v=BKsxJRzuxTI
 

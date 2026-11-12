@@ -1,6 +1,6 @@
 # Building Resilience through Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Shirisha Vivekanand](https://www.conf42.com/speaker_Shirisha_Vivekanand) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Shirisha_Vivekanand_building_resilience
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Shirisha Vivekanand](https://www.conf42.com/speaker_Shirisha_Vivekanand) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Shirisha_Vivekanand_building_resilience
 
 Video: https://www.youtube.com/watch?v=lpm2IK0N1nQ
 

@@ -1,6 +1,6 @@
 # How to be WRONG
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Russ Miles](https://www.conf42.com/speaker_Russ_Miles) (CEO @ ChaosIQ). Page: https://www.conf42.com/Chaos_Engineering_2020_Russ_Miles_how_to_be_wrong
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Russ Miles](https://www.conf42.com/speaker_Russ_Miles) (CEO @ ChaosIQ). Page: https://www.conf42.com/Chaos_Engineering_2020_Russ_Miles_how_to_be_wrong
 
 Video: https://www.youtube.com/watch?v=7k6gYZa6BVg
 

@@ -1,6 +1,6 @@
 # Self Healing Systems
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Nick Hodges](https://www.conf42.com/speaker_Nick_Hodges) (Developer Advocate @ Rollbar). Page: https://www.conf42.com/Chaos_Engineering_2022_Nick_Hodges_self_healing_systems
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Nick Hodges](https://www.conf42.com/speaker_Nick_Hodges) (Developer Advocate @ Rollbar). Page: https://www.conf42.com/Chaos_Engineering_2022_Nick_Hodges_self_healing_systems
 
 Video: https://www.youtube.com/watch?v=UBqouRXnslA
 

@@ -1,6 +1,6 @@
 # Cyber Chaos Engineering: How to Implement Security without a Blindfold
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Aaron Rinehart](https://www.conf42.com/speaker_Aaron_Rinehart) (CTO @ Verica) and [David Lavezzo](https://www.conf42.com/speaker_David_Lavezzo) (Director of Cyber Chaos Engineering @ Capital One). Page: https://www.conf42.com/Chaos_Engineering_2021_Aaron_Rinehart_David_Lavezzo_cyber_chaos_engineering
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Aaron Rinehart](https://www.conf42.com/speaker_Aaron_Rinehart) (CTO @ Verica) and [David Lavezzo](https://www.conf42.com/speaker_David_Lavezzo) (Director of Cyber Chaos Engineering @ Capital One). Page: https://www.conf42.com/Chaos_Engineering_2021_Aaron_Rinehart_David_Lavezzo_cyber_chaos_engineering
 
 Video: https://www.youtube.com/watch?v=5-nlCxeQUF4
 

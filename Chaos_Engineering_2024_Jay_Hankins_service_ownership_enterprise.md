@@ -1,6 +1,6 @@
 # Chaos Engineering and Service Ownership at Enterprise Scale
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Jay Hankins](https://www.conf42.com/speaker_Jay_Hankins) (Lead Member of Technical Staff @ Salesforce). Page: https://www.conf42.com/Chaos_Engineering_2024_Jay_Hankins_service_ownership_enterprise
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Jay Hankins](https://www.conf42.com/speaker_Jay_Hankins) (Lead Member of Technical Staff @ Salesforce). Page: https://www.conf42.com/Chaos_Engineering_2024_Jay_Hankins_service_ownership_enterprise
 
 Video: https://www.youtube.com/watch?v=susRzj7wwYE
 

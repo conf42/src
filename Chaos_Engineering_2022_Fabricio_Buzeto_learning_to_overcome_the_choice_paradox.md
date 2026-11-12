@@ -1,6 +1,6 @@
 # Learning to overcome the choice paradox
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Fabricio Buzeto](https://www.conf42.com/speaker_Fabricio_Buzeto) (CTO @ bxblue). Page: https://www.conf42.com/Chaos_Engineering_2022_Fabricio_Buzeto_learning_to_overcome_the_choice_paradox
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Fabricio Buzeto](https://www.conf42.com/speaker_Fabricio_Buzeto) (CTO @ bxblue). Page: https://www.conf42.com/Chaos_Engineering_2022_Fabricio_Buzeto_learning_to_overcome_the_choice_paradox
 
 Video: https://www.youtube.com/watch?v=WB9PH6P-FV0
 

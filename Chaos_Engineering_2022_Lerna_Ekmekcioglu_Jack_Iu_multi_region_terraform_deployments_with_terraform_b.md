@@ -1,6 +1,6 @@
 # Multi Region Terraform Deployments with Terraform Built CI/CD on AWS
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Lerna Ekmekcioglu](https://www.conf42.com/speaker_Lerna_Ekmekcioglu) (Senior Solutions Architect @ AWS) and [Jack Iu](https://www.conf42.com/speaker_Jack_Iu) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Lerna_Ekmekcioglu_Jack_Iu_multi_region_terraform_deployments_with_terraform_b
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Lerna Ekmekcioglu](https://www.conf42.com/speaker_Lerna_Ekmekcioglu) (Senior Solutions Architect @ AWS) and [Jack Iu](https://www.conf42.com/speaker_Jack_Iu) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Lerna_Ekmekcioglu_Jack_Iu_multi_region_terraform_deployments_with_terraform_b
 
 Video: https://www.youtube.com/watch?v=l3gvFLi-4FA
 

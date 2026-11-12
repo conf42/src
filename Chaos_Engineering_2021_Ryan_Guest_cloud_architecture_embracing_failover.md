@@ -1,6 +1,6 @@
 # Normalizing Chaos: A Cloud Architecture for Embracing Failover
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Ryan Guest](https://www.conf42.com/speaker_Ryan_Guest) (Software Architect @ Salesforce). Page: https://www.conf42.com/Chaos_Engineering_2021_Ryan_Guest_cloud_architecture_embracing_failover
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Ryan Guest](https://www.conf42.com/speaker_Ryan_Guest) (Software Architect @ Salesforce). Page: https://www.conf42.com/Chaos_Engineering_2021_Ryan_Guest_cloud_architecture_embracing_failover
 
 Video: https://www.youtube.com/watch?v=gxV9dtM6FgE
 

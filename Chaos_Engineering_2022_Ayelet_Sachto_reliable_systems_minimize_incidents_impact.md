@@ -1,6 +1,6 @@
 # Maintaining Reliable systems: How to minimize Incident's impact?
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Ayelet Sachto](https://www.conf42.com/speaker_Ayelet_Sachto) (Strategic Cloud Engineer @ Google). Page: https://www.conf42.com/Chaos_Engineering_2022_Ayelet_Sachto_reliable_systems_minimize_incidents_impact
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Ayelet Sachto](https://www.conf42.com/speaker_Ayelet_Sachto) (Strategic Cloud Engineer @ Google). Page: https://www.conf42.com/Chaos_Engineering_2022_Ayelet_Sachto_reliable_systems_minimize_incidents_impact
 
 Video: https://www.youtube.com/watch?v=u24KSshT2js
 

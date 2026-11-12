@@ -1,6 +1,6 @@
 # Increasing Kubernetes Resilience for an SRE
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (CEO @ Chaos Native). Page: https://www.conf42.com/Chaos_Engineering_2021_Uma_Mukkara_cloud_native_at_scale
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (CEO @ Chaos Native). Page: https://www.conf42.com/Chaos_Engineering_2021_Uma_Mukkara_cloud_native_at_scale
 
 Video: https://www.youtube.com/watch?v=yQiISxndExA
 

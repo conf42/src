@@ -1,6 +1,6 @@
 # Chaos Monkey for Spring Boot
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [John Fletcher](https://www.conf42.com/speaker_John_Fletcher) (Chaos Monkey Evangelist @ Codecentric AG) and [Manuel Wessner](https://www.conf42.com/speaker_Manuel_Wessner) (Chaos Monkey Evangelist). Page: https://www.conf42.com/Chaos_Engineering_2020_John_Fletcher_Manuel_Wessner_chaos_monkey_for_spring_boot
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [John Fletcher](https://www.conf42.com/speaker_John_Fletcher) (Chaos Monkey Evangelist @ Codecentric AG) and [Manuel Wessner](https://www.conf42.com/speaker_Manuel_Wessner) (Chaos Monkey Evangelist). Page: https://www.conf42.com/Chaos_Engineering_2020_John_Fletcher_Manuel_Wessner_chaos_monkey_for_spring_boot
 
 Video: https://www.youtube.com/watch?v=H99jI1nwe0g
 

@@ -1,6 +1,6 @@
 # AI Model Monitoring: Building Reliable Alert Systems
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Muddassar Sharif](https://www.conf42.com/speaker_Muddassar_Sharif) (Co-Founder & CTO @ Virtuans.ai). Page: https://www.conf42.com/Chaos_Engineering_2025_Muddassar_Sharif_ai_model_systems
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Muddassar Sharif](https://www.conf42.com/speaker_Muddassar_Sharif) (Co-Founder & CTO @ Virtuans.ai). Page: https://www.conf42.com/Chaos_Engineering_2025_Muddassar_Sharif_ai_model_systems
 
 Video: https://www.youtube.com/watch?v=6nGzSs1lxYY
 

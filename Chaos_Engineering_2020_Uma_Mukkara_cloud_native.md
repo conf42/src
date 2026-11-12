@@ -1,6 +1,6 @@
 # Cloud Native Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (CEO @ Chaos Native). Page: https://www.conf42.com/Chaos_Engineering_2020_Uma_Mukkara_cloud_native
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (CEO @ Chaos Native). Page: https://www.conf42.com/Chaos_Engineering_2020_Uma_Mukkara_cloud_native
 
 Video: https://www.youtube.com/watch?v=KUyIjjgYhl0
 

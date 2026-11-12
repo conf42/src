@@ -1,6 +1,6 @@
 # Defeating Ransomware Attacks with Security Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Kennedy Torkura](https://www.conf42.com/speaker_Kennedy_Torkura) (Co-Founder & CTO @ Mitigant). Page: https://www.conf42.com/Chaos_Engineering_2022_Kennedy_Torkura_defeating_ransomware_attacks
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Kennedy Torkura](https://www.conf42.com/speaker_Kennedy_Torkura) (Co-Founder & CTO @ Mitigant). Page: https://www.conf42.com/Chaos_Engineering_2022_Kennedy_Torkura_defeating_ransomware_attacks
 
 Video: https://www.youtube.com/watch?v=y_Ve7jiHDFA
 

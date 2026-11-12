@@ -1,6 +1,6 @@
 # One year of SRE failures
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Bart Enkelaar](https://www.conf42.com/speaker_Bart_Enkelaar) (Lead SRE @ bol.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Bart_Enkelaar_sre_failures
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Bart Enkelaar](https://www.conf42.com/speaker_Bart_Enkelaar) (Lead SRE @ bol.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Bart_Enkelaar_sre_failures
 
 Video: https://www.youtube.com/watch?v=MjGRhsBfrUo
 

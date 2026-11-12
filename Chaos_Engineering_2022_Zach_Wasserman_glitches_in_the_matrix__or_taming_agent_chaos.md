@@ -1,6 +1,6 @@
 # Glitches in the Matrix, or Taming Agent Chaos
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Zach Wasserman](https://www.conf42.com/speaker_Zach_Wasserman) (CTO @ Fleet). Page: https://www.conf42.com/Chaos_Engineering_2022_Zach_Wasserman_glitches_in_the_matrix__or_taming_agent_chaos
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Zach Wasserman](https://www.conf42.com/speaker_Zach_Wasserman) (CTO @ Fleet). Page: https://www.conf42.com/Chaos_Engineering_2022_Zach_Wasserman_glitches_in_the_matrix__or_taming_agent_chaos
 
 Video: https://www.youtube.com/watch?v=hBtYFm2m2Lo
 

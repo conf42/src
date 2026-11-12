@@ -1,6 +1,6 @@
 # Shipping Quality Software in Hostile Environments
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Luka Kladaric](https://www.conf42.com/speaker_Luka_Kladaric) (Founder & Chaos Management @ Sekura). Page: https://www.conf42.com/Chaos_Engineering_2020_Luka_Kladaric_quality_software_hostile_environments
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Luka Kladaric](https://www.conf42.com/speaker_Luka_Kladaric) (Founder & Chaos Management @ Sekura). Page: https://www.conf42.com/Chaos_Engineering_2020_Luka_Kladaric_quality_software_hostile_environments
 
 Video: https://www.youtube.com/watch?v=nApPLgPfPYM
 

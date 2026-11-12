@@ -1,6 +1,6 @@
 # Real-Time Personalization at Scale: Neural Ranking Systems and Operational Breakthroughs
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Vedant Agarwal](https://www.conf42.com/speaker_Vedant_Agarwal) (Senior Software Engineer @ Walmart Global Tech). Page: https://www.conf42.com/Chaos_Engineering_2025_Vedant_Agarwal_personalization_ranking_systems
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Vedant Agarwal](https://www.conf42.com/speaker_Vedant_Agarwal) (Senior Software Engineer @ Walmart Global Tech). Page: https://www.conf42.com/Chaos_Engineering_2025_Vedant_Agarwal_personalization_ranking_systems
 
 Video: https://www.youtube.com/watch?v=l0qOZv6rz54
 

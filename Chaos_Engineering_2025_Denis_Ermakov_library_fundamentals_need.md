@@ -1,6 +1,6 @@
 # Why You Don’t Need That New Library: Sticking to Fundamentals
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Denis Ermakov](https://www.conf42.com/speaker_Denis_Ermakov) (Lead Software Engineer @ Techflow). Page: https://www.conf42.com/Chaos_Engineering_2025_Denis_Ermakov_library_fundamentals_need
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Denis Ermakov](https://www.conf42.com/speaker_Denis_Ermakov) (Lead Software Engineer @ Techflow). Page: https://www.conf42.com/Chaos_Engineering_2025_Denis_Ermakov_library_fundamentals_need
 
 Video: https://www.youtube.com/watch?v=jDtQbir6LEg
 

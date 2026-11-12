@@ -1,6 +1,6 @@
 # Cloud Chaos Engineering with AWS Fault Injection Simulator (FIS)
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Samuel Baruffi](https://www.conf42.com/speaker_Samuel_Baruffi) (Senior Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Samuel_Baruffi_cloud_aws_fault_injection_simulator_fis
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Samuel Baruffi](https://www.conf42.com/speaker_Samuel_Baruffi) (Senior Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Samuel_Baruffi_cloud_aws_fault_injection_simulator_fis
 
 Video: https://www.youtube.com/watch?v=R23q51wkvY4
 

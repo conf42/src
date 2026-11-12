@@ -1,6 +1,6 @@
 # 5-Technology Trends and Opportunities for Start-ups & Fortune 500 Companies
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Derris Boomer](https://www.conf42.com/speaker_Derris_Boomer) (Founder @ BoomerTechGroup). Page: https://www.conf42.com/Chaos_Engineering_2021_Derris_Boomer_technology_trends_startups_fortune_500_companies
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Derris Boomer](https://www.conf42.com/speaker_Derris_Boomer) (Founder @ BoomerTechGroup). Page: https://www.conf42.com/Chaos_Engineering_2021_Derris_Boomer_technology_trends_startups_fortune_500_companies
 
 Video: https://www.youtube.com/watch?v=NBA8hDkoBfM
 

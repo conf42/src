@@ -1,6 +1,6 @@
 # Chaos Engineering: At the age of AI and ML
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Soumen Chatterjee](https://www.conf42.com/speaker_Soumen_Chatterjee) (Partner Solution Architecture @ AWS) and [Nathalie Rauschmayr](https://www.conf42.com/speaker_Nathalie_Rauschmayr) (Senior Applied Scientist @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Soumen_Chatterjee_Nathalie_Rauschmayr_at_the_age_of_ai_and_ml
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Soumen Chatterjee](https://www.conf42.com/speaker_Soumen_Chatterjee) (Partner Solution Architecture @ AWS) and [Nathalie Rauschmayr](https://www.conf42.com/speaker_Nathalie_Rauschmayr) (Senior Applied Scientist @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2022_Soumen_Chatterjee_Nathalie_Rauschmayr_at_the_age_of_ai_and_ml
 
 Video: https://www.youtube.com/watch?v=NmpjMg62wuw
 

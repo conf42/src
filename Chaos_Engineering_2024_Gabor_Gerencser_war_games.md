@@ -1,6 +1,6 @@
 # Chaos engineering war games – prepare for the unexpected
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Gabor Gerencser](https://www.conf42.com/speaker_Gabor_Gerencser) (Tech Lead @ Vodafone UK). Page: https://www.conf42.com/Chaos_Engineering_2024_Gabor_Gerencser_war_games
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Gabor Gerencser](https://www.conf42.com/speaker_Gabor_Gerencser) (Tech Lead @ Vodafone UK). Page: https://www.conf42.com/Chaos_Engineering_2024_Gabor_Gerencser_war_games
 
 Video: https://www.youtube.com/watch?v=cN5n-D7XKjw
 

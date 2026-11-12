@@ -1,6 +1,6 @@
 # Blameless Postmortem Culture
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Pranjal Deo](https://www.conf42.com/speaker_Pranjal_Deo) (Engineering Program Manager @ Google). Page: https://www.conf42.com/Chaos_Engineering_2021_Pranjal_Deo_postmortem_culture_blameless
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Pranjal Deo](https://www.conf42.com/speaker_Pranjal_Deo) (Engineering Program Manager @ Google). Page: https://www.conf42.com/Chaos_Engineering_2021_Pranjal_Deo_postmortem_culture_blameless
 
 Video: https://www.youtube.com/watch?v=6bAqj6B4m-Q
 

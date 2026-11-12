@@ -1,6 +1,6 @@
 # Mastering Cloud Cost Efficiency: Strategic Optimization for Cloud-Native Success
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Hari Yerramsetty](https://www.conf42.com/speaker_Hari_Yerramsetty) (Software Engineer @ Flexport). Page: https://www.conf42.com/Chaos_Engineering_2025_Hari_Yerramsetty_cost_optimization_success
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Hari Yerramsetty](https://www.conf42.com/speaker_Hari_Yerramsetty) (Software Engineer @ Flexport). Page: https://www.conf42.com/Chaos_Engineering_2025_Hari_Yerramsetty_cost_optimization_success
 
 Video: https://www.youtube.com/watch?v=MhKm9XSnymc
 

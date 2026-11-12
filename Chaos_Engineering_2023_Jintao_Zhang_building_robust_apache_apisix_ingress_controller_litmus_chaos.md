@@ -1,6 +1,6 @@
 # Building a more robust Apache APISIX Ingress controller with Litmus Chaos
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Jintao Zhang](https://www.conf42.com/speaker_Jintao_Zhang) (Technical Expert @ API7.AI). Page: https://www.conf42.com/Chaos_Engineering_2023_Jintao_Zhang_building_robust_apache_apisix_ingress_controller_litmus_chaos
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Jintao Zhang](https://www.conf42.com/speaker_Jintao_Zhang) (Technical Expert @ API7.AI). Page: https://www.conf42.com/Chaos_Engineering_2023_Jintao_Zhang_building_robust_apache_apisix_ingress_controller_litmus_chaos
 
 Video: https://www.youtube.com/watch?v=EstawZAVaVo
 

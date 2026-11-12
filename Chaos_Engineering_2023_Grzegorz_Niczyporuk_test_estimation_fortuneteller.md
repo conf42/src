@@ -1,6 +1,6 @@
 # Test estimation - how did I become a fortune-teller
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Grzegorz Niczyporuk](https://www.conf42.com/speaker_Grzegorz_Niczyporuk) (QA Manager @ Swing Development). Page: https://www.conf42.com/Chaos_Engineering_2023_Grzegorz_Niczyporuk_test_estimation_fortuneteller
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Grzegorz Niczyporuk](https://www.conf42.com/speaker_Grzegorz_Niczyporuk) (QA Manager @ Swing Development). Page: https://www.conf42.com/Chaos_Engineering_2023_Grzegorz_Niczyporuk_test_estimation_fortuneteller
 
 Video: https://www.youtube.com/watch?v=qwXpqlq40iE
 

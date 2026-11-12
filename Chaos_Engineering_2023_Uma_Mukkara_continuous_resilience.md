@@ -1,6 +1,6 @@
 # Continuous Resilience with Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (Head of Chaos Engineering @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2023_Uma_Mukkara_continuous_resilience
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Uma Mukkara](https://www.conf42.com/speaker_Uma_Mukkara) (Head of Chaos Engineering @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2023_Uma_Mukkara_continuous_resilience
 
 Video: https://www.youtube.com/watch?v=8bUiFaPqRj8
 

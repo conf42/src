@@ -1,6 +1,6 @@
 # Revolutionizing Nonprofit Marketing Analytics with a Unified API Ecosystem for Real-Time Insights
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Rao Marapatla](https://www.conf42.com/speaker_Rao_Marapatla) (Director, Data Infrastructure and Reporting @ BreakthroughT1D). Page: https://www.conf42.com/Chaos_Engineering_2025_Rao_Marapatla_analytics_marketing_insights
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Rao Marapatla](https://www.conf42.com/speaker_Rao_Marapatla) (Director, Data Infrastructure and Reporting @ BreakthroughT1D). Page: https://www.conf42.com/Chaos_Engineering_2025_Rao_Marapatla_analytics_marketing_insights
 
 Video: https://www.youtube.com/watch?v=NjXvMA9qAF4
 

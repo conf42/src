@@ -1,6 +1,6 @@
 # Chaos Engineering for Developers: Breaking Systems for Resilience
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Dhiraj Kumar Jain](https://www.conf42.com/speaker_Dhiraj_Kumar_Jain) (Software Engineer @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Dhiraj_Kumar_Jain_developers_breaking_systems
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Dhiraj Kumar Jain](https://www.conf42.com/speaker_Dhiraj_Kumar_Jain) (Software Engineer @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Dhiraj_Kumar_Jain_developers_breaking_systems
 
 Video: https://www.youtube.com/watch?v=v_jSTMcoWvU
 

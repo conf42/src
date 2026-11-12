@@ -1,6 +1,6 @@
 # Chaos Engineering in Mobile Apps: Building Resilient Systems Through Controlled Failure
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Jaspreet Kumar](https://www.conf42.com/speaker_Jaspreet_Kumar) (Lead Software Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Jaspreet_Kumar_mobile_apps
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Jaspreet Kumar](https://www.conf42.com/speaker_Jaspreet_Kumar) (Lead Software Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Jaspreet_Kumar_mobile_apps
 
 Video: https://www.youtube.com/watch?v=Z67_HlXjEEE
 

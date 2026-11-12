@@ -1,6 +1,6 @@
 # Chaos Engineering for Resilient Microservices
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Muhammad Ahmad Saeed](https://www.conf42.com/speaker_Muhammad_Ahmad_Saeed) (Software Engineer). Page: https://www.conf42.com/Chaos_Engineering_2025_Muhammad_Ahmad_Saeed_chaos_microservices_engineering
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Muhammad Ahmad Saeed](https://www.conf42.com/speaker_Muhammad_Ahmad_Saeed) (Software Engineer). Page: https://www.conf42.com/Chaos_Engineering_2025_Muhammad_Ahmad_Saeed_chaos_microservices_engineering
 
 Video: https://www.youtube.com/watch?v=1ZX9LYptI_0
 

@@ -1,6 +1,6 @@
 # How to avoid breaking other people's things
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Lisa Karlin Curtis](https://www.conf42.com/speaker_Lisa_Karlin_Curtis) (Tech Lead @ GoCardless). Page: https://www.conf42.com/Chaos_Engineering_2021_Lisa_Karlin_Curtis_breaking_things
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Lisa Karlin Curtis](https://www.conf42.com/speaker_Lisa_Karlin_Curtis) (Tech Lead @ GoCardless). Page: https://www.conf42.com/Chaos_Engineering_2021_Lisa_Karlin_Curtis_breaking_things
 
 Video: https://www.youtube.com/watch?v=PPoQSa_6Dko
 

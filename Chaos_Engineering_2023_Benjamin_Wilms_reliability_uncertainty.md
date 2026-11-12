@@ -1,6 +1,6 @@
 # Reliability in the Face of Uncertainty
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Benjamin Wilms](https://www.conf42.com/speaker_Benjamin_Wilms) (Co-Founder & CEO @ Steadybit). Page: https://www.conf42.com/Chaos_Engineering_2023_Benjamin_Wilms_reliability_uncertainty
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Benjamin Wilms](https://www.conf42.com/speaker_Benjamin_Wilms) (Co-Founder & CEO @ Steadybit). Page: https://www.conf42.com/Chaos_Engineering_2023_Benjamin_Wilms_reliability_uncertainty
 
 Video: https://www.youtube.com/watch?v=mdwAMxxKKRA
 

@@ -1,6 +1,6 @@
 # Streaming Aggregation on Cloud Scale Telemetry
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Shay Lin](https://www.conf42.com/speaker_Shay_Lin) (Staff Software Engineer @ Confluent). Page: https://www.conf42.com/Chaos_Engineering_2023_Shay_Lin_streaming_aggregation_cloud_scale_telemetry
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Shay Lin](https://www.conf42.com/speaker_Shay_Lin) (Staff Software Engineer @ Confluent). Page: https://www.conf42.com/Chaos_Engineering_2023_Shay_Lin_streaming_aggregation_cloud_scale_telemetry
 
 Video: https://www.youtube.com/watch?v=4FqrMgPTA1s
 

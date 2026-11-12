@@ -1,6 +1,6 @@
 # Chaos-Driven Cloud Security: Building Resilient Defense Systems Through Controlled Failure
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Sandeep Batchu](https://www.conf42.com/speaker_Sandeep_Batchu) (Principal Software Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Sandeep_Batchu_security_cloud_defense
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Sandeep Batchu](https://www.conf42.com/speaker_Sandeep_Batchu) (Principal Software Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Sandeep_Batchu_security_cloud_defense
 
 Video: https://www.youtube.com/watch?v=u4Laz2caiYQ
 

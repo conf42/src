@@ -1,6 +1,6 @@
 # Journey To Resilience: Building the Ramp to accelerate The Adoption of Chaos Engineering Practices
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Vilas Veeraraghavan](https://www.conf42.com/speaker_Vilas_Veeraraghavan) (Director of Engineering @ Walmart Labs). Page: https://www.conf42.com/Chaos_Engineering_2020_Vilas_Veeraraghavan_resilience_adoption
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Vilas Veeraraghavan](https://www.conf42.com/speaker_Vilas_Veeraraghavan) (Director of Engineering @ Walmart Labs). Page: https://www.conf42.com/Chaos_Engineering_2020_Vilas_Veeraraghavan_resilience_adoption
 
 Video: https://www.youtube.com/watch?v=4VosMeJlvWA
 

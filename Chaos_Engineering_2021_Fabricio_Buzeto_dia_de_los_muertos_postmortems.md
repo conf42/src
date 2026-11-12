@@ -1,6 +1,6 @@
 # Día de los Muertos - Postmortems that saves lives
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Fabricio Buzeto](https://www.conf42.com/speaker_Fabricio_Buzeto) (CTO @ bxblue). Page: https://www.conf42.com/Chaos_Engineering_2021_Fabricio_Buzeto_dia_de_los_muertos_postmortems
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Fabricio Buzeto](https://www.conf42.com/speaker_Fabricio_Buzeto) (CTO @ bxblue). Page: https://www.conf42.com/Chaos_Engineering_2021_Fabricio_Buzeto_dia_de_los_muertos_postmortems
 
 Video: https://www.youtube.com/watch?v=tSnQoN6J9R0
 

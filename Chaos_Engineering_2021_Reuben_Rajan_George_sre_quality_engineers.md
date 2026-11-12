@@ -1,6 +1,6 @@
 # Role of Quality Engineers in SRE
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Reuben Rajan George](https://www.conf42.com/speaker_Reuben_Rajan_George) (Cloud Reliability Architect @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2021_Reuben_Rajan_George_sre_quality_engineers
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Reuben Rajan George](https://www.conf42.com/speaker_Reuben_Rajan_George) (Cloud Reliability Architect @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2021_Reuben_Rajan_George_sre_quality_engineers
 
 Video: https://www.youtube.com/watch?v=urCJ53iqGSM
 
