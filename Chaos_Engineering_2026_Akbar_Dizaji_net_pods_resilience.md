@@ -1,0 +1,7 @@
+# Chaos Engineering Is Not Just Killing Pods: Testing Resilience in .NET Services
+
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Akbar Dizaji](https://www.conf42.com/speaker_Akbar_Dizaji) (Software Engineer @ Skedda). Page: https://www.conf42.com/Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience
+
+## Abstract
+
+Most teams try to build resilient applications by adding retries, timeouts, circuit breakers, and health checks. But an important question is often missed: have we actually tested whether those resilience mechanisms work under failure?  In this session, I will show how chaos engineering can be applied at the application level in .NET, not only at the Kubernetes or infrastructure level. Using a simple microservice-style example with an Order API calling a Payment API, we will inject controlled failures such as latency and exceptions, then observe how the system behaves when Polly-based resilience policies are triggered.  The talk will cover the difference between stability and resilience, why failures become dangerous when they spread across connected services, and how uncertainty, complexity, and emergent behavior make modern systems hard to predict. Through a practical .NET demo, we will explore retries, timeouts, circuit breakers, and fault injection using Simmy/Polly-style chaos policies.  The goal is to help developers move beyond assuming their systems are resilient and start validating resilience through safe, controlled experiments.

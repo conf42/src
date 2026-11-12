@@ -1,0 +1,7 @@
+# Breaking Things Safely at Scale: Configuration Canaries and Dependency Isolation at Meta
+
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Santhosh Somarapu](https://www.conf42.com/speaker_Santhosh_Somarapu) (Senior Member of Technical Staff @ eBay). Page: https://www.conf42.com/Chaos_Engineering_2026_Santhosh_Somarapu_configuration_canaries_meta
+
+## Abstract
+
+At large scale, most outages don't come from code. They come from configuration changes that take effect everywhere in seconds, and from shared dependencies whose failure spreads to everything built on top of them. At Meta, I worked on both problems for revenue-critical advertising infrastructure that handles thousands of changes a day and millions of requests per second.   This talk covers two practices that came out of that work. First, configuration canaries that judge a change by business signals, such as whether ad events are still being recorded correctly, and not only by system health, because a change can pass every CPU and error-rate check while quietly breaking the data a business depends on. Second, dependency isolation for shared services: isolating the parts of each record that depend on a shared tier, giving critical traffic its own limits, and recovering failed work afterward, so one shared-service failure doesn't cascade.   Attendees will leave with practical patterns they can apply to their own rollout and dependency design.

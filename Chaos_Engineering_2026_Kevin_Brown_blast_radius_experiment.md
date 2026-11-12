@@ -1,0 +1,7 @@
+# Predicting the Blast Radius, Then Spending Your One Experiment
+
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Kevin Brown](https://www.conf42.com/speaker_Kevin_Brown) (Founder @ Cloud World Model). Page: https://www.conf42.com/Chaos_Engineering_2026_Kevin_Brown_blast_radius_experiment
+
+## Abstract
+
+Chaos engineering asks an honest question: what breaks? Then it answers it by breaking it. That works, and it's why most teams don't do it. The experiment costs money, it costs pager load, and in production it costs customers, so the team that would learn the most is the team that runs it least.  This talk argues for a cheaper first move. Predict the blast radius of a change before you make it, then spend your one experiment on whatever the prediction couldn't settle.  I'll show it on a real infrastructure change rather than a diagram: what a modelled run says about p99, error rate and cost before anything is applied, and what it deliberately refuses to say. Then the harder half, which is knowing when a prediction is lying to you. A report that infers a pass from incomplete evidence is worse than no report, and a prediction that can't tell you which of its conclusions are estimated is theatre.  The useful position is neither. Predict what you can, mark what you can't, and let the experiment pay for itself by answering the one question the model couldn't.
