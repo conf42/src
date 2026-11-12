@@ -186,8 +186,16 @@ _CATEGORY_CACHE = {}
 _WARNED_SERIES = set()
 
 
-def series_key(event):
-    return re.sub(r'\d{4}$', '', str(event.get('short_url') or ''))
+def series_key(event, config=None):
+    """short_url minus the year; with a config, a series listed under another key's `aliases` maps to that key
+    (Chaos Engineering moved from ce20XX to chaos20XX: both use `chaos`)."""
+    key = re.sub(r'\d{4}$', '', str(event.get('short_url') or ''))
+    series = (config or {}).get('series') or {}
+    if config is not None and key not in series:
+        for name, body in series.items():
+            if key in ((body or {}).get('aliases') or []):
+                return name
+    return key
 
 
 def load_about_config(path='about.yaml'):
@@ -247,7 +255,7 @@ def build_about(event, config, today=None):
     """Sets event["about_*"] from event["talks_raw"] (needs talk["short_url"], so call it after
     the talk enrichment loop in events.py)."""
     today = today or datetime.date.today()
-    key = series_key(event)
+    key = series_key(event, config)
     event['about_series'] = key
     event['about_blurb'] = _blurb_for(event, key, config)
 
