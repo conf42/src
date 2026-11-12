@@ -40,4 +40,4 @@ The rest of the lineup ran from enterprise systems to networks: [Gopikrishna Yet
 
 Thanks to gold sponsors [Steadybit](https://steadybit.com/), [Rapydo](https://www.rapydo.io/), and [SREday](https://www.sreday.com/), the [StarterAI](https://www.starterai.dev/) newsletter, the [HockeyStick](https://www.hockeystick.show/) podcast, and the media partners on the event page.
 
-The series continues with [Conf42 Chaos Engineering 2026](https://www.conf42.com/ce2026) on December 3, 2026. Schedule your next game day accordingly.
+The series continues with [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) on December 3, 2026. Schedule your next game day accordingly.
