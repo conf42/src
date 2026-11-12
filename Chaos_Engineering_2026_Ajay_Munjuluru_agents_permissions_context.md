@@ -1,0 +1,7 @@
+# Chaos Engineering for AI Agents: Breaking Permissions, Tools, and Context on Purpose
+
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Ajay Munjuluru](https://www.conf42.com/speaker_Ajay_Munjuluru) (Senior Lead Software Engineer @ JPMorgan Chase). Page: https://www.conf42.com/Chaos_Engineering_2026_Ajay_Munjuluru_agents_permissions_context
+
+## Abstract
+
+Agent systems fail in ways traditional chaos experiments don’t cover. A user loses access mid-session, but the agent still holds their data in context. A tool times out, and the agent quietly switches to a different path that returns more than it should. Teams discover these behaviors in production because nobody tested for them.  This talk applies chaos engineering principles to multi-agent systems, drawing on experience building agents with custom MCP servers over enterprise banking CRM data. It covers:  Revoking entitlements mid-session to test whether cached context is revalidated Injecting tool failures and latency to observe how agents reroute and what data the fallback paths expose Returning partial or denied results to check whether the agent leaks information through its reasoning Defining steady state for agents, including what “safe behavior” means beyond uptime Running experiments safely with synthetic users and generalized data  Attendees will leave with a starter set of agent chaos experiments and the hypotheses behind each one.

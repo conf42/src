@@ -1,0 +1,7 @@
+# We attacked our own AI agent memory: 30 adversarial writes, one hole, one fix
+
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Michael Oskola](https://www.conf42.com/speaker_Michael_Oskola) (Founder @ Retailbox). Page: https://www.conf42.com/Chaos_Engineering_2026_Michael_Oskola_memory_agent_adversarial
+
+## Abstract
+
+FleetMemory is an open-source shared memory for a fleet of AI agents. An agent can propose a fact, but the fact only becomes memory if it traces to something a customer actually said. Claims without a source go to quarantine, and an LLM verifier that defaults to reject rules on them. If the verifier call fails, that counts as a rejection too.  Then we tried to break it. We ran 30 adversarial writes across 5 attack classes against the real gate and verifier, not a mock. The first run found a hole: a brand-new fact that contradicted nothing already in memory walked straight in, 6 times out of 6. The fix was one rule, needs_provenance, and after it the same 30 attacks were all blocked.  The gate still isn't perfect, and the talk shows where. It let through 9 of 10 legitimate customer updates. The one it missed is a race condition we left visible in the decision journal instead of tuning it away. Median gate latency over the run was 293 ms. The red-team script and results are in the public repo, so you can rerun them against your own agent memory.
