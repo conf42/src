@@ -182,6 +182,9 @@ class Resolver:
 
     def __init__(self, events, sponsors):
         self.events = {e.get("short_url"): e for e in events if e.get("short_url")}
+        for e in events:   # renamed events: Refs written with the old short_url still resolve
+            for old in e.get("old_short_urls") or []:
+                self.events.setdefault(old, e)
         self.sponsor_ids = {s.get("id") for s in sponsors or []}
         try:
             self.webinars = {w.get("Slug"): w for w in read_csv(WEBINARS_CSV) if w.get("Slug")}

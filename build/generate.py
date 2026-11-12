@@ -386,6 +386,15 @@ for event in context.get("events"):
         template = env.get_template("event.html")
         f.write(template.render(event=event, canonical=get_canonical_url(event.get("short_url")), event_ld=event_jsonld(event), **context))
         register_url(event.get("short_url").replace(".html",""), lastmod=released_on(event))
+    # renamed events (old_short_urls, e.g. ce2025 -> chaos2025, Marek 2026-11-12): the old page redirects to the new
+    # one and the old .ics stays a valid calendar file
+    for _old in event.get("old_short_urls") or []:
+        with open(BASE_FOLDER + "/" + _old + ".html", "w") as f:
+            f.write('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
+                    '<meta http-equiv="refresh" content="0; url=%(to)s"><link rel="canonical" href="%(to)s"><a href="%(to)s">Moved</a>'
+                    % {"to": get_canonical_url(event.get("short_url"))})
+        with open(BASE_FOLDER + "/" + _old + ".ics", "w") as f:
+            f.write(str(c))
     # template the secret event page
     if event.get("secret_url"):
         with open(BASE_FOLDER + "/" + event.get("secret_url") + ".html", "w") as f:
@@ -473,6 +482,12 @@ for post in posts:
     _olds = [post.get("ShortURL")]
     if "/" in post.get("ShortURL"):
         _olds.append(str(post.get("Date"))[:10] + "-" + post.get("ShortURL").split("/", 1)[1])
+        # a renamed event (old_short_urls) keeps its posts' old URLs alive too: /blog/ce2025/<slug> and /ce2025/<slug>
+        _pe, _ps = post.get("ShortURL").split("/", 1)
+        for _ev in context.get("events") or []:
+            if _ev.get("short_url") == _pe:
+                for _o in _ev.get("old_short_urls") or []:
+                    _olds += ["blog/%s/%s" % (_o, _ps), "%s/%s" % (_o, _ps)]
     for _old in _olds:
         os.makedirs(os.path.dirname(BASE_FOLDER + "/" + _old), exist_ok=True)
         with open(BASE_FOLDER + "/" + _old + ".html", "w") as f:
