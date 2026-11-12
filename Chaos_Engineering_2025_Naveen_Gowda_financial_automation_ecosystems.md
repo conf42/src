@@ -1,6 +1,6 @@
 # Transforming Financial Workflows: Harnessing Automation in Multi-Cloud Ecosystems
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Naveen Gowda](https://www.conf42.com/speaker_Naveen_Gowda) (Director, Data Engineering & Integrations @ Couchbase). Page: https://www.conf42.com/Chaos_Engineering_2025_Naveen_Gowda_financial_automation_ecosystems
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Naveen Gowda](https://www.conf42.com/speaker_Naveen_Gowda) (Director, Data Engineering & Integrations @ Couchbase). Page: https://www.conf42.com/Chaos_Engineering_2025_Naveen_Gowda_financial_automation_ecosystems
 
 Video: https://www.youtube.com/watch?v=5V9dcIAVAA4
 

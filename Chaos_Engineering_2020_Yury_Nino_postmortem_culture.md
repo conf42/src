@@ -1,6 +1,6 @@
 # Postmortem Culture: Learning from Failure
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (DevOps Engineer @ Aval Digital Labs). Page: https://www.conf42.com/Chaos_Engineering_2020_Yury_Nino_postmortem_culture
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Yury Nino](https://www.conf42.com/speaker_Yury_Nino) (DevOps Engineer @ Aval Digital Labs). Page: https://www.conf42.com/Chaos_Engineering_2020_Yury_Nino_postmortem_culture
 
 Video: https://www.youtube.com/watch?v=JtLrlDNdJzg
 

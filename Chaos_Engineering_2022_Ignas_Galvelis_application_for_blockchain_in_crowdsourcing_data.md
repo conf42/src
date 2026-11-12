@@ -1,6 +1,6 @@
 # Application for Blockchain in Crowdsourcing Data
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Ignas Galvelis](https://www.conf42.com/speaker_Ignas_Galvelis) (Software Developer @ Sky). Page: https://www.conf42.com/Chaos_Engineering_2022_Ignas_Galvelis_application_for_blockchain_in_crowdsourcing_data
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Ignas Galvelis](https://www.conf42.com/speaker_Ignas_Galvelis) (Software Developer @ Sky). Page: https://www.conf42.com/Chaos_Engineering_2022_Ignas_Galvelis_application_for_blockchain_in_crowdsourcing_data
 
 Video: https://www.youtube.com/watch?v=BKbTRMr2Ohk
 

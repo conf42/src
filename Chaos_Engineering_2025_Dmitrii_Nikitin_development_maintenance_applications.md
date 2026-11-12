@@ -1,6 +1,6 @@
 # Development, Customization, and Maintenance of White-Label Android Applications
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Dmitrii Nikitin](https://www.conf42.com/speaker_Dmitrii_Nikitin) (Android Team Leader @ Quadcode). Page: https://www.conf42.com/Chaos_Engineering_2025_Dmitrii_Nikitin_development_maintenance_applications
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Dmitrii Nikitin](https://www.conf42.com/speaker_Dmitrii_Nikitin) (Android Team Leader @ Quadcode). Page: https://www.conf42.com/Chaos_Engineering_2025_Dmitrii_Nikitin_development_maintenance_applications
 
 Video: https://www.youtube.com/watch?v=W7IGcIBB02Y
 

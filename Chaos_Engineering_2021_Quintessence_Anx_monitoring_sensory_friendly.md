@@ -1,6 +1,6 @@
 # Sensory Friendly Monitoring: Keeping the Noise Down
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Quintessence Anx](https://www.conf42.com/speaker_Quintessence_Anx) (Developer Advocate @ PagerDuty). Page: https://www.conf42.com/Chaos_Engineering_2021_Quintessence_Anx_monitoring_sensory_friendly
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Quintessence Anx](https://www.conf42.com/speaker_Quintessence_Anx) (Developer Advocate @ PagerDuty). Page: https://www.conf42.com/Chaos_Engineering_2021_Quintessence_Anx_monitoring_sensory_friendly
 
 Video: https://www.youtube.com/watch?v=F6czQRpCjiw
 

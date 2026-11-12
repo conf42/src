@@ -1,6 +1,6 @@
 # Who is responsible for Chaos?
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Joyce Lin](https://www.conf42.com/speaker_Joyce_Lin) (Developer Advocate Lead @ Postman). Page: https://www.conf42.com/Chaos_Engineering_2020_Joyce_Lin_who_is_responsible_for_chaos
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Joyce Lin](https://www.conf42.com/speaker_Joyce_Lin) (Developer Advocate Lead @ Postman). Page: https://www.conf42.com/Chaos_Engineering_2020_Joyce_Lin_who_is_responsible_for_chaos
 
 Video: https://www.youtube.com/watch?v=ZTbrf47mCEU
 

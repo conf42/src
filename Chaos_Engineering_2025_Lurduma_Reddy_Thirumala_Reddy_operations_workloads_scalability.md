@@ -1,6 +1,6 @@
 # Transforming Enterprise Operations: Optimizing Mission-Critical SAP Workloads on Microsoft Azure for Scalability and Efficiency
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Lurduma Reddy Thirumala Reddy](https://www.conf42.com/speaker_Lurduma_Reddy_Thirumala_Reddy) (Senior SAP Consultant @ Intone Networks Inc.). Page: https://www.conf42.com/Chaos_Engineering_2025_Lurduma_Reddy_Thirumala_Reddy_operations_workloads_scalability
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Lurduma Reddy Thirumala Reddy](https://www.conf42.com/speaker_Lurduma_Reddy_Thirumala_Reddy) (Senior SAP Consultant @ Intone Networks Inc.). Page: https://www.conf42.com/Chaos_Engineering_2025_Lurduma_Reddy_Thirumala_Reddy_operations_workloads_scalability
 
 Video: https://www.youtube.com/watch?v=BdgYKCJg2gQ
 

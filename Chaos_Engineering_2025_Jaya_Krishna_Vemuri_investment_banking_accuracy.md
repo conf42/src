@@ -1,6 +1,6 @@
 # Revolutionizing Investment Banking: Cloud-Driven Reconciliation for Financial Accuracy and Efficiency
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Jaya Krishna Vemuri](https://www.conf42.com/speaker_Jaya_Krishna_Vemuri) (Vice President @ State Street Bank and Trust Company). Page: https://www.conf42.com/Chaos_Engineering_2025_Jaya_Krishna_Vemuri_investment_banking_accuracy
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Jaya Krishna Vemuri](https://www.conf42.com/speaker_Jaya_Krishna_Vemuri) (Vice President @ State Street Bank and Trust Company). Page: https://www.conf42.com/Chaos_Engineering_2025_Jaya_Krishna_Vemuri_investment_banking_accuracy
 
 Video: https://www.youtube.com/watch?v=QIhW-O8Q9OU
 

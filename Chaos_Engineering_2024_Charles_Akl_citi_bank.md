@@ -1,6 +1,6 @@
 # Chaos Engineering at Citi Bank
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Charles Akl](https://www.conf42.com/speaker_Charles_Akl) (Head of NA SRE & NAM Core Production Management @ Citi Bank). Page: https://www.conf42.com/Chaos_Engineering_2024_Charles_Akl_citi_bank
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Charles Akl](https://www.conf42.com/speaker_Charles_Akl) (Head of NA SRE & NAM Core Production Management @ Citi Bank). Page: https://www.conf42.com/Chaos_Engineering_2024_Charles_Akl_citi_bank
 
 Video: https://www.youtube.com/watch?v=WdpWdyGtLdY
 

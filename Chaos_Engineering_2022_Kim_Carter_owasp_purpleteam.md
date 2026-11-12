@@ -1,6 +1,6 @@
 # Purple Teaming with OWASP PurpleTeam
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Kim Carter](https://www.conf42.com/speaker_Kim_Carter) (Lead Security Engineer @ BinaryMist). Page: https://www.conf42.com/Chaos_Engineering_2022_Kim_Carter_owasp_purpleteam
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Kim Carter](https://www.conf42.com/speaker_Kim_Carter) (Lead Security Engineer @ BinaryMist). Page: https://www.conf42.com/Chaos_Engineering_2022_Kim_Carter_owasp_purpleteam
 
 Video: https://www.youtube.com/watch?v=ELSwfpQ6o48
 

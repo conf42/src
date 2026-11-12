@@ -1,6 +1,6 @@
 # Mastering Event-Driven Architecture for Resilient and Fault-Tolerant Systems
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Muhammad Rizwan](https://www.conf42.com/speaker_Muhammad_Rizwan) (Software Engineer @ Procode). Page: https://www.conf42.com/Chaos_Engineering_2025_Muhammad_Rizwan_architecture_systems_event
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Muhammad Rizwan](https://www.conf42.com/speaker_Muhammad_Rizwan) (Software Engineer @ Procode). Page: https://www.conf42.com/Chaos_Engineering_2025_Muhammad_Rizwan_architecture_systems_event
 
 Video: https://www.youtube.com/watch?v=m4CLl-LD4g0
 

@@ -1,6 +1,6 @@
 # Pod Security Policy is Dead, Long Live...?
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Chris Nesbitt-Smith](https://www.conf42.com/speaker_Chris_NesbittSmith) (Consultant @ UK Government). Page: https://www.conf42.com/Chaos_Engineering_2023_Chris_NesbittSmith_pod_security_policy
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Chris Nesbitt-Smith](https://www.conf42.com/speaker_Chris_NesbittSmith) (Consultant @ UK Government). Page: https://www.conf42.com/Chaos_Engineering_2023_Chris_NesbittSmith_pod_security_policy
 
 Video: https://www.youtube.com/watch?v=bpj5bRAJ2J0
 

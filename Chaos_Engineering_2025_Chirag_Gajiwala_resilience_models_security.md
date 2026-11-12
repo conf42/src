@@ -1,6 +1,6 @@
 # Chaos Engineering Meets AI: Exploring Resilience, Generative Models, and Security in a Rapidly Evolving Landscape
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Chirag Gajiwala](https://www.conf42.com/speaker_Chirag_Gajiwala) (Member of Technical Staff @ Nutanix). Page: https://www.conf42.com/Chaos_Engineering_2025_Chirag_Gajiwala_resilience_models_security
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Chirag Gajiwala](https://www.conf42.com/speaker_Chirag_Gajiwala) (Member of Technical Staff @ Nutanix). Page: https://www.conf42.com/Chaos_Engineering_2025_Chirag_Gajiwala_resilience_models_security
 
 Video: https://www.youtube.com/watch?v=jnGKSVE97nU
 

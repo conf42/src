@@ -1,6 +1,6 @@
 # Graceful Degradation: Keeping The Lights On When Everything Goes Wrong
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Tanveer Gill](https://www.conf42.com/speaker_Tanveer_Gill) (CTO @ FluxNinja). Page: https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Tanveer Gill](https://www.conf42.com/speaker_Tanveer_Gill) (CTO @ FluxNinja). Page: https://www.conf42.com/Chaos_Engineering_2023_Tanveer_Gill_graceful_degradation_everything_goes_wrong
 
 Video: https://www.youtube.com/watch?v=nm62d2gYqNk
 

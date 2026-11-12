@@ -1,6 +1,6 @@
 # Chaos Engineering: When The Network Breaks
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Tammy Bryant (Butow)](https://www.conf42.com/speaker_Tammy_Bryant_Butow) (Principal SRE @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2021_Tammy_Bryant_Butow_breaking_network
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Tammy Bryant (Butow)](https://www.conf42.com/speaker_Tammy_Bryant_Butow) (Principal SRE @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2021_Tammy_Bryant_Butow_breaking_network
 
 Video: https://www.youtube.com/watch?v=vslg-W-ox-k
 

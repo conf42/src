@@ -1,6 +1,6 @@
 # Transforming Multi-Cloud Security: DevSecOps Strategies for Resilient and Compliant Operations
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Vamsi Anumolu](https://www.conf42.com/speaker_Vamsi_Anumolu) (Senior Devops Engineer @ iCrossing). Page: https://www.conf42.com/Chaos_Engineering_2025_Vamsi_Anumolu_security_devsecops_operations
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Vamsi Anumolu](https://www.conf42.com/speaker_Vamsi_Anumolu) (Senior Devops Engineer @ iCrossing). Page: https://www.conf42.com/Chaos_Engineering_2025_Vamsi_Anumolu_security_devsecops_operations
 
 Video: https://www.youtube.com/watch?v=I7-0TI938SI
 

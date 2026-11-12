@@ -1,6 +1,6 @@
 # Mindset by Design: Transforming How You Build Software
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Mihaela-Roxana Ghidersa](https://www.conf42.com/speaker_MihaelaRoxana_Ghidersa) (Technical Lead @ Signant Health). Page: https://www.conf42.com/Chaos_Engineering_2025_MihaelaRoxana_Ghidersa_mindset_software_build
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Mihaela-Roxana Ghidersa](https://www.conf42.com/speaker_MihaelaRoxana_Ghidersa) (Technical Lead @ Signant Health). Page: https://www.conf42.com/Chaos_Engineering_2025_MihaelaRoxana_Ghidersa_mindset_software_build
 
 Video: https://www.youtube.com/watch?v=iLLHVimdXFA
 

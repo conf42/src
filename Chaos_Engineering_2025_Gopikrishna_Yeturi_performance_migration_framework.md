@@ -1,6 +1,6 @@
 # Revolutionizing SAP SRM Performance: A Chaos-Resilient Migration Framework
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Gopikrishna Yeturi](https://www.conf42.com/speaker_Gopikrishna_Yeturi) (Senior specialist package implementation @ LTIMindtree). Page: https://www.conf42.com/Chaos_Engineering_2025_Gopikrishna_Yeturi_performance_migration_framework
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Gopikrishna Yeturi](https://www.conf42.com/speaker_Gopikrishna_Yeturi) (Senior specialist package implementation @ LTIMindtree). Page: https://www.conf42.com/Chaos_Engineering_2025_Gopikrishna_Yeturi_performance_migration_framework
 
 Video: https://www.youtube.com/watch?v=EJsnToUeP2c
 

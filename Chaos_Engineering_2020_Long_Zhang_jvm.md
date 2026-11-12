@@ -1,6 +1,6 @@
 # Application-Level Chaos Engineering in JVM
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (PhD Student in Computer Science @ KTH Royal Institute of Technology). Page: https://www.conf42.com/Chaos_Engineering_2020_Long_Zhang_jvm
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Long Zhang](https://www.conf42.com/speaker_Long_Zhang) (PhD Student in Computer Science @ KTH Royal Institute of Technology). Page: https://www.conf42.com/Chaos_Engineering_2020_Long_Zhang_jvm
 
 Video: https://www.youtube.com/watch?v=B0zf4a9T8jo
 

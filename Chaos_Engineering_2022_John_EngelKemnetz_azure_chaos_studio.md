@@ -1,6 +1,6 @@
 # Chaos engineering at Microsoft with Azure Chaos Studio
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [John Engel-Kemnetz](https://www.conf42.com/speaker_John_EngelKemnetz) (Principal Program Manager @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2022_John_EngelKemnetz_azure_chaos_studio
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [John Engel-Kemnetz](https://www.conf42.com/speaker_John_EngelKemnetz) (Principal Program Manager @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2022_John_EngelKemnetz_azure_chaos_studio
 
 Video: https://www.youtube.com/watch?v=c63JZRgRxIQ
 

@@ -1,6 +1,6 @@
 # Embracing the Fear of Failure
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Humaira Ahmed](https://www.conf42.com/speaker_Humaira_Ahmed) (CEO @ Locelle). Page: https://www.conf42.com/Chaos_Engineering_2021_Humaira_Ahmed_fear_failure
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Humaira Ahmed](https://www.conf42.com/speaker_Humaira_Ahmed) (CEO @ Locelle). Page: https://www.conf42.com/Chaos_Engineering_2021_Humaira_Ahmed_fear_failure
 
 Video: https://www.youtube.com/watch?v=6-MOtJPpves
 

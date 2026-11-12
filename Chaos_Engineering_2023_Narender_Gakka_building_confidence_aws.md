@@ -1,6 +1,6 @@
 # Building confidence through chaos engineering on AWS
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Narender Gakka](https://www.conf42.com/speaker_Narender_Gakka) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Narender_Gakka_building_confidence_aws
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Narender Gakka](https://www.conf42.com/speaker_Narender_Gakka) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2023_Narender_Gakka_building_confidence_aws
 
 Video: https://www.youtube.com/watch?v=o7lsPRXzPII
 

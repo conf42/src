@@ -1,6 +1,6 @@
 # Defining Steady States and Developing Hypotheses for Security Chaos Engineering
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Sakshyam Shah](https://www.conf42.com/speaker_Sakshyam_Shah) (Developer Relations Engineer @ Teleport). Page: https://www.conf42.com/Chaos_Engineering_2022_Sakshyam_Shah_steady_states_developing_hypotheses
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Sakshyam Shah](https://www.conf42.com/speaker_Sakshyam_Shah) (Developer Relations Engineer @ Teleport). Page: https://www.conf42.com/Chaos_Engineering_2022_Sakshyam_Shah_steady_states_developing_hypotheses
 
 Video: https://www.youtube.com/watch?v=cYx5gVYj97Q
 

@@ -1,6 +1,6 @@
 # Chaos in the cloud
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Bent Krause](https://www.conf42.com/speaker_Bent_Krause) (Associate Solutions Architect @ AWS) and [Oliver Steenbuck](https://www.conf42.com/speaker_Oliver_Steenbuck) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Bent_Krause_Oliver_Steenbuck_chaos_cloud
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Bent Krause](https://www.conf42.com/speaker_Bent_Krause) (Associate Solutions Architect @ AWS) and [Oliver Steenbuck](https://www.conf42.com/speaker_Oliver_Steenbuck) (Solutions Architect @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Bent_Krause_Oliver_Steenbuck_chaos_cloud
 
 Video: https://www.youtube.com/watch?v=cGftcKbG6lc
 

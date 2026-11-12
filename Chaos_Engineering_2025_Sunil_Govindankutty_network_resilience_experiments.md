@@ -1,6 +1,6 @@
 # Testing Network Resilience in Amazon ECS: Fault Injection Experiments on Fargate
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Sunil Govindankutty](https://www.conf42.com/speaker_Sunil_Govindankutty) (Enterprise Support Lead @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2025_Sunil_Govindankutty_network_resilience_experiments
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Sunil Govindankutty](https://www.conf42.com/speaker_Sunil_Govindankutty) (Enterprise Support Lead @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2025_Sunil_Govindankutty_network_resilience_experiments
 
 Video: https://www.youtube.com/watch?v=L7tAN8bGqRo
 

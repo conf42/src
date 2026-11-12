@@ -1,6 +1,6 @@
 # Risk-Driven Fault Injection: Security Chaos Engineering for the Fast & Furious
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Kennedy Torkura](https://www.conf42.com/speaker_Kennedy_Torkura) (Cyber Security Engineer @ Mattermost). Page: https://www.conf42.com/Chaos_Engineering_2021_Kennedy_Torkura_fault_injection
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Kennedy Torkura](https://www.conf42.com/speaker_Kennedy_Torkura) (Cyber Security Engineer @ Mattermost). Page: https://www.conf42.com/Chaos_Engineering_2021_Kennedy_Torkura_fault_injection
 
 Video: https://www.youtube.com/watch?v=B9_WBz4VJO8
 

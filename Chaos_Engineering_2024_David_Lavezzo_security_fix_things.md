@@ -1,6 +1,6 @@
 # Security Chaos Engineering: How to Fix Things (you didn't know were broken) and Make Friends While Doing It
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [David Lavezzo](https://www.conf42.com/speaker_David_Lavezzo) (Director of Security Chaos Engineering @ Capital One). Page: https://www.conf42.com/Chaos_Engineering_2024_David_Lavezzo_security_fix_things
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [David Lavezzo](https://www.conf42.com/speaker_David_Lavezzo) (Director of Security Chaos Engineering @ Capital One). Page: https://www.conf42.com/Chaos_Engineering_2024_David_Lavezzo_security_fix_things
 
 Video: https://www.youtube.com/watch?v=GLISEYuOwmI
 

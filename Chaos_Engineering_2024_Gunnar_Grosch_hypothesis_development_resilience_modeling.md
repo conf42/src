@@ -1,6 +1,6 @@
 # Enhancing Hypothesis Development Through Resilience Modeling
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Gunnar Grosch](https://www.conf42.com/speaker_Gunnar_Grosch) (Principal Developer Advocate @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Gunnar_Grosch_hypothesis_development_resilience_modeling
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Gunnar Grosch](https://www.conf42.com/speaker_Gunnar_Grosch) (Principal Developer Advocate @ AWS). Page: https://www.conf42.com/Chaos_Engineering_2024_Gunnar_Grosch_hypothesis_development_resilience_modeling
 
 Video: https://www.youtube.com/watch?v=Ed6g6yFUE5E
 

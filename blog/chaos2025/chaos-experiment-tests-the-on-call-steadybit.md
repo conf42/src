@@ -1,6 +1,6 @@
 # A chaos experiment that tests your on-call, not just your pods
 
-Conf42 Blog, 2025-02-20, updated 2026-11-09. https://www.conf42.com/blog/ce2025/chaos-experiment-tests-the-on-call-steadybit
+Conf42 Blog, 2025-02-20, updated 2026-11-09. https://www.conf42.com/blog/chaos2025/chaos-experiment-tests-the-on-call-steadybit
 
 In short: Benjamin Wilms of Steadybit at Conf42 Chaos Engineering 2025 on testing socio-technical resilience, from pod redundancy to Datadog and PagerDuty response.
 
@@ -46,7 +46,7 @@ Related Conf42 talks:
 - [Robert Ross on the incident response process](https://www.conf42.com/Chaos_Engineering_2021_Robert_Ross_incident_response_process) at Conf42 Chaos Engineering 2021.
 - [Uma Mukkara on continuous resilience](https://www.conf42.com/Chaos_Engineering_2023_Uma_Mukkara_continuous_resilience) at Conf42 Chaos Engineering 2023.
 
-[Watch Benjamin Wilms's talk](https://www.conf42.com/Chaos_Engineering_2025_Benjamin_Wilms_reliable_system_unpredictable) from [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025).
+[Watch Benjamin Wilms's talk](https://www.conf42.com/Chaos_Engineering_2025_Benjamin_Wilms_reliable_system_unpredictable) from [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025).
 
 ## From Steadybit
 

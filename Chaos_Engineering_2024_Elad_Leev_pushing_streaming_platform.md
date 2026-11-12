@@ -1,6 +1,6 @@
 # Pushing Your Streaming Platform to the Limit
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Elad Leev](https://www.conf42.com/speaker_Elad_Leev) (Senior Data Platform Engineer @ Dojo). Page: https://www.conf42.com/Chaos_Engineering_2024_Elad_Leev_pushing_streaming_platform
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Elad Leev](https://www.conf42.com/speaker_Elad_Leev) (Senior Data Platform Engineer @ Dojo). Page: https://www.conf42.com/Chaos_Engineering_2024_Elad_Leev_pushing_streaming_platform
 
 Video: https://www.youtube.com/watch?v=i5gjmRuBcgQ
 

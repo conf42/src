@@ -1,6 +1,6 @@
 # How Microsoft Shift left using Chaos Engineering practices to prevent outages and improve services quality?
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Ravi Bellam, Chris Ashton & Rohith Gundreddy](https://www.conf42.com/speaker_Ravi_Bellam_Chris_Ashton__Rohith_Gundreddy). Page: https://www.conf42.com/Chaos_Engineering_2023_Ravi_Bellam_Chris_Ashton__Rohith_Gundreddy_certificate_outages_resilient_dist
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Ravi Bellam, Chris Ashton & Rohith Gundreddy](https://www.conf42.com/speaker_Ravi_Bellam_Chris_Ashton__Rohith_Gundreddy). Page: https://www.conf42.com/Chaos_Engineering_2023_Ravi_Bellam_Chris_Ashton__Rohith_Gundreddy_certificate_outages_resilient_dist
 
 Video: https://www.youtube.com/watch?v=4ZClzWwNbhM
 

@@ -1,6 +1,6 @@
 # Shift up: Continous Security and feedback loop in production
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Swapnil Deshmukh](https://www.conf42.com/speaker_Swapnil_Deshmukh) (CTO @ Certus CyberSecurity). Page: https://www.conf42.com/Chaos_Engineering_2021_Swapnil_Deshmukh_shift_up_security_feedback_loop
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Swapnil Deshmukh](https://www.conf42.com/speaker_Swapnil_Deshmukh) (CTO @ Certus CyberSecurity). Page: https://www.conf42.com/Chaos_Engineering_2021_Swapnil_Deshmukh_shift_up_security_feedback_loop
 
 Video: https://www.youtube.com/watch?v=azofjyUDgJw
 

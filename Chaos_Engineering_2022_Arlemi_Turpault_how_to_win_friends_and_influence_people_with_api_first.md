@@ -1,6 +1,6 @@
 # How to Win Friends and Influence People with API First
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Arlemi Turpault](https://www.conf42.com/speaker_Arlemi_Turpault) (Senior Developer Advocate @ Postman). Page: https://www.conf42.com/Chaos_Engineering_2022_Arlemi_Turpault_how_to_win_friends_and_influence_people_with_api_first
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Arlemi Turpault](https://www.conf42.com/speaker_Arlemi_Turpault) (Senior Developer Advocate @ Postman). Page: https://www.conf42.com/Chaos_Engineering_2022_Arlemi_Turpault_how_to_win_friends_and_influence_people_with_api_first
 
 Video: https://www.youtube.com/watch?v=LI8ZBjGT0YA
 

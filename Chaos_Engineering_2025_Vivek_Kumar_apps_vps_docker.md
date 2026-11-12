@@ -1,6 +1,6 @@
 # Hosting Applications on VPS vs Docker: Key Differences and Best Practices
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Vivek Kumar](https://www.conf42.com/speaker_Vivek_Kumar) (Software Engineer @ FAANG). Page: https://www.conf42.com/Chaos_Engineering_2025_Vivek_Kumar_apps_vps_docker
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Vivek Kumar](https://www.conf42.com/speaker_Vivek_Kumar) (Software Engineer @ FAANG). Page: https://www.conf42.com/Chaos_Engineering_2025_Vivek_Kumar_apps_vps_docker
 
 Video: https://www.youtube.com/watch?v=I_NX6O4pDOM
 

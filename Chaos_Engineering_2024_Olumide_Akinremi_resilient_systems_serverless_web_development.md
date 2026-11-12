@@ -1,6 +1,6 @@
 # Building Resilient Systems with Serverless Web Development
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Olumide Akinremi](https://www.conf42.com/speaker_Olumide_Akinremi) (Technical Team Lead @ Sabi). Page: https://www.conf42.com/Chaos_Engineering_2024_Olumide_Akinremi_resilient_systems_serverless_web_development
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Olumide Akinremi](https://www.conf42.com/speaker_Olumide_Akinremi) (Technical Team Lead @ Sabi). Page: https://www.conf42.com/Chaos_Engineering_2024_Olumide_Akinremi_resilient_systems_serverless_web_development
 
 Video: https://www.youtube.com/watch?v=IqKFTe4U-u0
 

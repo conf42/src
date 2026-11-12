@@ -1,6 +1,6 @@
 # Chaos Engineering in the Fast Lane: Accelerating Resilience with AI and eBPF
 
-A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/ce2024) by [Francesco Sbaraglia](https://www.conf42.com/speaker_Francesco_Sbaraglia) (SRE Tech lead ASG @ Accenture) and [Michele Dodic](https://www.conf42.com/speaker_Michele_Dodic) (SRE Associate Manager @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2024_Francesco_Sbaraglia_Michele_Dodic_accelerating_resilience_ebpf
+A talk at [Conf42 Chaos Engineering 2024](https://www.conf42.com/chaos2024) by [Francesco Sbaraglia](https://www.conf42.com/speaker_Francesco_Sbaraglia) (SRE Tech lead ASG @ Accenture) and [Michele Dodic](https://www.conf42.com/speaker_Michele_Dodic) (SRE Associate Manager @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2024_Francesco_Sbaraglia_Michele_Dodic_accelerating_resilience_ebpf
 
 Video: https://www.youtube.com/watch?v=VcTYEkCL8aE
 

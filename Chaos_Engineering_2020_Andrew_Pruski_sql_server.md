@@ -1,6 +1,6 @@
 # Chaos Engineering for SQL Server
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Andrew Pruski](https://www.conf42.com/speaker_Andrew_Pruski) (SQL Server DBA @ Channel Advisor). Page: https://www.conf42.com/Chaos_Engineering_2020_Andrew_Pruski_sql_server
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Andrew Pruski](https://www.conf42.com/speaker_Andrew_Pruski) (SQL Server DBA @ Channel Advisor). Page: https://www.conf42.com/Chaos_Engineering_2020_Andrew_Pruski_sql_server
 
 Video: https://www.youtube.com/watch?v=HCy3sjMRvlI
 

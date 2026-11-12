@@ -1,12 +1,12 @@
 # Conf42 Chaos Engineering 2025: break it on purpose, everywhere
 
-Conf42 Blog, 2025-02-21. https://www.conf42.com/blog/ce2025/conf42-chaos-engineering-2025-roundup
+Conf42 Blog, 2025-02-21. https://www.conf42.com/blog/chaos2025/conf42-chaos-engineering-2025-roundup
 
 In short: Conf42 Chaos Engineering 2025 roundup - socio-technical experiments, network faults on Fargate, chaos in platforms, mobile apps, AI monitoring and security.
 
 Conf42 Chaos Engineering 2025 ran online on February 20, 2025, with 28 talks, and the theme was scope creep in the best sense. Chaos engineering started with killing instances; in this lineup it reached on-call rotations, internal developer platforms, mobile apps, AI model monitoring, and security controls. The common thread: if you have not watched it fail on purpose, you do not know how it fails.
 
-The talks are all on the [Conf42 Chaos Engineering 2025 event page](https://www.conf42.com/ce2025) and in the [YouTube playlist](https://www.youtube.com/playlist?list=PLIuxSyKxlQrDA4LX-Xal04LBJN52V6C1C).
+The talks are all on the [Conf42 Chaos Engineering 2025 event page](https://www.conf42.com/chaos2025) and in the [YouTube playlist](https://www.youtube.com/playlist?list=PLIuxSyKxlQrDA4LX-Xal04LBJN52V6C1C).
 
 ## The system includes the people
 

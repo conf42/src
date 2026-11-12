@@ -1,6 +1,6 @@
 # Chaos Engineering alongside Litmus and Jenkins
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Akram Riahi](https://www.conf42.com/speaker_Akram_Riahi) (LitmusChaos Leader @ WeScale). Page: https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Akram Riahi](https://www.conf42.com/speaker_Akram_Riahi) (LitmusChaos Leader @ WeScale). Page: https://www.conf42.com/Chaos_Engineering_2022_Akram_Riahi_chaos_engineering_alongside_litmus_and_jenkins
 
 Video: https://www.youtube.com/watch?v=yRpmKmeaweU
 

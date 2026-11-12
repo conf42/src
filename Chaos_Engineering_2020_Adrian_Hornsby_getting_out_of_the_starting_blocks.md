@@ -1,6 +1,6 @@
 # Chaos Engineering: Getting out of the Starting Blocks
 
-A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/ce2020) by [Adrian Hornsby](https://www.conf42.com/speaker_Adrian_Hornsby) (Principal Technologist, Architecture @ Amazon Web Services (AWS)). Page: https://www.conf42.com/Chaos_Engineering_2020_Adrian_Hornsby_getting_out_of_the_starting_blocks
+A talk at [Conf42 Chaos Engineering 2020](https://www.conf42.com/chaos2020) by [Adrian Hornsby](https://www.conf42.com/speaker_Adrian_Hornsby) (Principal Technologist, Architecture @ Amazon Web Services (AWS)). Page: https://www.conf42.com/Chaos_Engineering_2020_Adrian_Hornsby_getting_out_of_the_starting_blocks
 
 Video: https://www.youtube.com/watch?v=WGAogib0NZw
 

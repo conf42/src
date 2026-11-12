@@ -1,6 +1,6 @@
 # Trust Driven Development - DevOps transformation in practice
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Tomasz Manugiewicz](https://www.conf42.com/speaker_Tomasz_Manugiewicz) (General Manager @ Grand Parade / William Hill). Page: https://www.conf42.com/Chaos_Engineering_2023_Tomasz_Manugiewicz_trust_driven_development_devops_transformation_practice
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Tomasz Manugiewicz](https://www.conf42.com/speaker_Tomasz_Manugiewicz) (General Manager @ Grand Parade / William Hill). Page: https://www.conf42.com/Chaos_Engineering_2023_Tomasz_Manugiewicz_trust_driven_development_devops_transformation_practice
 
 Video: https://www.youtube.com/watch?v=gRbhNHO0jRk
 

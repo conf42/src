@@ -1,6 +1,6 @@
 # Vaccinate your Software, Build its Immunity
 
-A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/ce2023) by [Vipin Jain](https://www.conf42.com/speaker_Vipin_Jain) (QA Head & Product Delivery Manager @ Metacube Software). Page: https://www.conf42.com/Chaos_Engineering_2023_Vipin_Jain_vaccinate_your_software_immunity
+A talk at [Conf42 Chaos Engineering 2023](https://www.conf42.com/chaos2023) by [Vipin Jain](https://www.conf42.com/speaker_Vipin_Jain) (QA Head & Product Delivery Manager @ Metacube Software). Page: https://www.conf42.com/Chaos_Engineering_2023_Vipin_Jain_vaccinate_your_software_immunity
 
 Video: https://www.youtube.com/watch?v=QtpeVicQy1Y
 

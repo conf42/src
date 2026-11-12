@@ -1,6 +1,6 @@
 # Chaos Experiments under the lens of AIOps
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Michele Dodic](https://www.conf42.com/speaker_Michele_Dodic) (SRE DevOps Engineer @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2022_Michele_Dodic_chaos_experiments_under_the_lens_of_aiops
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Michele Dodic](https://www.conf42.com/speaker_Michele_Dodic) (SRE DevOps Engineer @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2022_Michele_Dodic_chaos_experiments_under_the_lens_of_aiops
 
 Video: https://www.youtube.com/watch?v=5Q5_vuHdOkI
 

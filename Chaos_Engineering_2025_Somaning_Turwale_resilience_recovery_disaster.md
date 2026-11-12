@@ -1,6 +1,6 @@
 # Enhancing Resilience with Azure Site Recovery: A Modern Approach to Cloud-Based Disaster Recovery
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Somaning Turwale](https://www.conf42.com/speaker_Somaning_Turwale) (Senior Tech Support Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Somaning_Turwale_resilience_recovery_disaster
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Somaning Turwale](https://www.conf42.com/speaker_Somaning_Turwale) (Senior Tech Support Engineer @ Microsoft). Page: https://www.conf42.com/Chaos_Engineering_2025_Somaning_Turwale_resilience_recovery_disaster
 
 Video: https://www.youtube.com/watch?v=-zQpPTSu6nA
 

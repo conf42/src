@@ -1,6 +1,6 @@
 # Continuous Reliability. How?
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Ana Margarita Medina](https://www.conf42.com/speaker_Ana_Margarita_Medina) (Senior Chaos Engineer @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2022_Ana_Margarita_Medina_continuous_reliability
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Ana Margarita Medina](https://www.conf42.com/speaker_Ana_Margarita_Medina) (Senior Chaos Engineer @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2022_Ana_Margarita_Medina_continuous_reliability
 
 Video: https://www.youtube.com/watch?v=5NJk7wc5WII
 

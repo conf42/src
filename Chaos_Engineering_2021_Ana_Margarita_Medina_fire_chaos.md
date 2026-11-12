@@ -1,6 +1,6 @@
 # In the kitchen: A sprinkle of fire and chaos
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Ana Margarita Medina](https://www.conf42.com/speaker_Ana_Margarita_Medina) (Senior Chaos Engineer @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2021_Ana_Margarita_Medina_fire_chaos
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Ana Margarita Medina](https://www.conf42.com/speaker_Ana_Margarita_Medina) (Senior Chaos Engineer @ Gremlin). Page: https://www.conf42.com/Chaos_Engineering_2021_Ana_Margarita_Medina_fire_chaos
 
 Video: https://www.youtube.com/watch?v=EEDE7YzWjCU
 

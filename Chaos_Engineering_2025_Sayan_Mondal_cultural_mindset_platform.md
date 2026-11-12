@@ -1,6 +1,6 @@
 # Cultural Shifts: Fostering a Chaos First Mindset in Platform Engineering
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Sayan Mondal](https://www.conf42.com/speaker_Sayan_Mondal) (Senior Software Engineer @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2025_Sayan_Mondal_cultural_mindset_platform
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Sayan Mondal](https://www.conf42.com/speaker_Sayan_Mondal) (Senior Software Engineer @ Harness). Page: https://www.conf42.com/Chaos_Engineering_2025_Sayan_Mondal_cultural_mindset_platform
 
 Video: https://www.youtube.com/watch?v=6dOWiZqjy2g
 

@@ -1,6 +1,6 @@
 # Distributed Transactions in Service Mesh
 
-A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/ce2022) by [Alparslan Avci](https://www.conf42.com/speaker_Alparslan_Avci) (Software Developer @ Zapata Computing). Page: https://www.conf42.com/Chaos_Engineering_2022_Alparslan_Avci_distributed_transactions_in_service_mesh
+A talk at [Conf42 Chaos Engineering 2022](https://www.conf42.com/chaos2022) by [Alparslan Avci](https://www.conf42.com/speaker_Alparslan_Avci) (Software Developer @ Zapata Computing). Page: https://www.conf42.com/Chaos_Engineering_2022_Alparslan_Avci_distributed_transactions_in_service_mesh
 
 Video: https://www.youtube.com/watch?v=dMhSaIjOTRA
 

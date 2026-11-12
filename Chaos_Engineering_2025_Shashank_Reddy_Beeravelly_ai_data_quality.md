@@ -1,6 +1,6 @@
 # Harnessing AI for Chaos-Resilient Data Quality: Ensuring Accuracy, Speed, and Real-World Impact
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Shashank Reddy Beeravelly](https://www.conf42.com/speaker_Shashank_Reddy_Beeravelly) (Software Engineer @ Walmart). Page: https://www.conf42.com/Chaos_Engineering_2025_Shashank_Reddy_Beeravelly_ai_data_quality
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Shashank Reddy Beeravelly](https://www.conf42.com/speaker_Shashank_Reddy_Beeravelly) (Software Engineer @ Walmart). Page: https://www.conf42.com/Chaos_Engineering_2025_Shashank_Reddy_Beeravelly_ai_data_quality
 
 Video: https://www.youtube.com/watch?v=Bx7p-z8Mhkc
 

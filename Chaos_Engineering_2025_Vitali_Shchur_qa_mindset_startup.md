@@ -1,6 +1,6 @@
 # The QA Ownership Mindset: Driving Startup Success
 
-A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/ce2025) by [Vitali Shchur](https://www.conf42.com/speaker_Vitali_Shchur) (QA Engineer @ Check Point Software). Page: https://www.conf42.com/Chaos_Engineering_2025_Vitali_Shchur_qa_mindset_startup
+A talk at [Conf42 Chaos Engineering 2025](https://www.conf42.com/chaos2025) by [Vitali Shchur](https://www.conf42.com/speaker_Vitali_Shchur) (QA Engineer @ Check Point Software). Page: https://www.conf42.com/Chaos_Engineering_2025_Vitali_Shchur_qa_mindset_startup
 
 Video: https://www.youtube.com/watch?v=iLyV2-fsMyk
 

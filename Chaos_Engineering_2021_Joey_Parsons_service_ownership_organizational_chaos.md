@@ -1,6 +1,6 @@
 # Organizational Chaos and recipes for Service Ownership
 
-A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/ce2021) by [Joey Parsons](https://www.conf42.com/speaker_Joey_Parsons) (CEO @ effx.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Joey_Parsons_service_ownership_organizational_chaos
+A talk at [Conf42 Chaos Engineering 2021](https://www.conf42.com/chaos2021) by [Joey Parsons](https://www.conf42.com/speaker_Joey_Parsons) (CEO @ effx.com). Page: https://www.conf42.com/Chaos_Engineering_2021_Joey_Parsons_service_ownership_organizational_chaos
 
 Video: https://www.youtube.com/watch?v=iUYdO2ZNgms
 
