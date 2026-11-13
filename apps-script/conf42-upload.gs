@@ -18,6 +18,7 @@
  *        compares sizes + MD5 with what Drive got, sets talk.json status "complete" (or "damaged").
  *   POST {action:"recorded", event, talk, typed, seconds}   the recorder at Stop (before Share / Abort): "recorded,
  *        not uploaded" on the event's status page. Kept in <event slug>/_recorded.json.
+ *   POST {action:"aborted", ...the same}   "Abort and start over": that take shows as "Attempted, not finished".
  *   GET  ?status=<event slug>            the event's uploads + recorded pings + the videos in "Manual upload" (by hand,
  *                                        any event: the page matches them to its speakers by name) for
  *                                        conf42.com/<event>/factory (cached 60 s)
@@ -41,7 +42,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 4;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 5;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
@@ -71,6 +72,7 @@ function doPost(e) {
     if (data.action === 'start') return respond(start(data));
     if (data.action === 'finish') return respond(finish(data));
     if (data.action === 'recorded') return respond(recorded(data));
+    if (data.action === 'aborted') return respond(recorded(data, true));
     if (data.action === 'dispatch') return respond(dispatch(data));
     if (data.action === 'credits') return respond(credits(data));
   } catch (err) {
@@ -224,7 +226,7 @@ function newest(folder, name) {
 // ---- the status page (conf42.com/<event>/factory, Marek 2026-11-13: a page per conference instead of emails) ------
 
 // the recorder at Stop: who recorded what, before they choose Share or Abort
-function recorded(data) {
+function recorded(data, aborted) {
   var ev = data.event || {}, talk = data.talk || {};
   var slug = String(ev.slug || '');
   if (!/^[a-z][a-z0-9-]{2,40}$/.test(slug)) return { ok: false, error: 'invalid' };
@@ -240,7 +242,12 @@ function recorded(data) {
     try { log = file ? JSON.parse(file.getBlob().getDataAsString()) : {}; } catch (err) { log = {}; }
     var id = key || ('typed:' + (names.join(' & ') || typed).toLowerCase());
     var prev = log[id] || { count: 0 };
-    log[id] = { k: key, names: names, typed: typed, seconds: Math.round(Number(data.seconds) || 0), at: new Date().toISOString(), count: (prev.count || 0) + 1 };
+    if (aborted) {   // "Abort and start over": the last take of this talk was attempted, not finished
+      log[id] = prev.at ? prev : { k: key, names: names, typed: typed, seconds: Math.round(Number(data.seconds) || 0), at: new Date().toISOString(), count: 1 };
+      log[id].aborted = true; log[id].aborted_at = new Date().toISOString();
+    } else {
+      log[id] = { k: key, names: names, typed: typed, seconds: Math.round(Number(data.seconds) || 0), at: new Date().toISOString(), count: (prev.count || 0) + 1, aborted: false };
+    }
     var ids = Object.keys(log);
     if (ids.length > 300) ids.sort(function (a, b) { return log[a].at < log[b].at ? -1 : 1; }).slice(0, ids.length - 300).forEach(function (x) { delete log[x]; });
     var text = JSON.stringify(log);
