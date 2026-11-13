@@ -24,6 +24,8 @@
  *   GET  ?ping=1                         {ok, service, version} - the factory's doctor calls this daily
  *   GET  ?list=1&token=<UPLOAD_TOKEN>    {access_token, workspace_id}: a short-lived Drive token for the factory
  *   POST {action:"dispatch", token, event, ...}         "Run now" on conf42.com/factory -> GitHub workflow_dispatch
+ *   POST {action:"credits", token, event, talk, top_up}  the factory's ONE email (Marek 2026-11-13): "Need more Descript
+ *        credits" to NOTIFY_TO (default: this account), at most once every 12 hours
  *
  * Abuse guards (speakers have no login): honeypot, per-day caps on sessions AND bytes, per-talk cap, strict patterns,
  * sizes. Unmatched uploads are still stored (the factory holds them, it never processes a stranger's file).
@@ -39,7 +41,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 3;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 4;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
@@ -70,6 +72,7 @@ function doPost(e) {
     if (data.action === 'finish') return respond(finish(data));
     if (data.action === 'recorded') return respond(recorded(data));
     if (data.action === 'dispatch') return respond(dispatch(data));
+    if (data.action === 'credits') return respond(credits(data));
   } catch (err) {
     Logger.log(data.action + ': ' + err + '\n' + (err.stack || ''));
     return respond({ ok: false, error: String(err.message || err).slice(0, 200) });
@@ -289,6 +292,23 @@ function manualVideos() {
   try { walk(DriveApp.getFolderById(props().getProperty('MANUAL_ID') || MANUAL_ID), '', 0); } catch (err) { return []; }
   try { cache.put('manual', JSON.stringify(out), 60); } catch (err) {}
   return out;
+}
+
+// Descript said 402: out of AI credits / media minutes. One email, at most every 12 hours
+function credits(data) {
+  if (!tokenOk(data.token)) return { ok: false, error: 'forbidden' };
+  var p = props(), last = Number(p.getProperty('credits_mail_at') || 0);
+  if (Date.now() - last < 12 * 3600 * 1000) return { ok: true, skipped: 'sent less than 12 h ago' };
+  var to = p.getProperty('NOTIFY_TO') || Session.getEffectiveUser().getEmail();
+  var link = /^https:\/\/[\w.-]*descript\.com\//.test(String(data.top_up || '')) ? String(data.top_up) : 'https://web.descript.com/';
+  var NL = String.fromCharCode(10);
+  MailApp.sendEmail({ to: to, name: 'Conf42 factory', subject: 'Need more Descript credits',
+    body: 'Descript is out of AI credits or media minutes, so the factory stopped editing' +
+          (data.event ? ' (' + clean(data.event, 100) + (data.talk ? ', ' + clean(data.talk, 100) : '') + ')' : '') + '.' + NL + NL +
+          'Top up: ' + link + NL + '(profile photo, top right > Settings > Usage > Top up)' + NL + NL +
+          'Then start the factory again (GitHub Actions > factory cloud > Run workflow) - it carries on where it stopped.' });
+  p.setProperty('credits_mail_at', String(Date.now()));
+  return { ok: true };
 }
 
 // "Run now" on conf42.com/factory: the page knows no GitHub token, this script holds a narrow one

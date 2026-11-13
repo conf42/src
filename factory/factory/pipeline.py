@@ -1050,6 +1050,9 @@ class Run:
             err = t.get("error") or ""
             if err or (t["steps"].get("upload") or {}).get("status") == "done":
                 self.upload_settled(key)                 # a failed talk never holds up the uploads after it
+            if "402" in err:                             # the factory's one email: "Need more Descript credits" (Marek 2026-11-13)
+                from . import alerts
+                alerts.credits_out(self.ev["title"], key, self.note)
             if not err or n == attempts or "402" in err or "edits paused" in err or err.startswith("health:"):
                 return
             with self.lock:

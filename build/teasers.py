@@ -159,7 +159,32 @@ def _git(*a):
     return subprocess.run(["git", "-C", REPO] + list(a), capture_output=True, timeout=120)
 
 
+_HIST = {}
+
+
 def csv_history(paths):
+    """csv_history_fetch, remembered per path for the whole build: the teasers, the recorder and the per-event factory
+    pages all need the purged talks (Marek 2026-11-13), the history is fetched once."""
+    paths = sorted({os.path.relpath(os.path.join(REPO, p), REPO).replace(os.sep, "/") for p in paths if p})
+    missing = [p for p in paths if p not in _HIST]
+    if missing:
+        _HIST.update(csv_history_fetch(missing))
+    return {p: _HIST.get(p, []) for p in paths}
+
+
+def purged_rows(event):
+    """The event's purged talks (purged()), each with its talk page key as the site made it (short_url)."""
+    from .shared import generate_short_url
+    if not event.get("db_path"):
+        return []
+    p = os.path.relpath(os.path.join(REPO, str(event["db_path"])), REPO).replace(os.sep, "/")
+    rows = purged(event, csv_history([str(event["db_path"])]).get(p, []))
+    for r in rows:
+        r["short_url"] = generate_short_url(event, r)
+    return rows
+
+
+def csv_history_fetch(paths):
     """{path: [every committed version of the CSV, newest first, as text]} (Marek 2026-11-01, for the purged talks).
     From the local git history; CI's checkout is shallow (the full history is ~16 GB), so there one GraphQL query lists
     every CSV's commits and the versions come from raw.githubusercontent.com. Empty when neither works - never fails the build."""
