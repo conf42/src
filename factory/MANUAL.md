@@ -181,6 +181,12 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-13** - **Old upload folders in the cloud factory**: an event whose speakers got the earlier Drive folder
+  link (Talks + Slides subfolders) is listed in `settings.yml` under `cloud_drive_folders` (MLOps 2026 is). The daily
+  pass and "Run workflow" then read that folder too: videos and decks are matched by the speaker's name in the file
+  name and go through the same loop, up to the unlisted YouTube video. A talk that also came through conf42.com/record
+  uses the recorder's upload; a new version of a talk that is already edited is flagged, never redone by itself; a file
+  with no speaker's name in it is listed in the pass summary and left alone. Nothing in the folder is moved or deleted.
 - **2026-11-13** - **Test talk**: every event has a hidden talk called "Factory Test". To try the whole loop, record at
   conf42.com/record under a name that is not on the lineup (it is put on hold as unmatched), then run
   `python -m factory release <short_url> <folder id> test` and push. The next pass edits it in Descript and uploads it

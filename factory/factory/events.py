@@ -148,6 +148,13 @@ def match(filename, talk_list):
     sub = [t for t in talk_list if len(words) >= 2 and words <= set(_norm(t["name1"]).split())]
     if len(sub) == 1:
         return sub[0], "file name words all in the speaker's name"
+    # a lone surname, e.g. "Brandizzi-conf42" -> "Nicolo Brandizzi" (MLOps 2026): only when that speaker is the one
+    # person on the lineup whose first or last name is in the file name at all, and the surname has 5+ letters
+    def names(t):
+        return [w for n in (t["name1"], t["name2"]) if n for w in (_norm(n).split()[0], _norm(n).split()[-1])]
+    named = [t for t in talk_list if words & set(names(t))]
+    if len(named) == 1 and len(_norm(named[0]["name1"]).split()) >= 2 and len(_norm(named[0]["name1"]).split()[-1]) >= 5             and _norm(named[0]["name1"]).split()[-1] in words:
+        return named[0], "surname in file name (the only speaker with it)"
     scored = sorted(((max(difflib.SequenceMatcher(None, stem, _norm(t["speakers"])).ratio(),
                           difflib.SequenceMatcher(None, stem, _norm(t["name1"])).ratio()), t) for t in talk_list),
                     key=lambda x: -x[0])
