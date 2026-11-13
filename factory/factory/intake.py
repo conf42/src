@@ -7,7 +7,7 @@ For each new, complete folder: download, check (the catalogue in the plan, secti
     accept  -> the video (rewrapped / fixed) + the slides go into the event's factory folders, named after the talk,
                and the normal pipeline (pipeline.Run) takes it from there
     hold    -> waits for Marek (unmatched speaker, a rehearsal-or-real question, two halves, Claude unsure): nothing
-               is spent, it shows on conf42.com/factory and in the pass mail
+               is spent, it shows on conf42.com/<event>/factory (Marek 2026-11-13: no emails)
     reject  -> the folder moves to Auto upload/_factory/Rejected/<reason>/ (never deleted by the factory)
     superseded -> an older upload of the same talk: Auto upload/_factory/Superseded/
 plus flags (carry on, but say it) and fixes (done automatically). Incomplete folders (no finish yet) wait; after

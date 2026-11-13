@@ -107,12 +107,7 @@ def main(argv):
     started = datetime.datetime.now().isoformat(timespec="seconds")
     lines = ["## Conf42 cloud factory - %s%s" % (started, " (dry run)" if dry else "")]
 
-    news = []                                            # what this pass decided / did: the mail (none = no mail)
-    def heard(msg):
-        print(msg)
-        if " -> " in msg:
-            news.append(msg.replace("intake: ", ""))
-    accepted = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry, log=heard).run(slugs)
+    accepted = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry).run(slugs)
     for slug in sorted(set(intake_events(slugs)) | set(accepted)):
         st = intake.Intake(drive).load(slug)
         items = sorted(st.get("items", {}).values(), key=lambda r: r.get("decided") or "", reverse=True)
@@ -154,8 +149,6 @@ def main(argv):
                 from . import ytupload
                 for msg in ytupload.event(run, cfg):
                     run.note(msg)
-                    if "->" in msg or "limit" in msg or "made the playlist" in msg:
-                        news.append(msg)
             except ImportError:
                 pass
             except Exception as e:                       # noqa: BLE001 - YouTube trouble never undoes the factory's work
@@ -166,16 +159,8 @@ def main(argv):
         for k, t in sorted(run.state["talks"].items()):
             if t.get("error"):
                 lines.append("- %s: **%s**" % (k, str(t["error"])[:200]))
-                news.append("%s / %s: FAILED - %s" % (slug, k, str(t["error"])[:200]))
-        if run.state.get("edits_paused"):
-            news.append("%s: Descript edits PAUSED - %s (python -m factory unpause %s after a look)" % (slug, run.state["edits_paused"], slug))
         run.publish(force=True)
     commit_intake("factory: cloud pass state (intake + youtube)")
-    if news:
-        nl = chr(10)
-        body = [("- " + n) for n in news] + ["", "Held uploads wait for you: python -m factory release <event> <folder id> "
-                "accept|reject [\"<speaker>\"] (ids in _db/factory_runs/<event>/intake.json).", "Run: " + run_url()]
-        notify("Conf42 factory: %d update%s" % (len(news), "" if len(news) == 1 else "s"), nl.join(body))
     summary_md(lines)
     print("\n".join(lines))
     return 0
@@ -186,22 +171,6 @@ def run_url():
         return "%s/%s/actions/runs/%s" % (os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
                                           os.environ.get("GITHUB_REPOSITORY", "conf42/src"), os.environ["GITHUB_RUN_ID"])
     return "local run"
-
-
-def notify(subject, body):
-    """The pass report by mail, through the Conf42 upload script's notify action (same key as UPLOAD_FEED)."""
-    import urllib.parse
-    import requests
-    feed = os.environ.get("UPLOAD_FEED") or ""
-    u = urllib.parse.urlparse(feed)
-    token = (urllib.parse.parse_qs(u.query).get("token") or [""])[0]
-    if not token:
-        return
-    try:
-        requests.post(urllib.parse.urlunparse(u._replace(query="")), data=json.dumps(
-            {"action": "notify", "token": token, "subject": subject, "body": body}), timeout=60)
-    except Exception as e:                               # noqa: BLE001 - a lost mail never fails the pass
-        print("notify failed: %s" % e)
 
 
 def more_to_do(slugs=None):

@@ -16,9 +16,13 @@
  *        Google in 8 MB chunks, so size is not limited by Apps Script.
  *   POST {action:"finish", folder_id, md5:{video, slides}}
  *        compares sizes + MD5 with what Drive got, sets talk.json status "complete" (or "damaged").
+ *   POST {action:"recorded", event, talk, typed, seconds}   the recorder at Stop (before Share / Abort): "recorded,
+ *        not uploaded" on the event's status page. Kept in <event slug>/_recorded.json.
+ *   GET  ?status=<event slug>            the event's uploads + recorded pings + the videos in "Manual upload" (by hand,
+ *                                        any event: the page matches them to its speakers by name) for
+ *                                        conf42.com/<event>/factory (cached 60 s)
  *   GET  ?ping=1                         {ok, service, version} - the factory's doctor calls this daily
  *   GET  ?list=1&token=<UPLOAD_TOKEN>    {access_token, workspace_id}: a short-lived Drive token for the factory
- *   POST {action:"notify", token, subject, body}        the factory's pass report, mailed to NOTIFY_TO
  *   POST {action:"dispatch", token, event, ...}         "Run now" on conf42.com/factory -> GitHub workflow_dispatch
  *
  * Abuse guards (speakers have no login): honeypot, per-day caps on sessions AND bytes, per-talk cap, strict patterns,
@@ -28,15 +32,16 @@
  *   1. https://script.google.com -> New project "Conf42 upload" -> paste this file; Project settings -> Show
  *      "appsscript.json" -> paste apps-script/conf42-upload.appsscript.json.
  *   2. Project settings -> Script properties: UPLOAD_TOKEN = a long random string (the factory's key),
- *      optional NOTIFY_TO (default: this account), GITHUB_PAT (fine-grained, actions:write on conf42/src only).
- *   3. Run selftest once from the editor (authorises Drive + mail + external requests, checks the folder).
+ *      optional GITHUB_PAT (fine-grained, actions:write on conf42/src only) for "Run now".
+ *   3. Run selftest once from the editor (authorises Drive + external requests, checks the folder).
  *   4. Deploy -> New deployment -> Web app -> Execute as: Me -> Who has access: Anyone. Copy the .../exec URL into
  *      metadata.yml -> record_upload_url, and set the GitHub secret UPLOAD_FEED = "<exec URL>?list=1&token=<UPLOAD_TOKEN>".
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 2;   // v2: finish returns Drive's own size + MD5 per file
+var VERSION = 3;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
+var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
 var TZ = 'Europe/London';
 var MAX_VIDEO = 4.5 * 1024 * 1024 * 1024;   // 2 h at the recorder's bitrate is ~1.3 GB; 4K screen captures more
@@ -52,6 +57,7 @@ function doGet(e) {
     if (!tokenOk(p.token)) return respond({ ok: false, error: 'forbidden' });
     return respond({ ok: true, access_token: ScriptApp.getOAuthToken(), workspace_id: workspace().getId(), version: VERSION });
   }
+  if (p.status) return respond(status(String(p.status)));
   return respond({ ok: true, service: 'conf42-upload', version: VERSION });
 }
 
@@ -62,7 +68,7 @@ function doPost(e) {
   try {
     if (data.action === 'start') return respond(start(data));
     if (data.action === 'finish') return respond(finish(data));
-    if (data.action === 'notify') return respond(notify(data));
+    if (data.action === 'recorded') return respond(recorded(data));
     if (data.action === 'dispatch') return respond(dispatch(data));
   } catch (err) {
     Logger.log(data.action + ': ' + err + '\n' + (err.stack || ''));
@@ -212,11 +218,77 @@ function newest(folder, name) {
 
 // ---- factory helpers (token) ---------------------------------------------------------------
 
-function notify(data) {
-  if (!tokenOk(data.token)) return { ok: false, error: 'forbidden' };
-  var to = props().getProperty('NOTIFY_TO') || Session.getEffectiveUser().getEmail();
-  MailApp.sendEmail({ to: to, subject: clean(data.subject, 200) || 'Conf42 factory', body: String(data.body || '').slice(0, 50000), name: 'Conf42 factory' });
+// ---- the status page (conf42.com/<event>/factory, Marek 2026-11-13: a page per conference instead of emails) ------
+
+// the recorder at Stop: who recorded what, before they choose Share or Abort
+function recorded(data) {
+  var ev = data.event || {}, talk = data.talk || {};
+  var slug = String(ev.slug || '');
+  if (!/^[a-z][a-z0-9-]{2,40}$/.test(slug)) return { ok: false, error: 'invalid' };
+  var key = String(talk.k || '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 100);
+  var names = (talk.names || []).map(function (n) { return clean(n, 80); }).filter(String).slice(0, 4);
+  var typed = clean(data.typed, 80);
+  if (!key && !typed && !names.length) return { ok: false, error: 'invalid' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var folder = child(workspace(), slug), it = folder.getFilesByName('_recorded.json'), file = it.hasNext() ? it.next() : null;
+    var log = {};
+    try { log = file ? JSON.parse(file.getBlob().getDataAsString()) : {}; } catch (err) { log = {}; }
+    var id = key || ('typed:' + (names.join(' & ') || typed).toLowerCase());
+    var prev = log[id] || { count: 0 };
+    log[id] = { k: key, names: names, typed: typed, seconds: Math.round(Number(data.seconds) || 0), at: new Date().toISOString(), count: (prev.count || 0) + 1 };
+    var ids = Object.keys(log);
+    if (ids.length > 300) ids.sort(function (a, b) { return log[a].at < log[b].at ? -1 : 1; }).slice(0, ids.length - 300).forEach(function (x) { delete log[x]; });
+    var text = JSON.stringify(log);
+    if (file) file.setContent(text); else folder.createFile('_recorded.json', text, 'application/json');
+    CacheService.getScriptCache().remove('status:' + slug);
+  } finally { lock.releaseLock(); }
   return { ok: true };
+}
+
+// the event's uploads (talk.json of every upload folder still in the event folder) + the recorded pings
+function status(slug) {
+  if (!/^[a-z][a-z0-9-]{2,40}$/.test(slug)) return { ok: false, error: 'invalid' };
+  var cache = CacheService.getScriptCache(), hit = cache.get('status:' + slug);
+  if (hit) return JSON.parse(hit);
+  var out = { ok: true, event: slug, at: new Date().toISOString(), uploads: [], recorded: {} };
+  var evs = workspace().getFoldersByName(slug);
+  if (evs.hasNext()) {
+    var ev = evs.next(), ups = ev.getFolders();
+    while (ups.hasNext()) {
+      var f = ups.next(), info = readInfo(f);
+      if (!info) continue;
+      var v = (info.files || {}).video || {}, sl = (info.files || {}).slides || {};
+      out.uploads.push({ folder: f.getName(), id: f.getId(), k: (info.talk || {}).k || '', names: (info.talk || {}).names || [], typed: info.typed || '',
+                         status: info.status || '', created: info.created_at || '', finished: info.finished_at || '',
+                         seconds: (info.meta || {}).seconds || 0, video: v.status || '', slides: sl.status || '', size: v.size || 0 });
+    }
+    var it = ev.getFilesByName('_recorded.json');
+    if (it.hasNext()) { try { out.recorded = JSON.parse(it.next().getBlob().getDataAsString()); } catch (err) {} }
+  }
+  out.manual = manualVideos();
+  try { cache.put('status:' + slug, JSON.stringify(out), 60); } catch (err) {}
+  return out;
+}
+
+// every video in "Manual upload" (two folder levels deep): name, size, when, the folder it sits in
+var VIDEO_EXT = /\.(mp4|mov|m4v|mkv|webm|avi|wmv)$/i;
+function manualVideos() {
+  var cache = CacheService.getScriptCache(), hit = cache.get('manual');
+  if (hit) return JSON.parse(hit);
+  var out = [];
+  function walk(folder, path, depth) {
+    var files = folder.getFiles();
+    while (files.hasNext() && out.length < 500) {
+      var f = files.next();
+      if (VIDEO_EXT.test(f.getName())) out.push({ name: f.getName(), size: f.getSize(), created: f.getDateCreated().toISOString(), path: path });
+    }
+    if (depth < 2) { var subs = folder.getFolders(); while (subs.hasNext()) { var d = subs.next(); walk(d, path ? path + '/' + d.getName() : d.getName(), depth + 1); } }
+  }
+  try { walk(DriveApp.getFolderById(props().getProperty('MANUAL_ID') || MANUAL_ID), '', 0); } catch (err) { return []; }
+  try { cache.put('manual', JSON.stringify(out), 60); } catch (err) {}
+  return out;
 }
 
 // "Run now" on conf42.com/factory: the page knows no GitHub token, this script holds a narrow one
