@@ -95,3 +95,11 @@ Other commands: `run`, `match`, `status`, `retry <short_url> "<speakers>"`, `red
 - "Publish to conf42.com/factory" (app) updates the website's Factory logs tab; runs also publish by themselves.
 - If you change the factory: update `factory/MANUAL.md` (and `MANUAL-CLAUDE.md`) plus the Changelog in the same commit,
   run `../env/bin/python tests/smoke.py`, and commit only your files.
+
+## Testing the whole loop (2026-11-13)
+
+Never put a test on a real speaker's talk. Every event has a hidden "Factory Test" talk (`events.test_talk`, behaves like
+a banished talk). An organizer's upload from conf42.com/record is held as unmatched; `python -m factory release
+<short_url> <folder id> test` (commit + push `_db/factory_runs/<short_url>/intake.json`) sends it through intake,
+Descript, proofread and an unlisted "[TEST]" YouTube upload. Ship skips it and it never joins the playlist. To test
+again, first remove the "Factory Test" entries from state.json / youtube.json / intake.json. It spends Descript credits.

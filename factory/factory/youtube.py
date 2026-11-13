@@ -29,7 +29,7 @@ def talk_rows(ev):
     from . import events
     return [{"speakers": t["speakers"], "Name1": t["name1"], "Name2": t["name2"],
              "Keywords": (t["keywords"] or "").strip(), "title": clean_title(t["title"] or ""),
-             "banished": t.get("banished", False)} for t in events.talks(ev)]
+             "banished": t.get("banished", False), "test": t.get("test", False)} for t in events.talks(ev)]
 
 
 def clean_title(t):

@@ -580,6 +580,8 @@ def release(slug, folder_id, outcome, talk=None):
     with open(p, encoding="utf-8") as f:
         st = json.load(f)
     rec = st["items"][folder_id]
+    if outcome == "test":                                # an organizer's test upload: the whole loop on the hidden test talk
+        outcome, talk = "accept", events.TEST_TALK
     rec["override"] = outcome
     if talk:
         rec["override_talk"] = talk

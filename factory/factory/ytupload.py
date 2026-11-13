@@ -311,7 +311,13 @@ def event(run, cfg):
         ch = ((t.get("steps") or {}).get("chapters") or {}).get("chapters") or []
         length = (t.get("probe") or {}).get("duration")
         body, note = video_body(ev, cfg, row, ch, t.get("yt_title"), (raw.get(key) or {}).get("keywords"), length)
+        is_test = bool(row.get("test"))
+        if is_test:                                       # the factory's own test talk: unlisted whatever the settings say
+            body["snippet"]["title"] = clean_text("[TEST] " + body["snippet"]["title"], 100)
+            body["status"]["privacyStatus"] = "unlisted"
         rec = {"title": body["snippet"]["title"], "privacy": body["status"]["privacyStatus"]}
+        if is_test:
+            rec["test"] = True
         try:
             vid = yt.upload(final, body, run.note)
         except QuotaExceeded:
@@ -334,6 +340,8 @@ def event(run, cfg):
             if not ok:
                 rec["captions_note"] = msg
         try:
+            if is_test:
+                raise RuntimeError("test talk - kept out of the playlist")
             if playlist_id is None:
                 title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
                 playlist_id, made = yt.playlist(title)

@@ -482,6 +482,7 @@ class Run:
             return out
         done = {k: t for k, t in self.state["talks"].items() if t.get("finished")}
         self.proofread_finished(done)                  # nothing goes to the site unproofread (Marek 2026-10-29)
+        done = {k: t for k, t in done.items() if k != events.TEST_TALK}   # the test talk never reaches the site
         jobs = []
         site_srt = os.path.join(events.REPO, "srt")
         if os.path.isdir(site_srt):
