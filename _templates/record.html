@@ -2,7 +2,8 @@
      design overlay (assets/js/overlays.js, the teasers' Overlays tab) frames the recording: the camera in the circle,
      the slides or a shared screen in the window; no camera or nothing in the window = the one big window, a second
      camera = co-talk. The engine is assets/js/record-worker.js (1080p60 H.264 + AAC MP4, written to the speaker's disk
-     as it records, with a copy in the browser's storage). Nothing is uploaded.
+     as it records, with a copy in the browser's storage). At Stop it uploads the MP4 + the slides PDF to the Conf42
+     Speaker Workspace on Drive (apps-script/conf42-upload.gs, metadata.yml record_upload_url; empty = no upload).
      Round 2 (Marek 2026-10-22): the conf42.com look (Plus Jakarta Sans, the dark navy hero, vivid colours), one screen
      with no scrolling, and a guided setup in 3 steps on opening - 1. camera (on screen or not, which one; first since
      2026-10-23), 2. microphone (choose + test), 3. what fills the window (PDF slides, a screen, both, or just you). Finishing it turns the
@@ -326,6 +327,11 @@
       color: var(--text); background: var(--glass2); }
     .btn:hover:not(:disabled) { border-color: var(--hi); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .up-card { margin-top: 10px; }
+    .up-bar { height: 8px; border-radius: 99px; background: color-mix(in srgb, currentColor 14%, transparent); overflow: hidden; margin: 10px 0 6px; }
+    .up-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--btn, var(--c, var(--hi))); transition: width .4s ease; }
+    .up-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; } .up-row .btn { flex: none; padding: 9px 14px; font-size: .88rem; }
+    .up-small { opacity: .8; font-size: .85rem; }
     .btn.go { flex: 1; border: 0; color: var(--btn-text, #06102a); background: var(--btn, var(--c, var(--hi))); box-shadow: 0 8px 24px color-mix(in srgb, var(--btn, var(--c, var(--hi))) 35%, transparent); }
     /* green buttons: darker green, white text, like the Slides / Screen switch (Marek 2026-10-23) */
     [style*="var(--green)"] { --btn: var(--green-btn); --btn-text: #fff; }
@@ -570,7 +576,7 @@
               <div class="kicker">Step 1 of 4 · Before you start</div>
               <h2>How this works</h2>
               <div class="intro">
-                <p>This page records your talk right in your browser, then saves it locally - you need to upload your finished talk file to the drive manually.</p>
+                {% if record_upload_url %}<p>This page records your talk right in your browser and saves it on your computer. When you press Stop, it sends the video and your slides to the Conf42 team by itself.</p>{% else %}<p>This page records your talk right in your browser, then saves it locally - you need to upload your finished talk file to the drive manually.</p>{% endif %}
                 <p>Your computer does all the work, like on a video call. The less else it's doing, the smoother your video.</p>
                 <p>Before you record, <b>plug in your charger</b> and <b>minimize/close what you won't need</b> (extra tabs, apps, video calls, Slack, cloud syncing). Leave on your demo window, if any.</p>
                 <p>Works best on a computer from the last five years, in Chrome or Edge, with a headset or USB mic. Each hour of video needs about 2.5 GB of free disk space.</p>
@@ -723,6 +729,10 @@
   </div>
 
   <div class="recs" id="recs" hidden></div>
+  <div class="banner" id="upres" hidden>
+    <span id="upres-text"></span>
+    <button class="btn go" id="upres-go" data-tip="Carry on from where it stopped - nothing is sent twice.">Resume upload</button>
+  </div>
   <div class="banner" id="recover" hidden>
     <span id="recover-text"></span>
     <button class="btn" id="recover-dl" data-tip="Save the backup the browser kept of your recording.">Download</button>
@@ -756,7 +766,7 @@
       <div class="pt"><svg viewBox="0 0 24 24"><circle cx="6.5" cy="7" r="3"/><rect x="11" y="4" width="10" height="8" rx="1.5"/><path d="M3 20c.6-3 2-4.5 3.5-4.5S9.4 17 10 20M13 15h6M13 18h4"/></svg>
         <div><b>Slides, notes and you</b><p>Show your slides or share a screen, read your speaker notes (only you see them) and appear on camera - with your laptop’s camera and mic, or USB / Bluetooth ones.</p></div></div>
       <div class="pt"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>
-        <div><b>Your file, nothing uploaded</b><p>You end up with an MP4 on your computer, ready to send to us. Works in Chrome or Edge.</p></div></div>
+        {% if record_upload_url %}<div><b>Sent to us when you stop</b><p>The MP4 and your slides go to the Conf42 team by themselves, and a copy stays on your computer. Works in Chrome or Edge.</p></div></div>{% else %}<div><b>Your file, nothing uploaded</b><p>You end up with an MP4 on your computer, ready to send to us. Works in Chrome or Edge.</p></div></div>{% endif %}
     </div>
     </div>
   </div>
@@ -1875,7 +1885,7 @@
       Promise.all([pdfjs(), file.arrayBuffer()]).then(function (r) { return r[0].getDocument({ data: r[1] }).promise; })
         .then(function (doc) {
           if (S.pdf) S.pdf.destroy();
-          S.pdf = doc; S.pdfName = file.name; S.pages = doc.numPages; S.page = keep ? Math.min(S.page, doc.numPages) || 1 : 1; S.cache.clear();
+          S.pdf = doc; S.pdfFile = file; S.pdfName = file.name; S.pages = doc.numPages; S.page = keep ? Math.min(S.page, doc.numPages) || 1 : 1; S.cache.clear();
           mapNotes(); dropText();
           setSrc('slides'); showSlide(); summaries();
           if (S.converted) { S.converted = false; say('Your PowerPoint is in! Google converted it, so check the slides look right - fonts can differ. For the exact look: <b>File → Export → PDF</b> in PowerPoint, and add it with the .pptx.', 15000); }
@@ -2243,13 +2253,15 @@
     }).catch(function () {});
     function lockWake() { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {}); }
     document.addEventListener('visibilitychange', function () { if (S.recording && document.visibilityState === 'visible') lockWake(); });
-    window.addEventListener('beforeunload', function (e) { if (S.recording || S.finishing) { e.preventDefault(); e.returnValue = ''; } });
+    window.addEventListener('beforeunload', function (e) { if (S.recording || S.finishing || UP.busy) { e.preventDefault(); e.returnValue = ''; } });
 
     $('rec').addEventListener('click', function () {
       this.blur();   // Space is the next slide, not this button
       if (S.recording) { worker.postMessage({ type: 'stop' }); S.recording = false; S.finishing = true; $('rec').disabled = true; $('pause').hidden = true; return; }
       var name = speaker();
       if (!name) { hello(); return; }
+      if (UP.busy) { say('Your last recording is still uploading. Wait for it to finish (the bar below), then record again.', 9000, 'warn'); return; }
+      if (UP.pendingBrowserCopy && !UP.warned) { UP.warned = true; say('Your last recording hasn’t finished uploading, and a new recording replaces the copy this browser keeps. Use <b>Resume upload</b> first, or press <b>Record</b> again to go ahead anyway.', 15000, 'warn'); return; }
       if (micDead()) { say(MIC_DEAD, 864e5, 'bad'); if ($('wizard').hidden) micRowOpen(); return; }
       var missing = !ready(1) ? 1 : !ready(2) ? 2 : !ready(3) ? 3 : 0;
       if (missing) {
@@ -2283,7 +2295,8 @@
         hudStart();
         // the corgi stays awake while recording (Marek 2026-10-25: dog trivia distracts the speaker): woken quietly, no hop
         var cg = $('corgi'); if (cg.classList.contains('sleep')) { cg.classList.remove('sleep'); clearInterval(dream.t); if ($('bubble').classList.contains('thought')) $('bubble').hidden = true; }
-        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; $('pause').hidden = false; pauseShown();
+        S.recCtx = { ev: S.ev, talk: S.talk, typed: typed(), name: name, mode: S.mode, src: S.src, cams: S.cam.filter(Boolean).length, entry: S.recE || null };
+        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; S.pauseCount = 0; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
@@ -2309,6 +2322,7 @@
       this.blur();
       if (!S.paused) {
         // a 3rd pause within a minute (Marek 2026-10-23): the corgi asks them to go easy on it
+        S.pauseCount = (S.pauseCount || 0) + 1;
         var t0 = Date.now(); S.pauses = (S.pauses || []).filter(function (x) { return t0 - x < 60000; }).concat(t0);
         if (S.pauses.length >= 3) say('Please don’t spam Pause / Resume - it can glitch your video.', 9000, 'bad');
         S.paused = true; worker.postMessage({ type: 'pause' }); pauseShown(); return;
@@ -2342,6 +2356,7 @@
       if (m.file) S.file = m.file;   // "Name (2).mp4" when the folder already had one
       if (S.recE) { S.recE.seconds = m.seconds; S.recE.bytes = m.bytes; S.recE.status = m.onDisk ? 'saved' : 'interrupted'; recPut(S.recE); S.recE = null; }
       if (m.onDisk || m.inBrowser) { var fin = $('fin'); fin.hidden = false; replay(fin); replay(fin.firstChild); clearTimeout(done.t); done.t = setTimeout(function () { fin.hidden = true; }, 4000); }
+      if (UP_URL && (m.onDisk || m.inBrowser)) { upOffer(m, lim, len, mb); return; }
       if (m.onDisk) status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').<br><br>Now please upload it and your slides in PDF to the Speaker Workspace.<br><br>Then let us know. Thank you!', 'ok saved');
       else if (m.inBrowser && !window.showSaveFilePicker) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + ') - downloading <b>' + esc(S.file) + '</b> now.<br><br>Now please upload it and your slides in PDF to the Speaker Workspace.<br><br>Then let us know. Thank you! <button class="btn go" id="dl" style="margin-top:8px">Download again</button>', 'ok saved'); $('dl').onclick = function () { downloadSaved(S.file); }; downloadSaved(S.file); }
       else if (m.inBrowser) { status('✅ ' + lim + 'Recorded ' + len + ' (' + mb + '). <button class="btn go" id="dl" style="margin-top:8px">Download ' + esc(S.file) + '</button>', 'ok'); $('dl').addEventListener('click', function () { downloadSaved(S.file); }); }
@@ -2499,6 +2514,236 @@
           .catch(function () {}).then(function () { $('recover').hidden = true; });
       };
     }).catch(function () {});
+
+    // ── Upload (Marek 2026-11-13): at Stop the recording + the slides PDF go to the Conf42 Speaker Workspace on Drive,
+    // for the cloud factory (factory/factory/intake.py). The "Conf42 upload" script (apps-script/conf42-upload.gs) opens
+    // one Drive resumable session per file; the browser PUTs 8 MB chunks straight to Google and counts the MD5 on the
+    // way; "finish" has the script compare sizes + MD5 with what Drive got. A dropped connection retries by itself, a
+    // closed tab resumes from the last chunk Drive confirmed (the job lives in IndexedDB "c42up", with the file handle
+    // and the slides). The local file always stays: it's the speaker's own copy.
+    var UP_URL = {{ (record_upload_url or '') | tojson }};
+    var UP_WORKSPACE = {{ (speaker_workspace_url or '') | tojson }};
+    var UP_V = {{ rec_v['record-worker'] | tojson }};
+    var UP_CHUNK = 8 * 1024 * 1024, UP_SHORT = 180;
+    var SPARK = 'https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.min.js';
+    var UP = { busy: false, job: null };
+    var UDB = new Promise(function (ok) {
+      try {
+        var q = indexedDB.open('c42up', 1);
+        q.onupgradeneeded = function () { q.result.createObjectStore('jobs', { keyPath: 'id' }); };
+        q.onsuccess = function () { ok(q.result); }; q.onerror = function () { ok(null); };
+      } catch (e) { ok(null); }
+    });
+    function upTx(mode, fn) {
+      return UDB.then(function (db) {
+        if (!db) return null;
+        return new Promise(function (ok) { var t = db.transaction('jobs', mode), q = fn(t.objectStore('jobs')); t.oncomplete = function () { ok(q && q.result); }; t.onerror = function () { ok(null); }; });
+      });
+    }
+    function upSave(j) { return upTx('readwrite', function (st) { return st.put(j); }); }
+    function upAll() { return upTx('readonly', function (st) { return st.getAll(); }).then(function (a) { return a || []; }); }
+    function sparkP() {   // MD5 is a bonus check: without the library the upload still goes, the sizes are still compared
+      if (window.SparkMD5) return Promise.resolve(window.SparkMD5);
+      return sparkP.p = sparkP.p || new Promise(function (ok) {
+        var s = document.createElement('script'); s.src = SPARK; s.onload = function () { ok(window.SparkMD5 || null); }; s.onerror = function () { sparkP.p = null; ok(null); };
+        document.head.appendChild(s);
+      });
+    }
+    function upPost(body) {   // text/plain: no CORS preflight, which Apps Script can't answer
+      return fetch(UP_URL, { method: 'POST', body: JSON.stringify(body) })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function (res) { if (!res || !res.ok) { var e = new Error((res && res.error) || 'rejected'); e.res = res || {}; throw e; } return res; });
+    }
+    function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+    // one PUT; resolves {final, json} or {final:false, range}; rejects with .status (0 = network)
+    function upPut(url, blob, start, total, onp) {
+      return new Promise(function (resolve, reject) {
+        var x = new XMLHttpRequest();
+        x.open('PUT', url);
+        x.setRequestHeader('Content-Range', blob ? 'bytes ' + start + '-' + (start + blob.size - 1) + '/' + total : 'bytes */' + total);
+        if (onp && blob) x.upload.onprogress = function (e) { if (e.lengthComputable) onp(start + e.loaded); };
+        x.onload = function () {
+          if (x.status === 308) { var rg = x.getResponseHeader('Range'); return resolve({ final: false, range: rg ? +rg.split('-')[1] + 1 : null }); }
+          if (x.status >= 200 && x.status < 300) { var j = {}; try { j = JSON.parse(x.responseText || '{}'); } catch (e) {} return resolve({ final: true, json: j }); }
+          var er = new Error('HTTP ' + x.status); er.status = x.status; reject(er);
+        };
+        x.onerror = function () { var er = new Error('network'); er.status = 0; reject(er); };
+        x.send(blob || null);
+      });
+    }
+    // where Drive really is: after a failed PUT it may have taken more (or less) than the page thinks
+    function upWhere(f, total) {
+      return upPut(f.url, null, 0, total).then(function (r) { return r.final ? total : (r.range == null ? f.sent : r.range); }, function () { return f.sent; });
+    }
+    async function upFile(j, role, file, onp) {
+      var f = j.files[role], Spark = await sparkP();
+      var spark = Spark ? new Spark.ArrayBuffer() : null;
+      if (spark && f.md5state) spark.setState(f.md5state); else if (f.sent) spark = null;   // a resume without the MD5 state: sizes only
+      var tries = 0;
+      while (f.sent < file.size) {
+        var start = f.sent, end = Math.min(start + UP_CHUNK, file.size), blob = file.slice(start, end), r;
+        try {
+          r = await upPut(f.url, blob, start, file.size, function (b) { onp(role, b); });
+          tries = 0;
+        } catch (er) {
+          if (er.status === 404 || er.status === 410) {   // the session expired (Drive keeps one about a week): a new one, from 0
+            var re = await upPost(upBody(j, role === 'video', role === 'slides', true));
+            f.url = re.uploads[role].upload_url; f.sent = 0; f.md5state = null; spark = Spark ? new Spark.ArrayBuffer() : null;
+            await upSave(j); continue;
+          }
+          if (++tries > 12) throw er;
+          onp(role, f.sent, 'Connection trouble - trying again in a moment…');
+          await wait(Math.min(60000, 2000 * Math.pow(2, Math.min(tries, 5))));
+          var at = await upWhere(f, file.size);
+          if (spark && at > f.sent) spark.append(await file.slice(f.sent, at).arrayBuffer());   // Drive kept more than we knew
+          if (at < f.sent) { f.sent = 0; f.md5state = null; spark = Spark ? new Spark.ArrayBuffer() : null; }   // it lost some: from 0
+          else f.sent = at;
+          if (spark) f.md5state = spark.getState();
+          await upSave(j);
+          continue;
+        }
+        if (spark) spark.append(await blob.arrayBuffer());
+        f.sent = r.final ? file.size : (r.range != null ? r.range : end);
+        if (r.final && r.json && r.json.id) f.id = r.json.id;
+        if (spark) f.md5state = spark.getState();
+        await upSave(j);
+      }
+      f.md5 = spark ? spark.end() : '';
+      f.done = true; f.md5state = null;
+      await upSave(j);
+    }
+    function upBody(j, video, slides, again) {
+      var c = j.ctx, b = { action: 'start', event: { slug: c.ev.slug, label: c.ev.label }, typed: c.typed, meta: j.meta, origin: location.origin, website: '' };
+      b.talk = c.talk ? { k: c.talk.k || '', names: c.talk.names, title: c.talk.title, min: c.talk.min || 0 } : { k: '', names: [], title: '' };
+      if (video) b.video = { name: j.files.video.name, size: j.files.video.size };
+      if (slides) b.slides = { name: j.files.slides.name, size: j.files.slides.size };
+      if (j.folder_id) b.folder_id = j.folder_id;
+      return b;
+    }
+    function upSource(j) {   // the recording itself: the speaker's file, their folder, or the browser's own copy
+      var e = j.entry;
+      if (e && e.fileH) return e.fileH.getFile();
+      if (e && e.folder) return e.folder.getFileHandle(e.file).then(function (h) { return h.getFile(); });
+      return opfsFile();
+    }
+    function upAllowed(j) {   // after a reload the browser asks again before the page may read the speaker's file
+      var h = j.entry && (j.entry.fileH || j.entry.folder);
+      if (!h || !h.queryPermission) return Promise.resolve(true);
+      return h.queryPermission({ mode: 'read' }).then(function (p) { return p === 'granted' || h.requestPermission({ mode: 'read' }).then(function (q) { return q === 'granted'; }); });
+    }
+    function upCard(html) { status('<div class="up-card">' + html + '</div>', 'ok saved'); }
+    function upBar(frac, line, small) {
+      upCard('<b>Uploading your talk to Conf42…</b><div class="up-bar"><i style="width:' + Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%"></i></div>' +
+        '<div class="up-small">' + line + '</div>' + (small ? '<div class="up-small" style="margin-top:6px">' + small + '</div>' : '') +
+        '<div class="up-small" style="margin-top:8px">Keep this page open until it says <b>Uploaded</b>. Your own copy stays on your computer.</div>');
+    }
+    // Stop: a short one is asked about first (most test takes end here, not in the factory)
+    function upOffer(m, lim, len, mb) {
+      var c = S.recCtx || {};
+      if (!c.ev) { status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').', 'ok saved'); return; }
+      var j = { id: Date.now(), at: Date.now(), status: 'new', file: S.file, entry: c.entry, ctx: { ev: { slug: c.ev.slug, label: c.ev.label }, talk: c.talk, typed: c.typed, name: c.name },
+                slidesBlob: S.pdfFile || null, files: {},
+                meta: { seconds: Math.round(m.seconds), bytes: m.bytes, stop_reason: m.why || 'stop', saved_to: m.onDisk ? 'disk' : 'browser', frames: m.frames || 0, dropped: m.dropped || 0,
+                        vcodec: m.video || '', acodec: m.audio || '', layout: c.mode || '', source: c.src || '', cameras: c.cams || 0, pauses: S.pauseCount || 0,
+                        slide_pages: S.pdf ? S.pages : 0, recorder: UP_V, browser: (navigator.userAgent.match(/(Edg|OPR|Chrome|Firefox|Safari)\/[\d.]+/) || [''])[0] } };
+      if (!j.entry && !m.onDisk) UP.pendingBrowserCopy = true;
+      var intro = '✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').';
+      if (m.seconds < UP_SHORT) {
+        upCard(intro + '<br><br>That was a short one (' + len + '). A test? Only real takes need to go to Conf42.' +
+          '<div class="up-row"><button class="btn go" id="up-yes">Upload it anyway</button><button class="btn" id="up-no">It was a test, don’t upload</button></div>');
+        $('up-yes').onclick = function () { upStart(j); };
+        $('up-no').onclick = function () { UP.pendingBrowserCopy = false; upCard(intro + '<br><br>Not uploaded. Record your talk when you’re ready - it uploads by itself when you press Stop.'); };
+        return;
+      }
+      upStart(j);
+    }
+    async function upStart(j) {
+      if (UP.busy) return;
+      UP.busy = true; UP.job = j;
+      try {
+        var video = await upSource(j);
+        if (!j.files.video) {
+          j.files.video = { name: S.file || (j.ctx.name + '.mp4'), size: video.size, sent: 0 };
+          if (j.slidesBlob) j.files.slides = { name: (j.slidesBlob.name || 'slides.pdf').replace(/\.[^.]+$/, '') + '.pdf', size: j.slidesBlob.size, sent: 0 };
+          upBar(0, 'Getting ready…');
+          var res = await upPost(upBody(j, true, !!j.files.slides));
+          if (res.honeypot) throw new Error('rejected');
+          j.folder_id = res.folder_id; j.status = 'uploading';
+          Object.keys(res.uploads).forEach(function (r) { j.files[r].url = res.uploads[r].upload_url; j.files[r].drive_name = res.uploads[r].name; });
+          await upSave(j);
+        }
+        var total = j.files.video.size + (j.files.slides ? j.files.slides.size : 0), t0 = Date.now(), b0 = null;
+        var onp = function (role, b, note) {
+          var done = (role === 'slides' ? b : (j.files.slides ? j.files.slides.size : 0) + b);
+          if (b0 == null) b0 = done;
+          var secs = (Date.now() - t0) / 1000, rate = secs > 3 ? (done - b0) / secs : 0, left = rate > 0 ? (total - done) / rate : 0;
+          upBar(done / total, (done / 1048576).toFixed(0) + ' of ' + (total / 1048576).toFixed(0) + ' MB' + (left > 0 ? ' · about ' + (left > 90 ? Math.round(left / 60) + ' min' : Math.round(left) + ' s') + ' left' : ''), note);
+        };
+        if (j.files.slides && !j.files.slides.done) await upFile(j, 'slides', j.slidesBlob, onp);   // the small one first
+        if (!j.files.video.done) await upFile(j, 'video', video, onp);
+        upBar(1, 'Checking with Drive…');
+        var fin = await upPost({ action: 'finish', folder_id: j.folder_id, md5: { video: j.files.video.md5 || '', slides: j.files.slides ? j.files.slides.md5 || '' : '' } });
+        j.status = fin.complete ? 'done' : 'problem'; j.report = fin.files; j.slidesBlob = j.status === 'done' ? null : j.slidesBlob;
+        await upSave(j);
+        UP.pendingBrowserCopy = false;
+        upDone(j);
+      } catch (er) {
+        console.error('[upload]', er);
+        j.status = j.status === 'new' ? 'new' : 'stopped'; await upSave(j);
+        var why = er.message === 'too many today' ? 'today’s upload limit was reached' : er.message === 'too many for this talk' ? 'this talk was uploaded many times today already' : er.message;
+        upCard('⚠ The upload didn’t go through (' + esc(why) + '). Your recording is safe on your computer.' +
+          '<div class="up-row"><button class="btn go" id="up-again">Try again</button>' + (UP_WORKSPACE ? '<a class="btn" target="_blank" rel="noopener" href="' + esc(UP_WORKSPACE) + '">Upload it to the Speaker Workspace yourself</a>' : '') + '</div>');
+        $('up-again').onclick = function () { upStart(j); };
+      } finally { UP.busy = false; }
+    }
+    function upDone(j) {
+      var first = (j.ctx.name || '').split(/\s*&\s*/)[0].split(' ')[0];
+      if (j.status === 'done') {
+        upCard('✅ <b>Uploaded! Thank you' + (first ? ', ' + esc(first) : '') + '.</b> Your talk' + (j.files.slides ? ' and your slides are' : ' is') + ' with the Conf42 team - there’s nothing else to do.' +
+          (j.files.slides ? '' : '<br><br>No slides came with it. If you have them, add the PDF here:') +
+          '<div class="up-row"><button class="btn" id="up-slides">' + (j.files.slides ? 'Replace my slides' : 'Add my slides (PDF)') + '</button>' +
+          '<button class="btn" id="up-copy">Download a copy</button></div><input type="file" id="up-pdf" accept="application/pdf,.pdf" hidden>');
+        $('up-copy').onclick = function () { upSource(j).then(function (f) { var u = URL.createObjectURL(f), a = document.createElement('a'); a.href = u; a.download = j.file; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 120000); }); };
+        $('up-slides').onclick = function () { $('up-pdf').click(); };
+        $('up-pdf').onchange = function () { var f = this.files[0]; if (f) upSlidesLater(j, f); };
+      } else {
+        var bad = Object.keys(j.report || {}).filter(function (r) { return j.report[r] !== 'complete'; });
+        upCard('⚠ Drive didn’t get ' + (bad.indexOf('video') >= 0 ? 'your recording' : 'your slides') + ' in one piece (' + esc(bad.map(function (r) { return j.report[r]; }).join(', ')) + '). Please send it again - it’s quick to retry.' +
+          '<div class="up-row"><button class="btn go" id="up-again">Upload again</button></div>');
+        $('up-again').onclick = function () { bad.forEach(function (r) { j.files[r] = null; delete j.files[r]; }); j.folder_id = null; j.status = 'new'; upStart(j); };
+      }
+    }
+    async function upSlidesLater(j, file) {   // slides on their own, into the same folder
+      if (!/\.pdf$/i.test(file.name)) { toast('Please choose a PDF.', 6000, 'warn'); return; }
+      if (UP.busy) return;
+      UP.busy = true;
+      try {
+        j.files.slides = { name: file.name, size: file.size, sent: 0 }; j.slidesBlob = file;
+        var res = await upPost(upBody(j, false, true));
+        j.files.slides.url = res.uploads.slides.upload_url; await upSave(j);
+        await upFile(j, 'slides', file, function (r, b) { upBar(b / file.size, 'Your slides: ' + (b / 1048576).toFixed(1) + ' of ' + (file.size / 1048576).toFixed(1) + ' MB'); });
+        var fin = await upPost({ action: 'finish', folder_id: j.folder_id, roles: ['slides'], md5: { slides: j.files.slides.md5 || '' } });
+        j.status = fin.files && fin.files.video === 'complete' && fin.files.slides === 'complete' ? 'done' : 'problem'; j.report = fin.files; j.slidesBlob = null;
+        await upSave(j);
+        upDone(j);
+      } catch (er) { toast('Your slides didn’t upload (' + er.message + '). Please try again.', 0, 'bad'); }
+      finally { UP.busy = false; }
+    }
+    // an upload that stopped last time (tab closed, laptop asleep): offered back, carried on from Drive's last chunk
+    if (UP_URL) upAll().then(function (jobs) {
+      var j = jobs.filter(function (x) { return x.status === 'uploading' || x.status === 'stopped'; }).sort(function (a, b) { return b.at - a.at; })[0];
+      if (!j || Date.now() - j.at > 6 * 864e5) return;   // Drive's sessions last about a week
+      if (!j.entry) UP.pendingBrowserCopy = true;
+      var pct = j.files.video && j.files.video.size ? Math.round(100 * (j.files.video.sent || 0) / j.files.video.size) : 0;
+      $('upres-text').innerHTML = 'The upload of <b>' + esc(j.file) + '</b> stopped at ' + pct + '%.';
+      $('upres').hidden = false;
+      $('upres-go').onclick = function () {
+        upAllowed(j).then(function (ok) {
+          if (!ok) { toast('The browser needs your OK to read the recording - please allow it.', 8000, 'warn'); return; }
+          $('upres').hidden = true; upStart(j);
+        });
+      };
+    });
 
     // start: the soonest event (or the one picked last time), the guide at step 1. A microphone (or camera) allowed
     // on an earlier visit opens by itself. The preview always opens on the circle + window overlay, whatever was
