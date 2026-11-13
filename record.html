@@ -2735,15 +2735,48 @@
       upSource(j).then(function (f) { dl(f, j.file); }, function (e) { toast('I couldn’t read the recording: ' + e.message, 0, 'bad'); });
       if (j.slidesBlob) setTimeout(function () { dl(j.slidesBlob, j.file.replace(/\.mp4$/i, '') + '.pdf'); }, 800);
     }
-    function upBar(j, frac, line, note) {
-      var pct = Math.floor(Math.max(0, Math.min(1, frac)) * 100);
-      upShow('<h2>Sending your talk to Conf42…</h2>' +
-        '<div class="upm-pct">' + pct + '%</div><div class="upm-bar"><i style="width:' + pct + '%"></i></div>' +
-        '<p class="upm-line">' + line + '</p>' +
-        (note === 'offline' ? '<p class="upm-warn" id="upm-off">' + OFFLINE + '. It carries on by itself.</p>' : note === 'retry' ? '<p class="upm-warn">The connection dropped - trying again…</p>' : '<p class="upm-warn" id="upm-off" hidden>' + OFFLINE + '.</p>') +
-        '<p class="upm-keep"><b>Keep this window open</b> until it says <b>All done</b>.</p>', j);
+    // One bar for the whole job (Marek 2026-11-13): getting ready, sending and the double check are all inside it, and
+    // 100 % means it is really done. The dialog is drawn once; the bar glides to its target every frame and never goes back.
+    var UPB = { shown: 0, target: 0, floor: 0, tau: 350, raf: 0, last: 0 };
+    function upBarTick(now) {
+      UPB.raf = 0;
+      var fill = $('upm-fill'); if (!fill || $('upm').hidden) return;
+      var dt = Math.min(1000, now - (UPB.last || now)); UPB.last = now;
+      // catching up with what is already sent is quick; only the stretch beyond it (the check) uses the slow glide
+      if (UPB.target > UPB.shown) UPB.shown = Math.min(UPB.target, UPB.shown + Math.max((UPB.target - UPB.shown) * (1 - Math.exp(-dt / (UPB.shown < UPB.floor ? 350 : UPB.tau))), dt / 60000));
+      if (UPB.target - UPB.shown < 0.0005) UPB.shown = Math.max(UPB.shown, UPB.target);
+      fill.style.width = (UPB.shown * 100).toFixed(2) + '%';
+      $('upm-pctn').textContent = Math.min(UPB.target >= 1 ? 100 : 99, Math.floor(UPB.shown * 100 + 0.01)) + '%';
+      if (UPB.shown < UPB.target) UPB.raf = requestAnimationFrame(upBarTick);
     }
-    // Stop: Share / Abort. Nothing leaves the computer until the speaker says so
+    function upBarReset() { UPB.shown = 0; UPB.target = 0; UPB.floor = 0; UPB.last = 0; }
+    function upBarFull() {   // resolves once the bar really shows 100 % (2 s at most, at once in a hidden tab)
+      return new Promise(function (ok) {
+        var t0 = Date.now(), iv = setInterval(function () {
+          if (UPB.shown < 1 && Date.now() - t0 < 2000 && !document.hidden) return;
+          clearInterval(iv); UPB.shown = 1;
+          if ($('upm-fill')) { $('upm-fill').style.width = '100%'; $('upm-pctn').textContent = '100%'; }
+          setTimeout(ok, 350);
+        }, 50);
+      });
+    }
+    function upBar(j, frac, line, note, tau) {   // frac = of the whole job; tau = how slowly the bar glides there (ms)
+      if (!$('upm-fill') || $('upm').hidden) {
+        upShow('<h2>Sending your talk to Conf42…</h2>' +
+          '<div class="upm-pct" id="upm-pctn">0%</div><div class="upm-bar"><i id="upm-fill" style="transition:none"></i></div>' +
+          '<p class="upm-line" id="upm-line"></p>' +
+          '<p class="upm-warn" id="upm-off" hidden>' + OFFLINE + '. It carries on by itself.</p>' +
+          '<p class="upm-warn" id="upm-retry" hidden>The connection dropped - trying again…</p>' +
+          '<p class="upm-keep"><b>Keep this window open</b> until it says <b>All done</b>.</p>', j);
+        upBarReset();
+      }
+      if (tau) UPB.floor = UPB.target; else UPB.floor = 1;
+      UPB.target = Math.max(UPB.target, Math.max(0, Math.min(1, frac))); UPB.tau = tau || 350;
+      if (line != null) $('upm-line').textContent = line;
+      $('upm-off').hidden = !(note === 'offline' || navigator.onLine === false);
+      $('upm-retry').hidden = note !== 'retry';
+      if (!UPB.raf) { UPB.last = 0; UPB.raf = requestAnimationFrame(upBarTick); }
+    }
     function upOffer(m, lim, len, mb) {
       var c = S.recCtx || {};
       if (!c.ev) { status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').', 'ok saved'); return; }
@@ -2825,7 +2858,7 @@
         if (!j.files.video) {
           j.files.video = { name: j.file, size: video.size, sent: 0, stamp: stamp };
           if (j.slidesBlob) j.files.slides = { name: (j.slidesBlob.name || 'slides.pdf').replace(/\.[^.]+$/, '') + '.pdf', size: j.slidesBlob.size, sent: 0 };
-          upBar(j, 0, 'Getting ready…', navigator.onLine === false ? 'offline' : '');
+          upBar(j, 0.02, 'Getting ready…', navigator.onLine === false ? 'offline' : '', 1500);
           await online();
           var res = await upPost(upBody(j, true, !!j.files.slides));
           if (res.honeypot) throw new Error('rejected');
@@ -2833,12 +2866,15 @@
           Object.keys(res.uploads).forEach(function (r) { j.files[r].url = res.uploads[r].upload_url; });
           await upSave(j);
         }
-        var total = j.files.video.size + (j.files.slides ? j.files.slides.size : 0), t0 = Date.now(), b0 = null;
+        var total = j.files.video.size + (j.files.slides ? j.files.slides.size : 0), t0 = Date.now(), b0 = null, lineAt = 0;
         var onp = function (role, b, note) {
           var done = (role === 'slides' ? b : (j.files.slides ? j.files.slides.size : 0) + b);
           if (b0 == null || note) { b0 = done; t0 = Date.now(); }
           var secs = (Date.now() - t0) / 1000, rate = secs > 3 ? (done - b0) / secs : 0, left = rate > 0 ? (total - done) / rate : 0;
-          upBar(j, done / total, mbs(done) + ' of ' + mbs(total) + (left > 0 ? ' · about ' + (left > 90 ? Math.round(left / 60) + ' min' : Math.max(1, Math.round(left)) + ' s') + ' left' : ''), note);
+          var fresh = note || Date.now() - lineAt > 900;   // the numbers change about once a second, not on every event
+          if (fresh) lineAt = Date.now();
+          // sending is 2-95 % of the bar; the rest is the check at the end
+          upBar(j, 0.02 + 0.93 * done / total, fresh ? mbs(done) + ' of ' + mbs(total) + (left > 0 ? ' · about ' + (left > 90 ? Math.round(left / 60) + ' min' : Math.max(1, Math.round(left)) + ' s') + ' left' : '') : null, note);
         };
         if (j.files.slides && !j.files.slides.done) await upFile(j, 'slides', j.slidesBlob, onp);   // the small one first
         if (!j.files.video.done) await upFile(j, 'video', video, onp);
@@ -2856,7 +2892,7 @@
     }
     // the double check: Drive's own size + MD5 of what it stored, against the speaker's file (unchanged since the start)
     async function upCheck(j, again) {
-      upShow('<h2>Double-checking your upload…</h2><p>Comparing the copy on Conf42’s Drive with the file on your computer.</p>', j);
+      upBar(j, 0.99, 'Almost there…', '', 5000);   // the same bar creeps on while Drive's copy is compared with the file
       var video = await upSource(j), changed = (video.size + ':' + video.lastModified) !== j.files.video.stamp;
       var fin = await upPost({ action: 'finish', folder_id: j.folder_id, md5: { video: j.files.video.md5 || '', slides: j.files.slides ? j.files.slides.md5 || '' : '' } });
       var d = fin.details || {}, rows = [], ok = fin.complete && !changed;
@@ -2871,6 +2907,7 @@
       if (ok) UP.pendingBrowserCopy = false;
       await upSave(j);
       if (ok) {
+        upBar(j, 1, 'Done', '', 120); await upBarFull();   // the bar reaches 100 % only now, then the last screen
         var first = ((j.ctx.talk && j.ctx.talk.names && j.ctx.talk.names[0]) || j.ctx.name || '').split(' ')[0];
         upShow('<div class="upm-done">✓</div><h2>All done' + (first ? ', thank you ' + esc(first) : '') + '!</h2>' +
           '<ul class="upm-checks">' + rows.join('') + '</ul>' +
@@ -2886,7 +2923,7 @@
         return;
       }
       if (!again) {   // once more from scratch, by itself, before bothering the speaker
-        j.files = {}; j.folder_id = null; j.status = 'new'; UP.busy = false;
+        j.files = {}; j.folder_id = null; j.status = 'new'; UP.busy = false; upBarReset();
         return upStart(j, true);
       }
       upShow('<h2>The check didn’t match</h2><ul class="upm-checks">' + rows.join('') + '</ul><p>Please download the video below and upload it to the Speaker Workspace yourself - or try once more.</p>' +
