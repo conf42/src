@@ -136,7 +136,7 @@ def cards(event, rows=None):
         last = " & ".join(n.split()[-1] for n in names)
         out.append(dict(i=i, title=title or "TBD", people=people, plate=plate, photo=photo if has_photo else "", missing=missing,
                         file=file + ".png", name=" & ".join(names), keynote=(t.get("Featured") or "").lower() == "yes", org=" & ".join(dict.fromkeys(c for _, c in people if c)),
-                        first=first.lower(), last=last.lower(),
+                        first=first.lower(), last=last.lower(), key=t.get("short_url") or "", duration=t.get("duration") or 0,
                         search=" ".join([title] + [n for n, _ in people] + [c for _, c in people]).lower()))
     return out
 
