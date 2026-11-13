@@ -1058,6 +1058,9 @@
     function typed() { return $('name').value.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim(); }
     // the file is named after the lineup's spelling once the name is matched, else as typed
     function speaker() { return S.who || typed(); }
+    // the file name: the speaker AND the conference in full, "<Speaker> - Conf42 <Event> <Year>" (Marek 2026-11-13: the
+    // same speaker at two conferences in a row must never save one recording over the other); the factory's own naming
+    function fileBase(name) { return name + (S.ev ? ' - ' + S.ev.label : ''); }
     // the name matched with every upcoming lineup as it's typed (Marek 2026-10-23: forgiving - accents, case, a typo,
     // the first name alone); one hit = that talk (switching conference), a few = "which one is you?", none = carry on
     function norm(x) { return x.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
@@ -1119,7 +1122,7 @@
         el.className = 'msg';
         el.innerHTML = 'We can\u2019t match you with any speaker name at the conference. Not a big problem, you can carry on and get this sorted later with the Conf42 Team.';
       }
-      $('fname').textContent = (speaker() || 'Your Name') + '.mp4';
+      $('fname').textContent = fileBase(speaker() || 'Your Name') + '.mp4';
     }
     $('name').addEventListener('input', function () { store.set('name', this.value); nameShown(); });
     // matched: the lineup's whole name in the field once they're done typing ("Mark" -> "Mark Pawlikowski", Marek 2026-10-24)
@@ -1234,6 +1237,14 @@
       }
       ['Processor', 'Memory', 'Power', 'Disk space', 'Video encoder', 'Current load'].forEach(function (n, i) { row(i, 'wait', n, 'checking…'); });
       var brave = !!navigator.brave, gx = /Opera GX/.test(brands), rough = brave ? ' (roughly: Brave hides exact numbers)' : '';
+      if (UP_URL) {   // can this computer upload to the Conf42 drive? (the real path, 256 KB, nothing kept)
+        total++; row(7, 'wait', 'Upload to Conf42', 'checking…');
+        upProbe(true).then(function (v) {
+          row(7, v === 'ok' ? 0 : v === 'offline' ? 1 : 2, 'Upload to Conf42', v === 'ok' ? 'works from this computer' : v === 'offline' ? 'offline right now' : 'blocked on this network - you’ll upload it yourself',
+            v === 'ok' ? '' : v === 'offline' ? 'offline|You’re offline. You can still record - the upload waits until you’re back online.'
+              : 'uploads are blocked here|' + PROBE_TEXT[v] + ' You can still record: at the end you’ll download the file and upload it yourself.');
+        });
+      }
       if (gx) { total++; row(6, 'wait', 'Opera GX', 'checking…'); row(6, 1, 'Opera GX', 'turn off GX Control\u2019s RAM and CPU limiters while you record', 'Opera GX limits|Opera GX can cap memory and processor use (GX Control). Turn those limits off while you record.'); }
       var cores = navigator.hardwareConcurrency || 0;
       row(0, cores >= 8 ? 0 : cores >= 4 ? 1 : 2, 'Processor', cores ? cores + ' cores' + (cores >= 8 ? '' : cores >= 4 ? ' - fine, close other apps' : ' - may struggle') + rough : 'unknown',
@@ -2301,7 +2312,7 @@
       if (!window.showSaveFilePicker) { countdown(null, name); return; }   // no picker (Brave): into the browser, downloaded at Stop
       // the Save dialog first, while the click still counts as the user's (Desktop allowed - a folder picker isn't, Chrome
       // calls the Desktop "system files"); the worker writes the file as it records and makes it real every minute
-      window.showSaveFilePicker({ suggestedName: name + '.mp4', startIn: 'desktop', id: 'c42-record', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
+      window.showSaveFilePicker({ suggestedName: fileBase(name) + '.mp4', startIn: 'desktop', id: 'c42-record', types: [{ description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }] })
         .then(function (h) { countdown(h, name); })
         .catch(function (e) { if (e.name !== 'AbortError') countdown(null, name); });
     });
@@ -2318,14 +2329,15 @@
         var r = new MediaStreamTrackProcessor({ track: S.recMic }).readable;
         // just the camera, full frame: a moving face needs more bits than slides (Marek 2026-10-23); 4 Mbit/s costs the
         // hardware encoder nothing extra, only ~0.7 GB more per hour
-        if (folder) { S.recE = { id: Date.now(), name: name, folder: folder, file: name + '.mp4', parts: name + ' - safety copy', started: Date.now(), status: 'recording' }; recPut(S.recE); }
+        var base = fileBase(name);   // the files carry the conference; the speaker's name stays for the dialogs
+        if (folder) { S.recE = { id: Date.now(), name: name, folder: folder, file: base + '.mp4', parts: base + ' - safety copy', started: Date.now(), status: 'recording' }; recPut(S.recE); }
         if (file) { S.recE = { id: Date.now(), name: name, fileH: file, file: file.name, started: Date.now(), status: 'recording' }; recPut(S.recE); }
-        worker.postMessage({ type: 'start', name: name, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
+        worker.postMessage({ type: 'start', name: base, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
         // the corgi stays awake while recording (Marek 2026-10-25: dog trivia distracts the speaker): woken quietly, no hop
         var cg = $('corgi'); if (cg.classList.contains('sleep')) { cg.classList.remove('sleep'); clearInterval(dream.t); if ($('bubble').classList.contains('thought')) $('bubble').hidden = true; }
         S.recCtx = { ev: S.ev, talk: S.talk, typed: typed(), name: name, mode: S.mode, src: S.src, cams: S.cam.filter(Boolean).length, entry: S.recE || null };
-        S.recording = true; S.file = name + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; S.pauseCount = 0; $('pause').hidden = false; pauseShown();
+        S.recording = true; S.file = base + '.mp4'; S.warn10 = S.warn1 = 0; S.paused = false; S.pauses = []; S.pauseCount = 0; $('pause').hidden = false; pauseShown();
         document.body.classList.add('locked'); $('zoom0').disabled = $('zoom1').disabled = true;
         all('#studio .row .body').forEach(function (x) { x.hidden = true; });
         $('rec').disabled = false; $('rec').classList.add('live'); $('rec').textContent = 'Stop';
@@ -2686,6 +2698,29 @@
       m.hidden = false; offlineShown();
     }
     function upHide() { $('upm').hidden = true; }
+    // The upload check: the same path as a real upload, from this browser - the script opens a Drive session (into
+    // Auto upload/_probe), the page PUTs 256 KB of a 512 KB file and expects Drive's 308 "go on"; the session is then
+    // dropped, so nothing is ever stored. Catches company proxies / data-loss tools that block Google Drive uploads or
+    // script.google.com. Result: 'ok' | 'offline' | 'script' | 'drive' | 'off' (no upload script set).
+    function upProbe(fresh) {
+      if (!UP_URL) return Promise.resolve('off');
+      if (navigator.onLine === false) return Promise.resolve('offline');
+      if (!fresh && UP.probe && Date.now() - UP.probeAt < 10 * 60000 && UP.probe === 'ok') return Promise.resolve('ok');
+      var timer = function (ms) { return new Promise(function (_, no) { setTimeout(function () { no(new Error('timeout')); }, ms); }); };
+      var r = Promise.race([upPost({ action: 'probe', origin: location.origin, website: '' }), timer(20000)])
+        .then(function (res) {
+          return Promise.race([upPut(res.upload_url, new Blob([new Uint8Array(262144)]), 0, 524288), timer(30000)])
+            .then(function (x) {
+              try { var d = new XMLHttpRequest(); d.open('DELETE', res.upload_url); d.send(); } catch (e) {}   // best effort
+              return x && x.final === false ? 'ok' : 'drive';
+            }, function () { return 'drive'; });
+        }, function () { return navigator.onLine === false ? 'offline' : 'script'; });
+      return r.then(function (v) { UP.probe = v; UP.probeAt = Date.now(); return v; });
+    }
+    var PROBE_TEXT = {
+      script: 'This computer can’t reach the Conf42 upload service (script.google.com) - a company network or firewall may block it.',
+      drive: 'This computer’s network blocks uploads to Google Drive - common on company laptops.'
+    };
     // the status page's pings (fire and forget): 'recorded' at Stop, 'aborted' on Abort and start over
     function upPing(action, j, seconds) {
       var c = j.ctx;
@@ -2694,7 +2729,7 @@
     }
     function upDownload(j) {
       upSource(j).then(function (f) { dl(f, j.file); }, function (e) { toast('I couldn’t read the recording: ' + e.message, 0, 'bad'); });
-      if (j.slidesBlob) setTimeout(function () { dl(j.slidesBlob, j.slidesBlob.name || 'slides.pdf'); }, 800);
+      if (j.slidesBlob) setTimeout(function () { dl(j.slidesBlob, j.file.replace(/\.mp4$/i, '') + '.pdf'); }, 800);
     }
     function upBar(j, frac, line, note) {
       var pct = Math.floor(Math.max(0, Math.min(1, frac)) * 100);
@@ -2717,7 +2752,8 @@
       // "recorded, not uploaded" on conf42.com/<event>/factory, before the speaker even chooses (fire and forget)
       upPing('recorded', j, m.seconds);
       status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').', 'ok saved');
-      upChoice(j, m.seconds);
+      upShow('<h2>Your recording is ready</h2><p>Checking the connection to the Conf42 drive…</p>', null);
+      upProbe().then(function (v) { j.probe = v; upChoice(j, m.seconds); });
     }
     function upChoice(j, seconds) {
       var who = (j.ctx.talk && j.ctx.talk.names ? j.ctx.talk.names.join(' & ') : j.ctx.name) || j.ctx.name;
@@ -2725,8 +2761,12 @@
         '<p class="upm-what"><b>' + esc(j.file) + '</b> · ' + esc(j.len) + '<br>' + esc(who) + ' · ' + esc(j.ctx.ev.label) + '<br>' +
         (j.slidesBlob ? 'Slides: <b>' + esc(j.slidesBlob.name || 'slides.pdf') + '</b>' : 'No slides with it - add the PDF here: <button class="upm-link" id="upm-addpdf">Add slides (PDF)</button><input type="file" id="upm-pdf" accept="application/pdf,.pdf" hidden>') + '</p>' +
         (seconds < UP_SHORT ? '<p class="upm-warn">This one is only ' + esc(j.len) + ' long. If it was a test, choose <b>No thanks</b> and record again.</p>' : '') +
-        '<div class="upm-row"><button class="btn go upm-big" id="upm-share">Upload to Conf42 drive automatically</button></div>' +
-        '<div class="upm-row"><button class="btn" id="upm-self">No thanks, I’ll do it myself</button></div>' +
+        (PROBE_TEXT[j.probe] ? '<p class="upm-warn">' + PROBE_TEXT[j.probe] + ' Please upload it yourself - or download it and upload it later from another network.</p>' +
+          '<div class="upm-row"><button class="btn go upm-big" id="upm-self">Upload it myself</button></div>' +
+          '<div class="upm-row"><button class="upm-link" id="upm-share">Try the automatic upload anyway</button></div>'
+        : (j.probe === 'offline' ? '<p class="upm-warn">You’re offline - the upload starts by itself when you’re back online.</p>' : '') +
+          '<div class="upm-row"><button class="btn go upm-big" id="upm-share">Upload to Conf42 drive automatically</button></div>' +
+          '<div class="upm-row"><button class="btn" id="upm-self">No thanks, I’ll do it myself</button></div>') +
         '<div class="upm-row"><button class="upm-link upm-abort" id="upm-abort">Abort and start over</button></div>', null);
       $('upm-share').onclick = function () { upStart(j); };
       $('upm-self').onclick = function () { upSelf(j, seconds); };
