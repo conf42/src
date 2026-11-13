@@ -181,6 +181,11 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-13** - **Test talk**: every event has a hidden talk called "Factory Test". To try the whole loop, record at
+  conf42.com/record under a name that is not on the lineup (it is put on hold as unmatched), then run
+  `python -m factory release <short_url> <folder id> test` and push. The next pass edits it in Descript and uploads it
+  to YouTube unlisted with "[TEST]" in the title - no transcript or deck goes to the site and it stays out of the
+  playlist. It spends Descript credits like a real talk.
 - **2026-11-05** - **Launch log**: every run adds a few lines to `_db/factory_runs/<event>/LAUNCHES.md` - computer,
   Drive fetch, talks done or failed, transcripts and decks shipped, the Descript project's size. When a second computer
   picks up an event, it no longer downloads the videos of talks that are already finished.

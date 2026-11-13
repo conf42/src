@@ -30,6 +30,8 @@
   python -m factory youtube-login <client_secret.json>   one-time: sign in as the Conf42 channel (settings youtube.channel_id
                                                           only), prints the YOUTUBE_OAUTH_JSON secret for the cloud factory
   python -m factory release <short_url> <folder id> accept|reject ["<speaker(s)>"]   Marek's answer for a held upload
+  python -m factory release <short_url> <folder id> test     run a held test upload through the whole loop as the hidden
+                                                             "Factory Test" talk (Descript + unlisted YouTube, nothing on the site)
 
   run ... --force   start even if another machine holds the event's lock (only when that machine is off)
 """

@@ -54,7 +54,20 @@ def talks(ev):
     the spreadsheet says now (Marek 2026-10-31: "presence of the video has higher prio than the excel")."""
     with open(ev["db_path"], encoding="utf-8-sig", newline="") as f:
         out = [_row(r) for r in dict_reader(f) if (r.get("Name1") or "").strip()]
-    return out + banished(ev, out)
+    return out + banished(ev, out) + [test_talk(ev)]
+
+
+TEST_TALK = "Factory Test"
+
+
+def test_talk(ev):
+    """The hidden test talk every event has (Marek 2026-11-13): an organizer's test upload released onto it
+    (`python -m factory release <short_url> <folder id> test`) runs the whole loop - intake, Descript, proofread,
+    unlisted YouTube - and never reaches the public site (no transcript or deck shipped, no playlist). It behaves like
+    a banished talk: no typed name ever matches it and without a video it is simply not there."""
+    return {"name1": TEST_TALK, "name2": "", "speakers": TEST_TALK, "title": "Factory test recording (not a talk)",
+            "abstract": "A test recording that checks the Conf42 factory end to end. Not a conference talk.",
+            "keywords": "", "job1": "", "company1": "", "job2": "", "company2": "", "banished": True, "test": True}
 
 
 _history = {}
