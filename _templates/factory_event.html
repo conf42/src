@@ -6,6 +6,8 @@
        Uploaded to drive - manual    a video in Drive "Manual upload" whose file name has the speaker's name
        Recorded, but not uploaded    the recorder's ping at Stop (or an upload that started and never finished)
        No recording yet
+       Purged talk uploaded          a talk that left the lineup (a ghost of every talk that was ever on the site, from the
+                                     CSV's history - "purged" tag + crossed-eye icon) got a video anyway
      Live data: the Conf42 upload script (?status=<event>: uploads, recorded pings, manual videos) and the factory's
      records on GitHub (youtube.json, intake.json, state.json via raw.githubusercontent.com). Built by build/record.py. ── #}
 <!DOCTYPE html>
@@ -41,6 +43,11 @@
     .s2 { background: #dbe7ff; color: #1d4ed8; }
     .s3 { background: #ede4ff; color: #6d28d9; }
     .s4 { background: #dff5e6; color: #17693a; }
+    .s5 { background: #fde2e1; color: #a4231c; }
+    tr.purged td { background: #fafafb; } tr.purged td.who b, tr.purged td:nth-child(2) { color: #7b8499; }
+    .ghost { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+      background: #eceef3; color: #5f6368; font-size: .72rem; font-weight: 700; vertical-align: 2px; }
+    .ghost svg { width: 14px; height: 14px; }
     .note { color: #55627f; font-size: .82rem; margin-top: 4px; } .note.bad { color: #a4231c; font-weight: 700; }
     .note a { color: inherit; }
     h2 { font-size: 1.1rem; margin: 30px 0 8px; }
@@ -90,7 +97,7 @@
 </script>{% endif %}
 <header><div class="in">
   <h1>{{ fe.label }} - uploads</h1>
-  <p>{{ fe.date }} · {{ fe.talks | length }} talks · <a href="/{{ fe.slug }}">event page</a> · <a href="/factory">all of the factory</a> · <a href="/record">the recorder</a></p>
+  <p>{{ fe.date }} · {{ fe.talks | rejectattr('p') | list | length }} talks{% set np = fe.talks | selectattr('p') | list | length %}{% if np %} + {{ np }} purged{% endif %} · <a href="/{{ fe.slug }}">event page</a> · <a href="/factory">all of the factory</a> · <a href="/record">the recorder</a></p>
 </div></header>
 <main>
   <div class="err" id="err" hidden></div>
@@ -105,8 +112,10 @@
 <script type="application/json" id="fe-data">{{ fe | tojson }}</script>
 <script>
   const FE = JSON.parse(document.getElementById('fe-data').textContent);
-  const STATES = ['No recording yet', 'Recorded, but not uploaded', 'Uploaded to drive - auto', 'Uploaded to drive - manual', 'Video ready in YouTube'];
-  const ORDER = [4, 2, 3, 1, 0];   // the summary from done to not started
+  const STATES = ['No recording yet', 'Recorded, but not uploaded', 'Uploaded to drive - auto', 'Uploaded to drive - manual', 'Video ready in YouTube', 'Purged talk uploaded'];
+  const ORDER = [4, 2, 3, 5, 1, 0];   // the summary from done to not started
+  // the crossed eye next to a purged talk's speaker (Marek 2026-11-13)
+  const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
   let filter = null, last = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
   const norm = s => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -150,6 +159,10 @@
     let s = 0;
     if (y && y.id) {
       s = 4; notes.unshift(['', '<a href="https://youtu.be/' + esc(y.id) + '" target="_blank">youtu.be/' + esc(y.id) + '</a> (' + esc(y.privacy || 'unlisted') + ') · <a href="' + esc(y.studio) + '" target="_blank">Studio</a>' + (y.problem ? ' · ' + esc(y.problem) : '')]);
+    } else if (talk.p && (done.length || manual.length)) {
+      s = 5; const u = done[0];
+      notes.unshift(['', u ? ago(u.finished || u.created) + ' · ' + mins(u.seconds) + ' · auto' : manual.map(f => esc(f.name) + ' (' + ago(f.created) + ', manual)').join('<br>')]);
+      notes.push(['', 'The talk was deleted from the lineup - the speaker recorded anyway']);
     } else if (done.length) {
       s = 2; notes.unshift(['', ago(done[0].finished || done[0].created) + ' · ' + mins(done[0].seconds) + (done[0].slides === 'complete' ? ' · with slides' : ' · no slides') + (done.length > 1 ? ' · ' + done.length + ' uploads' : '')]);
       if (manual.length) notes.push(['', 'Also ' + manual.length + ' manual upload' + (manual.length > 1 ? 's' : '')]);
@@ -164,12 +177,13 @@
   }
 
   function render() {
-    const d = last, counts = [0, 0, 0, 0, 0];
+    const d = last, counts = [0, 0, 0, 0, 0, 0];
     const rows = FE.talks.map(t => { const r = rowState(t, d); counts[r.s]++; return {t, r}; });
-    document.getElementById('sum').innerHTML = ORDER.map(i => '<button data-s="' + i + '" class="' + (filter === i ? 'on' : '') + '"><b>' + counts[i] + '</b><span class="st s' + i + '">' + STATES[i] + '</span></button>').join('');
+    document.getElementById('sum').innerHTML = ORDER.filter(i => i !== 5 || counts[5]).map(i => '<button data-s="' + i + '" class="' + (filter === i ? 'on' : '') + '"><b>' + counts[i] + '</b><span class="st s' + i + '">' + STATES[i] + '</span></button>').join('');
     document.querySelectorAll('#sum button').forEach(b => b.onclick = () => { const v = +b.dataset.s; filter = filter === v ? null : v; render(); });
     document.getElementById('rows').innerHTML = rows.filter(x => filter === null || x.r.s === filter).map(({t, r}) =>
-      '<tr><td class="who"><b>' + esc(t.names.join(' & ')) + '</b>' + (t.keynote ? '<small>Keynote</small>' : '') + '</td><td>' + esc(t.title) + '</td>' +
+      '<tr' + (t.p ? ' class="purged"' : '') + '><td class="who"><b>' + esc(t.names.join(' & ')) + '</b>' + (t.p ? '<span class="ghost" title="Purged: no longer in the lineup">' + EYE + 'purged</span>' : '') +
+      (t.keynote ? '<small>Keynote</small>' : '') + '</td><td>' + esc(t.title) + '</td>' +
       '<td><span class="st s' + r.s + '">' + STATES[r.s] + '</span>' + r.notes.map(n => '<div class="note ' + n[0] + '">' + n[1] + '</div>').join('') + '</td></tr>').join('');
     // uploads that match nobody on the lineup (the factory holds them)
     const known = new Set(FE.talks.map(t => t.k));

@@ -12,7 +12,7 @@ The page gets one JSON: every upcoming event with talks, its overlay data (tease
 import os
 
 from .shared import asset_version
-from .teasers import cards, overlays, past, upcoming, _event_name
+from .teasers import cards, overlays, past, purged_rows, upcoming, _event_name
 
 
 def events(context):
@@ -20,6 +20,10 @@ def events(context):
     for event in sorted(upcoming(context.get("events") or []), key=lambda e: e["date"]):
         # k = the talk page key (talk short_url): uploads name it so the factory never has to guess who it is
         talks = [dict(names=[n for n, _ in c["people"]], title=c["title"], k=c["key"], min=c["duration"]) for c in cards(event)]
+        # purged talks stay pickable (Marek 2026-11-13): a speaker deleted from the lineup may still come to record;
+        # nothing tells the speaker, the status page says "Purged talk uploaded"
+        talks += [dict(names=[n for n, _ in c["people"]], title=c["title"], k=c["key"], min=0, p=1)
+                  for c in cards(event, purged_rows(event)) if c["key"] not in {t["k"] for t in talks}]
         if not talks:
             continue
         slug = event["short_url"].replace(".html", "")
@@ -45,6 +49,11 @@ def generate_factory(env, context, base_folder, gate):
     out = []
     for event in evs:
         talks = [dict(names=[nm for nm, _ in c["people"]], title=c["title"], k=c["key"], keynote=c["keynote"]) for c in cards(event)]
+        if not talks:
+            continue
+        # a ghost of every talk that was ever on the site (Marek 2026-11-13): tagged purged, crossed-eye icon
+        talks += [dict(names=[nm for nm, _ in c["people"]], title=c["title"], k=c["key"], keynote=False, p=1)
+                  for c in cards(event, purged_rows(event)) if c["key"] not in {t["k"] for t in talks}]
         if not talks:
             continue
         slug = event["short_url"].replace(".html", "")

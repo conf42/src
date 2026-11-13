@@ -244,9 +244,8 @@ def assess(video, info, row, problem, cfg=None):
         rep["unclear"].append("short for a talk (%s)" % hm(length))
     if TEST_WORDS.search(names) or TEST_WORDS.search(info.get("typed") or ""):
         rep["unclear"].append("the name looks like a test")
-    if problem == "talk no longer in the lineup":
-        rep["flags"].append(problem)
-        return out("hold", "talk no longer in the lineup")
+    if problem == "talk no longer in the lineup":     # a purged talk recorded anyway: the video wins (Marek 2026-10-31,
+        rep["flags"].append("purged talk uploaded - no longer in the lineup, processed anyway")   # and 2026-11-13)
     if not row:
         return out("hold", "unmatched" + (" (%s)" % problem if problem else ""))
     return rep
@@ -438,7 +437,7 @@ class Intake:
             if seen.get("done"):
                 continue
             # a hold waits for Marek - only the ones a lineup change can settle (unmatched) are looked at again
-            if seen.get("outcome") == "hold" and not seen.get("override") and not str(seen.get("reason", "")).startswith(("unmatched", "talk no longer")):
+            if seen.get("outcome") == "hold" and not seen.get("override") and not str(seen.get("reason", "")).startswith("unmatched"):
                 continue
             try:
                 info = json.loads(self.d.text(files["talk.json"]["id"]))
@@ -481,11 +480,11 @@ class Intake:
             if orow:
                 row, how, problem = orow, "picked by Marek", None
             key = row["speakers"] if row else None
-            if not row or problem == "talk no longer in the lineup":
-                rec.update(talk=key)
-                self.finish(slug, st, up, rec, "hold", problem if problem == "talk no longer in the lineup" else
-                            "unmatched" + (" (%s)" % problem if problem else ""), [], [], keep=True)
+            if not row:
+                self.finish(slug, st, up, rec, "hold", "unmatched" + (" (%s)" % problem if problem else ""), [], [], keep=True)
                 continue
+            if problem == "talk no longer in the lineup":
+                rec["purged"] = True
             if key in unsure:
                 rec.update(talk=key)
                 self.finish(slug, st, up, rec, "hold", "several uploads of this talk and the newest is much shorter - rehearsal or the real one?", [], [], keep=True)

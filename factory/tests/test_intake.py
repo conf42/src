@@ -61,6 +61,7 @@ def main():
         check("mic drops out mid-talk", intake.assess(drop, info(420), ROW, None, CFG), "accept", "no sound for")
         check("organizer test upload", intake.assess(good, info(240, names=("Mark Pawlikowski",)), None, "no speaker", CFG), "reject", "organizer")
         check("unmatched speaker", intake.assess(good, info(240, names=("Nobody Here",)), None, "no speaker", CFG), "hold", "unmatched")
+        check("purged talk recorded anyway", intake.assess(good, info(240), ROW, "talk no longer in the lineup", CFG), "accept", "purged talk uploaded")
         check("test-ish name -> unclear", intake.assess(good, info(240, names=("test test",)), ROW, None, CFG), "accept", "looks like a test")
         check("ends early vs talk.json", intake.assess(good, info(400), ROW, None, CFG), "accept", "ends early")
         check("2 h limit", intake.assess(good, info(240, stop_reason="limit"), ROW, None, CFG), "accept", "2-hour limit")
