@@ -1,6 +1,6 @@
 # Inject a Lost Response, Then Count the Writes
 
-A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Hanif Karimi](https://www.conf42.com/speaker_Hanif_Karimi) (Senior Manager @ Accenture). Page: https://www.conf42.com/Chaos_Engineering_2026_Hanif_Karimi_response_writes_inject
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Hanif Karimi](https://www.conf42.com/speaker_Hanif_Karimi) (Enterprise Architecture Practitioner). Page: https://www.conf42.com/Chaos_Engineering_2026_Hanif_Karimi_response_writes_inject
 
 ## Abstract
 
