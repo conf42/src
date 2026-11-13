@@ -22,6 +22,11 @@
   python -m factory doctor                                check this machine (tools, GPU, token, git, disk)
   python -m factory setup                                 one-time setup on a new machine (token, launcher, check)
 
+  python -m factory intake [<short_url>|all] [--dry-run] [--no-claude]   tidy conf42.com/record uploads in Drive
+                                                          "Auto upload" (needs UPLOAD_FEED): accept / hold / reject /
+                                                          superseded, accepted talks go into the event's in/ + slides/
+  python -m factory release <short_url> <folder id> accept|reject ["<speaker(s)>"]   Marek's answer for a held upload
+
   run ... --force   start even if another machine holds the event's lock (only when that machine is off)
 """
 import getpass
@@ -112,6 +117,19 @@ def main(argv):
         reps = pipeline.proofread_site(argv[1], argv[2] if len(argv) > 2 else None, push=push)
         print("%d fixes in %d of %d transcripts, %d partial" % (sum(len(r["fixes"]) for r in reps),
               sum(1 for r in reps if r["fixes"]), len(reps), sum(1 for r in reps if r["partial"])))
+        return
+    if cmd == "intake":                                  # the cloud factory's first step (Marek 2026-11-13)
+        from . import gdrive, intake
+        dry, claude = "--dry-run" in argv, "--no-claude" not in argv
+        rest = [a for a in argv[1:] if not a.startswith("--")]
+        slugs = None if not rest or rest[0] == "all" else rest
+        got = intake.Intake(gdrive.Drive(), pipeline.settings(), use_claude=claude, dry_run=dry).run(slugs)
+        print(json.dumps(got, indent=1, ensure_ascii=False))
+        return
+    if cmd == "release":
+        from . import intake
+        intake.release(argv[1], argv[2], argv[3], argv[4] if len(argv) > 4 else None)
+        print("noted - the next intake pass takes it")
         return
     run = pipeline.Run(argv[1])
     if cmd == "slides":
