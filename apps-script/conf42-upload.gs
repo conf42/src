@@ -22,6 +22,8 @@
  *   GET  ?status=<event slug>            the event's uploads + recorded pings + the videos in "Manual upload" (by hand,
  *                                        any event: the page matches them to its speakers by name) for
  *                                        conf42.com/<event>/factory (cached 60 s)
+ *   POST {action:"probe", origin}        the recorder's upload check: a Drive session for a 512 KB file in
+ *        Auto upload/_probe that the page tests with 256 KB and never finishes - nothing is stored. Max 1000 a day.
  *   GET  ?ping=1                         {ok, service, version} - the factory's doctor calls this daily
  *   GET  ?list=1&token=<UPLOAD_TOKEN>    {access_token, workspace_id}: a short-lived Drive token for the factory
  *   POST {action:"dispatch", token, event, ...}         "Run now" on conf42.com/factory -> GitHub workflow_dispatch
@@ -42,7 +44,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 5;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 6;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
@@ -71,6 +73,7 @@ function doPost(e) {
   try {
     if (data.action === 'start') return respond(start(data));
     if (data.action === 'finish') return respond(finish(data));
+    if (data.action === 'probe') return respond(probe(data));
     if (data.action === 'recorded') return respond(recorded(data));
     if (data.action === 'aborted') return respond(recorded(data, true));
     if (data.action === 'dispatch') return respond(dispatch(data));
@@ -222,6 +225,22 @@ function newest(folder, name) {
 }
 
 // ---- factory helpers (token) ---------------------------------------------------------------
+
+// the recorder's upload check (company networks): the real path, a session that is never completed
+function probe(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var day = Utilities.formatDate(new Date(), TZ, 'yyyyMMdd'), p = props(), raw = p.getProperty('probes');
+    var b = raw ? JSON.parse(raw) : {};
+    if (b.day !== day) b = { day: day, n: 0 };
+    if (++b.n > 1000) return { ok: false, error: 'too many today' };
+    p.setProperty('probes', JSON.stringify(b));
+  } finally { lock.releaseLock(); }
+  var origin = ORIGINS.indexOf(String(data.origin || '')) >= 0 ? String(data.origin) : ORIGINS[0];
+  var url = session(child(workspace(), '_probe'), 'upload check.bin', { size: 524288, type: 'application/octet-stream' }, origin);
+  return { ok: true, upload_url: url };
+}
 
 // ---- the status page (conf42.com/<event>/factory, Marek 2026-11-13: a page per conference instead of emails) ------
 
