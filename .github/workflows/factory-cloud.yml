@@ -1,0 +1,120 @@
+# The Conf42 cloud factory (Marek 2026-11-13): conf42.com/record uploads in Drive "Auto upload" -> intake (junk
+# tidied away) -> Descript edit -> transcripts + slides shipped to the site -> unlisted YouTube video.
+# factory/factory/cloud.py has the details; the plan is in Claude's notes (conf42-cloud-factory).
+#
+# Daily pass + "Run workflow" here any time (last-minute submissions; conf42.com/factory "Run now" calls the same
+# through the Conf42 upload script). One pass at a time; a run started during a pass waits for it. A pass that hits
+# the time limit saves its state after every step and starts itself again (up to 5 times).
+#
+# Secrets: UPLOAD_FEED (the Conf42 upload script's list URL - without it the pass does nothing), DESCRIPT_API_TOKEN,
+# CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`: Marek's subscription, for the intake's unclear cases + proofreading),
+# STATIC_PUSH_TOKEN (fine-grained, contents:write on conf42/static, for the slides), YOUTUBE_OAUTH_JSON (later).
+name: factory cloud
+on:
+  schedule:
+    - cron: "30 5 * * *"          # 05:30 UTC: after the night's uploads (05:30 UK in winter, 06:30 in summer)
+  workflow_dispatch:
+    inputs:
+      event:
+        description: "short_url (e.g. mlops2026), or all"
+        default: all
+      dry_run:
+        description: "dry run: intake decides, nothing is moved or spent"
+        type: boolean
+        default: false
+      no_youtube:
+        description: "skip the YouTube upload"
+        type: boolean
+        default: false
+      attempt:
+        description: "restart counter (set by the workflow itself)"
+        default: "1"
+concurrency:
+  group: factory-cloud
+  cancel-in-progress: false
+permissions:
+  contents: write
+  actions: write
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      PYTHONUTF8: "1"
+      FACTORY_MACHINE_ID: cloud
+      FACTORY_NO_LAUNCH: "1"
+      UPLOAD_FEED: ${{ secrets.UPLOAD_FEED }}
+      DESCRIPT_API_TOKEN: ${{ secrets.DESCRIPT_API_TOKEN }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      YOUTUBE_OAUTH_JSON: ${{ secrets.YOUTUBE_OAUTH_JSON }}
+      HAS_STATIC: ${{ secrets.STATIC_PUSH_TOKEN != '' }}
+      HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      EVENT: ${{ inputs.event || 'all' }}
+    steps:
+      - name: Configured?
+        id: cfg
+        run: |
+          if [ -z "$UPLOAD_FEED" ]; then
+            echo "UPLOAD_FEED is not set yet (deploy the Conf42 upload script first) - nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "ok=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ok == 'yes'
+        with:
+          path: src
+          fetch-depth: 0              # the factory reads the lineup CSVs' history (talks dropped after recording)
+          filter: blob:none
+          sparse-checkout: |
+            factory
+            _db
+            srt
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ok == 'yes' && env.HAS_STATIC == 'true'
+        with:
+          repository: conf42/static
+          path: static
+          token: ${{ secrets.STATIC_PUSH_TOKEN }}
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: slides
+      - uses: actions/setup-python@v5
+        if: steps.cfg.outputs.ok == 'yes'
+        with:
+          python-version: "3.12"
+      - name: Tools
+        if: steps.cfg.outputs.ok == 'yes'
+        working-directory: src/factory
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          python -m pip install -q -r requirements.txt faster-whisper
+          if [ "$HAS_CLAUDE" = "true" ]; then npm install -g -q @anthropic-ai/claude-code && claude --version; fi
+          git config --global user.name "Conf42 factory"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf 'machine_name: cloud (GitHub Actions)\nwork_root: %s/factory-work\nrender_parallel: 2\nparallel_talks: 2\n' "$RUNNER_TEMP" > settings.local.yml
+          python -m factory doctor || true
+      - name: Factory pass
+        id: factory
+        if: steps.cfg.outputs.ok == 'yes'
+        working-directory: src/factory
+        timeout-minutes: 330
+        run: |
+          FLAGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then FLAGS="$FLAGS --dry-run"; fi
+          if [ "${{ inputs.no_youtube }}" = "true" ]; then FLAGS="$FLAGS --no-youtube"; fi
+          if [ "$HAS_CLAUDE" != "true" ]; then FLAGS="$FLAGS --no-claude"; fi
+          python -m factory cloud $EVENT $FLAGS
+      - name: Start again if work is left (time-out)
+        if: always() && steps.cfg.outputs.ok == 'yes' && inputs.dry_run != true && steps.factory.outcome != 'success'
+        working-directory: src/factory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(( ${{ inputs.attempt || '1' }} + 0 ))
+          more=$(python -m factory cloud-more $EVENT || echo no)
+          echo "work left: $more (attempt $n)"
+          if [ "$more" = "yes" ] && [ "$n" -lt 5 ]; then
+            gh workflow run factory-cloud.yml --repo "$GITHUB_REPOSITORY" -f event="$EVENT" -f attempt=$((n + 1))
+            echo "started attempt $((n + 1))" >> "$GITHUB_STEP_SUMMARY"
+          fi

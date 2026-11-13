@@ -214,7 +214,11 @@ def install_hint(what):
 
 # ---- who am I ----------------------------------------------------------------------------------------------------
 def machine_id():
-    """Stable, anonymous id of this computer (the lock and the public status file use it, not the host name)."""
+    """Stable, anonymous id of this computer (the lock and the public status file use it, not the host name).
+    FACTORY_MACHINE_ID overrides it: every GitHub Actions runner has another host name, and the cloud factory must
+    not lock itself out after a restart (it is set to "cloud" in .github/workflows/factory-cloud.yml)."""
+    if os.environ.get("FACTORY_MACHINE_ID"):
+        return os.environ["FACTORY_MACHINE_ID"].strip()[:20]
     return hashlib.sha1(socket.gethostname().lower().encode()).hexdigest()[:10]
 
 

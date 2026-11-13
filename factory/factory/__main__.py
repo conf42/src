@@ -25,6 +25,8 @@
   python -m factory intake [<short_url>|all] [--dry-run] [--no-claude]   tidy conf42.com/record uploads in Drive
                                                           "Auto upload" (needs UPLOAD_FEED): accept / hold / reject /
                                                           superseded, accepted talks go into the event's in/ + slides/
+  python -m factory cloud [<short_url>|all] [--dry-run] [--no-claude] [--no-youtube]   one cloud pass: intake +
+                                                          factory + YouTube for the Auto upload events (GitHub Actions)
   python -m factory release <short_url> <folder id> accept|reject ["<speaker(s)>"]   Marek's answer for a held upload
 
   run ... --force   start even if another machine holds the event's lock (only when that machine is off)
@@ -125,6 +127,13 @@ def main(argv):
         slugs = None if not rest or rest[0] == "all" else rest
         got = intake.Intake(gdrive.Drive(), pipeline.settings(), use_claude=claude, dry_run=dry).run(slugs)
         print(json.dumps(got, indent=1, ensure_ascii=False))
+        return
+    if cmd == "cloud":                                   # one pass of the cloud factory (GitHub Actions)
+        from . import cloud
+        sys.exit(cloud.main(argv[1:]))
+    if cmd == "cloud-more":                              # the workflow asks: start again after a time-out?
+        from . import cloud
+        print("yes" if cloud.more_to_do([a for a in argv[1:] if a != "all"] or None) else "no")
         return
     if cmd == "release":
         from . import intake
