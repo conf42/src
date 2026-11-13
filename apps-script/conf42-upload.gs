@@ -35,7 +35,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 1;
+var VERSION = 2;   // v2: finish returns Drive's own size + MD5 per file
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
 var TZ = 'Europe/London';
@@ -175,7 +175,7 @@ function finish(data) {
   if (!folder) return { ok: false, error: 'not found' };
   var info = readInfo(folder);
   if (!info) return { ok: false, error: 'not found' };
-  var md5 = data.md5 || {}, ok = true, report = {};
+  var md5 = data.md5 || {}, ok = true, report = {}, details = {};
   Object.keys(info.files || {}).forEach(function (role) {
     var f = info.files[role];
     if (f.status === 'complete') { report[role] = 'complete'; return; }
@@ -190,10 +190,14 @@ function finish(data) {
     if (f.status !== 'complete') ok = false;
     report[role] = f.status;
   });
+  Object.keys(info.files || {}).forEach(function (role) {   // what Drive itself holds: the page shows the comparison
+    var f = info.files[role];
+    details[role] = { status: f.status, size: f.drive_size || 0, md5: f.md5_drive || '', expected_size: f.size, browser_md5: f.md5_browser || '' };
+  });
   info.status = ok ? 'complete' : 'problem';
   info.finished_at = new Date().toISOString();
   writeInfo(folder, info);
-  return { ok: true, complete: ok, files: report };
+  return { ok: true, complete: ok, files: report, details: details };
 }
 
 // the newest file with this name in the folder (Drive allows twins: a retried upload makes one)
