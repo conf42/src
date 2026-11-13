@@ -12,7 +12,7 @@ The page gets one JSON: every upcoming event with talks, its overlay data (tease
 import os
 
 from .shared import asset_version
-from .teasers import cards, overlays, upcoming, _event_name
+from .teasers import cards, overlays, past, upcoming, _event_name
 
 
 def events(context):
@@ -36,3 +36,24 @@ def generate(env, context, base_folder):
     with open(os.path.join(base_folder, "record.html"), "w", encoding="utf-8") as f:
         f.write(env.get_template("record.html").render(rec_events=evs, rec_v=v, **context))
     print("Writing out record.html (%d events)" % len(evs))
+
+
+def generate_factory(env, context, base_folder, gate):
+    """conf42.com/<event>/factory (Marek 2026-11-13): every talk's upload state, live (_templates/factory_event.html),
+    for each upcoming event and each past one since 2026 with a lineup. Unlisted: noindex, never in the sitemap."""
+    evs = upcoming(context.get("events") or []) + past(context.get("events") or [])
+    out = []
+    for event in evs:
+        talks = [dict(names=[nm for nm, _ in c["people"]], title=c["title"], k=c["key"], keynote=c["keynote"]) for c in cards(event)]
+        if not talks:
+            continue
+        slug = event["short_url"].replace(".html", "")
+        fe = dict(slug=slug, label="Conf42 %s %d" % (_event_name(event), event["date"].year), color=event.get("color") or "",
+                  date="%s %d %d" % (event["date"].strftime("%B"), event["date"].day, event["date"].year),
+                  status_url=context.get("record_upload_url") or "", talks=talks)
+        os.makedirs(os.path.join(base_folder, slug), exist_ok=True)
+        with open(os.path.join(base_folder, slug, "factory.html"), "w", encoding="utf-8") as f:
+            f.write(env.get_template("factory_event.html").render(fe=fe, gate=gate))
+        out.append(dict(slug=slug, label=fe["label"], date=fe["date"], upcoming=event in evs[:len(upcoming(context.get("events") or []))]))
+    print("Writing out <event>/factory.html for %d events (unlisted)" % len(out))
+    return out

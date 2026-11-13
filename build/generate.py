@@ -594,10 +594,13 @@ for _y in context.get("years", {}).values():
 _fx_up = sorted((v for v in fx_events.values() if v["release"] and v["release"] > datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
                 key=lambda v: v["release"])
 fx_next = _fx_up[0] if _fx_up else None
+# conf42.com/<event>/factory: each talk's upload state, live (Marek 2026-11-13), same team password
+from .record import generate_factory as generate_factory_pages
+fe_links = generate_factory_pages(env, context, BASE_FOLDER, FACTORY_GATE_SHA256)
 with open(BASE_FOLDER + "/factory.html", "w", encoding="utf-8") as f:
     print("Writing out factory.html (unlisted)")
     f.write(env.get_template("factory.html").render(page="factory.html", vf=video_factory, manual=factory_manual, manual_claude=factory_manual_claude,
-                                                           fx_events=fx_events, fx_next=fx_next,
+                                                           fx_events=fx_events, fx_next=fx_next, fe_links=fe_links,
                                                            gate=FACTORY_GATE_SHA256,
                                                            steps=["render", "health", "upload", "edit", "publish", "download", "srt", "chapters", "loudness", "qa"]))
 
