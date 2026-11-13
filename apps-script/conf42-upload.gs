@@ -29,6 +29,12 @@
  *   POST {action:"dispatch", token, event, ...}         "Run now" on conf42.com/factory -> GitHub workflow_dispatch
  *   POST {action:"credits", token, event, talk, top_up}  the factory's ONE email (Marek 2026-11-13): "Need more Descript
  *        credits" to NOTIFY_TO (default: this account), at most once every 12 hours
+ *   POST {action:"sheet", token, tab, rows:[{key, name1, name2, title, url, was}]}   v7 (Marek 2026-11-13): the
+ *        factory writes each uploaded talk's https://youtu.be/<id> into the YouTube column of the event's tab in
+ *        Excels_for_WWW (SHEET_ID). Row = Name1 (+ Name2 / Title when a speaker has two talks), columns found by
+ *        their header. Only an empty cell is filled (or one still holding `was`, the link the factory wrote before):
+ *        a link somebody typed is never overwritten. Needs the spreadsheets scope: after pasting v7 run selftest
+ *        once (it asks for the new permission), then Deploy -> Manage deployments -> edit -> New version.
  *
  * Abuse guards (speakers have no login): honeypot, per-day caps on sessions AND bytes, per-talk cap, strict patterns,
  * sizes. Unmatched uploads are still stored (the factory holds them, it never processes a stranger's file).
@@ -44,7 +50,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 6;   // v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 7;   // v7: action "sheet" (YouTube links into Excels_for_WWW); v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
@@ -55,6 +61,7 @@ var DAILY_SESSIONS = 80;                      // uploads started per day, all sp
 var DAILY_BYTES = 200 * 1024 * 1024 * 1024;   // 200 GB a day
 var PER_TALK = 6;                             // uploads per talk per day (re-takes are fine, floods aren't)
 var REPO = 'conf42/src', WORKFLOW = 'factory-cloud.yml';
+var SHEET_ID = '1_-90A9g5_ACqeZl9bQuIHwfox2_-2gGh3cJMNjBrsHs';   // Excels_for_WWW: one tab per event (MLOPS_2026 ...)
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
@@ -78,6 +85,7 @@ function doPost(e) {
     if (data.action === 'aborted') return respond(recorded(data, true));
     if (data.action === 'dispatch') return respond(dispatch(data));
     if (data.action === 'credits') return respond(credits(data));
+    if (data.action === 'sheet') return respond(sheet(data));
   } catch (err) {
     Logger.log(data.action + ': ' + err + '\n' + (err.stack || ''));
     return respond({ ok: false, error: String(err.message || err).slice(0, 200) });
@@ -337,6 +345,46 @@ function credits(data) {
   return { ok: true };
 }
 
+// YouTube links into the event's tab of Excels_for_WWW (see the header). Answers {ok, results: {key: what happened}}
+function sheet(data) {
+  if (!tokenOk(data.token)) return { ok: false, error: 'forbidden' };
+  var tab = String(data.tab || '');
+  if (!/^[A-Za-z0-9_]{3,40}$/.test(tab)) return { ok: false, error: 'bad tab' };
+  var rows = (data.rows || []).slice(0, 300), results = {};
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(tab);
+    if (!sh) return { ok: false, error: 'no tab ' + tab };
+    var values = sh.getDataRange().getValues(), head = values[0].map(function (h) { return String(h).trim(); });
+    var cN1 = head.indexOf('Name1'), cN2 = head.indexOf('Name2'), cT = head.indexOf('Title'), cY = head.indexOf('YouTube');
+    if (cN1 < 0 || cY < 0) return { ok: false, error: 'no Name1 / YouTube column in ' + tab };
+    var norm = function (s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    rows.forEach(function (r) {
+      var key = clean(r.key || r.name1, 200), url = String(r.url || '');
+      if (!/^https:\/\/youtu\.be\/[\w-]{11}$/.test(url)) { results[key] = 'bad link'; return; }
+      var hits = [];
+      for (var i = 1; i < values.length; i++) if (norm(values[i][cN1]) && norm(values[i][cN1]) === norm(r.name1)) hits.push(i);
+      if (hits.length > 1 && cN2 >= 0) {
+        var h2 = hits.filter(function (i) { return norm(values[i][cN2]) === norm(r.name2); });
+        if (h2.length) hits = h2;
+      }
+      if (hits.length > 1 && cT >= 0) hits = hits.filter(function (i) { return norm(values[i][cT]) === norm(r.title); });
+      if (hits.length !== 1) { results[key] = hits.length ? 'several rows match' : 'no row'; return; }
+      var cell = sh.getRange(hits[0] + 1, cY + 1), have = String(values[hits[0]][cY]).trim();
+      if (have === url) { results[key] = 'same'; return; }
+      if (have && have !== String(r.was || '')) { results[key] = 'kept: ' + have.slice(0, 80); return; }
+      cell.setValue(url);
+      values[hits[0]][cY] = url;
+      results[key] = 'written';
+    });
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return { ok: true, tab: tab, results: results };
+}
+
 // "Run now" on conf42.com/factory: the page knows no GitHub token, this script holds a narrow one
 function dispatch(data) {
   if (!tokenOk(data.token)) return { ok: false, error: 'forbidden' };
@@ -417,4 +465,6 @@ function selftest() {
   Logger.log('ok: %s can write to %s (%s)', Session.getEffectiveUser().getEmail(), w.getName(), w.getId());
   f.setTrashed(true);
   if (!props().getProperty('UPLOAD_TOKEN')) Logger.log('WARNING: set the UPLOAD_TOKEN script property');
+  var ss = SpreadsheetApp.openById(SHEET_ID);   // v7: asks for the spreadsheet permission, proves the sheet opens
+  Logger.log('ok: %s opens with %s tabs', ss.getName(), ss.getSheets().length);
 }

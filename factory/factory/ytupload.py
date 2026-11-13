@@ -11,6 +11,8 @@ Per talk, once (the video id lands in _db/factory_runs/<event>/youtube.json; a l
   3. captions.insert: the proofread SRT (src/srt/<short_url>_<Name1>.srt).
   4. playlistItems.insert into "Conf42 <Name> <Year>" (made unlisted when it doesn't exist yet - an operator makes it
      public: a public playlist would show the unlisted videos).
+  5. the link https://youtu.be/<id> into the YouTube column of the event's tab in Excels_for_WWW (Marek 2026-11-13;
+     sheet_links below, through the "Conf42 upload" script) - only into an empty cell, never over a typed link.
 Quota (2026-11): uploads have their own bucket (100 a day); thumbnail 50, captions 400, playlist 50 of 10,000 a day.
 
 Auth: secret YOUTUBE_OAUTH_JSON = {"client_id", "client_secret", "refresh_token", "channel_id"} made once with
@@ -291,6 +293,7 @@ def event(run, cfg):
     raw = {t["speakers"]: t for t in events.talks(ev)}
     todo = [k for k, t in sorted(run.state["talks"].items()) if t.get("finished") and not (done.get(k) or {}).get("id")]
     if not todo:
+        yield from sheet_links(ev, done, raw)             # links of earlier passes that are not in the sheet yet
         return
     yt.check_channel((cfg.get("youtube") or {}).get("channel_id"))
     playlist_id = None
@@ -359,6 +362,61 @@ def event(run, cfg):
         save(slug, done)
         yield "youtube: %s -> %s (%s)%s" % (key, rec["studio"], rec["privacy"],
                                             "" if rec.get("thumbnail") else " - no thumbnail: " + rec.get("thumbnail_note", "refused"))
+    yield from sheet_links(ev, done, raw)
+
+
+def sheet_post(body):
+    """POST to the "Conf42 upload" script with the UPLOAD_FEED key. Returns its JSON answer."""
+    u = urllib.parse.urlparse(os.environ.get("UPLOAD_FEED") or "")
+    token = (urllib.parse.parse_qs(u.query).get("token") or [""])[0]
+    if not token:
+        raise LookupError("no UPLOAD_FEED")
+    r = requests.post(urllib.parse.urlunparse(u._replace(query="")), data=json.dumps(dict(body, token=token)), timeout=120)
+    r.raise_for_status()
+    return r.json()
+
+
+def sheet_links(ev, done, raw, post=None):
+    """Every uploaded talk's link into the YouTube column of the event's tab in Excels_for_WWW (the tab is named like
+    the event's CSV: _db/MLOPS_2026.csv -> MLOPS_2026). `done` (youtube.json) remembers the link written per talk
+    ("sheet"), so a pass asks only for new ones; a cell that holds another link is left alone and noted
+    ("sheet_note"). Never fails the pass. Yields log lines."""
+    slug = ev["short_url"]
+    tab = os.path.splitext(os.path.basename(ev.get("db_path") or ""))[0]
+    rows = []
+    for key, rec in sorted(done.items()):
+        url = "https://youtu.be/%s" % rec.get("id")
+        if not rec.get("id") or rec.get("test") or rec.get("sheet") == url or key not in raw:
+            continue
+        t = raw[key]
+        rows.append({"key": key, "name1": t["name1"], "name2": t.get("name2") or "", "title": t.get("title") or "",
+                     "url": url, "was": rec.get("sheet") or ""})
+    if not rows or not tab:
+        return
+    try:
+        d = (post or sheet_post)({"action": "sheet", "tab": tab, "rows": rows})
+    except LookupError:
+        return
+    except Exception as e:                               # noqa: BLE001
+        yield "sheet: links not written (%s)" % str(e)[:200]
+        return
+    if not d.get("ok"):
+        yield "sheet: links not written (%s)%s" % (d.get("error"), " - the Conf42 upload script needs v7"
+                                                   if d.get("error") == "bad action" else "")
+        return
+    wrote = []
+    for r in rows:
+        what, rec = (d.get("results") or {}).get(r["key"]) or "no answer", done[r["key"]]
+        if what in ("written", "same"):
+            rec["sheet"] = r["url"]
+            rec.pop("sheet_note", None)
+            wrote.append(r["key"])
+        else:
+            rec["sheet_note"] = what
+            yield "sheet: %s - link not written (%s)" % (r["key"], what)
+    save(slug, done)
+    if wrote:
+        yield "sheet: YouTube link in %s for %s" % (tab, ", ".join(wrote))
 
 
 def login(client_file, want=None):
