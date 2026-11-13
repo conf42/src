@@ -352,6 +352,7 @@
     .upm-small { font-size: .85rem; } .upm-row + .upm-small { margin-top: 12px !important; }
     .upm-step { color: var(--text) !important; font-weight: 700; margin: 16px 0 0 !important; }
     a.btn.upm-big { display: block; text-decoration: none; text-align: center; }
+    .upm-abort { color: var(--muted); font-weight: 700; font-size: .9rem; margin-top: 4px; }
     .upm-link { font: inherit; font-weight: 800; color: var(--hi); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
     .upm-manual { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--edge); display: flex; flex-direction: column; gap: 8px; align-items: center; }
     .upm-manual .btn { min-width: 260px; padding: 10px 16px; font-size: .9rem; text-decoration: none; text-align: center; }
@@ -2696,6 +2697,12 @@
       m.hidden = false; offlineShown();
     }
     function upHide() { $('upm').hidden = true; }
+    // the status page's pings (fire and forget): 'recorded' at Stop, 'aborted' on Abort and start over
+    function upPing(action, j, seconds) {
+      var c = j.ctx;
+      try { navigator.sendBeacon(UP_URL, JSON.stringify({ action: action, event: { slug: c.ev.slug }, typed: c.typed, seconds: Math.round(seconds || 0),
+        talk: c.talk ? { k: c.talk.k || '', names: c.talk.names } : { k: '', names: [] } })); } catch (e) {}
+    }
     function upDownload(j) {
       upSource(j).then(function (f) { dl(f, j.file); }, function (e) { toast('I couldn’t read the recording: ' + e.message, 0, 'bad'); });
       if (j.slidesBlob) setTimeout(function () { dl(j.slidesBlob, j.slidesBlob.name || 'slides.pdf'); }, 800);
@@ -2719,8 +2726,7 @@
                         slide_pages: S.pdf ? S.pages : 0, recorder: UP_V, browser: (navigator.userAgent.match(/(Edg|OPR|Chrome|Firefox|Safari)\/[\d.]+/) || [''])[0] } };
       if (!j.entry && !m.onDisk) UP.pendingBrowserCopy = true;
       // "recorded, not uploaded" on conf42.com/<event>/factory, before the speaker even chooses (fire and forget)
-      try { navigator.sendBeacon(UP_URL, JSON.stringify({ action: 'recorded', event: { slug: c.ev.slug }, typed: c.typed, seconds: Math.round(m.seconds),
-        talk: c.talk ? { k: c.talk.k || '', names: c.talk.names } : { k: '', names: [] } })); } catch (e) {}
+      upPing('recorded', j, m.seconds);
       status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').', 'ok saved');
       upChoice(j, m.seconds);
     }
@@ -2731,9 +2737,21 @@
         (j.slidesBlob ? 'Slides: <b>' + esc(j.slidesBlob.name || 'slides.pdf') + '</b>' : 'No slides with it - add the PDF here: <button class="upm-link" id="upm-addpdf">Add slides (PDF)</button><input type="file" id="upm-pdf" accept="application/pdf,.pdf" hidden>') + '</p>' +
         (seconds < UP_SHORT ? '<p class="upm-warn">This one is only ' + esc(j.len) + ' long. If it was a test, choose <b>No thanks</b> and record again.</p>' : '') +
         '<div class="upm-row"><button class="btn go upm-big" id="upm-share">Upload to Conf42 drive automatically</button></div>' +
-        '<div class="upm-row"><button class="btn" id="upm-self">No thanks, I’ll do it myself</button></div>', null);
+        '<div class="upm-row"><button class="btn" id="upm-self">No thanks, I’ll do it myself</button></div>' +
+        '<div class="upm-row"><button class="upm-link upm-abort" id="upm-abort">Abort and start over</button></div>', null);
       $('upm-share').onclick = function () { upStart(j); };
       $('upm-self').onclick = function () { upSelf(j, seconds); };
+      $('upm-abort').onclick = function () {   // asked once more: a slip can't throw a take away
+        upShow('<h2>Abort this recording?</h2><p>It won’t be sent to Conf42. ' + (j.entry ? 'The file stays on your computer. ' : '') + 'You can record your talk again right away.</p>' +
+          '<div class="upm-row"><button class="btn go" id="upm-back">No, go back</button><button class="btn" id="upm-yes">Yes, start over</button></div>', null);
+        $('upm-back').onclick = function () { upChoice(j, seconds); };
+        $('upm-yes').onclick = function () {
+          // "attempted, not finished" on conf42.com/<event>/factory (Marek 2026-11-13); a later recording clears it
+          upPing('aborted', j, seconds);
+          UP.pendingBrowserCopy = false; upHide();
+          status('Aborted - nothing was sent. Press <b>Record</b> when you’re ready.', 'ok');
+        };
+      };
       if ($('upm-addpdf')) {
         $('upm-addpdf').onclick = function () { $('upm-pdf').click(); };
         $('upm-pdf').onchange = function () { var f = this.files[0]; if (f && /\.pdf$/i.test(f.name)) { j.slidesBlob = f; upChoice(j, seconds); } else if (f) toast('Please choose a PDF.', 6000, 'warn'); };
