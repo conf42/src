@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Conf42 Chaos Engineering 2026 - uploads</title>
+  <link rel="shortcut icon" href="/assets/favicon/favicon.ico" type="image/x-icon"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --navy: #1b2a4e; --accent: #2D436F; }
+    body { margin: 0; background: #f4f4f6; color: var(--navy); font-family: 'Plus Jakarta Sans', Arial, sans-serif; }
+    header { background: var(--navy); color: #fff; padding: 26px 16px 22px; }
+    header .in, main { max-width: 1100px; margin: 0 auto; }
+    header h1 { margin: 0; font-weight: 800; font-size: 1.7rem; } header p { margin: 4px 0 0; color: #c9d3ee; }
+    header a { color: #c9d3ee; }
+    main { padding: 22px 16px 60px; }
+    .sum { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 18px; }
+    .sum button { font: inherit; border: 0; cursor: pointer; border-radius: 12px; padding: 10px 14px; background: #fff; color: var(--navy);
+      box-shadow: 0 1px 4px rgba(27,42,78,.08); text-align: left; min-width: 150px; }
+    .sum button b { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
+    .sum button.on { outline: 3px solid var(--navy); }
+    .wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(27,42,78,.08); overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 760px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #eef0f5; text-align: left; font-size: .9rem; vertical-align: top; }
+    th { background: #eef2fd; font-weight: 600; }
+    td.who b { font-weight: 800; } td.who small { display: block; color: #55627f; }
+    .st { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; white-space: nowrap; }
+    .s0 { background: #eceef3; color: #5f6368; }
+    .s1 { background: #fff3cd; color: #8a6100; }
+    .s2 { background: #dbe7ff; color: #1d4ed8; }
+    .s3 { background: #ede4ff; color: #6d28d9; }
+    .s4 { background: #dff5e6; color: #17693a; }
+    .note { color: #55627f; font-size: .82rem; margin-top: 4px; } .note.bad { color: #a4231c; font-weight: 700; }
+    .note a { color: inherit; }
+    h2 { font-size: 1.1rem; margin: 30px 0 8px; }
+    .meta { color: #55627f; font-size: .85rem; margin: 14px 0 0; }
+    .err { background: #fde2e1; color: #a4231c; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+    #gate { display: none; position: fixed; inset: 0; background: #1b2a4e; z-index: 50; align-items: center; justify-content: center; }
+    body.locked #gate { display: flex; } body.locked header, body.locked main { display: none; }
+    #gate form { background: #fff; color: #1d1d1f; padding: 26px 28px; border-radius: 12px; width: min(340px, 90vw); font-family: Arial, sans-serif; }
+    #gate h2 { margin: 0 0 6px; font-size: 20px; } #gate p { margin: 0 0 14px; color: #6b6b70; font-size: 14px; }
+    #gate input { width: 100%; padding: 9px 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+    #gate button { margin-top: 10px; width: 100%; padding: 9px; font-size: 15px; border: 0; border-radius: 8px; background: #335eea; color: #fff; cursor: pointer; }
+    #gate .gerr { color: #b3261e; font-size: 13px; min-height: 18px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div id="gate"><form onsubmit="return enterFactory(event)">
+  <h2>Conf42 Chaos Engineering 2026</h2><p>Team only - enter the factory password.</p>
+  <input type="password" id="gate-pw" autocomplete="current-password" autofocus>
+  <button type="submit">Enter</button><div class="gerr" id="gate-err"></div></form></div>
+<script>
+  // the same soft gate as conf42.com/factory (same password, same browser memory): not encryption, keeps casual visitors out
+  const GATE = "54b6ca6e5c7e0eb7e2e0cfdda988cb822dcbb539661d3359c1ac12398061d267", TRIES = 5, LOCK_MS = 24 * 3600 * 1000;
+  const store = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                 set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+                 del: k => { try { localStorage.removeItem(k); } catch (e) {} }};
+  function lockedUntil() { const u = +(store.get('factory-gate-lock') || 0); return u > Date.now() ? u : 0; }
+  function showLock() {
+    const u = lockedUntil(); if (!u) return false;
+    document.getElementById('gate-pw').disabled = true; document.querySelector('#gate button').disabled = true;
+    document.getElementById('gate-err').textContent = 'Too many wrong passwords - closed on this browser until ' + new Date(u).toLocaleString([], {weekday: 'short', hour: '2-digit', minute: '2-digit'}) + '.';
+    return true;
+  }
+  if (store.get('factory-gate') !== GATE) { document.body.classList.add('locked'); showLock(); }
+  async function enterFactory(ev) {
+    ev.preventDefault();
+    if (showLock()) return false;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(document.getElementById('gate-pw').value.trim()));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    if (hex === GATE) { store.set('factory-gate', GATE); store.del('factory-gate-fails'); store.del('factory-gate-lock'); document.body.classList.remove('locked'); load(); }
+    else {
+      const n = +(store.get('factory-gate-fails') || 0) + 1;
+      if (n >= TRIES) { store.set('factory-gate-lock', String(Date.now() + LOCK_MS)); store.del('factory-gate-fails'); showLock(); }
+      else { store.set('factory-gate-fails', String(n)); document.getElementById('gate-err').textContent = 'Not that one. ' + (TRIES - n) + ' tries left before a 24-hour lock.'; }
+    }
+    return false;
+  }
+</script>
+<header><div class="in">
+  <h1>Conf42 Chaos Engineering 2026 - uploads</h1>
+  <p>December 3 2026 · 43 talks · <a href="/chaos2026">event page</a> · <a href="/factory">all of the factory</a> · <a href="/record">the recorder</a></p>
+</div></header>
+<main>
+  <div class="err" id="err" hidden></div>
+  <div class="sum" id="sum"></div>
+  <div class="wrap"><table>
+    <thead><tr><th style="width:34%">Speaker(s)</th><th>Talk</th><th style="width:30%">State</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div id="extra"></div>
+  <p class="meta" id="meta">Loading…</p>
+</main>
+<script type="application/json" id="fe-data">{"color": "#2D436F", "date": "December 3 2026", "label": "Conf42 Chaos Engineering 2026", "slug": "chaos2026", "status_url": "", "talks": [{"k": "Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool", "keynote": false, "names": ["Arjun Garg"], "title": "A Timeout Is Not a Failed Action: Chaos Testing AI Agent Tool Calls"}, {"k": "Chaos_Engineering_2026_Ajay_Munjuluru_agents_permissions_context", "keynote": false, "names": ["Ajay Munjuluru"], "title": "Chaos Engineering for AI Agents: Breaking Permissions, Tools, and Context on Purpose"}, {"k": "Chaos_Engineering_2026_Meher_Bhaskar_Madiraju_agents_incident_recovery", "keynote": false, "names": ["Meher Bhaskar Madiraju"], "title": "When Agents Fail in Production: Incident Stories and Recovery Patterns"}, {"k": "Chaos_Engineering_2026_Sachin_Hiriyanna_coding_agents_failure", "keynote": false, "names": ["Sachin Hiriyanna"], "title": "Chaos for Coding Agents: Deliberate Failure Modes Before They Hit Production Review"}, {"k": "Chaos_Engineering_2026_Moeez_Khan_agent_eval_tool", "keynote": false, "names": ["Moeez Khan"], "title": "Your AI Agent Passed Every Eval. What Happens When a Tool Call Times Out?"}, {"k": "Chaos_Engineering_2026_Indika_Wimalasuriya_aws_datadog_ai", "keynote": false, "names": ["Indika Wimalasuriya"], "title": "Breaking the Brain: Chaos Engineering for AI-Native Apps on AWS with Datadog"}, {"k": "Chaos_Engineering_2026_Ruby_Agarwal_resilient_organization_system", "keynote": false, "names": ["Ruby Agarwal"], "title": "Your System Is Resilient. Is Your Organization?"}, {"k": "Chaos_Engineering_2026_Igor_Konopliastyi_organizational_financial_operational", "keynote": false, "names": ["Igor Konopliastyi"], "title": "Organizational Chaos Engineering: Stress-Testing Financial \u0026 Operational Systems in Tech Companies"}, {"k": "Chaos_Engineering_2026_Itamar_Knafo_agent_reliability_author", "keynote": false, "names": ["Itamar Knafo"], "title": "You Build It, You Run It Is Dead: Reliability When the Author Is an Agent"}, {"k": "Chaos_Engineering_2026_Akshay_Sharma_agents_pipelines_monitors", "keynote": false, "names": ["Akshay Sharma"], "title": "Your Monitors Approved Every Bad Fix: What Happened When AI Agents Repaired 64 Broken Pipelines"}, {"k": "Chaos_Engineering_2026_Sridhar_V_Potunuru_pipelines_commissions_data", "keynote": false, "names": ["Sridhar V Potunuru"], "title": "Engineering Resilient Data Pipelines for Commissions and Trade Intelligence"}, {"k": "Chaos_Engineering_2026_Egor_Kolovertnykh_dota_pipeline_testing", "keynote": false, "names": ["Egor Kolovertnykh"], "title": "When API Tests Aren\u2019t Enough: End-to-End Testing a Live Dota 2 Data Pipeline"}, {"k": "Chaos_Engineering_2026_Haim_Michael_json_latency_ux", "keynote": false, "names": ["Haim Michael"], "title": "Zero-Latency UX with JSON Mirrors: Rethinking Data Access Beyond the Backend"}, {"k": "Chaos_Engineering_2026_Santhosh_Somarapu_configuration_canaries_meta", "keynote": false, "names": ["Santhosh Somarapu"], "title": "Breaking Things Safely at Scale: Configuration Canaries and Dependency Isolation at Meta"}, {"k": "Chaos_Engineering_2026_Harini_Rajendran_kafka_region_chaos", "keynote": false, "names": ["Harini Rajendran"], "title": "When a Region Fails: Chaos Engineering for Multi-Region Kafka"}, {"k": "Chaos_Engineering_2026_Shanmukha_Rao_Nadella_race_distributed_resilience", "keynote": false, "names": ["Shanmukha Rao Nadella"], "title": "Engineering Race-Condition Resilience in Distributed Systems"}, {"k": "Chaos_Engineering_2026_Hanif_Karimi_response_writes_inject", "keynote": false, "names": ["Hanif Karimi"], "title": "Inject a Lost Response, Then Count the Writes"}, {"k": "Chaos_Engineering_2026_Daniel_Moya_mesh_dimensigon_partition", "keynote": false, "names": ["Daniel Moya"], "title": "Orchestrating Under Fire: Chaos Experiments and Mesh Partition Survival with Dimensigon"}, {"k": "Chaos_Engineering_2026_Madhumanti_Majumdar_kubernetes_microservices_pods", "keynote": false, "names": ["Madhumanti Majumdar"], "title": "Beyond Killing Pods: Chaos Engineering for Kubernetes and Microservices"}, {"k": "Chaos_Engineering_2026_Mayank_Gupta_kubernetes_database_ha", "keynote": false, "names": ["Mayank Gupta"], "title": "Surviving Kubernetes Failures: HA Database Design and Chaos Testing"}, {"k": "Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain", "keynote": false, "names": ["Amit Singh Negi"], "title": "Surviving a 300% Flash Crowd: State-Safe Autoscaling With Zero Split-Brain Events"}, {"k": "Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience", "keynote": false, "names": ["Akbar Dizaji"], "title": "Chaos Engineering Is Not Just Killing Pods: Testing Resilience in .NET Services"}, {"k": "Chaos_Engineering_2026_Mostafa_Aboelnaga_dns_kubernetes_breaking", "keynote": false, "names": ["Mostafa Aboelnaga"], "title": "What Happens When DNS Stops Working? Breaking Kubernetes on Purpose."}, {"k": "Chaos_Engineering_2026_Madhu_Chenna_agents_autonomous_operations", "keynote": false, "names": ["Madhu Chenna"], "title": "When the Fixer Breaks: Failure-Mode Thinking for Autonomous IT Operations Agents"}, {"k": "Chaos_Engineering_2026_Kishore_Chandra_Rajapudi_retail_agentic_recovery", "keynote": false, "names": ["Kishore Chandra Rajapudi"], "title": "Engineering Self-Healing Retail Systems with Agentic AI and Failure Recovery"}, {"k": "Chaos_Engineering_2026_Jaroslav_Pantsjoha_agents_ai_run", "keynote": false, "names": ["Jaroslav Pantsjoha"], "title": "Solving the Run Phase: The Next Bottleneck for AI Agents"}, {"k": "Chaos_Engineering_2026_Jose_Escrich_agents_production_platform", "keynote": false, "names": ["Jose Escrich"], "title": "We let AI agents touch production. Here is what the platform had to give them"}, {"k": "Chaos_Engineering_2026_Peter_De_Tender_azure_sre_agent", "keynote": false, "names": ["Peter De Tender"], "title": "How Azure SRE Agent supports your Chaos Engineering streams"}, {"k": "Chaos_Engineering_2026_Ishan_Shah_replay_event_recovery", "keynote": false, "names": ["Ishan Shah"], "title": "Replay-Safe Architecture: Failure Testing Event-Driven Recovery"}, {"k": "Chaos_Engineering_2026_Praveen_Kumar_Gopalakrishnan_backup_api_recovery", "keynote": false, "names": ["Praveen Kumar Gopalakrishnan"], "title": "Your Backup Is Not Your Recovery: Rebuilding API Trust Without Rebuilding the Breach"}, {"k": "Chaos_Engineering_2026_Pavel_Konnikov_metro_center_regional", "keynote": false, "names": ["Pavel Konnikov"], "title": "The Probabilities Have Flipped: Chaos Engineering for Metro-Wide and Regional Data Center Loss"}, {"k": "Chaos_Engineering_2026_Nishant_Kumar_Thakur_Aishwarya_Mathuria_agent_subagents_radius", "keynote": false, "names": ["Nishant Kumar Thakur", "Aishwarya Mathuria"], "title": "Break Your Own Agent: A Blast-Radius Experiment on \u0027Isolated\u0027 AI Subagents"}, {"k": "Chaos_Engineering_2026_Vamshidher_Reddy_Jannapu_Reddy_policy_guardrails_agent", "keynote": false, "names": ["Vamshidher Reddy Jannapu Reddy"], "title": "Chaos Engineering for Policy: Injecting Poisoned Rules Into AI-Agent Guardrails"}, {"k": "Chaos_Engineering_2026_Krishna_Istarla_agentforce_mcp_crm", "keynote": false, "names": ["Krishna Istarla"], "title": "Securing Agentforce MCP Integrations Against Seven CRM Failure Risks"}, {"k": "Chaos_Engineering_2026_Michael_Oskola_memory_agent_adversarial", "keynote": false, "names": ["Michael Oskola"], "title": "We attacked our own AI agent memory: 30 adversarial writes, one hole, one fix"}, {"k": "Chaos_Engineering_2026_Yossi_Eliaz_sandboxing_agent_ai", "keynote": false, "names": ["Yossi Eliaz"], "title": "Sandboxing an AI Agent Is Not One Decision, It\u0027s Four"}, {"k": "Chaos_Engineering_2026_Bongani_Mhlanga_security_agentic_ai", "keynote": false, "names": ["Bongani Mhlanga"], "title": "Trust me, bro? Is not a security stratergy in an agentic ai framework."}, {"k": "Chaos_Engineering_2026_Govardhan_Reddy_Kothinti_autonomous_safety_failures", "keynote": false, "names": ["Govardhan Reddy Kothinti"], "title": "Chaos at the Edge Case: Interaction-Only Failures in Safety-Critical Autonomous Systems"}, {"k": "Chaos_Engineering_2026_Fuad_Laguda_ios_test_window", "keynote": false, "names": ["Fuad Laguda"], "title": "The value that is eventually right: a tenth-of-a-second window on iOS, and why every test that waits cannot see it"}, {"k": "Chaos_Engineering_2026_Anwar_Khan_llm_regression_testing", "keynote": false, "names": ["Anwar Khan"], "title": "Behavioral Regression Testing for LLM Systems: Chaos Engineering for a Dependency You Do Not Control"}, {"k": "Chaos_Engineering_2026_Muhammad_Panji_Muryandi_queue_health_testing", "keynote": false, "names": ["Muhammad Panji Muryandi"], "title": "The Queue Is Empty, but Something Is Wrong: Chaos Testing Beyond Health Checks"}, {"k": "Chaos_Engineering_2026_Emmanuela_Opurum_failure_cloud_chaos", "keynote": false, "names": ["Emmanuela Opurum"], "title": "Designing for Failure: Practical Chaos Engineering in Cloud Systems"}, {"k": "Chaos_Engineering_2026_Kevin_Brown_blast_radius_experiment", "keynote": false, "names": ["Kevin Brown"], "title": "Predicting the Blast Radius, Then Spending Your One Experiment"}]}</script>
+<script>
+  const FE = JSON.parse(document.getElementById('fe-data').textContent);
+  const STATES = ['No recording yet', 'Recorded, but not uploaded', 'Uploaded to drive - auto', 'Uploaded to drive - manual', 'Video ready in YouTube'];
+  const ORDER = [4, 2, 3, 1, 0];   // the summary from done to not started
+  let filter = null, last = null;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const norm = s => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const ago = iso => { if (!iso) return ''; const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : new Date(iso).toLocaleDateString([], {day: 'numeric', month: 'short'}); };
+  const mins = s => s ? Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0') : '';
+  // a manual file is this speaker's when its name holds the speaker's first and last name (any order, accents ignored)
+  function nameIn(fileName, name) {
+    const words = new Set(norm(fileName.replace(/\.[^.]+$/, '')).split(' ')), parts = norm(name).split(' ').filter(Boolean);
+    return parts.length >= 2 ? words.has(parts[0]) && words.has(parts[parts.length - 1]) : parts.length === 1 && words.has(parts[0]);
+  }
+  async function getJson(url) { try { const r = await fetch(url, {cache: 'no-store'}); return r.ok ? await r.json() : null; } catch (e) { return null; } }
+
+  async function load() {
+    if (document.body.classList.contains('locked')) return;
+    const raw = 'https://raw.githubusercontent.com/conf42/src/main/_db/factory_runs/' + FE.slug + '/';
+    const t = '?t=' + Date.now();
+    const [st, yt, intake, state] = await Promise.all([
+      FE.status_url ? getJson(FE.status_url + '?status=' + encodeURIComponent(FE.slug)) : Promise.resolve(null),
+      getJson(raw + 'youtube.json' + t), getJson(raw + 'intake.json' + t), getJson(raw + 'state.json' + t)]);
+    const err = document.getElementById('err');
+    err.hidden = !!(st && st.ok) || !FE.status_url;
+    if (!err.hidden) err.textContent = 'The upload script did not answer - Drive states may be missing. YouTube states still show.';
+    if (!FE.status_url) { err.hidden = false; err.textContent = 'The upload script is not set up yet (metadata.yml record_upload_url) - only YouTube states show.'; }
+    last = {st: st || {uploads: [], recorded: {}, manual: []}, yt: yt || {}, intake: (intake || {}).items || {}, state: (state || {}).talks || {}};
+    render();
+  }
+
+  function rowState(talk, d) {
+    const notes = [], who = talk.names.join(' & ');
+    const key = talk.k, mine = u => (key && u.k === key) || (!u.k && talk.names.some(n => norm(n) === norm((u.names || []).join(' & ') || u.typed)));
+    const autos = d.st.uploads.filter(mine).sort((a, b) => (b.created || '').localeCompare(a.created || ''));
+    const done = autos.filter(u => u.status === 'complete');
+    const manual = (d.st.manual || []).filter(f => talk.names.some(n => nameIn(f.name, n)));
+    const rec = d.st.recorded[key] || Object.values(d.st.recorded).find(r => !r.k && talk.names.some(n => norm(n) === norm((r.names || []).join(' & ') || r.typed)));
+    const y = d.yt[who];
+    const run = d.state[who];
+    // the factory's word on the newest auto upload (held / rejected) and on the talk (where it is in the pipeline)
+    if (done[0]) { const i = d.intake[done[0].id]; if (i && i.outcome === 'hold') notes.push(['bad', 'Held: ' + i.reason]); if (i && i.outcome === 'reject') notes.push(['bad', 'Rejected: ' + i.reason + ' - needs a new recording']); }
+    if (run && !y) notes.push(['', run.finished ? 'Edited, waiting for the YouTube upload' : run.error ? 'Factory error: ' + String(run.error).slice(0, 120) : 'In the factory' + (run.current ? ': ' + run.current : '')]);
+    let s = 0;
+    if (y && y.id) {
+      s = 4; notes.unshift(['', '<a href="https://youtu.be/' + esc(y.id) + '" target="_blank">youtu.be/' + esc(y.id) + '</a> (' + esc(y.privacy || 'unlisted') + ') · <a href="' + esc(y.studio) + '" target="_blank">Studio</a>' + (y.problem ? ' · ' + esc(y.problem) : '')]);
+    } else if (done.length) {
+      s = 2; notes.unshift(['', ago(done[0].finished || done[0].created) + ' · ' + mins(done[0].seconds) + (done[0].slides === 'complete' ? ' · with slides' : ' · no slides') + (done.length > 1 ? ' · ' + done.length + ' uploads' : '')]);
+      if (manual.length) notes.push(['', 'Also ' + manual.length + ' manual upload' + (manual.length > 1 ? 's' : '')]);
+    } else if (manual.length) {
+      s = 3; notes.unshift(['', manual.map(f => esc(f.name) + ' (' + ago(f.created) + ')').join('<br>')]);
+    } else if (rec || autos.length) {
+      s = 1;
+      if (autos.length) notes.unshift(['bad', 'Upload started ' + ago(autos[0].created) + ', not finished']);
+      else notes.unshift(['', 'Stopped ' + ago(rec.at) + ' · ' + mins(rec.seconds) + (rec.count > 1 ? ' · ' + rec.count + ' takes' : '') + ' · not shared yet']);
+    }
+    return {s, notes};
+  }
+
+  function render() {
+    const d = last, counts = [0, 0, 0, 0, 0];
+    const rows = FE.talks.map(t => { const r = rowState(t, d); counts[r.s]++; return {t, r}; });
+    document.getElementById('sum').innerHTML = ORDER.map(i => '<button data-s="' + i + '" class="' + (filter === i ? 'on' : '') + '"><b>' + counts[i] + '</b><span class="st s' + i + '">' + STATES[i] + '</span></button>').join('');
+    document.querySelectorAll('#sum button').forEach(b => b.onclick = () => { const v = +b.dataset.s; filter = filter === v ? null : v; render(); });
+    document.getElementById('rows').innerHTML = rows.filter(x => filter === null || x.r.s === filter).map(({t, r}) =>
+      '<tr><td class="who"><b>' + esc(t.names.join(' & ')) + '</b>' + (t.keynote ? '<small>Keynote</small>' : '') + '</td><td>' + esc(t.title) + '</td>' +
+      '<td><span class="st s' + r.s + '">' + STATES[r.s] + '</span>' + r.notes.map(n => '<div class="note ' + n[0] + '">' + n[1] + '</div>').join('') + '</td></tr>').join('');
+    // uploads that match nobody on the lineup (the factory holds them)
+    const known = new Set(FE.talks.map(t => t.k));
+    const stray = d.st.uploads.filter(u => !(u.k && known.has(u.k)) && !FE.talks.some(t => t.names.some(n => norm(n) === norm((u.names || []).join(' & ') || u.typed))));
+    document.getElementById('extra').innerHTML = stray.length ? '<h2>Uploads not matched to the lineup</h2><div class="wrap"><table><tbody>' +
+      stray.map(u => '<tr><td><b>' + esc((u.names || []).join(' & ') || u.typed || '?') + '</b></td><td>' + esc(u.folder) + '</td><td>' + esc(u.status) + ' · ' + ago(u.created) + '</td></tr>').join('') + '</tbody></table></div>' : '';
+    document.getElementById('meta').textContent = 'Updated ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) +
+      ' · refreshes every minute · manual uploads are matched by the speaker’s name in the file name';
+  }
+  load(); setInterval(load, 60000);
+</script>
+</body>
+</html>
