@@ -529,7 +529,8 @@ class Intake:
                         spath = None
                 elif not sf:
                     slide_flags = ["no slides came with the recording"]
-                rec.update(talk=key, matched=how, numbers=rep["numbers"], claude=rep.get("claude"))
+                rec.update(talk=key, matched=how, numbers=rep["numbers"], claude=rep.get("claude"), video_id=video_meta["id"],
+                           video_md5=video_meta.get("md5Checksum"), slides_id=(files.get(sf.get("name")) or {}).get("id") if sf and spath else None)
                 if rep["outcome"] == "accept" and key:
                     decided_for[key] = {"seconds": float((info.get("meta") or {}).get("seconds") or 0), "md5": video_meta.get("md5Checksum")}
                     if not self.dry_run:
