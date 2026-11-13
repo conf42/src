@@ -27,6 +27,8 @@
                                                           superseded, accepted talks go into the event's in/ + slides/
   python -m factory cloud [<short_url>|all] [--dry-run] [--no-claude] [--no-youtube]   one cloud pass: intake +
                                                           factory + YouTube for the Auto upload events (GitHub Actions)
+  python -m factory youtube-login <client_secret.json>   one-time: sign in as the Conf42 channel (settings youtube.channel_id
+                                                          only), prints the YOUTUBE_OAUTH_JSON secret for the cloud factory
   python -m factory release <short_url> <folder id> accept|reject ["<speaker(s)>"]   Marek's answer for a held upload
 
   run ... --force   start even if another machine holds the event's lock (only when that machine is off)
@@ -134,6 +136,10 @@ def main(argv):
     if cmd == "cloud-more":                              # the workflow asks: start again after a time-out?
         from . import cloud
         print("yes" if cloud.more_to_do([a for a in argv[1:] if a != "all"] or None) else "no")
+        return
+    if cmd == "youtube-login":                           # one-time: the YOUTUBE_OAUTH_JSON secret, for the Conf42 channel only
+        from . import ytupload
+        ytupload.login(argv[1], (pipeline.settings().get("youtube") or {}).get("channel_id"))
         return
     if cmd == "release":
         from . import intake
