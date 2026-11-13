@@ -71,6 +71,10 @@ on the list.
 
 ## Changelog
 
+- **2026-11-13** - The cloud factory also reads old link-shared upload folders: add `<short_url>: <folder link>` under
+  `cloud_drive_folders` in `settings.yml` and push (MLOps 2026 is there). Ask *"Plug this Drive folder into the cloud
+  factory for <event>"*. Dry run first (Actions > factory cloud > Run workflow, dry run ticked): the summary lists
+  every file as TAKE or leave, with the reason. The recorder's upload wins over the old folder for the same talk.
 - **2026-11-05** - Every launch writes a short entry to `_db/factory_runs/<event>/LAUNCHES.md` (machine, command,
   Drive fetch, talks processed, ship result, Descript project count). Claude reads it plus the Descript project before
   any launch. A computer picking up an event from another one skips the videos the finished talks were made from.

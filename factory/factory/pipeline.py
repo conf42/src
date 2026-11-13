@@ -304,11 +304,14 @@ class Run:
             return []
         return [k for k, v in before.items() if v and now_.get(k) and abs(now_[k] - v) > 0.5]
 
-    def drive_fetch(self, link=None):
+    def drive_fetch(self, link=None, want=None):
         """Pull the event's Drive upload folder (shared as "anyone with the link") straight from Drive: list it, download
         every video and deck that is new or changed since the last fetch into <event>/drive/, and flag the talks
         (drive_check). The folder is remembered, so later fetches need no link. Returns the downloaded paths, which go
-        to collect / match like a Drive zip."""
+        to collect / match like a Drive zip.
+        want(name, size, uploaded, earlier fetch or None) lets the caller decide per file: True = download it whatever
+        the last fetch says, False = leave it alone (not recorded, so drive_check still sees it), None = the rules
+        below. The cloud factory uses it (cloud.legacy_want): its runner starts empty every time."""
         from . import drive
         fid = drive.folder_id(link) if link else self.state.get("drive_folder")
         if not fid:
@@ -347,9 +350,12 @@ class Run:
             listing.append({"title": name, "id": f["id"], "createdTime": up, "modifiedTime": up, "fileSize": str(size),
                             "mimeType": "video/mp4" if name.lower().endswith(VIDEO_EXT) else "application/octet-stream"})
             old = fetched.get(f["id"])
-            if old and old.get("size") == size and old.get("uploaded") == up:
+            verdict = want(name, size, up, old) if want else None
+            if verdict is False:
+                continue
+            if verdict is None and old and old.get("size") == size and old.get("uploaded") == up:
                 continue                                 # unchanged since the last fetch
-            if not old and size in have:
+            if verdict is None and not old and size in have:
                 fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "seen": now()}
                 continue                                 # already here from a zip
             self.note("Drive: downloading %s (%.0f MB)" % (name, size / 1e6))
@@ -452,7 +458,12 @@ class Run:
                     old = os.path.join(self.inp, mine["source"])
                     seen = set(mine.get("sizes_seen") or []) | ({os.path.getsize(old)} if os.path.exists(old) else set())
                     if os.path.getsize(path) in seen:
-                        os.remove(path)                  # a version we already had (a download unzipped again)
+                        if os.path.exists(old):
+                            os.remove(path)              # a version we already had (a download unzipped again)
+                        else:                            # ... but not on this machine (a fresh cloud runner): it is
+                            canonical = key + os.path.splitext(path)[1].lower()   # the source again, nothing redone
+                            os.replace(path, os.path.join(self.inp, canonical))
+                            mine["source"] = canonical
                         continue
                     mine["sizes_seen"] = sorted(seen | {os.path.getsize(path)})
                     # a different video for a talk we already have = the speaker uploaded a new version: it replaces

@@ -12,6 +12,14 @@
    playlist (ytupload.py; skipped until it is configured).
 4. the run state, intake.json and conf42.com/factory are committed + pushed (app.publish_status does the status).
 
+Old upload folders (Marek 2026-11-13, MLOps 2026): an event whose speakers were sent the earlier link-shared Drive
+folder ("Talks - your talk video recording" + "Slides - your deck in .pdf", free file names) has that folder in
+settings.yml `cloud_drive_folders`. Each pass reads it after the intake, like `python -m factory drive` on a PC:
+files are matched to the lineup by the speaker's name in the file name, new ones are downloaded and go through the
+same pipeline. A talk that came through Auto upload ignores the old folder (the new way wins); a new version of a
+talk that is already in Descript is never redone by itself (flagged "newer video on Drive - redo"); a file that
+names no speaker is listed in the pass summary and left alone. Nothing in that folder is ever moved or deleted.
+
 --dry-run: intake decides but moves nothing and writes nothing into the factory; no Descript, no YouTube.
 The lock is the same as on the PCs (_db/factory.json, one machine per event); the cloud's machine id is "cloud".
 """
@@ -21,7 +29,7 @@ import os
 import shutil
 import tempfile
 
-from . import app, events, gdrive, intake, pipeline
+from . import app, drive as linkdrive, events, gdrive, intake, pipeline
 
 
 def summary_md(lines):
@@ -29,6 +37,84 @@ def summary_md(lines):
     if p:
         with open(p, "a", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
+
+
+def legacy_folders(cfg, slugs=None):
+    """{short_url: Drive folder id} - the events with an old link-shared upload folder (settings cloud_drive_folders)."""
+    return {s: linkdrive.folder_id(str(link)) for s, link in (cfg.get("cloud_drive_folders") or {}).items()
+            if link and (not slugs or s in slugs)}
+
+
+def auto_talks(slug):
+    """The talks of an event that came through Auto upload (accepted by the intake)."""
+    p = os.path.join(intake.REPO_RUNS, slug, "intake.json")
+    if not os.path.exists(p):
+        return set()
+    with open(p, encoding="utf-8") as f:
+        return {r.get("talk") for r in json.load(f).get("items", {}).values() if r.get("outcome") == "accept" and r.get("talk")}
+
+
+def legacy_verdict(run, auto, talk_list, name, size, up, old):
+    """What the cloud does with one file of an old upload folder: (True / False / None for drive_fetch, why).
+    The runner starts empty, so "fetched before" only counts once the talk is in Descript."""
+    video = name.lower().endswith(pipeline.VIDEO_EXT)
+    t, _ = events.match(name, talk_list)
+    key = t["speakers"] if t else None
+    if not key:
+        return False, "no speaker of the lineup in the file name - not taken"
+    if key in auto:
+        return False, "%s came through conf42.com/record - the old folder is ignored" % key
+    mine = run.state["talks"].get(key)
+    if not video:
+        if mine and mine.get("finished"):
+            return None, "%s: deck (talk finished - only a changed deck is taken)" % key
+        return True, "%s: deck" % key
+    if not mine:
+        return None, "%s: new talk" % key
+    same = bool(old and old.get("size") == size and old.get("uploaded") == up) or size in (mine.get("sizes_seen") or [])
+    if (mine["steps"].get("upload") or {}).get("status") == "done" or mine.get("finished"):
+        return (None, "%s: already in Descript" % key) if same else \
+               (False, "%s: NEW VERSION of a talk that is already in Descript - not redone by itself" % key)
+    if os.path.isfile(os.path.join(run.inp, mine.get("source") or "-")):
+        return None, "%s: source already here" % key
+    return True, "%s: not in Descript yet - source fetched%s" % (key, " again" if same else "")
+
+
+def legacy_plan(run, fid, auto):
+    """Dry run of an old folder: one line per file, nothing downloaded."""
+    talk_list, fetched, out = events.talks(run.ev), run.state.get("drive_fetched", {}), []
+    for f in linkdrive.list_folder(fid):
+        name = f["title"]
+        if not name.lower().endswith(pipeline.VIDEO_EXT + pipeline.SLIDE_EXT):
+            continue
+        try:
+            size, up = linkdrive.head(f["id"])
+        except Exception as e:                           # noqa: BLE001
+            out.append("- %s: skipped (%s)" % (name, str(e)[:80]))
+            continue
+        old = fetched.get(f["id"])
+        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old)
+        get = verdict is True or (verdict is None and not (old and old.get("size") == size and old.get("uploaded") == up))
+        out.append("- %s `%s` (%.0f MB, %s) - %s" % ("**TAKE**" if get else "leave", name, size / 1e6, up[:16], why))
+    return out
+
+
+def legacy_fetch(run, fid, auto):
+    """Bring the new files of the event's old upload folder into the factory's input. Returns the lines for the
+    pass summary (files taken, files left alone and why)."""
+    talk_list, left = events.talks(run.ev), []
+
+    def want(name, size, up, old):
+        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old)
+        if verdict is False:
+            left.append("- left: `%s` - %s" % (name, why))
+        return verdict
+    got = run.drive_fetch(fid, want=want)
+    run.collect(got)
+    for p in got:                                        # collect copied them into in/ + slides/: the runner's disk is small
+        if os.path.isfile(p) and os.path.dirname(os.path.abspath(p)) == os.path.abspath(os.path.join(run.dir, "drive")):
+            os.remove(p)
+    return ["- taken: `%s`" % os.path.basename(p) for p in got] + left
 
 
 def intake_events(slugs=None):
@@ -118,18 +204,32 @@ def main(argv):
                                               (" - " + "; ".join(r["flags"])) if r.get("flags") else ""))
     if not dry:
         print("intake state:", commit_intake("factory intake: conf42.com/record uploads sorted (cloud)"))
+    legacy = legacy_folders(cfg, slugs)
     if dry:
+        for slug, fid in sorted(legacy.items()):
+            lines.append("\n### %s - old upload folder" % slug)
+            try:
+                lines += legacy_plan(pipeline.Run(slug), fid, auto_talks(slug)) or ["- empty"]
+            except Exception as e:                       # noqa: BLE001
+                lines.append("- could not read it: %s" % e)
         summary_md(lines)
         print("\n".join(lines))
         return 0
 
-    for slug in intake_events(slugs):
+    for slug in sorted(set(intake_events(slugs)) | set(legacy)):
         try:
             run = pipeline.Run(slug)
         except KeyError as e:
             print("cloud: %s skipped (%s)" % (slug, e))
             continue
         ready = rehydrate(run, drive, run.note)
+        if slug in legacy:
+            lines.append("\n### %s - old upload folder" % slug)
+            try:
+                lines += legacy_fetch(run, legacy[slug], auto_talks(slug)) or ["- nothing new"]
+            except Exception as e:                       # noqa: BLE001 - Drive trouble must not stop the Auto upload talks
+                run.note("cloud: old upload folder not read (%s)" % e)
+                lines.append("- could not read it: %s" % e)
         run.match()
         run.slides()
         todo = [k for k in ready if not run.state["talks"][k].get("finished")] + \
@@ -174,16 +274,17 @@ def run_url():
 
 
 def more_to_do(slugs=None):
-    """True when an Auto upload event still has accepted talks that are not finished (the workflow then starts
-    itself again after a time-out)."""
-    for slug in intake_events(slugs):
+    """True when an Auto upload event still has accepted talks that are not finished - or an event with an old upload
+    folder any unfinished talk at all (the workflow then starts itself again after a time-out)."""
+    legacy = legacy_folders(pipeline.settings(), slugs)
+    for slug in sorted(set(intake_events(slugs)) | set(legacy)):
         p = os.path.join(intake.REPO_RUNS, slug, "state.json")
         if not os.path.exists(p):
             continue
         with open(p, encoding="utf-8") as f:
             st = json.load(f)
-        with open(os.path.join(intake.REPO_RUNS, slug, "intake.json"), encoding="utf-8") as f:
-            accepted = {r.get("talk") for r in json.load(f).get("items", {}).values() if r.get("outcome") == "accept"}
-        if any(not t.get("finished") and not t.get("error") for k, t in st.get("talks", {}).items() if k in accepted):
+        accepted = auto_talks(slug) | (set(st.get("talks", {})) if slug in legacy else set())
+        if any(not t.get("finished") and not t.get("error") and not t.get("needs_new_video")
+               for k, t in st.get("talks", {}).items() if k in accepted):
             return True
     return False
