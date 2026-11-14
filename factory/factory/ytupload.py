@@ -379,8 +379,8 @@ def sheet_post(body):
 def sheet_links(ev, done, raw, post=None):
     """Every uploaded talk's link into the YouTube column of the event's tab in Excels_for_WWW (the tab is named like
     the event's CSV: _db/MLOPS_2026.csv -> MLOPS_2026). `done` (youtube.json) remembers the link written per talk
-    ("sheet"), so a pass asks only for new ones; a cell that holds another link is left alone and noted
-    ("sheet_note"). Never fails the pass. Yields log lines."""
+    ("sheet"), so a pass asks only for new ones; a cell that holds anything - a typed link or the factory's own
+    earlier one - is skipped and noted ("sheet_note"): nothing in the sheet is ever overwritten (Marek 2026-11-14). Never fails the pass. Yields log lines."""
     slug = ev["short_url"]
     tab = os.path.splitext(os.path.basename(ev.get("db_path") or ""))[0]
     rows = []
@@ -390,7 +390,7 @@ def sheet_links(ev, done, raw, post=None):
             continue
         t = raw[key]
         rows.append({"key": key, "name1": t["name1"], "name2": t.get("name2") or "", "title": t.get("title") or "",
-                     "url": url, "was": rec.get("sheet") or ""})
+                     "url": url, "was": ""})   # never "was": a cell that holds anything is skipped (Marek 2026-11-14)
     if not rows or not tab:
         return
     try:
