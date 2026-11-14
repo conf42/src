@@ -183,7 +183,7 @@ the other one did.
 
 - **2026-11-13** - **YouTube links land in the sheet**: after a talk is uploaded to YouTube, the cloud factory writes
   `https://youtu.be/<id>` into the YouTube column of the event's tab in Excels_for_WWW (the tab named like the event's
-  CSV, e.g. MLOPS_2026). Only an empty cell is filled: anything already in the cell is left as it is, also a link the factory wrote earlier - nothing is ever overwritten (the pass log says
+  CSV, e.g. MLOPS_2026). Only an empty cell is filled: a link typed by hand is never overwritten (the pass log says
   "link not written (kept: ...)"). The test talk is skipped. Needs version 7 of the "Conf42 upload" script.
 - **2026-11-13** - **Old upload folders in the cloud factory**: an event whose speakers got the earlier Drive folder
   link (Talks + Slides subfolders) is listed in `settings.yml` under `cloud_drive_folders` (MLOps 2026 is). The daily

@@ -48,10 +48,10 @@ def main():
 
     done["Ada Lovelace"]["id"] = "ccccccccccc"            # the talk was redone and uploaded again
     asked.clear()
-    list(ytupload.sheet_links(ev, done, raw, lambda b: asked.append(b) or {"ok": True, "results": {"Ada Lovelace": "kept: https://youtu.be/aaaaaaaaaaa"}}))
+    list(ytupload.sheet_links(ev, done, raw, lambda b: asked.append(b) or {"ok": True, "results": {"Ada Lovelace": "written"}}))
     ada = next(r for r in asked[0]["rows"] if r["key"] == "Ada Lovelace")
-    check("a filled cell is never overwritten, not even the factory's own earlier link", ada["was"] == ""
-          and done["Ada Lovelace"]["sheet"] == "https://youtu.be/aaaaaaaaaaa" and done["Ada Lovelace"]["sheet_note"].startswith("kept"))
+    check("a new video replaces the factory's own earlier link", ada["was"] == "https://youtu.be/aaaaaaaaaaa"
+          and done["Ada Lovelace"]["sheet"] == "https://youtu.be/ccccccccccc")
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return len(fails)
 
