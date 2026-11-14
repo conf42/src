@@ -181,6 +181,11 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-14** - **A redone talk is updated everywhere**: when a talk is redone (a new video from the speaker), the
+  new version goes up to YouTube as a new unlisted video, its link replaces the factory's earlier link in the sheet,
+  and the new transcript and deck replace the old ones on the site. A link typed by hand in the sheet is still never
+  touched. YouTube cannot swap a video's file, so the old video stays there until you delete it (the pass log gives
+  the Studio link).
 - **2026-11-13** - **YouTube links land in the sheet**: after a talk is uploaded to YouTube, the cloud factory writes
   `https://youtu.be/<id>` into the YouTube column of the event's tab in Excels_for_WWW (the tab named like the event's
   CSV, e.g. MLOPS_2026). Only an empty cell is filled: a link typed by hand is never overwritten (the pass log says
