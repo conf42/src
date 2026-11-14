@@ -50,10 +50,19 @@ def main():
     asked.clear()
     list(ytupload.sheet_links(ev, done, raw, lambda b: asked.append(b) or {"ok": True, "results": {"Ada Lovelace": "written"}}))
     ada = next(r for r in asked[0]["rows"] if r["key"] == "Ada Lovelace")
+    redone(check)
     check("a new video replaces the factory's own earlier link", ada["was"] == "https://youtu.be/aaaaaaaaaaa"
           and done["Ada Lovelace"]["sheet"] == "https://youtu.be/ccccccccccc")
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return len(fails)
+
+
+def redone(check):
+    r = ytupload.redone_since
+    check("redone after the upload = uploaded again", r({"redone": [{"at": "2026-11-20T10:00:00"}]}, {"id": "x", "uploaded_at": "2026-11-14T06:00:00Z"})
+          and r({"redone": [{}, {}]}, {"id": "x", "redone": 1}))
+    check("not redone since = left alone", not r({"redone": [{"at": "2026-11-10T10:00:00"}]}, {"id": "x", "uploaded_at": "2026-11-14T06:00:00Z"})
+          and not r({"redone": [{}]}, {"id": "x", "redone": 1}) and not r({}, {"id": "x"}))
 
 
 if __name__ == "__main__":

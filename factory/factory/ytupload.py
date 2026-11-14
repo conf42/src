@@ -280,8 +280,21 @@ def save(slug, d):
         f.write("\n")
 
 
+def redone_since(t, rec):
+    """True when the talk was redone (a new video from the speaker, pipeline.redo) after the upload in `rec`: the
+    new version then goes up as a new YouTube video and replaces the factory's link in the sheet, like its
+    transcript and deck replace the old ones on the site (Marek 2026-11-14). YouTube cannot swap a video's file."""
+    n = len(t.get("redone") or [])
+    if not n or not rec.get("id"):
+        return False
+    if "redone" in rec:
+        return n > rec["redone"]
+    return t["redone"][-1].get("at", "")[:19] > (rec.get("uploaded_at") or "")[:19]   # uploads from before 2026-11-14
+
+
 def event(run, cfg):
-    """Upload the event's finished talks that are not on YouTube yet. Yields log lines. No secret = nothing happens."""
+    """Upload the event's finished talks that are not on YouTube yet (or were redone since). Yields log lines. No
+    secret = nothing happens."""
     try:
         yt = YouTube()
     except LookupError:
@@ -291,7 +304,8 @@ def event(run, cfg):
     done = load(slug)
     rows = {r["speakers"]: r for r in youtube.talk_rows(ev)}
     raw = {t["speakers"]: t for t in events.talks(ev)}
-    todo = [k for k, t in sorted(run.state["talks"].items()) if t.get("finished") and not (done.get(k) or {}).get("id")]
+    todo = [k for k, t in sorted(run.state["talks"].items())
+            if t.get("finished") and (not (done.get(k) or {}).get("id") or redone_since(t, done[k]))]
     if not todo:
         yield from sheet_links(ev, done, raw)             # links of earlier passes that are not in the sheet yet
         return
@@ -318,9 +332,14 @@ def event(run, cfg):
         if is_test:                                       # the factory's own test talk: unlisted whatever the settings say
             body["snippet"]["title"] = clean_text("[TEST] " + body["snippet"]["title"], 100)
             body["status"]["privacyStatus"] = "unlisted"
-        rec = {"title": body["snippet"]["title"], "privacy": body["status"]["privacyStatus"]}
+        rec = {"title": body["snippet"]["title"], "privacy": body["status"]["privacyStatus"], "redone": len(t.get("redone") or [])}
         if is_test:
             rec["test"] = True
+        old = done.get(key) or {}
+        if old.get("id"):                                 # a redone talk: the new video replaces the old one
+            rec["replaces"] = (old.get("replaces") or []) + [old["id"]]
+            if old.get("sheet"):
+                rec["sheet"] = old["sheet"]               # sheet_links swaps the factory's own link for the new one
         try:
             vid = yt.upload(final, body, run.note)
         except QuotaExceeded:
@@ -362,6 +381,9 @@ def event(run, cfg):
         save(slug, done)
         yield "youtube: %s -> %s (%s)%s" % (key, rec["studio"], rec["privacy"],
                                             "" if rec.get("thumbnail") else " - no thumbnail: " + rec.get("thumbnail_note", "refused"))
+        if rec.get("replaces"):
+            yield ("youtube: %s was redone - this is the new video. The old one is still on YouTube and in the playlist: "
+                   "delete it at https://studio.youtube.com/video/%s/edit" % (key, rec["replaces"][-1]))
     yield from sheet_links(ev, done, raw)
 
 
