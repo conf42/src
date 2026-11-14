@@ -1,6 +1,6 @@
 # Your Agent Failed Mid-Run. Logs Won't Replay It.
 
-A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Reza Amini](https://www.conf42.com/speaker_Reza_Amini) (Senior Software Engineer @ Flashback). Page: https://www.conf42.com/MLOps_2026_Reza_Amini_agent_replay_logs
+A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Reza Amini](https://www.conf42.com/speaker_Reza_Amini) (Founder @ Flashback). Page: https://www.conf42.com/MLOps_2026_Reza_Amini_agent_replay_logs
 
 ## Abstract
 
