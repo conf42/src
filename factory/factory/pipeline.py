@@ -310,8 +310,9 @@ class Run:
         (drive_check). The folder is remembered, so later fetches need no link. Returns the downloaded paths, which go
         to collect / match like a Drive zip.
         want(name, size, uploaded, earlier fetch or None) lets the caller decide per file: True = download it whatever
-        the last fetch says, False = leave it alone (not recorded, so drive_check still sees it), None = the rules
-        below. The cloud factory uses it (cloud.legacy_want): its runner starts empty every time."""
+        the last fetch says, False = leave it alone (not recorded, so drive_check still sees it), "ignore" = not ours
+        at all (another source has this talk, or it is another event's file: drive_check never sees it), None = the
+        rules below. The cloud factory uses it (cloud.legacy_want): its runner starts empty every time."""
         from . import drive
         fid = drive.folder_id(link) if link else self.state.get("drive_folder")
         if not fid:
@@ -347,10 +348,12 @@ class Run:
             except Exception as e:                       # noqa: BLE001 - one odd file must not stop the fetch
                 self.note("Drive: %s skipped (%s)" % (name, e))
                 continue
-            listing.append({"title": name, "id": f["id"], "createdTime": up, "modifiedTime": up, "fileSize": str(size),
-                            "mimeType": "video/mp4" if name.lower().endswith(VIDEO_EXT) else "application/octet-stream"})
             old = fetched.get(f["id"])
             verdict = want(name, size, up, old) if want else None
+            if verdict == "ignore":
+                continue
+            listing.append({"title": name, "id": f["id"], "createdTime": up, "modifiedTime": up, "fileSize": str(size),
+                            "mimeType": "video/mp4" if name.lower().endswith(VIDEO_EXT) else "application/octet-stream"})
             if verdict is False:
                 continue
             if verdict is None and old and old.get("size") == size and old.get("uploaded") == up:

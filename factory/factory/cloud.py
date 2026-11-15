@@ -20,6 +20,14 @@ same pipeline. A talk that came through Auto upload ignores the old folder (the 
 talk that is already in Descript is never redone by itself (flagged "newer video on Drive - redo"); a file that
 names no speaker is listed in the pass summary and left alone. Nothing in that folder is ever moved or deleted.
 
+The same talk in several places (Marek 2026-11-15): speakers upload twice to be safe - through conf42.com/record
+AND by hand, or into the old folder as well. That is normal, not a problem. One source owns a talk, in this order:
+    1. conf42.com/record (Auto upload: accepted, or held for Marek)
+    2. the Manual upload folder (settings cloud_manual_folder; one folder for every event, files matched by the
+       speaker's name against the lineups of the events around today, a conference named in the file name decides)
+    3. the event's old upload folder (cloud_drive_folders)
+A lower source's video of an owned talk is ignored without a flag; its deck is only taken when the owner brought none.
+
 --dry-run: intake decides but moves nothing and writes nothing into the factory; no Descript, no YouTube.
 The lock is the same as on the PCs (_db/factory.json, one machine per event); the cloud's machine id is "cloud".
 """
@@ -46,6 +54,78 @@ def legacy_folders(cfg, slugs=None):
             if link and (not slugs or s in slugs)}
 
 
+def manual_folder(cfg):
+    link = str(cfg.get("cloud_manual_folder") or "").strip()
+    return linkdrive.folder_id(link) if link else None
+
+
+def active_events(cfg, base=()):
+    """{short_url: event} the Manual upload folder is read for: the events of this pass (base) and every event from
+    cloud_manual_days_after days ago to cloud_manual_days_before days ahead."""
+    today, out = datetime.date.today(), {}
+    after, before = int(cfg.get("cloud_manual_days_after", 45)), int(cfg.get("cloud_manual_days_before", 75))
+    for e in events.all_events():
+        slug = e["short_url"]
+        try:
+            day = datetime.date.fromisoformat(str(e.get("date", ""))[:10])
+        except ValueError:
+            day = None
+        if slug in base or (day and -after <= (day - today).days <= before):
+            try:
+                ev = events.event(slug)
+                if os.path.exists(ev["db_path"]):
+                    out[slug] = ev
+            except KeyError:
+                pass
+    return out
+
+
+def manual_claims(files, active):
+    """Which event each file of the Manual upload folder belongs to. files: [{title, ...}] (linkdrive.list_folder),
+    active: {slug: event}. Returns ({slug: {talk key: {"video": bool, "deck": bool}}}, {title: slug},
+    [lines about the files nobody takes]). A file goes to an event when a speaker of its lineup is in the file name;
+    when the name fits several events, the conference named in the file name decides - and with none named the file
+    is left for Marek (never guessed)."""
+    lineups = {s: events.talks(ev) for s, ev in active.items()}
+    claims, owner, left = {}, {}, []
+    for f in files:
+        name = f["title"]
+        video = name.lower().endswith(pipeline.VIDEO_EXT)
+        if not video and not name.lower().endswith(pipeline.SLIDE_EXT):
+            continue
+        stem = " %s " % events._norm(os.path.splitext(name)[0])
+        fits = {s: events.match(name, tl)[0] for s, tl in lineups.items()}
+        fits = {s: t for s, t in fits.items() if t and t["speakers"] != events.TEST_TALK}
+        if len(fits) > 1:
+            named = [s for s in fits if " %s " % events._norm(active[s]["name"]) in stem]
+            if len(named) != 1:
+                left.append("- left: `%s` - the speaker is on %s and the file names no single conference" % (name, " and ".join(sorted(fits))))
+                continue
+            fits = {named[0]: fits[named[0]]}
+        if not fits:
+            left.append("- left: `%s` - no speaker of an upcoming or recent lineup in the file name" % name)
+            continue
+        (slug, t), = fits.items()
+        owner[name] = slug
+        c = claims.setdefault(slug, {}).setdefault(t["speakers"], {"video": False, "deck": False})
+        c["video" if video else "deck"] = True
+    return claims, owner, left
+
+
+def auto_owned(slug):
+    """{talk: {"source": "conf42.com/record", "deck": bool}} - the talks conf42.com/record owns: accepted, or held
+    for Marek (a copy from a lower source must not slip past a hold)."""
+    p = os.path.join(intake.REPO_RUNS, slug, "intake.json")
+    out = {}
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as f:
+            for r in json.load(f).get("items", {}).values():
+                if r.get("outcome") in ("accept", "hold") and r.get("talk"):
+                    o = out.setdefault(r["talk"], {"source": "conf42.com/record", "deck": False})
+                    o["deck"] = o["deck"] or bool(r.get("slides_id"))
+    return out
+
+
 def auto_talks(slug):
     """The talks of an event that came through Auto upload (accepted by the intake)."""
     p = os.path.join(intake.REPO_RUNS, slug, "intake.json")
@@ -55,16 +135,19 @@ def auto_talks(slug):
         return {r.get("talk") for r in json.load(f).get("items", {}).values() if r.get("outcome") == "accept" and r.get("talk")}
 
 
-def legacy_verdict(run, auto, talk_list, name, size, up, old):
-    """What the cloud does with one file of an old upload folder: (True / False / None for drive_fetch, why).
-    The runner starts empty, so "fetched before" only counts once the talk is in Descript."""
+def legacy_verdict(run, auto, talk_list, name, size, up, old, here="the old folder"):
+    """What the cloud does with one file of an old upload folder or the Manual upload folder: (True / False /
+    "ignore" / None for drive_fetch, why). The runner starts empty, so "fetched before" only counts once the talk is
+    in Descript. auto = the talks a higher source owns: a set, or {talk: {"source": its name, "deck": it has one}}."""
     video = name.lower().endswith(pipeline.VIDEO_EXT)
     t, _ = events.match(name, talk_list)
     key = t["speakers"] if t else None
     if not key:
         return False, "no speaker of the lineup in the file name - not taken"
     if key in auto:
-        return False, "%s came through conf42.com/record - the old folder is ignored" % key
+        own = auto[key] if isinstance(auto, dict) else {"source": "conf42.com/record", "deck": True}
+        if video or own.get("deck"):
+            return "ignore", "%s came through %s - %s is ignored" % (key, own.get("source"), here)
     mine = run.state["talks"].get(key)
     if not video:
         if mine and mine.get("finished"):
@@ -81,12 +164,13 @@ def legacy_verdict(run, auto, talk_list, name, size, up, old):
     return True, "%s: not in Descript yet - source fetched%s" % (key, " again" if same else "")
 
 
-def legacy_plan(run, fid, auto):
-    """Dry run of an old folder: one line per file, nothing downloaded."""
+def legacy_plan(run, fid, auto, here="the old folder", mine=None):
+    """Dry run of an old folder (or the Manual upload folder: mine(name) = this event's file?): one line per file,
+    nothing downloaded."""
     talk_list, fetched, out = events.talks(run.ev), run.state.get("drive_fetched", {}), []
     for f in linkdrive.list_folder(fid):
         name = f["title"]
-        if not name.lower().endswith(pipeline.VIDEO_EXT + pipeline.SLIDE_EXT):
+        if not name.lower().endswith(pipeline.VIDEO_EXT + pipeline.SLIDE_EXT) or (mine and not mine(name)):
             continue
         try:
             size, up = linkdrive.head(f["id"])
@@ -94,23 +178,33 @@ def legacy_plan(run, fid, auto):
             out.append("- %s: skipped (%s)" % (name, str(e)[:80]))
             continue
         old = fetched.get(f["id"])
-        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old)
+        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old, here)
         get = verdict is True or (verdict is None and not (old and old.get("size") == size and old.get("uploaded") == up))
         out.append("- %s `%s` (%.0f MB, %s) - %s" % ("**TAKE**" if get else "leave", name, size / 1e6, up[:16], why))
     return out
 
 
-def legacy_fetch(run, fid, auto):
-    """Bring the new files of the event's old upload folder into the factory's input. Returns the lines for the
-    pass summary (files taken, files left alone and why)."""
+def legacy_fetch(run, fid, auto, here="the old folder", mine=None):
+    """Bring the new files of the event's old upload folder (or of the Manual upload folder: mine(name) = this
+    event's file?) into the factory's input. Returns the lines for the pass summary (files taken, files left alone
+    and why)."""
     talk_list, left = events.talks(run.ev), []
 
     def want(name, size, up, old):
-        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old)
-        if verdict is False:
+        if mine and not mine(name):
+            return "ignore"                              # another event's file
+        verdict, why = legacy_verdict(run, auto, talk_list, name, size, up, old, here)
+        if verdict is False or verdict == "ignore":
             left.append("- left: `%s` - %s" % (name, why))
         return verdict
+    keep = run.state.get("drive_folder")
     got = run.drive_fetch(fid, want=want)
+    if mine:                                             # the Manual folder is every event's: never "the event's folder"
+        run.state["drive_folder"] = keep
+        if not keep:
+            run.state.pop("drive_folder", None)
+        run.state["cloud_manual"] = True                 # more_to_do: its talks restart a timed-out pass too
+        run.save()
     run.collect(got)
     for p in got:                                        # collect copied them into in/ + slides/: the runner's disk is small
         if os.path.isfile(p) and os.path.dirname(os.path.abspath(p)) == os.path.abspath(os.path.join(run.dir, "drive")):
@@ -210,25 +304,43 @@ def main(argv):
     if not dry:
         print("intake state:", commit_intake("factory intake: conf42.com/record uploads sorted (cloud)"))
     legacy = legacy_folders(cfg, slugs)
+    manual = {"id": manual_folder(cfg), "claims": {}, "owner": {}}
+    if manual["id"]:
+        try:
+            active = active_events(cfg, set(intake_events(slugs)) | set(legacy))
+            manual["claims"], manual["owner"], unclaimed = manual_claims(linkdrive.list_folder(manual["id"]), active)
+            if slugs:
+                manual["claims"] = {s: c for s, c in manual["claims"].items() if s in slugs}
+            if unclaimed:
+                lines += ["\n### Manual upload folder - not taken"] + unclaimed
+        except Exception as e:                           # noqa: BLE001 - Drive trouble must not stop the other sources
+            lines.append("\n### Manual upload folder - could not read it: %s" % e)
     if dry:
-        for slug, fid in sorted(legacy.items()):
-            lines.append("\n### %s - old upload folder" % slug)
+        for slug in sorted(set(legacy) | set(manual["claims"])):
             try:
-                lines += legacy_plan(pipeline.Run(slug), fid, auto_talks(slug)) or ["- empty"]
+                run, owned = pipeline.Run(slug), auto_owned(slug)
+                if slug in manual["claims"]:
+                    lines.append("\n### %s - Manual upload folder" % slug)
+                    lines += legacy_plan(run, manual["id"], owned, "the Manual upload folder",
+                                         lambda name, slug=slug: manual["owner"].get(name) == slug) or ["- empty"]
+                    owned = with_manual(owned, manual["claims"][slug])
+                if slug in legacy:
+                    lines.append("\n### %s - old upload folder" % slug)
+                    lines += legacy_plan(run, legacy[slug], owned) or ["- empty"]
             except Exception as e:                       # noqa: BLE001
                 lines.append("- could not read it: %s" % e)
         summary_md(lines)
         print("\n".join(lines))
         return 0
 
-    for slug in sorted(set(intake_events(slugs)) | set(legacy)):
+    for slug in sorted(set(intake_events(slugs)) | set(legacy) | set(manual["claims"])):
         try:
             run = pipeline.Run(slug)
         except KeyError as e:
             print("cloud: %s skipped (%s)" % (slug, e))
             continue
         try:
-            lines += one_event(run, slug, drive, legacy, cfg, youtube_on)
+            lines += one_event(run, slug, drive, legacy, cfg, youtube_on, manual)
         except Exception as e:                           # noqa: BLE001 - one event must not stop the others
             failed.append("%s: %s: %s" % (slug, type(e).__name__, str(e)[:300]))
             lines.append("\n### %s - FAILED: **%s: %s**" % (slug, type(e).__name__, str(e)[:300]))
@@ -243,14 +355,33 @@ def main(argv):
     return 1 if failed else 0
 
 
-def one_event(run, slug, drive, legacy, cfg, youtube_on):
+def with_manual(owned, claims):
+    """The talks a source above the old folder owns: conf42.com/record's, then the Manual upload folder's videos."""
+    out = dict(owned)
+    for key, c in claims.items():
+        if c["video"] and key not in out:
+            out[key] = {"source": "the Manual upload folder", "deck": c["deck"]}
+    return out
+
+
+def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     """The factory + YouTube part of a pass for one event. Returns its lines for the pass summary."""
     lines = []
     ready = rehydrate(run, drive, run.note)
+    owned = auto_owned(slug)                             # conf42.com/record > Manual upload > the old folder
+    if manual and manual["claims"].get(slug):
+        lines.append("\n### %s - Manual upload folder" % slug)
+        try:
+            lines += legacy_fetch(run, manual["id"], owned, "the Manual upload folder",
+                                  lambda name: manual["owner"].get(name) == slug) or ["- nothing new"]
+        except Exception as e:                           # noqa: BLE001 - Drive trouble must not stop the other sources
+            run.note("cloud: Manual upload folder not read (%s)" % e)
+            lines.append("- could not read it: %s" % e)
+        owned = with_manual(owned, manual["claims"][slug])
     if slug in legacy:
         lines.append("\n### %s - old upload folder" % slug)
         try:
-            lines += legacy_fetch(run, legacy[slug], auto_talks(slug)) or ["- nothing new"]
+            lines += legacy_fetch(run, legacy[slug], owned) or ["- nothing new"]
         except Exception as e:                       # noqa: BLE001 - Drive trouble must not stop the Auto upload talks
             run.note("cloud: old upload folder not read (%s)" % e)
             lines.append("- could not read it: %s" % e)
@@ -298,13 +429,14 @@ def more_to_do(slugs=None):
     """True when an Auto upload event still has accepted talks that are not finished - or an event with an old upload
     folder any unfinished talk at all (the workflow then starts itself again after a time-out)."""
     legacy = legacy_folders(pipeline.settings(), slugs)
-    for slug in sorted(set(intake_events(slugs)) | set(legacy)):
+    runs = os.listdir(intake.REPO_RUNS) if os.path.isdir(intake.REPO_RUNS) else []
+    for slug in sorted(set(intake_events(slugs)) | set(legacy) | {s for s in runs if not slugs or s in slugs}):
         p = os.path.join(intake.REPO_RUNS, slug, "state.json")
         if not os.path.exists(p):
             continue
         with open(p, encoding="utf-8") as f:
             st = json.load(f)
-        accepted = auto_talks(slug) | (set(st.get("talks", {})) if slug in legacy else set())
+        accepted = auto_talks(slug) | (set(st.get("talks", {})) if slug in legacy or st.get("cloud_manual") else set())
         if any(not t.get("finished") and not t.get("error") and not t.get("needs_new_video")
                for k, t in st.get("talks", {}).items() if k in accepted):
             return True
