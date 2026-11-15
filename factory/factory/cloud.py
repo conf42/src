@@ -248,7 +248,7 @@ def rehydrate(run, drive, log=print):
             raw = os.path.join(tmp, "video.mp4")
             meta = drive.get(rec["video_id"])
             drive.download(rec["video_id"], raw, int(meta.get("size") or 0), log)
-            intake.prepare(raw, {"numbers": rec.get("numbers") or {}}, src)
+            intake.prepare_upload(raw, rec, run.ev["short_url"], src, log)   # with the overlay swap of a re-filed talk
             if rec.get("slides_id"):
                 pdf = os.path.join(run.slides_dir, key + ".pdf")
                 if not os.path.exists(pdf) and not os.path.exists(os.path.join(run.slides_dir, "%s - %s.pdf" % (key, run.ev["title"]))):
@@ -288,8 +288,18 @@ def main(argv):
     started = datetime.datetime.now().isoformat(timespec="seconds")
     lines = ["## Conf42 cloud factory - %s%s" % (started, " (dry run)" if dry else "")]
 
-    sorter = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry)
+    try:
+        lineups = active_events(cfg, set(intake_events(slugs)))
+    except Exception as e:                               # noqa: BLE001 - without them only the wrong-conference check is off
+        print("cloud: lineups not read (%s)" % e)
+        lineups = {}
+    sorter = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry, active=lineups)
     accepted = sorter.run(slugs)
+    if sorter.refiled and not dry:                       # uploads moved to the conference they belong to: taken now
+        moved = sorted(set(sorter.refiled))
+        sorter.refiled = []
+        for slug, keys in sorter.run(moved).items():
+            accepted[slug] = (accepted.get(slug) or []) + keys
     failed = list(sorter.failed)                         # the pass carries on, and ends red so it is seen
     if failed:
         lines += ["\n### FAILED - tried again next pass"] + ["- **%s**" % f for f in failed]

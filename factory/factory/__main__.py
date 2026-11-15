@@ -135,6 +135,9 @@ def main(argv):
     if cmd == "cloud":                                   # one pass of the cloud factory (GitHub Actions)
         from . import cloud
         sys.exit(cloud.main(argv[1:]))
+    if cmd == "overlay":                                 # swap a recording's overlay for another conference's
+        from . import overlay
+        return overlay.main(argv[1:])
     if cmd == "cloud-more":                              # the workflow asks: start again after a time-out?
         from . import cloud
         print("yes" if cloud.more_to_do([a for a in argv[1:] if a != "all"] or None) else "no")

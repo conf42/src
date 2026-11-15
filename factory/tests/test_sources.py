@@ -81,6 +81,61 @@ def main():
           o == {"Ada Lovelace": {"source": "conf42.com/record", "deck": True}, "Grace Hopper": {"source": "conf42.com/record", "deck": False}})
     check("record: only accepted talks count as 'came through' for the restart", cloud.auto_talks("mlops2027") == {"Ada Lovelace"})
 
+    # ---- the wrong conference picked in the recorder (Marek 2026-11-15: "whatever he says, goes") ----
+    it = cloud.intake
+    two = {"chaos2027": ("Chaos Engineering", "Chaos Engineering for AI Agents: Breaking Permissions, Tools, and Context on Purpose"),
+           "mlops2027": ("MLOps", "Testing Agents for Permission Leaks: Authorization Evals in the Delivery Pipeline")}
+    deck = "Conf42 MLOps 2026 Testing Agents for Permission Leaks Authorization evals in the delivery pipeline Ada Lovelace"
+    name = "Testing Agents for Permission Leaks Authorization Evals in the Delivery Pipeline.pdf"
+    hello = "Hi everyone and welcome to Conforded to MLOPS. I am Ada, a senior engineer"
+    signs = it.conference_signs(deck, name, hello, two)
+    check("wrong conference: deck, file name and greeting all point at the other event",
+          len(signs["mlops2027"]) == 3 and not signs["chaos2027"])
+    check("wrong conference: three signs, none for the filed event -> re-filed", it.wrong_conference("chaos2027", signs)[:2] == ("refile", "mlops2027"))
+    check("right conference: the same signs for the filed event -> nothing", it.wrong_conference("mlops2027", signs)[0] is None)
+    one = it.conference_signs("", "slides final.pdf", "Hello and welcome to Conf42 ML Ops, I am Ada", two)
+    check("wrong conference: the greeting alone -> hold, not moved", it.wrong_conference("chaos2027", one)[:2] == ("hold", "mlops2027"))
+    none = it.conference_signs("My talk about agents", "deck.pdf", "Hi, I am Ada and today we talk about agents", two)
+    check("no signs -> stays where it was filed", it.wrong_conference("chaos2027", none) == (None, None, ""))
+    both = it.conference_signs("Conf42 Chaos Engineering 2027", "x.pdf", "welcome to Conf42 MLOps", two)
+    check("signs for both -> stays (one each)", it.wrong_conference("chaos2027", both)[0] is None)
+    late = it.conference_signs("", "", " ".join(["word"] * 60) + " mlops", two)
+    check("the conference named after the greeting is no sign", not late["mlops2027"])
+    nested = it.conference_signs("Conf42 Platform Engineering 2027", "", "welcome to platform engineering",
+                                 {"a": ("Engineering", "T one"), "b": ("Platform Engineering", "T two")})
+    check("a name inside another event's name is never a sign", not nested["a"] and len(nested["b"]) == 2)
+
+    class FakeDrive:
+        root, moved, text = "ROOT", [], {}
+
+        def folder(self, parent, name):
+            return "%s/%s" % (parent, name)
+
+        def move(self, fid, parent):
+            self.moved.append((fid, parent))
+
+        def put_text(self, fid, text, mime="application/json"):
+            self.text[fid] = text
+    lineups["chaos2027"] = [dict(t, banished=False) for t in lineups["chaos2027"]]
+    cloud.intake.youtube.talk_rows = lambda ev: [{"speakers": t["speakers"], "title": t["title"]} for t in lineups[ev["short_url"]]]
+    cloud.intake.youtube.talk_page = lambda ev, r: "%s_%s" % (ev["short_url"], r["speakers"].replace(" ", "_"))
+    fd = FakeDrive()
+    sorter = cloud.intake.Intake(fd, active=active)
+    rec, info = {}, {"event": {"slug": "mlops2027"}, "talk": {"k": "mlops2027_Ada_Lovelace", "names": ["Ada Lovelace"], "title": "old"}, "typed": "Ada Lovelace"}
+    sorter.refile("mlops2027", {"items": {}}, {"id": "UP", "name": "Ada (x)"}, {"talk.json": {"id": "TJ"}}, info, rec, "chaos2027", "the deck says so")
+    import json as _json
+    new = _json.loads(fd.text.get("TJ") or "{}")
+    check("re-file: the folder moves to the other event", fd.moved == [("UP", "ROOT/chaos2027")] and sorter.refiled == ["chaos2027"])
+    check("re-file: talk.json names the other event and talk, the original is kept",
+          new.get("event", {}).get("slug") == "chaos2027" and new["talk"]["k"] == "chaos2027_Ada_Lovelace"
+          and new["refiled"]["from"] == "mlops2027" and new["refiled"]["talk"]["k"] == "mlops2027_Ada_Lovelace")
+    check("re-file: this event forgets the upload", rec["outcome"] == "refiled" and rec["done"] and rec["talk"] is None and rec["refiled_to"] == "chaos2027")
+    fd2 = FakeDrive()
+    fd2.moved, fd2.text = [], {}
+    dry = cloud.intake.Intake(fd2, active=active, dry_run=True)
+    dry.refile("mlops2027", {"items": {}}, {"id": "UP", "name": "Ada (x)"}, {"talk.json": {"id": "TJ"}}, info, {}, "chaos2027", "why")
+    check("re-file: a dry run moves nothing", not fd2.moved and not fd2.text)
+
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return 1 if fails else 0

@@ -18,6 +18,16 @@ minute's words when faster-whisper is installed), answers in a fixed JSON form, 
 not in the lineup or that a rule rejected. Claude runs through the Claude Code CLI (`claude -p`) on Marek's
 subscription (CLAUDE_CODE_OAUTH_TOKEN in GitHub Actions), never an API key.
 
+The wrong conference (Marek 2026-11-15, "whatever he says, goes"): a speaker on two lineups can record talk A with
+conference B picked in the recorder. The overlay then says B, but the deck and the speaker say A - and those win.
+For a speaker who is on another upcoming lineup too, the intake compares the deck (the conference on its first pages,
+its file name against the talk titles) and the greeting (the first words) with each of the speaker's talks:
+    two signs for the other conference, none for this one -> re-filed: the upload folder moves to the other event,
+        talk.json is rewritten (the original kept under "refiled"), and that event's intake takes it - with the right
+        conference's overlay laid over the video before anything else (overlay.py)
+    one sign, or signs for both -> hold: "which conference?"
+All of it before the upload to Descript, so a wrong one costs no credits.
+
 State: _db/factory_runs/<event>/intake.json (public on purpose: talks go public anyway, Marek 2026-11-13).
 """
 import datetime
@@ -29,7 +39,7 @@ import subprocess
 import tempfile
 import traceback
 
-from . import events, media, youtube
+from . import events, media, overlay, youtube
 
 REPO_RUNS = os.path.join(events.REPO, "_db", "factory_runs")
 TEST_WORDS = re.compile(r"\b(test(ing)?|asdf|qwerty|trial|dummy|sample|foo|bar)\b", re.I)
@@ -252,6 +262,81 @@ def assess(video, info, row, problem, cfg=None):
     return rep
 
 
+def squash(text):
+    """Letters and digits only, lower case: "Conf42 ML Ops" and "conf42 mlops" are the same thing."""
+    return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
+
+
+def title_words(text):
+    """The telling words of a title or a file name (4+ letters, plural s dropped)."""
+    return {w[:-1] if w.endswith("s") else w for w in re.findall(r"[a-z]{4,}", (text or "").lower())}
+
+
+def conference_signs(deck_text, deck_name, greeting, events_talks):
+    """{slug: [signs]} - what speaks for each conference. events_talks: {slug: (event name, talk title)}, the filed
+    event and every other one the speaker is on. Signs: the deck's first pages name the conference; the deck's file
+    name (or first page) is that talk's title and clearly not the other's; the speaker greets that conference."""
+    signs = {s: [] for s in events_talks}
+    deck, hello = squash(deck_text), squash(" ".join((greeting or "").split()[:45]))
+    for s, (name, _) in events_talks.items():
+        n = squash(name)
+        others = [squash(o[0]) for k, o in events_talks.items() if k != s]
+        if any(n in o and n != o for o in others):       # "Engineering" inside "Chaos Engineering": no use as a sign
+            continue
+        if n and "conf42" + n in deck:
+            signs[s].append("the deck says Conf42 %s" % name)
+        if n and n in hello:
+            signs[s].append("the speaker says %s" % name)
+    for label, text in (("the deck's file name", os.path.splitext(deck_name or "")[0]), ("the deck's first page", deck_text)):
+        have = title_words(text)
+        if not have:
+            continue
+        share = {s: (len(title_words(t) & have) / float(len(title_words(t))) if title_words(t) else 0.0)
+                 for s, (_, t) in events_talks.items()}
+        order = sorted(share, key=lambda k: -share[k])
+        if share[order[0]] >= .6 and (len(order) == 1 or share[order[0]] - share[order[1]] >= .25):
+            signs[order[0]].append("%s is that talk's title" % label)
+            break                                        # one title sign, whichever source gave it
+    return signs
+
+
+def wrong_conference(slug, signs):
+    """(verdict, other slug, why): ("refile", s, ...) when the signs are clear, ("hold", s, ...) when they are not,
+    (None, None, "") when the upload is where it belongs."""
+    mine = signs.get(slug) or []
+    other = max((s for s in signs if s != slug), key=lambda k: len(signs[k]), default=None)
+    theirs = signs.get(other) or []
+    if not theirs:
+        return None, None, ""
+    why = "; ".join(theirs)
+    if len(theirs) >= 2 and not mine:
+        return "refile", other, why
+    if len(theirs) > len(mine):
+        return "hold", other, why
+    return None, None, ""
+
+
+def deck_text(path, pages=2):
+    try:
+        from pypdf import PdfReader
+        rd = PdfReader(path)
+        return " ".join((p.extract_text() or "") for p in rd.pages[:pages])
+    except Exception:                                    # noqa: BLE001 - no text = no sign
+        return ""
+
+
+def prepare_upload(video, rec, slug, dest, log=print):
+    """prepare() for an accepted upload, with the overlay swapped first when the talk was recorded under another
+    conference (rec["refiled_from"]). Used by the intake and by the cloud's re-fetch of a source."""
+    old = rec.get("refiled_from")
+    if not old or old == slug:
+        return prepare(video, rec, dest)
+    fixed = os.path.join(os.path.dirname(video), "overlay-swapped.mp4")
+    rec["overlay_swap"] = dict(overlay.swap(video, old, slug, fixed, log), **{"from": old})
+    s = streams(fixed)                                   # the swap re-encoded it: prepare needs the new numbers
+    return prepare(fixed, {"numbers": {"probe": s}}, dest)
+
+
 def hm(sec):
     sec = int(round(sec or 0))
     return "%d:%02d:%02d" % (sec // 3600, sec // 60 % 60, sec % 60) if sec >= 3600 else "%d:%02d" % (sec // 60, sec % 60)
@@ -399,8 +484,10 @@ def prepare(video, rep, dest):
 class Intake:
     """intake.Intake(drive).run(["mlops2026"]) or run(None) = every event folder under Auto upload."""
 
-    def __init__(self, drive, cfg=None, use_claude=True, dry_run=False, log=print):
+    def __init__(self, drive, cfg=None, use_claude=True, dry_run=False, log=print, active=None):
         self.d, self.cfg, self.use_claude, self.dry_run, self.log = drive, cfg or {}, use_claude, dry_run, log
+        self.active = active or {}                       # {slug: event}: the lineups a speaker may also be on
+        self.refiled = []                                # events an upload was moved to this pass
         self.failed = []                                 # uploads (or whole events) that broke this pass
 
     def state_path(self, slug):
@@ -537,9 +624,6 @@ class Intake:
                 vpath = os.path.join(work, "video.mp4")
                 self.log("intake: %s / %s - downloading %.0f MB" % (slug, up["name"], int(video_meta.get("size") or 0) / 1e6))
                 self.d.download(video_meta["id"], vpath, int(video_meta.get("size") or 0), self.log)
-                rep = decide(vpath, info, row, problem, self.cfg, self.use_claude and override != "accept")
-                if override == "accept" and rep["outcome"] == "hold" and row:
-                    rep["outcome"], rep["reason"] = "accept", "accepted by Marek"
                 slide_flags, spath = [], None
                 if sf and files.get(sf.get("name")):
                     spath = os.path.join(work, "slides.pdf")
@@ -549,13 +633,40 @@ class Intake:
                         spath = None
                 elif not sf:
                     slide_flags = ["no slides came with the recording"]
+                # the wrong conference picked in the recorder? (not asked again once Marek accepted it, or once
+                # it was re-filed here: what was decided stays)
+                if override != "accept" and not info.get("refiled"):
+                    verdict, other, why = self.conference_check(slug, row, vpath, spath, sf)
+                    if verdict == "refile":
+                        self.refile(slug, st, up, files, info, rec, other, why)
+                        continue
+                    if verdict == "hold":
+                        rec.update(talk=key)
+                        self.finish(slug, st, up, rec, "hold", "which conference? recorded for %s, but %s (%s) - accept it here, or move it"
+                                    % (ev["title"], why, other), [], [], keep=True)
+                        continue
+                if info.get("refiled"):
+                    rec["refiled_from"] = (info["refiled"] or {}).get("from")
+                rep = decide(vpath, info, row, problem, self.cfg, self.use_claude and override != "accept")
+                if override == "accept" and rep["outcome"] == "hold" and row:
+                    rep["outcome"], rep["reason"] = "accept", "accepted by Marek"
                 rec.update(talk=key, matched=how, numbers=rep["numbers"], claude=rep.get("claude"), video_id=video_meta["id"],
                            video_md5=video_meta.get("md5Checksum"), slides_id=(files.get(sf.get("name")) or {}).get("id") if sf and spath else None)
                 if rep["outcome"] == "accept" and key:
                     decided_for[key] = {"seconds": float((info.get("meta") or {}).get("seconds") or 0), "md5": video_meta.get("md5Checksum")}
+                    if rec.get("refiled_from"):
+                        rep["flags"].append("recorded under %s - re-filed here, the overlay is swapped" % rec["refiled_from"])
                     if not self.dry_run:
                         dest = os.path.join(run.inp, key + ".mp4")
-                        prepare(vpath, rep, dest)
+                        try:
+                            prepare_upload(vpath, dict(rec, numbers=rep["numbers"]), slug, dest, self.log)
+                        except RuntimeError as e:
+                            if not rec.get("refiled_from"):
+                                raise
+                            decided_for.pop(key, None)   # the wrong overlay must not go out: Marek looks
+                            self.finish(slug, st, up, rec, "hold", "recorded with the %s overlay and it could not be swapped (%s)"
+                                        % (rec["refiled_from"], str(e)[:200]), rep["flags"] + slide_flags, rep["fixes"], keep=True)
+                            continue
                         if spath:
                             shutil.copy2(spath, os.path.join(run.slides_dir, key + ".pdf"))
                         if key in run.state["talks"]:
@@ -580,6 +691,56 @@ class Intake:
                     self.save(slug, st)                  # decided uploads survive a pass that dies later
         self.save(slug, st)
         return accepted
+
+    def conference_check(self, slug, row, video, deck, sf):
+        """(verdict, other slug, why) for one upload - see wrong_conference(). Only looked at when the speaker is on
+        another upcoming lineup as well; the first words are transcribed only then."""
+        others = {}
+        for s, ev in self.active.items():
+            if s == slug:
+                continue
+            try:
+                t, _ = events.match(row["speakers"], [x for x in events.talks(ev) if not x.get("banished")])
+            except Exception:                            # noqa: BLE001 - a lineup that won't load is no reason to stop
+                t = None
+            if t and t["speakers"] != events.TEST_TALK:
+                others[s] = (ev["name"], t.get("title") or "")
+        if not others:
+            return None, None, ""
+        mine = events.event(slug)
+        talks = dict(others, **{slug: (mine["name"], row.get("title") or row.get("Title") or "")})
+        words, _ = first_words(video, 45)
+        signs = conference_signs(deck_text(deck) if deck else "", (sf or {}).get("original_name") or "", words or "", talks)
+        verdict, other, why = wrong_conference(slug, signs)
+        if verdict:
+            self.log("intake: %s / %s - the signs say %s: %s" % (slug, row["speakers"], other, why))
+        return verdict, other, why
+
+    def refile(self, slug, st, up, files, info, rec, other, why):
+        """Move an upload recorded under the wrong conference to the right one: the folder goes to Auto upload/<other>/,
+        talk.json names the other event and talk (the original kept under "refiled"), and this event forgets it."""
+        ev2, by_key2, talk_list2 = lineup(other)
+        t, _ = events.match(" & ".join((info.get("talk") or {}).get("names") or []) or info.get("typed") or "",
+                            [x for x in talk_list2 if not x.get("banished")])
+        key2 = next((k for k, r in by_key2.items() if t and r["speakers"] == t["speakers"]), None)
+        rec.update(talk=None, refiled_to=other)
+        rec.update(outcome="refiled", reason="recorded for %s, but it is the %s talk: %s" % (slug, other, why), flags=[], fixes=[],
+                   decided=now(), done=True)
+        self.log("intake: %s / %s -> RE-FILED to %s (%s)" % (slug, up["name"], other, why))
+        if self.dry_run or not key2:
+            if not key2:
+                rec.update(outcome="hold", done=False, reason="belongs to %s (%s), but the talk was not found there" % (other, why))
+            return
+        new = dict(info, event={"slug": other, "label": ev2["title"]},
+                   talk=dict(info.get("talk") or {}, k=key2, title=t.get("title") or ""),
+                   refiled={"from": slug, "why": why, "at": now(), "event": info.get("event"), "talk": info.get("talk")})
+        try:
+            self.d.put_text(files["talk.json"]["id"], json.dumps(new, indent=1, ensure_ascii=False))
+            self.d.move(up["id"], self.d.folder(self.d.root, other))
+            self.refiled.append(other)
+        except Exception as e:                           # noqa: BLE001 - tried again next pass
+            rec.update(done=False)
+            self.log("intake: could not re-file %s (%s)" % (up["name"], e))
 
     @staticmethod
     def override_row(st, folder_id, talk_list):
