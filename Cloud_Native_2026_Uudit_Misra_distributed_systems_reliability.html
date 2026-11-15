@@ -42,7 +42,7 @@
     <meta property="og:title" content="Beyond Dashboards: Deep-Dive Network Observability with eBPF | Conf42"/>
     <meta property="og:description" content="Why do dashboards show "green" while users experience failures? Because traditional monitoring tells you when a system is broken, but it rarely tells you why. In this session, I break down the paradigm shift from legacy monitoring to true observability, specifically focusing on the most elusive layer: the network. I’ll dive into the "black box" of Kubernetes networking, explaining why traditional iptables and sidecar-based approaches often struggle to capture the full picture. I’ll introduce eBPF as the game-changing alternative, demonstrating how it operates as a kernel-level superpower that bypasses legacy bottlenecks. You will learn how eBPF-based agents deployed as DaemonSets, can provide granular, real-time visibility into every packet traversing your cluster. Finally, I’ll walk through an open-source observability toolkit you can leverage today to map Pod-to-Pod and Pod-to-Node traffic. I’ll share a practical blueprint for building a network-aware platform that makes your infrastructure transparent, scalable, and most importantly easy to debug."/>
     <meta property="og:url" content="https://www.conf42.com/Cloud_Native_2026_Uudit_Misra_distributed_systems_reliability"/>
-    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Senior Member Technical Staff", "name": "Uudit Misra", "sameAs": ["https://www.linkedin.com/in/uudit-misra-b3080a49/"], "url": "https://www.conf42.com/speaker_Uudit_Misra", "worksFor": {"@type": "Organization", "name": "Salesforce"}}], "description": "Why do dashboards show \"green\" while users experience failures? Because traditional monitoring tells you when a system is broken, but it rarely tells you why. In this session, I break down the paradigm shift from legacy monitoring to true observability, specifically focusing on the most elusive layer: the network. I\u2019ll dive into the \"black box\" of Kubernetes networking, explaining why traditional iptables and sidecar-based approaches often struggle to capture the full picture. I\u2019ll introduce eBPF as the game-changing alternative, demonstrating how it operates as a kernel-level superpower that bypasses legacy bottlenecks. You will learn how eBPF-based agents deployed as DaemonSets, can provide granular, real-time visibility into every packet traversing your cluster. Finally, I\u2019ll walk through an open-source observability toolkit you can leverage today to map Pod-to-Pod and Pod-to-Node traffic. I\u2019ll share a practical blueprint for building a network-aware platform that makes your infrastructure transparent, scalable, and most importantly easy to debug.", "embedUrl": "https://www.youtube.com/embed/OUm8z83DKrE", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 Cloud Native 2026", "url": "https://www.conf42.com/cloud2026"}, "keywords": ["distributed", "systems", "reliability"], "name": "Beyond Dashboards: Deep-Dive Network Observability with eBPF", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/OUm8z83DKrE/hqdefault.jpg"], "transcript": "Hello everyone. I am, first of all, I\u0027m glad to be here speaking at Conf42 Cloud Native 2026. Today I\u0027d be talking about this topic beyond Dashboards, deep Dive Network observability with EBPF. So I work on Kubernetes platform team at Salesforce. Pretty much, I live and breathe Kubernetes Cloud native every single day. So the topic that I\u0027m gonna be talking about is not an abstract one. It\u0027s basically my day-to-day work is based out of this. Before Salesforce, I was working at Microsoft developing, distributed, and scalable application in cloud networking domain. I know how hard it is to debug on-call issues when things are on high stake. Quick question before I dig deeper. Have you ever been on call, pulled up your dashboards? Everything is green and end users are still having a terrible time. This gap between the dashboard says Fine and something is clearly broken. That\u0027s what this talk is all about, and by the end of the session, you\u0027ll know exactly why that happens at the network layer and what you can do about it. So here\u0027s the plan for today. We start the problem, why your dashboards lie at the network layer. Then I\u0027ll quickly cover monitoring versus observability. Because these two words mean very different things and sometimes are used interchangeably. Then we look at what IP tables is, which is more of a traditional approach now and what they can and cannot see through the traffic. Then we\u0027ll go into EBPF first, understand in very simple way, and then get into a little bit of technicals. I\u0027ll walk through the architecture of two open source tools, retina and Cilium, which are based on EBPF technology, and show you real data from a benchmark. I ran on A-W-S-E-K-S cluster and close with a three step blueprint. You can go apply this week in your environment too. Let\u0027s get into it. So now let\u0027s talk about the problem. Think, let\u0027s say you are on call, a support ticket comes in. Users are getting 500 errors on, value while using that service. Revenue is dropping. You pull up the dashboard. CPU seems normal. Memory seems totally fine, and error rate is almost 0%. Everything is green, so you start digging more. You check logs, nothing obvious. You check traces. Requests are going in, something in the middle isn\u0027t responding. No error, no alert, nothing. Then you dig deeper and figure once you figure it out, that there\u0027s a network policy rule which was dropping traffic between two services. No logs was emitted, no alert fired. The package just disappeared, and this isn\u0027t a rare edge case. The three failures, morts that I have personally seen in productions are as follows. First one silent drops, a policy blocks traffic, and there is no log, no trace, nothing about it. The second one, DNS timeouts, there\u0027s always a race condition when a pod is starting up for a few seconds. It\u0027s when it\u0027s sim is spinning up. Lookups fail for that amount of time and your monitoring has no idea about it. The third one is wrong. Backends are set a label chain Somewhere in the deployment, traffic is getting routed to a different at all, and there is no information about it. These are in bugs and Kubernetes. This is what happens when you monitors, only watches what you told it to watch in advance. These are the major problems which you\u0027re trying to tackle in this talk. So before we talk about the solutions, I wanna make sure we are on the same page with respect to monitoring versus observability, as these things are changed interchangeably a lot. So monitoring is like the check engine light in your car. Someone decided in advance. If oil pressure drops below x, turn on the light works great for the problems you have, which have been seen before. But if something unexpected goes wrong that nobody anticipated light stays off, you have no idea about it. Observability, on the other hand, it\u0027s, is it\u0027s different. It\u0027s more like having a mechanic who can look under the hood and tell you what\u0027s happening. Even the things you didn\u0027t predict. Now talk about tap, talking about the networking layer. Monitoring means you have counters, for example, total request per second error rate, maybe latency. These are all you can have monitors for, which is u pretty much useful, but it doesn\u0027t tell you which specific pod made a request or why a packet was dropped. Which DNS name took a lot of time and like what was the latency of that? Specific DNS request observability at the network layer means flow level records. Every connection individually. What was the sore spot? What was the destination spot? What happened? And if it was dropped, exactly what was the reason for it? That\u0027s the bar we are trying to hit. And the reason we haven\u0027t been hitting is that like the traditional approach, which is IP table space, cannot help us get there. I wanted to give you a, like a little bit of under a background on how Kubernetes networking has traditionally worked. IP tables. If you ever looked at IB table rule, like it\u0027s a giant linear list and every packet walks down the list linearly one by one works fine at small scale. Four things break down as it starts growing. First it gets slow more. network. Policy rule means longer lookups per packet. There\u0027s a published I triple research on this Latency measurably degrades as root count goes up at real production scale with hundreds of service. This matters a lot. Second thing is it\u0027s shallow IP table only sees IP addresses and port numbers, like pretty much layer three and layer four kind information. No HDP paths, no DNS queries, no GRPC service names and all, all like, all pretty much like all layer seven stuff, completely blind at the application layer. The third issue is no identity. IP table cease ips, not bot names. Even if you know something was dropped, you don\u0027t automatically know which bot it, it basically dropped, or which po basically dropped that packet or like that flow. The fourth thing is, it hurts like a lot in incidents. Drops are completely silent. IP table drops a packet. There\u0027s no log, no event, nothing. The packet just disappears. So look at the right column. Those are the same exact questions which like, which comes up in the real incident. Why the traffic between these spots stop. What data queries are timing out is why network policy actually doing what it needs to do. None of those are answerable with IP tables alone, you need something that goes deeper. So EBPF is the answer for this. But before I explain what it is, let me just tell you what it gives you. Look at the right column. Seven questions that used to be impossible to answer Mid incident, which part related initiated this connection. You can answer that now with EBPF. Why did the packet get dropped? You get the exact kernel level reason, not just a guess. What services does Pod X depend on? You get a life flow map, not what you config says, but what\u0027s actually happening right now is DNS. The reason the call is low. You can see individual DNS queries per PO with latency. Is my network policy working? Watch it in real time. The word like if it\u0027s getting forwarded dropped or like whatever. The reason is what HT TP path is generating five oh errors. You get application layer visibility without touching the app. Which parts are talking to the internet? Egress visibility. It\u0027s right there. And like all of these without a sidecar on every pod, without changing application code, without restarting anything, three things. EBPF unlocks on the left. Peripheral records, DNS, visibility, drop reason, telemetry, those are like the basic building blocks for any application. So that\u0027s how A BPF agents lives in your cluster. So let\u0027s say there are three nodes, node one, node two, and node three. On each node you have your app pods at the top where your actual workload is sitting below them. Highlighted in teal is the A BPF agent. So basically this is a demon set Kubernetes schedules one copy on every single node. Automatically. You add a note, the EBPF agent shows up. Let\u0027s say you have 200 nodes. You get 200 EBPF demon set agents. Below. Just below that is, is the Linux kernel with the hook points where the EBBF programs attach and watch every, everything flowing through it without changing any kernel level code. So these EBBF programs are very lightweight programs that gets hooked onto some kernel events or calls. The agent that\u0027s then sends to data to four places. Flow records to Hubble Relay. That\u0027s what powers the CLI and UI metrics to Prometheus, then dashboards in Grafana, and then using CLI. You can see live flows by running the command. Hubble. Observe your app. Pods have no idea the agent is there. You haven\u0027t changed even a single line of code on the application. The visibility just appears. Now let\u0027s look at the specific tools to do this, starting with Retina. Retina, which was open sourced by Microsoft in 2024. It\u0027s designed only for observability. Doesn\u0027t replace your CNI. Doesn\u0027t enforce policies. Just keeps a watch on the traffic. So data flows from top to bottom. Let\u0027s talk about major kernel hooks that are configured in Retina. First one, TC Hook is triggered for every ingress and egress packet. And the second one, K prob gets called for each TCP rent. Third one socket filter is triggered for DNS and the fourth XDP for any packet drops. Once this event hook is triggered, then inside the agent ring buffer sent data from kernel to application spas. Then IP to POD mapping is taken taken care. And then finally, these metrics are aggregated. Aggregated and send eventually to Prometheus, then Prometheus, like we can have Grafana dashboards running and the Hubble CLI respectively taking all these metrics and showing you in UI or like the CLI, whichever you prefer. What clever thing here is it m like this retina agents image data in Hubble format. So if you have the Hubble CLI already installed in your Kubernetes, you can use it with Retina immediately. The key design trait to remember is IP two. POD mapping happens in user space, not at the kernel level. He hence it\u0027s not able to properly track identity for the package flowing. That\u0027s what creates the identity gap. You\u0027ll see in the screenshots in the coming slide. It\u0027s not a bug, it\u0027s how they kept it a lightweight and CNI agnostic, but it has its own consequences. On the other hand, Celia, which we\u0027ll be talking in the next slide, is able to track the identity for each bot through its cryptographic endpoint model. So that\u0027s the a diagram of cilium and Hubble together. It\u0027s similar, but I did that for The comparison can be drawn directly for both these tools. But the difference here is you see that purple box in the agent, the endpoint identity model. So when a pod start, cilium gives it a cryptographic identity based on its labels. And every EVPF program in the kernel shows this identity, not user space after the fact. It\u0027s a kernel itself. So when a packet moves from pod A to pod B, the kernel already knows about both pods, both sides of every flow kit. Results automatically. No filter needed at all. That flows into the EVPF policy engine for enforcement into the flow event, drink buffer, and through the L seven protocol parser, which gives you SGDP method path status quo GRPC service names none of that exists int that\u0027s where Cilium becomes powerful when we need L seven level information and visibility. In the S sgt P level, Hubble sits on top relay UI with a live service graph and command that interface. So here I have a architecture comparison side by side for both Retina and Cilium plus Audible SOA is just an observability tool and is CNI agnostic when, while cilium can be a standalone CNI or an observability plugin when used in a chaining mode with any other CNI. Just giving you a heads up for the specific scenario, I use C Lium in training mode because I was using A-W-S-E-K-S cluster, which has its own vp C, and I. Taking from identity model perspective, retina correlates ips in user space. Cilium does it in kernel. That\u0027s why C Dium shows identity clearly for the packages flowing. While Retina is not able to show that from L seven visibility perspective, Rina doesn\u0027t have it there much cilium does. S-G-T-P-G-R-P-C, everything at the application layer when coming to resource cost uses 47% less memory per note and barely moves. CPU under load. Cilium costs more because it\u0027s doing much more. That\u0027s the trade off. So both the tools were tested on real A-W-S-E-K-S cluster, sequentially, same workload that is like almost 500 QPS of sustained data was flown between the pods. The result is right after right here, retina, 47% less memory per node. CPU was basically flat under 500 QPS of load. On the other hand, cilium 31% CPU spike under the same load, more memory because it\u0027s processing per flow identity on every packet. Screenshots on screen like our, the actual kubectl, top parts output, not a tool, not simulated, but these are from the real environment. I ran. Both left. One is a cilium and the right one is a retina. You can see like the CPUN memory for each pod that I ran on. Now talking about the results, if you see left, it\u0027s a Hubble ui. If with cilium. Live service dependency grant for traffic. We generated load generator taking, talking to the test server. Look at both sides. Source spot, destination pot. Fully resolved. Every flow shows port protocol word and it updates in real time on the right. If you see it\u0027s traffic from retina, which got, I mean got through basically Hubble observe with a from pot filter. DNS flows, TCP events. All, everything is visible. But look at the destination column. I know it might not be visible from there, but it says World raw ip, not a PO name. That\u0027s the identity cap I was talking about in previous lights. Retina can see the packet, cannot automatically name the destination. The bottom bar Prometheus metrics are accurate. CLI with filters works fine, but it just don\u0027t rely on the UI for identity abstraction attribution. So here\u0027s a complete picture in one table. The pattern is simple. Both tools give you basics like flows, DNS, visibility, drop reasons. The cap opens at identity and L seven level source and destination pods. It\u0027s partial for Retina. If you need information on HTP method and Path C, lium is the only solution. Then same foundation, but different depth. I mean if I were to sum, I would say pick retina. If you are already on Prometheus and want Lowcost network traceability and L seven is not a requirement much. You can set up this, five minutes with helm if you\u0027re starting from zero, this is the move. Pick Cilium when you need accurate pod identity on both sides of a flow when you are debugging SGTP or GRPC issues more often when you need to know which service is calling which, and this they aren\u0027t just a permanent choices. You can start with get baseline visibility, migrate to Cilium when requirements grow, pick what\u0027s right for you today. So like these three steps you can use to get the observability in your own clusters. First deploy Retina, only two basic helm commands needed just five minutes. You start seeing T CCP flows and DNS in Prometheus right away. You would have to configure Prometheus to scrape the retina. Retina metrics from the, like the porta agent exposes to. The second one is run hobble. Observe from pod. To your pod, basically to trace the pods activity run, Hubble observed verdict, dropped in an incident. Anything which is getting silently blocked shows up immediately. You can debug, debug if any packets are getting dropped very easily through that. Third one is you need, if you need to level up at C in chaining mode. If you already have a Kubernetes service with a different CNI, for example, in my case, I have used a WSE case, so I had to use CM in chaining mode by putting the property CNI chaining mode equals to A-W-S-C-N-I. This keeps V-P-C-C-N-I doing all the IP address management. Cilium adds identity aware, L visibility on top, which becomes very powerful observability. Four takeaways for this talk is EVPF is the only lightweight solution to see the full picture of the network layer without any performance degradation. Retina is a lightweight, great starting point for network observability tool. Cilium is more smarter, more identity aware, more L seven level information. And when you need to go a little bit more deeper into L seven layer seven level information you need. C Lium network Observability is not an option anymore. As cluster grows prebuilt, dashboards stop big enough. You need more level of information. So it is a necessity going forward now. EBP based network observability is becoming like a standalone infrastructure. The question isn\u0027t whether you need it. It\u0027s which tool fits where you are right now. With that, I would want to conclude that. Thank you so very, thank you so very much everyone. I hope you guys found it informative. If you guys have any questions, concerns, or want to discuss this more, happy to connect on LinkedIn or through my email. Thanks again.", "uploadDate": "2026-04-23T17:00:00Z", "url": "https://www.conf42.com/Cloud_Native_2026_Uudit_Misra_distributed_systems_reliability"}</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Senior Member Technical Staff", "name": "Uudit Misra", "sameAs": ["https://www.linkedin.com/in/uudit-misra-b3080a49/"], "url": "https://www.conf42.com/speaker_Uudit_Misra", "worksFor": {"@type": "Organization", "name": "Salesforce"}}], "description": "Why do dashboards show \"green\" while users experience failures? Because traditional monitoring tells you when a system is broken, but it rarely tells you why. In this session, I break down the paradigm shift from legacy monitoring to true observability, specifically focusing on the most elusive layer: the network. I\u2019ll dive into the \"black box\" of Kubernetes networking, explaining why traditional iptables and sidecar-based approaches often struggle to capture the full picture. I\u2019ll introduce eBPF as the game-changing alternative, demonstrating how it operates as a kernel-level superpower that bypasses legacy bottlenecks. You will learn how eBPF-based agents deployed as DaemonSets, can provide granular, real-time visibility into every packet traversing your cluster. Finally, I\u2019ll walk through an open-source observability toolkit you can leverage today to map Pod-to-Pod and Pod-to-Node traffic. I\u2019ll share a practical blueprint for building a network-aware platform that makes your infrastructure transparent, scalable, and most importantly easy to debug.", "embedUrl": "https://www.youtube.com/embed/OUm8z83DKrE", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 Cloud Native 2026", "url": "https://www.conf42.com/cloud2026"}, "keywords": ["distributed", "systems", "reliability"], "name": "Beyond Dashboards: Deep-Dive Network Observability with eBPF", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/OUm8z83DKrE/hqdefault.jpg"], "transcript": "Hello everyone. I am, first of all, I\u0027m glad to be here speaking at Conf42 Cloud Native 2026. Today I\u0027d be talking about this topic beyond Dashboards, deep Dive Network observability with EBPF. So I work on Kubernetes platform team at Salesforce. Pretty much, I live and breathe Kubernetes Cloud native every single day. So the topic that I\u0027m gonna be talking about is not an abstract one. It\u0027s basically my day-to-day work is based out of this. Before Salesforce, I was working at Microsoft developing, distributed, and scalable application in cloud networking domain. I know how hard it is to debug on-call issues when things are on high stake. Quick question before I dig deeper. Have you ever been on call, pulled up your dashboards? Everything is green and end users are still having a terrible time. This gap between the dashboard says Fine and something is clearly broken. That\u0027s what this talk is all about, and by the end of the session, you\u0027ll know exactly why that happens at the network layer and what you can do about it. So here\u0027s the plan for today. We start the problem, why your dashboards lie at the network layer. Then I\u0027ll quickly cover monitoring versus observability. Because these two words mean very different things and sometimes are used interchangeably. Then we look at what IP tables is, which is more of a traditional approach now and what they can and cannot see through the traffic. Then we\u0027ll go into EBPF first, understand in very simple way, and then get into a little bit of technicals. I\u0027ll walk through the architecture of two open source tools, retina and Cilium, which are based on EBPF technology, and show you real data from a benchmark. I ran on AWS EKS cluster and close with a three step blueprint. You can go apply this week in your environment too. Let\u0027s get into it. So now let\u0027s talk about the problem. Think, let\u0027s say you are on call, a support ticket comes in. Users are getting 500 errors on, value while using that service. Revenue is dropping. You pull up the dashboard. CPU seems normal. Memory seems totally fine, and error rate is almost 0%. Everything is green, so you start digging more. You check logs, nothing obvious. You check traces. Requests are going in, something in the middle isn\u0027t responding. No error, no alert, nothing. Then you dig deeper and figure once you figure it out, that there\u0027s a network policy rule which was dropping traffic between two services. No logs was emitted, no alert fired. The packet just disappeared, and this isn\u0027t a rare edge case. The three failure modes that I have personally seen in productions are as follows. First one silent drops, a policy blocks traffic, and there is no log, no trace, nothing about it. The second one, DNS timeouts, there\u0027s always a race condition when a pod is starting up for a few seconds. It\u0027s when it\u0027s sim is spinning up. Lookups fail for that amount of time and your monitoring has no idea about it. The third one is wrong. Backends are set a label change Somewhere in the deployment, traffic is getting routed to a different at all, and there is no information about it. These are in bugs and Kubernetes. This is what happens when you monitors, only watches what you told it to watch in advance. These are the major problems which you\u0027re trying to tackle in this talk. So before we talk about the solutions, I wanna make sure we are on the same page with respect to monitoring versus observability, as these things are changed interchangeably a lot. So monitoring is like the check engine light in your car. Someone decided in advance. If oil pressure drops below x, turn on the light works great for the problems you have, which have been seen before. But if something unexpected goes wrong that nobody anticipated light stays off, you have no idea about it. Observability, on the other hand, it\u0027s, is it\u0027s different. It\u0027s more like having a mechanic who can look under the hood and tell you what\u0027s happening. Even the things you didn\u0027t predict. Now talk about tap, talking about the networking layer. Monitoring means you have counters, for example, total request per second error rate, maybe latency. These are all you can have monitors for, which is u pretty much useful, but it doesn\u0027t tell you which specific pod made a request or why a packet was dropped. Which DNS name took a lot of time and like what was the latency of that? Specific DNS request observability at the network layer means flow level records. Every connection individually. What was the source pod? What was the destination pod? What happened? And if it was dropped, exactly what was the reason for it? That\u0027s the bar we are trying to hit. And the reason we haven\u0027t been hitting is that like the traditional approach, which is IP table space, cannot help us get there. I wanted to give you a, like a little bit of under a background on how Kubernetes networking has traditionally worked. IP tables. If you ever looked at IP table rule, like it\u0027s a giant linear list and every packet walks down the list linearly one by one works fine at small scale. Four things break down as it starts growing. First it gets slow more. network. Policy rule means longer lookups per packet. There\u0027s a published IEEE research on this Latency measurably degrades as rule count goes up at real production scale with hundreds of service. This matters a lot. Second thing is it\u0027s shallow IP table only sees IP addresses and port numbers, like pretty much layer three and layer four kind information. No HTTP paths, no DNS queries, no GRPC service names and all, all like, all pretty much like all layer seven stuff, completely blind at the application layer. The third issue is no identity. IP table sees IPs, not pod names. Even if you know something was dropped, you don\u0027t automatically know which pod it, it basically dropped, or which pod basically dropped that packet or like that flow. The fourth thing is, it hurts like a lot in incidents. Drops are completely silent. IP table drops a packet. There\u0027s no log, no event, nothing. The packet just disappears. So look at the right column. Those are the same exact questions which like, which comes up in the real incident. Why the traffic between these pods stop. What data queries are timing out is why network policy actually doing what it needs to do. None of those are answerable with IP tables alone, you need something that goes deeper. So EBPF is the answer for this. But before I explain what it is, let me just tell you what it gives you. Look at the right column. Seven questions that used to be impossible to answer Mid incident, which pod related initiated this connection. You can answer that now with EBPF. Why did the packet get dropped? You get the exact kernel level reason, not just a guess. What services does Pod X depend on? You get a live flow map, not what you config says, but what\u0027s actually happening right now is DNS. The reason the call is low. You can see individual DNS queries per pod with latency. Is my network policy working? Watch it in real time. The word like if it\u0027s getting forwarded dropped or like whatever. The reason is what HTTP path is generating five oh errors. You get application layer visibility without touching the app. Which pods are talking to the internet? Egress visibility. It\u0027s right there. And like all of these without a sidecar on every pod, without changing application code, without restarting anything, three things. EBPF unlocks on the left. Per flow records, DNS, visibility, drop reason, telemetry, those are like the basic building blocks for any application. So that\u0027s how eBPF agents lives in your cluster. So let\u0027s say there are three nodes, node one, node two, and node three. On each node you have your app pods at the top where your actual workload is sitting below them. Highlighted in teal is the eBPF agent. So basically this is a DaemonSet Kubernetes schedules one copy on every single node. Automatically. You add a node, the EBPF agent shows up. Let\u0027s say you have 200 nodes. You get 200 EBPF DaemonSet agents. Below. Just below that is, is the Linux kernel with the hook points where the eBPF programs attach and watch every, everything flowing through it without changing any kernel level code. So these eBPF programs are very lightweight programs that gets hooked onto some kernel events or calls. The agent that\u0027s then sends to data to four places. Flow records to Hubble Relay. That\u0027s what powers the CLI and UI metrics to Prometheus, then dashboards in Grafana, and then using CLI. You can see live flows by running the command. Hubble. Observe your app. Pods have no idea the agent is there. You haven\u0027t changed even a single line of code on the application. The visibility just appears. Now let\u0027s look at the specific tools to do this, starting with Retina. Retina, which was open sourced by Microsoft in 2024. It\u0027s designed only for observability. Doesn\u0027t replace your CNI. Doesn\u0027t enforce policies. Just keeps a watch on the traffic. So data flows from top to bottom. Let\u0027s talk about major kernel hooks that are configured in Retina. First one, TC Hook is triggered for every ingress and egress packet. And the second one, kprobe gets called for each TCP rent. Third one socket filter is triggered for DNS and the fourth XDP for any packet drops. Once this event hook is triggered, then inside the agent ring buffer sent data from kernel to application space. Then IP to POD mapping is taken taken care. And then finally, these metrics are aggregated. Aggregated and send eventually to Prometheus, then Prometheus, like we can have Grafana dashboards running and the Hubble CLI respectively taking all these metrics and showing you in UI or like the CLI, whichever you prefer. What clever thing here is it m like this retina agents emit data in Hubble format. So if you have the Hubble CLI already installed in your Kubernetes, you can use it with Retina immediately. The key design trait to remember is IP to. POD mapping happens in user space, not at the kernel level. He hence it\u0027s not able to properly track identity for the package flowing. That\u0027s what creates the identity gap. You\u0027ll see in the screenshots in the coming slide. It\u0027s not a bug, it\u0027s how they kept it a lightweight and CNI agnostic, but it has its own consequences. On the other hand, Cilium, which we\u0027ll be talking in the next slide, is able to track the identity for each pod through its cryptographic endpoint model. So that\u0027s the a diagram of cilium and Hubble together. It\u0027s similar, but I did that for The comparison can be drawn directly for both these tools. But the difference here is you see that purple box in the agent, the endpoint identity model. So when a pod start, cilium gives it a cryptographic identity based on its labels. And every eBPF program in the kernel shows this identity, not user space after the fact. It\u0027s a kernel itself. So when a packet moves from pod A to pod B, the kernel already knows about both pods, both sides of every flow kit. Results automatically. No filter needed at all. That flows into the eBPF policy engine for enforcement into the flow event, ring buffer, and through the L seven protocol parser, which gives you HTTP method path status code GRPC service names none of that exists int that\u0027s where Cilium becomes powerful when we need L seven level information and visibility. In the HTTP level, Hubble sits on top relay UI with a live service graph and command that interface. So here I have a architecture comparison side by side for both Retina and Cilium plus Hubble SOA is just an observability tool and is CNI agnostic when, while cilium can be a standalone CNI or an observability plugin when used in a chaining mode with any other CNI. Just giving you a heads up for the specific scenario, I use Cilium in chaining mode because I was using AWS EKS cluster, which has its own VPC, and I. Taking from identity model perspective, retina correlates ips in user space. Cilium does it in kernel. That\u0027s why Cilium shows identity clearly for the packages flowing. While Retina is not able to show that from L seven visibility perspective, Retina doesn\u0027t have it there much cilium does. HTTP, gRPC, everything at the application layer when coming to resource cost uses 47% less memory per node and barely moves. CPU under load. Cilium costs more because it\u0027s doing much more. That\u0027s the trade off. So both the tools were tested on real AWS EKS cluster, sequentially, same workload that is like almost 500 QPS of sustained data was flown between the pods. The result is right after right here, retina, 47% less memory per node. CPU was basically flat under 500 QPS of load. On the other hand, cilium 31% CPU spike under the same load, more memory because it\u0027s processing per flow identity on every packet. Screenshots on screen like our, the actual kubectl, top pods output, not a tool, not simulated, but these are from the real environment. I ran. Both left. One is a cilium and the right one is a retina. You can see like the CPU and memory for each pod that I ran on. Now talking about the results, if you see left, it\u0027s a Hubble ui. If with cilium. Live service dependency graph for traffic. We generated load generator taking, talking to the test server. Look at both sides. Source pod, destination pod. Fully resolved. Every flow shows port protocol verdict and it updates in real time on the right. If you see it\u0027s traffic from retina, which got, I mean got through basically Hubble observe with a from pod filter. DNS flows, TCP events. All, everything is visible. But look at the destination column. I know it might not be visible from there, but it says World raw ip, not a pod name. That\u0027s the identity gap I was talking about in previous slides. Retina can see the packet, cannot automatically name the destination. The bottom bar Prometheus metrics are accurate. CLI with filters works fine, but it just don\u0027t rely on the UI for identity abstraction attribution. So here\u0027s a complete picture in one table. The pattern is simple. Both tools give you basics like flows, DNS, visibility, drop reasons. The gap opens at identity and L seven level source and destination pods. It\u0027s partial for Retina. If you need information on HTTP method and path, Cilium is the only solution. Then same foundation, but different depth. I mean if I were to sum, I would say pick retina. If you are already on Prometheus and want Lowcost network traceability and L seven is not a requirement much. You can set up this, five minutes with helm if you\u0027re starting from zero, this is the move. Pick Cilium when you need accurate pod identity on both sides of a flow when you are debugging HTTP or GRPC issues more often when you need to know which service is calling which, and this they aren\u0027t just a permanent choices. You can start with get baseline visibility, migrate to Cilium when requirements grow, pick what\u0027s right for you today. So like these three steps you can use to get the observability in your own clusters. First deploy Retina, only two basic helm commands needed just five minutes. You start seeing TCP flows and DNS in Prometheus right away. You would have to configure Prometheus to scrape the retina. Retina metrics from the, like the porta agent exposes to. The second one is run Hubble. Observe from pod. To your pod, basically to trace the pods activity run, Hubble observed verdict, dropped in an incident. Anything which is getting silently blocked shows up immediately. You can debug, debug if any packets are getting dropped very easily through that. Third one is you need, if you need to level up add Cilium in chaining mode. If you already have a Kubernetes service with a different CNI, for example, in my case, I have used AWS EKS, so I had to use Cilium in chaining mode by putting the property CNI chaining mode equals to A-W-S-C-N-I. This keeps VPC CNI doing all the IP address management. Cilium adds identity aware, L visibility on top, which becomes very powerful observability. Four takeaways for this talk is eBPF is the only lightweight solution to see the full picture of the network layer without any performance degradation. Retina is a lightweight, great starting point for network observability tool. Cilium is more smarter, more identity aware, more L seven level information. And when you need to go a little bit more deeper into L seven layer seven level information you need. Cilium network Observability is not an option anymore. As cluster grows prebuilt, dashboards stop big enough. You need more level of information. So it is a necessity going forward now. eBPF based network observability is becoming like a standalone infrastructure. The question isn\u0027t whether you need it. It\u0027s which tool fits where you are right now. With that, I would want to conclude that. Thank you so very, thank you so very much everyone. I hope you guys found it informative. If you guys have any questions, concerns, or want to discuss this more, happy to connect on LinkedIn or through my email. Thanks again.", "uploadDate": "2026-04-23T17:00:00Z", "url": "https://www.conf42.com/Cloud_Native_2026_Uudit_Misra_distributed_systems_reliability"}</script>
     
 
     <link rel="shortcut icon" href="./assets/favicon/favicon.ico" type="image/x-icon" />
@@ -683,7 +683,7 @@
             
             
             <span id="chunk-28" class="transcript-chunks" title="00:01:39" data-s="99.0" onclick="seek(99.0)">
-              I ran on A-W-S-E-K-S cluster and close with a three step blueprint.
+              I ran on AWS EKS cluster and close with a three step blueprint.
             </span>
             
             
@@ -776,12 +776,12 @@
             
             
             <span id="chunk-46" class="transcript-chunks" title="00:02:28" data-s="148.0" onclick="seek(148.0)">
-              The package just disappeared, and this isn't a rare edge case.
+              The packet just disappeared, and this isn't a rare edge case.
             </span>
             
             
             <span id="chunk-47" class="transcript-chunks" title="00:02:32" data-s="152.0" onclick="seek(152.0)">
-              The three failures, morts that I have personally seen
+              The three failure modes that I have personally seen
             </span>
             
             
@@ -826,7 +826,7 @@
             
             
             <span id="chunk-56" class="transcript-chunks" title="00:02:56" data-s="176.0" onclick="seek(176.0)">
-              Backends are set a label chain Somewhere in the deployment, traffic is getting
+              Backends are set a label change Somewhere in the deployment, traffic is getting
             </span>
             
             
@@ -967,12 +967,12 @@
             
             
             <span id="chunk-83" class="transcript-chunks" title="00:04:22" data-s="262.0" onclick="seek(262.0)">
-              What was the sore spot?
+              What was the source pod?
             </span>
             
             
             <span id="chunk-84" class="transcript-chunks" title="00:04:23" data-s="263.0" onclick="seek(263.0)">
-              What was the destination spot?
+              What was the destination pod?
             </span>
             
             
@@ -1017,7 +1017,7 @@
             
             
             <span id="chunk-93" class="transcript-chunks" title="00:04:45" data-s="285.0" onclick="seek(285.0)">
-              If you ever looked at IB table rule, like it's a giant linear list and every
+              If you ever looked at IP table rule, like it's a giant linear list and every
             </span>
             
             
@@ -1047,12 +1047,12 @@
             
             
             <span id="chunk-99" class="transcript-chunks" title="00:05:02" data-s="302.0" onclick="seek(302.0)">
-              There's a published I triple research on this Latency measurably degrades as
+              There's a published IEEE research on this Latency measurably degrades as
             </span>
             
             
             <span id="chunk-100" class="transcript-chunks" title="00:05:07" data-s="307.0" onclick="seek(307.0)">
-              root count goes up at real production scale with hundreds of service.
+              rule count goes up at real production scale with hundreds of service.
             </span>
             
             
@@ -1075,7 +1075,7 @@
             
             
             <span id="chunk-104" class="transcript-chunks" title="00:05:20" data-s="320.0" onclick="seek(320.0)">
-              No HDP paths, no DNS queries, no GRPC service names and all, all like, all
+              No HTTP paths, no DNS queries, no GRPC service names and all, all like, all
             </span>
             
             
@@ -1090,7 +1090,7 @@
             
             
             <span id="chunk-107" class="transcript-chunks" title="00:05:33" data-s="333.0" onclick="seek(333.0)">
-              IP table cease ips, not bot names.
+              IP table sees IPs, not pod names.
             </span>
             
             
@@ -1100,7 +1100,7 @@
             
             
             <span id="chunk-109" class="transcript-chunks" title="00:05:39" data-s="339.0" onclick="seek(339.0)">
-              know which bot it, it basically dropped, or which po basically
+              know which pod it, it basically dropped, or which pod basically
             </span>
             
             
@@ -1145,7 +1145,7 @@
             
             
             <span id="chunk-118" class="transcript-chunks" title="00:06:01" data-s="361.0" onclick="seek(361.0)">
-              Why the traffic between these spots stop.
+              Why the traffic between these pods stop.
             </span>
             
             
@@ -1188,7 +1188,7 @@
             
             
             <span id="chunk-126" class="transcript-chunks" title="00:06:19" data-s="379.0" onclick="seek(379.0)">
-              Seven questions that used to be impossible to answer Mid incident, which part
+              Seven questions that used to be impossible to answer Mid incident, which pod
             </span>
             
             
@@ -1218,7 +1218,7 @@
             
             
             <span id="chunk-132" class="transcript-chunks" title="00:06:35" data-s="395.0" onclick="seek(395.0)">
-              You get a life flow map, not what you config says, but what's
+              You get a live flow map, not what you config says, but what's
             </span>
             
             
@@ -1233,7 +1233,7 @@
             
             
             <span id="chunk-135" class="transcript-chunks" title="00:06:42" data-s="402.0" onclick="seek(402.0)">
-              You can see individual DNS queries per PO with latency.
+              You can see individual DNS queries per pod with latency.
             </span>
             
             
@@ -1253,7 +1253,7 @@
             
             
             <span id="chunk-139" class="transcript-chunks" title="00:06:52" data-s="412.0" onclick="seek(412.0)">
-              The reason is what HT TP path is generating five oh errors.
+              The reason is what HTTP path is generating five oh errors.
             </span>
             
             
@@ -1263,7 +1263,7 @@
             
             
             <span id="chunk-141" class="transcript-chunks" title="00:06:59" data-s="419.0" onclick="seek(419.0)">
-              Which parts are talking to the internet?
+              Which pods are talking to the internet?
             </span>
             
             
@@ -1293,7 +1293,7 @@
             
             
             <span id="chunk-147" class="transcript-chunks" title="00:07:13" data-s="433.0" onclick="seek(433.0)">
-              Peripheral records, DNS, visibility, drop reason, telemetry, those are like the
+              Per flow records, DNS, visibility, drop reason, telemetry, those are like the
             </span>
             
             
@@ -1306,7 +1306,7 @@
               <p class="transcript-para">
             
             <span id="chunk-149" class="transcript-chunks" title="00:07:21" data-s="441.0" onclick="seek(441.0)">
-              So that's how A BPF agents lives in your cluster.
+              So that's how eBPF agents lives in your cluster.
             </span>
             
             
@@ -1326,12 +1326,12 @@
             
             
             <span id="chunk-153" class="transcript-chunks" title="00:07:32" data-s="452.0" onclick="seek(452.0)">
-              Highlighted in teal is the A BPF agent.
+              Highlighted in teal is the eBPF agent.
             </span>
             
             
             <span id="chunk-154" class="transcript-chunks" title="00:07:34" data-s="454.0" onclick="seek(454.0)">
-              So basically this is a demon set Kubernetes schedules one
+              So basically this is a DaemonSet Kubernetes schedules one
             </span>
             
             
@@ -1346,7 +1346,7 @@
             
             
             <span id="chunk-157" class="transcript-chunks" title="00:07:40" data-s="460.0" onclick="seek(460.0)">
-              You add a note, the EBPF agent shows up.
+              You add a node, the EBPF agent shows up.
             </span>
             
             
@@ -1356,7 +1356,7 @@
             
             
             <span id="chunk-159" class="transcript-chunks" title="00:07:43" data-s="463.0" onclick="seek(463.0)">
-              You get 200 EBPF demon set agents.
+              You get 200 EBPF DaemonSet agents.
             </span>
             
             
@@ -1371,7 +1371,7 @@
             
             
             <span id="chunk-162" class="transcript-chunks" title="00:07:50" data-s="470.0" onclick="seek(470.0)">
-              the EBBF programs attach and watch every, everything flowing through it
+              the eBPF programs attach and watch every, everything flowing through it
             </span>
             
             
@@ -1381,7 +1381,7 @@
             
             
             <span id="chunk-164" class="transcript-chunks" title="00:07:57" data-s="477.0" onclick="seek(477.0)">
-              So these EBBF programs are very lightweight programs that gets hooked
+              So these eBPF programs are very lightweight programs that gets hooked
             </span>
             
             
@@ -1489,7 +1489,7 @@
             
             
             <span id="chunk-185" class="transcript-chunks" title="00:08:51" data-s="531.0" onclick="seek(531.0)">
-              And the second one, K prob gets called for each TCP rent.
+              And the second one, kprobe gets called for each TCP rent.
             </span>
             
             
@@ -1509,7 +1509,7 @@
             
             
             <span id="chunk-189" class="transcript-chunks" title="00:09:03" data-s="543.0" onclick="seek(543.0)">
-              data from kernel to application spas.
+              data from kernel to application space.
             </span>
             
             
@@ -1542,7 +1542,7 @@
               <p class="transcript-para">
             
             <span id="chunk-195" class="transcript-chunks" title="00:09:25" data-s="565.0" onclick="seek(565.0)">
-              What clever thing here is it m like this retina agents image data in Hubble format.
+              What clever thing here is it m like this retina agents emit data in Hubble format.
             </span>
             
             
@@ -1557,7 +1557,7 @@
             
             
             <span id="chunk-198" class="transcript-chunks" title="00:09:35" data-s="575.0" onclick="seek(575.0)">
-              The key design trait to remember is IP two.
+              The key design trait to remember is IP to.
             </span>
             
             
@@ -1592,12 +1592,12 @@
             
             
             <span id="chunk-205" class="transcript-chunks" title="00:09:55" data-s="595.0" onclick="seek(595.0)">
-              On the other hand, Celia, which we'll be talking in the next slide, is able
+              On the other hand, Cilium, which we'll be talking in the next slide, is able
             </span>
             
             
             <span id="chunk-206" class="transcript-chunks" title="00:09:58" data-s="598.0" onclick="seek(598.0)">
-              to track the identity for each bot through its cryptographic endpoint model.
+              to track the identity for each pod through its cryptographic endpoint model.
             </span>
             
             
@@ -1637,7 +1637,7 @@
             
             
             <span id="chunk-214" class="transcript-chunks" title="00:10:21" data-s="621.0" onclick="seek(621.0)">
-              And every EVPF program in the kernel shows this identity,
+              And every eBPF program in the kernel shows this identity,
             </span>
             
             
@@ -1675,17 +1675,17 @@
             
             
             <span id="chunk-221" class="transcript-chunks" title="00:10:38" data-s="638.0" onclick="seek(638.0)">
-              That flows into the EVPF policy engine for enforcement into the flow event,
+              That flows into the eBPF policy engine for enforcement into the flow event,
             </span>
             
             
             <span id="chunk-222" class="transcript-chunks" title="00:10:42" data-s="642.0" onclick="seek(642.0)">
-              drink buffer, and through the L seven protocol parser, which gives you SGDP
+              ring buffer, and through the L seven protocol parser, which gives you HTTP
             </span>
             
             
             <span id="chunk-223" class="transcript-chunks" title="00:10:45" data-s="645.0" onclick="seek(645.0)">
-              method path status quo GRPC service names none of that exists int that's
+              method path status code GRPC service names none of that exists int that's
             </span>
             
             
@@ -1695,7 +1695,7 @@
             
             
             <span id="chunk-225" class="transcript-chunks" title="00:10:56" data-s="656.0" onclick="seek(656.0)">
-              In the S sgt P level, Hubble sits on top relay UI with a live service
+              In the HTTP level, Hubble sits on top relay UI with a live service
             </span>
             
             
@@ -1710,7 +1710,7 @@
             
             
             <span id="chunk-228" class="transcript-chunks" title="00:11:07" data-s="667.0" onclick="seek(667.0)">
-              plus Audible SOA is just an observability tool and is CNI agnostic when, while
+              plus Hubble SOA is just an observability tool and is CNI agnostic when, while
             </span>
             
             
@@ -1725,17 +1725,17 @@
             
             
             <span id="chunk-231" class="transcript-chunks" title="00:11:19" data-s="679.0" onclick="seek(679.0)">
-              Just giving you a heads up for the specific scenario, I use C
+              Just giving you a heads up for the specific scenario, I use Cilium
             </span>
             
             
             <span id="chunk-232" class="transcript-chunks" title="00:11:22" data-s="682.0" onclick="seek(682.0)">
-              Lium in training mode because I was using A-W-S-E-K-S cluster,
+              in chaining mode because I was using AWS EKS cluster,
             </span>
             
             
             <span id="chunk-233" class="transcript-chunks" title="00:11:25" data-s="685.0" onclick="seek(685.0)">
-              which has its own vp C, and I.
+              which has its own VPC, and I.
             </span>
             
             
@@ -1753,12 +1753,12 @@
             
             
             <span id="chunk-236" class="transcript-chunks" title="00:11:34" data-s="694.0" onclick="seek(694.0)">
-              That's why C Dium shows identity clearly for the packages flowing.
+              That's why Cilium shows identity clearly for the packages flowing.
             </span>
             
             
             <span id="chunk-237" class="transcript-chunks" title="00:11:37" data-s="697.0" onclick="seek(697.0)">
-              While Retina is not able to show that from L seven visibility perspective, Rina
+              While Retina is not able to show that from L seven visibility perspective, Retina
             </span>
             
             
@@ -1768,12 +1768,12 @@
             
             
             <span id="chunk-239" class="transcript-chunks" title="00:11:44" data-s="704.0" onclick="seek(704.0)">
-              S-G-T-P-G-R-P-C, everything at the application layer when coming
+              HTTP, gRPC, everything at the application layer when coming
             </span>
             
             
             <span id="chunk-240" class="transcript-chunks" title="00:11:48" data-s="708.0" onclick="seek(708.0)">
-              to resource cost uses 47% less memory per note and barely moves.
+              to resource cost uses 47% less memory per node and barely moves.
             </span>
             
             
@@ -1793,7 +1793,7 @@
             
             
             <span id="chunk-244" class="transcript-chunks" title="00:11:58" data-s="718.0" onclick="seek(718.0)">
-              So both the tools were tested on real A-W-S-E-K-S cluster, sequentially, same
+              So both the tools were tested on real AWS EKS cluster, sequentially, same
             </span>
             
             
@@ -1823,7 +1823,7 @@
             
             
             <span id="chunk-250" class="transcript-chunks" title="00:12:24" data-s="744.0" onclick="seek(744.0)">
-              Screenshots on screen like our, the actual kubectl, top parts output,
+              Screenshots on screen like our, the actual kubectl, top pods output,
             </span>
             
             
@@ -1851,7 +1851,7 @@
             
             
             <span id="chunk-255" class="transcript-chunks" title="00:12:35" data-s="755.0" onclick="seek(755.0)">
-              You can see like the CPUN memory for each pod that I ran on.
+              You can see like the CPU and memory for each pod that I ran on.
             </span>
             
             
@@ -1866,7 +1866,7 @@
             
             
             <span id="chunk-258" class="transcript-chunks" title="00:12:44" data-s="764.0" onclick="seek(764.0)">
-              Live service dependency grant for traffic.
+              Live service dependency graph for traffic.
             </span>
             
             
@@ -1881,7 +1881,7 @@
             
             
             <span id="chunk-261" class="transcript-chunks" title="00:12:51" data-s="771.0" onclick="seek(771.0)">
-              Source spot, destination pot.
+              Source pod, destination pod.
             </span>
             
             
@@ -1891,7 +1891,7 @@
             
             
             <span id="chunk-263" class="transcript-chunks" title="00:12:54" data-s="774.0" onclick="seek(774.0)">
-              Every flow shows port protocol word and it updates in real time on the right.
+              Every flow shows port protocol verdict and it updates in real time on the right.
             </span>
             
             
@@ -1901,7 +1901,7 @@
             
             
             <span id="chunk-265" class="transcript-chunks" title="00:13:03" data-s="783.0" onclick="seek(783.0)">
-              Hubble observe with a from pot filter.
+              Hubble observe with a from pod filter.
             </span>
             
             
@@ -1921,12 +1921,12 @@
             
             
             <span id="chunk-269" class="transcript-chunks" title="00:13:11" data-s="791.0" onclick="seek(791.0)">
-              I know it might not be visible from there, but it says World raw ip, not a PO name.
+              I know it might not be visible from there, but it says World raw ip, not a pod name.
             </span>
             
             
             <span id="chunk-270" class="transcript-chunks" title="00:13:16" data-s="796.0" onclick="seek(796.0)">
-              That's the identity cap I was talking about in previous lights.
+              That's the identity gap I was talking about in previous slides.
             </span>
             
             
@@ -1969,7 +1969,7 @@
             
             
             <span id="chunk-278" class="transcript-chunks" title="00:13:38" data-s="818.0" onclick="seek(818.0)">
-              The cap opens at identity and L seven level source and destination pods.
+              The gap opens at identity and L seven level source and destination pods.
             </span>
             
             
@@ -1979,7 +1979,7 @@
             
             
             <span id="chunk-280" class="transcript-chunks" title="00:13:44" data-s="824.0" onclick="seek(824.0)">
-              If you need information on HTP method and Path C, lium is the only solution.
+              If you need information on HTTP method and path, Cilium is the only solution.
             </span>
             
             
@@ -2019,7 +2019,7 @@
             
             
             <span id="chunk-288" class="transcript-chunks" title="00:14:10" data-s="850.0" onclick="seek(850.0)">
-              you are debugging SGTP or GRPC issues more often when you need to know which
+              you are debugging HTTP or GRPC issues more often when you need to know which
             </span>
             
             
@@ -2057,7 +2057,7 @@
               <p class="transcript-para">
             
             <span id="chunk-295" class="transcript-chunks" title="00:14:34" data-s="874.0" onclick="seek(874.0)">
-              You start seeing T CCP flows and DNS in Prometheus right away.
+              You start seeing TCP flows and DNS in Prometheus right away.
             </span>
             
             
@@ -2072,7 +2072,7 @@
             
             
             <span id="chunk-298" class="transcript-chunks" title="00:14:44" data-s="884.0" onclick="seek(884.0)">
-              The second one is run hobble.
+              The second one is run Hubble.
             </span>
             
             
@@ -2102,7 +2102,7 @@
             
             
             <span id="chunk-304" class="transcript-chunks" title="00:15:00" data-s="900.0" onclick="seek(900.0)">
-              Third one is you need, if you need to level up at C in chaining mode.
+              Third one is you need, if you need to level up add Cilium in chaining mode.
             </span>
             
             
@@ -2112,7 +2112,7 @@
             
             
             <span id="chunk-306" class="transcript-chunks" title="00:15:07" data-s="907.0" onclick="seek(907.0)">
-              example, in my case, I have used a WSE case, so I had to use CM in chaining
+              example, in my case, I have used AWS EKS, so I had to use Cilium in chaining
             </span>
             
             
@@ -2122,7 +2122,7 @@
             
             
             <span id="chunk-308" class="transcript-chunks" title="00:15:15" data-s="915.0" onclick="seek(915.0)">
-              This keeps V-P-C-C-N-I doing all the IP address management.
+              This keeps VPC CNI doing all the IP address management.
             </span>
             
             
@@ -2137,7 +2137,7 @@
             
             
             <span id="chunk-311" class="transcript-chunks" title="00:15:24" data-s="924.0" onclick="seek(924.0)">
-              Four takeaways for this talk is EVPF is the only lightweight solution to see
+              Four takeaways for this talk is eBPF is the only lightweight solution to see
             </span>
             
             
@@ -2170,7 +2170,7 @@
             
             
             <span id="chunk-317" class="transcript-chunks" title="00:15:47" data-s="947.0" onclick="seek(947.0)">
-              C Lium network Observability is not an option anymore.
+              Cilium network Observability is not an option anymore.
             </span>
             
             
@@ -2190,7 +2190,7 @@
             
             
             <span id="chunk-321" class="transcript-chunks" title="00:15:59" data-s="959.0" onclick="seek(959.0)">
-              EBP based network observability is becoming like a standalone infrastructure.
+              eBPF based network observability is becoming like a standalone infrastructure.
             </span>
             
             
