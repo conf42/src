@@ -27,6 +27,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import traceback
 
 from . import events, media, youtube
 
@@ -292,18 +293,29 @@ def contact_sheet(video, length, dest):
 
 
 def first_words(video, seconds=60):
-    """The first minute's words (faster-whisper tiny on the CPU) - only when the library is installed."""
+    """The first minute's words (faster-whisper tiny on the CPU) - only when the library is installed. A nicety for
+    Claude, never a reason to fail: any trouble (the library, the model download, the sound) gives (None, None).
+    The sound is read here (ffmpeg's 16 kHz mono WAV -> samples), not by faster-whisper: its own file reading broke
+    with a new PyAV and stopped every cloud pass on 2026-11-14 and 15."""
     try:
+        import wave
+
+        import numpy as np
         from faster_whisper import WhisperModel
-    except ImportError:
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = os.path.join(tmp, "a.wav")
+            media.run([media.tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-t", str(seconds), "-i", video,
+                       "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav])
+            with wave.open(wav, "rb") as w:
+                sound = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+            if not len(sound):
+                return None, None
+            model = WhisperModel("tiny", device="cpu", compute_type="int8")
+            segs, inf = model.transcribe(sound, beam_size=1)
+            return " ".join(s.text.strip() for s in segs)[:1500], inf.language
+    except Exception as e:                               # noqa: BLE001
+        print("intake: first words not transcribed (%s: %s)" % (type(e).__name__, str(e)[:120]), flush=True)
         return None, None
-    with tempfile.TemporaryDirectory() as tmp:
-        wav = os.path.join(tmp, "a.wav")
-        media.run([media.tool("ffmpeg"), "-hide_banner", "-loglevel", "error", "-y", "-t", str(seconds), "-i", video,
-                   "-ac", "1", "-ar", "16000", wav])
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segs, inf = model.transcribe(wav, beam_size=1)
-        return " ".join(s.text.strip() for s in segs)[:1500], inf.language
 
 
 def ask_claude(video, info, row, rep, cfg):
@@ -344,7 +356,11 @@ def decide(video, info, row, problem, cfg, use_claude=True):
     """assess() + Claude for the unclear ones. Claude can only turn accept into hold/reject, never the other way."""
     rep = assess(video, info, row, problem, cfg)
     if rep["outcome"] == "accept" and rep["unclear"]:
-        c = ask_claude(video, info, row, rep, cfg) if use_claude else None
+        try:
+            c = ask_claude(video, info, row, rep, cfg) if use_claude else None
+        except Exception as e:                           # noqa: BLE001 - no answer = held for Marek, never a crash
+            print("intake: Claude not asked (%s: %s)" % (type(e).__name__, str(e)[:160]), flush=True)
+            c = None
         rep["claude"] = c
         if c is None:
             rep["outcome"], rep["reason"] = "hold", "unclear: " + "; ".join(rep["unclear"])
@@ -385,6 +401,7 @@ class Intake:
 
     def __init__(self, drive, cfg=None, use_claude=True, dry_run=False, log=print):
         self.d, self.cfg, self.use_claude, self.dry_run, self.log = drive, cfg or {}, use_claude, dry_run, log
+        self.failed = []                                 # uploads (or whole events) that broke this pass
 
     def state_path(self, slug):
         return os.path.join(REPO_RUNS, slug, "intake.json")
@@ -421,6 +438,10 @@ class Intake:
                 out[slug] = self.event(slug, evf["id"])
             except KeyError as e:
                 self.log("intake: %s is not an event in metadata.yml (%s) - skipped" % (slug, e))
+            except Exception as e:                       # noqa: BLE001 - one event must not stop the others
+                self.failed.append("%s: %s: %s" % (slug, type(e).__name__, str(e)[:300]))
+                self.log("intake: %s -> FAILED (%s: %s)" % (slug, type(e).__name__, e))
+                self.log(traceback.format_exc())
         return out
 
     def event(self, slug, folder_id):
@@ -544,8 +565,19 @@ class Intake:
                     accepted.append(key)
                 self.finish(slug, st, up, rec, rep["outcome"], rep["reason"], rep["flags"] + slide_flags, rep["fixes"],
                             keep=rep["outcome"] == "hold")
+            except Exception as e:                       # noqa: BLE001 - one upload must not stop the pass
+                rec["error"] = "%s: %s" % (type(e).__name__, str(e)[:300])
+                rec["error_at"] = now()
+                self.failed.append("%s / %s: %s" % (slug, up["name"], rec["error"]))
+                self.log("intake: %s / %s -> FAILED, tried again next pass (%s)" % (slug, up["name"], rec["error"]))
+                self.log(traceback.format_exc())
+            else:
+                rec.pop("error", None)
+                rec.pop("error_at", None)
             finally:
                 shutil.rmtree(work, ignore_errors=True)
+                if not self.dry_run:
+                    self.save(slug, st)                  # decided uploads survive a pass that dies later
         self.save(slug, st)
         return accepted
 

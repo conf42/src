@@ -28,6 +28,7 @@ import json
 import os
 import shutil
 import tempfile
+import traceback
 
 from . import app, drive as linkdrive, events, gdrive, intake, pipeline
 
@@ -193,7 +194,11 @@ def main(argv):
     started = datetime.datetime.now().isoformat(timespec="seconds")
     lines = ["## Conf42 cloud factory - %s%s" % (started, " (dry run)" if dry else "")]
 
-    accepted = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry).run(slugs)
+    sorter = intake.Intake(drive, cfg, use_claude=use_claude, dry_run=dry)
+    accepted = sorter.run(slugs)
+    failed = list(sorter.failed)                         # the pass carries on, and ends red so it is seen
+    if failed:
+        lines += ["\n### FAILED - tried again next pass"] + ["- **%s**" % f for f in failed]
     for slug in sorted(set(intake_events(slugs)) | set(accepted)):
         st = intake.Intake(drive).load(slug)
         items = sorted(st.get("items", {}).values(), key=lambda r: r.get("decided") or "", reverse=True)
@@ -222,48 +227,64 @@ def main(argv):
         except KeyError as e:
             print("cloud: %s skipped (%s)" % (slug, e))
             continue
-        ready = rehydrate(run, drive, run.note)
-        if slug in legacy:
-            lines.append("\n### %s - old upload folder" % slug)
+        try:
+            lines += one_event(run, slug, drive, legacy, cfg, youtube_on)
+        except Exception as e:                           # noqa: BLE001 - one event must not stop the others
+            failed.append("%s: %s: %s" % (slug, type(e).__name__, str(e)[:300]))
+            lines.append("\n### %s - FAILED: **%s: %s**" % (slug, type(e).__name__, str(e)[:300]))
+            traceback.print_exc()
             try:
-                lines += legacy_fetch(run, legacy[slug], auto_talks(slug)) or ["- nothing new"]
-            except Exception as e:                       # noqa: BLE001 - Drive trouble must not stop the Auto upload talks
-                run.note("cloud: old upload folder not read (%s)" % e)
-                lines.append("- could not read it: %s" % e)
-        run.match()
-        run.slides()
-        todo = [k for k in ready if not run.state["talks"][k].get("finished")] + \
-               [k for k, t in run.state["talks"].items() if not t.get("finished") and k not in ready
-                and os.path.exists(os.path.join(run.inp, t.get("source") or ""))]
-        if todo:
-            run.note("cloud: %d talk(s) to process: %s" % (len(todo), ", ".join(sorted(todo))))
-            try:
-                run.run(only=sorted(set(todo)))
-            except SystemExit as e:                      # the lock: another machine has this event
-                lines.append("\n### %s - not run: %s" % (slug, e))
-                continue
-        else:
-            run.ship()                                   # nothing to edit - still ship what finished (slides added late)
-        if youtube_on:
-            try:
-                from . import ytupload
-                for msg in ytupload.event(run, cfg):
-                    run.note(msg)
-            except ImportError:
+                run.publish(force=True)
+            except Exception:                            # noqa: BLE001
                 pass
-            except Exception as e:                       # noqa: BLE001 - YouTube trouble never undoes the factory's work
-                run.note("youtube: %s" % e)
-        s = pipeline.summary(run.state)
-        lines.append("\n### %s - factory" % slug)
-        lines.append("%d talks matched, %d finished" % (s["matched"], sum(1 for t in run.state["talks"].values() if t.get("finished"))))
-        for k, t in sorted(run.state["talks"].items()):
-            if t.get("error"):
-                lines.append("- %s: **%s**" % (k, str(t["error"])[:200]))
-        run.publish(force=True)
     commit_intake("factory: cloud pass state (intake + youtube)")
     summary_md(lines)
     print("\n".join(lines))
-    return 0
+    return 1 if failed else 0
+
+
+def one_event(run, slug, drive, legacy, cfg, youtube_on):
+    """The factory + YouTube part of a pass for one event. Returns its lines for the pass summary."""
+    lines = []
+    ready = rehydrate(run, drive, run.note)
+    if slug in legacy:
+        lines.append("\n### %s - old upload folder" % slug)
+        try:
+            lines += legacy_fetch(run, legacy[slug], auto_talks(slug)) or ["- nothing new"]
+        except Exception as e:                       # noqa: BLE001 - Drive trouble must not stop the Auto upload talks
+            run.note("cloud: old upload folder not read (%s)" % e)
+            lines.append("- could not read it: %s" % e)
+    run.match()
+    run.slides()
+    todo = [k for k in ready if not run.state["talks"][k].get("finished")] + \
+           [k for k, t in run.state["talks"].items() if not t.get("finished") and k not in ready
+            and os.path.exists(os.path.join(run.inp, t.get("source") or ""))]
+    if todo:
+        run.note("cloud: %d talk(s) to process: %s" % (len(todo), ", ".join(sorted(todo))))
+        try:
+            run.run(only=sorted(set(todo)))
+        except SystemExit as e:                      # the lock: another machine has this event
+            lines.append("\n### %s - not run: %s" % (slug, e))
+            return lines
+    else:
+        run.ship()                                   # nothing to edit - still ship what finished (slides added late)
+    if youtube_on:
+        try:
+            from . import ytupload
+            for msg in ytupload.event(run, cfg):
+                run.note(msg)
+        except ImportError:
+            pass
+        except Exception as e:                       # noqa: BLE001 - YouTube trouble never undoes the factory's work
+            run.note("youtube: %s" % e)
+    s = pipeline.summary(run.state)
+    lines.append("\n### %s - factory" % slug)
+    lines.append("%d talks matched, %d finished" % (s["matched"], sum(1 for t in run.state["talks"].values() if t.get("finished"))))
+    for k, t in sorted(run.state["talks"].items()):
+        if t.get("error"):
+            lines.append("- %s: **%s**" % (k, str(t["error"])[:200]))
+    run.publish(force=True)
+    return lines
 
 
 def run_url():
