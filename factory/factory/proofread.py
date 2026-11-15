@@ -35,8 +35,10 @@ flags" in a feature flags talk -> "feature flags"; "CON forty-two" / "Conference
 "Kubernetes"; "L LMS" -> "LLMs"; "get ops" -> "GitOps"; "lama" next to Ollama -> "LM Studio" or "Llama", whichever the \
 context shows; a speaker's or company's name spelled differently from the talk info below.
 
-The conference is "Conf42"; this event is "{event}" (write it like that when the speaker names it, e.g. "Welcome to \
-{event}").
+The conference is "Conf42"; this event is "{event}". When the speaker names THIS event and it was misheard, spell it \
+like that ("Welcome to {event}"). But what the speaker says, goes: when the speaker names a different Conf42 \
+conference (e.g. "welcome to Conf42 MLOps" in a talk filed under another event) or a different year, keep the \
+conference and year they said - only fix the spelling of "Conf42". Never replace one conference's name with another's.
 
 Do NOT rephrase, reorder words, fix the speaker's grammar, remove fillers or repetitions, change punctuation or style, \
 translate, or touch anything you are not sure about. Never add words the speaker didn't say (no middle names from the \
