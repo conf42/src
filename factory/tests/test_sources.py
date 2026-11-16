@@ -263,12 +263,12 @@ def main():
     check("reslide: a slide after the end is refused", reslide.check([{"slide": 1, "at": 0}, {"slide": 2, "at": 50}, {"slide": 3, "at": 599}], 3, 600)[0] is None)
     check("reslide: 'way less than the deck' is a quarter of its pages (never or once always counts)",
           (reslide.few(18), reslide.few(4), reslide.few(40)) == (4, 1, 10))
-    check("reslide: the recorder's presses that changed nothing become the slides' times",
-          reslide.presses({"press_log": "12.5+ 80.1+ 95.0+ 140+ 200.4+", "slide_log": ""}, 8) == [(0, 0.0), (1, 12.5), (2, 80.1), (3, 95.0), (4, 140.0), (5, 200.4)])
-    check("reslide: back and forward presses are followed, real turns count too",
-          reslide.presses({"press_log": "50+ 60- 70+ 90+", "slide_log": "0:1 20:2"}, 5) == [(0, 0.0), (1, 20.0), (2, 50.0), (1, 60.0), (2, 70.0), (3, 90.0)])
-    check("reslide: when every press went through there is nothing to put back", reslide.presses({"press_log": "", "slide_log": "0:1 30:2 60:3"}, 6) is None)
-    check("reslide: presses that reach too little of the deck are no use", reslide.presses({"press_log": "10+ 20+"}, 20) is None)
+    check("reslide: deck marks that did not show become the slides' times",
+          reslide.marks({"deck_marks_x": "12.5+ 80.1+ 95.0+ 140+ 200.4+", "deck_marks": ""}, 8) == [(0, 0.0), (1, 12.5), (2, 80.1), (3, 95.0), (4, 140.0), (5, 200.4)])
+    check("reslide: back and forward marks are followed, turns that showed count too",
+          reslide.marks({"deck_marks_x": "50+ 60- 70+ 90+", "deck_marks": "0:1 20:2"}, 5) == [(0, 0.0), (1, 20.0), (2, 50.0), (1, 60.0), (2, 70.0), (3, 90.0)])
+    check("reslide: when every turn showed there is nothing to put back", reslide.marks({"deck_marks_x": "", "deck_marks": "0:1 30:2 60:3"}, 6) is None)
+    check("reslide: marks that reach too little of the deck are no use", reslide.marks({"deck_marks_x": "10+ 20+"}, 20) is None)
     srt_p = os.path.join(tmp, "t.srt")
     with open(srt_p, "w", encoding="utf-8") as f:
         for i in range(30):

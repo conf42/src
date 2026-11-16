@@ -17,10 +17,11 @@ It runs on Descript's finished export, with the transcript that belongs to it, r
 it costs no Descript credits and the edit is already done. The talk is flagged "slides put back from the deck by
 the transcript - check the timing" on the factory's pages, and what was decided is kept in the talk's state.
 
-The exact way, when the recorder knows better (Marek: "add button presses in the recording app to log in switches
-that didn't go through"): conf42.com/record logs every next / previous press with its second, also the ones that
-changed nothing on the picture (meta.press_log). by_presses() turns them into the slides' times and puts the deck
-back before the talk goes to Descript - no guessing, no Claude. Used when the presses reach at least half the deck.
+The exact way, when the recorder knows better: conf42.com/record keeps deck marks with an upload - where the deck
+turns during the recording (meta.deck_marks), and where a turn was asked for but the picture did not follow
+(meta.deck_marks_x). by_marks() turns them into the slides' times and puts the deck back before the talk goes to
+Descript - no guessing, no Claude. Used when the marks reach at least half the deck. The marks stay in the upload's
+own talk.json: nothing of them is written to the repo, the factory's logs or its pages.
 
 The transcript's way is a best guess by design (Marek: "start shipping it with your best ability, and then if the results suck for
 the upcoming conferences, then we abort this flow"): settings `reslide: false` switches it off. Never fails a talk -
@@ -270,18 +271,18 @@ def draw(video, pdf, box, radius, starts, length, tmp, dest=None):
         os.replace(out, video)
 
 
-def presses(meta, pages):
-    """The recorder's press log as [(page index, start second)], or None when it is no use. meta.press_log is
-    "12.5+ 80.1+ 95.0- ..." - the second and the direction of every next / previous press that changed nothing on the
-    picture; meta.slide_log is "0:1 31.2:2 ..." - the turns that did happen. Together they are what the speaker meant
-    to show. Used when the turns reach at least half of the deck."""
+def marks(meta, pages):
+    """The recorder's deck marks as [(page index, start second)], or None when they are no use. meta.deck_marks is
+    "0:1 31.2:2 ..." (second:page, the turns that showed); meta.deck_marks_x is "12.5+ 80.1+ 95.0- ..." (a turn forward
+    or back that did not show). Together they are the deck as it was meant to be seen. Used when they reach at least
+    half of the deck."""
     events = []
-    for m in re.finditer(r"([\d.]+)([+-])", str(meta.get("press_log") or "")):
+    for m in re.finditer(r"([\d.]+)([+-])", str(meta.get("deck_marks_x") or "")):
         events.append((float(m.group(1)), m.group(2)))
-    for m in re.finditer(r"([\d.]+):(\d+)", str(meta.get("slide_log") or "")):
+    for m in re.finditer(r"([\d.]+):(\d+)", str(meta.get("deck_marks") or "")):
         events.append((float(m.group(1)), int(m.group(2))))
     if not any(isinstance(e[1], str) for e in events):
-        return None                                      # every press went through: the picture is what was meant
+        return None                                      # every turn showed: the picture is what was meant
     page, out = 1, [(0, 0.0)]
     for at, what in sorted(events, key=lambda e: e[0]):
         new = what if isinstance(what, int) else page + (1 if what == "+" else -1)
@@ -297,18 +298,18 @@ def presses(meta, pages):
     return out
 
 
-def by_presses(video, pdf, slug, meta, cfg, log=print):
-    """Before Descript: the deck put back at the moments the speaker pressed next / previous, when the picture did
-    not follow. Replaces `video` in place. Returns {"done": True, ...} or {"none": why}."""
+def by_marks(video, pdf, slug, meta, cfg, log=print):
+    """Before Descript: the deck put back at the recorder's deck marks, when the picture did not follow them.
+    Replaces `video` in place. Returns {"done": True, ...} or {"none": why}."""
     try:
         if str(cfg.get("reslide", True)).lower() in ("false", "0", "no"):
             return {"none": "switched off"}
-        if not (pdf and os.path.exists(pdf)) or not (meta or {}).get("press_log"):
-            return {"none": "no deck or no presses logged"}
+        if not (pdf and os.path.exists(pdf)) or not (meta or {}).get("deck_marks_x"):
+            return {"none": "no deck or no deck marks"}
         pages = len(deck_text(pdf))
-        starts = presses(meta, pages)
+        starts = marks(meta, pages)
         if not starts:
-            return {"none": "the logged presses do not cover the deck"}
+            return {"none": "the deck marks do not cover the deck"}
         length = media.probe(video)["duration"]
         starts = [(p, at) for p, at in starts if at < length - 1]
         with tempfile.TemporaryDirectory() as tmp:
@@ -319,8 +320,8 @@ def by_presses(video, pdf, slug, meta, cfg, log=print):
             if n > few(pages):
                 return {"none": "the slides do change (%d times for %d pages)" % (n, pages)}
             draw(video, pdf, box, radius, starts, length, tmp)
-        # what the speaker pressed when is not written anywhere outside the upload's own talk.json: the factory's logs,
-        # its run summaries and its state files are public (Marek 2026-11-16: "don't show any 'spying' logs on the repo")
+        # the marks themselves are not written anywhere outside the upload's own talk.json: the factory's logs, run
+        # summaries and state files are public, and they say only that the slides were put back
         log("slides put back from the deck (%d pages)" % pages)
         return {"done": True, "pages": pages}
     except Exception as e:                               # noqa: BLE001 - the video stays as it was

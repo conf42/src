@@ -660,13 +660,12 @@ class Intake:
                     decided_for[key] = {"seconds": float((info.get("meta") or {}).get("seconds") or 0), "md5": video_meta.get("md5Checksum")}
                     if rec.get("refiled_from"):
                         rep["flags"].append("recorded under %s - re-filed here, the overlay is swapped" % rec["refiled_from"])
-                    if not self.dry_run and spath:       # a deck the picture did not follow, put back from the recorder's notes (reslide.py)
+                    if not self.dry_run and spath:       # a deck the picture did not follow, put back (reslide.py)
                         from . import reslide
-                        rs = reslide.by_presses(vpath, spath, slug, info.get("meta") or {}, self.cfg, self.log)
+                        rs = reslide.by_marks(vpath, spath, slug, info.get("meta") or {}, self.cfg, self.log)
                         if rs.get("done"):
-                            # Only THAT it was done goes into this record: it is in a public repo, and what a speaker
-                            # did when during a recording is nobody's business there (Marek 2026-11-16: "don't show
-                            # any 'spying' logs on the repo"). The recorder's notes stay in the upload's own talk.json.
+                            # only THAT it was done goes into this record (it is in a public repo); the recorder's
+                            # deck marks stay in the upload's own talk.json
                             rec["reslide"] = {"done": True}
                             rep["numbers"]["probe"] = streams(vpath)
                             rep["flags"].append("slides put back from the deck - check them")

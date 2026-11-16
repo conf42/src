@@ -261,7 +261,7 @@ def rehydrate(run, drive, log=print):
                 for f in drive.children((drive.get(rec["video_id"], "parents").get("parents") or [""])[0]):
                     if f["name"] == "talk.json":
                         notes = json.loads(drive.text(f["id"])).get("meta") or {}
-                reslide.by_presses(raw, deck, (rec.get("refiled_from") or run.ev["short_url"]), notes, run.cfg, log)
+                reslide.by_marks(raw, deck, (rec.get("refiled_from") or run.ev["short_url"]), notes, run.cfg, log)
             intake.prepare_upload(raw, rec, run.ev["short_url"], src, log)   # with the overlay swap of a re-filed talk
             if rec.get("slides_id"):
                 pdf = os.path.join(run.slides_dir, key + ".pdf")
