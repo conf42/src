@@ -4,4 +4,16 @@ A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [
 
 ## Abstract
 
-n 2026, simultaneous multi-availability zone and data center outages shifted from hypothetical risk models to hard operational reality—taking out major cloud infrastructure across the UAE and Russia, with some fintech services requiring up to 11 days to recover. Traditional disaster recovery assumes that losing a physical facility is an edge case and that multiple availability zones provide sufficient isolation. They don't: availability zones within a single metro area share correlated physical and grid failure domains.  Moving disaster recovery from static runbooks to active Chaos Engineering, this session breaks down how to empirically test and survive regional blast radiuses:  Challenging Core DR Hypotheses: Why multiple AZs are not a DR strategy, why "zero RPO" does not exist under catastrophic partitions, and how to determine acceptable data loss upfront.  Decoupling Control and Data Planes: Architecting backup orchestration, state machines, and failover control planes strictly outside the primary blast radius.  Testing Reserve Capacity: Validating dynamic failover agreements and cross-region provisioning under simulated stress rather than paying for idle multi-region parity.  Autonomous Pre-emptive Failover: Exploring AI agents that monitor external telemetry (grid signals, physical threat vectors, critical zero-days) to trigger chaos-tested failover sequences before the cloud provider acknowledges the outage.  Attendees will walk away with concrete patterns for structuring regional GameDays and transforming recovery assumptions into validated, production-ready chaos experiments.
+In 2026, simultaneous multi-availability zone and data center outages shifted from hypothetical risk models to hard operational reality—taking out major cloud infrastructure across the UAE and Russia, with some fintech services requiring up to 11 days to recover. Traditional disaster recovery assumes that losing a physical facility is an edge case and that multiple availability zones provide sufficient isolation. They don't: availability zones within a single metro area share correlated physical and grid failure domains.
+
+Moving disaster recovery from static runbooks to active Chaos Engineering, this session breaks down how to empirically test and survive regional blast radiuses:
+
+Challenging Core DR Hypotheses: Why multiple AZs are not a DR strategy, why "zero RPO" does not exist under catastrophic partitions, and how to determine acceptable data loss upfront.
+
+Decoupling Control and Data Planes: Architecting backup orchestration, state machines, and failover control planes strictly outside the primary blast radius.
+
+Testing Reserve Capacity: Validating dynamic failover agreements and cross-region provisioning under simulated stress rather than paying for idle multi-region parity.
+
+Autonomous Pre-emptive Failover: Exploring AI agents that monitor external telemetry (grid signals, physical threat vectors, critical zero-days) to trigger chaos-tested failover sequences before the cloud provider acknowledges the outage.
+
+Attendees will walk away with concrete patterns for structuring regional GameDays and transforming recovery assumptions into validated, production-ready chaos experiments.

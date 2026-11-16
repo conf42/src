@@ -4,4 +4,14 @@ A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [
 
 ## Abstract
 
-Imagine a ticketing system where a worker crashes after saving a seat assignment, but before marking the job as complete. The job gets retried, the worker finishes successfully, and the queue is empty. Everything looks fine. But the event now has more confirmed seats than it can hold.  How can a system look healthy after recovery while still producing the wrong result?  In this talk, I’ll walk through a small experiment I built using Go and PostgreSQL. It models a paid waitlist where each person should either get a confirmed seat or receive a refund. I’ll show how worker crashes, retries, and races can lead to problems that a final health check does not catch.  We’ll compare two versions of the workers: one with deliberate implementation mistakes and another that handles the scenarios safely. I’ll demonstrate how to inject faults at specific points, control the order in which workers run, and check the final result against business rules.  The takeaway is simple: a worker can recover and the queue can be empty while the result is still wrong. To catch that, we need to check what happened to users—not just whether the workers finished.  The project uses synthetic data and deliberately introduced bugs. It is a reproducible case study, not a test of a real ticketing platform.
+Imagine a ticketing system where a worker crashes after saving a seat assignment, but before marking the job as complete. The job gets retried, the worker finishes successfully, and the queue is empty. Everything looks fine. But the event now has more confirmed seats than it can hold.
+
+How can a system look healthy after recovery while still producing the wrong result?
+
+In this talk, I’ll walk through a small experiment I built using Go and PostgreSQL. It models a paid waitlist where each person should either get a confirmed seat or receive a refund. I’ll show how worker crashes, retries, and races can lead to problems that a final health check does not catch.
+
+We’ll compare two versions of the workers: one with deliberate implementation mistakes and another that handles the scenarios safely. I’ll demonstrate how to inject faults at specific points, control the order in which workers run, and check the final result against business rules.
+
+The takeaway is simple: a worker can recover and the queue can be empty while the result is still wrong. To catch that, we need to check what happened to users—not just whether the workers finished.
+
+The project uses synthetic data and deliberately introduced bugs. It is a reproducible case study, not a test of a real ticketing platform.

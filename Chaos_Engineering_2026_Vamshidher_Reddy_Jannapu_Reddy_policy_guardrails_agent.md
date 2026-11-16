@@ -4,4 +4,12 @@ A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [
 
 ## Abstract
 
-Chaos engineering injects faults into infrastructure to see what breaks. This talk applies the same idea one layer up, to the *policy* that guards AI coding agents. Guardrail rules are increasingly mined from postmortems, runbooks, tickets and chat; what happens when some of them are wrong, tampered with, or forged?  I built a fault-injection benchmark to find out: **500 Kubernetes and Terraform constraints** seeded from public postmortems and the OPA Gatekeeper library, with 18 kinds of poisoning injected (tampered provenance hashes, forged principals, rules asserted by people with no authority, stale copies, injected text), and a steady-state hypothesis expressed as a metric, **poison susceptibility**: how much poisoned policy does the guardrail act on, without over-blocking the legitimate changes? - OPA/Rego and deny-list hooks acted on **100%** of injected faults. - An LLM self-check with the organisation's authority map still acted on **52%**. - Provenance plus authority checks got to **zero**.  You will leave with a repeatable way to run policy-poisoning experiments against your own hooks and admission controllers, the blast-radius patterns we saw, and the open-source corpus and harness to do it.
+Chaos engineering injects faults into infrastructure to see what breaks. This talk applies the same idea one layer up, to the *policy* that guards AI coding agents. Guardrail rules are increasingly mined from postmortems, runbooks, tickets and chat; what happens when some of them are wrong, tampered with, or forged?
+
+I built a fault-injection benchmark to find out: **500 Kubernetes and Terraform constraints** seeded from public postmortems and the OPA Gatekeeper library, with 18 kinds of poisoning injected (tampered provenance hashes, forged principals, rules asserted by people with no authority, stale copies, injected text), and a steady-state hypothesis expressed as a metric, **poison susceptibility**: how much poisoned policy does the guardrail act on, without over-blocking the legitimate changes?
+
+- OPA/Rego and deny-list hooks acted on **100%** of injected faults.
+- An LLM self-check with the organisation's authority map still acted on **52%**.
+- Provenance plus authority checks got to **zero**.
+
+You will leave with a repeatable way to run policy-poisoning experiments against your own hooks and admission controllers, the blast-radius patterns we saw, and the open-source corpus and harness to do it.
