@@ -71,6 +71,19 @@ on the list.
 
 ## Changelog
 
+- **2026-11-16** - After the cloud factory's first outage (postmortem: `postmortems/2026-11-15-conf42-cloud-factory.md`):
+  - A talk goes up to YouTube the moment it is finished. There are two passes a day now (05:30 and 22:30 UTC).
+  - The same talk in several places is normal: conf42.com/record wins over the Manual upload folder, which wins over
+    an event's old folder. The Manual upload folder is read by the cloud pass.
+  - A talk recorded with the wrong conference picked is moved to the right event by itself when the deck and the
+    speaker both say so, and gets the right overlay. One sign only: it waits, with "which conference?".
+  - A video whose owner's company blocks link sharing is fetched anyway, through the upload script's Drive access.
+  - Upload folders are emptied 120 days after a conference's kick-off (ours to Drive's bin, speakers' own files out of
+    the folder; anything not sorted out is listed instead). Ask *"What would the clean-up do?"* for a dry run.
+  - Older videos get the site's transcript as captions, 15 a pass, never more than 50 a day, and only when the day's
+    talks are out of the way. Ask *"How far are the captions?"*.
+  - One broken upload no longer stops a pass; the pass ends red and its summary says what broke.
+
 - **2026-11-13** - The cloud factory also reads old link-shared upload folders: add `<short_url>: <folder link>` under
   `cloud_drive_folders` in `settings.yml` and push (MLOps 2026 is there). Ask *"Plug this Drive folder into the cloud
   factory for <event>"*. Dry run first (Actions > factory cloud > Run workflow, dry run ticked): the summary lists

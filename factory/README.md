@@ -138,6 +138,27 @@ Nothing is paid for twice:
 - a composition already in the Descript project is reused instead of uploaded again
 - an edit is skipped when the ledger of paid edits (`factory\local\ledger.json`, machine-wide) lists it, or when the composition is already shorter than its media
 
+## The cloud factory: learned from real days
+
+`factory/cloud.py` has how a pass works; `postmortems/` has what went wrong. The short version of 2026-11-14 to 16:
+
+- **One upload must never stop a pass.** An unpinned `faster-whisper` broke on a new PyAV and took two days of
+  passes with it. Every per-upload and per-event step now catches, logs and carries on; the pass ends red. The
+  workflow pins what it installs - raise a pin on purpose, after a test.
+- **A red pass tells nobody.** Look at Actions > factory cloud after an event's uploads, until the status page shows it.
+- **Starting and reading a pass without `gh`:** the stored git login works for the API
+  (`git credential fill` -> `POST .../actions/workflows/factory-cloud.yml/dispatches`, and
+  `GET .../actions/jobs/<id>/logs` for a job's log).
+- **Working in this repo while a job runs in it** (a proofread, a local run): never `git pull --rebase --autostash`
+  and never leave untracked copies of files that are already pushed - both break the job's own commits. Commit
+  beside it with a temporary index (`GIT_INDEX_FILE`, `read-tree origin/main`, `update-index --cacheinfo`,
+  `commit-tree`, `push <sha>:main`).
+- **Resetting a talk by hand in `state.json`:** do what `Run.redo` does and keep its `source` name.
+- **A dry run decides and shows, it never writes** (since `ca3f9a80b171`). Before that, a local `cloud --dry-run`
+  left "done" records in `intake.json`.
+- **YouTube gives one allowance a day** for uploads and captions together (it starts again at 08:00 UTC). Test
+  anything that calls YouTube with `--dry-run` first, and never on a day with talks still to upload.
+
 ## Setup (any machine: Windows, macOS, Linux)
 
 1. Get the repo. The full `src` history is ~12 GB; the factory needs only `factory/`, `_db/` and `metadata.yml`, so a slim
