@@ -429,7 +429,7 @@ def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     run.slides()
     todo = [k for k in ready if not run.state["talks"][k].get("finished")] + \
            [k for k, t in run.state["talks"].items() if not t.get("finished") and k not in ready
-            and os.path.exists(os.path.join(run.inp, t.get("source") or ""))]
+            and os.path.isfile(os.path.join(run.inp, t.get("source") or "-"))]   # a file: a talk with no source is not work
     if youtube_on:
         run.on_finished = lambda key: youtube_now(run, cfg)
     if todo:

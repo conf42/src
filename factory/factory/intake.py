@@ -659,7 +659,10 @@ class Intake:
                     if not self.dry_run:
                         dest = os.path.join(run.inp, key + ".mp4")
                         try:
-                            prepare_upload(vpath, dict(rec, numbers=rep["numbers"]), slug, dest, self.log)
+                            prep = dict(rec, numbers=rep["numbers"])
+                            prepare_upload(vpath, prep, slug, dest, self.log)
+                            if prep.get("overlay_swap"):
+                                rec["overlay_swap"] = prep["overlay_swap"]
                         except RuntimeError as e:
                             if not rec.get("refiled_from"):
                                 raise
