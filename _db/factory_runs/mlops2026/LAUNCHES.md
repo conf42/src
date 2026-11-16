@@ -1,5 +1,12 @@
 # Conf42 MLOps 2026 - factory launches (newest first, written by the factory)
 
+## 2026-11-16 14:02 · cloud (GitHub Actions) · run
+- Drive: 22 files, 2 downloaded (Nishanth Vepachedu - Conf42 MLOps 2026 - Scaling Observability with Agentic LLMs.pdf, Nishanth Vepachedu - Conf42 MLOps 2026 - Scaling Observability with Agentic LLMs.mp4), 9 up to date, 0 newer, 1 new
+- processed: Nishanth Vepachedu - done; Phoebe Wang - done; RanjithKumar Ragavan - done; Shanker Valipireddy - done
+- finished before, untouched: 18
+- ship: 3 transcripts, 3 decks
+- Descript project Conf42 MLOps 2026: 22 compositions, 22 published
+
 ## 2026-11-16 02:23 · cloud (GitHub Actions) · run
 - Drive: 19 files, 0 downloaded, 9 up to date, 0 newer, 0 new
 - processed: Arpita Sheth - done; Phoebe Wang - done
