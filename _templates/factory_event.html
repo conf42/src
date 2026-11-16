@@ -55,6 +55,16 @@
     h2 { font-size: 1.1rem; margin: 30px 0 8px; }
     .meta { color: #55627f; font-size: .85rem; margin: 14px 0 0; }
     .err { background: #fde2e1; color: #a4231c; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+    /* what needs a look (Marek 2026-11-16: "a huge yellow glowing pill"): failed passes and problems the factory found,
+       from _db/factory_runs/problems.json (factory/factory/problems.py) */
+    .alarm { background: #ffe24a; color: #3a2c00; border-radius: 26px; padding: 16px 24px 14px; margin: 4px 0 22px;
+      box-shadow: 0 0 0 3px #ffc800, 0 0 26px 6px rgba(255, 200, 0, .7); animation: alarm-glow 2.4s ease-in-out infinite; }
+    @keyframes alarm-glow { 50% { box-shadow: 0 0 0 3px #ffc800, 0 0 48px 16px rgba(255, 200, 0, .95); } }
+    @media (prefers-reduced-motion: reduce) { .alarm { animation: none; } }
+    .alarm h2 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 800; }
+    .alarm ul { margin: 0; padding-left: 20px; } .alarm li { margin: 4px 0; font-size: .93rem; line-height: 1.35; }
+    .alarm li.fail { font-weight: 800; } .alarm a { color: #3a2c00; }
+    .alarm .when { margin: 8px 0 0; font-size: .8rem; opacity: .75; }
     #gate { display: none; position: fixed; inset: 0; background: #1b2a4e; z-index: 50; align-items: center; justify-content: center; }
     body.locked #gate { display: flex; } body.locked header, body.locked main { display: none; }
     #gate form { background: #fff; color: #1d1d1f; padding: 26px 28px; border-radius: 12px; width: min(340px, 90vw); font-family: Arial, sans-serif; }
@@ -104,6 +114,7 @@
 <main>
   <div class="err" id="err" hidden></div>
   <div class="sum" id="sum"></div>
+  <div class="alarm" id="alarm" hidden></div>
   <div class="wrap"><table>
     <thead><tr><th style="width:34%">Speaker(s)</th><th>Talk</th><th style="width:30%">State</th></tr></thead>
     <tbody id="rows"></tbody>
@@ -135,15 +146,35 @@
     if (document.body.classList.contains('locked')) return;
     const raw = 'https://raw.githubusercontent.com/conf42/src/main/_db/factory_runs/' + FE.slug + '/';
     const t = '?t=' + Date.now();
-    const [st, yt, intake, state] = await Promise.all([
+    const [st, yt, intake, state, prob] = await Promise.all([
       FE.status_url ? getJson(FE.status_url + '?status=' + encodeURIComponent(FE.slug)) : Promise.resolve(null),
-      getJson(raw + 'youtube.json' + t), getJson(raw + 'intake.json' + t), getJson(raw + 'state.json' + t)]);
+      getJson(raw + 'youtube.json' + t), getJson(raw + 'intake.json' + t), getJson(raw + 'state.json' + t),
+      getJson(raw + '../problems.json' + t)]);
+    alarm(prob);
     const err = document.getElementById('err');
     err.hidden = !!(st && st.ok) || !FE.status_url;
     if (!err.hidden) err.textContent = 'The upload script did not answer - Drive states may be missing. YouTube states still show.';
     if (!FE.status_url) { err.hidden = false; err.textContent = 'The upload script is not set up yet (metadata.yml record_upload_url) - only YouTube states show.'; }
     last = {st: st || {uploads: [], recorded: {}, manual: []}, yt: yt || {}, intake: (intake || {}).items || {}, state: (state || {}).talks || {}};
     render();
+  }
+
+  // the yellow pill: what the last factory pass could not do or wants looked at, and a pass that failed or never came
+  function alarm(p) {
+    const el = document.getElementById('alarm'), items = [];
+    if (p && p.updated) {
+      const hours = (Date.now() - new Date(p.updated)) / 36e5;
+      const run = /^https:\/\/github\.com\//.test(p.run || '') ? ' <a href="' + esc(p.run) + '" target="_blank" rel="noopener">Open the run</a>' : '';
+      if (hours > 30) items.push(['fail', 'No factory pass has finished since ' + new Date(p.updated).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) +
+        ' - new uploads are not being processed.' + run]);
+      if (p.ok === false) (p.failed && p.failed.length ? p.failed : ['no reason recorded']).forEach(f => items.push(['fail', 'The last factory pass failed (' + ago(p.updated) + '): ' + esc(f) + '.' + run]));
+      ((p.events || {})[FE.slug] || []).concat(p.all || []).forEach(i => items.push([i.k === 'fail' ? 'fail' : '', esc(i.t)]));
+    }
+    el.hidden = !items.length;
+    if (!items.length) return;
+    items.sort((a, b) => (b[0] === 'fail') - (a[0] === 'fail'));
+    el.innerHTML = '<h2>' + items.length + (items.length === 1 ? ' thing needs' : ' things need') + ' a look</h2><ul>' +
+      items.map(i => '<li class="' + i[0] + '">' + i[1] + '</li>').join('') + '</ul><p class="when">From the factory pass that ended ' + ago(p.updated) + '.</p>';
   }
 
   function rowState(talk, d) {

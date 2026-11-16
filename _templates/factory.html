@@ -123,6 +123,48 @@
   <nav class="tabs">{% if manual_claude %}<a href="#claude" data-tab="claude" class="on">Run with Claude</a>{% endif %}<a href="#manual" data-tab="manual"{% if not manual_claude %} class="on"{% endif %}>No Claude, manual</a><a href="#factory" data-tab="factory">Factory logs</a></nav>
 </div></header>
 <main>
+  {# what needs a look, over every event (Marek 2026-11-16: failed passes and problems are printed in the factory):
+     _db/factory_runs/problems.json, written by every cloud pass (factory/factory/problems.py) #}
+  <style>
+    .alarm { background: #ffe24a; color: #3a2c00; border-radius: 26px; padding: 16px 24px 14px; margin: 4px 0 22px;
+      box-shadow: 0 0 0 3px #ffc800, 0 0 26px 6px rgba(255, 200, 0, .7); animation: alarm-glow 2.4s ease-in-out infinite; }
+    @keyframes alarm-glow { 50% { box-shadow: 0 0 0 3px #ffc800, 0 0 48px 16px rgba(255, 200, 0, .95); } }
+    @media (prefers-reduced-motion: reduce) { .alarm { animation: none; } }
+    .alarm h2 { margin: 0 0 6px; font-size: 1.2rem; font-weight: 800; }
+    .alarm ul { margin: 0; padding-left: 20px; } .alarm li { margin: 4px 0; font-size: .93rem; line-height: 1.35; }
+    .alarm li.fail { font-weight: 800; } .alarm a { color: #3a2c00; }
+    .alarm .when { margin: 8px 0 0; font-size: .8rem; opacity: .75; }
+  </style>
+  <div class="alarm" id="alarm" hidden></div>
+  <script>
+    (function () {
+      const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+      const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000);
+        return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : new Date(iso).toLocaleDateString([], {day: 'numeric', month: 'short'}); };
+      async function alarm() {
+        if (document.body.classList.contains('locked')) return;
+        let p = null;
+        try { const r = await fetch('https://raw.githubusercontent.com/conf42/src/main/_db/factory_runs/problems.json?t=' + Date.now(), {cache: 'no-store'}); if (r.ok) p = await r.json(); } catch (e) {}
+        const el = document.getElementById('alarm'), items = [];
+        if (p && p.updated) {
+          const hours = (Date.now() - new Date(p.updated)) / 36e5;
+          const run = /^https:\/\/github\.com\//.test(p.run || '') ? ' <a href="' + esc(p.run) + '" target="_blank" rel="noopener">Open the run</a>' : '';
+          if (hours > 30) items.push(['fail', 'No factory pass has finished since ' + new Date(p.updated).toLocaleString([], {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) +
+            ' - new uploads are not being processed.' + run]);
+          if (p.ok === false) (p.failed && p.failed.length ? p.failed : ['no reason recorded']).forEach(f => items.push(['fail', 'The last factory pass failed (' + ago(p.updated) + '): ' + esc(f) + '.' + run]));
+          Object.keys(p.events || {}).sort().forEach(slug => p.events[slug].forEach(i => items.push([i.k === 'fail' ? 'fail' : '',
+            '<a href="/' + esc(slug) + '/factory">' + esc(slug) + '</a>: ' + esc(i.t)])));
+          (p.all || []).forEach(i => items.push([i.k === 'fail' ? 'fail' : '', esc(i.t)]));
+        }
+        el.hidden = !items.length;
+        if (!items.length) return;
+        items.sort((a, b) => (b[0] === 'fail') - (a[0] === 'fail'));
+        el.innerHTML = '<h2>' + items.length + (items.length === 1 ? ' thing needs' : ' things need') + ' a look</h2><ul>' +
+          items.map(i => '<li class="' + i[0] + '">' + i[1] + '</li>').join('') + '</ul><p class="when">From the factory pass that ended ' + ago(p.updated) + '.</p>';
+      }
+      alarm(); setInterval(alarm, 60000);
+    })();
+  </script>
   {% if fe_links %}<p class="uplinks" style="margin:0 0 18px;line-height:2"><b>Uploads per conference:</b>
   {% for e in fe_links %}<a href="/{{ e.slug }}/factory" style="display:inline-block;margin-right:10px;padding:2px 10px;border-radius:999px;background:{{ '#dbe7ff' if e.upcoming else '#eceef3' }};color:#1b2a4e;text-decoration:none;font-weight:600">{{ e.label }}</a>{% endfor %}</p>{% endif %}
   {% if manual_claude %}<section class="tab on manual" id="tab-claude" style="margin-top:0">{{ manual_claude | safe }}</section>{% endif %}

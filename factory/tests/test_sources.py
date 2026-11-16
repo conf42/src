@@ -165,6 +165,47 @@ def main():
     event_state("mlops2027", {"Ada Lovelace": {"finished": "x"}}, ["Ada Lovelace"])
     check("captions: the hours are a setting", cloud.rollout_clear(["mlops2027"], [], {"captions_utc_hours": [10, 14]}, None, noon)[0])
 
+    # ---- what needs a look, for the factory's pages (Marek 2026-11-16) ----
+    from factory import problems
+    state = {"talks": {"Ada Lovelace": {"finished": "x", "steps": {"qa": {"status": "done", "flags": ["picture changes at 0:00.2 - check the start"]}}},
+                       "Grace Hopper": {"error": "Descript said no", "steps": {"edit": {"status": "failed"}}},
+                       "Alan Turing": {"finished": "x", "steps": {}}, "Edsger Dijkstra": {"needs_new_video": "no sound"},
+                       "Factory Test": {"error": "ignored"}},
+             "unmatched": [{"file": "my talk final.mp4", "why": "no speaker in the CSV matches"}]}
+    inbox = {"items": {"a": {"folder": "Nobody (x)", "outcome": "hold", "reason": "unmatched"},
+                       "b": {"folder": "Junk (x)", "outcome": "reject", "reason": "too-short", "decided": problems.now()},
+                       "c": {"folder": "Old junk (x)", "outcome": "reject", "reason": "too-short", "decided": "2020-01-01T00:00:00+00:00"},
+                       "d": {"folder": "Broken (x)", "error": "RuntimeError: boom"},
+                       "e": {"folder": "Ada (x)", "outcome": "accept", "talk": "Ada Lovelace", "decided": problems.now(),
+                             "flags": ["distorted sound", "recorded under chaos2027 - re-filed here, the overlay is swapped"]}}}
+    tube = {"Ada Lovelace": {"id": "yt1", "captions": False, "captions_note": "refused"}}
+    got = problems.items("mlops2027", state, inbox, tube,
+                         ["- left: `deck.pdf` - no speaker of the lineup in the file name - not taken",
+                          "- left: `Ada Lovelace.mp4` - Ada Lovelace came through conf42.com/record - the old folder is ignored", "- taken: `x.mp4`"],
+                         ["Blocked.mp4 (needs a Google sign-in)"])
+    text = " || ".join("%s:%s" % (i["k"], i["t"]) for i in got)
+    check("problems: a talk that stopped, with the step", "fail:Grace Hopper: stopped at edit - Descript said no" in text)
+    check("problems: a finished talk that is not on YouTube", "fail:Alan Turing is edited but not on YouTube yet" in text)
+    check("problems: a talk that needs a new video", "fail:Edsger Dijkstra needs a new video from the speaker - no sound" in text)
+    check("problems: held, recently rejected and unsortable uploads", "look:upload Nobody (x) is held: unmatched" in text
+          and "look:upload Junk (x) was rejected (too-short)" in text and "fail:upload Broken (x) could not be sorted" in text and "Old junk" not in text)
+    check("problems: QA and intake flags, captions that did not go up", "look:Ada Lovelace: picture changes at 0:00.2" in text
+          and "look:Ada Lovelace: distorted sound" in text and "the captions did not go up (refused)" in text)
+    check("problems: a file nobody is named in, a file Drive would not hand out, a video matching nobody",
+          "not taken: deck.pdf" in text and "Drive would not hand out Blocked.mp4" in text and "my talk final.mp4" in text)
+    check("problems: a duplicate in a lower folder and a re-filed talk are normal, the test talk is not listed",
+          "is ignored" not in text and "re-filed" not in text and "Factory Test" not in text)
+    pp = os.path.join(tmp, "problems.json")
+    d = problems.write({"mlops2027": got, "chaos2027": []}, [], [problems.item("look", "kept: x.mp4")], "https://github.com/conf42/src/actions/runs/1", pp)
+    check("problems: the pass's report (events with nothing are left out)", d["ok"] and list(d["events"]) == ["mlops2027"] and d["all"][0]["t"] == "kept: x.mp4")
+    d = problems.write({"chaos2027": [problems.item("fail", "x")]}, ["chaos2027: KeyError"], [], None, pp)
+    check("problems: an event the pass did not touch keeps its list; a failure makes the pass not ok",
+          not d["ok"] and sorted(d["events"]) == ["chaos2027", "mlops2027"] and d["failed"] == ["chaos2027: KeyError"])
+    check("problems: a pass that reported itself is not overwritten by the workflow's last step", not problems.mark("failure", "2000-01-01T00:00:00+00:00", None, pp))
+    check("problems: a green pass marks nothing", not problems.mark("success", "2999-01-01T00:00:00+00:00", None, pp))
+    check("problems: a pass that died before its report says so", problems.mark("cancelled", "2999-01-01T00:00:00+00:00", "https://github.com/x", pp)
+          and "ran out of time" in problems.load(pp)["failed"][0] and problems.load(pp)["ok"] is False and "mlops2027" in problems.load(pp)["events"])
+
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return 1 if fails else 0

@@ -138,6 +138,11 @@ def main(argv):
     if cmd == "overlay":                                 # swap a recording's overlay for another conference's
         from . import overlay
         return overlay.main(argv[1:])
+    if cmd == "problems-mark":                           # the workflow's last step: a pass that died says so on the pages
+        from . import cloud, problems
+        if problems.mark(argv[1] if len(argv) > 1 else "failure", os.environ.get("PASS_STARTED"), cloud.run_url()):
+            print("factory pages:", cloud.commit_intake("factory: the pass did not finish (cloud)"))
+        return
     if cmd == "captions":                                # the site's transcripts as captions on older YouTube videos
         from . import captions
         return captions.main(argv[1:])

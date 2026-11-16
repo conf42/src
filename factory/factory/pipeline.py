@@ -186,6 +186,7 @@ class Run:
         self.state = self._load()
         self.render_futures, self.render_locks = {}, {}
         self.launch = {}                              # how this launch started, for LAUNCHES.md (cmd, sources, drive)
+        self.skipped = []                             # files Drive would not hand out this run (for the pages' problems)
         self.on_finished = None                       # called with the talk's key right after it finishes (the cloud
                                                       # factory uploads it to YouTube there and then)
 
@@ -385,6 +386,7 @@ class Run:
                 size, up, via = drive_size(f, api)
             except Exception as e:                       # noqa: BLE001 - one odd file must not stop the fetch
                 self.note("Drive: %s skipped (%s)" % (name, e))
+                self.skipped.append("%s (%s)" % (name, str(e)[:120]))
                 continue
             old = fetched.get(f["id"])
             verdict = want(name, size, up, old) if want else None

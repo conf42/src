@@ -12,6 +12,8 @@
    than batched in the end"), unlisted, with title / description / chapters / thumbnail / captions / playlist
    (ytupload.py; skipped until it is configured). The pass ends with one more sweep for anything left over.
 4. the run state, intake.json and conf42.com/factory are committed + pushed (app.publish_status does the status).
+5. what needs a look goes to _db/factory_runs/problems.json, which the factory's pages show as a yellow pill
+   (problems.py; Marek 2026-11-16: "any failed runs and problems should be printed out in the factory").
 
 Old upload folders (Marek 2026-11-13, MLOps 2026): an event whose speakers were sent the earlier link-shared Drive
 folder ("Talks - your talk video recording" + "Slides - your deck in .pdf", free file names) has that folder in
@@ -317,6 +319,7 @@ def main(argv):
         print("intake state:", commit_intake("factory intake: conf42.com/record uploads sorted (cloud)"))
     legacy = legacy_folders(cfg, slugs)
     manual = {"id": manual_folder(cfg), "claims": {}, "owner": {}}
+    unclaimed, report = [], {}                           # Manual upload files nobody takes; {slug: problems}
     if manual["id"]:
         try:
             active = active_events(cfg, set(intake_events(slugs)) | set(legacy))
@@ -357,8 +360,11 @@ def main(argv):
             print("cloud: %s skipped (%s)" % (slug, e))
             continue
         try:
-            lines += one_event(run, slug, drive, legacy, cfg, youtube_on, manual)
+            ev_lines = one_event(run, slug, drive, legacy, cfg, youtube_on, manual)
+            lines += ev_lines
+            report[slug] = event_problems(slug, run, ev_lines)
         except Exception as e:                           # noqa: BLE001 - one event must not stop the others
+            report[slug] = event_problems(slug, run, []) + [{"k": "fail", "t": "the pass failed in this event: %s: %s" % (type(e).__name__, str(e)[:200])}]
             failed.append("%s: %s: %s" % (slug, type(e).__name__, str(e)[:300]))
             lines.append("\n### %s - FAILED: **%s: %s**" % (slug, type(e).__name__, str(e)[:300]))
             traceback.print_exc()
@@ -368,7 +374,9 @@ def main(argv):
                 pass
     try:                                                 # the last step: upload folders of events long over are emptied
         from . import cleanup
-        lines += cleanup.Cleanup(drive, cfg).run()
+        tidied = cleanup.Cleanup(drive, cfg).run()
+        lines += tidied
+        unclaimed += [l for l in tidied if l.startswith("- kept:")]
     except Exception as e:                               # noqa: BLE001 - tidying up never fails a pass
         lines.append("\n### Upload folders - not tidied (%s)" % e)
     try:                                                 # and a few of the older videos get their transcript as captions -
@@ -380,10 +388,25 @@ def main(argv):
             lines += ["", "### Captions on older videos - not this pass: %s" % why]
     except Exception as e:                               # noqa: BLE001
         lines.append("\n### Captions on older videos - not done (%s)" % e)
+    try:                                                 # what needs a look, for the factory's pages
+        from . import problems
+        extra = [problems.item("look", l.lstrip("- ").replace("`", "")) for l in unclaimed]
+        problems.write(report, failed, extra, run_url())
+    except Exception as e:                               # noqa: BLE001
+        lines.append("\n### The pages' problem list was not written (%s)" % e)
     commit_intake("factory: cloud pass state (intake + youtube)")
     summary_md(lines)
     print("\n".join(lines))
     return 1 if failed else 0
+
+
+def event_problems(slug, run, ev_lines):
+    """The event's list for the factory's pages (problems.py), from what is on disk after its part of the pass."""
+    from . import problems, ytupload
+    try:
+        return problems.items(slug, run.state, intake.Intake(None).load(slug), ytupload.load(slug), ev_lines, getattr(run, "skipped", []))
+    except Exception as e:                               # noqa: BLE001 - the list never fails a pass
+        return [{"k": "fail", "t": "this event's problems could not be listed (%s)" % str(e)[:160]}]
 
 
 def with_manual(owned, claims):
