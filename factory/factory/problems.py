@@ -69,6 +69,9 @@ def items(slug, state, intake_state, youtube, lines=(), skipped=()):
         yt = (youtube or {}).get(key) or {}
         if t.get("finished") and not yt.get("id"):
             out.append(item("fail", "%s is edited but not on YouTube yet (the daily limit, or the upload failed) - the next pass tries again" % key))
+        elif not t.get("finished") and not t.get("error") and not yt.get("id") and (steps.get("edit") or {}).get("status") == "done":
+            # edited on an earlier pass, its finished file gone with that machine: exported again and uploaded next pass
+            out.append(item("fail", "%s is edited but not on YouTube yet - its video is exported again and uploaded on the next pass" % key))
         if yt.get("problem"):
             out.append(item("fail", "%s: YouTube says %s (youtu.be/%s)" % (key, yt["problem"], yt.get("id"))))
         rs = t.get("reslide") or {}
@@ -85,7 +88,9 @@ def items(slug, state, intake_state, youtube, lines=(), skipped=()):
         if yt.get("id") and yt.get("playlist") is False and "test talk" not in str(yt.get("playlist_note") or ""):
             out.append(item("look", "%s: not in the event's playlist yet (youtu.be/%s) - tried again every pass" % (key, yt["id"])))
         if yt.get("id") and yt.get("captions") is False:
-            out.append(item("look", "%s: the captions did not go up (%s)" % (key, str(yt.get("captions_note") or "no reason given")[:120])))
+            note = str(yt.get("captions_note") or "no reason given")
+            out.append(item("look", "%s: the captions did not go up (%s) - tried again every pass" % (
+                key, "YouTube's daily limit" if "quota" in note.lower() else " ".join(note.split())[:120])))
         if t.get("drive_newer"):
             out.append(item("look", "%s: a newer video is on Drive (%s) - redo it?" % (key, str((t["drive_newer"] or {}).get("uploaded", ""))[:16])))
         for flag in ((steps.get("qa") or {}).get("flags") or []) if t.get("finished") else []:
