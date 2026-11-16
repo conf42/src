@@ -1,0 +1,886 @@
+1
+00:00:00,300 --> 00:00:01,106
+Hi, everyone.
+
+2
+00:00:01,123 --> 00:00:02,148
+Thanks for joining.
+
+3
+00:00:02,443 --> 00:00:03,047
+I'm Artem.
+
+4
+00:00:03,865 --> 00:00:08,977
+I've been a software engineer for
+about 10 years, and I'm currently a
+
+5
+00:00:08,993 --> 00:00:13,263
+senior software engineer at Amazon
+working on AI shopping features.
+
+6
+00:00:14,729 --> 00:00:17,897
+So, here's the topic
+that I wanna talk about.
+
+7
+00:00:18,651 --> 00:00:24,469
+Getting a model to produce good output in
+a demo isn't hard anymore, and the work is
+
+8
+00:00:24,474 --> 00:00:31,073
+now serving that output on a high-traffic
+page without sl-slowing down the page and
+
+9
+00:00:31,090 --> 00:00:33,305
+without showing customers something wrong.
+
+10
+00:00:35,228 --> 00:00:36,841
+I have one note on the scope.
+
+11
+00:00:36,841 --> 00:00:42,882
+So this talk is about AI features that
+live on a web page, the kind of a shopper
+
+12
+00:00:42,882 --> 00:00:45,165
+loads in a browser, like a product page.
+
+13
+00:00:45,586 --> 00:00:49,779
+If you're building a standalone chatbot
+or a background agent, some of this
+
+14
+00:00:49,780 --> 00:00:54,694
+still applies, but a traditional web
+page is what I have in mind for this talk
+
+15
+00:00:55,694 --> 00:00:59,268
+So you probably know the
+standard production toolkit.
+
+16
+00:00:59,375 --> 00:01:04,950
+It's timeouts, caching, canaries,
+feature flags, dashboards, A/B tests.
+
+17
+00:01:05,295 --> 00:01:09,688
+So LLM features add three
+problems on top of it.
+
+18
+00:01:10,385 --> 00:01:11,862
+The first is latency.
+
+19
+00:01:12,564 --> 00:01:16,555
+Google's guidance is that a page's
+main content should appear within two
+
+20
+00:01:16,555 --> 00:01:21,305
+point five seconds, and that the first
+byte from the server should arrive
+
+21
+00:01:21,325 --> 00:01:24,014
+in under zero point eight seconds.
+
+22
+00:01:24,882 --> 00:01:29,145
+A fast model starts streaming in a
+few hundred milliseconds, but a full
+
+23
+00:01:29,236 --> 00:01:35,247
+response usually takes several seconds,
+and the slow tail runs well past that.
+
+24
+00:01:37,025 --> 00:01:38,442
+The second is quality.
+
+25
+00:01:38,882 --> 00:01:43,547
+Bad output usually comes back
+well-formed with a successful status,
+
+26
+00:01:43,557 --> 00:01:48,021
+so your error rate stays flat while
+customers read something wrong.
+
+27
+00:01:49,121 --> 00:01:50,618
+The third is cost.
+
+28
+00:01:51,093 --> 00:01:55,224
+Every call costs money and at
+page view volume, that can add up.
+
+29
+00:01:56,789 --> 00:02:06,234
+So the four lessons that follow are
+about these three problems So I've
+
+30
+00:02:06,234 --> 00:02:09,334
+grouped this into these four lessons.
+
+31
+00:02:09,370 --> 00:02:11,245
+They follow the life of a feature.
+
+32
+00:02:11,766 --> 00:02:16,286
+So it's deciding when to generate,
+serving the output, checking it,
+
+33
+00:02:16,343 --> 00:02:18,348
+and connecting to the assistant.
+
+34
+00:02:19,545 --> 00:02:22,163
+All of this is model agnostic
+
+35
+00:02:23,163 --> 00:02:26,179
+To keep this simple, I'll
+use one example throughout.
+
+36
+00:02:26,998 --> 00:02:29,464
+Ridgeline Coffee, a made-up store.
+
+37
+00:02:30,486 --> 00:02:35,172
+Ridgeline wants three LLM
+features on its product pages.
+
+38
+00:02:35,575 --> 00:02:37,416
+The first is a quick take.
+
+39
+00:02:37,659 --> 00:02:42,494
+It's three short highlights
+about the coffee written by an
+
+40
+00:02:42,514 --> 00:02:47,883
+LLM It uses product details and
+reviews to get this information.
+
+41
+00:02:48,115 --> 00:02:50,148
+It shows on every product page.
+
+42
+00:02:51,041 --> 00:02:53,283
+The second is suggested questions.
+
+43
+00:02:54,054 --> 00:02:57,821
+A few questions picked for this
+shop are like, "Is it similar to
+
+44
+00:02:57,821 --> 00:02:59,694
+the Colombia I bought last time?"
+
+45
+00:03:00,677 --> 00:03:06,810
+They also show on every product page, and
+tapping one asks the store's AI assistant.
+
+46
+00:03:07,755 --> 00:03:09,900
+The third is an Ask button.
+
+47
+00:03:10,385 --> 00:03:14,371
+It opens the same assistant, which
+already knows which coffee you're looking
+
+48
+00:03:14,372 --> 00:03:19,708
+at, so you can ask your own questions
+like, "Will this work for espresso?"
+
+49
+00:03:20,708 --> 00:03:26,257
+So these are the two kinds of AI
+features I'll keep coming back to.
+
+50
+00:03:27,004 --> 00:03:28,934
+The quick take is pre-computed.
+
+51
+00:03:29,131 --> 00:03:33,986
+It's generated ahead of time, and
+the page only reads stored text.
+
+52
+00:03:34,889 --> 00:03:39,816
+The suggested questions
+and ask button are live.
+
+53
+00:03:40,694 --> 00:03:43,875
+They call the model while
+the shopper is on the page.
+
+54
+00:03:44,758 --> 00:03:48,453
+Each kind runs into different
+problems, so for every lesson,
+
+55
+00:03:48,468 --> 00:03:50,712
+I'll say which kind it is about.
+
+56
+00:03:51,712 --> 00:03:54,277
+Lesson one: precompute by default.
+
+57
+00:03:54,760 --> 00:03:59,798
+So the problem is when you're doing
+a demo, right, you're most likely
+
+58
+00:03:59,799 --> 00:04:02,445
+just doing a live call to LLM.
+
+59
+00:04:03,457 --> 00:04:09,534
+But then if you just put it to production,
+now every page would wait for a model
+
+60
+00:04:09,560 --> 00:04:16,696
+call that takes seconds and costs
+money, and for some features, the output
+
+61
+00:04:16,731 --> 00:04:18,407
+would be the same for every shopper.
+
+62
+00:04:19,329 --> 00:04:23,601
+And so before building a feature,
+it's worth asking whether it has to
+
+63
+00:04:23,608 --> 00:04:25,832
+be generated while the shopper waits.
+
+64
+00:04:26,366 --> 00:04:28,890
+So there's three questions that decide it.
+
+65
+00:04:29,570 --> 00:04:32,688
+Does the output depend on the
+shopper or what they typed?
+
+66
+00:04:33,330 --> 00:04:35,162
+How often do inputs change?
+
+67
+00:04:35,291 --> 00:04:37,816
+And is anyone waiting for it?
+
+68
+00:04:38,741 --> 00:04:42,777
+So the quick take is the
+same for every shopper.
+
+69
+00:04:43,152 --> 00:04:47,544
+It changes only when the
+product or its reviews change,
+
+70
+00:04:47,995 --> 00:04:49,244
+and nobody's waiting for it.
+
+71
+00:04:49,830 --> 00:04:55,104
+So we generate it in a background job,
+run the checks, and store the default.
+
+72
+00:04:56,796 --> 00:05:00,827
+At page load, the page does a key lookup.
+
+73
+00:05:01,042 --> 00:05:05,201
+The ask button can't be
+precomputed because the response
+
+74
+00:05:05,205 --> 00:05:06,625
+depends on the question.
+
+75
+00:05:07,291 --> 00:05:11,844
+It runs live, but only for the
+shoppers who click, which is
+
+76
+00:05:11,844 --> 00:05:14,604
+usually a small share of page views.
+
+77
+00:05:16,121 --> 00:05:20,606
+Suggested questions depend on the
+shopper, and there are too many
+
+78
+00:05:20,609 --> 00:05:24,475
+shoppers and product pairs to generate
+them all ahead of time, so they
+
+79
+00:05:24,476 --> 00:05:27,334
+run live too on every page view.
+
+80
+00:05:28,339 --> 00:05:31,135
+So keep that in mind for lesson four.
+
+81
+00:05:32,241 --> 00:05:37,188
+So this works because a
+precomputed feature puts no
+
+82
+00:05:37,188 --> 00:05:39,299
+model call on the page at all.
+
+83
+00:05:40,046 --> 00:05:45,076
+Latency becomes just a key
+lookup, and cost follows product
+
+84
+00:05:45,080 --> 00:05:46,813
+changes instead of traffic.
+
+85
+00:05:47,935 --> 00:05:53,320
+So the LLM part becomes a
+content pipeline, which is a,
+
+86
+00:05:53,917 --> 00:05:55,581
+an easier to deal with problem.
+
+87
+00:05:56,969 --> 00:06:00,801
+One thing to get right
+is when to regenerate.
+
+88
+00:06:01,537 --> 00:06:06,794
+If you regenerate on every new review,
+a popular product burns model calls
+
+89
+00:06:06,854 --> 00:06:09,315
+all day for output that barely changes.
+
+90
+00:06:10,062 --> 00:06:16,246
+So a threshold, like a minimum number of
+new reviews or a change to the product
+
+91
+00:06:16,249 --> 00:06:19,211
+details, keeps costs tied to real change.
+
+92
+00:06:19,965 --> 00:06:28,635
+I start from precomputed and see if the
+feature really needs to be real time
+
+93
+00:06:29,635 --> 00:06:33,310
+Lesson two, keep the model
+off the critical path.
+
+94
+00:06:33,599 --> 00:06:39,685
+So the problem is that a model call
+takes seconds and sometimes fails.
+
+95
+00:06:40,260 --> 00:06:47,277
+If the page waits for it, the page is as
+slow and as fragile as this model call.
+
+96
+00:06:47,853 --> 00:06:51,127
+So the usual protection, a
+timeout, doesn't help much here.
+
+97
+00:06:51,553 --> 00:06:56,373
+A timeout short enough to protect the
+page would cut off most of model calls.
+
+98
+00:06:57,284 --> 00:07:00,918
+So the fix depends on the kind of feature.
+
+99
+00:07:01,789 --> 00:07:06,755
+A pre-computed feature already reads
+stored text, so the open question is
+
+100
+00:07:06,777 --> 00:07:09,204
+what to show when nothing good is stored.
+
+101
+00:07:10,346 --> 00:07:12,642
+Decide that before you
+write a single prompt.
+
+102
+00:07:12,710 --> 00:07:15,897
+I think of it as a ladder.
+
+103
+00:07:16,435 --> 00:07:18,090
+So fresh content first.
+
+104
+00:07:18,214 --> 00:07:22,356
+If that's missing or failed a check,
+the last good version you saved.
+
+105
+00:07:22,361 --> 00:07:27,952
+If there's none, a plain non-AI default,
+like the product's existing bullet points.
+
+106
+00:07:28,385 --> 00:07:30,702
+And as a last resort,
+just hide the feature.
+
+107
+00:07:31,623 --> 00:07:36,507
+For live features, render the page
+first and call the model afterwards.
+
+108
+00:07:36,949 --> 00:07:40,613
+The Ask button calls it
+only after the shopper asks.
+
+109
+00:07:41,560 --> 00:07:46,113
+Suggested questions fill in after
+the page has loaded, and if they're
+
+110
+00:07:46,265 --> 00:07:49,672
+slow or fail, that space stays empty.
+
+111
+00:07:50,656 --> 00:07:52,632
+For Ask, stream the response.
+
+112
+00:07:53,063 --> 00:07:57,383
+The first words appear long before
+the full response would, and streaming
+
+113
+00:07:57,385 --> 00:08:02,329
+keeps long responses from hitting
+fixed timeouts in proxies and gateways.
+
+114
+00:08:03,577 --> 00:08:06,387
+This works because the page
+never waits on the model.
+
+115
+00:08:06,869 --> 00:08:10,879
+Whether the model is slow, failing,
+or down, the page loads, and
+
+116
+00:08:10,879 --> 00:08:13,086
+the worst case is a plainer page
+
+117
+00:08:14,087 --> 00:08:18,946
+Lesson three, check outputs
+before customers see them So the
+
+118
+00:08:18,947 --> 00:08:23,607
+problem is that wrong output from
+a model could look like success.
+
+119
+00:08:24,154 --> 00:08:29,589
+It's well-formed, the call returns fine,
+and your error dashboard stays flat,
+
+120
+00:08:30,504 --> 00:08:32,588
+and the company owns it either way.
+
+121
+00:08:32,676 --> 00:08:38,058
+So there was an interesting case in two
+thousand twenty-four, a Cana- Canadian
+
+122
+00:08:38,065 --> 00:08:44,067
+tribunal ruled against Air Canada
+after its chatbot told a customer that
+
+123
+00:08:44,067 --> 00:08:49,413
+he could claim a bereavement discount
+after his trip, which contradicted
+
+124
+00:08:49,413 --> 00:08:51,391
+the airline's own policy page.
+
+125
+00:08:51,980 --> 00:08:56,748
+But the tribunal held the airline
+responsible for what the chatbot said, the
+
+126
+00:08:56,748 --> 00:08:59,891
+same as for any other page on its site.
+
+127
+00:09:01,552 --> 00:09:06,426
+So the fix for a precomputed
+feature like quick take is check
+
+128
+00:09:06,429 --> 00:09:08,335
+four things before storing it.
+
+129
+00:09:09,432 --> 00:09:14,634
+Format so it renders, grounding
+so every claim traces back to
+
+130
+00:09:14,635 --> 00:09:20,032
+the product data or a review,
+consistency with the rest of the page.
+
+131
+00:09:20,301 --> 00:09:26,263
+A highlight that says the coffee ships
+ground on a page that says whole bean
+
+132
+00:09:26,288 --> 00:09:32,521
+only is the kind of the problem that
+Air Canada had at a smaller scale.
+
+133
+00:09:33,586 --> 00:09:34,902
+And the content policy.
+
+134
+00:09:35,400 --> 00:09:38,958
+Format and policy are mostly simple rules.
+
+135
+00:09:39,424 --> 00:09:44,895
+Grounding and consistency often need a
+second model call to judge the first.
+
+136
+00:09:45,590 --> 00:09:52,317
+Anything that fails goes down the
+fallback ladder from lesson two This
+
+137
+00:09:52,319 --> 00:09:56,417
+works because that output is caught
+before it's stored, so it never reaches
+
+138
+00:09:56,420 --> 00:10:01,905
+the page, and the extra model call is
+affordable because you pay for it once per
+
+139
+00:10:01,905 --> 00:10:05,310
+product change, not once per page view.
+
+140
+00:10:07,135 --> 00:10:11,659
+Live responses are harder because
+there's no time to run all of that
+
+141
+00:10:11,696 --> 00:10:16,337
+before the first word appears,
+so the fix comes in layers.
+
+142
+00:10:16,988 --> 00:10:21,798
+Keep the model working from the product's
+own data so grounding is built in.
+
+143
+00:10:22,840 --> 00:10:28,677
+Run cheap rule-based checks on
+the stream and stop or respl--
+
+144
+00:10:28,744 --> 00:10:31,085
+replace response that fails one.
+
+145
+00:10:31,994 --> 00:10:37,243
+Afterwards, judge a sample of real
+responses with the same checks
+
+146
+00:10:37,510 --> 00:10:39,499
+you use for precomputed content.
+
+147
+00:10:40,494 --> 00:10:45,519
+That catches problems in aggregate,
+not one response at a time, which
+
+148
+00:10:45,521 --> 00:10:49,849
+is why live features also need a
+narrower scope and an easy way for
+
+149
+00:10:49,850 --> 00:10:52,137
+shoppers to report a bad response.
+
+150
+00:10:53,551 --> 00:10:58,234
+For both precomputed and live
+features, keep an eval set, a fixed
+
+151
+00:10:58,237 --> 00:11:02,266
+set of real products with known
+good and known bad outputs rerun
+
+152
+00:11:02,270 --> 00:11:04,283
+on every prompt or model change.
+
+153
+00:11:04,898 --> 00:11:08,651
+And in production, watch the rejection
+rate, especially while prompt
+
+154
+00:11:08,670 --> 00:11:10,946
+or model change is rolling out.
+
+155
+00:11:11,706 --> 00:11:15,838
+The page will look healthy because
+the fallbacks cover for failures, so
+
+156
+00:11:16,228 --> 00:11:20,395
+moving rejection rate is often your
+first sign that something changed
+
+157
+00:11:21,395 --> 00:11:25,602
+Lesson four: put one service
+in front of the assistant.
+
+158
+00:11:26,215 --> 00:11:29,322
+This one is about live features.
+
+159
+00:11:29,845 --> 00:11:34,643
+So for Ridgeline Coffee, two features
+call the same assistant, the Ask
+
+160
+00:11:34,698 --> 00:11:37,062
+button and the suggested questions.
+
+161
+00:11:37,877 --> 00:11:40,203
+The first problem is duplicated rules.
+
+162
+00:11:40,532 --> 00:11:45,855
+When each feature calls the assistant
+directly, each one keeps its own copy
+
+163
+00:11:45,857 --> 00:11:50,582
+of the rules, which pages and shoppers
+are eligible, which languages are
+
+164
+00:11:50,585 --> 00:11:55,250
+supported, which timeout to use, and
+what to show when the call fails.
+
+165
+00:11:56,162 --> 00:12:00,314
+Those copies could drift apart
+into features on the same page
+
+166
+00:12:00,314 --> 00:12:01,819
+start behaving differently.
+
+167
+00:12:02,825 --> 00:12:04,809
+Second problem is capacity.
+
+168
+00:12:06,416 --> 00:12:10,798
+Let's say the assistant was first
+built for the Ask button, so
+
+169
+00:12:10,798 --> 00:12:14,998
+it's sized for the shoppers who
+click it, which is a small share.
+
+170
+00:12:15,728 --> 00:12:19,473
+Suggested questions appear on
+every product page, so they call
+
+171
+00:12:19,482 --> 00:12:21,597
+the assistant on every page view.
+
+172
+00:12:22,384 --> 00:12:25,546
+Launching them can multiply
+the assistant's traffic.
+
+173
+00:12:26,704 --> 00:12:32,275
+So the fix is a small service between
+the features and the assistant.
+
+174
+00:12:32,928 --> 00:12:36,878
+Features don't call the assistant
+directly, they call the service.
+
+175
+00:12:37,417 --> 00:12:42,183
+And the service, it holds the eligibility
+rules, sets the timeout, and returns
+
+176
+00:12:42,184 --> 00:12:44,267
+a fallback when the assistant fails.
+
+177
+00:12:45,256 --> 00:12:49,652
+It also gives each feature a
+traffic budget and rate limits
+
+178
+00:12:49,872 --> 00:12:51,964
+any feature that goes over it.
+
+179
+00:12:53,462 --> 00:12:57,378
+I make it a service rather than a
+shared library because a library can't
+
+180
+00:12:57,399 --> 00:13:00,547
+enforce one budget across every caller.
+
+181
+00:13:02,340 --> 00:13:07,180
+This works because the rules live
+in one place, so they cannot drift.
+
+182
+00:13:07,907 --> 00:13:13,049
+Every calls goes through one door, so no
+feature can send page scale traffic to the
+
+183
+00:13:13,049 --> 00:13:15,438
+assistant without someone planning for it.
+
+184
+00:13:16,801 --> 00:13:21,030
+If the assistant slows down, the service
+returns fallbacks, and the pages are fine.
+
+185
+00:13:21,345 --> 00:13:25,991
+If a feature misbehaves, its budget
+stops it before it reaches the assistant
+
+186
+00:13:26,991 --> 00:13:32,021
+So if there's one thing you remember
+from this talk, it's calling the
+
+187
+00:13:32,022 --> 00:13:36,611
+model is easy, and most of the
+work is just a system around it.
+
+188
+00:13:37,270 --> 00:13:38,605
+So that's all from me.
+
+189
+00:13:38,617 --> 00:13:39,627
+Thanks for watching.
+
+190
+00:13:39,972 --> 00:13:44,021
+If you're shipping LLM features too, I'd
+like to hear how it's going, so find me on
+
+191
+00:13:44,030 --> 00:13:46,993
+LinkedIn or on the Conf42 Discord.
+
+192
+00:13:47,885 --> 00:13:49,383
+Enjoy the rest of the conference.

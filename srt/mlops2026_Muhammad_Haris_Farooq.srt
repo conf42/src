@@ -1,0 +1,1370 @@
+1
+00:00:00,300 --> 00:00:02,447
+Hi everyone, and thanks for joining.
+
+2
+00:00:02,886 --> 00:00:03,711
+I am Haris.
+
+3
+00:00:04,543 --> 00:00:10,264
+For most of this year, I have been running
+a big group of AI agents in production.
+
+4
+00:00:10,933 --> 00:00:14,470
+And today, I want to share
+what actually held up.
+
+5
+00:00:15,003 --> 00:00:19,883
+Not the theory, the stuff
+that survived real users.
+
+6
+00:00:20,916 --> 00:00:22,904
+But let me start with a story.
+
+7
+00:00:23,828 --> 00:00:30,077
+A bug that took us months to find,
+and the strange part is nothing
+
+8
+00:00:30,078 --> 00:00:35,518
+was broken so here is what I mean.
+
+9
+00:00:36,170 --> 00:00:39,868
+As you can see on the screen,
+every request succeeded.
+
+10
+00:00:40,710 --> 00:00:43,965
+Every request our agent
+sent to the model worked.
+
+11
+00:00:44,833 --> 00:00:47,970
+No errors, no alerts,
+nothing red anywhere.
+
+12
+00:00:48,735 --> 00:00:50,141
+But look at that number.
+
+13
+00:00:50,891 --> 00:00:55,215
+Our prompt cache hit
+rate was 0% for months.
+
+14
+00:00:56,781 --> 00:01:02,565
+Quick background in case you haven't used
+it: prompt caching lets you reuse the
+
+15
+00:01:02,565 --> 00:01:08,136
+parts of your prompts that doesn't change,
+like your instructions, and you pay
+
+16
+00:01:08,152 --> 00:01:10,641
+about a tenth of the price for that part.
+
+17
+00:01:11,588 --> 00:01:18,260
+We had it turned on in the code, but the
+code that talks to the model was joining
+
+18
+00:01:18,262 --> 00:01:25,542
+the system prompt into one plain string,
+and this, threw away the cache markers.
+
+19
+00:01:26,535 --> 00:01:31,417
+So we paid full price on every
+call, and nothing told us.
+
+20
+00:01:32,964 --> 00:01:37,053
+We only found it when we looked
+at the cost of single runs.
+
+21
+00:01:38,045 --> 00:01:39,454
+The fix was a few lines.
+
+22
+00:01:40,054 --> 00:01:41,873
+Finding it was the hard part
+
+23
+00:01:42,873 --> 00:01:50,076
+And honestly, that bugs, bug, sums up
+our what our running agents is like.
+
+24
+00:01:50,674 --> 00:01:55,387
+They don't fail loudly, they
+fail quietly, and they still give
+
+25
+00:01:55,392 --> 00:01:57,288
+you something that looks fine.
+
+26
+00:01:58,564 --> 00:01:59,491
+A bit about me.
+
+27
+00:02:00,440 --> 00:02:07,337
+I lead the AI side at Ruby AI, a US
+startup that builds sales intelligence.
+
+28
+00:02:08,262 --> 00:02:13,707
+I'm the main engineer on our agent
+platform, and I run it in production.
+
+29
+00:02:15,104 --> 00:02:19,878
+So the idea of this talk is the
+line at the top of the slide.
+
+30
+00:02:20,720 --> 00:02:25,720
+Every pattern here removes a place
+where the system can be wrong
+
+31
+00:02:26,239 --> 00:02:30,396
+without telling you And you can
+see the four patterns below it.
+
+32
+00:02:31,191 --> 00:02:34,904
+One, the AI suggests, code decides.
+
+33
+00:02:35,384 --> 00:02:38,611
+Second, quality you can see.
+
+34
+00:02:39,145 --> 00:02:41,205
+Third, cost per run.
+
+35
+00:02:41,614 --> 00:02:43,984
+And fourth, speed.
+
+36
+00:02:45,127 --> 00:02:48,696
+At the end, I will give you
+a short checklist you can
+
+37
+00:02:48,696 --> 00:02:50,556
+take back to your own system
+
+38
+00:02:51,556 --> 00:02:58,755
+So before the patterns, a quick picture
+of what we run so the numbers make sense.
+
+39
+00:02:59,700 --> 00:03:02,087
+On the screen, you can see three numbers.
+
+40
+00:03:02,446 --> 00:03:04,531
+More than 50 types of agents.
+
+41
+00:03:05,111 --> 00:03:10,989
+They research companies, analyze
+deals, write documents, prepare meeting
+
+42
+00:03:10,995 --> 00:03:13,504
+briefs, and there is a chat assistant.
+
+43
+00:03:14,400 --> 00:03:23,083
+About 3,800 production runs a month, and
+every single run is traced in Langfuse.
+
+44
+00:03:25,006 --> 00:03:30,048
+They run on Claude Sonnet
+and Haiku on Amazon Bedrock.
+
+45
+00:03:31,660 --> 00:03:34,964
+Most of our, most of our
+agents have the same shape.
+
+46
+00:03:35,525 --> 00:03:40,817
+A small config that says which
+model, which tool, what it has to
+
+47
+00:03:40,833 --> 00:03:43,401
+return, and what it depends on.
+
+48
+00:03:44,553 --> 00:03:49,619
+Then a loop where it can call
+all the tools with a hard limit
+
+49
+00:03:49,778 --> 00:03:55,835
+on rounds, and it ends with a
+structured output, not free text.
+
+50
+00:03:56,872 --> 00:04:00,970
+Keep that shape in mind because the
+first pattern builds right on it
+
+51
+00:04:01,970 --> 00:04:08,058
+So pattern one, if I could only keep one
+thing from this talk, it would be this
+
+52
+00:04:08,059 --> 00:04:11,036
+one written right there on the screen.
+
+53
+00:04:11,405 --> 00:04:12,823
+Let the AI suggest.
+
+54
+00:04:13,201 --> 00:04:15,194
+Let the code decide.
+
+55
+00:04:16,071 --> 00:04:18,689
+What d- what does that mean day to day?
+
+56
+00:04:19,204 --> 00:04:21,173
+The three lines below say it.
+
+57
+00:04:21,916 --> 00:04:26,756
+Math goes to code, formatting
+goes to code, code, and changing
+
+58
+00:04:26,801 --> 00:04:29,224
+a customer data goes to code.
+
+59
+00:04:30,644 --> 00:04:36,773
+The model is great at reading, judging,
+and writing, but it's not great
+
+60
+00:04:36,786 --> 00:04:39,392
+at being exact every single time.
+
+61
+00:04:40,156 --> 00:04:44,611
+And these three things have
+to be exact every single time.
+
+62
+00:04:45,734 --> 00:04:48,228
+Let me show you what each one looks like
+
+63
+00:04:49,228 --> 00:04:50,270
+First, scores.
+
+64
+00:04:50,762 --> 00:04:52,041
+We score deals.
+
+65
+00:04:52,591 --> 00:04:54,084
+How healthy is the deal?
+
+66
+00:04:54,534 --> 00:04:57,401
+How complete is our picture of it?
+
+67
+00:04:58,589 --> 00:05:04,562
+It's really tempting to just ask the
+model, "Give me a number out of 100."
+
+68
+00:05:05,147 --> 00:05:05,914
+Please don't.
+
+69
+00:05:06,753 --> 00:05:12,317
+As it says at the bottom here, it
+will look fine, and it won't add up.
+
+70
+00:05:13,469 --> 00:05:17,945
+So we split the work, and you
+can follow it left to right.
+
+71
+00:05:18,930 --> 00:05:22,894
+The model reads the evidence,
+and for each factor, it gives
+
+72
+00:05:22,895 --> 00:05:24,909
+a finding with a citation.
+
+73
+00:05:25,935 --> 00:05:26,649
+Then code.
+
+74
+00:05:27,366 --> 00:05:32,527
+A simple weighted formula does
+the math, and the result is
+
+75
+00:05:32,529 --> 00:05:35,455
+a score that always adds up.
+
+76
+00:05:36,567 --> 00:05:39,657
+When someone asks, "Why is this 62?"
+
+77
+00:05:40,149 --> 00:05:45,466
+We can show them exactly why
+formatting works the same way.
+
+78
+00:05:46,408 --> 00:05:51,338
+Our document agents used to write
+the whole document in markdown.
+
+79
+00:05:52,253 --> 00:05:56,767
+When, when I looked at their output,
+that first number is what I found.
+
+80
+00:05:57,567 --> 00:06:02,794
+Thirty-six to forty-five percent of
+the output tokens were just formatting.
+
+81
+00:06:03,986 --> 00:06:08,318
+Headings, bullets, tables,
+and output tokens are the
+
+82
+00:06:08,330 --> 00:06:11,074
+expensive ones and the slow ones.
+
+83
+00:06:11,950 --> 00:06:18,292
+So now, as the boxes at the bottom
+show, the model just returns the
+
+84
+00:06:18,330 --> 00:06:23,365
+content as JSON, and the code--
+and code builds the document.
+
+85
+00:06:25,037 --> 00:06:30,619
+We moved twenty-two of our twenty-three
+document agents this way, and
+
+86
+00:06:30,619 --> 00:06:32,688
+the second number is the result.
+
+87
+00:06:33,290 --> 00:06:40,095
+Output tokens went down between twenty-one
+and seventy-eight percent per agent.
+
+88
+00:06:41,500 --> 00:06:44,712
+The layout is now the same every time, too
+
+89
+00:06:45,712 --> 00:06:49,457
+The third rule is the one
+that matters most for trust:
+
+90
+00:06:50,034 --> 00:06:51,743
+changing a customer's data.
+
+91
+00:06:53,142 --> 00:06:58,229
+Our chat assistant can update
+things for a user, like moving a
+
+92
+00:06:58,243 --> 00:07:02,556
+deal to the next stage, but follow
+the three steps on the screen.
+
+93
+00:07:03,422 --> 00:07:07,625
+One, the model proposes
+the change as a card.
+
+94
+00:07:08,792 --> 00:07:13,133
+Second, the user sees it and confirms.
+
+95
+00:07:13,974 --> 00:07:17,438
+Third, code makes the
+change, not the model.
+
+96
+00:07:19,366 --> 00:07:21,688
+So where does that leave the model?
+
+97
+00:07:22,654 --> 00:07:30,380
+It's in the line at the bottom, judging,
+writing, and pulling facts out of a messy
+
+98
+00:07:30,414 --> 00:07:33,588
+text with the code to back each one up.
+
+99
+00:07:34,563 --> 00:07:37,532
+That's what's-- what it is good at.
+
+100
+00:07:38,713 --> 00:07:44,242
+one ho-- one honest quid though,
+moving things into code, into code,
+
+101
+00:07:44,607 --> 00:07:46,500
+doesn't make them right by itself.
+
+102
+00:07:47,534 --> 00:07:52,717
+The formula is only as good as
+the evidence the model gives it.
+
+103
+00:07:53,469 --> 00:07:57,553
+So you still need to check that
+evidence, and that's exactly
+
+104
+00:07:57,556 --> 00:07:59,317
+where the pattern two comes in
+
+105
+00:08:00,317 --> 00:08:04,877
+Pattern two is about making
+quality something you can see.
+
+106
+00:08:05,952 --> 00:08:11,714
+Remember what I said at the start,
+agents fail quietly, and the line
+
+107
+00:08:11,714 --> 00:08:14,324
+on the screen says it simply.
+
+108
+00:08:15,042 --> 00:08:19,526
+A run can finish, return perfect
+JSON, and still be wrong.
+
+109
+00:08:20,356 --> 00:08:23,043
+So you need a way to see that.
+
+110
+00:08:23,734 --> 00:08:29,606
+We do it in two layers
+Here they are side by side.
+
+111
+00:08:30,389 --> 00:08:32,187
+On the left, code checks.
+
+112
+00:08:33,003 --> 00:08:36,911
+On every single run,
+they are cheap and fast.
+
+113
+00:08:38,144 --> 00:08:39,962
+Is the output the right shape?
+
+114
+00:08:40,948 --> 00:08:45,604
+Did any raw tool text leak
+into what the user sees?
+
+115
+00:08:46,973 --> 00:08:50,475
+Or any internal names, any errors?
+
+116
+00:08:51,756 --> 00:08:58,216
+We also score how much we should
+trust each run based on what
+
+117
+00:08:58,325 --> 00:09:00,483
+it actually managed to find.
+
+118
+00:09:02,081 --> 00:09:05,491
+On the right, AI judges on a sample.
+
+119
+00:09:06,444 --> 00:09:08,472
+One judge checks grounding.
+
+120
+00:09:09,854 --> 00:09:15,436
+That is, is every claim backed up
+by what the agent actually found?
+
+121
+00:09:15,893 --> 00:09:21,846
+We run it on 20% of runs for
+about 30 customer-facing agents.
+
+122
+00:09:22,945 --> 00:09:26,623
+Our second judge checks
+one very specific thing.
+
+123
+00:09:27,321 --> 00:09:30,022
+Is this even about the right company?
+
+124
+00:09:30,807 --> 00:09:33,240
+That one runs on 10%.
+
+125
+00:09:34,227 --> 00:09:36,955
+At the bottom of the card,
+you can see the volume.
+
+126
+00:09:37,667 --> 00:09:44,575
+Last month, about 1,700 judge, judge
+scores a- across our environments,
+
+127
+00:09:45,258 --> 00:09:51,797
+about 1,700 of them on production
+runs, and each score about 700 of
+
+128
+00:09:51,798 --> 00:09:58,098
+them on production runs, and each
+score comes back in about 30 seconds.
+
+129
+00:09:58,963 --> 00:10:04,362
+Now, setting this up taught
+us a few things, the hard way.
+
+130
+00:10:04,945 --> 00:10:05,946
+Here's the first one
+
+131
+00:10:06,946 --> 00:10:13,002
+When we first turned on the grounding
+judge, it gave one of our good analysis
+
+132
+00:10:13,570 --> 00:10:16,964
+the score you see on the left, 0.2
+
+133
+00:10:17,369 --> 00:10:18,154
+out of one.
+
+134
+00:10:19,156 --> 00:10:22,477
+It looked like the agent
+was making things up.
+
+135
+00:10:23,225 --> 00:10:24,041
+It wasn't.
+
+136
+00:10:24,624 --> 00:10:26,049
+The problem was the judge.
+
+137
+00:10:26,928 --> 00:10:31,764
+As the label says, it only saw,
+saw the prompt and the answer.
+
+138
+00:10:32,689 --> 00:10:37,413
+It never saw what actually
+agent had found with its tools.
+
+139
+00:10:38,175 --> 00:10:46,299
+So every real fact the agent had
+looked up, looked made up, made up
+
+140
+00:10:46,299 --> 00:10:54,174
+to, to the judges So once we added
+the tool outputs to the trace and the
+
+141
+00:10:54,175 --> 00:10:58,884
+judge could see the real evidence,
+the same answer scored what you see on
+
+142
+00:10:58,886 --> 00:11:02,045
+the right side, zero point nine five.
+
+143
+00:11:02,849 --> 00:11:06,261
+Eighteen of 19 claims backed up.
+
+144
+00:11:07,191 --> 00:11:09,236
+So the lesson is the title of the slide.
+
+145
+00:11:09,741 --> 00:11:12,983
+Judge what the agent found, not the prompt
+
+146
+00:11:13,983 --> 00:11:20,119
+The second thing we learned is that
+scores can lie in really boring ways.
+
+147
+00:11:20,856 --> 00:11:22,258
+Three of them are on the screen.
+
+148
+00:11:23,147 --> 00:11:28,616
+The first card, one of our checks
+looked for a long random-looking
+
+149
+00:11:28,618 --> 00:11:31,182
+string to catch leaked IDs.
+
+150
+00:11:32,218 --> 00:11:33,875
+It fired on every single one.
+
+151
+00:11:34,592 --> 00:11:35,364
+Every one.
+
+152
+00:11:36,765 --> 00:11:42,529
+Turns out signed download links
+are long random-looking strings.
+
+153
+00:11:43,457 --> 00:11:46,506
+So a check that always fires is broken.
+
+154
+00:11:47,919 --> 00:11:49,810
+The middle card is the opposite.
+
+155
+00:11:50,817 --> 00:11:53,512
+The score that never moves is dead.
+
+156
+00:11:54,611 --> 00:11:56,210
+Either way, it's telling you nothing.
+
+157
+00:11:57,077 --> 00:12:00,029
+And the last card is
+the fix for the judges.
+
+158
+00:12:00,756 --> 00:12:03,580
+Plant a known bad case.
+
+159
+00:12:04,267 --> 00:12:09,487
+Before we trusted a judge, we
+gave it cases we knew were bad
+
+160
+00:12:10,006 --> 00:12:12,263
+and checked that it caught them.
+
+161
+00:12:13,591 --> 00:12:17,055
+Eight out of eight before it went live.
+
+162
+00:12:18,222 --> 00:12:23,791
+But even so, a later test showed
+ours was still too lenient.
+
+163
+00:12:24,673 --> 00:12:29,019
+So calibration isn't a one-time
+thing, and a lenient judge is
+
+164
+00:12:29,031 --> 00:12:34,530
+worse than no judge because it
+makes you feel safe when you aren't
+
+165
+00:12:35,530 --> 00:12:35,568
+Yeah.
+
+166
+00:12:36,498 --> 00:12:38,774
+And the third lesson is the humbling one.
+
+167
+00:12:39,520 --> 00:12:40,588
+It's the whole slide.
+
+168
+00:12:41,547 --> 00:12:47,720
+When we were comparing models, one of
+them won on every score, every check
+
+169
+00:12:47,760 --> 00:12:55,168
+passed, every score green, and it had
+written a whole brief about a wrong
+
+170
+00:12:55,177 --> 00:12:59,447
+company No average will ever catch that.
+
+171
+00:13:00,395 --> 00:13:03,999
+Someone had to actually read it.
+
+172
+00:13:04,616 --> 00:13:12,884
+So today, a judge checks for exactly
+that, and we still read outputs ourselves.
+
+173
+00:13:13,962 --> 00:13:20,009
+That's also how we caught things
+like a filing agent that invented
+
+174
+00:13:20,009 --> 00:13:25,783
+financials or a news agent that
+invented a multi-billion deal.
+
+175
+00:13:27,337 --> 00:13:31,134
+And that-- And on top of
+all of this, we have alerts.
+
+176
+00:13:32,024 --> 00:13:38,866
+Errors above five an hour, grounding
+below zero point four, wrong company
+
+177
+00:13:39,251 --> 00:13:45,389
+z-- below zero point eight, and we
+filed every alert once on purpose
+
+178
+00:13:46,063 --> 00:13:49,499
+just to make sure it really reaches us
+
+179
+00:13:50,499 --> 00:13:52,151
+So that's quality.
+
+180
+00:13:52,773 --> 00:13:56,732
+It's one place agents fail quietly.
+
+181
+00:13:57,452 --> 00:14:04,160
+Cost is another one, and that's the
+pattern three: know what every run costs.
+
+182
+00:14:05,543 --> 00:14:06,945
+It starts with measuring.
+
+183
+00:14:07,951 --> 00:14:14,796
+As the slide says, every model call in
+our system goes through one single place.
+
+184
+00:14:15,753 --> 00:14:22,436
+That place works out what the call
+cost, including cache reads and
+
+185
+00:14:22,436 --> 00:14:28,449
+writes, and attaches it to the run,
+and our numbers match the bill.
+
+186
+00:14:29,654 --> 00:14:31,867
+And just doing that found things.
+
+187
+00:14:32,585 --> 00:14:34,080
+Look at the line at the bottom.
+
+188
+00:14:34,540 --> 00:14:38,053
+One agent was making
+34 model calls per run.
+
+189
+00:14:39,028 --> 00:14:42,465
+You can't fix what you
+can't see run by run
+
+190
+00:14:43,465 --> 00:14:48,652
+Over a few months, we've brought
+the cost of an agent run down by
+
+191
+00:14:48,665 --> 00:14:52,581
+the numbers you see, about 75%.
+
+192
+00:14:53,264 --> 00:15:00,153
+One not-- one note on that, written just
+under it, this is from staging data.
+
+193
+00:15:01,167 --> 00:15:05,524
+We ran the same deal five
+times as the changes shipped.
+
+194
+00:15:07,021 --> 00:15:10,337
+The three cards are the
+three of the biggest changes.
+
+195
+00:15:11,010 --> 00:15:13,762
+On the left, fewer round trips.
+
+196
+00:15:14,425 --> 00:15:20,487
+Our document agents worked in long
+loops, eight to 12 rounds with
+
+197
+00:15:20,500 --> 00:15:24,383
+the model, and every round sends
+the whole conversation again.
+
+198
+00:15:24,927 --> 00:15:30,364
+So you pay for it again and again,
+where the agent already had what
+
+199
+00:15:30,365 --> 00:15:35,009
+it needed, and we, and we moved
+it to one main structured call.
+
+200
+00:15:35,788 --> 00:15:39,704
+So eight to 12 rounds became two or three.
+
+201
+00:15:40,969 --> 00:15:45,368
+In the middle, the silent cache
+fix I told you about at the start.
+
+202
+00:15:46,051 --> 00:15:50,514
+And on the right, cleaning
+up tools results in the code
+
+203
+00:15:51,629 --> 00:15:53,103
+before the model sees them.
+
+204
+00:15:53,877 --> 00:15:57,850
+One tool gave back two to seven
+thousand tokens of raw data.
+
+205
+00:15:59,249 --> 00:16:05,826
+A small bit of code now turns that
+into three to five hundred tokens with
+
+206
+00:16:05,837 --> 00:16:12,150
+just what matters, and the answers
+actually got more accurate, not less.
+
+207
+00:16:13,150 --> 00:16:15,417
+Now here is something people don't expect.
+
+208
+00:16:16,326 --> 00:16:18,355
+Caching can lose you money.
+
+209
+00:16:19,448 --> 00:16:20,737
+Look at these three bars.
+
+210
+00:16:21,518 --> 00:16:24,165
+The top one is the normal input price.
+
+211
+00:16:24,951 --> 00:16:30,977
+The orange one is writing to
+a five-minute cache, one and a
+
+212
+00:16:30,977 --> 00:16:33,060
+quarter times the normal price.
+
+213
+00:16:33,545 --> 00:16:38,971
+And that tiny bar at the bottom is reading
+from the cache, a tenth of the price.
+
+214
+00:16:40,038 --> 00:16:46,171
+So caching only pays off if you
+read back enough of what you write.
+
+215
+00:16:47,316 --> 00:16:52,534
+As it says below, the break-even
+is about zero point two
+
+216
+00:16:52,556 --> 00:16:54,499
+eight reads for every write.
+
+217
+00:16:56,391 --> 00:17:01,937
+We had four agent that almost
+never got a second read in time.
+
+218
+00:17:02,936 --> 00:17:10,889
+For them, caching was costing more than it
+saved, so we turned it off for these four.
+
+219
+00:17:12,243 --> 00:17:18,711
+Before you assume caching is helping,
+check your real reads and writes
+
+220
+00:17:19,712 --> 00:17:24,377
+And one more things about the cost:
+the platform can change under you.
+
+221
+00:17:25,672 --> 00:17:30,261
+When you add a new cache point,
+Bedrock only looks back a
+
+222
+00:17:30,262 --> 00:17:32,064
+short way to find the old one.
+
+223
+00:17:33,072 --> 00:17:37,667
+The card on the left is what
+I measured in early October.
+
+224
+00:17:38,438 --> 00:17:44,087
+Every tool call and every
+tool result counted as a step.
+
+225
+00:17:45,025 --> 00:17:49,417
+So a turn with lots of parallel
+tool calls lost the cache.
+
+226
+00:17:50,715 --> 00:17:55,572
+The card on right is what I found when
+I tested again at the end of October.
+
+227
+00:17:56,362 --> 00:17:57,891
+That had changed.
+
+228
+00:17:58,711 --> 00:18:06,613
+A group of parallel tool calls now
+counts as one step, which matches how
+
+229
+00:18:06,676 --> 00:18:10,083
+Anthropic's own documents describe it.
+
+230
+00:18:11,042 --> 00:18:15,910
+That's good news for everyone, but the
+lesson is the line below the cards.
+
+231
+00:18:16,760 --> 00:18:21,279
+Keep a live check for the
+things your cost depend on.
+
+232
+00:18:22,413 --> 00:18:28,233
+I maintain a small open source
+tool for exactly this called Cache
+
+233
+00:18:28,246 --> 00:18:32,208
+Canary, so I retest it regularly.
+
+234
+00:18:32,985 --> 00:18:36,325
+Whatever you use, test it yourself.
+
+235
+00:18:37,031 --> 00:18:42,052
+Don't trust last quarter's
+blog post, including mine
+
+236
+00:18:43,052 --> 00:18:49,324
+Before we get to speed, I want to be
+honest about what didn't work because
+
+237
+00:18:49,339 --> 00:18:52,285
+these four taught me just as much.
+
+238
+00:18:53,144 --> 00:18:58,425
+Top left, we tried a lower
+effort settings to save money.
+
+239
+00:18:59,378 --> 00:19:07,182
+It actually cost more, twenty-four to
+sixty-four percent more input because
+
+240
+00:19:07,193 --> 00:19:13,086
+the model started making its tool
+calls one by one instead of together.
+
+241
+00:19:14,404 --> 00:19:17,168
+Top right, we built a cache warmer.
+
+242
+00:19:17,715 --> 00:19:22,630
+After some other changes, it could
+never get a cache hit, but its
+
+243
+00:19:22,686 --> 00:19:25,386
+logs still said warmed every time.
+
+244
+00:19:26,170 --> 00:19:31,296
+We only found out because we
+measured the hits, not the log lines.
+
+245
+00:19:33,006 --> 00:19:36,346
+Bottom left, we doubled
+our parallel workers.
+
+246
+00:19:36,975 --> 00:19:40,749
+On one sample, it looked
+sixty-four percent better.
+
+247
+00:19:41,230 --> 00:19:46,705
+On three samples, it was sixteen
+percent worse, so we reverted it.
+
+248
+00:19:47,183 --> 00:19:48,765
+One sample lies.
+
+249
+00:19:50,008 --> 00:19:55,186
+And the bottom right, we tested a
+newer model whose tokenizer turned
+
+250
+00:19:55,439 --> 00:20:02,310
+our prompts into about forty-eight
+percent more tokens with no gain
+
+251
+00:20:02,310 --> 00:20:05,279
+in quality, so we didn't switch
+
+252
+00:20:06,279 --> 00:20:09,103
+Which brings me to the
+last pattern, speed.
+
+253
+00:20:10,350 --> 00:20:14,881
+Researching a new company took our
+system about thirty-two minutes.
+
+254
+00:20:15,450 --> 00:20:21,458
+Users were waiting, and the idea on the
+table was what you see on the screen.
+
+255
+00:20:22,426 --> 00:20:26,554
+Send users text updates to
+keep them busy while they wait.
+
+256
+00:20:27,546 --> 00:20:34,255
+But before building that, I asked the
+question in orange: Why thirty-two
+
+257
+00:20:34,266 --> 00:20:35,993
+minutes in the first place?
+
+258
+00:20:37,004 --> 00:20:41,255
+So I looked at the timeline of real runs.
+
+259
+00:20:41,679 --> 00:20:42,829
+It wasn't the model.
+
+260
+00:20:43,745 --> 00:20:45,415
+We weren't being throttled.
+
+261
+00:20:46,078 --> 00:20:51,957
+Thirteen agents were simply running
+one after another, one step at a time
+
+262
+00:20:52,957 --> 00:20:59,662
+You can see it at the top of the
+slide, 13 agents in a line, one
+
+263
+00:20:59,702 --> 00:21:04,970
+after another, and most of those
+agents didn't need each other.
+
+264
+00:21:06,459 --> 00:21:12,426
+So I checked what each agent really
+needs and grouped them into levels.
+
+265
+00:21:13,151 --> 00:21:14,436
+That's the picture below.
+
+266
+00:21:15,428 --> 00:21:21,047
+The first level had seven agents that
+didn't depend on any other agent.
+
+267
+00:21:22,110 --> 00:21:28,240
+The second had four agents that
+needed something from the first,
+
+268
+00:21:29,149 --> 00:21:31,624
+and the third had only two.
+
+269
+00:21:32,653 --> 00:21:35,557
+Everything in a level runs together.
+
+270
+00:21:36,083 --> 00:21:41,537
+And when one lev-- when one level
+is done, the next one starts.
+
+271
+00:21:42,148 --> 00:21:45,631
+Same agents, same model,
+only the order changed.
+
+272
+00:21:46,947 --> 00:21:49,481
+And the result is the
+big number on the right.
+
+273
+00:21:50,067 --> 00:21:56,200
+The median went from 32 and
+a half minutes to about 10.7,
+
+274
+00:21:57,121 --> 00:22:04,698
+and it stayed around 11 over
+700 production runs in 45 days.
+
+275
+00:22:06,292 --> 00:22:13,429
+One small side note: caching helped our
+cost a lot, but it wasn't really a speed
+
+276
+00:22:13,429 --> 00:22:17,272
+fix, so don't count on it for that.
+
+277
+00:22:18,593 --> 00:22:20,796
+And we never built the
+text message feature.
+
+278
+00:22:21,304 --> 00:22:27,226
+So draw the dependency graph before
+you build something to hide the wait
+
+279
+00:22:28,226 --> 00:22:31,392
+So let me pull, pull,
+pull it all together.
+
+280
+00:22:31,929 --> 00:22:37,929
+These are the seven things
+I would again on day one, I
+
+281
+00:22:37,930 --> 00:22:39,938
+would do again on the day one.
+
+282
+00:22:40,673 --> 00:22:46,093
+first, put math, formatting,
+and data changes in the code.
+
+283
+00:22:46,685 --> 00:22:52,193
+Second, code checks on every
+run and judges on a sample.
+
+284
+00:22:53,413 --> 00:22:58,680
+Third, judge against what
+the agent actually found.
+
+285
+00:22:59,812 --> 00:23:05,275
+Fourth, fire every alert once on purpose.
+
+286
+00:23:06,870 --> 00:23:12,542
+Fifth, price you every run
+yourself, cache included.
+
+287
+00:23:14,029 --> 00:23:18,707
+Six, turn caching off
+where it loses money.
+
+288
+00:23:19,782 --> 00:23:27,005
+And seven, draw the graph before you
+build anything to hide a slow system.
+
+289
+00:23:28,231 --> 00:23:34,258
+On the right, there are a few more, so
+feel free to take a screenshot of this one
+
+290
+00:23:35,258 --> 00:23:41,225
+If you take away one thing today,
+let it be the line on the screen.
+
+291
+00:23:42,243 --> 00:23:49,999
+Agents usually don't fail loudly, and
+every pattern I showed you is about
+
+292
+00:23:50,041 --> 00:23:56,803
+removing one more place where the system
+can be wrong without even telling you.
+
+293
+00:23:58,086 --> 00:24:04,114
+So thank you so much for listening,
+and thanks to Conf42 for having me.
+
+294
+00:24:04,855 --> 00:24:08,972
+If you are running agents in
+production and want to swap
+
+295
+00:24:08,972 --> 00:24:11,515
+notes, my LinkedIn is right there.
+
+296
+00:24:12,364 --> 00:24:17,621
+And if you want to check your own
+prompt caching on Bedrock, Cache
+
+297
+00:24:17,627 --> 00:24:20,615
+Canary is free at cachecanary.com.
+
+298
+00:24:21,478 --> 00:24:24,818
+I would really love to
+hear what's working for you

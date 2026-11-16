@@ -1,0 +1,1053 @@
+1
+00:00:00,000 --> 00:00:01,360
+hi, I'm Ankur Mehra.
+
+2
+00:00:01,414 --> 00:00:07,145
+I have been working with, major US banks
+for fifteen plus years, so I carry rich
+
+3
+00:00:07,145 --> 00:00:09,724
+experience in financial risk technology.
+
+4
+00:00:10,402 --> 00:00:14,814
+Today, I want to talk about, building
+the resilient MLOps pipelines for
+
+5
+00:00:14,884 --> 00:00:17,365
+illiquid loans portfolio valuation.
+
+6
+00:00:17,937 --> 00:00:19,393
+So that's a mouthful.
+
+7
+00:00:19,704 --> 00:00:20,938
+So here's the short version.
+
+8
+00:00:21,644 --> 00:00:27,688
+When a financial institution value loans
+that don't trade on an open market, like
+
+9
+00:00:27,688 --> 00:00:33,815
+how a stock trades on an open market,
+the model is only half the story.
+
+10
+00:00:34,437 --> 00:00:37,269
+The other half is the pipeline around it.
+
+11
+00:00:37,798 --> 00:00:43,628
+And my argument today is that reliability,
+traceability, and reproducibility
+
+12
+00:00:43,724 --> 00:00:45,450
+are core engineering requirements.
+
+13
+00:00:45,485 --> 00:00:51,290
+They are not afterthoughts the
+challenge, from models to production.
+
+14
+00:00:52,104 --> 00:00:56,321
+So banks and lenders, they hold
+mortgages, they hold commercial
+
+15
+00:00:56,326 --> 00:01:02,031
+loans and other lending assets that
+don't have a quoted market price.
+
+16
+00:01:02,346 --> 00:01:07,369
+Like a stock will have a quoted market
+price, but, these mortgages will not.
+
+17
+00:01:07,902 --> 00:01:09,548
+You can't look up their value.
+
+18
+00:01:09,939 --> 00:01:15,615
+You actually have to model it and
+keep remodeling it as rates, spreads,
+
+19
+00:01:15,690 --> 00:01:17,612
+and borrower behavior changes.
+
+20
+00:01:18,278 --> 00:01:23,564
+So the models themselves are often quite
+sophisticated, but in my experience,
+
+21
+00:01:23,896 --> 00:01:28,161
+getting them into production reliably
+is a very hard problem to solve.
+
+22
+00:01:29,009 --> 00:01:30,376
+Now, I have two points here.
+
+23
+00:01:30,767 --> 00:01:34,597
+First, accuracy alone is insufficient.
+
+24
+00:01:35,052 --> 00:01:41,387
+A great model that can be run
+consistently at scale isn't useful.
+
+25
+00:01:42,071 --> 00:01:45,151
+Second, auditability is non-negotiable.
+
+26
+00:01:45,773 --> 00:01:50,167
+Regulators expect every
+valuation to be explainable and
+
+27
+00:01:50,169 --> 00:01:53,192
+traceable back to its inputs.
+
+28
+00:01:54,594 --> 00:01:58,195
+So our agenda for today.
+
+29
+00:01:58,728 --> 00:02:00,482
+So here's how we will go.
+
+30
+00:02:00,673 --> 00:02:05,345
+First, the pipeline architecture,
+how market data, scenarios, and
+
+31
+00:02:05,420 --> 00:02:07,333
+cash flow models fit together.
+
+32
+00:02:07,840 --> 00:02:12,364
+Second, versioning and
+reproducibility, how to rerun
+
+33
+00:02:12,379 --> 00:02:14,461
+any historical valuation exactly.
+
+34
+00:02:15,070 --> 00:02:20,050
+Third, observability and controls,
+which includes testing, lineage,
+
+35
+00:02:20,075 --> 00:02:22,040
+failure handling, and validation.
+
+36
+00:02:22,495 --> 00:02:27,072
+And finally, event-driven processing,
+how to read, market changes
+
+37
+00:02:27,079 --> 00:02:29,217
+without recomputing everything.
+
+38
+00:02:30,059 --> 00:02:35,903
+So let's, start with the
+pipeline architecture.
+
+39
+00:02:36,903 --> 00:02:37,243
+Okay.
+
+40
+00:02:37,884 --> 00:02:41,485
+at its core, the pipeline
+has three stages.
+
+41
+00:02:42,360 --> 00:02:45,060
+Market data ingestion comes first.
+
+42
+00:02:45,468 --> 00:02:47,421
+That's everything the model depends on.
+
+43
+00:02:47,960 --> 00:02:52,766
+The scenario setup, where we decide
+which economic assumptions to apply,
+
+44
+00:02:53,254 --> 00:02:57,392
+and finally, cash flow modeling,
+where we project payments and
+
+45
+00:02:57,392 --> 00:02:59,345
+discount them to a present value.
+
+46
+00:03:00,196 --> 00:03:05,109
+The principle that matters most,
+each stage must be independently
+
+47
+00:03:05,126 --> 00:03:10,681
+versioned, testable, and auditable,
+and failures must be isolated.
+
+48
+00:03:11,294 --> 00:03:14,021
+A bad input should stop the pipeline.
+
+49
+00:03:14,447 --> 00:03:18,314
+It should never be silently
+passed downstream into a number
+
+50
+00:03:18,600 --> 00:03:21,670
+someone signs off on Okay.
+
+51
+00:03:22,055 --> 00:03:25,926
+So now market data ingestion.
+
+52
+00:03:26,260 --> 00:03:32,106
+So every downstream depends on market
+data, so treat it as first-class
+
+53
+00:03:32,540 --> 00:03:34,417
+artifact with full lineage.
+
+54
+00:03:35,306 --> 00:03:40,261
+In practice, we ingest rate curves,
+credit spreads, and prepayment
+
+55
+00:03:40,286 --> 00:03:42,559
+indices for multiple providers.
+
+56
+00:03:43,057 --> 00:03:47,544
+Every ingestion batch gets a
+timestamp and a hash, so we can prove
+
+57
+00:03:47,545 --> 00:03:50,524
+exactly which data a valuation used.
+
+58
+00:03:50,886 --> 00:03:56,921
+We run schema validation and anomaly
+detection right at the boundary before
+
+59
+00:03:56,939 --> 00:04:02,794
+bad data gets in, and anything rejected
+or malformed goes to a dead letter queue,
+
+60
+00:04:03,220 --> 00:04:13,170
+so it's quarantined and reviewable, not
+quietly lost Okay, moving on to Cash
+
+61
+00:04:13,182 --> 00:04:16,211
+flow, configurable economic, scenarios.
+
+62
+00:04:16,440 --> 00:04:18,332
+So next is scenario management.
+
+63
+00:04:18,733 --> 00:04:23,762
+The goal is to separate economic
+assumptions from model logic.
+
+64
+00:04:24,168 --> 00:04:28,290
+Team needs to run a base case,
+stress cases, and regulatory
+
+65
+00:04:28,291 --> 00:04:32,645
+scenarios against the same cash flow
+engine without changing any code.
+
+66
+00:04:33,222 --> 00:04:35,094
+So we have three building blocks here.
+
+67
+00:04:35,505 --> 00:04:40,578
+A scenario registry where each
+scenario is named, versioned, and
+
+68
+00:04:40,578 --> 00:04:42,990
+stored as an immutable artifact.
+
+69
+00:04:43,560 --> 00:04:48,746
+Parameterized runs where scenario
+overrides are injected when the pipeline
+
+70
+00:04:48,764 --> 00:04:51,040
+is invoked and never hard-coded.
+
+71
+00:04:51,472 --> 00:04:56,280
+And parallel execution fanning out
+across scenarios at the same time,
+
+72
+00:04:56,641 --> 00:05:02,424
+which is faster and guarantees
+that all ran on identical inputs.
+
+73
+00:05:03,769 --> 00:05:09,945
+Okay, so next is, cash flow
+modeling and discounting.
+
+74
+00:05:10,530 --> 00:05:14,960
+So essentially, the heart of the
+system is the cash flow engine
+
+75
+00:05:15,522 --> 00:05:17,770
+with four design principles.
+
+76
+00:05:18,517 --> 00:05:23,058
+The first one is the engine itself,
+which is stateless and deterministic.
+
+77
+00:05:23,674 --> 00:05:27,522
+Identical inputs, identical
+outputs every time.
+
+78
+00:05:28,147 --> 00:05:32,109
+Second is prepayment and
+credit models are pluggable.
+
+79
+00:05:32,602 --> 00:05:36,091
+You can swap one out without
+rewiring the pipeline.
+
+80
+00:05:36,614 --> 00:05:42,188
+And third is the discount curves are
+injected, not embedded in model logic.
+
+81
+00:05:42,863 --> 00:05:46,990
+And finally, the fourth one,
+we output the intermediate cash
+
+82
+00:05:46,990 --> 00:05:49,791
+flows, not just the final NPV.
+
+83
+00:05:50,149 --> 00:05:55,830
+When a value moves, those intermediate
+numbers are how you explain why.
+
+84
+00:05:57,405 --> 00:06:04,020
+Okay, so we will move on to
+chapter two, which is our
+
+85
+00:06:04,115 --> 00:06:06,772
+versioning and reproducibility.
+
+86
+00:06:07,687 --> 00:06:08,724
+Okay, let's begin.
+
+87
+00:06:09,597 --> 00:06:14,097
+So versioning essentially
+has three layers.
+
+88
+00:06:14,964 --> 00:06:19,704
+The first one is the data version,
+which includes the market data snapshot,
+
+89
+00:06:20,196 --> 00:06:22,547
+portfolio positions, and reference data.
+
+90
+00:06:23,279 --> 00:06:27,576
+Now, another form of versioning is
+assumption versioning, which includes
+
+91
+00:06:27,608 --> 00:06:32,094
+prepayment speeds, credit loss
+curves, discount rate conventions.
+
+92
+00:06:32,398 --> 00:06:37,677
+And finally, model config versions,
+which is algorithmic parameters,
+
+93
+00:06:37,871 --> 00:06:40,519
+feature sets, and calibration output.
+
+94
+00:06:40,984 --> 00:06:41,998
+The rule is simple.
+
+95
+00:06:42,539 --> 00:06:47,801
+Every valuation run ID must pin a
+specific version in all three layers.
+
+96
+00:06:48,275 --> 00:06:52,138
+Then you can reproduce any
+historical valuation just by
+
+97
+00:06:52,371 --> 00:06:55,373
+replaying its run manifest.
+
+98
+00:06:56,994 --> 00:06:57,652
+Okay.
+
+99
+00:06:58,467 --> 00:07:03,592
+Now I'll discuss about
+reproducing historical valuations.
+
+100
+00:07:03,999 --> 00:07:07,395
+So why does, reproducibility
+break in practice?
+
+101
+00:07:08,265 --> 00:07:11,297
+Usually it's, due to
+one of the four things.
+
+102
+00:07:12,357 --> 00:07:14,921
+reference data gets overwritten in place.
+
+103
+00:07:15,488 --> 00:07:18,971
+Model parameters live only
+in someone's notebook.
+
+104
+00:07:19,294 --> 00:07:22,359
+Someone make a manual override
+to an assumption and doesn't
+
+105
+00:07:22,361 --> 00:07:27,662
+document it, or a dependency gets
+upgraded in the middle of a cycle.
+
+106
+00:07:28,294 --> 00:07:30,776
+The fix is an immutable run manifest.
+
+107
+00:07:31,277 --> 00:07:35,806
+Every run emits a signed
+manifest with data snapshot IDs.
+
+108
+00:07:36,295 --> 00:07:40,579
+The assumption set hash, the
+model config version, and a hash
+
+109
+00:07:40,583 --> 00:07:44,406
+of the pipeline itself, and a
+digest of execution environment.
+
+110
+00:07:45,089 --> 00:07:49,271
+And critically, store manifests
+in append-only storage.
+
+111
+00:07:49,329 --> 00:07:50,506
+Never mutate them.
+
+112
+00:07:50,972 --> 00:07:54,600
+That manifest is your audit defense
+
+113
+00:07:55,600 --> 00:07:59,005
+Next up, I want to cover,
+safe model updates.
+
+114
+00:07:59,298 --> 00:08:06,390
+So models evolve over time, and updating
+a live valuation system is pretty risky.
+
+115
+00:08:06,596 --> 00:08:08,861
+So you need a structured promotion path.
+
+116
+00:08:09,578 --> 00:08:11,748
+So essentially, it
+starts in a shadow mode.
+
+117
+00:08:12,174 --> 00:08:17,885
+The new model runs in parallel on
+real data, but its output is not used.
+
+118
+00:08:18,399 --> 00:08:23,754
+Then a challenger test, which is
+head-to-head against the current baseline.
+
+119
+00:08:24,313 --> 00:08:28,316
+Then a staged rolled out to a
+subset of the portfolio, and
+
+120
+00:08:28,332 --> 00:08:30,477
+only then a full cut over.
+
+121
+00:08:30,977 --> 00:08:36,293
+At every step, rollback must be a single
+command with zero manual intervention.
+
+122
+00:08:36,831 --> 00:08:42,182
+If going back is hard, people hesitate,
+and that's when problem starts.
+
+123
+00:08:44,053 --> 00:08:44,489
+Okay.
+
+124
+00:08:44,790 --> 00:08:50,608
+So now we'll, discuss more about,
+observability and operational
+
+125
+00:08:50,628 --> 00:08:53,097
+controls, which is my chapter three.
+
+126
+00:08:53,762 --> 00:08:57,617
+So reproducibility tells you
+what happened after the fact.
+
+127
+00:08:58,033 --> 00:09:01,762
+Observability and controls tells
+you something wrong before a
+
+128
+00:09:01,781 --> 00:09:03,921
+bad number goes out the door.
+
+129
+00:09:05,465 --> 00:09:05,825
+Okay.
+
+130
+00:09:06,526 --> 00:09:10,952
+So what should you instrument?
+
+131
+00:09:11,154 --> 00:09:15,028
+Basically, there are four categories
+which we should be worried about.
+
+132
+00:09:15,990 --> 00:09:21,259
+the first one is the execution metrics,
+which includes stage latency, throughput,
+
+133
+00:09:21,539 --> 00:09:27,193
+retry rates, and at the end, this,
+tells us, is the pipeline healthy?
+
+134
+00:09:27,914 --> 00:09:32,589
+Now, the second metrics could be data
+quality, which includes null rates,
+
+135
+00:09:33,001 --> 00:09:35,686
+out-of-range values, distribution drift.
+
+136
+00:09:36,359 --> 00:09:39,717
+in this, the question really
+is, are the inputs healthy?
+
+137
+00:09:40,724 --> 00:09:46,562
+Now, the third metrics is model output,
+which is actually the shifts in the
+
+138
+00:09:46,583 --> 00:09:49,661
+NPV distribution spread anomalies.
+
+139
+00:09:50,115 --> 00:09:53,560
+And the question we ask here is,
+do the result look plausible?
+
+140
+00:09:54,515 --> 00:09:59,495
+And business rule checks, which includes
+portfolio-level constraints, validated
+
+141
+00:09:59,495 --> 00:10:01,218
+before any result is published.
+
+142
+00:10:01,686 --> 00:10:03,814
+That last one is the most important.
+
+143
+00:10:04,316 --> 00:10:07,503
+It's the final gate between
+the pipeline and the people
+
+144
+00:10:07,511 --> 00:10:11,598
+who rely on its numbers Okay.
+
+145
+00:10:11,941 --> 00:10:15,390
+Now, failure handling and data lineage.
+
+146
+00:10:15,934 --> 00:10:19,887
+So pipeline fails, that's
+for sure and that's given.
+
+147
+00:10:20,373 --> 00:10:24,229
+The question is whether
+failures are cheap and safe.
+
+148
+00:10:24,853 --> 00:10:26,542
+Three patterns can help us here.
+
+149
+00:10:27,748 --> 00:10:29,188
+Idempotent stages.
+
+150
+00:10:29,644 --> 00:10:32,341
+Identical input and identical output.
+
+151
+00:10:33,227 --> 00:10:38,207
+So retries are safe if we have identical
+input and as I said, identical output
+
+152
+00:10:38,548 --> 00:10:40,980
+with no side effects or duplicate writes.
+
+153
+00:10:41,765 --> 00:10:42,963
+Checkpoint and resume.
+
+154
+00:10:43,763 --> 00:10:49,221
+Save outputs at each stage boundary, so
+a failed run resumes from the last clean
+
+155
+00:10:49,221 --> 00:10:51,369
+checkpoint instead of starting over.
+
+156
+00:10:52,027 --> 00:10:55,741
+And full data lineage tracking
+every transformation from
+
+157
+00:10:55,742 --> 00:10:57,346
+source to final valuation.
+
+158
+00:10:57,884 --> 00:11:02,544
+You should be able to ask which run
+consumed this version of the rate
+
+159
+00:11:02,547 --> 00:11:04,803
+curve and get an answer in seconds.
+
+160
+00:11:05,241 --> 00:11:11,679
+When a vendor tells you a curve was
+wrong, that question matters a lot Okay.
+
+161
+00:11:12,064 --> 00:11:15,619
+next is, automated testing
+for valuation pipelines.
+
+162
+00:11:16,721 --> 00:11:20,239
+So valuation pipeline needs
+four layers of testing.
+
+163
+00:11:20,699 --> 00:11:26,179
+Unit test for code logic, which is
+your cash flow calculations, prepayment
+
+164
+00:11:26,179 --> 00:11:28,412
+formulas, discounting conventions.
+
+165
+00:11:28,957 --> 00:11:33,699
+Integration tests that run the
+pipeline end-to-end with synthetic loan
+
+166
+00:11:33,733 --> 00:11:36,480
+portfolios and controlled market data.
+
+167
+00:11:37,216 --> 00:11:42,186
+Regression tests that compare output
+against pinned historical baselines
+
+168
+00:11:42,251 --> 00:11:47,368
+after any change, so you know
+if a code change moved a number.
+
+169
+00:11:47,729 --> 00:11:53,019
+And stress test with extreme scenario
+inputs to confirm the system stays
+
+170
+00:11:53,085 --> 00:11:55,762
+numerically stable at the boundaries.
+
+171
+00:11:56,762 --> 00:12:00,038
+next is model validation and auditability.
+
+172
+00:12:00,702 --> 00:12:05,389
+So in regulated finance, someone
+independent will check your work,
+
+173
+00:12:05,603 --> 00:12:07,502
+so the idea is to build for it.
+
+174
+00:12:08,308 --> 00:12:13,897
+Independent validation teams need access
+to run manifest and intermediate output.
+
+175
+00:12:14,831 --> 00:12:18,900
+Challenger model comparison should
+be documented in the model risk
+
+176
+00:12:18,900 --> 00:12:23,484
+framework, and assumption sensitivity
+reports should be generated
+
+177
+00:12:23,981 --> 00:12:26,263
+automatically on every production run.
+
+178
+00:12:27,098 --> 00:12:32,736
+On the right is the audit pack of
+every run, the signed manifest, a
+
+179
+00:12:32,736 --> 00:12:38,655
+lineage graph report, intermediate
+cash flow snapshot, output distribution
+
+180
+00:12:38,662 --> 00:12:43,721
+statistics, the business rule
+validation report, and approval record.
+
+181
+00:12:44,535 --> 00:12:51,198
+The broader point here is regulators
+increasingly expect MLOps-grade controls.
+
+182
+00:12:51,675 --> 00:12:57,811
+Versioned models, documented assumptions,
+and reproducible outputs aren't just good
+
+183
+00:12:57,849 --> 00:13:01,579
+practice, they are examination targets.
+
+184
+00:13:03,536 --> 00:13:10,570
+Okay, this takes us to our chapter
+four, which is event-driven processing,
+
+185
+00:13:10,578 --> 00:13:14,883
+where we are going to talk about
+scale and how to stop recomputing
+
+186
+00:13:15,350 --> 00:13:18,992
+everything every time something changes.
+
+187
+00:13:19,409 --> 00:13:20,796
+So here we go
+
+188
+00:13:21,796 --> 00:13:26,114
+Most valuation systems revalue
+the whole portfolio on a schedule.
+
+189
+00:13:26,855 --> 00:13:32,611
+That works, but it's expensive
+and slow, and most of the compute
+
+190
+00:13:32,666 --> 00:13:35,772
+actually is spent on loans where
+nothing is actually changing.
+
+191
+00:13:36,396 --> 00:13:39,058
+Event-driven patterns flip that around.
+
+192
+00:13:39,605 --> 00:13:43,059
+You revalue only the segments
+affected by a change.
+
+193
+00:13:43,658 --> 00:13:48,027
+A rate curve update revalue
+just the rates and RV tranches.
+
+194
+00:13:48,744 --> 00:13:54,282
+A position change revalue just the
+impacted loans and an assumption
+
+195
+00:13:54,287 --> 00:14:00,500
+update, a scope rerun with lineage
+tracked so you can always see which
+
+196
+00:14:00,503 --> 00:14:02,116
+numbers were refreshed and why.
+
+197
+00:14:02,648 --> 00:14:07,771
+This is where the earlier pieces pay
+off because every input is versioned
+
+198
+00:14:07,851 --> 00:14:09,518
+and every dependency is tracked.
+
+199
+00:14:09,880 --> 00:14:13,422
+The system knows exactly
+what needs recomputing.
+
+200
+00:14:13,824 --> 00:14:17,560
+Lower compute cost, much lower latency
+
+201
+00:14:18,560 --> 00:14:18,941
+Okay.
+
+202
+00:14:19,319 --> 00:14:24,796
+Now I want to briefly touch base
+some key architectural principles.
+
+203
+00:14:25,084 --> 00:14:30,220
+So if I boil the architecture
+down, it rests on four principles.
+
+204
+00:14:30,767 --> 00:14:32,915
+Immutability as a foundation.
+
+205
+00:14:33,374 --> 00:14:38,887
+This is our data assumptions and
+configs are version and append only
+
+206
+00:14:39,316 --> 00:14:44,302
+because mutation is the root cause
+of most reproducibility failures.
+
+207
+00:14:44,883 --> 00:14:46,472
+Observability by design.
+
+208
+00:14:47,065 --> 00:14:50,840
+Instrument every stage from
+day one, so problems surface
+
+209
+00:14:50,863 --> 00:14:52,941
+before they reach stakeholders.
+
+210
+00:14:53,424 --> 00:14:59,104
+Testability at every layer with pipeline
+changes gated on a automated test passing.
+
+211
+00:14:59,691 --> 00:15:01,700
+And auditability as a feature.
+
+212
+00:15:02,094 --> 00:15:08,152
+Regulatory traceability as a product
+requirement built into core, not bolted on
+
+213
+00:15:09,152 --> 00:15:09,488
+Okay.
+
+214
+00:15:09,740 --> 00:15:13,304
+Now, some of the key takeaways.
+
+215
+00:15:13,323 --> 00:15:16,207
+So three things actually I
+would like you to take away.
+
+216
+00:15:16,657 --> 00:15:21,563
+First, in regulated valuation
+systems, reliability, traceability,
+
+217
+00:15:21,566 --> 00:15:24,871
+and reproducibility aren't
+optional engineering quality.
+
+218
+00:15:25,235 --> 00:15:27,836
+They are core MLOps requirements.
+
+219
+00:15:28,386 --> 00:15:32,463
+Second, versioning across
+data, assumptions, and model
+
+220
+00:15:32,467 --> 00:15:34,158
+config is the foundation.
+
+221
+00:15:34,554 --> 00:15:38,711
+Without it, you can't
+investigate a historical number
+
+222
+00:15:38,796 --> 00:15:40,394
+or defend it in an audit.
+
+223
+00:15:40,912 --> 00:15:45,519
+And third, event-driven architecture
+lets you respond to market and
+
+224
+00:15:45,528 --> 00:15:50,021
+portfolio changes quickly at a
+scale without recomputing the whole
+
+225
+00:15:50,410 --> 00:15:56,303
+portfolio every time Finally, I
+want to say thank you for your time.
+
+226
+00:15:56,330 --> 00:16:00,001
+I hope this gives you a practical
+blueprint for running valuation
+
+227
+00:16:00,011 --> 00:16:04,284
+models with same rigor we expect
+from the model themselves.
+
+228
+00:16:04,319 --> 00:16:07,812
+I'll be glad to continue the
+conversation, so feel free to reach out.
+
+229
+00:16:08,330 --> 00:16:09,299
+Thank you so much.
+

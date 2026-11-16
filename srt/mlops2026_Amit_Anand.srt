@@ -1,0 +1,1005 @@
+1
+00:00:00,300 --> 00:00:00,908
+Hello, everyone.
+
+2
+00:00:01,134 --> 00:00:05,836
+My name is Amit Anand, and my background
+is designing and developing distributed
+
+3
+00:00:05,836 --> 00:00:11,246
+system, payment system, data center
+applications, and these days, AI agents.
+
+4
+00:00:11,873 --> 00:00:16,655
+My argument, argument today fit, today
+fits in one sentence: The reliability
+
+5
+00:00:16,689 --> 00:00:20,628
+of agentic system is a property
+of the platform around the model.
+
+6
+00:00:21,442 --> 00:00:25,751
+I'll treat as a architectural review,
+of that platform, the workload, three
+
+7
+00:00:25,751 --> 00:00:29,324
+use case, the failure modes, different
+architecture, and five principle.
+
+8
+00:00:29,925 --> 00:00:33,331
+One incidence will, run
+through the entire talk
+
+9
+00:00:34,331 --> 00:00:38,178
+Start with the workload because every
+later decision comes from its shapes.
+
+10
+00:00:38,650 --> 00:00:41,943
+A trigger to start a, starts
+a run, and runtime then loops.
+
+11
+00:00:42,138 --> 00:00:45,954
+It plans and decisions through
+the model gateway, act through the
+
+12
+00:00:45,956 --> 00:00:50,132
+model gateway, writes a checkpoint
+or-- to a state store, and emit
+
+13
+00:00:50,181 --> 00:00:52,631
+telemetries tagged with the run ID.
+
+14
+00:00:52,874 --> 00:00:55,354
+It repeats until the goal is met.
+
+15
+00:00:55,857 --> 00:01:00,263
+I read this as a distributed long-running
+workflow whose control flow, flow
+
+16
+00:01:00,292 --> 00:01:02,530
+is chosen at the runtime by a model.
+
+17
+00:01:03,116 --> 00:01:07,029
+Every arrow in this diagram, if you
+see, it's a remote call that can be
+
+18
+00:01:07,029 --> 00:01:10,730
+slow, fail, or to-- and be re-retried
+
+19
+00:01:11,730 --> 00:01:14,217
+That saves, that save create four forces.
+
+20
+00:01:15,101 --> 00:01:20,258
+First, control flow is decided at the
+runtime, so you-- when you admit a run,
+
+21
+00:01:20,264 --> 00:01:23,175
+you don't know its length and its fan-out.
+
+22
+00:01:23,741 --> 00:01:26,752
+That calls for admission
+control and run budget.
+
+23
+00:01:27,669 --> 00:01:29,670
+Second, latency and failure compound.
+
+24
+00:01:30,092 --> 00:01:34,887
+A plain arithmetic, a ninety-nine
+percent success per step and no retries.
+
+25
+00:01:35,185 --> 00:01:39,594
+A fifty per step run completes
+and sixty percent of the time.
+
+26
+00:01:40,176 --> 00:01:44,926
+So you retry individual step, and
+each step must be safe to retry.
+
+27
+00:01:45,720 --> 00:01:48,541
+Third, run outl- outlive their compute.
+
+28
+00:01:48,604 --> 00:01:53,668
+Think about a pods which is, m- which is,
+which l-- whose life is shorter than the
+
+29
+00:01:53,670 --> 00:01:57,169
+run, or a deploy state or some deployment.
+
+30
+00:01:57,554 --> 00:01:59,005
+So a state has to be durable.
+
+31
+00:01:59,190 --> 00:02:01,540
+Fourth, the resource profile is mixed.
+
+32
+00:02:01,643 --> 00:02:06,795
+Think about something like a GPU-bound,
+CPU-bound, or I/O-bound tools in one run.
+
+33
+00:02:07,132 --> 00:02:11,535
+That calls a separate pools
+and scaling on works signals.
+
+34
+00:02:12,535 --> 00:02:14,349
+Three use cases drive this design.
+
+35
+00:02:14,742 --> 00:02:18,604
+For each, I name the control loop and
+one requirement that can-- cannot--
+
+36
+00:02:18,711 --> 00:02:20,075
+that you cannot compromise with.
+
+37
+00:02:20,788 --> 00:02:25,511
+Self-healing operation, telemetry,
+diagnostic remediation, and verification.
+
+38
+00:02:25,517 --> 00:02:29,023
+These are the control plane, and
+the requirement is safe actuation.
+
+39
+00:02:29,805 --> 00:02:33,544
+Second, the elastic agent platform,
+queue, schedule, run, and checkpoint.
+
+40
+00:02:33,559 --> 00:02:36,708
+These are the control plane and
+workplace scaling and durable
+
+41
+00:02:36,792 --> 00:02:38,368
+state is the hard requirement.
+
+42
+00:02:38,798 --> 00:02:43,283
+The third, autonomous pipeline, where
+the control plane is drift, evaluate,
+
+43
+00:02:43,909 --> 00:02:46,887
+ret-retrain, and gated, gated, rollout.
+
+44
+00:02:47,189 --> 00:02:50,578
+And the hard requirement,
+reproducible evaluation as promotion
+
+45
+00:02:50,578 --> 00:02:53,438
+gated, which is what we, needed.
+
+46
+00:02:53,462 --> 00:02:59,255
+The requirement, agents appear, twice
+here as a workload the platform runs
+
+47
+00:02:59,327 --> 00:03:01,761
+and as a operator of that platform.
+
+48
+00:03:02,606 --> 00:03:07,082
+Self-healing is where we two mates,
+so it, we'll go-- walk through in our
+
+49
+00:03:07,106 --> 00:03:12,691
+example Here is a incident which I-I'll
+follow through the rest of the talk.
+
+50
+00:03:13,301 --> 00:03:16,603
+Latency on API service rises
+slowly after the deployment.
+
+51
+00:03:17,083 --> 00:03:22,298
+A agent connects the incident, incident
+to recent changes and propose a rollback.
+
+52
+00:03:22,364 --> 00:03:25,713
+The policy gate decides whether
+the action is allowed or not.
+
+53
+00:03:26,107 --> 00:03:30,271
+Afterwards, it checks whether the
+latency and error actually improves.
+
+54
+00:03:30,777 --> 00:03:33,216
+Now, the same story in the
+diagram, if you see here.
+
+55
+00:03:33,664 --> 00:03:37,503
+The telemetry arrive, arrives
+through the OpenTelemetry, detection
+
+56
+00:03:37,854 --> 00:03:41,998
+correlate the alerts and traces
+and open, opens and one incident.
+
+57
+00:03:42,671 --> 00:03:45,895
+Diagnosis find the deployment,
+planning propose the rollback,
+
+58
+00:03:45,916 --> 00:03:47,070
+and it score the risk.
+
+59
+00:03:48,551 --> 00:03:51,757
+Then the-- it's, the most
+important box, the policy gate.
+
+60
+00:03:51,796 --> 00:03:53,459
+The planner cannot touch the production.
+
+61
+00:03:54,059 --> 00:03:58,120
+Policy as code decide whether the rollback
+is permitted on this service right now
+
+62
+00:03:58,297 --> 00:04:01,148
+and answers allow, deny, and ask a human.
+
+63
+00:04:02,540 --> 00:04:05,581
+If allowed, the change is,
+applied preferably as a Git
+
+64
+00:04:05,587 --> 00:04:08,224
+commit after a control reconciles.
+
+65
+00:04:08,781 --> 00:04:11,108
+Then the system check
+latency and error rates.
+
+66
+00:04:11,267 --> 00:04:13,409
+If they recover, the loop closes.
+
+67
+00:04:13,423 --> 00:04:17,874
+If result is unclear or worse,
+the default is to stop and
+
+68
+00:04:17,874 --> 00:04:20,066
+escalate to, the on-call engineer.
+
+69
+00:04:20,440 --> 00:04:26,156
+The automatic compensating action
+runs only w-w-only where one
+
+70
+00:04:26,167 --> 00:04:28,002
+has been defined and tested.
+
+71
+00:04:29,767 --> 00:04:33,708
+The incident memory records an
+outcome for the next time, and it--
+
+72
+00:04:33,943 --> 00:04:38,032
+so that it can be treated, it can
+be considered for the next time and
+
+73
+00:04:38,033 --> 00:04:41,306
+it, it, it, it can be re-evaluated
+
+74
+00:04:42,306 --> 00:04:43,015
+Now the failure modes.
+
+75
+00:04:43,684 --> 00:04:47,783
+I state them as a failure mode because
+the mechanism can be designed out.
+
+76
+00:04:48,015 --> 00:04:49,415
+All five are on the slide.
+
+77
+00:04:49,657 --> 00:04:51,605
+I'll talk through the three.
+
+78
+00:04:52,397 --> 00:04:53,850
+the first one is retry storm.
+
+79
+00:04:53,986 --> 00:04:57,781
+A model eight points-- endpoint
+slows, every agent retry together
+
+80
+00:04:57,816 --> 00:05:01,897
+and load peaks and then-- and
+when compa-- capacity is lowest.
+
+81
+00:05:02,248 --> 00:05:05,387
+It is-- That's is, also how cost run away.
+
+82
+00:05:06,366 --> 00:05:11,125
+The, the response is rate limits,
+jitter backbo-- backoff, and
+
+83
+00:05:11,244 --> 00:05:12,773
+load shedding, at the gateway.
+
+84
+00:05:13,516 --> 00:05:14,926
+The second is duplicate action.
+
+85
+00:05:14,950 --> 00:05:18,943
+In our incident, suppose the worker
+crashes after requesting the rollback,
+
+86
+00:05:19,167 --> 00:05:23,026
+but before recording the result,
+the blind retry repeats the changes.
+
+87
+00:05:23,338 --> 00:05:27,976
+So a-actions need idempotency keys,
+and when the outcome is unknown,
+
+88
+00:05:28,140 --> 00:05:30,297
+you verify state before retry.
+
+89
+00:05:31,036 --> 00:05:33,437
+The confused-- The last
+one is a confused deputy.
+
+90
+00:05:34,336 --> 00:05:37,973
+Text injected in the log
+liner-- log line steers an agent
+
+91
+00:05:37,988 --> 00:05:39,777
+that holds broad privileges.
+
+92
+00:05:40,471 --> 00:05:44,373
+The answer is that one architecture,
+and we will talk about that
+
+93
+00:05:45,373 --> 00:05:46,985
+The second issue is observability.
+
+94
+00:05:47,422 --> 00:05:52,256
+This is our rollback as a trace
+that run the model, calls that, that
+
+95
+00:05:52,274 --> 00:05:56,379
+plans a tool, calls the rollback,
+and Kubernetes patches underneath,
+
+96
+00:05:57,167 --> 00:05:58,736
+and the model calls that verify.
+
+97
+00:05:59,295 --> 00:06:02,016
+In most states, it
+breaks the three places.
+
+98
+00:06:02,042 --> 00:06:06,831
+Model and tool span comes f- from the
+different library and no shared context.
+
+99
+00:06:07,311 --> 00:06:10,544
+The Kubernetes changes carries, no run ID.
+
+100
+00:06:10,862 --> 00:06:14,718
+The audit log shows a serv-- a
+service account passed a deployment
+
+101
+00:06:14,732 --> 00:06:19,041
+and cannot say what decision caused
+it, and nothing records the outcome.
+
+102
+00:06:19,053 --> 00:06:22,872
+Every call returns two hundred
+whether or not latency recovered.
+
+103
+00:06:23,785 --> 00:06:27,892
+A long-running, workflow can span
+several linked traces, so the principle
+
+104
+00:06:27,892 --> 00:06:31,609
+is to connect the run ID, decisions,
+action, and outcome reliably.
+
+105
+00:06:32,166 --> 00:06:35,304
+Without that, you cannot evaluate
+an agent, and you should not
+
+106
+00:06:35,330 --> 00:06:39,673
+automate what you ne-- you cannot
+evaluate it Now the solution.
+
+107
+00:06:41,036 --> 00:06:43,506
+Here it is starting with
+the reference architecture.
+
+108
+00:06:43,866 --> 00:06:48,245
+one logical control plane per
+organization itself highly available.
+
+109
+00:06:49,030 --> 00:06:53,871
+Holds the registry of the model and tool
+that with their evaluation gates, GitOps
+
+110
+00:06:53,895 --> 00:06:58,179
+or poli-- and policy placement quota
+and the observ-observability backend.
+
+111
+00:06:58,777 --> 00:07:02,691
+The data plane is the identical,
+Kubernetes cluster per cloud,
+
+112
+00:07:02,785 --> 00:07:07,274
+agent worker, a GPU inference pool,
+tool sandbox states, and queue.
+
+113
+00:07:07,620 --> 00:07:11,881
+Desired state flows down
+and telemetry flows up.
+
+114
+00:07:12,854 --> 00:07:14,993
+Multi-cloud is design decis-- decision.
+
+115
+00:07:15,276 --> 00:07:17,547
+So ask when what happens one cloud fails.
+
+116
+00:07:17,998 --> 00:07:19,642
+There are two separate cases.
+
+117
+00:07:20,680 --> 00:07:24,197
+New inference requests, can
+be routed to other cloud,
+
+118
+00:07:24,245 --> 00:07:26,419
+possibly to the different model.
+
+119
+00:07:27,097 --> 00:07:28,208
+One, a different model.
+
+120
+00:07:28,253 --> 00:07:35,250
+A concrete pairing could be GKE, with
+the Vertex AI and EKS with Bedrock.
+
+121
+00:07:35,477 --> 00:07:40,373
+They are not interchangeable, so prompt
+and evaluation must pass on both.
+
+122
+00:07:40,964 --> 00:07:44,518
+Resuming a run that, that was
+already in progress in the
+
+123
+00:07:44,524 --> 00:07:45,865
+harder, is the harder case.
+
+124
+00:07:46,446 --> 00:07:49,631
+Its state must be durable and
+reachable after the failure.
+
+125
+00:07:50,210 --> 00:07:54,790
+You must know which worker run owns
+that, run, and you must know whether
+
+126
+00:07:55,261 --> 00:07:57,283
+an interrupted action already happened.
+
+127
+00:07:58,892 --> 00:08:03,081
+And the cluster must keep running
+on the, last sync state if the
+
+128
+00:08:03,084 --> 00:08:04,748
+control plane is unreachable.
+
+129
+00:08:05,447 --> 00:08:10,519
+You pay for all its, this in recovery
+time, data, residency constraint,
+
+130
+00:08:10,528 --> 00:08:12,666
+network cost, and idle GPUs
+
+131
+00:08:13,666 --> 00:08:15,145
+Zoom into one of the cluster.
+
+132
+00:08:15,795 --> 00:08:21,175
+Runs into the queue and a Keda
+scaler set the number of worker.
+
+133
+00:08:21,244 --> 00:08:23,410
+Queue depth and age drive scale out.
+
+134
+00:08:23,896 --> 00:08:29,199
+Depth can, depth can fall while
+long run are still active, so scale
+
+135
+00:08:29,199 --> 00:08:31,549
+in must also respect active runs.
+
+136
+00:08:33,013 --> 00:08:38,165
+During scale down, drain work, drain
+workers where possible and recover safely
+
+137
+00:08:38,362 --> 00:08:40,228
+if the worker is interrupted mid-step.
+
+138
+00:08:40,869 --> 00:08:44,686
+From the worker, reasoning goes
+through the model gateway to GPU pool.
+
+139
+00:08:45,336 --> 00:08:49,744
+I scale that pool on waiting
+request, queue time, and time to
+
+140
+00:08:49,747 --> 00:08:52,477
+first token, as well as throughput.
+
+141
+00:08:53,525 --> 00:08:56,619
+Because throughput flatten once
+the pool is saturated, action
+
+142
+00:08:56,619 --> 00:08:59,907
+go through the tool gateway to
+sandbox to the separate GPU pool.
+
+143
+00:09:01,772 --> 00:09:05,776
+After every state of the
+worker checkpoint, so another
+
+144
+00:09:05,802 --> 00:09:07,888
+worker can resume the run.
+
+145
+00:09:08,167 --> 00:09:11,753
+A checkpoint does not make
+a side effect or to repeat.
+
+146
+00:09:11,926 --> 00:09:17,931
+Recovery also needs to own on a per run
+and idempotent and deduplicated actions.
+
+147
+00:09:18,186 --> 00:09:19,739
+Finally, the run budget.
+
+148
+00:09:19,794 --> 00:09:21,801
+Limit the steps, time, and token.
+
+149
+00:09:22,203 --> 00:09:26,566
+A breach stop, breach stop
+the run and escalates.
+
+150
+00:09:27,566 --> 00:09:30,721
+The security comes down,
+to the trust boundary.
+
+151
+00:09:31,069 --> 00:09:37,634
+Everything in the agent read is untrusted,
+alerts, log, tickets, tool output.
+
+152
+00:09:37,697 --> 00:09:39,811
+So the agent runtime is a reasoning zone.
+
+153
+00:09:40,277 --> 00:09:41,466
+It is scoped identity.
+
+154
+00:09:41,482 --> 00:09:44,548
+It can be-- It can read the
+telemetry it needs, call the
+
+155
+00:09:44,551 --> 00:09:46,170
+model, and writes its own state.
+
+156
+00:09:46,349 --> 00:09:48,810
+It cannot change the
+in-infrastructure directly.
+
+157
+00:09:49,106 --> 00:09:53,157
+In our ins-incident, it emits
+the type request, roll back its
+
+158
+00:09:53,166 --> 00:09:55,287
+deployment in, in its namespace.
+
+159
+00:09:56,614 --> 00:09:59,421
+Here's the rule, every
+infrastructure-changing action
+
+160
+00:09:59,421 --> 00:10:02,893
+goes through the gateway that
+can refuse, that can be refused.
+
+161
+00:10:03,644 --> 00:10:06,327
+Your compliance evidence
+is the gateway log
+
+162
+00:10:07,327 --> 00:10:09,990
+How much autonomy should
+be, should the agent have?
+
+163
+00:10:10,515 --> 00:10:14,822
+I set it per action class by
+reversibility and blast radius.
+
+164
+00:10:15,134 --> 00:10:18,337
+Each cell on the slide
+is a s-- is a ceiling.
+
+165
+00:10:18,527 --> 00:10:21,694
+Reversible and narrow action
+may become autonomous.
+
+166
+00:10:22,858 --> 00:10:26,788
+A wide and irreversible
+one, ones need approval.
+
+167
+00:10:27,463 --> 00:10:31,662
+Reversible, reversible and wide
+ones stay recommended only.
+
+168
+00:10:32,151 --> 00:10:36,451
+every, every action class start with
+recommended, recommended only and step
+
+169
+00:10:36,480 --> 00:10:41,812
+up towards the ceiling, to approval and
+then to autonomous when it evolution
+
+170
+00:10:41,813 --> 00:10:44,690
+passes and its production record is clean.
+
+171
+00:10:45,153 --> 00:10:48,727
+In our incidence, rollback was
+allowed because the service had it
+
+172
+00:10:48,829 --> 00:10:51,507
+enabled and no migration was in flight
+
+173
+00:10:52,507 --> 00:10:55,298
+Five decisions, decisions
+are on, on this slide.
+
+174
+00:10:55,332 --> 00:10:56,146
+I'll talk three.
+
+175
+00:10:56,717 --> 00:10:57,674
+Run execution.
+
+176
+00:10:58,412 --> 00:11:02,833
+LangGraph gives you durable execution
+through checkpoint inside the application.
+
+177
+00:11:02,933 --> 00:11:07,062
+A workflow engine such as Temporal
+bring its own orchestration feature,
+
+178
+00:11:07,507 --> 00:11:12,173
+features and operational model, and
+you can, and two can be used together.
+
+179
+00:11:13,015 --> 00:11:16,132
+Decide by, by the recovery
+guarantee, features, and
+
+180
+00:11:16,132 --> 00:11:18,121
+operating model your team needs.
+
+181
+00:11:19,164 --> 00:11:23,148
+Either way, the external action
+can be retried after a failure, so
+
+182
+00:11:23,148 --> 00:11:25,483
+its effect must be handled safely.
+
+183
+00:11:26,835 --> 00:11:30,542
+The multi-cloud active-active can
+provide faster recovery, it-- but it
+
+184
+00:11:30,542 --> 00:11:32,911
+requires capacity across both clouds.
+
+185
+00:11:33,361 --> 00:11:37,287
+A primary standby design can--
+may cost less with recovery time
+
+186
+00:11:37,287 --> 00:11:41,743
+depending on how much capacity is
+already available remediation path.
+
+187
+00:11:42,281 --> 00:11:44,364
+A direct API call is fast.
+
+188
+00:11:44,499 --> 00:11:48,579
+A g-- a Git commit reconciled by a
+controller is slower and give you
+
+189
+00:11:48,581 --> 00:11:50,421
+review, audit, and drift control.
+
+190
+00:11:51,194 --> 00:11:54,771
+My default is Git for anything
+that change desired state
+
+191
+00:11:55,771 --> 00:11:57,832
+Two things to finish the solution.
+
+192
+00:11:57,984 --> 00:12:03,266
+First, the migration order for, order
+from the existing, state, join the trace,
+
+193
+00:12:03,454 --> 00:12:08,364
+insert the gateway in a recommendation
+mo- only mode, turn runbook into type
+
+194
+00:12:08,373 --> 00:12:11,063
+tool, then promote, promote by evidence.
+
+195
+00:12:11,396 --> 00:12:13,737
+Second, there is where MLOps come.
+
+196
+00:12:14,122 --> 00:12:16,307
+An agent relea-release like a model.
+
+197
+00:12:16,396 --> 00:12:20,517
+Version the model, the prompt, the
+tool, and the configuration together.
+
+198
+00:12:20,797 --> 00:12:23,349
+Evaluate the version on past incidents.
+
+199
+00:12:24,664 --> 00:12:26,522
+Did it find useful evidence?
+
+200
+00:12:26,620 --> 00:12:29,479
+Did it pro-propose an appropriate action?
+
+201
+00:12:29,539 --> 00:12:32,112
+Did it avoid unsafe one?
+
+202
+00:12:32,222 --> 00:12:34,738
+Did it stay within the
+time and the cost budget?
+
+203
+00:12:35,348 --> 00:12:39,797
+Then deploy gradually, monitor
+outcome, and roll back or revise.
+
+204
+00:12:40,714 --> 00:12:44,829
+A new prompt goes through
+the same gate as a new model
+
+205
+00:12:45,829 --> 00:12:48,028
+Here are the five principle,
+I would like to cover.
+
+206
+00:12:48,308 --> 00:12:51,121
+Model every agent run
+as a durable workflow.
+
+207
+00:12:51,647 --> 00:12:54,255
+Scale on work signal and budget every run.
+
+208
+00:12:54,455 --> 00:12:58,672
+Keep infrastructure privileges out of the
+agent and route action through one agent.
+
+209
+00:12:59,292 --> 00:13:02,757
+Connect decisions, action, and
+outcome through the run ID.
+
+210
+00:13:03,033 --> 00:13:08,589
+Grant ar-autonomy per action class,
+run evidence our incidents w-went
+
+211
+00:13:08,599 --> 00:13:12,299
+well because the platform, the
+gate, the gate, the trace, and the
+
+212
+00:13:12,299 --> 00:13:13,743
+checkpoint and the verification.
+
+213
+00:13:14,087 --> 00:13:16,376
+So I'll end where I begin.
+
+214
+00:13:16,698 --> 00:13:20,761
+The reliability of the agentic system
+is property of the platform around
+
+215
+00:13:20,765 --> 00:13:26,643
+the model Thank you everyone, and I'm
+glad to continue this conversation.
+
+216
+00:13:26,789 --> 00:13:31,115
+If you please reach out to my LinkedIn
+with questions, or you have experience
+
+217
+00:13:31,140 --> 00:13:37,711
+running agents in production, and enjoy
+the rest of the conference Thank you
