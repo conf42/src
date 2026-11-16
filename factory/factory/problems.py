@@ -71,6 +71,13 @@ def items(slug, state, intake_state, youtube, lines=(), skipped=()):
             out.append(item("fail", "%s is edited but not on YouTube yet (the daily limit, or the upload failed) - the next pass tries again" % key))
         if yt.get("problem"):
             out.append(item("fail", "%s: YouTube says %s (youtu.be/%s)" % (key, yt["problem"], yt.get("id"))))
+        hl = t.get("highlights") or {}
+        if hl.get("retry"):
+            out.append(item("look", "%s: Talk Highlights were not made (%s) - tried again when the talk is next processed" % (key, hl.get("none"))))
+        if yt.get("id") and yt.get("thumbnail") is False and not yt.get("thumbnail_note"):
+            out.append(item("look", "%s: the thumbnail did not go up (youtu.be/%s) - tried again every pass" % (key, yt["id"])))
+        if yt.get("id") and yt.get("playlist") is False and "test talk" not in str(yt.get("playlist_note") or ""):
+            out.append(item("look", "%s: not in the event's playlist yet (youtu.be/%s) - tried again every pass" % (key, yt["id"])))
         if yt.get("id") and yt.get("captions") is False:
             out.append(item("look", "%s: the captions did not go up (%s)" % (key, str(yt.get("captions_note") or "no reason given")[:120])))
         if t.get("drive_newer"):

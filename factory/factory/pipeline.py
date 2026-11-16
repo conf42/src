@@ -275,7 +275,7 @@ class Run:
         if t.get("composition_id"):
             t.setdefault("broken_compositions", []).append(t["composition_id"])
         for k in ("probe", "resolution", "composition_id", "finished", "trim", "drive_newer", "error", "retry", "current",
-                  "needs_new_video"):
+                  "needs_new_video", "highlights"):
             t.pop(k, None)
         t["steps"] = {}
         t.setdefault("redone", []).append({"at": now(), "why": why})
@@ -531,7 +531,7 @@ class Run:
         to conf42/static/slides/ (the repo next to src), committed and pushed. The site links both by name, so nothing
         else is needed. Only what is new or changed is copied; a talk that is not finished ships nothing. Off with
         settings `ship: false`. Returns {"srt": [...], "slides": [...]}."""
-        out = {"srt": [], "slides": []}
+        out = {"srt": [], "slides": [], "highlights": []}
         if str(self.cfg.get("ship", True)).lower() in ("false", "0", "no"):
             return out
         done = {k: t for k, t in self.state["talks"].items() if t.get("finished")}
@@ -549,6 +549,12 @@ class Run:
         if os.path.isdir(os.path.join(static, "slides")):
             files = [os.path.join(self.slides_dir, "%s - %s.pdf" % (k, self.ev["title"])) for k in done]
             jobs.append(("slides", static, os.path.join(static, "slides"), files, "slides"))
+            # Talk Highlights live next to the decks, under their own name (the site shows them where slides would be);
+            # a talk that got a deck after all loses them here - slides in, then no highlights
+            from . import highlights
+            files = [os.path.join(self.dir, "highlights", highlights.name_for(k, self.ev)) for k in done
+                     if not os.path.exists(os.path.join(self.slides_dir, "%s - %s.pdf" % (k, self.ev["title"])))]
+            jobs.append(("highlights", static, os.path.join(static, "slides"), files, "talk highlights"))
         elif done:
             self.note("slides not shipped: no conf42/static repo next to this one")
         git = lambda repo, *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, timeout=300,
@@ -584,6 +590,24 @@ class Run:
             self.note("shipped %d %s to the site%s" % (len(new), label, "" if r.returncode == 0
                                                          else " (commit made, push failed: %s)" % r.stderr[-200:]))
         return out
+
+    # ---- Talk Highlights: a slide-less talk's interesting screen moments as a PDF (Marek 2026-11-16) -----------
+    def highlights_step(self, key):
+        """highlights.py does the work; the result (the PDF's name, or why there is none) is kept in the talk's state.
+        Made once, from the talk's original video while it is on this machine; a redone talk gets new ones."""
+        from . import highlights
+        t = self.talk(key)
+        if not highlights.since(self.cfg, self.ev) or (t.get("highlights") and not (t["highlights"] or {}).get("retry")):
+            return
+        with self.lock:
+            t["current"] = "highlights"
+            self.save()
+        rep = highlights.make(self, key, self.note)
+        with self.lock:
+            t["highlights"] = rep
+            self.save()
+        if rep.get("none"):
+            self.note("%s: no Talk Highlights - %s" % (key, rep["none"]))
 
     # ---- proofread: Descript's transcript, checked for software-engineering words (Marek 2026-10-29) ----------
     def srt_path(self, t):
@@ -807,6 +831,7 @@ class Run:
                     flags.append("picture changes at 0:%04.1f - check the start (setup screen?)" % jump)
                 self.set(key, "qa", "done", lufs=lufs, peak=peak, minutes_before=round(t["probe"]["duration"] / 60, 1),
                          minutes_after=round(out["duration"] / 60, 1), cut_percent=round(cut, 1), flags=flags)
+            self.highlights_step(key)                   # a talk without slides: its Talk Highlights (never fails it)
             with self.lock:
                 t["current"] = None
                 t["finished"] = now()

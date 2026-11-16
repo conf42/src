@@ -304,6 +304,8 @@ def event(run, cfg):
     done = load(slug)
     rows = {r["speakers"]: r for r in youtube.talk_rows(ev)}
     raw = {t["speakers"]: t for t in events.talks(ev)}
+    for msg in repair(yt, run, cfg, done, rows):
+        yield msg
     todo = [k for k, t in sorted(run.state["talks"].items())
             if t.get("finished") and (not (done.get(k) or {}).get("id") or redone_since(t, done[k]))]
     if not todo:
@@ -385,6 +387,60 @@ def event(run, cfg):
             yield ("youtube: %s was redone - this is the new video. The old one is still on YouTube and in the playlist: "
                    "delete it at https://studio.youtube.com/video/%s/edit" % (key, rec["replaces"][-1]))
     yield from sheet_links(ev, done, raw)
+
+
+def repair(yt, run, cfg, done, rows):
+    """What an upload could not finish is tried again every pass: the thumbnail, the captions, the playlist. YouTube's
+    daily limit can fall between a video and its extras (2026-11-16: a video went up, its three extras were refused).
+    Stops at the first refusal for the limit. Yields log lines."""
+    slug, ev = run.ev["short_url"], run.ev
+    playlist_id, changed = None, False
+    limit = lambda text: "quota" in str(text).lower()
+    for key, rec in sorted(done.items()):
+        row, t = rows.get(key), run.state["talks"].get(key)
+        if not rec.get("id") or rec.get("test") or not row or not t:
+            continue
+        got = []
+        try:
+            if rec.get("thumbnail") is False and not rec.get("thumbnail_note"):     # there was one, YouTube refused it
+                thumb, _ = thumbnail_for(ev, row)
+                if thumb:
+                    ok, msg = yt.thumbnail(rec["id"], *thumb)
+                    if not ok and limit(msg):
+                        break
+                    if ok:
+                        rec["thumbnail"] = True
+                        got.append("thumbnail")
+            if rec.get("captions") is False and os.path.exists(run.srt_path(t)):
+                with open(run.srt_path(t), encoding="utf-8-sig") as f:
+                    ok, msg = yt.captions(rec["id"], f.read())
+                if not ok and limit(msg):
+                    break
+                if ok:
+                    rec["captions"] = True
+                    rec.pop("captions_note", None)
+                    got.append("captions")
+            if rec.get("playlist") is False and "test talk" not in str(rec.get("playlist_note") or ""):
+                try:
+                    if playlist_id is None:
+                        title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
+                        playlist_id, _ = yt.playlist(title)
+                    ok, msg = yt.add_to_playlist(playlist_id, rec["id"])
+                except RuntimeError as e:
+                    ok, msg = False, str(e)
+                if not ok and limit(msg):
+                    break
+                if ok:
+                    rec["playlist"] = True
+                    rec.pop("playlist_note", None)
+                    got.append("playlist")
+        finally:
+            if got:
+                changed = True
+                done[key] = rec
+                yield "youtube: %s - added later: %s" % (key, ", ".join(got))
+    if changed:
+        save(slug, done)
 
 
 def sheet_post(body):

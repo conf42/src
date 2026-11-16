@@ -221,6 +221,12 @@ for event in context.get("events"):
             slide_path = make_remote_address("slides", slide_file)
             warn_on_missing_file(slide_path, remote=True)
             talk["Slides"] = slide_path
+        elif static_slides and talk.get("Name1"):
+            # Talk Highlights (factory/factory/highlights.py, Marek 2026-11-16): a talk without slides can have a PDF
+            # of its interesting screen moments instead, next to the decks under "<deck name> - Talk Highlights.pdf"
+            candidate = conventional_slides_name(event, talk)[:-4] + " - Talk Highlights.pdf"
+            if candidate in static_slides:
+                talk["Highlights"] = make_remote_address("slides", candidate)
 
         # check the headshot exists
         picture_path = make_remote_address("headshots", talk.get("Picture", ""))

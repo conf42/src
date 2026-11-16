@@ -206,6 +206,39 @@ def main():
     check("problems: a pass that died before its report says so", problems.mark("cancelled", "2999-01-01T00:00:00+00:00", "https://github.com/x", pp)
           and "ran out of time" in problems.load(pp)["failed"][0] and problems.load(pp)["ok"] is False and "mlops2027" in problems.load(pp)["events"])
 
+    # ---- Talk Highlights (Marek 2026-11-16): the rules, without video or Claude ----
+    from factory import highlights
+    ev27 = {"short_url": "mlops2027", "title": "Conf42 MLOps 2027", "date": "2027-01-10"}
+    check("highlights: from the set date on, never before it, off when switched off",
+          highlights.since({"highlights_from": "2026-11-19"}, ev27) and not highlights.since({"highlights_from": "2027-02-01"}, ev27)
+          and not highlights.since({}, ev27) and not highlights.since({"highlights_from": "2026-11-19", "highlights": False}, ev27))
+    check("highlights: the PDF's name sits next to the deck's", highlights.name_for("Ada Lovelace", ev27) == "Ada Lovelace - Conf42 MLOps 2027 - Talk Highlights.pdf")
+    picks = highlights.clean([{"n": 5, "caption": "  The   retry loop  "}, {"n": 2, "caption": "Config", "crop": [0, 0, 1, .9]},
+                              {"n": 2, "caption": "twice"}, {"n": 99, "caption": "no such tile"}, {"n": 3, "caption": ""},
+                              {"n": 4, "caption": "cut to nothing", "crop": [0, 0, .3, 1]}, {"n": 6, "caption": "whole", "crop": [0, 0, 1, 1]},
+                              {"n": "7", "caption": "not a number"}], 10)
+    check("highlights: Claude's picks are checked - known tiles, once, in talk order, tidy captions",
+          [p["n"] for p in picks] == [2, 5, 6] and picks[1]["caption"] == "The retry loop")
+    check("highlights: a crop is kept when most of the picture stays, a tile whose crop leaves too little goes",
+          picks[0]["crop"] == [0.0, 0.0, 1.0, 0.9] and picks[2]["crop"] is None and 4 not in [p["n"] for p in picks])
+    check("highlights: never more than the cap", len(highlights.clean([{"n": i, "caption": "x"} for i in range(1, 30)], 40)) == highlights.MAX_GOOD)
+
+    class FakeRun:
+        ev, cfg, dir = dict(ev27, db_path=""), {"highlights_from": "2026-11-19"}, os.path.join(tmp, "hl")
+        slides_dir, inp = os.path.join(tmp, "hl", "slides"), os.path.join(tmp, "hl", "in")
+
+        def talk(self, key):
+            return {"source": "nothing.mp4"}
+    os.makedirs(FakeRun.slides_dir)
+    os.makedirs(FakeRun.inp)
+    check("highlights: no original video on the machine -> none, with the reason", "not on this machine" in highlights.make(FakeRun(), "Ada Lovelace").get("none", ""))
+    open(os.path.join(FakeRun.slides_dir, "Ada_Lovelace_slides.pdf"), "wb").close()
+    check("highlights: slides in, then no highlights (a deck under the speaker's own file name counts)",
+          highlights.make(FakeRun(), "Ada Lovelace") == {"none": "the talk has slides"})
+    check("highlights: the test talk gets none", highlights.make(FakeRun(), events.TEST_TALK) == {"none": "the test talk"})
+    FakeRun.cfg = {"highlights_from": "2028-01-01"}
+    check("highlights: an event before the start date gets none", highlights.make(FakeRun(), "Grace Hopper") == {"none": "before highlights_from"})
+
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return 1 if fails else 0
