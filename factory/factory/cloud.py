@@ -252,6 +252,11 @@ def rehydrate(run, drive, log=print):
             raw = os.path.join(tmp, "video.mp4")
             meta = drive.get(rec["video_id"])
             drive.download(rec["video_id"], raw, int(meta.get("size") or 0), log)
+            if (rec.get("reslide") or {}).get("done") and rec.get("slides_id"):      # the deck put back at the speaker's presses, again
+                from . import reslide
+                deck = os.path.join(tmp, "deck.pdf")
+                drive.download(rec["slides_id"], deck)
+                reslide.again(raw, deck, (rec.get("refiled_from") or run.ev["short_url"]), rec["reslide"]["slides"], log)
             intake.prepare_upload(raw, rec, run.ev["short_url"], src, log)   # with the overlay swap of a re-filed talk
             if rec.get("slides_id"):
                 pdf = os.path.join(run.slides_dir, key + ".pdf")

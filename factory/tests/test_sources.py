@@ -253,6 +253,32 @@ def main():
     check("highlights: the highlights PDF has one highlight a page and stays under the deck limit",
           len(PdfReader(out_pdf).pages) == 3 and os.path.getsize(out_pdf) <= highlights.MAX_MB * 1e6)
 
+    # ---- slides put back into a talk whose screen never moved (reslide.py, Marek 2026-11-16) ----
+    from factory import reslide
+    ok_starts, why = reslide.check([{"slide": 2, "at": 40}, {"slide": 1, "at": 5}, {"slide": 3, "at": 95.5}, {"slide": 3, "at": 99}, {"slide": 9, "at": 120}], 4, 600)
+    check("reslide: Claude's times are checked - deck order, slide 1 at the start, unknown and repeated slides out",
+          ok_starts == [(0, 0.0), (1, 40.0), (2, 95.5)] and why == "")
+    check("reslide: times that do not rise are refused", reslide.check([{"slide": 1, "at": 0}, {"slide": 2, "at": 50}, {"slide": 3, "at": 51}], 3, 600)[0] is None)
+    check("reslide: too few slides placed is refused", reslide.check([{"slide": 1, "at": 0}, {"slide": 2, "at": 50}, {"slide": 3, "at": 90}], 12, 600)[0] is None)
+    check("reslide: a slide after the end is refused", reslide.check([{"slide": 1, "at": 0}, {"slide": 2, "at": 50}, {"slide": 3, "at": 599}], 3, 600)[0] is None)
+    check("reslide: 'way less than the deck' is a quarter of its pages (never or once always counts)",
+          (reslide.few(18), reslide.few(4), reslide.few(40)) == (4, 1, 10))
+    check("reslide: the recorder's presses that changed nothing become the slides' times",
+          reslide.presses({"press_log": "12.5+ 80.1+ 95.0+ 140+ 200.4+", "slide_log": ""}, 8) == [(0, 0.0), (1, 12.5), (2, 80.1), (3, 95.0), (4, 140.0), (5, 200.4)])
+    check("reslide: back and forward presses are followed, real turns count too",
+          reslide.presses({"press_log": "50+ 60- 70+ 90+", "slide_log": "0:1 20:2"}, 5) == [(0, 0.0), (1, 20.0), (2, 50.0), (1, 60.0), (2, 70.0), (3, 90.0)])
+    check("reslide: when every press went through there is nothing to put back", reslide.presses({"press_log": "", "slide_log": "0:1 30:2 60:3"}, 6) is None)
+    check("reslide: presses that reach too little of the deck are no use", reslide.presses({"press_log": "10+ 20+"}, 20) is None)
+    srt_p = os.path.join(tmp, "t.srt")
+    with open(srt_p, "w", encoding="utf-8") as f:
+        for i in range(30):
+            f.write("%d\n00:%02d:%02d,000 --> 00:%02d:%02d,900\nwords %d here\n\n" % (i + 1, i * 5 // 60, i * 5 % 60, i * 5 // 60, i * 5 % 60 + 4, i))
+    passages = reslide.cues(srt_p)
+    check("reslide: the transcript is read as passages of about 12 seconds with their start", passages[0][0] == 0.0 and passages[1][0] == 20.0 and "words 0 here" in passages[0][1] and len(passages) >= 7)
+    check("reslide: switched off, or a talk without a deck, changes nothing",
+          reslide.make("x.mp4", None, None, "mlops2027", {}, {"reslide": False}).get("none") == "switched off"
+          and reslide.make("x.mp4", os.path.join(tmp, "nope.pdf"), None, "mlops2027", {}, {}).get("none") == "the talk has no deck")
+
     class FakeRun:
         ev, cfg, dir = dict(ev27, db_path=""), {"highlights_from": "2026-11-19"}, os.path.join(tmp, "hl")
         slides_dir, inp = os.path.join(tmp, "hl", "slides"), os.path.join(tmp, "hl", "in")

@@ -71,6 +71,12 @@ def items(slug, state, intake_state, youtube, lines=(), skipped=()):
             out.append(item("fail", "%s is edited but not on YouTube yet (the daily limit, or the upload failed) - the next pass tries again" % key))
         if yt.get("problem"):
             out.append(item("fail", "%s: YouTube says %s (youtu.be/%s)" % (key, yt["problem"], yt.get("id"))))
+        rs = t.get("reslide") or {}
+        if rs.get("done"):
+            out.append(item("look", "%s: the screen stayed on one slide, so the deck was put back by the transcript (%d slides, %s confidence) - check the timing" % (
+                key, len(rs.get("slides") or []), rs.get("confidence") or "?")))
+        elif rs.get("frozen"):
+            out.append(item("look", "%s: the screen stays on one slide and the deck could not be put back (%s)" % (key, rs.get("none"))))
         hl = t.get("highlights") or {}
         if hl.get("retry"):
             out.append(item("look", "%s: Talk Highlights were not made (%s) - tried again when the talk is next processed" % (key, hl.get("none"))))

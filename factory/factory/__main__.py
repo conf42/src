@@ -143,6 +143,9 @@ def main(argv):
         if problems.mark(argv[1] if len(argv) > 1 else "failure", os.environ.get("PASS_STARTED"), cloud.run_url()):
             print("factory pages:", cloud.commit_intake("factory: the pass did not finish (cloud)"))
         return
+    if cmd == "reslide":                                 # put a deck back into one video, to look at it
+        from . import reslide
+        return reslide.main(argv[1:])
     if cmd == "captions":                                # the site's transcripts as captions on older YouTube videos
         from . import captions
         return captions.main(argv[1:])

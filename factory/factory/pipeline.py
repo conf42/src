@@ -275,7 +275,7 @@ class Run:
         if t.get("composition_id"):
             t.setdefault("broken_compositions", []).append(t["composition_id"])
         for k in ("probe", "resolution", "composition_id", "finished", "trim", "drive_newer", "error", "retry", "current",
-                  "needs_new_video", "highlights"):
+                  "needs_new_video", "highlights", "reslide"):
             t.pop(k, None)
         t["steps"] = {}
         t.setdefault("redone", []).append({"at": now(), "why": why})
@@ -596,6 +596,25 @@ class Run:
                                                          else " (commit made, push failed: %s)" % r.stderr[-200:]))
         return out
 
+    # ---- slides put back into a talk whose screen never moved (reslide.py, Marek 2026-11-16) -------------------
+    def reslide_step(self, key, raw, srt_path):
+        """Once per talk, on Descript's export with its own transcript. Never fails the talk; what was decided is in
+        the talk's state (t["reslide"]) and, when slides were put back, in its QA flags."""
+        from . import reslide
+        t = self.talk(key)
+        if t.get("reslide") or key == events.TEST_TALK or str(self.cfg.get("reslide", True)).lower() in ("false", "0", "no"):
+            return
+        pdf = os.path.join(self.slides_dir, "%s - %s.pdf" % (key, self.ev["title"]))
+        if not os.path.exists(pdf):
+            return
+        talk = next((x for x in events.talks(self.ev) if x["speakers"] == key), {})
+        rep = reslide.make(raw, pdf, srt_path, self.ev["short_url"], {"title": talk.get("title"), "speakers": key}, self.cfg, None, self.note)
+        with self.lock:
+            t["reslide"] = rep
+            self.save()
+        if rep.get("frozen") and not rep.get("done"):
+            self.note("%s: the slides never change, and they could not be put back (%s)" % (key, rep.get("none")))
+
     # ---- Talk Highlights: a slide-less talk's interesting screen moments as a PDF (Marek 2026-11-16) -----------
     def highlights_step(self, key):
         """highlights.py does the work; the result (the PDF's name, or why there is none) is kept in the talk's state.
@@ -810,6 +829,7 @@ class Run:
             if not done("chapters"):
                 self.chapters_step(key, d)
             if not done("loudness"):
+                self.reslide_step(key, raw, srt_path)   # a screen stuck on one slide: the deck put back by the transcript
                 self.set(key, "loudness", "running", label="ffmpeg to %s LUFS" % cfg["loudness_lufs"])
                 trim = self.plan_trim(key, raw, srt_path)
                 media.normalize(raw, final, cfg["loudness_lufs"], cfg["true_peak_db"], trim.get("start"), trim.get("end"))

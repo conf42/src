@@ -77,8 +77,11 @@ def streams(path):
 
 def scan(path, length):
     """One decode of the whole file (picture at 2 fps, 320 px): black, frozen, scene changes, long silences, clipping."""
+    # scene changes are counted inside the slides' window only (the middle-right of the frame in every layout), and
+    # at 0.06: at 0.25 over the whole frame, slides that share a template never counted as a change, and a talk with
+    # 17 slide changes was flagged "the slides never change" (2026-11-16)
     vf = ("fps=2,scale=320:-2,blackdetect=d=2:pic_th=0.98:pix_th=0.10,freezedetect=n=-50dB:d=20,"
-          "select='gt(scene\\,0.25)',showinfo")
+          "crop=248:136:66:38,select='gt(scene\\,0.06)',showinfo")
     af = "silencedetect=noise=-50dB:d=60,volumedetect"   # volumedetect's 0 dB bin = samples at full scale (clipping)
     err = media.run([media.tool("ffmpeg"), "-hide_banner", "-nostats", "-i", path, "-vf", vf, "-af", af, "-f", "null", "-"]).stderr
     black = sum(float(x) for x in re.findall(r"black_duration:\s*([\d.]+)", err))
@@ -657,6 +660,13 @@ class Intake:
                     decided_for[key] = {"seconds": float((info.get("meta") or {}).get("seconds") or 0), "md5": video_meta.get("md5Checksum")}
                     if rec.get("refiled_from"):
                         rep["flags"].append("recorded under %s - re-filed here, the overlay is swapped" % rec["refiled_from"])
+                    if not self.dry_run and spath:       # next / previous presses the picture did not follow (reslide.py)
+                        from . import reslide
+                        rs = reslide.by_presses(vpath, spath, slug, info.get("meta") or {}, self.cfg, self.log)
+                        if rs.get("done"):
+                            rec["reslide"] = rs
+                            rep["numbers"]["probe"] = streams(vpath)
+                            rep["flags"].append("slides put back from the deck at the speaker's own presses (%d turns) - check them" % (len(rs["slides"]) - 1))
                     if not self.dry_run:
                         dest = os.path.join(run.inp, key + ".mp4")
                         try:

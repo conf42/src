@@ -1839,7 +1839,7 @@
       else if (m.type === 'shaky') { if (m.on && S.cam[0] && Date.now() - (S.shakyAt || 0) > 60000) { S.shakyAt = Date.now(); say('Your camera is shaky - try putting your laptop on a more stable surface.', 9000, 'warn'); } }
       else if (m.type === 'started') { if (H) { H.codec = m.video; H.hw = m.hw; } if (S.recE && m.file) { S.recE.file = m.file; S.recE.parts = m.parts; recPut(S.recE); } }
       else if (m.type === 'tick') {
-        $('tc').textContent = hms(m.us); hudTick(m);
+        $('tc').textContent = hms(m.us); hudTick(m); S.recUs = m.us;
         // the recording state in the tab's title (Marek 2026-10-24): seen in the tab bar and the window switcher, never in the video
         document.title = (S.paused ? '\u275a\u275a Paused ' : '\ud83d\udd34 ') + hms(m.us) + ' Recording \u2013 Conf42';
         // the engine stops by itself at 2 hours (record-worker.js MAX_US); warned 10 minutes and 1 minute ahead
@@ -2302,7 +2302,16 @@
       if (!noteDrag) return;
       noteDrag = null; this.classList.remove('drag'); store.set('notes-off', S.noteOff.map(Math.round).join(','));
     }); });
-    function go(d) { if (!S.pdf || S.src !== 'slides') return; var n = Math.max(1, Math.min(S.pages, S.page + d)); if (n !== S.page) { S.page = n; showSlide(); } }
+    // the slide log (Marek 2026-11-16: "add button presses ... to log in switches that didn't go through"): while
+    // recording, every turn of the slides with its second - and every next / previous press that changed nothing on the
+    // picture (no deck in the window right then, or already at the first / last page). The factory puts the deck back
+    // at those moments when the video shows one slide for the whole talk (factory/factory/reslide.py).
+    function slideLog(what, went) { if (S.recording && S.slideLog && S.slideLog.length < 900) S.slideLog.push([Math.round((S.recUs || 0) / 1e5) / 10, what, went]); }
+    function go(d) {
+      if (!S.pdf || S.src !== 'slides') { if (S.pdf) slideLog(d > 0 ? '+' : '-', false); return; }
+      var n = Math.max(1, Math.min(S.pages, S.page + d));
+      if (n !== S.page) { S.page = n; showSlide(); slideLog(n, true); } else slideLog(d > 0 ? '+' : '-', false);
+    }
     $('prev').addEventListener('click', function () { go(-1); this.blur(); });
     $('next').addEventListener('click', function () { go(1); this.blur(); });
     document.addEventListener('keydown', function (e) {
@@ -2374,7 +2383,7 @@
         if (folder) { S.recE = { id: Date.now(), name: name, folder: folder, file: base + '.mp4', parts: base + ' - safety copy', started: Date.now(), status: 'recording' }; recPut(S.recE); }
         if (file) { S.recE = { id: Date.now(), name: name, fileH: file, file: file.name, started: Date.now(), status: 'recording' }; recPut(S.recE); }
         // Talk Highlights stills (record-worker.js): only for a talk without slides - slides in, then no highlights
-        S.stills = []; S.stillsOff = '';
+        S.stills = []; S.stillsOff = ''; S.recUs = 0; S.slideLog = S.pdf && S.src === 'slides' ? [[0, S.page, true]] : [];
         worker.postMessage({ type: 'stills', on: !S.pdf && !/[?&]stills=0/.test(location.search) });
         worker.postMessage({ type: 'start', name: base, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
@@ -2929,6 +2938,8 @@
                 slidesBlob: S.pdfFile || null, files: {}, len: len,
                 meta: { seconds: Math.round(m.seconds), bytes: m.bytes, stop_reason: m.why || 'stop', saved_to: m.onDisk ? 'disk' : 'browser', frames: m.frames || 0, dropped: m.dropped || 0,
                         vcodec: m.video || '', acodec: m.audio || '', layout: c.mode || '', source: c.src || '', cameras: c.cams || 0, pauses: S.pauseCount || 0,
+                        slide_log: (S.slideLog || []).filter(function (x) { return x[2]; }).map(function (x) { return x[0] + ':' + x[1]; }).join(' ').slice(0, 6000),
+                        press_log: (S.slideLog || []).filter(function (x) { return !x[2]; }).map(function (x) { return x[0] + x[1]; }).join(' ').slice(0, 6000),
                         stills: S.pdf ? 0 : (S.stills || []).length, stills_off: S.stillsOff || '', stills_ms: Math.max.apply(null, [0].concat((S.stills || []).map(function (x) { return x.ms || 0; }))),
                         slide_pages: S.pdf ? S.pages : 0, recorder: UP_V, browser: (navigator.userAgent.match(/(Edg|OPR|Chrome|Firefox|Safari)\/[\d.]+/) || [''])[0] } };
       if (!j.entry && !m.onDisk) UP.pendingBrowserCopy = true;

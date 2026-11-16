@@ -475,7 +475,7 @@ function sanitize(m) {   // the recorder's numbers and words about the recording
     var v = m[k];
     if (typeof v === 'number' && isFinite(v)) out[k] = v;
     else if (typeof v === 'boolean') out[k] = v;
-    else if (typeof v === 'string') out[k] = v.slice(0, 300);
+    else if (typeof v === 'string') out[k] = v.slice(0, /_log$/.test(k) ? 6000 : 300);   // v8: slide_log / press_log (the recorder's slide turns and presses)
   });
   return out;
 }
