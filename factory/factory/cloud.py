@@ -8,8 +8,9 @@
    render/health, Descript upload + edit + publish + download, SRT + proofread, chapters, loudness, QA, slides, ship).
    A fresh runner has no source files: talks that are not in Descript yet get theirs again from Drive (the intake
    record keeps the file id), talks already uploaded to Descript need none.
-3. youtube: finished talks go up to YouTube, unlisted, with title / description / chapters / thumbnail / captions /
-   playlist (ytupload.py; skipped until it is configured).
+3. youtube: a talk goes up to YouTube the moment it is finished (Marek 2026-11-16: "as they are finished, rather
+   than batched in the end"), unlisted, with title / description / chapters / thumbnail / captions / playlist
+   (ytupload.py; skipped until it is configured). The pass ends with one more sweep for anything left over.
 4. the run state, intake.json and conf42.com/factory are committed + pushed (app.publish_status does the status).
 
 Old upload folders (Marek 2026-11-13, MLOps 2026): an event whose speakers were sent the earlier link-shared Drive
@@ -36,6 +37,7 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 import traceback
 
 from . import app, drive as linkdrive, events, gdrive, intake, pipeline
@@ -374,6 +376,24 @@ def with_manual(owned, claims):
     return out
 
 
+YT_LOCK = threading.Lock()                               # one upload at a time, whichever talk finishes
+
+
+def youtube_now(run, cfg):
+    """Upload what is finished and not on YouTube yet, and save that in the repo straight away (a pass that dies
+    later must not upload it twice, and the link shows on the status page)."""
+    with YT_LOCK:
+        try:
+            from . import ytupload
+            for msg in ytupload.event(run, cfg):
+                run.note(msg)
+        except ImportError:
+            return
+        except Exception as e:                           # noqa: BLE001 - YouTube trouble never undoes the factory's work
+            run.note("youtube: %s" % e)
+        commit_intake("factory: YouTube upload (cloud)")
+
+
 def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     """The factory + YouTube part of a pass for one event. Returns its lines for the pass summary."""
     lines = []
@@ -400,6 +420,8 @@ def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     todo = [k for k in ready if not run.state["talks"][k].get("finished")] + \
            [k for k, t in run.state["talks"].items() if not t.get("finished") and k not in ready
             and os.path.exists(os.path.join(run.inp, t.get("source") or ""))]
+    if youtube_on:
+        run.on_finished = lambda key: youtube_now(run, cfg)
     if todo:
         run.note("cloud: %d talk(s) to process: %s" % (len(todo), ", ".join(sorted(todo))))
         try:
@@ -410,14 +432,7 @@ def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     else:
         run.ship()                                   # nothing to edit - still ship what finished (slides added late)
     if youtube_on:
-        try:
-            from . import ytupload
-            for msg in ytupload.event(run, cfg):
-                run.note(msg)
-        except ImportError:
-            pass
-        except Exception as e:                       # noqa: BLE001 - YouTube trouble never undoes the factory's work
-            run.note("youtube: %s" % e)
+        youtube_now(run, cfg)                            # the sweep: talks finished by an earlier pass, sheet links
     s = pipeline.summary(run.state)
     lines.append("\n### %s - factory" % slug)
     lines.append("%d talks matched, %d finished" % (s["matched"], sum(1 for t in run.state["talks"].values() if t.get("finished"))))

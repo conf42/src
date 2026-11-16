@@ -152,6 +152,8 @@ class Run:
         self.state = self._load()
         self.render_futures, self.render_locks = {}, {}
         self.launch = {}                              # how this launch started, for LAUNCHES.md (cmd, sources, drive)
+        self.on_finished = None                       # called with the talk's key right after it finishes (the cloud
+                                                      # factory uploads it to YouTube there and then)
 
     # ---- state ---------------------------------------------------------------------------
     def _load(self):
@@ -772,6 +774,11 @@ class Run:
                 t["finished"] = now()
                 self.save()
             self.note("done: %s" % key)
+            if self.on_finished:
+                try:
+                    self.on_finished(key)
+                except Exception as ex:                 # noqa: BLE001 - what follows a finished talk never fails it
+                    self.note("after %s: %s" % (key, ex))
             self.publish()
         except Exception as ex:
             if "no video content" in str(ex) and t.get("composition_id"):
