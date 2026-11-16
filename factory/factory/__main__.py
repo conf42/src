@@ -138,6 +138,9 @@ def main(argv):
     if cmd == "overlay":                                 # swap a recording's overlay for another conference's
         from . import overlay
         return overlay.main(argv[1:])
+    if cmd == "captions":                                # the site's transcripts as captions on older YouTube videos
+        from . import captions
+        return captions.main(argv[1:])
     if cmd == "cleanup":                                 # upload folders of events 120 days past their kick-off
         from . import cleanup
         return cleanup.main(argv[1:])

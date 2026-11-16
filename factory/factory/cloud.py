@@ -371,6 +371,11 @@ def main(argv):
         lines += cleanup.Cleanup(drive, cfg).run()
     except Exception as e:                               # noqa: BLE001 - tidying up never fails a pass
         lines.append("\n### Upload folders - not tidied (%s)" % e)
+    try:                                                 # and a few of the older videos get their transcript as captions
+        from . import captions
+        lines += captions.backlog(cfg)
+    except Exception as e:                               # noqa: BLE001
+        lines.append("\n### Captions on older videos - not done (%s)" % e)
     commit_intake("factory: cloud pass state (intake + youtube)")
     summary_md(lines)
     print("\n".join(lines))
