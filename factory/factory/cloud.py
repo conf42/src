@@ -252,11 +252,16 @@ def rehydrate(run, drive, log=print):
             raw = os.path.join(tmp, "video.mp4")
             meta = drive.get(rec["video_id"])
             drive.download(rec["video_id"], raw, int(meta.get("size") or 0), log)
-            if (rec.get("reslide") or {}).get("done") and rec.get("slides_id"):      # the deck put back at the speaker's presses, again
+            if (rec.get("reslide") or {}).get("done") and rec.get("slides_id"):      # the deck was put back at the intake: again
                 from . import reslide
                 deck = os.path.join(tmp, "deck.pdf")
                 drive.download(rec["slides_id"], deck)
-                reslide.again(raw, deck, (rec.get("refiled_from") or run.ev["short_url"]), rec["reslide"]["slides"], log)
+                # from the upload's own talk.json on Drive - nothing about it is kept in the repo (see intake.py)
+                notes = {}
+                for f in drive.children((drive.get(rec["video_id"], "parents").get("parents") or [""])[0]):
+                    if f["name"] == "talk.json":
+                        notes = json.loads(drive.text(f["id"])).get("meta") or {}
+                reslide.by_presses(raw, deck, (rec.get("refiled_from") or run.ev["short_url"]), notes, run.cfg, log)
             intake.prepare_upload(raw, rec, run.ev["short_url"], src, log)   # with the overlay swap of a re-filed talk
             if rec.get("slides_id"):
                 pdf = os.path.join(run.slides_dir, key + ".pdf")

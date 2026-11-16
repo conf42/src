@@ -319,8 +319,10 @@ def by_presses(video, pdf, slug, meta, cfg, log=print):
             if n > few(pages):
                 return {"none": "the slides do change (%d times for %d pages)" % (n, pages)}
             draw(video, pdf, box, radius, starts, length, tmp)
-        log("slides put back from the deck: %d turns the speaker pressed for, that the picture did not follow" % (len(starts) - 1))
-        return {"done": True, "by": "presses", "pages": pages, "changes_before": n, "slides": [{"slide": p + 1, "at": round(at, 1)} for p, at in starts]}
+        # what the speaker pressed when is not written anywhere outside the upload's own talk.json: the factory's logs,
+        # its run summaries and its state files are public (Marek 2026-11-16: "don't show any 'spying' logs on the repo")
+        log("slides put back from the deck (%d pages)" % pages)
+        return {"done": True, "pages": pages}
     except Exception as e:                               # noqa: BLE001 - the video stays as it was
         return {"none": "not done: %s: %s" % (type(e).__name__, str(e)[:200])}
 
