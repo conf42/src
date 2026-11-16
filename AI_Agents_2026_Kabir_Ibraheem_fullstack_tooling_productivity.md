@@ -6,7 +6,7 @@ Video: https://www.youtube.com/watch?v=yKjWTlMAdYM
 
 ## Abstract
 
-We will be taking a walk through the various tools and techniques for full-stack engineers to leverage the various AI tools to improve efficiency and stay ahead of the curve in the fast paced, growing labyrinth of AI tools and techniques available. The talk will also take a short look at integrating with some of the more populate AI powered coding tools like cloud ai, github copilot and cursor. We will explore how this tool can help developers write and ship maintainable and well tested code faster and easier with real world simple examples. We will also explore some of the intricacies of making client side (frontend) development easier using code generation tools from figma on a minimal level.
+We will be taking a walk through the various tools and techniques for full-stack engineers to leverage the various AI tools to improve efficiency and stay ahead of the curve in the fast paced, growing labyrinth of AI tools and techniques available. The talk will also take a short look at integrating with some of the more popular AI powered coding tools like cloud ai, GitHub Copilot and Cursor. We will explore how this tool can help developers write and ship maintainable and well tested code faster and easier with real world simple examples. We will also explore some of the intricacies of making client side (frontend) development easier using code generation tools from Figma on a minimal level.
 
 ## Transcript
 

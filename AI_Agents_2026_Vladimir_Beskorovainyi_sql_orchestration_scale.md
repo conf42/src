@@ -6,7 +6,11 @@ Video: https://www.youtube.com/watch?v=t4AZDCjhOnw
 
 ## Abstract
 
-Everyone demos text-to-SQL agents. Almost nobody runs them in production at national scale. This talk shares hard-won lessons from building and operating an on-prem NL2SQL platform serving 30M+ users across 500+ data marts with open-weight LLMs.  We'll cover the three parts of the agentic architecture that decided whether it worked: schema retrieval and routing across hundreds of marts, SQL generation with self-correction loops, and guardrails against hallucinated queries. I'll also be honest about what didn't work — where agent autonomy breaks down, and why bigger models didn't always win.  Target audience: data engineers, platform engineers, and anyone moving an LLM agent from demo to dependable enterprise infrastructure.
+Everyone demos text-to-SQL agents. Almost nobody runs them in production at national scale. This talk shares hard-won lessons from building and operating an on-prem NL2SQL platform serving 30M+ users across 500+ data marts with open-weight LLMs.
+
+We'll cover the three parts of the agentic architecture that decided whether it worked: schema retrieval and routing across hundreds of marts, SQL generation with self-correction loops, and guardrails against hallucinated queries. I'll also be honest about what didn't work — where agent autonomy breaks down, and why bigger models didn't always win.
+
+Target audience: data engineers, platform engineers, and anyone moving an LLM agent from demo to dependable enterprise infrastructure.
 
 ## Transcript
 

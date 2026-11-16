@@ -6,7 +6,14 @@ Video: https://www.youtube.com/watch?v=G7W5sQMq5Uk
 
 ## Abstract
 
-In this session, we’ll dive into a case study on how the Driver Onboarding team transitioned lots of manual, script-heavy engineering processes into agentic-based ones. We’ll explore how various AI agents were integrated into the developer lifecycle to scale team output.  The session will include: - Existing workflows and the pain points associated with them - How the team transitioned those workflows into agentic-based ones - Overview of the AI-based tools and landscape at Uber - Best practices for integrated agentic workflows
+In this session, we’ll dive into a case study on how the Driver Onboarding team transitioned lots of manual, script-heavy engineering processes into agentic-based ones. We’ll explore how various AI agents were integrated into the developer lifecycle to scale team output.
+
+The session will include:
+
+- Existing workflows and the pain points associated with them
+- How the team transitioned those workflows into agentic-based ones
+- Overview of the AI-based tools and landscape at Uber
+- Best practices for integrated agentic workflows
 
 ## Transcript
 

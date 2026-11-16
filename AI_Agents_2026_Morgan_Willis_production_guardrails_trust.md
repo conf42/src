@@ -6,7 +6,17 @@ Video: https://www.youtube.com/watch?v=feClaurFkbo
 
 ## Abstract
 
-Your AI agent works great in the demo. Then you deploy it and it hallucinates a refund policy that costs you $10K, or exposes customer data, or just loops endlessly burning tokens.  This session explores how to build AI agents you can trust in production using Amazon Bedrock AgentCore and the Strands Agents SDK.  We’ll walk through a layered approach to agent safety that spans guardrails at multiple levels, including input validation, output filtering, and action approval, along with observability patterns that make agent behavior transparent and auditable.  You’ll also see how multi-agent architectures can be designed so agents steer and check one another, and how security policies combined with deliberate prompt design reduce risk across the system.  We'll walk through a reference architecture that combines these layers, and you'll learn how each layer can catch failures.  You should have basic familiarity with LLMs and AI agents. You'll leave with architectures pattern you can adapt and a clearer picture of what can go wrong and how to address common issues with AI agent trust and reliability.
+Your AI agent works great in the demo. Then you deploy it and it hallucinates a refund policy that costs you $10K, or exposes customer data, or just loops endlessly burning tokens.
+
+This session explores how to build AI agents you can trust in production using Amazon Bedrock AgentCore and the Strands Agents SDK.
+
+We’ll walk through a layered approach to agent safety that spans guardrails at multiple levels, including input validation, output filtering, and action approval, along with observability patterns that make agent behavior transparent and auditable.
+
+You’ll also see how multi-agent architectures can be designed so agents steer and check one another, and how security policies combined with deliberate prompt design reduce risk across the system.
+
+We'll walk through a reference architecture that combines these layers, and you'll learn how each layer can catch failures.
+
+You should have basic familiarity with LLMs and AI agents. You'll leave with architecture patterns you can adapt and a clearer picture of what can go wrong and how to address common issues with AI agent trust and reliability.
 
 ## Transcript
 

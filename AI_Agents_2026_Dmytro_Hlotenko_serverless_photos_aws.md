@@ -6,7 +6,17 @@ Video: https://www.youtube.com/watch?v=Nbi4urdt7_c
 
 ## Abstract
 
-Once I decided to translate my photography experience into a serverless pipeline. I judged 8000 photos of your faces, and it was a big success - we turned a problem into a solution with AWS. Lambdas, Rekognition, Bedrock and the rest played together as a system, delivering a memorable AWS Community Day.  The talk traveled far - but it had a fatal weakness. It was good while it lived in the conference room. Outside, my taste - hardcoded into weights and thresholds, and a single Claude call guessing how to process every file - brought things to disaster. It ran rules I wrote for photographs I hadn't taken yet, and failed silently on every shot that didn't fit. Terraform destroy.  Vérité This year I tore out every guess. With agents.  Imagine swapping the single photographer for the press agency. I'll show how to keep a mature orchestration relevant in the agentic era. How a chain of pipelines became a grid of agents - separate programs, each with its own tooling and skills distilled from real photography craft. Where the agent reasons about what belongs and judges against real craft, not one engineer's gut. Where v1 had a frozen rule, v2 has a program that thinks.  I'll draw the parallels - where we broke through, where classic approaches still win, which weaknesses got replaced and what each agent does instead. You'll leave with a pattern for any rigid pipeline: which box is a guess, and what if it could reason instead?  Last year I automated my hands. This year, my judgment.
+Once I decided to translate my photography experience into a serverless pipeline. I judged 8000 photos of your faces, and it was a big success - we turned a problem into a solution with AWS. Lambdas, Rekognition, Bedrock and the rest played together as a system, delivering a memorable AWS Community Day.
+
+The talk traveled far - but it had a fatal weakness. It was good while it lived in the conference room. Outside, my taste - hardcoded into weights and thresholds, and a single Claude call guessing how to process every file - brought things to disaster. It ran rules I wrote for photographs I hadn't taken yet, and failed silently on every shot that didn't fit. Terraform destroy.
+
+Vérité This year I tore out every guess. With agents.
+
+Imagine swapping the single photographer for the press agency. I'll show how to keep a mature orchestration relevant in the agentic era. How a chain of pipelines became a grid of agents - separate programs, each with its own tooling and skills distilled from real photography craft. Where the agent reasons about what belongs and judges against real craft, not one engineer's gut. Where v1 had a frozen rule, v2 has a program that thinks.
+
+I'll draw the parallels - where we broke through, where classic approaches still win, which weaknesses got replaced and what each agent does instead. You'll leave with a pattern for any rigid pipeline: which box is a guess, and what if it could reason instead?
+
+Last year I automated my hands. This year, my judgment.
 
 ## Transcript
 

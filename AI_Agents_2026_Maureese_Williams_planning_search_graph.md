@@ -6,7 +6,21 @@ Video: https://www.youtube.com/watch?v=10MCcG6fLYo
 
 ## Abstract
 
-Every step your agent takes costs a model call. Plan a twenty-step task, pay twenty times, and get a different plan each run.  That isn't a law of nature. It's an architectural choice, and it's the wrong one.  **GATS** (Graph-Augmented Tree Search) inverts it. Instead of asking a language model what to do next, it runs UCB1 tree search over a persistent state-transition graph the agent builds as it works. The LLM never picks an action. It lives inside *skills*, synthesizing a diff or reading a file, and even there, only when a cheaper layer can't answer.  That escalation ladder is the core idea:  - **L1, symbolic**: preconditions and effects you already know. Free, exact, and it covers most of what an agent does all day. - **L2, learned**: per-state transition statistics mined from the agent's own execution history. Takes over once an action turns out to be stochastic. - **L3, generative**: the LLM proposes effects for genuinely novel actions. The result is cached, so a novel situation costs at most one call, ever.  Episode one pays. Episode two is free. On a 100-task suite: **100% success, 100% optimal plans, zero model calls at plan time, zero variance across runs.**  Then the result I didn't expect. Swap the simulated backend for a real local Llama 3.2 and run the same benchmark: the tree-search baseline collapses from 87% to under 1%, ReAct falls to 36%, and GATS doesn't move, because GATS wasn't calling the model at plan time to begin with. Planning quality stopped being a function of model quality.
+Every step your agent takes costs a model call. Plan a twenty-step task, pay twenty times, and get a different plan each run.
+
+That isn't a law of nature. It's an architectural choice, and it's the wrong one.
+
+**GATS** (Graph-Augmented Tree Search) inverts it. Instead of asking a language model what to do next, it runs UCB1 tree search over a persistent state-transition graph the agent builds as it works. The LLM never picks an action. It lives inside *skills*, synthesizing a diff or reading a file, and even there, only when a cheaper layer can't answer.
+
+That escalation ladder is the core idea:
+
+- **L1, symbolic**: preconditions and effects you already know. Free, exact, and it covers most of what an agent does all day.
+- **L2, learned**: per-state transition statistics mined from the agent's own execution history. Takes over once an action turns out to be stochastic.
+- **L3, generative**: the LLM proposes effects for genuinely novel actions. The result is cached, so a novel situation costs at most one call, ever.
+
+Episode one pays. Episode two is free. On a 100-task suite: **100% success, 100% optimal plans, zero model calls at plan time, zero variance across runs.**
+
+Then the result I didn't expect. Swap the simulated backend for a real local Llama 3.2 and run the same benchmark: the tree-search baseline collapses from 87% to under 1%, ReAct falls to 36%, and GATS doesn't move, because GATS wasn't calling the model at plan time to begin with. Planning quality stopped being a function of model quality.
 
 ## Transcript
 

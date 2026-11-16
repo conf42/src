@@ -6,7 +6,13 @@ Video: https://www.youtube.com/watch?v=8Dxg8CmJWsI
 
 ## Abstract
 
-AI agents with many tools face a dual problem: they pick the wrong tool and waste tokens because tool descriptions get serialized into the context on every call. As agents scale to 50+ tools, errors increase and costs explode.  Semantic tool selection filters tools before they reach the LLM context using vector search, reducing errors and token costs.   This talk walks you through building TWO versions of the same travel agent to prove semantic tool selection works. By comparing the agents side-by-side on identical queries, you'll see dramatic improvements in both accuracy and cost and learn how to implement dynamic tool filtering that preserves conversation memory across multi-turn sessions.   You'll leave with working Python code and production patterns you can deploy immediately.
+AI agents with many tools face a dual problem: they pick the wrong tool and waste tokens because tool descriptions get serialized into the context on every call. As agents scale to 50+ tools, errors increase and costs explode.
+
+Semantic tool selection filters tools before they reach the LLM context using vector search, reducing errors and token costs.
+
+This talk walks you through building TWO versions of the same travel agent to prove semantic tool selection works. By comparing the agents side-by-side on identical queries, you'll see dramatic improvements in both accuracy and cost and learn how to implement dynamic tool filtering that preserves conversation memory across multi-turn sessions.
+
+You'll leave with working Python code and production patterns you can deploy immediately.
 
 ## Transcript
 

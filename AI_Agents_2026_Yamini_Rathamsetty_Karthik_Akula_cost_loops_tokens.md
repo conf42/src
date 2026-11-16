@@ -6,7 +6,13 @@ Video: https://www.youtube.com/watch?v=6cfk3YbKLzE
 
 ## Abstract
 
-Your agent works. It also just blew through $400 in tokens because it got stuck in a reasoning loop at 2 AM and nobody was watching. This talk is a technical deep-dive into the failure modes that silently drain your infrastructure budget when running agents in production — retry storms, runaway tool calls, context window bloat, and multi-agent orchestration overhead. I'll walk through real architectures where agents went off the rails, show you what the observability gaps looked like, and share the circuit-breaker patterns, token budgeting strategies, and cost-aware orchestration designs that brought things back under control. If you're building agents that run autonomously, this talk might save you a very awkward conversation with finance. Key Takeaways: How to identify and instrument the five most expensive failure modes in agentic architectures Circuit-breaker and token budgeting patterns that prevent runaway agent costs without killing autonomy A cost-aware orchestration design that routes between agent complexity levels based on task economics
+Your agent works. It also just blew through $400 in tokens because it got stuck in a reasoning loop at 2 AM and nobody was watching. This talk is a technical deep-dive into the failure modes that silently drain your infrastructure budget when running agents in production — retry storms, runaway tool calls, context window bloat, and multi-agent orchestration overhead. I'll walk through real architectures where agents went off the rails, show you what the observability gaps looked like, and share the circuit-breaker patterns, token budgeting strategies, and cost-aware orchestration designs that brought things back under control. If you're building agents that run autonomously, this talk might save you a very awkward conversation with finance.
+
+Key Takeaways:
+
+- How to identify and instrument the five most expensive failure modes in agentic architectures
+- Circuit-breaker and token budgeting patterns that prevent runaway agent costs without killing autonomy
+- A cost-aware orchestration design that routes between agent complexity levels based on task economics
 
 ## Transcript
 
