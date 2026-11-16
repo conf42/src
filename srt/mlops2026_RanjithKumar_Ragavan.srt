@@ -1,0 +1,979 @@
+1
+00:00:00,300 --> 00:00:04,621
+Hello everyone and welcome
+to Conf42 MLOps 2026.
+
+2
+00:00:05,253 --> 00:00:10,186
+Today, we are diving into an Edge
+MLOps, how to build a real production
+
+3
+00:00:10,207 --> 00:00:14,858
+pipeline from PyTorch, training
+all the way on-device Android
+
+4
+00:00:14,858 --> 00:00:17,205
+inferences using Meta's ExecuTorch.
+
+5
+00:00:18,018 --> 00:00:22,255
+First, a quick intro, an
+important note on context.
+
+6
+00:00:22,366 --> 00:00:24,026
+My name is Ranjit Kumar Raghavan.
+
+7
+00:00:24,298 --> 00:00:28,099
+By day, I'm a member of technical
+staff at T-Mobile, where I
+
+8
+00:00:28,099 --> 00:00:32,940
+architect large-scale mobile
+platforms serving millions of users.
+
+9
+00:00:33,952 --> 00:00:39,101
+However, everything I'm sharing with
+you today is hundred percent my own
+
+10
+00:00:39,238 --> 00:00:43,880
+open source personal project, completely
+independent of my role at T-Mobile.
+
+11
+00:00:44,755 --> 00:00:48,912
+As an engineer who loves both mobile
+architecture and machine learning,
+
+12
+00:00:49,442 --> 00:00:53,202
+I want to get my hands dirty
+with PyTorch's new Edge compiler
+
+13
+00:00:53,211 --> 00:00:58,068
+stack and contribute a practical
+end-to-end reference architecture
+
+14
+00:00:58,093 --> 00:00:59,782
+back to the open source community.
+
+15
+00:01:00,723 --> 00:01:05,953
+That project is called Noctua, named
+after an owl genius, nocturnal wisdom.
+
+16
+00:01:06,592 --> 00:01:11,598
+Over the next twenty minutes, we use
+a Noctua to trace how a six-kilobyte
+
+17
+00:01:11,625 --> 00:01:18,081
+neural network runs locally on a mobile
+phone under five milliseconds with zero
+
+18
+00:01:18,089 --> 00:01:20,518
+health data ever touching the cloud
+
+19
+00:01:21,518 --> 00:01:25,529
+To understand why I built this,
+let's talk about what I call the
+
+20
+00:01:25,536 --> 00:01:27,672
+measurement versus the coaching gap.
+
+21
+00:01:28,417 --> 00:01:33,866
+If you wear an Oura Ring or
+a smartwatch, you know the
+
+22
+00:01:33,872 --> 00:01:35,642
+hardware sensors are incredible.
+
+23
+00:01:35,771 --> 00:01:42,197
+Every night, your ring tracks, tracks
+heartbeat variability, sleep stages,
+
+24
+00:01:42,337 --> 00:01:45,107
+resting heart rate, and skin temperature.
+
+25
+00:01:45,340 --> 00:01:49,206
+Every morning you open the companion
+app, it reads you numbers like
+
+26
+00:01:49,620 --> 00:01:51,375
+readiness scores of seventy-eight.
+
+27
+00:01:51,471 --> 00:01:54,393
+It measures everything,
+but it doesn't coach.
+
+28
+00:01:55,042 --> 00:01:58,344
+It never answer the actual
+questions you have in your mind.
+
+29
+00:01:58,854 --> 00:02:01,669
+Should I train hard today
+or focus on recovery?
+
+30
+00:02:03,393 --> 00:02:07,886
+A few months ago, I caught myself
+doing something pretty ironic.
+
+31
+00:02:08,553 --> 00:02:12,876
+Every morning, I was screenshotting my
+Oura metrics and posting them into a
+
+32
+00:02:12,876 --> 00:02:15,665
+cloud chatbot to ask if I should work out.
+
+33
+00:02:16,482 --> 00:02:20,489
+It worked great until I stopped,
+thought about what I'm actually doing.
+
+34
+00:02:22,174 --> 00:02:25,316
+I was falling right into the
+cloud chatbot anti-pattern.
+
+35
+00:02:25,758 --> 00:02:30,535
+I was voluntarily uploading my most
+intimate, continuously physiological
+
+36
+00:02:30,537 --> 00:02:35,579
+history to a third-party cloud server
+just to answer a question my phone
+
+37
+00:02:35,584 --> 00:02:37,621
+processor could easily compute locally.
+
+38
+00:02:38,573 --> 00:02:44,992
+So I decided to build the local tool I
+wish exist, Noctua, an open source Kotlin
+
+39
+00:02:44,998 --> 00:02:52,041
+SDK that paired typical Oura's API version
+two client with local ExecuTorch engine.
+
+40
+00:02:53,041 --> 00:02:57,384
+So when you step back and compare the
+default cloud AI approach against an
+
+41
+00:02:57,399 --> 00:03:01,047
+on-device architecture, the engineering
+trade-off become crystal clear.
+
+42
+00:03:02,064 --> 00:03:04,017
+First is biometric privacy.
+
+43
+00:03:04,161 --> 00:03:09,260
+Instead of uploading a raw HRV sleep and
+temperature logs to an external server,
+
+44
+00:03:09,807 --> 00:03:11,874
+your health data never leaves the phone.
+
+45
+00:03:12,550 --> 00:03:14,244
+Second is explainability.
+
+46
+00:03:14,588 --> 00:03:19,388
+Cloud LLM wrapper really on opaque
+prompts that can give you different
+
+47
+00:03:19,388 --> 00:03:21,520
+advice on exact same biometric.
+
+48
+00:03:21,963 --> 00:03:27,360
+In Noctua, we combine open
+verifiable PTE neural network with
+
+49
+00:03:27,367 --> 00:03:29,198
+deterministic unit test rules.
+
+50
+00:03:30,149 --> 00:03:32,140
+Third is offline readability and speed.
+
+51
+00:03:32,443 --> 00:03:36,537
+A cloud round trip takes anywhere
+from five hundred milliseconds to
+
+52
+00:03:36,541 --> 00:03:42,203
+couple of seconds and fail completely
+if you are on flight or on a trail.
+
+53
+00:03:43,092 --> 00:03:47,476
+On device via ExecuTorch, our readiness
+forecasts run completely offline
+
+54
+00:03:47,481 --> 00:03:48,910
+in under five milliseconds.
+
+55
+00:03:49,909 --> 00:03:51,834
+And finally, the resilience.
+
+56
+00:03:52,440 --> 00:03:56,525
+Even if the native runtime
+isn't available on device, our
+
+57
+00:03:56,526 --> 00:04:00,382
+architecture gracefully fall back
+to the zero dependency linear model.
+
+58
+00:04:00,980 --> 00:04:06,812
+The big takeaway here is the privacy
+first architecture is also fast, more
+
+59
+00:04:06,815 --> 00:04:08,505
+reliable engineering architecture
+
+60
+00:04:09,505 --> 00:04:14,467
+To make this useful for the open source
+community, I didn't want the machine
+
+61
+00:04:14,467 --> 00:04:20,635
+learning code tangible upon-- tangled upon
+with only Android UIs or network logics.
+
+62
+00:04:20,991 --> 00:04:24,641
+So Noctua is architected as
+three independent Gradle models.
+
+63
+00:04:25,223 --> 00:04:30,694
+First is Noctua Core, a pure
+Kotlin, coroutine-first client
+
+64
+00:04:30,704 --> 00:04:32,954
+for Oura Cloud API version two.
+
+65
+00:04:33,074 --> 00:04:38,050
+It handles OAuth flows, automatic
+token refresh, transparent paginations,
+
+66
+00:04:38,060 --> 00:04:40,513
+and typed except-expect-exceptions.
+
+67
+00:04:41,044 --> 00:04:45,612
+Because it's pure JVM, you can run
+in on Android or on a backend server.
+
+68
+00:04:46,286 --> 00:04:47,852
+Second is a Noctua AI.
+
+69
+00:04:48,579 --> 00:04:49,630
+That is an intelligence…
+
+70
+00:04:49,713 --> 00:04:50,883
+This is the intelligent layer.
+
+71
+00:04:51,036 --> 00:04:56,867
+It handles feature extractions, runs
+our explainable heuristic engine, and
+
+72
+00:04:56,877 --> 00:04:59,935
+bridges to our ExecuTorch neural forecaster.
+
+73
+00:05:00,732 --> 00:05:04,907
+Third is an example app, a Material
+3 Jetpack Compose app, and to
+
+74
+00:05:04,907 --> 00:05:08,702
+make life easy for contributors,
+I built in a deterministic
+
+75
+00:05:08,751 --> 00:05:10,979
+twenty-one-day synthetic demo mode.
+
+76
+00:05:11,477 --> 00:05:14,763
+This means you don't, you don't
+even need to own a Oura Ring.
+
+77
+00:05:15,190 --> 00:05:19,416
+You can clone the repo right now,
+install the debug app, and immediately
+
+78
+00:05:19,416 --> 00:05:24,478
+watch ExecuTorch model run live
+twenty-one-day biometric datasets.
+
+79
+00:05:25,478 --> 00:05:30,134
+So in cloud MLOps, you have a
+data warehouse, a feature stores
+
+80
+00:05:30,172 --> 00:05:32,172
+pre-processing your inputs.
+
+81
+00:05:32,235 --> 00:05:36,396
+In edge MLOps, the user phones
+is your feature pipelines.
+
+82
+00:05:37,213 --> 00:05:41,305
+Here is how a single data points
+travel from a ring to a neural network.
+
+83
+00:05:41,944 --> 00:05:48,721
+First, Noctua core fetches your trailing
+twenty-one days of Oura data, aggregate
+
+84
+00:05:48,721 --> 00:05:55,379
+readiness, sleep activity, and HRV into
+an computable immutable Kotlin object
+
+85
+00:05:55,701 --> 00:06:00,669
+called wellness snapshot Next, the
+snapshot enters the feature extractor.
+
+86
+00:06:01,381 --> 00:06:06,055
+Now, why can't we just feed raw HRV
+numbers directly into our neural network?
+
+87
+00:06:06,278 --> 00:06:08,850
+Because HRV is highly individual.
+
+88
+00:06:09,289 --> 00:06:13,257
+Fifty milliseconds might be
+big recovery for me, but it's a
+
+89
+00:06:13,257 --> 00:06:15,047
+deep fatigue for someone else.
+
+90
+00:06:15,701 --> 00:06:19,915
+So feature extractor combines,
+computes personalized baseline
+
+91
+00:06:19,922 --> 00:06:22,422
+normalized feature right on its device.
+
+92
+00:06:22,540 --> 00:06:27,002
+It calculates your accumulated sleep
+debt, your HRV score against your
+
+93
+00:06:27,042 --> 00:06:32,730
+own night, fourteen-day night rolling
+baseline, a resting heart rate, delta
+
+94
+00:06:32,773 --> 00:06:34,576
+or three days readiness momentum.
+
+95
+00:06:35,507 --> 00:06:40,295
+Those eight normalized floating-point
+features are then passed into, in
+
+96
+00:06:40,306 --> 00:06:45,143
+both our heuristic rule engine and
+our ExecuTorch forecaster to produce
+
+97
+00:06:45,146 --> 00:06:48,697
+a single unified Noctua report.
+
+98
+00:06:49,697 --> 00:06:56,185
+Now that we have an R8 normalized
+physiological feature on the device, let's
+
+99
+00:06:56,197 --> 00:06:58,812
+get into the heart of the MLOps pipeline.
+
+100
+00:06:59,499 --> 00:07:02,754
+How can we design the right
+PyTorch model, strip away the
+
+101
+00:07:02,761 --> 00:07:07,463
+massive Python interpreters, and
+compile it ahead of time into an
+
+102
+00:07:07,485 --> 00:07:10,165
+ultra-compact PTE program for Android?
+
+103
+00:07:11,165 --> 00:07:17,547
+If this is, if there is one mindset I
+want to advocate for today, it is this.
+
+104
+00:07:17,995 --> 00:07:22,434
+Stop shipping and bloated base
+model for tabular edge task.
+
+105
+00:07:23,448 --> 00:07:27,577
+Right now it's tempting for to
+quantize a multi-gigabyte large
+
+106
+00:07:27,579 --> 00:07:29,161
+language models for everything.
+
+107
+00:07:29,976 --> 00:07:35,790
+But you don't need a two gigabyte model
+to eating up a user's battery and storage
+
+108
+00:07:35,808 --> 00:07:39,605
+just to predict tomorrow's readiness
+score for eight biometric feature.
+
+109
+00:07:41,347 --> 00:07:48,134
+Instead, we designed a right-sized
+multilayer perceptron with just an eight
+
+110
+00:07:48,148 --> 00:07:50,694
+to thirty-two to sixteen to one topology.
+
+111
+00:07:51,237 --> 00:07:55,577
+It takes our eight phys- physiological
+feature, passes them through eight
+
+112
+00:07:55,589 --> 00:08:00,516
+to sixteen ReLU hidden units,
+and output a single readiness
+
+113
+00:08:00,518 --> 00:08:01,991
+score from zero to hundred.
+
+114
+00:08:02,965 --> 00:08:06,670
+Why use a MLP instead of
+simple linear equation?
+
+115
+00:08:07,258 --> 00:08:11,654
+Because human physiology has
+no linear interaction effects.
+
+116
+00:08:12,965 --> 00:08:16,285
+High workout strain combined
+with a positive HRV baseline
+
+117
+00:08:16,293 --> 00:08:17,883
+leads to a super compensation.
+
+118
+00:08:18,670 --> 00:08:23,548
+That exact same workout strain combined
+with a negative HRV and a high sleep
+
+119
+00:08:23,550 --> 00:08:26,444
+depth lead to a sharp drop in readiness.
+
+120
+00:08:26,998 --> 00:08:31,631
+Those two hidden layers captures those
+cross feature interaction effortlessly.
+
+121
+00:08:33,119 --> 00:08:34,260
+And look at the footprint.
+
+122
+00:08:34,317 --> 00:08:39,547
+Across eight to thirty-two to sixteen to
+one, the entire network has just eight
+
+123
+00:08:39,561 --> 00:08:41,561
+thirty-three float thirty-two parameters.
+
+124
+00:08:41,899 --> 00:08:46,735
+Once compiled into an ExecuTorch PTE
+binary, the model on desk is only
+
+125
+00:08:46,735 --> 00:08:52,235
+eight kilobytes, smaller than a
+single, maybe a simple app icon, and
+
+126
+00:08:52,235 --> 00:08:54,254
+executes hundred and five milliseconds.
+
+127
+00:08:55,254 --> 00:08:59,112
+Compiling that PyTorch model into
+an R eight kilobyte readiness
+
+128
+00:08:59,119 --> 00:09:03,321
+forecaster PDE file takes less than
+ten lines of Python code in our
+
+129
+00:09:03,498 --> 00:09:05,846
+export readiness forecaster Py script.
+
+130
+00:09:06,687 --> 00:09:11,421
+First, we put readiness forecaster
+MLP into an eval model and
+
+131
+00:09:11,422 --> 00:09:14,856
+create a dummy sample input
+tensor for shape one to eight.
+
+132
+00:09:15,488 --> 00:09:20,038
+From there, ExecuTorch uses three-stage
+ahead of time lowering pipeline.
+
+133
+00:09:20,419 --> 00:09:26,004
+Stage one is Torch export exporter
+using PyTorch to graph capture.
+
+134
+00:09:26,462 --> 00:09:30,303
+This traces our model and produce
+a clean and static computation
+
+135
+00:09:30,307 --> 00:09:32,817
+graph in the core ATEN dialect.
+
+136
+00:09:33,441 --> 00:09:37,029
+Every ten of Python's overhead
+disappears right here.
+
+137
+00:09:37,714 --> 00:09:39,038
+Stage two is to Edge.
+
+138
+00:09:39,944 --> 00:09:44,369
+This lowers the ATEN graph into an ExecuTorch Edge dialect, normalizing your
+
+139
+00:09:44,369 --> 00:09:49,263
+operators looking in float thirty-two
+tensor shops, and preparing the
+
+140
+00:09:49,267 --> 00:09:51,481
+graph for target hardware dialects.
+
+141
+00:09:52,671 --> 00:09:54,878
+Stage three is to ExecuTorch.
+
+142
+00:09:55,996 --> 00:10:00,606
+Here, the compiler performs static
+memory planning, pre-calculating memory,
+
+143
+00:10:00,770 --> 00:10:04,659
+array know offsets of intermediate
+tensor at compile time, so the Android
+
+144
+00:10:04,659 --> 00:10:09,143
+phone never have to slow down dynamic
+memory, locations during inferences.
+
+145
+00:10:09,636 --> 00:10:14,813
+Finally, we write ET program buffer
+directly into a readiness forecaster PTE
+
+146
+00:10:15,813 --> 00:10:21,621
+Having a PDE file is great, but
+shipping into a native C++ runtime
+
+147
+00:10:21,621 --> 00:10:25,939
+inside a mobile SDK introduces
+a classic production hazard.
+
+148
+00:10:26,470 --> 00:10:29,573
+Missing JNI binaries,
+runtime, and crashes.
+
+149
+00:10:30,381 --> 00:10:33,481
+Think about how different developer
+use an open source library.
+
+150
+00:10:33,756 --> 00:10:40,277
+One Android app ships a full or PyTorch,
+ExecuTorch Android native runtime.
+
+151
+00:10:40,619 --> 00:10:44,719
+Another developer imports an Noctua AI
+just for the heuristic, and omits the
+
+152
+00:10:44,725 --> 00:10:47,276
+native dependency to keep their APK tiny.
+
+153
+00:10:48,027 --> 00:10:53,332
+And our own CI server run unit test on
+a standard desktop JVM, where Android
+
+154
+00:10:53,354 --> 00:10:59,270
+JNI library doesn't exist If our SDK
+hard-coded a direct dependency on the
+
+155
+00:10:59,270 --> 00:11:04,564
+runtime C++ runtime, unit test and
+lightweight consumer could immediately
+
+156
+00:11:04,565 --> 00:11:06,827
+crash on unsatisfied link error.
+
+157
+00:11:07,630 --> 00:11:11,234
+So in Noctua, we build a
+defensive dual path forecaster.
+
+158
+00:11:11,453 --> 00:11:14,270
+Our primary path is ExecuTorch forecaster.
+
+159
+00:11:14,629 --> 00:11:19,050
+It loads an ExecuTorch native
+runtime reflectively at runtime
+
+160
+00:11:19,075 --> 00:11:23,279
+and feeds our eight feature tensor
+into Readiness Forecaster PTE.
+
+161
+00:11:23,865 --> 00:11:27,796
+When it runs, UI explicitly
+displays a neural ExecuTorch
+
+162
+00:11:27,825 --> 00:11:31,649
+telemetry batch, so the known neural
+engine produce the prediction.
+
+163
+00:11:32,406 --> 00:11:35,022
+Our fallback is Linear
+Heuristic Forecaster.
+
+164
+00:11:35,285 --> 00:11:40,943
+If the native runtime PTE file is missing
+for any reason, Noctua catches cleanly
+
+165
+00:11:40,969 --> 00:11:42,983
+and fall back to the zero dependency.
+
+166
+00:11:43,443 --> 00:11:47,839
+Pure Kotlin linear model updating
+the UI batches to linear fallback.
+
+167
+00:11:48,149 --> 00:11:52,971
+Because of this pattern, all
+sixteen unit test cases can cleanly
+
+168
+00:11:53,774 --> 00:11:57,742
+run on a standard JVM, and the
+app never breaks in production
+
+169
+00:11:58,742 --> 00:12:02,498
+From a developer experience standpoint,
+all of this complexities is hidden
+
+170
+00:12:02,501 --> 00:12:05,394
+behind a clean four-line Kotlin API.
+
+171
+00:12:05,964 --> 00:12:12,467
+You initialize a Noctua API with ExecuTorch forecaster, passes in our wellness
+
+172
+00:12:12,467 --> 00:12:15,517
+snapshot, and call AI analyze snapshot.
+
+173
+00:12:16,161 --> 00:12:20,282
+Then you get back what did I call
+explainable hybrid intelligence.
+
+174
+00:12:20,496 --> 00:12:26,312
+Our PTE neural networks gives us the
+nonlinear numerical forecast, like
+
+175
+00:12:26,328 --> 00:12:29,923
+predicting, predicting a seventy-four
+readiness score for tomorrow.
+
+176
+00:12:30,662 --> 00:12:35,285
+Right alongside it, our heuristic
+insight engine evaluates deterministic
+
+177
+00:12:35,387 --> 00:12:41,028
+unit test rules on exact same extracted
+features, flagging insight like sleep
+
+178
+00:12:41,029 --> 00:12:45,654
+depth accuracy at, eighty-eight percent
+confidence, or HRV below your baseline
+
+179
+00:12:45,654 --> 00:12:47,237
+is eighty percentage confidence.
+
+180
+00:12:48,306 --> 00:12:49,517
+Why to combine both?
+
+181
+00:12:49,580 --> 00:12:54,011
+Because in health and wellness, you
+cannot afford hallucinated medical advice.
+
+182
+00:12:54,600 --> 00:12:58,821
+The neural network handles continuous
+neural forecasting, while unit
+
+183
+00:12:58,831 --> 00:13:02,888
+test rules guaranteed and every
+coaching recommendation is hundred
+
+184
+00:13:02,888 --> 00:13:05,602
+percent auditable and traceable
+
+185
+00:13:06,602 --> 00:13:07,883
+Noctua 1.0
+
+186
+00:13:07,886 --> 00:13:09,374
+is live on GitLab today.
+
+187
+00:13:10,154 --> 00:13:13,690
+We have an exciting roadmap ahead
+where I could love to invite
+
+188
+00:13:13,691 --> 00:13:15,398
+contributors from the community.
+
+189
+00:13:15,547 --> 00:13:21,623
+First, we integrate ExecuTorch Llama
+Runner to add an optional, fully local
+
+190
+00:13:21,639 --> 00:13:26,368
+on-device LLM coach that can chat
+over structured Noctua report offline.
+
+191
+00:13:27,204 --> 00:13:31,157
+Second, we are working on nightly
+on-device fine-tuning, so while
+
+192
+00:13:31,161 --> 00:13:35,859
+your phone charging overnight, the
+forecaster adapts its weights to
+
+193
+00:13:35,859 --> 00:13:37,541
+your personal recovery pattern.
+
+194
+00:13:38,471 --> 00:13:43,637
+Third, we are adding Android Health
+Connect right back so the other local
+
+195
+00:13:43,637 --> 00:13:46,292
+fitness app can use Noctua's insight.
+
+196
+00:13:47,186 --> 00:13:52,993
+And fourth, a Kotlin multi-platform
+port so iOS apps can run the exact same
+
+197
+00:13:52,996 --> 00:13:56,252
+PTE model via ExecuTorch CoreML backend
+
+198
+00:13:57,252 --> 00:14:02,775
+To wrap up, we don't have to upload
+our most sensitive personal data to the
+
+199
+00:14:02,792 --> 00:14:05,308
+cloud just to get intelligence coaching.
+
+200
+00:14:05,886 --> 00:14:10,454
+With PyTorch and ExecuTorch, privacy is
+the product, and the local execution
+
+201
+00:14:10,454 --> 00:14:12,675
+is faster, lighter, and more resilient.
+
+202
+00:14:14,548 --> 00:14:18,544
+So everything we talked through
+today, the Kotlin SDK, the Python
+
+203
+00:14:18,554 --> 00:14:23,234
+PT export pipeline, and the Jetpack
+Compose app with twenty-one-day
+
+204
+00:14:23,261 --> 00:14:25,698
+demo mode is MIT licensed at GitLab.
+
+205
+00:14:26,289 --> 00:14:30,748
+Please clone it, take it for a spin, and
+star the repo if you find it helpful.
+
+206
+00:14:31,683 --> 00:14:35,508
+You can also scan my QR code right
+here on the screen with your phone to
+
+207
+00:14:35,512 --> 00:14:37,528
+connect me with, with me on the LinkedIn.
+
+208
+00:14:38,290 --> 00:14:42,517
+Thank you so much for joining my session
+at Conf42 MLOps twenty twenty-six.
+
+209
+00:14:43,232 --> 00:14:44,466
+Enjoy the rest of the session.
+
+210
+00:14:44,564 --> 00:14:45,024
+Thank you.

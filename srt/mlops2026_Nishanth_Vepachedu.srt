@@ -1,0 +1,1676 @@
+1
+00:00:00,792 --> 00:00:02,931
+Hi, my name is Nishanth Vepachedu.
+
+2
+00:00:03,518 --> 00:00:06,944
+I'm a principal engineer at
+Target, and my work is AI
+
+3
+00:00:06,976 --> 00:00:09,293
+infrastructure in agentic systems.
+
+4
+00:00:09,837 --> 00:00:14,661
+Basically, the plumbing that lets, agents
+using large language models call tools
+
+5
+00:00:14,675 --> 00:00:16,472
+and act inside distributed systems.
+
+6
+00:00:17,470 --> 00:00:20,903
+today we are going to talk about
+scaling microservices observability
+
+7
+00:00:20,906 --> 00:00:23,954
+with agentic, usage of language models.
+
+8
+00:00:24,674 --> 00:00:27,124
+I want to be upfront about my angle.
+
+9
+00:00:27,350 --> 00:00:32,125
+Most of the talks on this subject
+are mostly focused on how to make
+
+10
+00:00:32,187 --> 00:00:33,944
+an agent, a good investigator.
+
+11
+00:00:34,588 --> 00:00:36,896
+how does that investigative agent reads?
+
+12
+00:00:37,146 --> 00:00:38,310
+How does it read logs?
+
+13
+00:00:38,311 --> 00:00:43,544
+How does it correlate traces and, and
+propose candidates for root cause?
+
+14
+00:00:44,025 --> 00:00:46,183
+I think that part is largely understood.
+
+15
+00:00:46,231 --> 00:00:49,225
+The part that isn't
+understood is the authority.
+
+16
+00:00:50,058 --> 00:00:52,753
+What is the agent allowed to do?
+
+17
+00:00:53,319 --> 00:00:56,301
+Who decides, what is it allowed to do?
+
+18
+00:00:56,331 --> 00:01:01,199
+And how should that decision
+change as an investigation goes on?
+
+19
+00:01:01,855 --> 00:01:04,413
+that will be the focus of the talk.
+
+20
+00:01:04,557 --> 00:01:10,368
+so basically what I am proposing
+is diagnosis is the easy bit.
+
+21
+00:01:10,862 --> 00:01:13,709
+Authority, is the hard part.
+
+22
+00:01:14,689 --> 00:01:20,277
+So, So think about what an incident agent
+actually does to-- So to be useful, an,
+
+23
+00:01:20,286 --> 00:01:26,519
+an incident agent or investigative agent,
+needs to access, all of your logs, your
+
+24
+00:01:26,519 --> 00:01:31,395
+traces, your metrics, deployment history,
+and at some point of time, it might
+
+25
+00:01:31,395 --> 00:01:37,922
+even start, having controls to restart,
+roll back, in your deployment pipeline.
+
+26
+00:01:38,503 --> 00:01:40,996
+That is a privileged
+identity in production.
+
+27
+00:01:41,330 --> 00:01:45,393
+Now think about what it reads,
+log lines, error messages,
+
+28
+00:01:45,426 --> 00:01:47,040
+request headers, stack traces.
+
+29
+00:01:47,787 --> 00:01:54,263
+A large share of that text originates
+outside our trust boundary.
+
+30
+00:01:54,952 --> 00:02:02,353
+So, anyone who can send, a request to
+our service can put words in our logs.
+
+31
+00:02:02,461 --> 00:02:09,204
+So we have to build a privileged
+actor whose main input is
+
+32
+00:02:09,226 --> 00:02:11,097
+partly written by strangers.
+
+33
+00:02:11,213 --> 00:02:13,296
+So how, how would you build that?
+
+34
+00:02:13,361 --> 00:02:18,717
+In security terms, that is, a
+confused deputy waiting to happen.
+
+35
+00:02:19,400 --> 00:02:24,635
+So in, in operational terms, it's the
+most interesting, agent we will deploy
+
+36
+00:02:24,680 --> 00:02:29,547
+because the questions you can postpone
+for the chatbot, you cannot postpone here.
+
+37
+00:02:30,642 --> 00:02:31,342
+moving on.
+
+38
+00:02:32,198 --> 00:02:34,534
+So, I'll go through the
+investigation slide quickly
+
+39
+00:02:34,537 --> 00:02:35,832
+because I want to be fair to it.
+
+40
+00:02:35,875 --> 00:02:39,438
+It matters, and it is where most
+of the engineering effort has gone.
+
+41
+00:02:40,033 --> 00:02:44,802
+Four habits separate a credible
+investigative agent from a demo.
+
+42
+00:02:44,945 --> 00:02:46,370
+First is grounding.
+
+43
+00:02:46,887 --> 00:02:51,226
+So if the agent says the checkout
+service caused the timeout, it
+
+44
+00:02:51,228 --> 00:02:57,406
+cites, the trace ID, the timestamp,
+and maybe some log statements,
+
+45
+00:02:57,406 --> 00:02:59,451
+and then gives us links for those.
+
+46
+00:02:59,851 --> 00:03:05,115
+So if it's unable to cite, obviously
+it's hallucinating and, and there
+
+47
+00:03:05,116 --> 00:03:07,922
+is no claim, there is no finding.
+
+48
+00:03:08,668 --> 00:03:12,321
+Secondly, it, it tests
+rather than, narrates.
+
+49
+00:03:12,372 --> 00:03:15,969
+A, a language model will happily
+tell you a plausible story.
+
+50
+00:03:16,983 --> 00:03:23,042
+But, a real investigative agent needs
+to turn that story into a prediction
+
+51
+00:03:23,266 --> 00:03:29,410
+that a query can refute and, and runs
+the refuting query first before it, it
+
+52
+00:03:29,411 --> 00:03:36,598
+provides you the story so it needs to be
+very methodical in its, in, in, in the
+
+53
+00:03:36,608 --> 00:03:40,103
+theories, and analysis that it provides.
+
+54
+00:03:41,147 --> 00:03:44,201
+third, step that it takes
+is staged retrieval.
+
+55
+00:03:44,226 --> 00:03:49,658
+So it starts with cheap aggregates,
+then pulls a few traces, then, then
+
+56
+00:03:49,685 --> 00:03:52,647
+it could maybe open a, a log window.
+
+57
+00:03:53,282 --> 00:03:57,785
+a gateway enforces the budget so the
+agent can't take down your entire
+
+58
+00:03:57,809 --> 00:04:00,140
+telemetry while investigating an outage.
+
+59
+00:04:00,768 --> 00:04:03,418
+And finally, it needs
+to be honest about gaps.
+
+60
+00:04:03,591 --> 00:04:05,618
+Sampling drops, spans.
+
+61
+00:04:05,658 --> 00:04:08,106
+A missing edge is not evidence of health.
+
+62
+00:04:08,640 --> 00:04:13,557
+"Undersolved, but here is the next probe"
+is a good answer instead of hallucinating.
+
+63
+00:04:13,562 --> 00:04:18,887
+So, so one of the main, aspects of
+investigative agent is to ground
+
+64
+00:04:18,889 --> 00:04:25,038
+itself and, and to be able to tell
+what, is covered and what isn't.
+
+65
+00:04:25,809 --> 00:04:30,091
+So if it does all four of these, then
+we have a pretty good investigator.
+
+66
+00:04:30,360 --> 00:04:34,944
+And, and notice that if it gets
+any of these wrong, it leads
+
+67
+00:04:34,944 --> 00:04:39,641
+to an engineer losing time and
+which is, not an ideal case.
+
+68
+00:04:40,779 --> 00:04:44,148
+So here is the asymmetry that
+the rest of this talk is about.
+
+69
+00:04:44,903 --> 00:04:49,225
+On the investigation side, the agent
+touches logs, metrics, and traces.
+
+70
+00:04:49,740 --> 00:04:51,268
+When it is wrong, an agent…
+
+71
+00:04:51,308 --> 00:04:54,483
+an engineer loses time, and
+a person reading the summary
+
+72
+00:04:54,485 --> 00:04:56,726
+usu-usually catches the mistake.
+
+73
+00:04:57,805 --> 00:05:01,068
+We protect that side with
+read-only scopes and query
+
+74
+00:05:01,068 --> 00:05:03,435
+budgets, and those generally work.
+
+75
+00:05:03,862 --> 00:05:07,377
+But on the action side, the
+agent can touch running systems.
+
+76
+00:05:08,202 --> 00:05:12,565
+When it is wrong, customers can
+lose service, and nobody is reading
+
+77
+00:05:12,567 --> 00:05:16,222
+along in the same way, so the
+error often shows up as an impact.
+
+78
+00:05:16,758 --> 00:05:18,509
+Look at the bottom right cell.
+
+79
+00:05:19,212 --> 00:05:24,320
+In many published designs, the safeguard
+on the action side is a single approve
+
+80
+00:05:24,320 --> 00:05:26,544
+or deny prompt in front of a human.
+
+81
+00:05:27,154 --> 00:05:33,611
+Every action gets the same prompt, whether
+it is restarting one pod or changing
+
+82
+00:05:33,611 --> 00:05:35,449
+network policy for a whole region.
+
+83
+00:05:36,638 --> 00:05:39,981
+And after the 20th prompt of the
+night, the on-call engineer is
+
+84
+00:05:39,982 --> 00:05:41,859
+clicking approve, approve, approve.
+
+85
+00:05:42,075 --> 00:05:45,864
+So separating read from write
+is the right first move, but it
+
+86
+00:05:45,867 --> 00:05:47,894
+only tells you where the line is.
+
+87
+00:05:48,436 --> 00:05:52,938
+It doesn't tell you how much scrutiny
+a given action deserves, and it tells
+
+88
+00:05:52,938 --> 00:05:59,373
+you nothing about the path that the
+agent took to get there Let me make the
+
+89
+00:05:59,374 --> 00:06:04,425
+input problem concrete with two pieces
+of published research from this year.
+
+90
+00:06:04,953 --> 00:06:09,058
+The first is a benchmark called LogJack.
+
+91
+00:06:09,586 --> 00:06:14,803
+The authors, planted prompt injection
+payloads in cloud logs and gave those
+
+92
+00:06:14,824 --> 00:06:19,064
+logs to debugging agents built on
+eight different foundation models.
+
+93
+00:06:19,595 --> 00:06:23,481
+On six of the eight, the agent
+executed a remote command that
+
+94
+00:06:23,483 --> 00:06:24,937
+came from the log content.
+
+95
+00:06:25,472 --> 00:06:31,612
+The attacker needed no cloud permissions
+at all, only the ability to influence
+
+96
+00:06:31,803 --> 00:06:33,899
+an error message in the logs.
+
+97
+00:06:34,398 --> 00:06:38,239
+The second is a NeurIPS paper
+on security operations agents.
+
+98
+00:06:38,835 --> 00:06:44,516
+Across more than 1,100 payloads,
+e-e-every agent configuration
+
+99
+00:06:44,526 --> 00:06:49,043
+they tested could be talked into
+downgrading real malicious activity.
+
+100
+00:06:49,493 --> 00:06:54,482
+So there was, some sort of
+influence to even downplay things.
+
+101
+00:06:54,904 --> 00:06:59,236
+And the detail I find most important,
+when they let the agent pull additional
+
+102
+00:06:59,253 --> 00:07:04,344
+read-only telemetry to cross-check,
+that did not reliably fix it.
+
+103
+00:07:04,764 --> 00:07:08,093
+That second finding does matter to us.
+
+104
+00:07:08,616 --> 00:07:12,025
+The standard advice is verify
+with independent telemetry.
+
+105
+00:07:12,616 --> 00:07:14,306
+That helps with honest mistakes.
+
+106
+00:07:14,661 --> 00:07:19,355
+It is not a defense against an adversary
+who's writing into your telemetry.
+
+107
+00:07:19,562 --> 00:07:26,787
+So treat every log, statement as an
+unvalidated user input, and accept that
+
+108
+00:07:26,803 --> 00:07:33,371
+moral reading-- accept that the moral
+reading it will sometimes be fooled.
+
+109
+00:07:33,916 --> 00:07:37,714
+The design question is
+what we need to look into.
+
+110
+00:07:38,589 --> 00:07:42,006
+so the second problem is harder to
+see, and it doesn't need an attacker.
+
+111
+00:07:42,019 --> 00:07:45,495
+That is the illustrative
+investigation, not a real incident.
+
+112
+00:07:46,022 --> 00:07:47,854
+The agent reads error logs.
+
+113
+00:07:48,563 --> 00:07:49,602
+Yeah, that's reasonable.
+
+114
+00:07:49,648 --> 00:07:50,704
+It queries traces.
+
+115
+00:07:50,916 --> 00:07:51,768
+That's fine too.
+
+116
+00:07:52,188 --> 00:07:53,925
+Treats the service configuration.
+
+117
+00:07:53,939 --> 00:07:55,044
+That is still okay.
+
+118
+00:07:55,584 --> 00:07:57,548
+Then it starts to act.
+
+119
+00:07:57,562 --> 00:08:00,615
+It restarts one pod, which
+is a standard first move.
+
+120
+00:08:01,432 --> 00:08:05,096
+The systems persist, so it
+restarts the whole service.
+
+121
+00:08:05,139 --> 00:08:09,420
+System still persists, so it concludes
+the problem is connectivity and
+
+122
+00:08:09,420 --> 00:08:11,751
+proposes a network policy change.
+
+123
+00:08:12,175 --> 00:08:17,610
+If you put an approval prompt in front
+of each of those steps and judged
+
+124
+00:08:17,669 --> 00:08:21,966
+each one alone, each one would pass.
+
+125
+00:08:22,348 --> 00:08:25,019
+Restarting a pod during
+an incident is normal.
+
+126
+00:08:25,228 --> 00:08:28,577
+Escalating, when that
+doesn't work is also normal.
+
+127
+00:08:29,224 --> 00:08:35,485
+But as you look at this whole pattern
+on the whole, the agent started as
+
+128
+00:08:36,730 --> 00:08:42,007
+Basically a scraping, and in, in
+the role of a scraping reader, and
+
+129
+00:08:42,007 --> 00:08:44,335
+it ended up editing network policy.
+
+130
+00:08:44,679 --> 00:08:47,155
+At no point did anything raise the bar.
+
+131
+00:08:47,362 --> 00:08:52,397
+The height of these bars is the
+thing nobody was measuring, the
+
+132
+00:08:52,399 --> 00:08:54,609
+accumulated risk of the path.
+
+133
+00:08:55,059 --> 00:08:57,492
+Engineers know this pattern
+from human incidents.
+
+134
+00:08:57,568 --> 00:09:01,879
+The dangerous moment is the fourth
+mitigation that didn't work when
+
+135
+00:09:01,881 --> 00:09:07,759
+some- someone tried, someone
+tired reaches for a bigger lever.
+
+136
+00:09:08,328 --> 00:09:10,068
+We have norms for that with people.
+
+137
+00:09:10,098 --> 00:09:13,094
+We need a mechanism for it with agents.
+
+138
+00:09:14,258 --> 00:09:18,687
+So if the last slide, slide
+felt a little hypothetical, the
+
+139
+00:09:18,693 --> 00:09:21,319
+cascading of events, it is not.
+
+140
+00:09:21,684 --> 00:09:26,237
+In July of this year, research agents
+running an internal cybersecurity eval
+
+141
+00:09:26,237 --> 00:09:30,836
+at OpenAI got caught out of their sandbox
+and into Hugging Face's production.
+
+142
+00:09:30,841 --> 00:09:33,665
+This was a ve- very famous incident.
+
+143
+00:09:34,274 --> 00:09:38,506
+Both companies have published, detailed
+accounts, both OpenAI and Hugging Face,
+
+144
+00:09:38,507 --> 00:09:40,259
+and I'd encourage you to read them.
+
+145
+00:09:40,851 --> 00:09:44,303
+there are two numbers which,
+which were interesting.
+
+146
+00:09:44,313 --> 00:09:48,094
+Hugging Face's forensic
+reconstruction covers roughly
+
+147
+00:09:48,109 --> 00:09:53,113
+17,600 actions over four days.
+
+148
+00:09:53,144 --> 00:09:56,437
+And according to OpenAI's report,
+the agents went from a single
+
+149
+00:09:56,457 --> 00:10:02,811
+dataset pod to cluster admin across
+multiple clusters in under 13 hours.
+
+150
+00:10:03,671 --> 00:10:04,951
+I want to be careful here.
+
+151
+00:10:05,007 --> 00:10:07,653
+These are not incident response agents.
+
+152
+00:10:07,666 --> 00:10:11,019
+The-- and this was an
+evaluation environment and
+
+153
+00:10:11,019 --> 00:10:12,698
+not operations team tooling.
+
+154
+00:10:13,752 --> 00:10:20,440
+So I'm not claiming that typical
+observability agents will do this, but
+
+155
+00:10:20,440 --> 00:10:23,004
+the lesson to take is a little narrower.
+
+156
+00:10:23,054 --> 00:10:26,450
+It is, it is more on
+the architectural side.
+
+157
+00:10:26,942 --> 00:10:31,986
+There was no single action you could
+point to and say that one was the breach.
+
+158
+00:10:32,013 --> 00:10:34,364
+It is more like the trajectory.
+
+159
+00:10:34,889 --> 00:10:37,293
+Thousands of individually small steps.
+
+160
+00:10:37,748 --> 00:10:42,928
+Any control that evaluates one call at a
+time with no memory of what came before
+
+161
+00:10:42,962 --> 00:10:45,074
+is structurally unable to see that.
+
+162
+00:10:45,578 --> 00:10:48,919
+So if we are going to give
+agents authority in production,
+
+163
+00:10:49,294 --> 00:10:52,051
+the control has to have memory.
+
+164
+00:10:52,056 --> 00:10:57,138
+It needs to be able to see things
+holistically So, this is where
+
+165
+00:10:57,176 --> 00:11:01,588
+we kind of go back to the, to the
+title of the talk, 'cause I think
+
+166
+00:11:01,595 --> 00:11:04,620
+observability has a second job now.
+
+167
+00:11:05,370 --> 00:11:09,662
+We've spent almost a decade
+learning to instrument services,
+
+168
+00:11:09,662 --> 00:11:13,382
+traces, metrics, logs, a shared
+schema through OpenTelemetry.
+
+169
+00:11:13,949 --> 00:11:19,057
+The incident agent consumes all of that,
+but the agent is itself a new service
+
+170
+00:11:19,064 --> 00:11:24,226
+in our system with far more freedom
+than any microservice that we run.
+
+171
+00:11:24,673 --> 00:11:29,027
+So it needs to be the best
+instrumented thing that we own.
+
+172
+00:11:30,035 --> 00:11:34,952
+Concretely, every tool call that
+the agent makes should emit a
+
+173
+00:11:35,017 --> 00:11:37,694
+typed event before it executes.
+
+174
+00:11:38,227 --> 00:11:43,195
+Not a log line of free text, a record
+with fields, a system of record,
+
+175
+00:11:43,360 --> 00:11:46,985
+that's, that's showing change that
+the agent is proposing to make.
+
+176
+00:11:47,049 --> 00:11:48,791
+What is the effect of this action?
+
+177
+00:11:50,074 --> 00:11:50,777
+is it none?
+
+178
+00:11:50,896 --> 00:11:53,231
+Is it reversible or,
+or is it irreversible?
+
+179
+00:11:53,264 --> 00:11:54,769
+What is the scope of the action?
+
+180
+00:11:54,769 --> 00:11:56,960
+Is it one pod, a service, a region?
+
+181
+00:11:57,674 --> 00:11:58,917
+What is its provenance?
+
+182
+00:11:59,009 --> 00:12:02,757
+Meaning which inputs influenced
+this call, and did any of them
+
+183
+00:12:02,758 --> 00:12:04,809
+come from untrusted content?
+
+184
+00:12:05,501 --> 00:12:07,164
+And then the governance fields.
+
+185
+00:12:07,236 --> 00:12:11,689
+What level of scrutiny was required
+and what was granted, and by whom?
+
+186
+00:12:12,122 --> 00:12:14,383
+On the right is the illustrative record.
+
+187
+00:12:15,101 --> 00:12:18,706
+The values are made up, but the
+shape, is the one that matters.
+
+188
+00:12:19,102 --> 00:12:21,655
+And one rule makes this enforceable.
+
+189
+00:12:21,712 --> 00:12:26,994
+If a tool has no declared
+metadata, the call fails closed.
+
+190
+00:12:27,729 --> 00:12:31,985
+An action the system can't
+classify does not run.
+
+191
+00:12:33,489 --> 00:12:37,310
+Once actions are typed, you can
+do something simple and powerful.
+
+192
+00:12:37,473 --> 00:12:39,420
+Let the action itself set a floor.
+
+193
+00:12:40,598 --> 00:12:43,412
+So you can read this
+table from, top to bottom.
+
+194
+00:12:43,414 --> 00:12:47,659
+Querying telemetry has no effect on
+the system, so it sits at tier zero.
+
+195
+00:12:47,763 --> 00:12:48,948
+Hopefully, right?
+
+196
+00:12:49,502 --> 00:12:52,092
+The, the agent just does it and we record.
+
+197
+00:12:52,612 --> 00:12:56,934
+Opening an incident and posting
+a summary is-- it is reversible,
+
+198
+00:12:57,194 --> 00:12:58,617
+and it affects maybe one team.
+
+199
+00:12:59,230 --> 00:13:00,473
+Still, it is tier zero.
+
+200
+00:13:01,018 --> 00:13:04,057
+Restarting a pod is also reversible.
+
+201
+00:13:04,776 --> 00:13:07,109
+Touches one instance, so
+it gets a light check.
+
+202
+00:13:07,592 --> 00:13:12,753
+Scaling a re-- and/or restarting a whole
+service touches more, so the floor rises.
+
+203
+00:13:13,225 --> 00:13:17,505
+Changing network policy or rolling back
+deployment is hard to undo and touches
+
+204
+00:13:17,555 --> 00:13:19,699
+many services, so that needs a person.
+
+205
+00:13:20,695 --> 00:13:24,690
+And at the bottom, anything
+irreversible or anything that crosses
+
+206
+00:13:24,691 --> 00:13:29,176
+a tenant boundary never goes below
+human approval, no matter what.
+
+207
+00:13:29,794 --> 00:13:31,107
+Two things about this table.
+
+208
+00:13:31,132 --> 00:13:36,592
+First, the, the specific assignments
+here are illustrative defaults.
+
+209
+00:13:37,176 --> 00:13:40,609
+Where exactly you put a restart
+depends on your system, and
+
+210
+00:13:40,656 --> 00:13:42,777
+every operator will tune that.
+
+211
+00:13:43,242 --> 00:13:47,438
+Second, and more important, the
+floor depends on the action and never
+
+212
+00:13:47,438 --> 00:13:49,557
+on how confident the agent sounds.
+
+213
+00:13:50,193 --> 00:13:53,975
+An agent that is very sure about
+deleting data still needs a human.
+
+214
+00:13:54,142 --> 00:13:56,112
+Confidence is not a credential.
+
+215
+00:13:56,967 --> 00:13:58,966
+I'll explain the tiers in the next slide.
+
+216
+00:13:59,950 --> 00:14:03,751
+So here is the approach that we
+are proposing, that I'm working
+
+217
+00:14:03,752 --> 00:14:05,383
+on as an open reference design.
+
+218
+00:14:05,383 --> 00:14:07,441
+I call it guarded oversight.
+
+219
+00:14:08,198 --> 00:14:14,041
+Today, most systems have two settings:
+the agent acts alone or a human approves.
+
+220
+00:14:14,838 --> 00:14:17,187
+That is still a bit too coarse.
+
+221
+00:14:17,228 --> 00:14:22,583
+It either leaves risk unexamined
+or it buries the on-call engineer.
+
+222
+00:14:23,366 --> 00:14:26,632
+So we need to put some steps in between.
+
+223
+00:14:26,778 --> 00:14:28,512
+Tier zero is observe.
+
+224
+00:14:28,549 --> 00:14:29,403
+Observe only.
+
+225
+00:14:29,934 --> 00:14:31,720
+The action runs and is recorded.
+
+226
+00:14:31,885 --> 00:14:33,335
+Tier one is justify.
+
+227
+00:14:33,356 --> 00:14:37,695
+The agent must state why it wants
+to take this action in a fixed
+
+228
+00:14:37,695 --> 00:14:42,720
+structure, and a deterministic rule
+that check-checks that justification
+
+229
+00:14:42,755 --> 00:14:44,292
+against the evidence it cites.
+
+230
+00:14:44,435 --> 00:14:45,274
+This is cheap.
+
+231
+00:14:46,083 --> 00:14:50,393
+And the idea is that an agent
+that has wandered off task will
+
+232
+00:14:50,403 --> 00:14:52,029
+struggle to fill in the form.
+
+233
+00:14:52,328 --> 00:14:54,478
+Tier two is a second opinion.
+
+234
+00:14:54,501 --> 00:15:00,752
+An independent model with a different
+context has to concur to the action
+
+235
+00:15:00,757 --> 00:15:02,738
+proposed by the investigative agent.
+
+236
+00:15:03,247 --> 00:15:07,607
+Tier three is human approval, and
+the human sees the provenance.
+
+237
+00:15:07,660 --> 00:15:11,956
+This proposal was influenced
+by untrusted log content, for
+
+238
+00:15:11,956 --> 00:15:16,342
+example, that makes it a real hard
+decision instead of a rubber stamp.
+
+239
+00:15:17,102 --> 00:15:18,907
+Tier four is halt.
+
+240
+00:15:19,084 --> 00:15:20,182
+Stop the session.
+
+241
+00:15:20,250 --> 00:15:24,771
+Freeze anything the agent would write
+to its own memory and page the operator.
+
+242
+00:15:24,870 --> 00:15:31,082
+The point of the middle tiers is to spend
+human attention only where it is needed.
+
+243
+00:15:32,082 --> 00:15:36,342
+So, now the piece that answers the
+trajectory problem, the tier an action
+
+244
+00:15:36,344 --> 00:15:38,913
+needs is a larger of the two things.
+
+245
+00:15:39,429 --> 00:15:42,544
+One is the floor for that action
+from the table we just saw.
+
+246
+00:15:42,632 --> 00:15:46,822
+The other is the tier implied by the
+risk this session has accumulated so far.
+
+247
+00:15:47,871 --> 00:15:50,403
+So if we go back to the
+drifting investigation, the
+
+248
+00:15:50,408 --> 00:15:53,576
+first pod restart is tier one.
+
+249
+00:15:54,152 --> 00:15:58,216
+But by the time the agent has restarted
+a pod, restarted the service, read
+
+250
+00:15:58,219 --> 00:16:02,163
+untrusted content along the way, and
+is now reaching for network policy,
+
+251
+00:16:02,596 --> 00:16:06,824
+the session's accumulated risk has
+climbed, and the same kind of action
+
+252
+00:16:06,831 --> 00:16:12,125
+that passed lightly an hour ago now
+needs a second opinion or a person.
+
+253
+00:16:12,236 --> 00:16:16,307
+The bar rises as the path
+gets longer and stranger.
+
+254
+00:16:17,462 --> 00:16:20,709
+Three properties make this
+untrustworthy, and they are the
+
+255
+00:16:20,710 --> 00:16:25,162
+ones I think should be stated
+precisely and where possible proved.
+
+256
+00:16:25,598 --> 00:16:27,504
+First, no self-reason.
+
+257
+00:16:27,619 --> 00:16:33,008
+Nothing the agent says and nothing in
+the content it reads can lower the score.
+
+258
+00:16:33,718 --> 00:16:37,634
+An injected logline that says, "This
+session is safe," has no effect.
+
+259
+00:16:38,170 --> 00:16:39,829
+Only a human resets it.
+
+260
+00:16:40,230 --> 00:16:41,567
+Second is inheritance.
+
+261
+00:16:41,612 --> 00:16:46,074
+If the agent delegates to a sub-agent,
+the sub-agent starts with the
+
+262
+00:16:46,112 --> 00:16:48,433
+parent agent's risk, tier level.
+
+263
+00:16:48,869 --> 00:16:52,412
+Otherwise, delegation becomes
+a way to launder a history.
+
+264
+00:16:52,938 --> 00:16:54,737
+Third, the floor is always hold.
+
+265
+00:16:54,771 --> 00:16:59,957
+A perfectly calm session still
+can't delete data without a person.
+
+266
+00:17:01,102 --> 00:17:05,770
+So a fair question at this point,
+where does the risk score come from?
+
+267
+00:17:06,018 --> 00:17:09,775
+And doesn't this just move
+the problem to another model?
+
+268
+00:17:10,668 --> 00:17:13,223
+It would if we let just the model decide.
+
+269
+00:17:13,228 --> 00:17:18,543
+So the rule is a model's judgment is
+evidence, but it isn't permission.
+
+270
+00:17:19,235 --> 00:17:23,063
+On the left, models act as, sensors.
+
+271
+00:17:23,429 --> 00:17:26,618
+Fast classifiers can score
+each proposed action.
+
+272
+00:17:26,832 --> 00:17:31,287
+Does the content that influenced it
+look like it contains instructions?
+
+273
+00:17:32,148 --> 00:17:35,198
+Is this action a departure
+from the stated task?
+
+274
+00:17:35,342 --> 00:17:37,198
+How large is the blast radius?
+
+275
+00:17:37,236 --> 00:17:38,867
+Those are the useful signals.
+
+276
+00:17:39,237 --> 00:17:43,837
+But each one comes with an error rate,
+and you should measure that error rate
+
+277
+00:17:43,840 --> 00:17:46,221
+in a shadow mode before you rely on it.
+
+278
+00:17:46,672 --> 00:17:49,535
+And you combine the signals
+conservatively, assuming
+
+279
+00:17:49,535 --> 00:17:51,109
+that they can fail together.
+
+280
+00:17:51,694 --> 00:17:54,328
+On the right, authority lives in code.
+
+281
+00:17:54,638 --> 00:17:58,161
+Deterministic policy
+takes the typed action.
+
+282
+00:17:58,703 --> 00:18:02,597
+Its provenance and sensor
+readings decides the tier.
+
+283
+00:18:03,885 --> 00:18:06,069
+That component is meant to be small.
+
+284
+00:18:06,101 --> 00:18:07,189
+It's a state machine.
+
+285
+00:18:07,299 --> 00:18:11,593
+Small enough to test exhaustively, small
+enough that you can prove properties
+
+286
+00:18:11,598 --> 00:18:16,121
+about it, like the no self-reset
+property from the previous slide.
+
+287
+00:18:16,568 --> 00:18:18,675
+That division is the heart of the design.
+
+288
+00:18:19,232 --> 00:18:26,084
+That-- the, the parts that can be fooled
+sit at the edge and treated as fallible.
+
+289
+00:18:26,630 --> 00:18:31,837
+The part that grants authority can't
+be argued with, and if untrusted input
+
+290
+00:18:31,849 --> 00:18:38,965
+tries to talk its own score down, that
+attempt itself is a policy violation.
+
+291
+00:18:40,383 --> 00:18:43,521
+So how do we know if any of this can work?
+
+292
+00:18:44,320 --> 00:18:48,936
+So I want to offer four measurements, and
+I ask them of any vendor or internal team
+
+293
+00:18:48,936 --> 00:18:51,644
+that tells you their agent is safe to ask.
+
+294
+00:18:51,655 --> 00:18:53,869
+First, catch tier distribution.
+
+295
+00:18:54,625 --> 00:18:59,839
+Take a set of unsafe actions
+from benchmarks and from your own
+
+296
+00:18:59,854 --> 00:19:03,594
+replayed incidents, and record
+which tiers stopped each one.
+
+297
+00:19:04,128 --> 00:19:09,580
+If everything is caught at tier three
+by the human, your lower tiers aren't
+
+298
+00:19:09,587 --> 00:19:12,955
+doing anything, and people will burn out.
+
+299
+00:19:13,504 --> 00:19:17,866
+If things are caught at tier one and
+two, the design is earning its keep.
+
+300
+00:19:18,448 --> 00:19:20,969
+Secondly, approvals per shift.
+
+301
+00:19:21,009 --> 00:19:26,802
+Count the human decisions the gate demands
+from one on-call engineer in one shift.
+
+302
+00:19:27,303 --> 00:19:30,305
+This is the approval fatigue
+number, and it is a budget.
+
+303
+00:19:30,323 --> 00:19:31,401
+You have to budget it.
+
+304
+00:19:31,844 --> 00:19:35,794
+If you can ex-- If you exceed it,
+people stop reading and just start
+
+305
+00:19:35,795 --> 00:19:38,095
+clicking yes, yes, yes, approve.
+
+306
+00:19:38,955 --> 00:19:40,923
+Third is the utility cost.
+
+307
+00:19:40,957 --> 00:19:45,416
+With the gate on, how many legitimate
+investigations still complete?
+
+308
+00:19:45,751 --> 00:19:50,040
+A gate that blocks everything is
+perfectly safe, but it's useless.
+
+309
+00:19:50,761 --> 00:19:54,022
+The-there are no investigations
+that complete and, and
+
+310
+00:19:54,023 --> 00:19:55,343
+are providing resolution.
+
+311
+00:19:56,362 --> 00:19:59,544
+And finally, there is replay miss rate.
+
+312
+00:20:00,111 --> 00:20:04,831
+Run the whole thing in shadow
+against your past incidents and
+
+313
+00:20:04,833 --> 00:20:07,262
+count what it would have let through.
+
+314
+00:20:07,621 --> 00:20:09,430
+I'm not showing you
+results for these today.
+
+315
+00:20:09,820 --> 00:20:12,494
+The reference implementation
+and evaluation harness are in
+
+316
+00:20:12,494 --> 00:20:16,335
+progress, and I'd rather show you
+numbers when I have real ones.
+
+317
+00:20:16,706 --> 00:20:20,679
+What I'm arguing is that these are
+the right four numbers to look at
+
+318
+00:20:21,679 --> 00:20:23,800
+So if you want to start on
+Monday, here is the order.
+
+319
+00:20:23,818 --> 00:20:25,309
+Stage one, replay.
+
+320
+00:20:25,463 --> 00:20:28,308
+Take your past instance with
+their telemetry and run the
+
+321
+00:20:28,309 --> 00:20:29,672
+agent against them offline.
+
+322
+00:20:29,847 --> 00:20:31,042
+No live access at all.
+
+323
+00:20:31,646 --> 00:20:34,219
+You learn how good the
+investigator is, and you start
+
+324
+00:20:34,219 --> 00:20:35,622
+collecting the phone numbers.
+
+325
+00:20:36,082 --> 00:20:38,328
+Stage two is read-only in production.
+
+326
+00:20:38,461 --> 00:20:41,816
+The agent investigates real live
+incidents and writes summaries.
+
+327
+00:20:41,898 --> 00:20:42,970
+It can't change anything.
+
+328
+00:20:43,779 --> 00:20:45,554
+Meanwhile, the gate runs in shadow.
+
+329
+00:20:45,598 --> 00:20:49,719
+It records what tier it
+would have required for the,
+
+330
+00:20:49,973 --> 00:20:51,512
+actions the agent proposed.
+
+331
+00:20:51,657 --> 00:20:55,341
+You compare that to what
+your engineers actually did.
+
+332
+00:20:56,188 --> 00:20:58,083
+Stage three is reversible actions.
+
+333
+00:20:58,114 --> 00:21:01,493
+Now the agent can restart and
+scale through the tires with every
+
+334
+00:21:01,497 --> 00:21:03,262
+decision recorded as telemetry.
+
+335
+00:21:04,066 --> 00:21:06,740
+And then finally, stage
+four is wider authority.
+
+336
+00:21:07,282 --> 00:21:11,886
+And, and the rule for this stage
+is that you expand only, as far
+
+337
+00:21:11,888 --> 00:21:13,755
+as your catch tier data supports.
+
+338
+00:21:14,206 --> 00:21:18,511
+If the data says the middle tiers
+are catching drift reliably, extend.
+
+339
+00:21:18,831 --> 00:21:20,340
+If not, do not.
+
+340
+00:21:20,856 --> 00:21:24,103
+What I like about this order
+is that each stage produces the
+
+341
+00:21:24,103 --> 00:21:26,205
+evidence that justifies the next.
+
+342
+00:21:26,337 --> 00:21:32,292
+You never have to take the agent's safety
+on faith, and you never have to take mine.
+
+343
+00:21:32,816 --> 00:21:36,647
+So, I just want to close out,
+basically where, we started.
+
+344
+00:21:36,659 --> 00:21:42,573
+The title of this talk is about scaling
+observability with agentic LLMs.
+
+345
+00:21:42,627 --> 00:21:44,215
+we've argued about two things.
+
+346
+00:21:45,198 --> 00:21:49,092
+What it means for agents that read your
+telemetry and help you investigate.
+
+347
+00:21:49,504 --> 00:21:52,366
+That's the easy half, and
+that's the real value.
+
+348
+00:21:53,004 --> 00:21:57,394
+It means telemetry about your agents,
+typed, recorded, and used to decide how
+
+349
+00:21:57,396 --> 00:21:59,662
+much authority they get at each step.
+
+350
+00:21:59,667 --> 00:22:00,855
+That is the hard half.
+
+351
+00:22:01,457 --> 00:22:03,678
+If you take one sentence
+away, take this one.
+
+352
+00:22:03,685 --> 00:22:06,808
+Scale the oversight with the agent.
+
+353
+00:22:07,458 --> 00:22:12,552
+As you give it more reach, the scrutiny
+has to grow with it automatically in a
+
+354
+00:22:12,552 --> 00:22:15,848
+way the agent can't talk its way out of.
+
+355
+00:22:16,429 --> 00:22:17,712
+Two notes on what's next.
+
+356
+00:22:18,196 --> 00:22:22,045
+I am working on open reference design
+and an evaluation harness for the
+
+357
+00:22:22,048 --> 00:22:24,498
+graduated oversight approach I described.
+
+358
+00:22:24,880 --> 00:22:28,228
+I'll be publishing them when
+they're ready to be scrutinized.
+
+359
+00:22:29,065 --> 00:22:31,305
+And this isn't only an
+engineering concern.
+
+360
+00:22:31,336 --> 00:22:36,148
+In February, NIST's, s-center of AI
+Standards and Innovation, they la-launched
+
+361
+00:22:36,154 --> 00:22:40,605
+an AI agent standard initiative and
+asked for input on agent scrutiny.
+
+362
+00:22:41,015 --> 00:22:45,184
+I have a comment submitted there
+with some perspective, of somebody
+
+363
+00:22:45,184 --> 00:22:47,118
+who runs and deploys these systems.
+
+364
+00:22:47,191 --> 00:22:51,945
+So if you run agents in production, your
+experience is exactly what that process
+
+365
+00:22:51,946 --> 00:22:54,618
+needs, and I encourage you to take part.
+
+366
+00:22:55,218 --> 00:22:56,437
+Thank you for your time.
+
