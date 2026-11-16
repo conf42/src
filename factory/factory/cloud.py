@@ -341,6 +341,11 @@ def main(argv):
                     lines += legacy_plan(run, legacy[slug], owned) or ["- empty"]
             except Exception as e:                       # noqa: BLE001
                 lines.append("- could not read it: %s" % e)
+        try:
+            from . import cleanup
+            lines += cleanup.Cleanup(drive, cfg, dry_run=True).run()
+        except Exception as e:                           # noqa: BLE001
+            lines.append("\n### Upload folders - not looked at (%s)" % e)
         summary_md(lines)
         print("\n".join(lines))
         return 0
@@ -361,6 +366,11 @@ def main(argv):
                 run.publish(force=True)
             except Exception:                            # noqa: BLE001
                 pass
+    try:                                                 # the last step: upload folders of events long over are emptied
+        from . import cleanup
+        lines += cleanup.Cleanup(drive, cfg).run()
+    except Exception as e:                               # noqa: BLE001 - tidying up never fails a pass
+        lines.append("\n### Upload folders - not tidied (%s)" % e)
     commit_intake("factory: cloud pass state (intake + youtube)")
     summary_md(lines)
     print("\n".join(lines))

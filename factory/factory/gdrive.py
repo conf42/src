@@ -57,7 +57,7 @@ class Drive:
         out, page = [], None
         while True:
             params = {"q": q, "pageSize": 1000, "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
-                      "fields": "nextPageToken,files(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents)"}
+                      "fields": "nextPageToken,files(id,name,mimeType,size,md5Checksum,createdTime,modifiedTime,parents,ownedByMe)"}
             if page:
                 params["pageToken"] = page
             d = self._call("GET", API + "/files", params=params).json()
@@ -115,6 +115,16 @@ class Drive:
         old = ",".join(self.get(file_id, "parents").get("parents") or [])
         self._call("PATCH", API + "/files/" + file_id, params={"addParents": new_parent, "removeParents": old,
                                                                "supportsAllDrives": "true", "fields": "id,parents"}, json={})
+
+    def trash(self, file_id):
+        """Into Drive's bin (only the owner can; Drive deletes it for good 30 days later)."""
+        self._call("PATCH", API + "/files/" + file_id, params={"supportsAllDrives": "true", "fields": "id,trashed"},
+                   json={"trashed": True})
+
+    def remove_from(self, file_id, parent):
+        """Take a file out of one of our folders without binning it (someone else's file: it stays in their Drive)."""
+        self._call("PATCH", API + "/files/" + file_id, params={"removeParents": parent, "supportsAllDrives": "true",
+                                                               "fields": "id,parents"}, json={})
 
 
 def dumps(o):
