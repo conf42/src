@@ -78,9 +78,10 @@ CSVs instead and the sheet is read through the Google Sheets connector. Same rul
    - fixed: `{"id": "<id>", "cell": "K12", "corrected": "<exactly the text you wrote into the cell>"}`
    - clean: `{"id": "<id>", "clean": true}`
    - row not in the sheet: `{"id": "<id>", "missing": true}`
-   - only when the sheet cell differed from the CSV text shown by `show` (the sheet was edited after the
-     export): add `"sheet_original": "<the sheet text before your fix>"`; the CSV is then left for the next
-     export.
+   - only when the sheet cell differed from the CSV text shown by `show`: add
+     `"sheet_original": "<the sheet text as you found it>"` (with `"corrected"` too if you then fixed it,
+     without it if the sheet text was already fine). The script works out whether the sheet was proofread
+     on an earlier run (the CSV catches up) or really edited (the CSV waits for the next export).
    Refused cells: write `value` from the restore file back into `'<tab>'!<cell>`.
 
 Never edit a CSV by hand, never write to the sheet outside the abstract cells listed by `show`, and never

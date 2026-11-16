@@ -300,10 +300,14 @@ def finish_csv(args, pending):
             continue
         if new is None or norm(new) == norm(so if so is not None else old):
             seen.append(h(old))
-            if so is not None:
-                seen.append(h(so))
-            log.append(f'=  {who}: clean')
-            continue
+            if so is None or norm(so) == norm(old):
+                log.append(f'=  {who}: clean')
+                continue
+            seen.append(h(so))
+            if guard(old, so):       # the sheet text is a different abstract, not a proofread of the CSV one
+                log.append(f'=  {who}: clean (sheet differs from the CSV; CSV left for the next export)')
+                continue
+            new = so                 # proofread in the sheet on an earlier run whose push was lost: catch up
         base = so if so is not None else old
         why = guard(base, new)
         if why:
@@ -311,7 +315,8 @@ def finish_csv(args, pending):
             log.append(f'X  {who}: REFUSED ({why}) - restore the cell from the restore file')
             continue
         seen += [h(old), h(new)] + ([h(so)] if so is not None else [])
-        if so is not None and norm(so) != norm(old):
+        if so is not None and norm(so) != norm(old) and guard(old, new):
+            # the sheet was really edited since the export (not just proofread earlier): the export brings it
             log.append(f'~  {who}: fixed in the sheet; the CSV holds an older text, left for the next export')
             continue
         path = os.path.join(args.root, p['csv'])
