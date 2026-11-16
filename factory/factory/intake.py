@@ -488,6 +488,7 @@ class Intake:
         self.d, self.cfg, self.use_claude, self.dry_run, self.log = drive, cfg or {}, use_claude, dry_run, log
         self.active = active or {}                       # {slug: event}: the lineups a speaker may also be on
         self.refiled = []                                # events an upload was moved to this pass
+        self.states = {}                                 # {slug: intake state as this pass left it}
         self.failed = []                                 # uploads (or whole events) that broke this pass
 
     def state_path(self, slug):
@@ -692,8 +693,10 @@ class Intake:
                 shutil.rmtree(work, ignore_errors=True)
                 if not self.dry_run:
                     self.save(slug, st)                  # decided uploads survive a pass that dies later
-        self.save(slug, st)
-        return accepted
+        self.states[slug] = st                           # what this pass decided, for the summary
+        if not self.dry_run:                             # a dry run decides and shows, it never writes: a dry
+            self.save(slug, st)                          # run's "done" records once sat in a working copy, one
+        return accepted                                  # commit away from making the factory skip real uploads
 
     def conference_check(self, slug, row, video, deck, sf):
         """(verdict, other slug, why) for one upload - see wrong_conference(). Only looked at when the speaker is on
