@@ -4,4 +4,17 @@ A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Neelima Verm
 
 ## Abstract
 
-AI fairness regulations are tightening globally — but passing a disparate impact audit may not be enough. This talk introduces the Dollar-Cost Fairness Framework, developed through FairLens: an open-source credit-decisioning analysis tool built on 95,588 real HMDA mortgage applications.  We trained and evaluated 10 machine learning models — from logistic regression to neural networks — measuring not just accuracy, but the dollar-denominated harm imposed on protected groups. The findings are striking: a Support Vector Machine and a Neural Network achieved near-identical AUC scores, yet the SVM imposed $227M more in disparate harm against Black and Hispanic applicants. That is a 13x difference in financial harm between two "equally accurate" models.  We will walk through: - Why accuracy metrics systematically obscure fairness gaps in high-stakes lending - How Dollar-Cost Fairness translates model bias into regulatory and business risk ($) - AIF360 bias intervention techniques (reweighing, calibrated equalized odds) and their real tradeoffs - A live demo of FairLens showing model comparison, fairness dashboards, and bootstrap-validated results (p < 0.001)  Attendees will leave with a reusable evaluation framework, concrete code patterns for integrating fairness audits into ML pipelines, and a clearer picture of what "AI agent risk" means when agents are making financial decisions about people's lives.  This talk is for ML engineers, data scientists, and AI practitioners building or auditing decision systems — especially in regulated domains like finance, insurance, or hiring.
+AI fairness regulations are tightening globally — but passing a disparate impact audit may not be enough. This talk introduces the Dollar-Cost Fairness Framework, developed through FairLens: an open-source credit-decisioning analysis tool built on 95,588 real HMDA mortgage applications.
+
+We trained and evaluated 10 machine learning models — from logistic regression to neural networks — measuring not just accuracy, but the dollar-denominated harm imposed on protected groups. The findings are striking: a Support Vector Machine and a Neural Network achieved near-identical AUC scores, yet the SVM imposed $227M more in disparate harm against Black and Hispanic applicants. That is a 13x difference in financial harm between two "equally accurate" models.
+
+We will walk through:
+
+- Why accuracy metrics systematically obscure fairness gaps in high-stakes lending
+- How Dollar-Cost Fairness translates model bias into regulatory and business risk ($)
+- AIF360 bias intervention techniques (reweighing, calibrated equalized odds) and their real tradeoffs
+- A live demo of FairLens showing model comparison, fairness dashboards, and bootstrap-validated results (p < 0.001)
+
+Attendees will leave with a reusable evaluation framework, concrete code patterns for integrating fairness audits into ML pipelines, and a clearer picture of what "AI agent risk" means when agents are making financial decisions about people's lives.
+
+This talk is for ML engineers, data scientists, and AI practitioners building or auditing decision systems — especially in regulated domains like finance, insurance, or hiring.

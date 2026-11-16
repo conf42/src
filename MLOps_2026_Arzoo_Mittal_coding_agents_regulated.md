@@ -7,6 +7,7 @@ A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Arzoo Mittal
 Enterprise knowledge is often fragmented across documents, internal wikis, policies, technical documentation, and legacy systems. While large language models make it possible to build conversational interfaces over this information, deploying a reliable enterprise knowledge assistant requires far more than connecting an LLM to a vector database.
 
 This talk explores how to design and operationalize a Retrieval-Augmented Generation (RAG)–powered enterprise knowledge assistant that delivers trustworthy, permission-aware, and auditable answers in regulated environments.
+
 We will walk through the end-to-end architecture, from document ingestion, chunking, embeddings, and hybrid retrieval to reranking, grounded generation, and source attribution. We will examine how to preserve document-level access controls, reduce hallucinations, evaluate retrieval quality, and establish observability across the RAG pipeline.
 
 The session will also cover the operational challenges that emerge beyond the prototype: keeping knowledge fresh, handling changing permissions, monitoring retrieval failures, managing latency and inference costs, and measuring whether the assistant actually improves employee productivity.

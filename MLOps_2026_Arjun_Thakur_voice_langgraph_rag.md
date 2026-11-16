@@ -4,4 +4,14 @@ A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Arjun Thakur
 
 ## Abstract
 
-Building an AI agent is easy. Making it fast, reliable, observable and useful in production is much harder.  In this talk, I’ll share lessons from building a voice-first AI tutoring system using LangGraph, RAG, OpenAI Realtime, FastAPI, PostgreSQL and pgvector.  I’ll walk through how the system combines retrieval, agent workflows, semantic caching, verification and conversational memory while keeping latency low enough for a real-time voice experience. I’ll also cover the operational challenges that appear once an AI prototype meets real users: retrieval quality, agent failures, evaluation, tracing, latency and cost.  We’ll look at how evaluation and observability can be built into the development lifecycle using retrieval metrics, agent traces and systematic testing rather than relying on whether an LLM response simply “looks good.”  The session will focus on practical engineering decisions, trade-offs and lessons learned from taking an Agentic AI system beyond the prototype stage and operating it as a real product.  Attendees will leave with a practical approach to designing, evaluating and operating RAG and agent-based applications in production.
+Building an AI agent is easy. Making it fast, reliable, observable and useful in production is much harder.
+
+In this talk, I’ll share lessons from building a voice-first AI tutoring system using LangGraph, RAG, OpenAI Realtime, FastAPI, PostgreSQL and pgvector.
+
+I’ll walk through how the system combines retrieval, agent workflows, semantic caching, verification and conversational memory while keeping latency low enough for a real-time voice experience. I’ll also cover the operational challenges that appear once an AI prototype meets real users: retrieval quality, agent failures, evaluation, tracing, latency and cost.
+
+We’ll look at how evaluation and observability can be built into the development lifecycle using retrieval metrics, agent traces and systematic testing rather than relying on whether an LLM response simply “looks good.”
+
+The session will focus on practical engineering decisions, trade-offs and lessons learned from taking an Agentic AI system beyond the prototype stage and operating it as a real product.
+
+Attendees will leave with a practical approach to designing, evaluating and operating RAG and agent-based applications in production.

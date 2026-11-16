@@ -4,4 +4,13 @@ A talk at [Conf42 MLOps 2026](https://www.conf42.com/mlops2026) by [Bhavik Thakk
 
 ## Abstract
 
-Your ML platform is full of non-human actors: training jobs pulling data, inference services calling feature stores, CI pipelines pushing models, and now AI agents calling tools through the Model Context Protocol (MCP) on behalf of real users. Most of them authenticate with shared API keys or over-privileged service accounts, and very few teams can answer: which workload made this call, on whose behalf, and how do I revoke it?  This talk walks through a practical identity architecture for ML and agent systems, based on lessons from building identity products for AI agents:  - Workload identity instead of secrets – giving pipelines, model servers and agents verifiable identities (SPIFFE/SPIRE-style) and short-lived credentials instead of long-lived keys. - Delegated access for agents – how an agent should get scoped, user-bound access to tools and APIs: OAuth token exchange, MCP authorization, and registering agent clients with Client ID Metadata Documents. - Guardrails in the loop – where human approval, step-up and revocation belong when agents take real actions. - What goes wrong – over-scoped tokens, confused-deputy calls between services, invisible agent-to-agent hops, and the missing kill switch, with fixes for each.  You'll leave with a reference architecture and a checklist you can apply to your own ML platform and agent deployments.
+Your ML platform is full of non-human actors: training jobs pulling data, inference services calling feature stores, CI pipelines pushing models, and now AI agents calling tools through the Model Context Protocol (MCP) on behalf of real users. Most of them authenticate with shared API keys or over-privileged service accounts, and very few teams can answer: which workload made this call, on whose behalf, and how do I revoke it?
+
+This talk walks through a practical identity architecture for ML and agent systems, based on lessons from building identity products for AI agents:
+
+- Workload identity instead of secrets – giving pipelines, model servers and agents verifiable identities (SPIFFE/SPIRE-style) and short-lived credentials instead of long-lived keys.
+- Delegated access for agents – how an agent should get scoped, user-bound access to tools and APIs: OAuth token exchange, MCP authorization, and registering agent clients with Client ID Metadata Documents.
+- Guardrails in the loop – where human approval, step-up and revocation belong when agents take real actions.
+- What goes wrong – over-scoped tokens, confused-deputy calls between services, invisible agent-to-agent hops, and the missing kill switch, with fixes for each.
+
+You'll leave with a reference architecture and a checklist you can apply to your own ML platform and agent deployments.
