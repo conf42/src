@@ -876,7 +876,7 @@
     };
     var store = { get: function (k) { try { return localStorage.getItem('c42rec.' + k); } catch (e) { return null; } },
                   set: function (k, v) { try { localStorage.setItem('c42rec.' + k, v); } catch (e) {} } };
-    var worker = new Worker('./assets/js/record-worker.js?v=7c0bd3ab61');
+    var worker = new Worker('./assets/js/record-worker.js?v=158c1437c9');
     var display = $('pv').transferControlToOffscreen();   // the engine draws the preview itself
     worker.postMessage({ type: 'display', canvas: display }, [display]);
     // the preview's pixels follow its size on screen (it was a fixed 1280x720, stretched - soft slides on a Retina screen)
@@ -1836,6 +1836,8 @@
         if (left < 600 && !S.warn10) { S.warn10 = 1; toast('10 minutes left - the recording stops by itself at 2 hours.', 10000, 'warn'); }
         if (left < 60 && !S.warn1) { S.warn1 = 1; toast('1 minute left - the recording stops by itself at 2 hours.', 10000, 'bad'); }
       }
+      else if (m.type === 'still') { if (S.stills && S.stills.length < 90) S.stills.push({ t: m.t, blob: m.blob, ms: m.ms }); }
+      else if (m.type === 'stills-off') { S.stillsOff = m.why; console.info('[recorder] no more stills for the highlights: ' + m.why); }
       else if (m.type === 'finishing') status('Finishing the file… don’t close the page.');
       else if (m.type === 'warn') { if (m.what === 'disk') toast('I couldn’t write to your folder, so I’m keeping the recording in the browser instead.', 8000, 'bad');
         else if (m.what === 'audio' || m.what === 'video') { console.warn('[recorder] ' + m.what + ' encoder restarted'); say('A hiccup in the ' + (m.what === 'audio' ? 'sound' : 'video') + ' encoder - I restarted it and we’re still recording. Maybe repeat your last sentence.', 10000, 'warn'); } }
@@ -2360,6 +2362,9 @@
         var base = fileBase(name);   // the files carry the conference; the speaker's name stays for the dialogs
         if (folder) { S.recE = { id: Date.now(), name: name, folder: folder, file: base + '.mp4', parts: base + ' - safety copy', started: Date.now(), status: 'recording' }; recPut(S.recE); }
         if (file) { S.recE = { id: Date.now(), name: name, fileH: file, file: file.name, started: Date.now(), status: 'recording' }; recPut(S.recE); }
+        // Talk Highlights stills (record-worker.js): only for a talk without slides - slides in, then no highlights
+        S.stills = []; S.stillsOff = '';
+        worker.postMessage({ type: 'stills', on: !S.pdf && !/[?&]stills=0/.test(location.search) });
         worker.postMessage({ type: 'start', name: base, folder: folder, handle: file, audio: r, vbitrate: S.mode === 'none' ? 4000000 : 0 }, [r]);
         hudStart();
         // the corgi stays awake while recording (Marek 2026-10-25: dog trivia distracts the speaker): woken quietly, no hop
@@ -2595,7 +2600,7 @@
     // A closed tab resumes from Drive's last confirmed chunk (job in IndexedDB "c42up", with the file handle + slides).
     var UP_URL = "https://script.google.com/macros/s/AKfycbynzLrpO9pxeGjmhv3Zy1H8GMmf-hyO7j-s9cJjO4ivbYcQp0Y1O-mWoIkzlFe3SjEkgw/exec";
     var UP_WORKSPACE = "https://drive.google.com/drive/folders/1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG";
-    var UP_V = "7c0bd3ab61";
+    var UP_V = "158c1437c9";
     var UP_CHUNK = 8 * 1024 * 1024, UP_SHORT = 180;
     var OFFLINE = 'Offline, connect to the internet to upload your talk';
     var UP = { busy: false, job: null };
@@ -2689,6 +2694,41 @@
       f.md5 = spark ? spark.end() : await fullMd5(file);
       f.done = true; f.md5state = null;
       await upSave(j);
+    }
+    // Talk Highlights stills: one stored (uncompressed) zip of the PNGs, named by order and second, sent to the talk's
+    // upload folder between the video and the final check. Whatever goes wrong here is only logged - an upload script
+    // that does not know stills yet answers "invalid", a slow line gives up after 3 minutes - and the upload carries on.
+    var CRC = (function () { var t = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    function crc32(u8) { var c = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+    async function zipStore(files) {   // [{ name (ASCII), blob }] -> a zip Blob, method 0 (PNG is compressed already)
+      var parts = [], central = [], at = 0, enc = new TextEncoder();
+      for (var i = 0; i < files.length; i++) {
+        var data = new Uint8Array(await files[i].blob.arrayBuffer()), name = enc.encode(files[i].name), crc = crc32(data);
+        var lh = new DataView(new ArrayBuffer(30)), ch = new DataView(new ArrayBuffer(46));
+        lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
+        ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true);
+        ch.setUint16(28, name.length, true); ch.setUint32(42, at, true);
+        parts.push(lh.buffer, name, data); central.push(ch.buffer, name);
+        at += 30 + name.length + data.length;
+        if (i % 8 === 7) await wait(0);   // the page stays alive between files
+      }
+      var size = central.reduce(function (a, b) { return a + (b.byteLength || b.length); }, 0), end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, size, true); end.setUint32(16, at, true);
+      return new Blob(parts.concat(central, [end.buffer]), { type: 'application/zip' });
+    }
+    async function upStills(j) {
+      try {
+        var st = UP.stills || [];
+        if (st.length < 3 || j.stillsSent || j.files.slides) return;   // too few to make highlights from, sent already, or a talk with slides
+        var zip = await zipStore(st.map(function (x, i) { return { name: ('00' + (i + 1)).slice(-3) + '_t' + Number(x.t).toFixed(1) + '.png', blob: x.blob }; }));
+        var b = upBody(j, false, false); b.stills = { name: 'screen stills.zip', size: zip.size };
+        var res = await upPost(b), u = res.uploads && res.uploads.stills;
+        if (!u) return;
+        var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, 180000);
+        var r = await fetch(u.upload_url, { method: 'PUT', body: zip, headers: { 'Content-Range': 'bytes 0-' + (zip.size - 1) + '/' + zip.size }, signal: ctl.signal });
+        clearTimeout(timer);
+        if (r.ok) { j.stillsSent = true; await upSave(j); }
+      } catch (er) { console.info('[upload] the stills for the highlights were not sent: ' + (er && er.message)); }
     }
     function upBody(j, video, slides) {
       var c = j.ctx, b = { action: 'start', event: { slug: c.ev.slug, label: c.ev.label }, typed: c.typed, meta: j.meta, origin: location.origin, website: '' };
@@ -2872,11 +2912,13 @@
     }
     function upOffer(m, lim, len, mb) {
       var c = S.recCtx || {};
+      UP.stills = S.pdf ? [] : (S.stills || []).slice();   // this recording's stills, for its highlights (kept in memory only)
       if (!c.ev) { status('✅ ' + lim + 'Saved <b>' + esc(S.file) + '</b> (' + len + ', ' + mb + ').', 'ok saved'); return; }
       var j = { id: Date.now(), at: Date.now(), status: 'new', file: S.file, entry: c.entry, ctx: { ev: { slug: c.ev.slug, label: c.ev.label }, talk: c.talk, typed: c.typed, name: c.name },
                 slidesBlob: S.pdfFile || null, files: {}, len: len,
                 meta: { seconds: Math.round(m.seconds), bytes: m.bytes, stop_reason: m.why || 'stop', saved_to: m.onDisk ? 'disk' : 'browser', frames: m.frames || 0, dropped: m.dropped || 0,
                         vcodec: m.video || '', acodec: m.audio || '', layout: c.mode || '', source: c.src || '', cameras: c.cams || 0, pauses: S.pauseCount || 0,
+                        stills: S.pdf ? 0 : (S.stills || []).length, stills_off: S.stillsOff || '', stills_ms: Math.max.apply(null, [0].concat((S.stills || []).map(function (x) { return x.ms || 0; }))),
                         slide_pages: S.pdf ? S.pages : 0, recorder: UP_V, browser: (navigator.userAgent.match(/(Edg|OPR|Chrome|Firefox|Safari)\/[\d.]+/) || [''])[0] } };
       if (!j.entry && !m.onDisk) UP.pendingBrowserCopy = true;
       // "recorded, not uploaded" on conf42.com/<event>/factory, before the speaker even chooses (fire and forget)
@@ -2971,6 +3013,7 @@
         };
         if (j.files.slides && !j.files.slides.done) await upFile(j, 'slides', j.slidesBlob, onp);   // the small one first
         if (!j.files.video.done) await upFile(j, 'video', video, onp);
+        await upStills(j);   // best effort, never in the way: the video is already there
         await upCheck(j, again);
       } catch (er) {
         console.error('[upload]', er);

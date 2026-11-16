@@ -242,12 +242,68 @@ function tick() {
     pvFull = false; pvBoxes = [];
     if (soft) { dx.filter = 'none'; dx.fillStyle = 'rgba(0,0,0,' + (dim ? .5 : .3) + ')'; dx.fillRect(0, 0, pw, ph); }   // and 30 % darker
   }
+  if (rec && frameNo % FPS === 30) { try { stills(); } catch (e) { stillsOff('error'); } }   // the highlights' stills never touch the recording
   if (frameNo % FPS === 0 && !rec) brightness();
   if (frameNo % 15 === 0 && !rec) shake();   // setup only, like the darkness check   // the dark / same-person hints are setup's; a recording skips the read-back
   // with what the page's health dials need (Marek 2026-10-23): frames made and dropped, the encoder's queue, the disk's backlog
   if (rec && frameNo % 15 === 0) post({ type: 'tick', us: now(), bytes: rec.bytes, dropped: rec.dropped, frames: rec.frames,
                                          queue: rec.venc ? rec.venc.encodeQueueSize : 0, backlog: rec.backlog || 0, copies: rec.copies || 0 });
   frameNo++;
+}
+// Talk Highlights stills (Marek 2026-11-16): while a screen is shared, a still of the RAW shared screen (before it is
+// scaled into the overlay's window, so sharper than the video and with no overlay or speaker) each time the screen has
+// settled - changed, then stayed put for 3 s. A PNG, lossless: about 13 ms for a full-HD screen of code, and measured
+// not to hold up the 60 fps loop. The factory picks the interesting ones for the talk's highlights (highlights.py).
+// Never at the recording's expense (Marek: "cut the additional recording if the machine is being overburdened"):
+// none in saver mode; none while the machine is busy (over 2 % of frames dropped in the last 10 s); a strike when a
+// still is followed by dropped frames or took over 250 ms, and after 3 strikes no more stills for this recording.
+// At most 80, 150 MB; a screen seen before is not taken again.
+var STW = 480, STH = 270, stl = { on: false }, stc = new OffscreenCanvas(STW, STH), stx = stc.getContext('2d', { willReadFrequently: true });
+function stillsReset(on, debug) { stl = { on: !!on, debug: !!debug, sig: null, changed: 0, pending: false, busy: false, count: 0, bytes: 0, strikes: 0, hist: [], after: null, seen: [] }; }
+function stillsOff(why) { if (!stl.on) return; stl.on = false; post({ type: 'stills-off', why: why, count: stl.count }); }
+// has the screen changed? A 480 x 270 grey copy, compared pixel by pixel: the share of pixels that differ clearly.
+// Small enough to cost about a millisecond a second, large enough that text still shows: two tries with smaller
+// copies (64 x 36 averaged, then 160 x 90) could not tell two slides of one template apart - new words on the same
+// background wash out when a screen is shrunk twelve times. A moving mouse pointer or a blinking cursor is a few
+// pixels (0.01 %); a new slide, a scrolled editor or new terminal output is far more than the 0.3 % that counts.
+function stillSig(f) {
+  stx.drawImage(f, 0, 0, STW, STH);
+  var p = stx.getImageData(0, 0, STW, STH).data, g = new Uint8Array(STW * STH);
+  for (var i = 0; i < g.length; i++) g[i] = (p[i * 4] * 77 + p[i * 4 + 1] * 151 + p[i * 4 + 2] * 28) >> 8;
+  return g;
+}
+function stillDiff(a, b) {   // 0-1: the share of pixels whose brightness moved by more than 12 (of 255)
+  var n = 0;
+  for (var i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 12) n++;
+  return n / a.length;
+}
+function stills() {   // once a second while recording
+  if (!stl.on || !rec || rec.paused || !rec.w0 || stl.busy) return;
+  if (source !== 'screen' || !scr.frame) { stl.sig = null; stl.pending = false; return; }
+  if (rec.half) return stillsOff('saver mode');   // the page already decided this laptop can't keep up
+  var t = performance.now();
+  // busy right now? more than 12 frames (2 %) dropped over the last 10 s: no still this second, tried again the next
+  // (the encoder drops a few frames while it warms up at the start of every recording - that is not a reason to give up)
+  stl.hist.push([t, rec.dropped]); while (stl.hist.length > 11) stl.hist.shift();
+  var busyNow = rec.dropped - stl.hist[0][1] > 12;
+  // did the last still cost frames? more than 3 dropped in the 2 s after it is a strike; 3 strikes and stills are off
+  if (stl.after && t - stl.after[0] >= 2000) { if (rec.dropped - stl.after[1] > 3 && ++stl.strikes >= 3) return stillsOff('frames dropped'); stl.after = null; }
+  var f = scr.frame, g = stillSig(f);
+  if (stl.debug) post({ type: 'stills-debug', t: Math.round(now() / 1e5) / 10, d: stl.sig ? stillDiff(g, stl.sig) : -1, pending: stl.pending, busy: busyNow, after: !!stl.after,
+                        seen: stl.seen.map(function (k) { return Math.round(stillDiff(g, k) * 1e4) / 1e4; }) });   // the test page's trace (?stills=debug)
+  if (!stl.sig || stillDiff(g, stl.sig) > .003) { stl.sig = g; stl.changed = t; stl.pending = true; return; }   // still changing
+  if (!stl.pending || t - stl.changed < 3000 || busyNow || stl.after) return;   // not settled yet, this screen is done, or the machine is busy
+  stl.pending = false;
+  for (var k = 0; k < stl.seen.length; k++) if (stillDiff(g, stl.seen[k]) < .003) return;   // seen before
+  if (stl.count >= 80 || stl.bytes > 150e6) return stillsOff('enough');
+  var w = f.displayWidth, h = f.displayHeight, z = Math.min(1, 1920 / w, 1080 / h), at = now() / 1e6, t0 = performance.now(), c;
+  try { c = new OffscreenCanvas(Math.round(w * z), Math.round(h * z)); c.getContext('2d', { alpha: false }).drawImage(f, 0, 0, c.width, c.height); } catch (e) { return; }
+  stl.busy = true; stl.seen.push(g); stl.after = [t, rec.dropped];
+  c.convertToBlob({ type: 'image/png' }).then(function (b) {
+    var ms = performance.now() - t0;
+    if (rec) { stl.count++; stl.bytes += b.size; post({ type: 'still', blob: b, t: Math.round(at * 10) / 10, w: c.width, h: c.height, ms: Math.round(ms) }); }
+    if (ms > 250 && ++stl.strikes >= 3) stillsOff('slow');
+  }).catch(function () {}).then(function () { stl.busy = false; });
 }
 var next = performance.now(), stat = { n: 0, busy: 0, at: performance.now() };
 (function loop() {
@@ -535,6 +591,7 @@ self.onmessage = function (e) {
   // the preview at its real size on screen (Retina included, never above the recording's 1920x1080): 1:1 is sharp
   else if (m.type === 'display-size') { if (dx && (dx.canvas.width !== m.w || dx.canvas.height !== m.h)) { dx.canvas.width = m.w; dx.canvas.height = m.h; pvFull = true; pvStale = true; } }
   else if (m.type === 'dim') dim = m.on;
+  else if (m.type === 'stills') stillsReset(m.on, m.debug);
   else if (m.type === 'nocam') { if (noCam !== m.on) dirty = true; noCam = m.on; }
   // saver mode for the rest of the recording (new pictures 30 times a second, lean: unchanged slots not encoded), from a keyframe
   else if (m.type === 'saver' && rec) { rec.half = rec.lean = true; rec.lastKey = -KEY_EVERY; }
