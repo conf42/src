@@ -42,7 +42,7 @@
     <meta property="og:title" content="From Diffusion to Production: How vLLM-Omni Unifies Multimodal Inference | Conf42"/>
     <meta property="og:description" content="Most LLM engineers know autoregressive models inside out, but diffusion transformers play by completely different rules. They don't generate token by token. They denoise. They're compute-bound, not memory-bound. But how do you keep serving LLMs while still generating videos and images in the same inference engine? Is there a way for diffusion to sit inside the same serving pipelines as your LLMs?  vLLM-Omni is the inference engine built for exactly this reality. In this talk, we'll start with just enough diffusion fundamentals  from noise to pixel  the denoising loop, why timesteps matter, and how DiT differs fundamentally from AR models. Then we'll dive into vLLM-Omni's architecture and how it integrates both worlds together: natively disaggregated AR and DiT stages, the OmniRouter dispatch logic, available acceleration for diffusion, and OpenAI-compatible endpoints serving text, images, video, and audio from a single engine.  You'll leave with a clear mental model of where multimodal inference is heading  and what it actually takes to serve it in production."/>
     <meta property="og:url" content="https://www.conf42.com/Large_Language_Models_LLMs_2026_Kosseila_Haddalene_multimodal_inference_vllm"/>
-    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Founder | AI infrastructure Lead", "name": "Kosseila Haddalene", "sameAs": ["https://www.linkedin.com/in/kousshd/"], "url": "https://www.conf42.com/speaker_Kosseila_Haddalene", "worksFor": {"@type": "Organization", "name": "Cloudthrill"}}], "description": "Most LLM engineers know autoregressive models inside out, but diffusion transformers play by completely different rules. They don\u0027t generate token by token. They denoise. They\u0027re compute-bound, not memory-bound. But how do you keep serving LLMs while still generating videos and images in the same inference engine? Is there a way for diffusion to sit inside the same serving pipelines as your LLMs? vLLM-Omni is the inference engine built for exactly this reality. In this talk, we\u0027ll start with just enough diffusion fundamentals \u0097 from noise to pixel \u0097 the denoising loop, why timesteps matter, and how DiT differs fundamentally from AR models. Then we\u0027ll dive into vLLM-Omni\u0027s architecture and how it integrates both worlds together: natively disaggregated AR and DiT stages, the OmniRouter dispatch logic, available acceleration for diffusion, and OpenAI-compatible endpoints serving text, images, video, and audio from a single engine. You\u0027ll leave with a clear mental model of where multimodal inference is heading \u0097 and what it actually takes to serve it in production.", "embedUrl": "https://www.youtube.com/embed/Z_pGSa7umwU", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 Large Language Models (LLMs) 2026", "url": "https://www.conf42.com/llms2026"}, "keywords": ["multimodal", "inference", "vllm"], "name": "From Diffusion to Production: How vLLM-Omni Unifies Multimodal Inference", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/Z_pGSa7umwU/hqdefault.jpg"], "transcript": "Hey, and welcome everybody to Conf42 LM Conference. Today, we\u0027ve got an exciting topic planned for you. And by the way did you see that intro right there? Yeah, the old rock star watching the World Cup. Yeah. There was no camera, no actor here, and none of that was real. Everything was AI-generated. See that quality? That\u0027s a diffusion model for you, which is the entire reason why we\u0027re here for the next 40 minutes. I\u0027m Kasella. This is VLM Omni. One engine, two brands, the multi-model, any to any inference. And let\u0027s go Okay. So first, a very quick intro as shown here. My name is Kasella, founder of Cloud Thrill. Eighteen years in tech, now AI Infra Lead and VL and production stack contributor across six different cloud. But hey, that\u0027s not what matters. Here\u0027s the part that\u0027s actually useful to you. We have a couple of deep dive blogs for example VLM for Beginner series if you\u0027re new into it or not with three parts starting from fundamentals to features to deployment. We also got Kivy Cache explainer explain blog to learn all about it. Then a super helpful diffusion 101 since it\u0027s the topic of the day. Literally all the questions you never dare to ask about diffusion models, like what is diffusion, denoise and loop diffusion solvers, CFG and negative prompts, even diffusion model papers from twenty twenty-one to twenty twenty-four, the whole thing. Super simple visuals and annotation are very helpful for AI builders, and of course, no PhD required. I also happen to host a podcast called Tech Bits Unplugged, and so you can check that out for a full episode on quantization if you\u0027re into that, and that\u0027s actually about it. We can start with the agenda. So let\u0027s do this Okay, so what are we talking about today? First we\u0027ll start with the multimodal mess, and why serving text message, video, and audio all together breaks your stack. And in section two, we\u0027ll talk about the one engine, two brains architecture behind vLLM Omni, where autoregressive meets diffusion across pipelines and multimodal stages, and how they work. And in section three we\u0027ll cover the orchestration part, including the request journey and the API calls the serving and deployment framework on a single or multi-node environment. And in section four we\u0027ll cover what makes vLLM Omni very fast. I\u0027m talking about the acceleration features with diffusion caching and parallelism dials like sequence splitting and HSPD, including quick example. We\u0027ll dive a bit deeper later on this talk. And in section five that\u0027s the fun part we\u0027ll jump into a live-ish demo replay on a Navios 800 node testing ZImage, TTS and the brand-new Cosmos-3 world model from NVIDIA, which I\u0027m very excited about as well. And finally we\u0027ll close on what the latest release of vLLM Omni, the V22 shipped, and the project world map with more blogs and goodies. Okay, so let\u0027s start with the mess, but let me just zoom out a bit the slide back for a second just so you guys can see the slide better. Let me switch that here. There you go. Looking better, right? Perfect Okay. So you probably know most of these visual generation services which are proprietary, like V03, Kling, Midjourney, Luma, Cedens, ElevenLabs for voice, and there are obviously tons more open source versions of course. There are different models, different UIs, but one thing is common under the hood though it\u0027s they\u0027re all diffusion based. But here\u0027s the catch. They\u0027re nothing like serving LLMs. Why? Because text generation is autoregressive, so it\u0027s token by token. You cache keys and values so it\u0027s more memory bound. And then image and video are diffusion based, so you denoise over a fixed number of steps, and every step is a full forward pass, even sometimes double. And it\u0027s more compute bound. So that\u0027s totally different physics. So for years if you wanna text an image behind one product, you run two stacks, two engines, two schedulers, two teams to ship one feature. But VLLMni Omni on the other hand, is betting on one sentence. What if a single engine by the way, I was talking about the text autoregressive and image video diffusion comparison and the way that, that teams are actually splitting that into stacks. And the question that VL Omni is asking is, what if a single engine could s- serve both actually, or even more by the way? So let\u0027s see what this Omni engine is all about All right, so what does omnimodality actually gets you in vLLM Omni? Two things. One, it keeps the autoregressive support vLLM is already perfect for and extends it to anything not autoregressive, like diffusion transformers and other parallel generation model, right? So on one side we have all modalities like text, image, audio, video that can be ingested by their specific encoders. We call them modality encoders as well. And then we have the LLM AR code, which stands for autoregressive core, right? That\u0027s literally vLLM, takes care of anything LLM related. And then on the other side, we have the modality decoders or modality generators to generate all these various modality output like text, image, video, and audio. That\u0027s the any to any modality in and out. Again, it does that by keeping everything vLLM is great at on the AR side, the autoregressive, and grow a second brain natively for diffusion, which is exactly the picture on this slide. Now, how about the model support? How does vLLM Omni actually do in terms of supporting all these open source models? It does great because the biggest momentum driver for vLLM Omni is that this isn\u0027t just a paper. It\u0027s built in the open with huge OSS model support with more than 40 architectures under one runtime from chat models all the way to long video generations. We got the whole Qwen suite from Qwen Image Qwen Omni, Qwen TTS to models like FLUX, Hunyuan, Wan, Stable Diffusion, Z models for G- from GLM, and even Kosmos the new Wan model made to generate wall simulation and train robots and the latest Helios real-time long video generation model. Because the one thing you need to know is that most video gen models can only generate short clips due to their training corpus. But this one makes longer videos. And that\u0027s already five thousand plus stars and climbing. And this list actually will definitely be different tomorrow. So whatever you\u0027re seeing here in the screen is gonna be different in like within weeks. But let\u0027s step back a minute and compare the AR and diffusion one more time All right. Let me actually walk the difference between the two brains, right? AR and diffusion, and they\u0027re all as well. So on the left side, we have the autoregressive brain, the AR model. We call that\u2026 We can call it talker, for example. It generates text token by token. That\u0027s your usual LLM with prefill driven by KV cache, which is compute bound, and decode that\u0027s more memory bound. The sequence length is varies per request, so it can be different, and the attention is casual. So you only look backwards to tokens. On the right side that\u0027s diffusion. That\u0027s completely different. So the DiT, which stands for diffusion transformer brain diffusion transformer is more like a dreamer. So it generates pixels and waveforms by denoising image generation. So every single step is a full forward pass. I said also that it could be double through the transformers. Early on it was, like, 50 steps just for one image, but recently with the recent models, it\u0027s way less, up to 10, six or seven. So it\u0027s compute bind bind, bound. And since we\u0027re not dealing with tokens the sequence length is fixed. It\u0027s fixed by your output size. So the\u2026 And then the attention is full, so every latent patch sees everything, right? We also have different type of parallelism between AR and diffusion, but this will be covered in in the later in this talk. But now look at the bottleneck though, at the bottleneck row. So you have memory bound versus compute bound. That one row is why historically, as we said you run two stacks. But the vLLM Omni actually runs both brands under one runtime. And today we\u0027ll discover how Okay, so b- it\u0027s always good to still check how it works at the API surface, right? Again, it\u0027s very similar to vLLM here with two paths under the SAM runtime. We have on one side the offline batch serven which is a synchronous path called Omni. That\u0027s the main class, mostly through Python. And then we have the online serven which is the async path or class, best for OpenAI compatible endpoint inference. But whichever door y- you walk through, you actually land on the same Omni stage underneath which is known as a vLLM API. So nothing really changes here for this extension, but it\u0027s always good to know so in terms of user interface though with vLLM Omni, here are three real front ends you can try. You got first Gradio demo that\u0027s the most basic. Then you have the ComfyUI for professional artists that can use vLLM Omni as a, an endpoint, especially for a local inference. And finally, a very neat project called vLLM Playground built by our friend Michael Yang. Shout out Michael. That now support vLLM Omni locally through containers one shot or as remote endpoint, which is super cool actually, because you can launch it on your laptop on CPU and put remote vLLM Omni base URL and boom. You can generate pictures or you can generate talk to speech all those modalities just through your web UI, like Open Web UI. Or you can actually just run the the REST API with the good old cURL as shown here in the command. You can see here that there\u0027s a dash Omni flag. That\u0027s the only thing you need to add on top of the usual vLLM serving command, which is pretty convenient. So there, there\u0027s no friction, there\u0027s no learning curve for vLLM users if they switch to vLLM Omni, which is super cool. Now, let\u0027s dig big big deeper into the core component of the engine runtime. So first we have the Omni router. That\u0027s the intelligence. Every request gets dispatched to the right unit by modality or by load. So for example, you ship text, that goes to the AI brain, of course. You ship video, that routes to the diffusion, right? That decision is the router\u0027s literal job, right? And then you got the entry point. We just talked about the API layer. We got the offline API represented by Omni class and online serving represented by Async Omni class, all sitting under the same abstraction. And then you have the Omni stage. It\u0027s a sort of stage orchestratio- orchestrator. So anything related to the stages is managed by the Omni stage And first of the two engines, as you can see here in the left side that\u0027s the AR engine the Aura Aggressive engine. So all the best part of VLM is inherited here, so no reinventing the wheel for text generation. So key-value cache management, page attention, continuous batching, all of those goodies all of it comes straight from the VLM and adapted for for Omni. On the other side you got the diffusion engine, right? And this one\u0027s native, actually. They had to come out with it from scratch, and it\u0027s also tuned by acceleration components that we\u0027ll call, cover later like parallelism, et cetera. But under both engines there\u0027s something called shared floor, AKA the kernels with parallelisms, quantization, attention. Those are the same privenet- primitives actually for both brands, right? So AR and diffusion are benefiting from these two from these primitives. And finally, we got the Omni connector which is what\u0027s tying the whole thing together decoupling the full encode process, decode, generate, split. So like all of these stages and transferring the data from each one of them, right? This is very important to connect all these stages. So this connector is exactly where both the magic and complexity live in which we\u0027ll see in the next slide, of course So you can see here that AR side and the diffusion side aren\u0027t really bolted together. They\u0027re just peers. They have the same scheduler discipline, same color f- kernel flow, but different generation build. So one is continuous batch-in over casual decode, and the other is stepwise denoising. And most importantly, these modules need to exchange a bunch of key data during inference that are very important to to generate whatever data or content. Three of them are information data, so this is more like a metadata. You also have KV cache prompt embedding that\u0027s also exchanged between these stages. And you also have latent data for encoded content, right? So those data are transferred between each one of these stages. This is a very critical piece of the architecture because all these modules actually require a flawless inter connection. And then we actually have stages that actually talk and how do they do that actually? So how do the stages actually talk? They do that through the omni connector, right? So this connector splits a control plan from data plan. So you got light metadata on one path, right? We talk about the information metadata, and the heavy tensors that ride a separate fast path, right? And in terms of interconnect from inside the node, it goes device to device, so D2D GPU to GPU, so there\u0027s no host roundtrip. But as soon as it crosses different nodes, it falls back to device to host to device, right? D to H to D through a memory pool managed by a transfer engine like Moonkick. Most of the time it\u0027s Moonkick. And lastly the very big difference for scaling here is that every stage replicas replicates independently so if you notice a bottleneck on a stage, you can just scale it out with the which you don\u0027t need to\u2026 Which you don\u0027t see that in every other LLM engines, even in vLLM, right? As opposed to the case with vLLM Omni you can have a stage w- one that is needing four replicas and then another stage that needs one \u0027cause they\u0027re completely independent. So you don\u0027t have to scale the whole pipeline, you just need to scale whatever you need, whichever stage that requires a little bit of resources. That\u0027s the advantage here. That\u0027s what makes it very differentiated compared to the other engine. And the Omni Connector relies on three transfer engines depending on how far the data travels actually. So single box, that\u0027s shared memory connector over what we call the SHM which is the fastest one, lowest latency. Crossing nodes, that\u0027s Mooncake Store Connector over RDMA or TCP. And that\u0027s through the Mooncake Store. So that\u0027s perfect for a high bandwidth intra-node. And then you have, if you have big clusters, then you have something called the Mooncake Transfer Engine Connector that uses RDMA exclusively, and that\u0027s built for scale, right? So you got two Mooncake Store connect- two Mooncake Transfer Engine. One of them is mixing TCP and RDMA, and the other one is really made for scale. So the rule of thumb here is shared memory on one machine, Mooncake the moment you cross the network. And this swap happens in the YAML config, not the code, right? So it\u0027s very flexible Now, a concrete example here with the Qwen Omni pipeline. You get, for example, one request, which is a TTS text-to-speech ask. End-to-end, you have three stages. So it-- the first one, it hits the thinker at first, then the talker, then the code to web. We\u0027ll cover all of these stages and their role of course, in the next slide. But notice each arrow between these stages is an Omni connector hub, right? This is the exact example we deploy in YAML on the next slide. So keep that in mind. Keep that shape in mind. Thinker, talker, code to web. By the way, code to web is just, It\u0027s also called vocoder. You can also find other examples like thinker, talker, AR plus D. So thinker, talker is just using the Qwen Omni architecture, and then the AR plus transfor-- diffusion transformer, that\u0027s with the GLM image. And then you have a very special case with a mixture of transformers that\u0027s using BigGL where KVCache is shared between the two generation and and the understanding expert and generation expert. But this is\u2026 I would like to have just a recap just for you to take away from this, of the three stages and what each actually does. So the first one is the thinker. Its role is understanding, so it ingests whatever you hand it, whether it\u0027s text, image, video, audio, and produces reasoning states what we call also text tokens or hidden state embeddings which are handed to the talker. So this is very heavy work. And then you have the talker which is codec logic, right? This is behind speech synthesis for example, and it turns the thinker\u0027s text and those embeddings codec codes or latent space, and the output is actually streamed down to the code to web. Code to web is just something that renders. It\u0027s just the de-decoding into it\u0027s mostly a web form, so it decodes the, those codes into a real audible audio web form, like MP3, back to the client. So these three independent stages or engines handle understanding, the codec, and the web form, which is responsible for the final format of the audio Now let\u0027s talk about deployment now. So every model has a pipeline that defines each stage. And to deploy an omni model, you need to define those stages through a YAML deploy config. This is what we call actually placement. And each stage is actually its own engine with with its own GPU budget. But you\u0027re not actually splitting one model the weights across GPUs like we used to know when we deploy a model actually. So this is not parallelism. You\u0027re just actually placing three engines and telling each one of them how much memory it can use and how it should run. Remember the quant three omni TTS that we just saw a couple of slides ago, thinker, talker, code to wave? This is the YAML config, right? So let\u0027s start easy from the left side, stage zero, that\u0027s the thinker. It\u0027s pinned to GPU zero here, and it has AI worker, right? So this is AI model. That\u0027s the LLM part, right? And it also uses ninety percent of the VRAM. That\u0027s because the understanding is heavy. We have a lot of prefill going on here in the thinker. Then stage one, the next stage, is the talker that takes the thinker\u0027s output and uses here sixty percent of the memory of another GPU. And right after, you got the stage two, which is the code to wave, the co- the vocoder which is the decoder that takes the latent from the talker and transfer- transforms it into a, an audio content. And this uses only ten percent because it\u0027s not as heavy as the other stages. And the final output, of course, is the audio. But notice that here we actually have three stages two GPUs, but each one can scale as much as you want, right? So the fact that you have one GPU for a thinker and then two, two stages sharing a GPU doesn\u0027t mean that they cannot have each of them one GPU. It\u0027s just that you can go as far as you can, right? I know it may be confusing but let me explain how it works, to be honest. All right. So this was actually the most confusing thing for me in this whole project but bear with me. So two things. We have the pipeline and the deploy, and the difference is actually simple. So we got the pipeline on the left which is written in Python. This is where the model code is, right? It defines the stages like thinker, talker, code to Wave with each attributes like a class, so you do not touch this to deploy, ever. And then we have the deploy YAML, right? Which is more like recipe, config file. We also called it repl- the placement a slide ago, right? So you can tweak the values like devices per stage, memory utilization, max sequences, et cetera, using the overlay pattern. So this is like a child class, so you only change whatever attribute you want, but everything else is actually default, right? And the bottom line here is a stage doesn\u0027t equal a GPU. As I said a couple of minutes ago, it\u0027s a unit of work. So it can share a GPU, as I said, like the previous two stages or span over many, right? It\u0027s one-to-many. But let\u0027s see some deployment example though, \u0027cause that\u0027s way easier than just talking about the theory So serving a model in vLLM Omni can be done in three ways, dependent on your topology, a", "uploadDate": "2026-06-18T17:00:00Z", "url": "https://www.conf42.com/Large_Language_Models_LLMs_2026_Kosseila_Haddalene_multimodal_inference_vllm"}</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Founder | AI infrastructure Lead", "name": "Kosseila Haddalene", "sameAs": ["https://www.linkedin.com/in/kousshd/"], "url": "https://www.conf42.com/speaker_Kosseila_Haddalene", "worksFor": {"@type": "Organization", "name": "Cloudthrill"}}], "description": "Most LLM engineers know autoregressive models inside out, but diffusion transformers play by completely different rules. They don\u0027t generate token by token. They denoise. They\u0027re compute-bound, not memory-bound. But how do you keep serving LLMs while still generating videos and images in the same inference engine? Is there a way for diffusion to sit inside the same serving pipelines as your LLMs? vLLM-Omni is the inference engine built for exactly this reality. In this talk, we\u0027ll start with just enough diffusion fundamentals \u0097 from noise to pixel \u0097 the denoising loop, why timesteps matter, and how DiT differs fundamentally from AR models. Then we\u0027ll dive into vLLM-Omni\u0027s architecture and how it integrates both worlds together: natively disaggregated AR and DiT stages, the OmniRouter dispatch logic, available acceleration for diffusion, and OpenAI-compatible endpoints serving text, images, video, and audio from a single engine. You\u0027ll leave with a clear mental model of where multimodal inference is heading \u0097 and what it actually takes to serve it in production.", "embedUrl": "https://www.youtube.com/embed/Z_pGSa7umwU", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 Large Language Models (LLMs) 2026", "url": "https://www.conf42.com/llms2026"}, "keywords": ["multimodal", "inference", "vllm"], "name": "From Diffusion to Production: How vLLM-Omni Unifies Multimodal Inference", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/Z_pGSa7umwU/hqdefault.jpg"], "transcript": "Hey, and welcome everybody to Conf42 LLM Conference. Today, we\u0027ve got an exciting topic planned for you. And by the way did you see that intro right there? Yeah, the old rock star watching the World Cup. Yeah. There was no camera, no actor here, and none of that was real. Everything was AI-generated. See that quality? That\u0027s a diffusion model for you, which is the entire reason why we\u0027re here for the next 40 minutes. I\u0027m Kosseila. This is vLLM Omni. One engine, two brains, the multimodal, any to any inference. And let\u0027s go Okay. So first, a very quick intro as shown here. My name is Kosseila, founder of Cloudthrill. Eighteen years in tech, now AI Infra Lead and vLLM production stack contributor across six different cloud. But hey, that\u0027s not what matters. Here\u0027s the part that\u0027s actually useful to you. We have a couple of deep dive blogs for example vLLM for Beginner series if you\u0027re new into it or not with three parts starting from fundamentals to features to deployment. We also got KV Cache explainer explain blog to learn all about it. Then a super helpful diffusion 101 since it\u0027s the topic of the day. Literally all the questions you never dare to ask about diffusion models, like what is diffusion, denoising loop diffusion solvers, CFG and negative prompts, even diffusion model papers from twenty twenty-one to twenty twenty-four, the whole thing. Super simple visuals and annotation are very helpful for AI builders, and of course, no PhD required. I also happen to host a podcast called Tech Bits Unplugged, and so you can check that out for a full episode on quantization if you\u0027re into that, and that\u0027s actually about it. We can start with the agenda. So let\u0027s do this Okay, so what are we talking about today? First we\u0027ll start with the multimodal mess, and why serving text message, video, and audio all together breaks your stack. And in section two, we\u0027ll talk about the one engine, two brains architecture behind vLLM Omni, where autoregressive meets diffusion across pipelines and multimodal stages, and how they work. And in section three we\u0027ll cover the orchestration part, including the request journey and the API calls the serving and deployment framework on a single or multi-node environment. And in section four we\u0027ll cover what makes vLLM Omni very fast. I\u0027m talking about the acceleration features with diffusion caching and parallelism dials like sequence splitting and HSDP, including quick example. We\u0027ll dive a bit deeper later on this talk. And in section five that\u0027s the fun part we\u0027ll jump into a live-ish demo replay on a Nebius H100 node testing ZImage, TTS and the brand-new Cosmos-3 world model from NVIDIA, which I\u0027m very excited about as well. And finally we\u0027ll close on what the latest release of vLLM Omni, the V22 shipped, and the project world map with more blogs and goodies. Okay, so let\u0027s start with the mess, but let me just zoom out a bit the slide back for a second just so you guys can see the slide better. Let me switch that here. There you go. Looking better, right? Perfect Okay. So you probably know most of these visual generation services which are proprietary, like Veo 3, Kling, Midjourney, Luma, Seedance, ElevenLabs for voice, and there are obviously tons more open source versions of course. There are different models, different UIs, but one thing is common under the hood though it\u0027s they\u0027re all diffusion based. But here\u0027s the catch. They\u0027re nothing like serving LLMs. Why? Because text generation is autoregressive, so it\u0027s token by token. You cache keys and values so it\u0027s more memory bound. And then image and video are diffusion based, so you denoise over a fixed number of steps, and every step is a full forward pass, even sometimes double. And it\u0027s more compute bound. So that\u0027s totally different physics. So for years if you wanna text an image behind one product, you run two stacks, two engines, two schedulers, two teams to ship one feature. But vLLM Omni on the other hand, is betting on one sentence. What if a single engine by the way, I was talking about the text autoregressive and image video diffusion comparison and the way that, that teams are actually splitting that into stacks. And the question that vLLM Omni is asking is, what if a single engine could s- serve both actually, or even more by the way? So let\u0027s see what this Omni engine is all about All right, so what does omnimodality actually gets you in vLLM Omni? Two things. One, it keeps the autoregressive support vLLM is already perfect for and extends it to anything not autoregressive, like diffusion transformers and other parallel generation model, right? So on one side we have all modalities like text, image, audio, video that can be ingested by their specific encoders. We call them modality encoders as well. And then we have the LLM AR core, which stands for autoregressive core, right? That\u0027s literally vLLM, takes care of anything LLM related. And then on the other side, we have the modality decoders or modality generators to generate all these various modality output like text, image, video, and audio. That\u0027s the any to any modality in and out. Again, it does that by keeping everything vLLM is great at on the AR side, the autoregressive, and grow a second brain natively for diffusion, which is exactly the picture on this slide. Now, how about the model support? How does vLLM Omni actually do in terms of supporting all these open source models? It does great because the biggest momentum driver for vLLM Omni is that this isn\u0027t just a paper. It\u0027s built in the open with huge OSS model support with more than 40 architectures under one runtime from chat models all the way to long video generations. We got the whole Qwen suite from Qwen Image Qwen Omni, Qwen TTS to models like FLUX, Hunyuan, Wan, Stable Diffusion, Z models for G- from GLM, and even Cosmos the new world model made to generate world simulation and train robots and the latest Helios real-time long video generation model. Because the one thing you need to know is that most video gen models can only generate short clips due to their training corpus. But this one makes longer videos. And that\u0027s already five thousand plus stars and climbing. And this list actually will definitely be different tomorrow. So whatever you\u0027re seeing here in the screen is gonna be different in like within weeks. But let\u0027s step back a minute and compare the AR and diffusion one more time All right. Let me actually walk the difference between the two brains, right? AR and diffusion, and they\u0027re all as well. So on the left side, we have the autoregressive brain, the AR model. We call that\u2026 We can call it talker, for example. It generates text token by token. That\u0027s your usual LLM with prefill driven by KV cache, which is compute bound, and decode that\u0027s more memory bound. The sequence length is varies per request, so it can be different, and the attention is causal. So you only look backwards to tokens. On the right side that\u0027s diffusion. That\u0027s completely different. So the DiT, which stands for diffusion transformer brain diffusion transformer is more like a dreamer. So it generates pixels and waveforms by denoising image generation. So every single step is a full forward pass. I said also that it could be double through the transformers. Early on it was, like, 50 steps just for one image, but recently with the recent models, it\u0027s way less, up to 10, six or seven. So it\u0027s compute bind bind, bound. And since we\u0027re not dealing with tokens the sequence length is fixed. It\u0027s fixed by your output size. So the\u2026 And then the attention is full, so every latent patch sees everything, right? We also have different type of parallelism between AR and diffusion, but this will be covered in in the later in this talk. But now look at the bottleneck though, at the bottleneck row. So you have memory bound versus compute bound. That one row is why historically, as we said you run two stacks. But the vLLM Omni actually runs both brains under one runtime. And today we\u0027ll discover how Okay, so b- it\u0027s always good to still check how it works at the API surface, right? Again, it\u0027s very similar to vLLM here with two paths under the same runtime. We have on one side the offline batch serving which is a synchronous path called Omni. That\u0027s the main class, mostly through Python. And then we have the online serving which is the async path or class, best for OpenAI compatible endpoint inference. But whichever door y- you walk through, you actually land on the same Omni stage underneath which is known as a vLLM API. So nothing really changes here for this extension, but it\u0027s always good to know so in terms of user interface though with vLLM Omni, here are three real front ends you can try. You got first Gradio demo that\u0027s the most basic. Then you have the ComfyUI for professional artists that can use vLLM Omni as a, an endpoint, especially for a local inference. And finally, a very neat project called vLLM Playground built by our friend Michael Yang. Shout out Michael. That now support vLLM Omni locally through containers one shot or as remote endpoint, which is super cool actually, because you can launch it on your laptop on CPU and put remote vLLM Omni base URL and boom. You can generate pictures or you can generate talk to speech all those modalities just through your web UI, like Open Web UI. Or you can actually just run the the REST API with the good old cURL as shown here in the command. You can see here that there\u0027s a dash Omni flag. That\u0027s the only thing you need to add on top of the usual vLLM serving command, which is pretty convenient. So there, there\u0027s no friction, there\u0027s no learning curve for vLLM users if they switch to vLLM Omni, which is super cool. Now, let\u0027s dig big big deeper into the core component of the engine runtime. So first we have the Omni router. That\u0027s the intelligence. Every request gets dispatched to the right unit by modality or by load. So for example, you ship text, that goes to the AR brain, of course. You ship video, that routes to the diffusion, right? That decision is the router\u0027s literal job, right? And then you got the entry point. We just talked about the API layer. We got the offline API represented by Omni class and online serving represented by Async Omni class, all sitting under the same abstraction. And then you have the Omni stage. It\u0027s a sort of stage orchestratio- orchestrator. So anything related to the stages is managed by the Omni stage And first of the two engines, as you can see here in the left side that\u0027s the AR engine the autoregressive engine. So all the best part of vLLM is inherited here, so no reinventing the wheel for text generation. So key-value cache management, paged attention, continuous batching, all of those goodies all of it comes straight from the vLLM and adapted for for Omni. On the other side you got the diffusion engine, right? And this one\u0027s native, actually. They had to come out with it from scratch, and it\u0027s also tuned by acceleration components that we\u0027ll call, cover later like parallelism, et cetera. But under both engines there\u0027s something called shared floor, AKA the kernels with parallelisms, quantization, attention. Those are the same privenet- primitives actually for both brains, right? So AR and diffusion are benefiting from these two from these primitives. And finally, we got the Omni connector which is what\u0027s tying the whole thing together decoupling the full encode process, decode, generate, split. So like all of these stages and transferring the data from each one of them, right? This is very important to connect all these stages. So this connector is exactly where both the magic and complexity live in which we\u0027ll see in the next slide, of course So you can see here that AR side and the diffusion side aren\u0027t really bolted together. They\u0027re just peers. They have the same scheduler discipline, same color f- kernel flow, but different generation build. So one is continuous batch-in over causal decode, and the other is stepwise denoising. And most importantly, these modules need to exchange a bunch of key data during inference that are very important to to generate whatever data or content. Three of them are information data, so this is more like a metadata. You also have KV cache prompt embedding that\u0027s also exchanged between these stages. And you also have latent data for encoded content, right? So those data are transferred between each one of these stages. This is a very critical piece of the architecture because all these modules actually require a flawless inter connection. And then we actually have stages that actually talk and how do they do that actually? So how do the stages actually talk? They do that through the omni connector, right? So this connector splits a control plan from data plan. So you got light metadata on one path, right? We talk about the information metadata, and the heavy tensors that ride a separate fast path, right? And in terms of interconnect from inside the node, it goes device to device, so D2D GPU to GPU, so there\u0027s no host roundtrip. But as soon as it crosses different nodes, it falls back to device to host to device, right? D to H to D through a memory pool managed by a transfer engine like Mooncake. Most of the time it\u0027s Mooncake. And lastly the very big difference for scaling here is that every stage replicas replicates independently so if you notice a bottleneck on a stage, you can just scale it out with the which you don\u0027t need to\u2026 Which you don\u0027t see that in every other LLM engines, even in vLLM, right? As opposed to the case with vLLM Omni you can have a stage w- one that is needing four replicas and then another stage that needs one \u0027cause they\u0027re completely independent. So you don\u0027t have to scale the whole pipeline, you just need to scale whatever you need, whichever stage that requires a little bit of resources. That\u0027s the advantage here. That\u0027s what makes it very differentiated compared to the other engine. And the Omni Connector relies on three transfer engines depending on how far the data travels actually. So single box, that\u0027s shared memory connector over what we call the SHM which is the fastest one, lowest latency. Crossing nodes, that\u0027s Mooncake Store Connector over RDMA or TCP. And that\u0027s through the Mooncake Store. So that\u0027s perfect for a high bandwidth intra-node. And then you have, if you have big clusters, then you have something called the Mooncake Transfer Engine Connector that uses RDMA exclusively, and that\u0027s built for scale, right? So you got two Mooncake Store connect- two Mooncake Transfer Engine. One of them is mixing TCP and RDMA, and the other one is really made for scale. So the rule of thumb here is shared memory on one machine, Mooncake the moment you cross the network. And this swap happens in the YAML config, not the code, right? So it\u0027s very flexible Now, a concrete example here with the Qwen Omni pipeline. You get, for example, one request, which is a TTS text-to-speech ask. End-to-end, you have three stages. So it-- the first one, it hits the thinker at first, then the talker, then the code to wave. We\u0027ll cover all of these stages and their role of course, in the next slide. But notice each arrow between these stages is an Omni connector hop, right? This is the exact example we deploy in YAML on the next slide. So keep that in mind. Keep that shape in mind. Thinker, talker, code to wave. By the way, code to wave is just, It\u0027s also called vocoder. You can also find other examples like thinker, talker, AR plus D. So thinker, talker is just using the Qwen Omni architecture, and then the AR plus transfor-- diffusion transformer, that\u0027s with the GLM image. And then you have a very special case with a mixture of transformers that\u0027s using BAGEL where KVCache is shared between the two generation and and the understanding expert and generation expert. But this is\u2026 I would like to have just a recap just for you to take away from this, of the three stages and what each actually does. So the first one is the thinker. Its role is understanding, so it ingests whatever you hand it, whether it\u0027s text, image, video, audio, and produces reasoning states what we call also text tokens or hidden state embeddings which are handed to the talker. So this is very heavy work. And then you have the talker which is codec logic, right? This is behind speech synthesis for example, and it turns the thinker\u0027s text and those embeddings codec codes or latent space, and the output is actually streamed down to the code to wave. Code to wave is just something that renders. It\u0027s just the de-decoding into it\u0027s mostly a waveform, so it decodes the, those codes into a real audible audio waveform, like MP3, back to the client. So these three independent stages or engines handle understanding, the codec, and the waveform, which is responsible for the final format of the audio Now let\u0027s talk about deployment now. So every model has a pipeline that defines each stage. And to deploy an omni model, you need to define those stages through a YAML deploy config. This is what we call actually placement. And each stage is actually its own engine with with its own GPU budget. But you\u0027re not actually splitting one model the weights across GPUs like we used to know when we deploy a model actually. So this is not parallelism. You\u0027re just actually placing three engines and telling each one of them how much memory it can use and how it should run. Remember the Qwen3 Omni TTS that we just saw a couple of slides ago, thinker, talker, code to wave? This is the YAML config, right? So let\u0027s start easy from the left side, stage zero, that\u0027s the thinker. It\u0027s pinned to GPU zero here, and it has AR worker, right? So this is AR model. That\u0027s the LLM part, right? And it also uses ninety percent of the VRAM. That\u0027s because the understanding is heavy. We have a lot of prefill going on here in the thinker. Then stage one, the next stage, is the talker that takes the thinker\u0027s output and uses here sixty percent of the memory of another GPU. And right after, you got the stage two, which is the code to wave, the co- the vocoder which is the decoder that takes the latent from the talker and transfer- transforms it into a, an audio content. And this uses only ten percent because it\u0027s not as heavy as the other stages. And the final output, of course, is the audio. But notice that here we actually have three stages two GPUs, but each one can scale as much as you want, right? So the fact that you have one GPU for a thinker and then two, two stages sharing a GPU doesn\u0027t mean that they cannot have each of them one GPU. It\u0027s just that you can go as far as you can, right? I know it may be confusing but let me explain how it works, to be honest. All right. So this was actually the most confusing thing for me in this whole project but bear with me. So two things. We have the pipeline and the deploy, and the difference is actually simple. So we got the pipeline on the left which is written in Python. This is where the model code is, right? It defines the stages like thinker, talker, code to Wave with each attributes like a class, so you do not touch this to deploy, ever. And then we have the deploy YAML, right? Which is more like recipe, config file. We also called it repl- the placement a slide ago, right? So you can tweak the values like devices per stage, memory utilization, max sequences, et cetera, using the overlay pattern. So this is like a child class, so you only change whatever attribute you want, but everything else is actually default, right? And the bottom line here is a stage doesn\u0027t equal a GPU. As I said a couple of minutes ago, it\u0027s a unit of work. So it can share a GPU, as I said, like the previous two stages or span over many, right? It\u0027s one-to-many. But let\u0027s see some deployment example though, \u0027cause that\u0027s way easier than just talking about the theory So serving a model in vLLM Omni can be done in three ways, dependent on your to", "uploadDate": "2026-06-18T17:00:00Z", "url": "https://www.conf42.com/Large_Language_Models_LLMs_2026_Kosseila_Haddalene_multimodal_inference_vllm"}</script>
     
 
     <link rel="shortcut icon" href="./assets/favicon/favicon.ico" type="image/x-icon" />
@@ -540,7 +540,7 @@
             
             
             <span id="chunk-0" class="transcript-chunks" title="00:00:00" data-s="0.0" onclick="seek(0.0)">
-              Hey, and welcome everybody to Conf42 LM Conference.
+              Hey, and welcome everybody to Conf42 LLM Conference.
             </span>
             
             
@@ -590,17 +590,17 @@
             
             
             <span id="chunk-10" class="transcript-chunks" title="00:00:29" data-s="29.0" onclick="seek(29.0)">
-              I'm Kasella.
+              I'm Kosseila.
             </span>
             
             
             <span id="chunk-11" class="transcript-chunks" title="00:00:31" data-s="31.0" onclick="seek(31.0)">
-              This is VLM Omni.
+              This is vLLM Omni.
             </span>
             
             
             <span id="chunk-12" class="transcript-chunks" title="00:00:32" data-s="32.0" onclick="seek(32.0)">
-              One engine, two brands, the multi-model, any to any inference.
+              One engine, two brains, the multimodal, any to any inference.
             </span>
             
             
@@ -615,12 +615,12 @@
             
             
             <span id="chunk-15" class="transcript-chunks" title="00:00:43" data-s="43.0" onclick="seek(43.0)">
-              My name is Kasella, founder of Cloud Thrill.
+              My name is Kosseila, founder of Cloudthrill.
             </span>
             
             
             <span id="chunk-16" class="transcript-chunks" title="00:00:45" data-s="45.0" onclick="seek(45.0)">
-              Eighteen years in tech, now AI Infra Lead and VL and production stack
+              Eighteen years in tech, now AI Infra Lead and vLLM production stack
             </span>
             
             
@@ -640,7 +640,7 @@
             
             
             <span id="chunk-20" class="transcript-chunks" title="00:00:58" data-s="58.0" onclick="seek(58.0)">
-              We have a couple of deep dive blogs for example VLM for Beginner
+              We have a couple of deep dive blogs for example vLLM for Beginner
             </span>
             
             
@@ -658,7 +658,7 @@
               <p class="transcript-para">
             
             <span id="chunk-23" class="transcript-chunks" title="00:01:10" data-s="70.0" onclick="seek(70.0)">
-              We also got Kivy Cache explainer explain blog to learn all about it.
+              We also got KV Cache explainer explain blog to learn all about it.
             </span>
             
             
@@ -673,7 +673,7 @@
             
             
             <span id="chunk-26" class="transcript-chunks" title="00:01:24" data-s="84.0" onclick="seek(84.0)">
-              like what is diffusion, denoise and loop diffusion solvers, CFG and
+              like what is diffusion, denoising loop diffusion solvers, CFG and
             </span>
             
             
@@ -776,7 +776,7 @@
             
             
             <span id="chunk-46" class="transcript-chunks" title="00:02:48" data-s="168.0" onclick="seek(168.0)">
-              parallelism dials like sequence splitting and HSPD, including quick example.
+              parallelism dials like sequence splitting and HSDP, including quick example.
             </span>
             
             
@@ -791,7 +791,7 @@
             
             
             <span id="chunk-49" class="transcript-chunks" title="00:03:02" data-s="182.0" onclick="seek(182.0)">
-              demo replay on a Navios 800 node testing ZImage, TTS and the brand-new
+              demo replay on a Nebius H100 node testing ZImage, TTS and the brand-new
             </span>
             
             
@@ -849,7 +849,7 @@
             
             
             <span id="chunk-60" class="transcript-chunks" title="00:03:48" data-s="228.0" onclick="seek(228.0)">
-              are proprietary, like V03, Kling, Midjourney, Luma, Cedens, ElevenLabs
+              are proprietary, like Veo 3, Kling, Midjourney, Luma, Seedance, ElevenLabs
             </span>
             
             
@@ -927,7 +927,7 @@
             
             
             <span id="chunk-75" class="transcript-chunks" title="00:04:48" data-s="288.0" onclick="seek(288.0)">
-              But VLLMni Omni on the other hand, is betting on one sentence.
+              But vLLM Omni on the other hand, is betting on one sentence.
             </span>
             
             
@@ -947,7 +947,7 @@
             
             
             <span id="chunk-79" class="transcript-chunks" title="00:05:08" data-s="308.0" onclick="seek(308.0)">
-              And the question that VL Omni is asking is, what if a single engine could s- serve
+              And the question that vLLM Omni is asking is, what if a single engine could s- serve
             </span>
             
             
@@ -1005,7 +1005,7 @@
             
             
             <span id="chunk-90" class="transcript-chunks" title="00:05:50" data-s="350.0" onclick="seek(350.0)">
-              And then we have the LLM AR code, which stands for autoregressive core, right?
+              And then we have the LLM AR core, which stands for autoregressive core, right?
             </span>
             
             
@@ -1088,7 +1088,7 @@
             
             
             <span id="chunk-106" class="transcript-chunks" title="00:07:03" data-s="423.0" onclick="seek(423.0)">
-              and even Kosmos the new Wan model made to generate wall simulation and
+              and even Cosmos the new world model made to generate world simulation and
             </span>
             
             
@@ -1191,7 +1191,7 @@
             
             
             <span id="chunk-126" class="transcript-chunks" title="00:08:14" data-s="494.0" onclick="seek(494.0)">
-              and the attention is casual.
+              and the attention is causal.
             </span>
             
             
@@ -1299,7 +1299,7 @@
             
             
             <span id="chunk-147" class="transcript-chunks" title="00:09:25" data-s="565.0" onclick="seek(565.0)">
-              But the vLLM Omni actually runs both brands under one runtime.
+              But the vLLM Omni actually runs both brains under one runtime.
             </span>
             
             
@@ -1322,12 +1322,12 @@
               <p class="transcript-para">
             
             <span id="chunk-151" class="transcript-chunks" title="00:09:40" data-s="580.0" onclick="seek(580.0)">
-              Again, it's very similar to vLLM here with two paths under the SAM runtime.
+              Again, it's very similar to vLLM here with two paths under the same runtime.
             </span>
             
             
             <span id="chunk-152" class="transcript-chunks" title="00:09:45" data-s="585.0" onclick="seek(585.0)">
-              We have on one side the offline batch serven which is
+              We have on one side the offline batch serving which is
             </span>
             
             
@@ -1342,7 +1342,7 @@
             
             
             <span id="chunk-155" class="transcript-chunks" title="00:09:53" data-s="593.0" onclick="seek(593.0)">
-              And then we have the online serven which is the async path or class, best for
+              And then we have the online serving which is the async path or class, best for
             </span>
             
             
@@ -1493,7 +1493,7 @@
               <p class="transcript-para">
             
             <span id="chunk-184" class="transcript-chunks" title="00:11:45" data-s="705.0" onclick="seek(705.0)">
-              So for example, you ship text, that goes to the AI brain, of course.
+              So for example, you ship text, that goes to the AR brain, of course.
             </span>
             
             
@@ -1548,12 +1548,12 @@
             
             
             <span id="chunk-195" class="transcript-chunks" title="00:12:25" data-s="745.0" onclick="seek(745.0)">
-              engine the Aura Aggressive engine.
+              engine the autoregressive engine.
             </span>
             
             
             <span id="chunk-196" class="transcript-chunks" title="00:12:28" data-s="748.0" onclick="seek(748.0)">
-              So all the best part of VLM is inherited here, so no reinventing
+              So all the best part of vLLM is inherited here, so no reinventing
             </span>
             
             
@@ -1563,12 +1563,12 @@
             
             
             <span id="chunk-198" class="transcript-chunks" title="00:12:35" data-s="755.0" onclick="seek(755.0)">
-              So key-value cache management, page attention, continuous batching, all of
+              So key-value cache management, paged attention, continuous batching, all of
             </span>
             
             
             <span id="chunk-199" class="transcript-chunks" title="00:12:40" data-s="760.0" onclick="seek(760.0)">
-              those goodies all of it comes straight from the VLM and adapted for for Omni.
+              those goodies all of it comes straight from the vLLM and adapted for for Omni.
             </span>
             
             
@@ -1606,7 +1606,7 @@
             
             
             <span id="chunk-206" class="transcript-chunks" title="00:13:10" data-s="790.0" onclick="seek(790.0)">
-              Those are the same privenet- primitives actually for both brands, right?
+              Those are the same privenet- primitives actually for both brains, right?
             </span>
             
             
@@ -1674,7 +1674,7 @@
             
             
             <span id="chunk-219" class="transcript-chunks" title="00:14:00" data-s="840.0" onclick="seek(840.0)">
-              So one is continuous batch-in over casual decode, and the
+              So one is continuous batch-in over causal decode, and the
             </span>
             
             
@@ -1792,12 +1792,12 @@
             
             
             <span id="chunk-242" class="transcript-chunks" title="00:15:27" data-s="927.0" onclick="seek(927.0)">
-              D to H to D through a memory pool managed by a transfer engine like Moonkick.
+              D to H to D through a memory pool managed by a transfer engine like Mooncake.
             </span>
             
             
             <span id="chunk-243" class="transcript-chunks" title="00:15:33" data-s="933.0" onclick="seek(933.0)">
-              Most of the time it's Moonkick.
+              Most of the time it's Mooncake.
             </span>
             
             
@@ -1958,7 +1958,7 @@
             
             
             <span id="chunk-274" class="transcript-chunks" title="00:17:40" data-s="1060.0" onclick="seek(1060.0)">
-              talker, then the code to web.
+              talker, then the code to wave.
             </span>
             
             
@@ -1968,7 +1968,7 @@
             
             
             <span id="chunk-276" class="transcript-chunks" title="00:17:47" data-s="1067.0" onclick="seek(1067.0)">
-              But notice each arrow between these stages is an Omni connector hub, right?
+              But notice each arrow between these stages is an Omni connector hop, right?
             </span>
             
             
@@ -1988,7 +1988,7 @@
             
             
             <span id="chunk-280" class="transcript-chunks" title="00:17:59" data-s="1079.0" onclick="seek(1079.0)">
-              Thinker, talker, code to web.
+              Thinker, talker, code to wave.
             </span>
             
             
@@ -1996,7 +1996,7 @@
               <p class="transcript-para">
             
             <span id="chunk-281" class="transcript-chunks" title="00:18:01" data-s="1081.0" onclick="seek(1081.0)">
-              By the way, code to web is just, It's also called vocoder.
+              By the way, code to wave is just, It's also called vocoder.
             </span>
             
             
@@ -2021,7 +2021,7 @@
             
             
             <span id="chunk-286" class="transcript-chunks" title="00:18:25" data-s="1105.0" onclick="seek(1105.0)">
-              BigGL where KVCache is shared between the two generation and and the understanding
+              BAGEL where KVCache is shared between the two generation and and the understanding
             </span>
             
             
@@ -2089,22 +2089,22 @@
             
             
             <span id="chunk-299" class="transcript-chunks" title="00:19:21" data-s="1161.0" onclick="seek(1161.0)">
-              actually streamed down to the code to web.
+              actually streamed down to the code to wave.
             </span>
             
             
             <span id="chunk-300" class="transcript-chunks" title="00:19:23" data-s="1163.0" onclick="seek(1163.0)">
-              Code to web is just something that renders.
+              Code to wave is just something that renders.
             </span>
             
             
             <span id="chunk-301" class="transcript-chunks" title="00:19:25" data-s="1165.0" onclick="seek(1165.0)">
-              It's just the de-decoding into it's mostly a web form, so it decodes the,
+              It's just the de-decoding into it's mostly a waveform, so it decodes the,
             </span>
             
             
             <span id="chunk-302" class="transcript-chunks" title="00:19:31" data-s="1171.0" onclick="seek(1171.0)">
-              those codes into a real audible audio web form, like MP3, back to the client.
+              those codes into a real audible audio waveform, like MP3, back to the client.
             </span>
             
             
@@ -2114,7 +2114,7 @@
             
             
             <span id="chunk-304" class="transcript-chunks" title="00:19:43" data-s="1183.0" onclick="seek(1183.0)">
-              and the web form, which is responsible for the final format of the audio
+              and the waveform, which is responsible for the final format of the audio
             </span>
             
             
@@ -2177,7 +2177,7 @@
             
             
             <span id="chunk-316" class="transcript-chunks" title="00:20:29" data-s="1229.0" onclick="seek(1229.0)">
-              Remember the quant three omni TTS that we just saw a couple of slides
+              Remember the Qwen3 Omni TTS that we just saw a couple of slides
             </span>
             
             
@@ -2197,12 +2197,12 @@
             
             
             <span id="chunk-320" class="transcript-chunks" title="00:20:43" data-s="1243.0" onclick="seek(1243.0)">
-              It's pinned to GPU zero here, and it has AI worker, right?
+              It's pinned to GPU zero here, and it has AR worker, right?
             </span>
             
             
             <span id="chunk-321" class="transcript-chunks" title="00:20:47" data-s="1247.0" onclick="seek(1247.0)">
-              So this is AI model.
+              So this is AR model.
             </span>
             
             
@@ -2655,7 +2655,7 @@
             
             
             <span id="chunk-408" class="transcript-chunks" title="00:26:24" data-s="1584.0" onclick="seek(1584.0)">
-              you get started actually build Omni.
+              you get started actually vLLM Omni.
             </span>
             
             
@@ -2974,7 +2974,7 @@
             
             
             <span id="chunk-470" class="transcript-chunks" title="00:30:00" data-s="1800.0" onclick="seek(1800.0)">
-              You have, for example, TCache that caches any similar consecutive timestamps.
+              You have, for example, TeaCache that caches any similar consecutive timesteps.
             </span>
             
             
@@ -2984,7 +2984,7 @@
             
             
             <span id="chunk-472" class="transcript-chunks" title="00:30:10" data-s="1810.0" onclick="seek(1810.0)">
-              We also have CacheDid, which speeds up diffusion via DB cache.
+              We also have Cache-DiT, which speeds up diffusion via DBCache.
             </span>
             
             
@@ -2999,12 +2999,12 @@
             
             
             <span id="chunk-475" class="transcript-chunks" title="00:30:24" data-s="1824.0" onclick="seek(1824.0)">
-              for sure, better than TCache.
+              for sure, better than TeaCache.
             </span>
             
             
             <span id="chunk-476" class="transcript-chunks" title="00:30:26" data-s="1826.0" onclick="seek(1826.0)">
-              TCache is mostly for images so far.
+              TeaCache is mostly for images so far.
             </span>
             
             
@@ -3107,7 +3107,7 @@
             
             
             <span id="chunk-496" class="transcript-chunks" title="00:31:33" data-s="1893.0" onclick="seek(1893.0)">
-              Now here's a support metric for image models where you
+              Now here's a support matrix for image models where you
             </span>
             
             
@@ -3120,7 +3120,7 @@
               <p class="transcript-para">
             
             <span id="chunk-498" class="transcript-chunks" title="00:31:38" data-s="1898.0" onclick="seek(1898.0)">
-              TCache here is, for example is actually hit or miss.
+              TeaCache here is, for example is actually hit or miss.
             </span>
             
             
@@ -3150,7 +3150,7 @@
             
             
             <span id="chunk-504" class="transcript-chunks" title="00:32:00" data-s="1920.0" onclick="seek(1920.0)">
-              You can see here that TCache is not available for any of
+              You can see here that TeaCache is not available for any of
             </span>
             
             
@@ -3170,7 +3170,7 @@
             
             
             <span id="chunk-508" class="transcript-chunks" title="00:32:13" data-s="1933.0" onclick="seek(1933.0)">
-              I don't wanna go deep into it, but it's necessary for T-cache to provide
+              I don't wanna go deep into it, but it's necessary for TeaCache to provide
             </span>
             
             
@@ -3195,7 +3195,7 @@
             
             
             <span id="chunk-513" class="transcript-chunks" title="00:32:31" data-s="1951.0" onclick="seek(1951.0)">
-              You either split the data talking about sequences with Ulises sequence
+              You either split the data talking about sequences with Ulysses sequence
             </span>
             
             
@@ -3205,7 +3205,7 @@
             
             
             <span id="chunk-515" class="transcript-chunks" title="00:32:42" data-s="1962.0" onclick="seek(1962.0)">
-              attention, or you can split the model like we talked about with HSPD, right?
+              attention, or you can split the model like we talked about with HSDP, right?
             </span>
             
             
@@ -3213,7 +3213,7 @@
               <p class="transcript-para">
             
             <span id="chunk-516" class="transcript-chunks" title="00:32:48" data-s="1968.0" onclick="seek(1968.0)">
-              And in this example, we can see on the left that we used SSPD to split
+              And in this example, we can see on the left that we used HSDP to split
             </span>
             
             
@@ -3366,12 +3366,12 @@
             
             
             <span id="chunk-546" class="transcript-chunks" title="00:34:48" data-s="2088.0" onclick="seek(2088.0)">
-              One of the models I wanted to try actually is Cosmos 3 word model by NVIDIA.
+              One of the models I wanted to try actually is Cosmos 3 world model by NVIDIA.
             </span>
             
             
             <span id="chunk-547" class="transcript-chunks" title="00:34:54" data-s="2094.0" onclick="seek(2094.0)">
-              This was suggested by one of the maintainers Villem Omni or Roger Wang.
+              This was suggested by one of the maintainers vLLM Omni or Roger Wang.
             </span>
             
             
@@ -3414,7 +3414,7 @@
             
             
             <span id="chunk-555" class="transcript-chunks" title="00:35:20" data-s="2120.0" onclick="seek(2120.0)">
-              And a little heads up, I picked a Nebus H100 VM for the test, and you'll
+              And a little heads up, I picked a Nebius H100 VM for the test, and you'll
             </span>
             
             
@@ -3482,7 +3482,7 @@
             
             
             <span id="chunk-568" class="transcript-chunks" title="00:36:05" data-s="2165.0" onclick="seek(2165.0)">
-              So you have here a z image.
+              So you have here a Z-Image.
             </span>
             
             
@@ -3595,7 +3595,7 @@
             
             
             <span id="chunk-590" class="transcript-chunks" title="00:37:27" data-s="2247.0" onclick="seek(2247.0)">
-              You can see it in the the log of the VLM Omni server, and it's
+              You can see it in the the log of the vLLM Omni server, and it's
             </span>
             
             
@@ -3688,7 +3688,7 @@
             
             
             <span id="chunk-608" class="transcript-chunks" title="00:38:28" data-s="2308.0" onclick="seek(2308.0)">
-              Cosmos3, even the recipe in in VLM Omni was not really accurate.
+              Cosmos3, even the recipe in in vLLM Omni was not really accurate.
             </span>
             
             
@@ -3751,12 +3751,12 @@
             
             
             <span id="chunk-620" class="transcript-chunks" title="00:39:14" data-s="2354.0" onclick="seek(2354.0)">
-              And by the way, this generation of Cosmos three was done through CacheDit.
+              And by the way, this generation of Cosmos three was done through Cache-DiT.
             </span>
             
             
             <span id="chunk-621" class="transcript-chunks" title="00:39:20" data-s="2360.0" onclick="seek(2360.0)">
-              And within this generation, I-- when using CacheDit, I had four times faster
+              And within this generation, I-- when using Cache-DiT, I had four times faster
             </span>
             
             
@@ -3766,12 +3766,12 @@
             
             
             <span id="chunk-623" class="transcript-chunks" title="00:39:28" data-s="2368.0" onclick="seek(2368.0)">
-              This example is on one, two, but I had similar performance also on Cosmos.
+              This example is on Wan2.2, but I had similar performance also on Cosmos.
             </span>
             
             
             <span id="chunk-624" class="transcript-chunks" title="00:39:34" data-s="2374.0" onclick="seek(2374.0)">
-              CacheDit is really the go-to acceleration for video.
+              Cache-DiT is really the go-to acceleration for video.
             </span>
             
             
@@ -3894,7 +3894,7 @@
             
             
             <span id="chunk-648" class="transcript-chunks" title="00:41:10" data-s="2470.0" onclick="seek(2470.0)">
-              So let's take the-- this baby home with the latest updates from vL Omni, and
+              So let's take the-- this baby home with the latest updates from vLLM Omni, and
             </span>
             
             
@@ -3909,7 +3909,7 @@
             
             
             <span id="chunk-651" class="transcript-chunks" title="00:41:24" data-s="2484.0" onclick="seek(2484.0)">
-              lot to unpack with features like day zero support for NVIDIA Cosmos 3, one
+              lot to unpack with features like day zero support for NVIDIA Cosmos 3, world
             </span>
             
             
@@ -3952,7 +3952,7 @@
             
             
             <span id="chunk-659" class="transcript-chunks" title="00:42:01" data-s="2521.0" onclick="seek(2521.0)">
-              And obviously, vL Omni team is still cooking.
+              And obviously, vLLM Omni team is still cooking.
             </span>
             
             
@@ -4108,7 +4108,7 @@
             
             
             <span id="chunk-689" class="transcript-chunks" title="00:44:08" data-s="2648.0" onclick="seek(2648.0)">
-              You can find them all on cloudarray.ca/blog.
+              You can find them all on cloudthrill.ca/blog.
             </span>
             
             
