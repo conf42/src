@@ -19,6 +19,9 @@ changes.
   lines that are clearly list items become a markdown list). Abstracts render as markdown on every site:
   a paragraph break is an empty line, a bullet is `- `. A single newline renders as a space, so lines the
   author meant as separate lines need a blank line or a bullet.
+- Flattened breaks: in the Conf42 tabs many abstracts were pasted with their paragraph breaks turned into a
+  double space and list items into single-spaced runs ("...covers:  Item one Item two"). `show` prints them
+  as double spaces, easy to mistake for clean. Restore the blank line / the bullets.
 - Leading/trailing blank lines, runs of 3+ newlines, trailing spaces.
 
 ## What never to do
