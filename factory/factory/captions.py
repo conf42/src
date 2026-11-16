@@ -196,10 +196,28 @@ def all_events():
                   key=lambda s: (s[-4:], s), reverse=True)
 
 
+def added_today():
+    """How many caption tracks this job has added today (UTC), over every event - from the captions.json files."""
+    today, n = time.strftime("%Y-%m-%d", time.gmtime()), 0
+    for p in glob.glob(os.path.join(pipeline.REPO_RUNS, "*", "captions.json")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                n += sum(1 for r in json.load(f).values() if r.get("added") and str(r.get("at", "")).startswith(today))
+        except (OSError, ValueError):
+            pass
+    return n
+
+
+def day_room(cfg):
+    """Tracks still allowed today: Marek 2026-11-16 - "no rush ... never more than 50 daily" (captions_per_day)."""
+    return max(0, int(cfg.get("captions_per_day", 50) or 0) - added_today())
+
+
 def backlog(cfg, log=print):
     """A few caption tracks per cloud pass (settings captions_per_pass), newest events first, after the day's uploads:
-    YouTube's daily allowance is small and the talks' own uploads come first. Returns the lines for the pass summary."""
-    n = int(cfg.get("captions_per_pass", 0) or 0)
+    YouTube's daily allowance is small and the talks' own uploads come first. Never more than captions_per_day in one
+    day, however many passes run. Returns the lines for the pass summary."""
+    n = min(int(cfg.get("captions_per_pass", 0) or 0), day_room(cfg))
     if n <= 0:
         return []
     try:
@@ -241,7 +259,12 @@ def main(argv):
                 raise
             print("STOPPED: YouTube's daily limit is already used up - nothing added. Run it again tomorrow.")
             return 0
-    budget, total = ([mx] if mx is not None else None), 0
+    room = day_room(cfg)                                 # by hand too: never more than captions_per_day in one day
+    mx = room if mx is None else min(mx, room)
+    if not dry and mx <= 0:
+        print("STOPPED: today's %d caption tracks are done (captions_per_day) - more tomorrow." % int(cfg.get("captions_per_day", 50) or 0))
+        return 0
+    budget, total = ([mx] if not dry else None), 0
     for slug in slugs:
         try:
             added, left, lines = event(yt, slug, channel, dry, budget)
