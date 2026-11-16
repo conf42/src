@@ -116,6 +116,19 @@ class Drive:
         self._call("PATCH", API + "/files/" + file_id, params={"addParents": new_parent, "removeParents": old,
                                                                "supportsAllDrives": "true", "fields": "id,parents"}, json={})
 
+    def tree(self, folder_id, depth=3, path=""):
+        """Every downloadable file under a folder, as drive.list_folder gives them ([{id, title, folder}]) plus
+        size + uploaded and via="api". Subfolders are followed, except the OBS overlays we hand out."""
+        out = []
+        for f in self.children(folder_id):
+            if f.get("mimeType") == FOLDER:
+                if depth > 0 and "overlay" not in f["name"].lower():
+                    out += self.tree(f["id"], depth - 1, path + f["name"] + "/")
+            elif f.get("size"):                           # Google Docs / Vids have no size and no download
+                out.append({"id": f["id"], "title": f["name"], "folder": path, "via": "api", "size": int(f["size"]),
+                            "uploaded": stamp(f.get("modifiedTime") or f.get("createdTime"))})
+        return out
+
     def trash(self, file_id):
         """Into Drive's bin (only the owner can; Drive deletes it for good 30 days later)."""
         self._call("PATCH", API + "/files/" + file_id, params={"supportsAllDrives": "true", "fields": "id,trashed"},
@@ -125,6 +138,12 @@ class Drive:
         """Take a file out of one of our folders without binning it (someone else's file: it stays in their Drive)."""
         self._call("PATCH", API + "/files/" + file_id, params={"removeParents": parent, "supportsAllDrives": "true",
                                                                "fields": "id,parents"}, json={})
+
+
+def stamp(t):
+    """Drive's 2026-11-12T03:19:10.123Z -> 2026-11-12T03:19:10Z (the form the link-shared listing uses)."""
+    t = str(t or "")
+    return (t.split(".")[0] + "Z") if "." in t else t
 
 
 def dumps(o):

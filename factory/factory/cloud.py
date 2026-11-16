@@ -166,16 +166,16 @@ def legacy_verdict(run, auto, talk_list, name, size, up, old, here="the old fold
     return True, "%s: not in Descript yet - source fetched%s" % (key, " again" if same else "")
 
 
-def legacy_plan(run, fid, auto, here="the old folder", mine=None):
+def legacy_plan(run, fid, auto, here="the old folder", mine=None, api=None):
     """Dry run of an old folder (or the Manual upload folder: mine(name) = this event's file?): one line per file,
     nothing downloaded."""
     talk_list, fetched, out = events.talks(run.ev), run.state.get("drive_fetched", {}), []
-    for f in linkdrive.list_folder(fid):
+    for f in pipeline.drive_files(fid, api):
         name = f["title"]
         if not name.lower().endswith(pipeline.VIDEO_EXT + pipeline.SLIDE_EXT) or (mine and not mine(name)):
             continue
         try:
-            size, up = linkdrive.head(f["id"])
+            size, up, _ = pipeline.drive_size(f, api)
         except Exception as e:                           # noqa: BLE001
             out.append("- %s: skipped (%s)" % (name, str(e)[:80]))
             continue
@@ -186,7 +186,7 @@ def legacy_plan(run, fid, auto, here="the old folder", mine=None):
     return out
 
 
-def legacy_fetch(run, fid, auto, here="the old folder", mine=None):
+def legacy_fetch(run, fid, auto, here="the old folder", mine=None, api=None):
     """Bring the new files of the event's old upload folder (or of the Manual upload folder: mine(name) = this
     event's file?) into the factory's input. Returns the lines for the pass summary (files taken, files left alone
     and why)."""
@@ -200,7 +200,7 @@ def legacy_fetch(run, fid, auto, here="the old folder", mine=None):
             left.append("- left: `%s` - %s" % (name, why))
         return verdict
     keep = run.state.get("drive_folder")
-    got = run.drive_fetch(fid, want=want)
+    got = run.drive_fetch(fid, want=want, api=api)
     if mine:                                             # the Manual folder is every event's: never "the event's folder"
         run.state["drive_folder"] = keep
         if not keep:
@@ -306,7 +306,7 @@ def main(argv):
     if failed:
         lines += ["\n### FAILED - tried again next pass"] + ["- **%s**" % f for f in failed]
     for slug in sorted(set(intake_events(slugs)) | set(accepted)):
-        st = intake.Intake(drive).load(slug)
+        st = sorter.states.get(slug) or intake.Intake(drive).load(slug)
         items = sorted(st.get("items", {}).values(), key=lambda r: r.get("decided") or "", reverse=True)
         lines.append("\n### %s - intake" % slug)
         for r in items[:40]:
@@ -320,7 +320,7 @@ def main(argv):
     if manual["id"]:
         try:
             active = active_events(cfg, set(intake_events(slugs)) | set(legacy))
-            manual["claims"], manual["owner"], unclaimed = manual_claims(linkdrive.list_folder(manual["id"]), active)
+            manual["claims"], manual["owner"], unclaimed = manual_claims(pipeline.drive_files(manual["id"], drive), active)
             if slugs:
                 manual["claims"] = {s: c for s, c in manual["claims"].items() if s in slugs}
             if unclaimed:
@@ -334,11 +334,11 @@ def main(argv):
                 if slug in manual["claims"]:
                     lines.append("\n### %s - Manual upload folder" % slug)
                     lines += legacy_plan(run, manual["id"], owned, "the Manual upload folder",
-                                         lambda name, slug=slug: manual["owner"].get(name) == slug) or ["- empty"]
+                                         lambda name, slug=slug: manual["owner"].get(name) == slug, api=drive) or ["- empty"]
                     owned = with_manual(owned, manual["claims"][slug])
                 if slug in legacy:
                     lines.append("\n### %s - old upload folder" % slug)
-                    lines += legacy_plan(run, legacy[slug], owned) or ["- empty"]
+                    lines += legacy_plan(run, legacy[slug], owned, api=drive) or ["- empty"]
             except Exception as e:                       # noqa: BLE001
                 lines.append("- could not read it: %s" % e)
         try:
@@ -422,7 +422,7 @@ def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
         lines.append("\n### %s - Manual upload folder" % slug)
         try:
             lines += legacy_fetch(run, manual["id"], owned, "the Manual upload folder",
-                                  lambda name: manual["owner"].get(name) == slug) or ["- nothing new"]
+                                  lambda name: manual["owner"].get(name) == slug, api=drive) or ["- nothing new"]
         except Exception as e:                           # noqa: BLE001 - Drive trouble must not stop the other sources
             run.note("cloud: Manual upload folder not read (%s)" % e)
             lines.append("- could not read it: %s" % e)
@@ -430,7 +430,7 @@ def one_event(run, slug, drive, legacy, cfg, youtube_on, manual=None):
     if slug in legacy:
         lines.append("\n### %s - old upload folder" % slug)
         try:
-            lines += legacy_fetch(run, legacy[slug], owned) or ["- nothing new"]
+            lines += legacy_fetch(run, legacy[slug], owned, api=drive) or ["- nothing new"]
         except Exception as e:                       # noqa: BLE001 - Drive trouble must not stop the Auto upload talks
             run.note("cloud: old upload folder not read (%s)" % e)
             lines.append("- could not read it: %s" % e)

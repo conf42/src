@@ -131,6 +131,40 @@ def write_json(path, data, tries=10):
             time.sleep(0.2 * (n + 1))
 
 
+def drive_files(fid, api=None, note=None):
+    """The files of a link-shared Drive folder (drive.list_folder), plus - with `api`, a gdrive.Drive - the ones the
+    public view does not show: a speaker whose company blocks link sharing (2026-11-03 Scarlett Attensil, 2026-11-15
+    Phoebe Wang) is listed for the account that owns the folder, but not for the world."""
+    from . import drive
+    files = drive.list_folder(fid)
+    if api:
+        try:
+            have = {f["id"] for f in files}
+            files += [f for f in api.tree(fid) if f["id"] not in have]
+        except Exception as e:                           # noqa: BLE001 - the public view still stands
+            if note:
+                note("Drive: the folder could not be read through the upload script's access (%s)" % str(e)[:120])
+    return files
+
+
+def drive_size(f, api=None):
+    """(size, uploaded, via) of one listed file: the public link's answer, or - when that asks for a sign-in, or the
+    file only shows through the API - the API's (via = "api": download it with api.download)."""
+    from . import drive, gdrive
+    if f.get("via") == "api":
+        return f["size"], f["uploaded"], "api"
+    try:
+        size, up = drive.head(f["id"])
+        return size, up, "link"
+    except drive.NeedsSignIn:
+        if not api:
+            raise
+        m = api.get(f["id"], "id,size,modifiedTime,createdTime")
+        if not m.get("size"):
+            raise
+        return int(m["size"]), gdrive.stamp(m.get("modifiedTime") or m.get("createdTime")), "api"
+
+
 class Run:
     def __init__(self, short_url):
         self.cfg = settings()
@@ -306,7 +340,7 @@ class Run:
             return []
         return [k for k, v in before.items() if v and now_.get(k) and abs(now_[k] - v) > 0.5]
 
-    def drive_fetch(self, link=None, want=None):
+    def drive_fetch(self, link=None, want=None, api=None):
         """Pull the event's Drive upload folder (shared as "anyone with the link") straight from Drive: list it, download
         every video and deck that is new or changed since the last fetch into <event>/drive/, and flag the talks
         (drive_check). The folder is remembered, so later fetches need no link. Returns the downloaded paths, which go
@@ -314,7 +348,9 @@ class Run:
         want(name, size, uploaded, earlier fetch or None) lets the caller decide per file: True = download it whatever
         the last fetch says, False = leave it alone (not recorded, so drive_check still sees it), "ignore" = not ours
         at all (another source has this talk, or it is another event's file: drive_check never sees it), None = the
-        rules below. The cloud factory uses it (cloud.legacy_want): its runner starts empty every time."""
+        rules below. The cloud factory uses it (cloud.legacy_want): its runner starts empty every time.
+        api (a gdrive.Drive, the cloud factory's): files the public view hides or won't hand out (the owner's company
+        blocks link sharing) are listed and downloaded through it; everything else goes the public way as before."""
         from . import drive
         fid = drive.folder_id(link) if link else self.state.get("drive_folder")
         if not fid:
@@ -337,7 +373,7 @@ class Run:
             have.update(t.get("sizes_seen") or [])
         listing, got = [], []
         safety = {}                                      # name -> its "<name> - safety copy" parts (conf42.com/record)
-        for f in drive.list_folder(fid):
+        for f in drive_files(fid, api, self.note):
             name = f["title"]
             m = SAFETY_COPY.search(f.get("folder") or "")
             if m and SAFETY_PART.match(name):
@@ -346,7 +382,7 @@ class Run:
             if not name.lower().endswith(VIDEO_EXT + SLIDE_EXT):
                 continue                                 # Google Vids projects, docs, images
             try:
-                size, up = drive.head(f["id"])
+                size, up, via = drive_size(f, api)
             except Exception as e:                       # noqa: BLE001 - one odd file must not stop the fetch
                 self.note("Drive: %s skipped (%s)" % (name, e))
                 continue
@@ -363,9 +399,9 @@ class Run:
             if verdict is None and not old and size in have:
                 fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "seen": now()}
                 continue                                 # already here from a zip
-            self.note("Drive: downloading %s (%.0f MB)" % (name, size / 1e6))
+            self.note("Drive: downloading %s (%.0f MB)%s" % (name, size / 1e6, " - through the upload script's access (not link-shared)" if via == "api" else ""))
             dest = os.path.join(ddir, os.path.basename(name))
-            drive.download(f["id"], dest, size, self.note)
+            (api.download if via == "api" else drive.download)(f["id"], dest, size, self.note)
             fetched[f["id"]] = {"file": name, "size": size, "uploaded": up, "fetched": now(), "pending": True}
         got += self.drive_safety_copies(drive, ddir, safety, listing, fetched)
         # everything downloaded and not yet handed to a run (also from a fetch whose run never got to it)

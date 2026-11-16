@@ -113,6 +113,48 @@ def main():
           and sum("NEW VERSION" in l for l in lines) == 2)
     check("pass 4: nothing redone", not any(t.get("redone") for t in run.state["talks"].values()))
     check("pass 4: the finished talk is flagged for Marek", bool(run.state["talks"]["Grace Hopper"].get("drive_newer")))
+
+    # 5. files the public view hides or won't hand out (the owner's company blocks link sharing: Scarlett Attensil
+    #    2026-11-03, Phoebe Wang 2026-11-15) come through the upload script's Drive access - when there is one
+    TALKS.extend({"name1": n, "name2": "", "speakers": n, "title": "Talk of " + n} for n in ("Barbara Liskov", "Edsger Dijkstra"))
+    FILES["v7"] = ("Edsger Dijkstra.mp4", "Talks/", 7000, "2026-11-07T10:00:00Z")      # listed, but the download wants a sign-in
+    public_head = drive.head
+
+    def head(fid, tries=3):
+        if fid == "v7":
+            raise drive.NeedsSignIn("needs a Google sign-in")
+        return public_head(fid, tries)
+    drive.head = head
+
+    class Api:
+        got = []
+
+        def tree(self, fid, depth=3, path=""):
+            return [{"id": "a6", "title": "Barbara Liskov.mp4", "folder": "Talks/", "via": "api", "size": 6000, "uploaded": "2026-11-06T10:00:00Z"},
+                    {"id": "v2", "title": "Grace Hopper.mp4", "folder": "Talks/", "via": "api", "size": 2500, "uploaded": "2026-11-09T10:00:00Z"}]
+
+        def get(self, fid, fields=""):
+            return {"id": fid, "size": "7000", "modifiedTime": "2026-11-07T10:00:00.123Z"}
+
+        def download(self, fid, dest, size=0, note=None):
+            self.got.append(fid)
+            with open(dest, "wb") as f:
+                f.write(b"x" * size)
+            return dest
+    run = fresh_runner(run)
+    lines = cloud.legacy_fetch(run, "abcdefghijklmnop", auto)
+    run.match()
+    check("pass 5, no Drive access: the hidden file is not seen, the blocked one is skipped as before",
+          "Barbara Liskov" not in run.state["talks"] and "Edsger Dijkstra" not in run.state["talks"])
+    plan = "\n".join(cloud.legacy_plan(run, "abcdefghijklmnop", auto, api=Api()))
+    check("pass 5, dry run with Drive access: both show as TAKE", "**TAKE** `Barbara Liskov.mp4`" in plan and "**TAKE** `Edsger Dijkstra.mp4`" in plan)
+    api = Api()
+    lines = cloud.legacy_fetch(run, "abcdefghijklmnop", auto, api=api)
+    run.match()
+    check("pass 5: a file only the Drive access lists is taken through it", "Barbara Liskov" in run.state["talks"] and "a6" in api.got)
+    check("pass 5: a file whose link wants a sign-in is taken through it", "Edsger Dijkstra" in run.state["talks"] and "v7" in api.got)
+    check("pass 5: a file the public view lists is never fetched twice", sorted(api.got) == ["a6", "v7"])
+    check("pass 5: the sources are named after the talks", {"Barbara Liskov.mp4", "Edsger Dijkstra.mp4"} <= set(os.listdir(run.inp)))
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return len(fails)
