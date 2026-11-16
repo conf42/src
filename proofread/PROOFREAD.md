@@ -61,5 +61,27 @@ Checkouts side by side: `conf42` (github.com/conf42/src, may be called `src`), `
 6. Append one line per run to `proofread/LOG.md` (date, events, fixed / clean / refused counts) in the same
    conf42 commit.
 
+## Connector mode (scan prints "CONNECTOR MODE")
+
+Where docs.google.com cannot be downloaded (the cloud sandbox), `scan` lists the abstracts from the repo
+CSVs instead and the sheet is read through the Google Sheets connector. Same rules, different steps 2-4:
+
+2. `show` prints each pending abstract as `=== <id> | <name> | <title>` followed by the CSV text.
+3. Per event: `get_spreadsheet` (fields `sheets.properties.title`) to get the exact tab name (scan prints a
+   hint such as "SF 2026 Q4"; the tab may be "San Francisco 2026 Q4"; never a "Copy of" / "Kopia arkusza"
+   tab). `get_values` on row 1 of the tab to find the columns headed name (or Name1), title and abstract,
+   then `get_values` on those three columns only (never the whole tab: it holds emails). Match each
+   pending abstract to its row by name + title. The sheet cell is the text you proofread and correct. Write
+   each fix with `update_values` into that abstract cell, one cell per call.
+4. Write `proofread/fixes.json`, one entry per pending abstract you dealt with, then
+   `python3 proofread/proofread.py finish proofread/fixes.json`:
+   - fixed: `{"id": "<id>", "cell": "K12", "corrected": "<exactly the text you wrote into the cell>"}`
+   - clean: `{"id": "<id>", "clean": true}`
+   - row not in the sheet: `{"id": "<id>", "missing": true}`
+   - only when the sheet cell differed from the CSV text shown by `show` (the sheet was edited after the
+     export): add `"sheet_original": "<the sheet text before your fix>"`; the CSV is then left for the next
+     export.
+   Refused cells: write `value` from the restore file back into `'<tab>'!<cell>`.
+
 Never edit a CSV by hand, never write to the sheet outside the abstract cells listed by `show`, and never
 touch `past/` folders.

@@ -7,7 +7,8 @@ byte kept). The script only READS the sheets (xlsx export; they are link-readabl
 
   scan [--limit N] [EVENT ...]   abstract cells never proofread (hash not in state.json) -> pending.json
   show [EVENT]                   print the pending abstracts for reading (EVENT = e.g. sreday/2026-nyc-q4)
-  finish                         re-read the sheet: record clean cells, refuse rewrites, patch the CSVs
+  finish [FIXES.json]            re-read the sheet: record clean cells, refuse rewrites, patch the CSVs
+                                 (connector mode, sheets not downloadable: FIXES.json says what was written)
   baseline [EVENT ...]           record pending cells as seen WITHOUT proofreading
 
 In scope: tabs of events that have a CSV in the repo - top-level <year>-<city>-q<n>/_db/talks.csv in the
@@ -150,6 +151,10 @@ def event_files(root):
     return out
 
 
+class SheetUnreachable(Exception):
+    pass
+
+
 def fetch_xlsx(brand, fresh=False):
     """The brand's whole sheet as an xlsx export (the sheets are link-readable, so no login)."""
     import time, urllib.request
@@ -159,10 +164,10 @@ def fetch_xlsx(brand, fresh=False):
         return dest
     url = f'https://docs.google.com/spreadsheets/d/{BRANDS[brand]["sheet"]}/export?format=xlsx'
     last = None
-    for attempt in range(4):
+    for attempt in range(2):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (proofread)'})
-            data = urllib.request.urlopen(req, timeout=120).read()
+            data = urllib.request.urlopen(req, timeout=60).read()
             if data[:2] != b'PK':
                 raise RuntimeError('not an xlsx (the sheet is no longer link-readable?)')
             with open(dest, 'wb') as f:
@@ -171,7 +176,7 @@ def fetch_xlsx(brand, fresh=False):
         except Exception as ex:          # noqa
             last = ex
             time.sleep(5 * (attempt + 1))
-    raise SystemExit(f'cannot download the {brand} sheet: {last}')
+    raise SheetUnreachable(f'cannot download the {brand} sheet: {last}')
 
 
 def scan(root, st, fresh=True, only=None):
@@ -196,8 +201,34 @@ def scan(root, st, fresh=True, only=None):
     return pending
 
 
+def scan_csv(root, st, only=None):
+    """Connector mode (the sheets cannot be downloaded from here): pending = CSV abstracts never proofread.
+    The agent finds the cells and reads the sheet text with the Google Sheets connector."""
+    pending = []
+    for brand, key, hint, path in event_files(root):
+        if only and key not in only:
+            continue
+        c = Csv(path)
+        if c.c_abs is None:
+            continue
+        seen, got = set(st['seen'][brand]), set()
+        for row in c.rows[1:]:
+            a = c.get(row, c.c_abs)
+            if not norm(a) or PLACEHOLDER.match(norm(a)) or h(a) in seen or h(a) in got:
+                continue
+            got.add(h(a))
+            pending.append({'id': f'{key}#{h(a)}', 'mode': 'csv', 'brand': brand, 'event': key,
+                            'sheet_id': BRANDS[brand]['sheet'], 'tab': hint, 'csv': os.path.relpath(path, root),
+                            'name': c.get(row, c.c_name), 'title': c.get(row, c.c_title), 'abstract': a})
+    return pending
+
+
 def cmd_scan(args):
-    pending = scan(args.root, load_state(), only=args.events)
+    try:
+        pending = scan(args.root, load_state(), only=args.events)
+    except SheetUnreachable as ex:
+        print(f'CONNECTOR MODE: {ex}. Follow "Connector mode" in PROOFREAD.md.')
+        pending = scan_csv(args.root, load_state(), only=args.events)
     total = len(pending)
     if args.limit and total > args.limit:                # whole events, oldest tab order, until the cap
         keep, n = [], 0
@@ -223,7 +254,7 @@ def cmd_show(args):
     for p in pending:
         if args.event and p['event'] != args.event:
             continue
-        print(f'=== {p["range"]} | {p["name"]} | {p["title"]}')
+        print(f'=== {p.get("range") or p["id"]} | {p["name"]} | {p["title"]}')
         print(p['abstract'])
         print()
 
@@ -247,10 +278,73 @@ def guard(orig, new):
     return None
 
 
+def finish_csv(args, pending):
+    """Connector mode: the agent says what it wrote (fixes file), the script guards it and patches the CSVs."""
+    if not args.fixes:
+        raise SystemExit('connector mode: finish needs the fixes file (see "Connector mode" in PROOFREAD.md)')
+    st = load_state()
+    fixes = json.load(open(args.fixes, encoding='utf-8'))
+    byid = {p['id']: p for p in pending}
+    files, log, restore = {}, [], []
+    for fx in fixes:
+        p = byid.get(fx.get('id'))
+        if not p:
+            log.append(f'?  {fx.get("id")}: not in this batch - ignored')
+            continue
+        who = f'{p["event"]} {fx.get("cell", "")} | {p["name"]}'
+        seen = st['seen'][p['brand']]
+        old, new, so = p['abstract'], fx.get('corrected'), fx.get('sheet_original')
+        if fx.get('missing'):
+            seen.append(h(old))
+            log.append(f'-  {who}: not in the sheet, recorded untouched')
+            continue
+        if new is None or norm(new) == norm(so if so is not None else old):
+            seen.append(h(old))
+            if so is not None:
+                seen.append(h(so))
+            log.append(f'=  {who}: clean')
+            continue
+        base = so if so is not None else old
+        why = guard(base, new)
+        if why:
+            restore.append({'spreadsheet': p['sheet_id'], 'tab': p['tab'], 'cell': fx.get('cell'), 'value': base, 'why': why})
+            log.append(f'X  {who}: REFUSED ({why}) - restore the cell from the restore file')
+            continue
+        seen += [h(old), h(new)] + ([h(so)] if so is not None else [])
+        if so is not None and norm(so) != norm(old):
+            log.append(f'~  {who}: fixed in the sheet; the CSV holds an older text, left for the next export')
+            continue
+        path = os.path.join(args.root, p['csv'])
+        c = files.get(path) or Csv(path)
+        files[path] = c
+        if not c.roundtrip:
+            log.append(f'~  {who}: fixed in the sheet; {p["csv"]} cannot be rewritten byte-safely, left for the next export')
+            continue
+        for r in c.rows[1:]:
+            if norm(c.get(r, c.c_abs)) == norm(old):
+                r[c.c_abs] = norm(new)
+        c.changed = True
+        log.append(f'+  {who}: fixed')
+    for path, c in files.items():
+        if getattr(c, 'changed', False):
+            c.save()
+    save_state(st)
+    json.dump(restore, open(RESTORE, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
+    print('\n'.join(log))
+    count = lambda k: sum(l[0] == k for l in log)
+    left = len(pending) - len({fx.get('id') for fx in fixes} & set(byid))
+    print(f'\nSUMMARY: {count("+")} fixed (sheet + CSV), {count("~")} fixed in the sheet only, {count("=")} clean, '
+          f'{count("X")} refused, {left} not reported (stay pending)')
+    if restore:
+        print(f'{len(restore)} cell(s) to restore: see {RESTORE}')
+
+
 def cmd_finish(args):
     """After the agent edited cells in the sheet: re-read the sheet, keep the good fixes, patch the CSVs."""
-    st = load_state()
     pending = json.load(open(PENDING, encoding='utf-8'))
+    if pending and pending[0].get('mode') == 'csv':
+        return finish_csv(args, pending)
+    st = load_state()
     tabs_of, files, log, restore = {}, {}, [], []
     for p in pending:
         brand = p['brand']
@@ -396,7 +490,7 @@ def main():
     sub = ap.add_subparsers(dest='cmd', required=True)
     s = sub.add_parser('scan'); s.add_argument('--limit', type=int, default=0); s.add_argument('events', nargs='*'); s.set_defaults(fn=cmd_scan)
     s = sub.add_parser('show'); s.add_argument('event', nargs='?'); s.set_defaults(fn=cmd_show)
-    sub.add_parser('finish').set_defaults(fn=cmd_finish)
+    s = sub.add_parser('finish'); s.add_argument('fixes', nargs='?'); s.set_defaults(fn=cmd_finish)
     s = sub.add_parser('baseline'); s.add_argument('events', nargs='*'); s.set_defaults(fn=cmd_baseline)
     args = ap.parse_args()
     args.fn(args)
