@@ -371,9 +371,13 @@ def main(argv):
         lines += cleanup.Cleanup(drive, cfg).run()
     except Exception as e:                               # noqa: BLE001 - tidying up never fails a pass
         lines.append("\n### Upload folders - not tidied (%s)" % e)
-    try:                                                 # and a few of the older videos get their transcript as captions
-        from . import captions
-        lines += captions.backlog(cfg)
+    try:                                                 # and a few of the older videos get their transcript as captions -
+        from . import captions                           # only once the talks' own rollout is confirmed out of the way
+        clear, why = rollout_clear(sorted(set(intake_events(slugs)) | set(legacy) | set(manual["claims"])), failed, cfg, slugs)
+        if clear:
+            lines += captions.backlog(cfg)
+        elif int(cfg.get("captions_per_pass", 0) or 0) > 0:
+            lines += ["", "### Captions on older videos - not this pass: %s" % why]
     except Exception as e:                               # noqa: BLE001
         lines.append("\n### Captions on older videos - not done (%s)" % e)
     commit_intake("factory: cloud pass state (intake + youtube)")
@@ -463,6 +467,38 @@ def run_url():
         return "%s/%s/actions/runs/%s" % (os.environ.get("GITHUB_SERVER_URL", "https://github.com"),
                                           os.environ.get("GITHUB_REPOSITORY", "conf42/src"), os.environ["GITHUB_RUN_ID"])
     return "local run"
+
+
+def rollout_clear(slugs_done, failed, cfg, slugs=None, now=None):
+    """(True, "") when adding captions to older videos cannot get in the way of the factory's own videos (Marek
+    2026-11-16: "only after confirming that there's no conflict with the regular rollout"), else (False, why).
+    YouTube gives one allowance a day for uploads and captions together, so captions only take what is left over:
+    - nothing broke in this pass;
+    - every finished talk of the pass's events is on YouTube (nothing waits for an upload, no daily limit hit);
+    - no accepted talk is still being made (more_to_do);
+    - and it is the end of YouTube's day (it starts at midnight Pacific = 08:00 UTC): only in the hours
+      captions_utc_hours (default 0-7), when the day's uploads are behind us and tomorrow starts fresh."""
+    if failed:
+        return False, "something failed in this pass (%s)" % str(failed[0])[:80]
+    from . import ytupload
+    for slug in slugs_done:
+        p = os.path.join(intake.REPO_RUNS, slug, "state.json")
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            talks = json.load(f).get("talks", {})
+        up = ytupload.load(slug)
+        waiting = sorted(k for k, t in talks.items() if t.get("finished") and not (up.get(k) or {}).get("id"))
+        if waiting:
+            return False, "%d finished talk(s) of %s are not on YouTube yet (%s)" % (len(waiting), slug, ", ".join(waiting[:3]))
+    if more_to_do(slugs):
+        return False, "talks are still being made"
+    hours = cfg.get("captions_utc_hours") or [0, 7]
+    hour = (now or datetime.datetime.now(datetime.timezone.utc)).hour
+    if not int(hours[0]) <= hour <= int(hours[-1]):
+        return False, "it is %02d:00 UTC - captions only go up %02d:00-%02d:59 UTC, at the end of YouTube's day, after the day's videos" % (
+            hour, int(hours[0]), int(hours[-1]))
+    return True, ""
 
 
 def more_to_do(slugs=None):

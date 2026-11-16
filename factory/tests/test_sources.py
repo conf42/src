@@ -136,6 +136,35 @@ def main():
     dry.refile("mlops2027", {"items": {}}, {"id": "UP", "name": "Ada (x)"}, {"talk.json": {"id": "TJ"}}, info, {}, "chaos2027", "why")
     check("re-file: a dry run moves nothing", not fd2.moved and not fd2.text)
 
+    # ---- captions on older videos never get in the way of the talks' own rollout (Marek 2026-11-16) ----
+    import datetime as _dt
+    night, noon = _dt.datetime(2027, 1, 5, 5, 30, tzinfo=_dt.timezone.utc), _dt.datetime(2027, 1, 5, 12, 30, tzinfo=_dt.timezone.utc)
+    runs = cloud.intake.REPO_RUNS
+    cloud.ytupload = __import__("factory.ytupload", fromlist=["x"])
+    cloud.ytupload.REPO_RUNS = runs
+
+    def event_state(slug, talks, tube):
+        os.makedirs(os.path.join(runs, slug), exist_ok=True)
+        with open(os.path.join(runs, slug, "state.json"), "w", encoding="utf-8") as f:
+            _json.dump({"talks": talks}, f)
+        with open(os.path.join(runs, slug, "youtube.json"), "w", encoding="utf-8") as f:
+            _json.dump({k: {"id": "yt"} for k in tube}, f)
+    event_state("mlops2027", {"Ada Lovelace": {"finished": "x"}}, ["Ada Lovelace"])
+    check("captions: everything on YouTube, nothing in the making, end of YouTube's day -> clear",
+          cloud.rollout_clear(["mlops2027"], [], {}, None, night) == (True, ""))
+    ok, why = cloud.rollout_clear(["mlops2027"], [], {}, None, noon)
+    check("captions: not in the middle of YouTube's day", not ok and "12:00 UTC" in why)
+    ok, why = cloud.rollout_clear(["mlops2027"], ["chaos2027: KeyError"], {}, None, night)
+    check("captions: not when something failed in the pass", not ok and "failed" in why)
+    event_state("mlops2027", {"Ada Lovelace": {"finished": "x"}, "Grace Hopper": {"finished": "x"}}, ["Ada Lovelace"])
+    ok, why = cloud.rollout_clear(["mlops2027"], [], {}, None, night)
+    check("captions: not while a finished talk waits for its upload", not ok and "Grace Hopper" in why)
+    event_state("mlops2027", {"Ada Lovelace": {}}, [])
+    ok, why = cloud.rollout_clear(["mlops2027"], [], {}, None, night)
+    check("captions: not while an accepted talk is still being made", not ok and "still being made" in why)
+    event_state("mlops2027", {"Ada Lovelace": {"finished": "x"}}, ["Ada Lovelace"])
+    check("captions: the hours are a setting", cloud.rollout_clear(["mlops2027"], [], {"captions_utc_hours": [10, 14]}, None, noon)[0])
+
     shutil.rmtree(tmp, ignore_errors=True)
     print("\n%s" % ("ALL PASSED" if not fails else "%d FAILED: %s" % (len(fails), "; ".join(fails))))
     return 1 if fails else 0
