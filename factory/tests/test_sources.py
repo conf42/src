@@ -223,6 +223,36 @@ def main():
           picks[0]["crop"] == [0.0, 0.0, 1.0, 0.9] and picks[2]["crop"] is None and 4 not in [p["n"] for p in picks])
     check("highlights: never more than the cap", len(highlights.clean([{"n": i, "caption": "x"} for i in range(1, 30)], 40)) == highlights.MAX_GOOD)
 
+    # slides shared as a screen: every distinct slide, captions not needed, a higher cap
+    deck = highlights.clean([{"n": 3, "caption": ""}, {"n": 1, "caption": ""}, {"n": 1, "caption": ""}, {"n": 2}], 5, slides=True)
+    check("highlights: a deck rebuilt from the screen keeps every slide once, in order, without captions", [p["n"] for p in deck] == [1, 2, 3])
+    check("highlights: a rebuilt deck may be long, highlights may not",
+          len(highlights.clean([{"n": i, "caption": ""} for i in range(1, 61)], 60, slides=True)) == 60)
+    check("highlights: the rebuilt deck carries the deck's own name", highlights.deck_name("Ada Lovelace", ev27) == "Ada Lovelace - Conf42 MLOps 2027.pdf")
+    # the recorder's stills: a stored zip of PNGs named by order and second
+    import zipfile
+    from PIL import Image
+    zp, pics = os.path.join(tmp, "stills.zip"), os.path.join(tmp, "pics")
+    os.makedirs(pics)
+    with zipfile.ZipFile(zp, "w", zipfile.ZIP_STORED) as z:
+        for i, sec in enumerate((3.6, 61.0, 125.4)):
+            Image.new("RGB", (64, 36), (10 * i, 20, 30)).save(os.path.join(pics, "p.png"))
+            z.write(os.path.join(pics, "p.png"), "%03d_t%.1f.png" % (i + 1, sec))
+        z.writestr("004_t200.0.png", b"not a picture")
+        z.writestr("notes.txt", "not a still")
+        z.writestr("../evil.png", b"x")
+    got_stills = highlights.stills(zp, pics)
+    check("highlights: the recorder's stills are read in order with their second; anything else in the zip is left out",
+          [(c["n"], c["t"]) for c in got_stills] == [(1, 3.6), (2, 61.0), (3, 125.4)] and all(c["still"] for c in got_stills))
+    check("highlights: a zip that is not one gives no stills", highlights.stills(os.path.join(pics, "p.png"), pics) == [])
+    pages = [Image.new("RGB", (1920, 1080), (200, 30 * i, 40)) for i in range(4)]
+    out_pdf = highlights.deck(pages, {"title": "T"}, os.path.join(tmp, "deck", "d.pdf"))
+    from pypdf import PdfReader
+    check("highlights: the rebuilt deck is a PDF with one slide a page", len(PdfReader(out_pdf).pages) == 4)
+    out_pdf = highlights.pdf([(p, "A caption that says what is on the screen", 65) for p in pages[:3]], {"title": "T", "speakers": "Ada", "event": "E"}, os.path.join(tmp, "deck", "h.pdf"))
+    check("highlights: the highlights PDF has one highlight a page and stays under the deck limit",
+          len(PdfReader(out_pdf).pages) == 3 and os.path.getsize(out_pdf) <= highlights.MAX_MB * 1e6)
+
     class FakeRun:
         ev, cfg, dir = dict(ev27, db_path=""), {"highlights_from": "2026-11-19"}, os.path.join(tmp, "hl")
         slides_dir, inp = os.path.join(tmp, "hl", "slides"), os.path.join(tmp, "hl", "in")

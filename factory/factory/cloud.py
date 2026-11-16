@@ -257,6 +257,15 @@ def rehydrate(run, drive, log=print):
                 pdf = os.path.join(run.slides_dir, key + ".pdf")
                 if not os.path.exists(pdf) and not os.path.exists(os.path.join(run.slides_dir, "%s - %s.pdf" % (key, run.ev["title"]))):
                     drive.download(rec["slides_id"], pdf)
+            if rec.get("stills_id"):                     # the recorder's stills, for the talk's highlights
+                try:
+                    from . import highlights
+                    z = highlights.stills_zip(run, key)
+                    if not os.path.exists(z):
+                        os.makedirs(os.path.dirname(z), exist_ok=True)
+                        drive.download(rec["stills_id"], z)
+                except Exception as e:                   # noqa: BLE001 - highlights fall back to the video
+                    log("cloud: %s - its stills were not fetched (%s)" % (key, e))
             t["source"] = os.path.basename(src)
             ready.append(key)
             log("cloud: %s - source fetched again from Drive" % key)

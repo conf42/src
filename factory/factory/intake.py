@@ -673,6 +673,7 @@ class Intake:
                             continue
                         if spath:
                             shutil.copy2(spath, os.path.join(run.slides_dir, key + ".pdf"))
+                        rec["stills_id"] = self.fetch_stills(run, key, info, files)
                         if key in run.state["talks"]:
                             run.redo(key, "new upload from conf42.com/record (%s)" % up["name"])
                             run.state["talks"][key]["source"] = key + ".mp4"
@@ -697,6 +698,24 @@ class Intake:
         if not self.dry_run:                             # a dry run decides and shows, it never writes: a dry
             self.save(slug, st)                          # run's "done" records once sat in a working copy, one
         return accepted                                  # commit away from making the factory skip real uploads
+
+    def fetch_stills(self, run, key, info, files):
+        """The recorder's stills of the shared screen (Talk Highlights, highlights.py) next to the talk's video:
+        "<talk> - screen stills.zip" -> <event>/highlights/<Speakers>.stills.zip. Returns the Drive id, or None.
+        Never a reason to fail an upload."""
+        st = (info.get("files") or {}).get("stills") or {}
+        meta = files.get(st.get("name")) if st else None
+        if not meta or int(meta.get("size") or 0) > 250e6:
+            return None
+        try:
+            from . import highlights
+            dest = highlights.stills_zip(run, key)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            self.d.download(meta["id"], dest, int(meta.get("size") or 0))
+            return meta["id"]
+        except Exception as e:                           # noqa: BLE001
+            self.log("intake: the stills of %s were not fetched (%s)" % (key, e))
+            return None
 
     def conference_check(self, slug, row, video, deck, sf):
         """(verdict, other slug, why) for one upload - see wrong_conference(). Only looked at when the speaker is on

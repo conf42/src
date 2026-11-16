@@ -531,7 +531,7 @@ class Run:
         to conf42/static/slides/ (the repo next to src), committed and pushed. The site links both by name, so nothing
         else is needed. Only what is new or changed is copied; a talk that is not finished ships nothing. Off with
         settings `ship: false`. Returns {"srt": [...], "slides": [...]}."""
-        out = {"srt": [], "slides": [], "highlights": []}
+        out = {"srt": [], "slides": [], "highlights": [], "rebuilt": []}
         if str(self.cfg.get("ship", True)).lower() in ("false", "0", "no"):
             return out
         done = {k: t for k, t in self.state["talks"].items() if t.get("finished")}
@@ -555,6 +555,11 @@ class Run:
             files = [os.path.join(self.dir, "highlights", highlights.name_for(k, self.ev)) for k in done
                      if not os.path.exists(os.path.join(self.slides_dir, "%s - %s.pdf" % (k, self.ev["title"])))]
             jobs.append(("highlights", static, os.path.join(static, "slides"), files, "talk highlights"))
+            # ... and a deck rebuilt from a shared screen (highlights.py) ships under the deck's own name, so the
+            # site shows it as the talk's slides - until the speaker's own deck, which has that name too, replaces it
+            files = [os.path.join(self.dir, "highlights", highlights.deck_name(k, self.ev)) for k in done
+                     if not os.path.exists(os.path.join(self.slides_dir, "%s - %s.pdf" % (k, self.ev["title"])))]
+            jobs.append(("rebuilt", static, os.path.join(static, "slides"), files, "slides rebuilt from the shared screen"))
         elif done:
             self.note("slides not shipped: no conf42/static repo next to this one")
         git = lambda repo, *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, timeout=300,

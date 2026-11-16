@@ -50,13 +50,14 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 7;   // v7: action "sheet" (YouTube links into Excels_for_WWW); v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 8;   // v8: a talk's "screen stills.zip" for its Talk Highlights (start with only `stills` + folder_id; never part of "complete"); v7: action "sheet" (YouTube links into Excels_for_WWW); v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
 var TZ = 'Europe/London';
 var MAX_VIDEO = 4.5 * 1024 * 1024 * 1024;   // 2 h at the recorder's bitrate is ~1.3 GB; 4K screen captures more
 var MAX_SLIDES = 200 * 1024 * 1024;
+var MAX_STILLS = 200 * 1024 * 1024;         // the recorder stops at 150 MB of stills
 var DAILY_SESSIONS = 80;                      // uploads started per day, all speakers together
 var DAILY_BYTES = 200 * 1024 * 1024 * 1024;   // 200 GB a day
 var PER_TALK = 6;                             // uploads per talk per day (re-takes are fine, floods aren't)
@@ -95,7 +96,29 @@ function doPost(e) {
 
 // ---- start --------------------------------------------------------------------------
 
+// Talk Highlights stills (v8): the recorder's PNG stills of the shared screen, one zip, added to a talk's upload folder
+// after its video. An extra: it never changes the upload's status, and finish() never counts it towards "complete".
+function stillsStart(data) {
+  var slug = String((data.event || {}).slug || ''), errors = [];
+  if (!/^[a-z][a-z0-9-]{2,40}$/.test(slug)) errors.push('event');
+  var f = fileSpec('stills', data.stills, /\.zip$/i, MAX_STILLS, 'application/zip', errors);
+  if (errors.length) return { ok: false, error: 'invalid', fields: errors };
+  var folder = ownFolder(String(data.folder_id || ''), slug);
+  if (!folder) return { ok: false, error: 'not found' };
+  var info = readInfo(folder);
+  if (!info || !info.files || !info.files.video) return { ok: false, error: 'not found' };
+  var budget = spend(f.size, slug + '|stills|' + folder.getId());
+  if (budget) return { ok: false, error: budget };
+  var origin = ORIGINS.indexOf(String(data.origin || '')) >= 0 ? String(data.origin) : ORIGINS[0];
+  var name = String(info.files.video.name || 'talk.mp4').replace(/\.mp4$/i, '') + ' - screen stills.zip';
+  var url = session(folder, name, f, origin);
+  info.files.stills = { name: name, size: f.size, original_name: f.original, id: '', md5_browser: '', md5_drive: '', status: 'uploading' };
+  writeInfo(folder, info);
+  return { ok: true, folder_id: folder.getId(), uploads: { stills: { upload_url: url, name: name } } };
+}
+
 function start(data) {
+  if (data.stills && !data.video && !data.slides) return stillsStart(data);
   var ev = data.event || {}, talk = data.talk || {}, errors = [];
   var slug = String(ev.slug || '');
   if (!/^[a-z][a-z0-9-]{2,40}$/.test(slug)) errors.push('event');
@@ -201,8 +224,13 @@ function finish(data) {
   Object.keys(info.files || {}).forEach(function (role) {
     var f = info.files[role];
     if (f.status === 'complete') { report[role] = 'complete'; return; }
-    if (data.roles && data.roles.indexOf(role) < 0) { ok = ok && f.status === 'complete'; report[role] = f.status; return; }
+    if (data.roles && data.roles.indexOf(role) < 0) { if (role !== 'stills') ok = ok && f.status === 'complete'; report[role] = f.status; return; }
     var got = newest(folder, f.name);
+    if (role === 'stills') {                   // an extra (v8): noted, never part of "complete"
+      f.status = !got ? 'missing' : Number(got.size) === f.size ? 'complete' : 'incomplete';
+      if (got) { f.id = got.id; f.md5_drive = got.md5Checksum || ''; f.drive_size = Number(got.size) || 0; }
+      report[role] = f.status; return;
+    }
     if (!got) { f.status = 'missing'; ok = false; report[role] = 'missing'; return; }
     f.id = got.id; f.md5_drive = got.md5Checksum || ''; f.drive_size = Number(got.size) || 0;
     f.md5_browser = /^[0-9a-f]{32}$/.test(String(md5[role] || '')) ? String(md5[role]) : '';
