@@ -98,6 +98,44 @@ def load_context():
     return ctx
 
 
+def ref_aliases(events=None):
+    """old short_url -> current one, for renamed events (old_short_urls in metadata.yml, e.g. ce2022 -> chaos2022).
+    Without events it reads metadata.yml itself (lint counts duplicate Refs before the heavy context is loaded)."""
+    aliases = {}
+
+    def walk(o):
+        if isinstance(o, dict):
+            if o.get("short_url"):
+                for old in o.get("old_short_urls") or []:
+                    aliases[old] = o["short_url"]
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    if events is None:
+        try:
+            with open(os.path.join(HERE, "metadata.yml"), encoding="utf-8") as f:
+                events = yaml.safe_load(f)
+        except Exception:
+            events = []
+    walk(events)
+    return aliases
+
+
+def canon_ref(ref, aliases):
+    """A Ref with a renamed event's old short_url rewritten to the current one: "sponsor:ce2022/gremlin/X" and
+    "sponsor:chaos2022/gremlin/X" are the same post. Before this the planner listed every post of a renamed event as
+    missing (2026-11-16: Chaos 2020-2024 came back as "new" after ce20XX -> chaos20XX) and lint let the twin through."""
+    ref = (ref or "").strip()
+    kind, sep, rest = ref.partition(":")
+    if not sep or kind not in ("event", "talk", "sponsor"):
+        return ref
+    short_url, slash, tail = rest.partition("/")
+    return "%s:%s%s%s" % (kind, aliases.get(short_url, short_url), slash, tail)
+
+
 # ---------------------------------------------------------------- sister events
 
 def sister_events():
@@ -413,12 +451,13 @@ def plan(args):
     write_sister_json(sisters)
     ctx = load_context()
     rows = read_blog_rows()
-    have = {(r.get("Ref") or "").strip() for r in rows if (r.get("Ref") or "").strip()}
+    aliases = ref_aliases(ctx["events"])
+    have = {canon_ref(r.get("Ref"), aliases) for r in rows if (r.get("Ref") or "").strip()}
     want = wanted_posts(ctx, sisters, since, today)
 
     missing, waiting = [], collections.Counter()
     for w in want:
-        if w["ref"] in have:
+        if canon_ref(w["ref"], aliases) in have:
             continue
         if w.get("ready") is False:
             if w["type"] in ("talk", "sponsored"):
@@ -542,10 +581,11 @@ def lint_rows(rows, only=None, verbose=False):
         if r.get("Date", "") < "2025" and not (r.get("Ref") or "").strip() and key not in {x.get("ShortURL") or x.get("Title") for x in rows}:
             problems.append("%s: pre-2025 row deleted" % key)
     seen_slug, seen_ref = collections.Counter(), collections.Counter()
+    aliases = ref_aliases()
     for r in rows:
         seen_slug[r.get("ShortURL")] += 1
         if (r.get("Ref") or "").strip() and (r.get("Status") or "").lower() != "orphaned":
-            seen_ref[r["Ref"].strip()] += 1
+            seen_ref[canon_ref(r["Ref"], aliases)] += 1
     ctx = None
     sisters = None
     talk_urls = None
@@ -572,7 +612,7 @@ def lint_rows(rows, only=None, verbose=False):
             continue
         if r.get("ShortURL") and seen_slug[r["ShortURL"]] > 1:
             bad(r, "duplicate ShortURL")
-        if (r.get("Ref") or "").strip() and seen_ref[r["Ref"].strip()] > 1:
+        if (r.get("Ref") or "").strip() and seen_ref[canon_ref(r["Ref"], aliases)] > 1:
             bad(r, "duplicate Ref")
         if (r.get("Status") or "").lower() in ("orphaned", "hidden"):
             continue
