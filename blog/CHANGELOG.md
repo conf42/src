@@ -3,6 +3,25 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-17 - Maintenance run from the PC (the nightly writer cannot push yet)
+- 32 posts written by 7 parallel writers, each running only `check`; then one `add` + `lint` (0 problems):
+  - 26 rewrites from transcripts, same ShortURLs, Status waiting -> live: 21 MLOps 2026 talk posts, Feature Flags
+    2026 (Ishan Shah, Girish Konda), LLMs 2026 (Kosseila Haddalene), Platform Engineering 2025 (Shivam Tiwari), and the
+    sponsored SRE 2026 Virtana post (David McNerney). Several titles changed where the talk did not deliver what the
+    abstract promised (the posts say so). 32 MLOps 2026 posts stay `waiting` (no transcript yet).
+  - 2 roundups: MLOps 2026 (dated 2026-11-20) and Chaos Engineering 2026 (dated 2026-12-04, written from abstracts
+    only - no transcripts yet; no talk count in it; re-check its links if the lineup changes before December 3).
+  - 4 plugs for 2027: SREday Warsaw (free), SREday London and PLATFORMday London (paid, CONF42 checked on the Luma
+    calendar: 42% off, unlimited), SREday Katowice. Lineups of the first three are not announced; the posts say so.
+- Held back (`hidden`): SREday Katowice 2027 plug. The site data marks the event paid, Luma has only a free ticket, so
+  a code would not work and lint wants one. Its metadata.yml still carries the template's sponsors (Harness).
+- Not done: `enrich` (6 hand-written Harness recaps - their text is left alone), the Snyk live-hacking post
+  (Enterprise 2021, set aside earlier), the Sheet mirror (still pending a route).
+- Planner fixes: renamed events (ce20XX -> chaos20XX) no longer come back as missing posts; the SREday repo is found
+  when cloned as `sreday` instead of `website` (before, its plugs looked orphaned on the PC and none were planned).
+- Rollout: 12 posts per run instead of 36 (Marek: fewer a day is fine, newest first).
+- Next: MLOps 2026 talk posts for the remaining 32 talks once their transcripts land; Chaos 2026 talk posts likewise.
+
 ## 2026-11-11 - First webinar post
 - Reliaburger 0.2.0 webinar (2026-10-28) published: blog/2026-10-28-reliaburger-0-2-0-webinar-break-a-cluster, written
   generically from the Reliaburger repo at v0.2.0 + the WEBINARS.csv invite (it predates Snoop, so no transcript).

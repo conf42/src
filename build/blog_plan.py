@@ -66,6 +66,9 @@ SISTER_REPOS = {   # repo folder -> brand
     "platformday": "PLATFORMday",
     "2026.promptengineering.rocks": "PEC",
 }
+# sreday/sreday is "website" in Refs (sister:website/...); the Windows PC and the cloud sandbox clone it as "sreday".
+# Without this fallback every SREday plug looked orphaned there and no new one was planned.
+SISTER_FOLDER_ALT = {"website": "sreday"}
 # CONF42 = 42% off, paid events only (Marek 2026-11-08). PLATFORMday is free except London 2027 Q2.
 PAID_PLATFORMDAY = {"2027-london-q2"}
 PARTNER_LEVELS = {"media", "newsletter", "podcast"}
@@ -142,6 +145,8 @@ def sister_events():
     out = []
     for repo, brand in SISTER_REPOS.items():
         root = os.path.join(GITHUB, repo)
+        if not os.path.isdir(root) and os.path.isdir(os.path.join(GITHUB, SISTER_FOLDER_ALT.get(repo, repo))):
+            root = os.path.join(GITHUB, SISTER_FOLDER_ALT[repo])   # same repo, cloned under its GitHub name
         for meta in glob.glob(os.path.join(root, "*", "metadata.yml")) + glob.glob(os.path.join(root, "past", "*", "metadata.yml")):
             folder = os.path.basename(os.path.dirname(meta))
             if not re.match(r"^\d{4}-", folder):
