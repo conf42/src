@@ -45,7 +45,10 @@ def _row(r):
     return {"name1": n1, "name2": n2, "speakers": n1 + (" & " + n2 if n2 else ""), "title": r.get("Title", ""),
             "abstract": r.get("Abstract", ""), "keywords": r.get("Keywords", ""),
             "job1": r.get("JobTitle1", ""), "company1": r.get("Company1", ""),
-            "job2": r.get("JobTitle2", ""), "company2": r.get("Company2", "")}
+            "job2": r.get("JobTitle2", ""), "company2": r.get("Company2", ""),
+            # where the talk sits on the event page (build/events.py): keynotes, panels, then the tracks
+            "featured": (r.get("Featured") or "").strip().lower() == "yes",
+            "panel": (r.get("Panel") or "").strip().lower() == "yes", "track": (r.get("Track") or "other").strip()}
 
 
 def talks(ev):

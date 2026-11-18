@@ -161,6 +161,28 @@ class YouTube:
                       json={"snippet": {"playlistId": playlist_id, "resourceId": {"kind": "youtube#video", "videoId": video_id}}})
         return r.status_code == 200, r.text[:200]
 
+    def playlist_items(self, playlist_id):
+        """[(item id, video id)] in the playlist's current order."""
+        out, page = [], None
+        while True:
+            params = {"part": "snippet", "playlistId": playlist_id, "maxResults": 50}
+            if page:
+                params["pageToken"] = page
+            r = self.call("GET", API + "/playlistItems", params=params)
+            if r.status_code != 200:
+                raise RuntimeError("playlist items: %s" % r.text[:200])
+            d = r.json()
+            out += [(i["id"], i["snippet"]["resourceId"].get("videoId")) for i in d.get("items", [])]
+            page = d.get("nextPageToken")
+            if not page:
+                return out
+
+    def move(self, playlist_id, item_id, video_id, position):
+        r = self.call("PUT", API + "/playlistItems", params={"part": "snippet"},
+                      json={"id": item_id, "snippet": {"playlistId": playlist_id, "position": position,
+                                                       "resourceId": {"kind": "youtube#video", "videoId": video_id}}})
+        return r.status_code == 200, r.text[:200]
+
     def status(self, video_id):
         r = self.call("GET", API + "/videos", params={"part": "status,processingDetails", "id": video_id})
         items = r.json().get("items") or [] if r.status_code == 200 else []
@@ -309,6 +331,7 @@ def event(run, cfg):
     todo = [k for k, t in sorted(run.state["talks"].items())
             if t.get("finished") and (not (done.get(k) or {}).get("id") or redone_since(t, done[k]))]
     if not todo:
+        yield from playlist_order(yt, ev, cfg, done, run)
         yield from sheet_links(ev, done, raw)             # links of earlier passes that are not in the sheet yet
         return
     yt.check_channel((cfg.get("youtube") or {}).get("channel_id"))
@@ -367,8 +390,7 @@ def event(run, cfg):
             if is_test:
                 raise RuntimeError("test talk - kept out of the playlist")
             if playlist_id is None:
-                title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
-                playlist_id, made = yt.playlist(title)
+                playlist_id, made, title = playlist_for(yt, ev, cfg)
                 if made:
                     yield "youtube: made the playlist %s (unlisted - make it public when the talks are)" % title
             rec["playlist"] = yt.add_to_playlist(playlist_id, vid)[0]
@@ -386,7 +408,102 @@ def event(run, cfg):
         if rec.get("replaces"):
             yield ("youtube: %s was redone - this is the new video. The old one is still on YouTube and in the playlist: "
                    "delete it at https://studio.youtube.com/video/%s/edit" % (key, rec["replaces"][-1]))
+    yield from playlist_order(yt, ev, cfg, done, run)
     yield from sheet_links(ev, done, raw)
+
+
+def playlist_id_from(url):
+    """The list= id of a YouTube playlist link (metadata.yml playlist_url), or None."""
+    q = urllib.parse.parse_qs(urllib.parse.urlparse(str(url or "")).query)
+    pid = (q.get("list") or [""])[0]
+    return pid if re.fullmatch(r"[\w-]{10,64}", pid) else None
+
+
+def playlist_for(yt, ev, cfg):
+    """The event's playlist: the one the site links (metadata.yml playlist_url, Marek 2026-11-18: "add talks to the
+    corresponding playlist"), else found or made by title. Returns (id, made, title)."""
+    pid = playlist_id_from(ev.get("playlist_url"))
+    if pid:
+        return pid, False, "playlist_url"
+    title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
+    pid, made = yt.playlist(title)
+    return pid, made, title
+
+
+def site_order(talks):
+    """Talk keys in the order the event page shows them (build/events.py + event.html): keynotes, panels, then each
+    track in the order it first appears, talks in CSV order inside it; banished talks after, the test talk never."""
+    live = [t for t in talks if not t.get("banished")]
+    out = [t["speakers"] for t in live if t.get("featured")]
+    out += [t["speakers"] for t in live if t.get("panel") and t["speakers"] not in out]
+    tracks = []
+    for t in live:
+        if not t.get("featured") and not t.get("panel") and t.get("track", "other") not in tracks:
+            tracks.append(t.get("track", "other"))
+    for tr in tracks:
+        out += [t["speakers"] for t in live if not t.get("featured") and not t.get("panel") and t.get("track", "other") == tr]
+    out += [t["speakers"] for t in talks if t.get("banished") and not t.get("test") and t["speakers"] not in out]
+    return out
+
+
+def order_moves(current, wanted):
+    """current: video ids in playlist order; wanted: our talks' video ids in page order. Our talks go to the top in
+    page order, anything else in the playlist keeps its order after them. Returns [(video id, position)] - the fewest
+    single moves, applied one after another."""
+    ours = set(wanted)
+    target = [v for v in wanted if v in current] + [v for v in current if v not in ours]
+    cur, moves = list(current), []
+    for i, v in enumerate(target):
+        if cur[i] != v:
+            cur.remove(v)
+            cur.insert(i, v)
+            moves.append((v, i))
+    return moves
+
+
+def playlist_order(yt, ev, cfg, done, run=None):
+    """Every pass (Marek 2026-11-18): each uploaded talk is in the event's playlist, sorted like the event page.
+    Adding is 50 units a video, a move 50; an already sorted playlist costs one list call. Never fails the pass.
+    The playlist must be on "Manual" ordering in YouTube Studio, or YouTube ignores the positions."""
+    if (cfg.get("youtube") or {}).get("playlist_sort") is False:
+        return
+    try:
+        order = site_order(events.talks(ev))
+        vid_of = {k: r["id"] for k, r in done.items() if r.get("id") and not r.get("test")}
+        wanted = [vid_of[k] for k in order if k in vid_of]
+        if not wanted:
+            return
+        pid = playlist_for(yt, ev, cfg)[0]
+        items = yt.playlist_items(pid)
+        have = {v for _, v in items}
+        added = []
+        for k in order:
+            v = vid_of.get(k)
+            if v and v not in have:
+                ok, msg = yt.add_to_playlist(pid, v)
+                if not ok:
+                    yield "youtube: playlist - %s not added (%s)" % (k, msg[:120])
+                    if "quota" in msg.lower():
+                        return
+                    continue
+                done[k]["playlist"] = True
+                done[k].pop("playlist_note", None)
+                added.append(k)
+        if added:
+            save(ev["short_url"], done)
+            yield "youtube: playlist - added %s" % ", ".join(added)
+            items = yt.playlist_items(pid)
+        item_of = {v: i for i, v in items}
+        moves = order_moves([v for _, v in items], wanted)
+        for n, (v, pos) in enumerate(moves):
+            ok, msg = yt.move(pid, item_of[v], v, pos)
+            if not ok:
+                yield "youtube: playlist sorted %d of %d moves, then: %s" % (n, len(moves), msg[:160])
+                return
+        if moves:
+            yield "youtube: playlist sorted like the event page (%d moves)" % len(moves)
+    except Exception as e:                               # noqa: BLE001 - sorting never fails the pass
+        yield "youtube: playlist not sorted (%s)" % str(e)[:200]
 
 
 def repair(yt, run, cfg, done, rows):
@@ -429,8 +546,7 @@ def repair(yt, run, cfg, done, rows):
             if rec.get("playlist") is False and "test talk" not in str(rec.get("playlist_note") or ""):
                 try:
                     if playlist_id is None:
-                        title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
-                        playlist_id, _ = yt.playlist(title)
+                        playlist_id = playlist_for(yt, ev, cfg)[0]
                     ok, msg = yt.add_to_playlist(playlist_id, rec["id"])
                 except RuntimeError as e:
                     ok, msg = False, str(e)
