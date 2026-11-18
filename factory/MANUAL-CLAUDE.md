@@ -75,6 +75,9 @@ on the list.
   every `event()` pass: adds uploaded talks missing from it, then `order_moves` (fewest single moves, 50 units each)
   to `site_order` (= build/events.py + event.html: Featured, Panel, tracks by first appearance, banished last, test
   talk never). `events._row` now keeps featured/panel/track. `tests/test_playlist.py`.
+  Same day: `YouTube.playlist(title, name, year)` matches exact normalized title, else the one title with conf42 +
+  name + year (several -> RuntimeError, nothing made); no `playlist_url` -> `wire_site` fills metadata.yml
+  (`set_playlist_url`: empty value or missing key only) and pushes with gc.auto=0.
 - **2026-11-18** - `sheetcsv.py`: after `sheet_links` writes a link (real sheet only, `post is None`), the tab is
   exported (Drive token from UPLOAD_FEED, Sheets API for the gid, `docs.google.com/.../export?format=csv&gid=`), the
   email column(s) dropped in memory, and `db_path` committed + pushed. Never writes to the sheet. Guards: an email address left in

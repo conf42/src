@@ -137,19 +137,35 @@ class YouTube:
                       headers={"Content-Type": "multipart/related; boundary=" + boundary})
         return r.status_code == 200, r.text[:200]
 
-    def playlist(self, title):
-        page = None
+    def playlist(self, title, name=None, year=None):
+        """The channel's playlist for the event: the exact title (case, punctuation and spaces ignored), else the one
+        playlist whose title has "conf42", the event's name and its year (Marek 2026-11-18: he made the 2026 + 2027
+        playlists by hand). Several such playlists: nothing is guessed or made (RuntimeError). None at all: made
+        unlisted. Returns (id, made)."""
+        norm = lambda t: " ".join(re.sub(r"[^a-z0-9]+", " ", str(t).lower()).split())
+        want, exact, loose, page = norm(title), [], [], None
+        words = [w for w in norm("conf42 %s %s" % (name or "", year or "")).split()] if name and year else []
         while True:
             params = {"part": "id,snippet", "mine": "true", "maxResults": 50}
             if page:
                 params["pageToken"] = page
             d = self.call("GET", API + "/playlists", params=params).json()
             for p in d.get("items", []):
-                if p["snippet"]["title"].strip().lower() == title.lower():
-                    return p["id"], False
+                t = norm(p["snippet"]["title"])
+                if t == want:
+                    exact.append(p["id"])
+                elif words and all(w in t.split() for w in words) and norm(name) in t:
+                    loose.append((p["id"], p["snippet"]["title"]))
             page = d.get("nextPageToken")
             if not page:
                 break
+        if exact:
+            return exact[0], False
+        if len(loose) == 1:
+            return loose[0][0], False
+        if len(loose) > 1:
+            raise RuntimeError("several playlists could be this event's (%s) - add its playlist_url to metadata.yml"
+                               % "; ".join(t for _, t in loose)[:200])
         r = self.call("POST", API + "/playlists", params={"part": "snippet,status"},
                       json={"snippet": {"title": title}, "status": {"privacyStatus": "unlisted"}})
         if r.status_code != 200:
@@ -421,13 +437,71 @@ def playlist_id_from(url):
 
 def playlist_for(yt, ev, cfg):
     """The event's playlist: the one the site links (metadata.yml playlist_url, Marek 2026-11-18: "add talks to the
-    corresponding playlist"), else found or made by title. Returns (id, made, title)."""
+    corresponding playlist"), else found by title among the channel's playlists, else made unlisted - and then wired
+    to the website: its link goes into the event's playlist_url in metadata.yml, pushed ("remember to rewire the
+    playlist to the website"). Returns (id, made, title)."""
     pid = playlist_id_from(ev.get("playlist_url"))
     if pid:
         return pid, False, "playlist_url"
     title = str((cfg.get("youtube") or {}).get("playlist_title") or "Conf42 {name} {year}").format(name=ev["name"], year=ev["year"])
-    pid, made = yt.playlist(title)
+    pid, made = yt.playlist(title, ev.get("name"), ev.get("year"))
+    ev["playlist_url"] = "https://www.youtube.com/playlist?list=%s" % pid
+    WIRED.append((ev["short_url"], ev["playlist_url"], wire_site(ev["short_url"], ev["playlist_url"])))
     return pid, made, title
+
+
+WIRED = []                                               # (short_url, url, result) - the pass log shows them
+
+
+def set_playlist_url(text, slug, url):
+    """metadata.yml text with the event's playlist_url set (the key added after short_url when missing). Only an
+    empty value (~ / blank) is filled: a link somebody typed is never replaced. Returns (text, changed)."""
+    lines = text.split("\n")
+    start = next((i for i, l in enumerate(lines) if re.fullmatch(r"\s+short_url:\s*%s\s*" % re.escape(slug), l)), None)
+    if start is None:
+        raise LookupError("no event %s in metadata.yml" % slug)
+    indent = re.match(r"\s*", lines[start]).group(0)
+    top = start
+    while top > 0 and not re.match(r"\s*- ", lines[top]):
+        top -= 1
+    end = start + 1
+    while end < len(lines) and not re.match(r"\s*- \w+:", lines[end]) and not re.match(r"\S", lines[end]):
+        end += 1
+    for i in range(top, end):
+        m = re.match(r"(\s*(?:- )?)playlist_url:\s*(.*)$", lines[i])
+        if m and len(m.group(1).replace("- ", "  ")) == len(indent):
+            if m.group(2).strip() not in ("", "~", "null", "''", '""'):
+                return text, False
+            lines[i] = "%splaylist_url: %s" % (m.group(1), url)
+            return "\n".join(lines), True
+    lines.insert(start + 1, "%splaylist_url: %s" % (indent, url))
+    return "\n".join(lines), True
+
+
+def wire_site(slug, url, git=None):
+    """Write the playlist link into metadata.yml and push it (the event page's on-demand button uses it)."""
+    path = os.path.join(events.REPO, "metadata.yml")
+    try:
+        if git is None:
+            from .app import _git
+            git = _git()
+        git("-c", "gc.auto=0", "pull", "--rebase", "--autostash", "-q")
+        with open(path, encoding="utf-8", newline="") as f:
+            text = f.read()
+        new, changed = set_playlist_url(text, slug, url)
+        if not changed:
+            return "metadata.yml already has a playlist_url for %s - left as it is" % slug
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(new)
+        git("add", "--", "metadata.yml")
+        git("commit", "-q", "-m", "factory: %s playlist_url -> the event's YouTube playlist" % slug, "--", "metadata.yml")
+        for _ in range(3):
+            if git("-c", "gc.auto=0", "push", "-q").returncode == 0:
+                return "playlist wired to the website (metadata.yml playlist_url, pushed)"
+            git("-c", "gc.auto=0", "pull", "--rebase", "--autostash", "-q")
+        return "metadata.yml committed, push failed - the pass's own push takes it"
+    except Exception as e:                               # noqa: BLE001 - never fails the pass
+        return "metadata.yml not updated (%s) - add playlist_url: %s by hand" % (str(e)[:150], url)
 
 
 def site_order(talks):
@@ -504,6 +578,10 @@ def playlist_order(yt, ev, cfg, done, run=None):
             yield "youtube: playlist sorted like the event page (%d moves)" % len(moves)
     except Exception as e:                               # noqa: BLE001 - sorting never fails the pass
         yield "youtube: playlist not sorted (%s)" % str(e)[:200]
+    finally:
+        while WIRED:
+            slug, url, res = WIRED.pop(0)
+            yield "youtube: %s %s - %s" % (slug, url, res)
 
 
 def repair(yt, run, cfg, done, rows):

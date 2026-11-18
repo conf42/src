@@ -186,6 +186,11 @@ the other one did.
   playlist in the order the event page shows the talks: keynotes, panels, then each track. Talks missing from the
   playlist are added. Other videos in it stay, after the talks. In YouTube Studio the playlist's sorting must be
   "Manual", or YouTube ignores the order. Off with `playlist_sort: false` under `youtube` in settings.yml.
+  An event with no `playlist_url` gets its playlist found among the channel's playlists by title (punctuation
+  ignored, e.g. "Conf42: MLOps 2026"); only when there is none is an unlisted one made. Either way its link is then
+  written into the event's `playlist_url` in metadata.yml and pushed, so the website points to it. A link already
+  there is never replaced. Two playlists that could both be the event's: nothing is guessed, the pass log asks for
+  the playlist_url.
 - **2026-11-18** - **The sheet goes to the site's CSV by itself**: every time the cloud factory writes YouTube links into
   the event's tab in Excels_for_WWW, it downloads that tab as CSV, leaves out the speakers' email column, and pushes it
   as the event's CSV in the repo (MLOPS_2026 -> `_db/MLOPS_2026.csv`), like a manual "Add files via upload". The sheet

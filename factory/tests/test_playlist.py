@@ -17,7 +17,7 @@ class FakeYT:
         self.items = list(items)                         # video ids, playlist order
         self.calls = []
 
-    def playlist(self, title):
+    def playlist(self, title, *a):
         self.calls.append(("by-title", title))
         return "PLbytitle", False
 
@@ -35,6 +35,20 @@ class FakeYT:
         self.items.remove(vid)
         self.items.insert(pos, vid)
         return True, ""
+
+
+def ev2_wired(y):
+    """playlist_for without playlist_url wires the found playlist (wire_site faked)."""
+    got = []
+    real = y.wire_site
+    y.wire_site = lambda slug, url, git=None: got.append((slug, url)) or "wired"
+    try:
+        ev = {"short_url": "c2027", "name": "MLOps", "year": 2027}
+        log = list(y.playlist_order(FakeYT([]), ev, {}, {"A": {"id": "va"}}))
+        return got == [("c2027", "https://www.youtube.com/playlist?list=PLbytitle")] and any("wired" in l for l in log) \
+            and ev["playlist_url"].endswith("PLbytitle")
+    finally:
+        y.wire_site = real
 
 
 def main():
@@ -85,8 +99,49 @@ def main():
         yt3 = FakeYT([])
         list(ytupload.playlist_order(yt3, ev, {"youtube": {"playlist_sort": False}}, done))
         check("playlist_sort: false switches it off", yt3.calls == [])
+        check("found by title: the link is wired to the website", ev2_wired(ytupload))
     finally:
         events.talks = events_talks
+
+    # title matching against the channel's playlists (YouTube.playlist with a fake API)
+    def channel(titles):
+        yt = ytupload.YouTube.__new__(ytupload.YouTube)
+        made = []
+
+        class R:
+            def __init__(self, code, d):
+                self.status_code, self._d, self.text = code, d, ""
+
+            def json(self):
+                return self._d
+
+        def call(method, url, **kw):
+            if method == "GET":
+                return R(200, {"items": [{"id": "PL%d" % i, "snippet": {"title": t}} for i, t in enumerate(titles)]})
+            made.append(kw["json"]["status"]["privacyStatus"])
+            return R(200, {"id": "PLnew"})
+        yt.call = call
+        return yt, made
+    yt, made = channel(["Conf42 Golang 2026", "Conf42: MLOps 2026 ", "Conf42 MLOps 2025"])
+    check("Marek's own playlist found despite the colon", yt.playlist("Conf42 MLOps 2026", "MLOps", 2026) == ("PL1", False) and not made)
+    yt, made = channel(["Conf42 Golang 2026"])
+    check("none found: made unlisted", yt.playlist("Conf42 MLOps 2026", "MLOps", 2026) == ("PLnew", True) and made == ["unlisted"])
+    yt, made = channel(["Conf42 MLOps 2026 - talks", "Conf42 MLOps 2026 (backup)"])
+    try:
+        yt.playlist("Conf42 MLOps 2026", "MLOps", 2026)
+        check("two candidates: nothing guessed or made", False)
+    except RuntimeError:
+        check("two candidates: nothing guessed or made", not made)
+
+    # metadata.yml rewiring
+    text = "events:\n  - name: A\n    short_url: a2027\n    playlist_url: ~\n    db_path: x\n  - name: B\n    short_url: b2027\n    db_path: y\n"
+    t1, c1 = ytupload.set_playlist_url(text, "a2027", "https://www.youtube.com/playlist?list=PLa")
+    check("an empty playlist_url is filled", c1 and "    playlist_url: https://www.youtube.com/playlist?list=PLa\n    db_path: x" in t1)
+    t2, c2 = ytupload.set_playlist_url(text, "b2027", "https://www.youtube.com/playlist?list=PLb")
+    check("a missing key is added to that event only", c2 and "short_url: b2027\n    playlist_url: https://www.youtube.com/playlist?list=PLb\n    db_path: y" in t2
+          and "a2027\n    playlist_url: ~" in t2)
+    t3, c3 = ytupload.set_playlist_url(t1, "a2027", "https://other")
+    check("a typed link is never replaced", not c3 and t3 == t1)
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 
