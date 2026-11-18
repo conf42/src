@@ -783,14 +783,20 @@ def match_videos(talks, order, videos, ev_title):
     (Name1) and, when it says which conference, this event's title. One video per talk, one talk per video; a talk
     with two candidates gets none (never guessed)."""
     by = {t["speakers"]: t for t in talks}
-    ev_n = _norm(ev_title)
+    words = _norm(ev_title).split()                      # conf42 platform engineering 2026
+    year = words[-1] if words and words[-1].isdigit() else ""
+    first = next((w for w in words if w not in ("conf42", year)), "")
+
+    def this_event(title):
+        """Titles shorten the name ("Conf42 Platform Eng. 2026"): Conf42 + the year + the name's first word."""
+        w = _norm(title).split()
+        return "conf42" not in w or (year in w and first in w)
     out, used = {}, set()
     for k in order:
         n1 = _norm(by[k]["name1"])
         if not n1:
             continue
-        cands = [v for v in videos if v["video"] not in used and n1 in _norm(v["title"])
-                 and ("conf42" not in _norm(v["title"]) or ev_n in _norm(v["title"]))]
+        cands = [v for v in videos if v["video"] not in used and n1 in _norm(v["title"]) and this_event(v["title"])]
         ids = list(dict.fromkeys(v["video"] for v in cands))
         if len(ids) == 1:
             out[k] = ids[0]

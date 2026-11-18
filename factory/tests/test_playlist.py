@@ -164,7 +164,7 @@ def main():
           {"speakers": "Nobody Here", "name1": "Nobody Here", "track": "x"}]
     vids = [{"video": "v1", "title": "Machines | Alan Turing | Conf42 Platform Engineering 2026"},
             {"video": "v9", "title": "Machines again | Alan Turing | Conf42 MLOps 2026"},
-            {"video": "v2", "title": "Compilers | Grace Hopper | Conf42 Platform Engineering 2026"},
+            {"video": "v2", "title": "Compilers | Grace Hopper | Conf42 Platform Eng. 2026"},
             {"video": "v3", "title": "Engines | Ada Lovelace | Conf42 Platform Engineering 2026"},
             {"video": "v4", "title": "Engines (part 2) | Ada Lovelace | Conf42 Platform Engineering 2026"}]
     m = ytupload.match_videos(tk, ["Ada Lovelace", "Alan Turing", "Grace Hopper", "Nobody Here"], vids,
