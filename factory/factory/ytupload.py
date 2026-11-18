@@ -178,7 +178,7 @@ class YouTube:
         return r.status_code == 200, r.text[:200]
 
     def playlist_items(self, playlist_id):
-        """[(item id, video id)] in the playlist's current order."""
+        """[(item id, video id, added at)] in the playlist's position order."""
         out, page = [], None
         while True:
             params = {"part": "snippet", "playlistId": playlist_id, "maxResults": 50}
@@ -188,16 +188,15 @@ class YouTube:
             if r.status_code != 200:
                 raise RuntimeError("playlist items: %s" % r.text[:200])
             d = r.json()
-            out += [(i["id"], i["snippet"]["resourceId"].get("videoId")) for i in d.get("items", [])]
+            out += [(i["id"], i["snippet"]["resourceId"].get("videoId"), i["snippet"].get("publishedAt") or "")
+                    for i in d.get("items", [])]
             page = d.get("nextPageToken")
             if not page:
                 return out
 
-    def move(self, playlist_id, item_id, video_id, position):
-        r = self.call("PUT", API + "/playlistItems", params={"part": "snippet"},
-                      json={"id": item_id, "snippet": {"playlistId": playlist_id, "position": position,
-                                                       "resourceId": {"kind": "youtube#video", "videoId": video_id}}})
-        return r.status_code == 200, r.text[:200]
+    def remove_item(self, item_id):
+        r = self.call("DELETE", API + "/playlistItems", params={"id": item_id})
+        return r.status_code in (200, 204), r.text[:200]
 
     def status(self, video_id):
         r = self.call("GET", API + "/videos", params={"part": "status,processingDetails", "id": video_id})
@@ -520,25 +519,23 @@ def site_order(talks):
     return out
 
 
-def order_moves(current, wanted):
-    """current: video ids in playlist order; wanted: our talks' video ids in page order. Our talks go to the top in
-    page order, anything else in the playlist keeps its order after them. Returns [(video id, position)] - the fewest
-    single moves, applied one after another."""
-    ours = set(wanted)
-    target = [v for v in wanted if v in current] + [v for v in current if v not in ours]
-    cur, moves = list(current), []
-    for i, v in enumerate(target):
-        if cur[i] != v:
-            cur.remove(v)
-            cur.insert(i, v)
-            moves.append((v, i))
-    return moves
+def readd_plan(current, wanted):
+    """current: video ids in playlist order; wanted: our talks' video ids in page order. Marek 2026-11-18: add the
+    talks to the playlist in the website order - works whatever the playlist's sorting is (except newest first), no
+    "Manual" needed. The talks already in order at the front stay; from the first one out of place, the rest are taken
+    out and added again in page order (missing ones simply added). Returns (keep, readd): readd in the order to add."""
+    ours = [v for v in current if v in set(wanted)]
+    k = 0
+    while k < len(ours) and k < len(wanted) and ours[k] == wanted[k]:
+        k += 1
+    return wanted[:k], wanted[k:]
 
 
 def playlist_order(yt, ev, cfg, done, run=None):
-    """Every pass (Marek 2026-11-18): each uploaded talk is in the event's playlist, sorted like the event page.
-    Adding is 50 units a video, a move 50; an already sorted playlist costs one list call. Never fails the pass.
-    The playlist must be on "Manual" ordering in YouTube Studio, or YouTube ignores the positions."""
+    """Every pass (Marek 2026-11-18): each uploaded talk is in the event's playlist, in the order of the event page,
+    by adding the talks in that order (readd_plan) - no "Manual" sorting needed in YouTube Studio. Taking out and
+    adding are 50 units each; a playlist already in order costs one list call. Never fails the pass. A pass stopped
+    halfway (quota) leaves talks out of the playlist for a few hours: the next pass adds them, still in order."""
     if (cfg.get("youtube") or {}).get("playlist_sort") is False:
         return
     try:
@@ -548,34 +545,32 @@ def playlist_order(yt, ev, cfg, done, run=None):
         if not wanted:
             return
         pid = playlist_for(yt, ev, cfg)[0]
-        items = yt.playlist_items(pid)
-        have = {v for _, v in items}
-        added = []
-        for k in order:
-            v = vid_of.get(k)
-            if v and v not in have:
-                ok, msg = yt.add_to_playlist(pid, v)
+        # the order the talks were ADDED (publishedAt of the playlist item), which is what a playlist sorted by date
+        # shows; adding in page order puts the positions right too, so the playlist is right however it is sorted
+        items = [(i, v) for i, v, _ in sorted(yt.playlist_items(pid), key=lambda x: x[2])]
+        keep, readd = readd_plan([v for _, v in items], wanted)
+        if not readd:
+            return
+        key_of = {v: k for k, v in vid_of.items()}
+        items_of = {}
+        for i, v in items:
+            items_of.setdefault(v, []).append(i)
+        for v in readd:                                  # out first (a video twice in the playlist: every copy)
+            for item in items_of.get(v, []):
+                ok, msg = yt.remove_item(item)
                 if not ok:
-                    yield "youtube: playlist - %s not added (%s)" % (k, msg[:120])
-                    if "quota" in msg.lower():
-                        return
-                    continue
-                done[k]["playlist"] = True
-                done[k].pop("playlist_note", None)
-                added.append(k)
-        if added:
-            save(ev["short_url"], done)
-            yield "youtube: playlist - added %s" % ", ".join(added)
-            items = yt.playlist_items(pid)
-        item_of = {v: i for i, v in items}
-        moves = order_moves([v for _, v in items], wanted)
-        for n, (v, pos) in enumerate(moves):
-            ok, msg = yt.move(pid, item_of[v], v, pos)
+                    yield "youtube: playlist not sorted - could not take out %s (%s)" % (key_of[v], msg[:120])
+                    return
+        for n, v in enumerate(readd):                    # then back in, in the order of the event page
+            ok, msg = yt.add_to_playlist(pid, v)
             if not ok:
-                yield "youtube: playlist sorted %d of %d moves, then: %s" % (n, len(moves), msg[:160])
+                yield "youtube: playlist - %d of %d talks added back in order, then: %s (the next pass goes on)" % (
+                    n, len(readd), msg[:160])
                 return
-        if moves:
-            yield "youtube: playlist sorted like the event page (%d moves)" % len(moves)
+            done[key_of[v]]["playlist"] = True
+            done[key_of[v]].pop("playlist_note", None)
+        save(ev["short_url"], done)
+        yield "youtube: playlist in the event page's order (%d talks kept, %d added in order)" % (len(keep), len(readd))
     except Exception as e:                               # noqa: BLE001 - sorting never fails the pass
         yield "youtube: playlist not sorted (%s)" % str(e)[:200]
     finally:

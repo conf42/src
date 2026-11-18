@@ -13,8 +13,13 @@ def row(name, track="ml", featured=False, panel=False, banished=False, test=Fals
 
 
 class FakeYT:
-    def __init__(self, items):
-        self.items = list(items)                         # video ids, playlist order
+    """A playlist that remembers when each video was added (a clock), like YouTube's publishedAt."""
+    def __init__(self, items, added=None):
+        self.clock = 0
+        self.items = []                                  # [video id, added at] in position order
+        for v in items:
+            self.clock += 1
+            self.items.append([v, (added or {}).get(v, self.clock)])
         self.calls = []
 
     def playlist(self, title, *a):
@@ -23,18 +28,24 @@ class FakeYT:
 
     def playlist_items(self, pid):
         self.calls.append(("list", pid))
-        return [("item-" + v, v) for v in self.items]
+        return [("item-" + v, v, "%06d" % t) for v, t in self.items]
 
     def add_to_playlist(self, pid, vid):
         self.calls.append(("add", pid, vid))
-        self.items.append(vid)
+        self.clock += 100
+        self.items.append([vid, self.clock])
         return True, ""
 
-    def move(self, pid, item, vid, pos):
-        self.calls.append(("move", pid, vid, pos))
-        self.items.remove(vid)
-        self.items.insert(pos, vid)
+    def remove_item(self, item):
+        self.calls.append(("remove", item))
+        self.items = [x for x in self.items if "item-" + x[0] != item]
         return True, ""
+
+    def by_date(self):
+        return [v for v, _ in sorted(self.items, key=lambda x: x[1])]
+
+    def by_position(self):
+        return [v for v, _ in self.items]
 
 
 def ev2_wired(y):
@@ -67,13 +78,9 @@ def main():
           ytupload.playlist_id_from("https://www.youtube.com/playlist?list=PLIuxSyKxlQrCqfY7wceGZMeGnQ647UUYw")
           == "PLIuxSyKxlQrCqfY7wceGZMeGnQ647UUYw")
     check("no link, no id", ytupload.playlist_id_from(None) is None and ytupload.playlist_id_from("https://x.y/") is None)
-    check("sorted already: no moves", ytupload.order_moves(["a", "b", "x"], ["a", "b"]) == [])
-    cur = ["x", "c", "a", "b"]
-    moves = ytupload.order_moves(cur, ["a", "b", "c"])
-    for v, pos in moves:
-        cur.remove(v)
-        cur.insert(pos, v)
-    check("our talks to the top in order, others after", cur == ["a", "b", "c", "x"])
+    check("in order already: nothing to re-add", ytupload.readd_plan(["a", "x", "b"], ["a", "b"]) == (["a", "b"], []))
+    check("from the first one out of place, the rest is re-added in order",
+          ytupload.readd_plan(["a", "c", "b"], ["a", "b", "c", "d"]) == (["a"], ["b", "c", "d"]))
 
     # a whole pass
     ytupload.REPO_RUNS = tempfile.mkdtemp(prefix="playlist-test-")
@@ -86,13 +93,21 @@ def main():
         yt = FakeYT(["vc", "intro", "va"])               # B and K missing, wrong order, one video of someone else's
         log = list(ytupload.playlist_order(yt, ev, {}, done))
         check("the site's playlist is used, no title lookup", not any(c[0] == "by-title" for c in yt.calls)
-              and all(c[1] == "PLsite0000000000" for c in yt.calls if c[0] in ("add", "move", "list")))
-        check("missing talks added, the test talk never", {c[2] for c in yt.calls if c[0] == "add"} == {"vb", "vk"})
-        check("sorted like the page, other videos after", yt.items == ["vk", "va", "vc", "vb", "intro"])
-        check("log says so", any("added" in l for l in log) and any("sorted" in l for l in log))
+              and all(c[1] == "PLsite0000000000" for c in yt.calls if c[0] in ("add", "list")))
+        check("the test talk never goes in", "vt" not in yt.by_position())
+        talks_by_date = [v for v in yt.by_date() if v != "intro"]
+        talks_by_pos = [v for v in yt.by_position() if v != "intro"]
+        check("added in the page's order: right when sorted by date", talks_by_date == ["vk", "va", "vc", "vb"])
+        check("... and by position (Manual)", talks_by_pos == ["vk", "va", "vc", "vb"])
+        check("someone else's video stays", "intro" in yt.by_position())
+        check("log says so", any("order" in l for l in log))
         yt.calls.clear()
         list(ytupload.playlist_order(yt, ev, {}, done))
         check("next pass: one list call, nothing else", [c[0] for c in yt.calls] == ["list"])
+        # positions right but added in the wrong order (the 15 moves of 2026-11-18): fixed by re-adding
+        ytm = FakeYT(["vk", "va", "vc", "vb"], added={"vk": 4, "va": 3, "vc": 2, "vb": 1})
+        list(ytupload.playlist_order(ytm, ev, {}, done))
+        check("moved-but-not-re-added playlist gets re-added in order", ytm.by_date() == ["vk", "va", "vc", "vb"])
         yt2 = FakeYT([])
         list(ytupload.playlist_order(yt2, {"short_url": "test2027", "name": "MLOps", "year": 2027}, {}, done))
         check("no playlist_url: found by title", yt2.calls[0] == ("by-title", "Conf42 MLOps 2027"))

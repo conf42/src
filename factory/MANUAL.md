@@ -184,8 +184,10 @@ the other one did.
 - **2026-11-18** - **Playlist sorted like the website**: every finished talk goes into the playlist the event page
   links (`playlist_url` in metadata.yml; only without one is it found or made by title), and every pass sorts that
   playlist in the order the event page shows the talks: keynotes, panels, then each track. Talks missing from the
-  playlist are added. Other videos in it stay, after the talks. In YouTube Studio the playlist's sorting must be
-  "Manual", or YouTube ignores the order. Off with `playlist_sort: false` under `youtube` in settings.yml.
+  playlist are added. It does this by adding the talks in the website's order (the ones already in order stay; the
+  rest are taken out and added again), so the playlist is right sorted "Manual" or "Date added (oldest)" - only
+  "Date added (newest)" would show it upside down. Other videos in it stay. Off with `playlist_sort: false` under
+  `youtube` in settings.yml.
   An event with no `playlist_url` gets its playlist found among the channel's playlists by title (punctuation
   ignored, e.g. "Conf42: MLOps 2026"); only when there is none is an unlisted one made. Either way its link is then
   written into the event's `playlist_url` in metadata.yml and pushed, so the website points to it. A link already

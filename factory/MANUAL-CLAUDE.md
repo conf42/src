@@ -72,8 +72,9 @@ on the list.
 ## Changelog
 
 - **2026-11-18** - `ytupload.playlist_for` prefers metadata `playlist_url` (list=); `playlist_order` runs at the end of
-  every `event()` pass: adds uploaded talks missing from it, then `order_moves` (fewest single moves, 50 units each)
-  to `site_order` (= build/events.py + event.html: Featured, Panel, tracks by first appearance, banished last, test
+  every `event()` pass: `readd_plan` on the playlist items sorted by publishedAt (date added) keeps the in-order
+  prefix and removes + re-adds the rest in `site_order` (Marek's workaround: add in website order, no "Manual"
+  needed; 50 + 50 units a talk). `site_order` (= build/events.py + event.html: Featured, Panel, tracks by first appearance, banished last, test
   talk never). `events._row` now keeps featured/panel/track. `tests/test_playlist.py`.
   Same day: `YouTube.playlist(title, name, year)` matches exact normalized title, else the one title with conf42 +
   name + year (several -> RuntimeError, nothing made); no `playlist_url` -> `wire_site` fills metadata.yml
