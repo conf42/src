@@ -36,7 +36,8 @@ def event(short_url):
             year = str(e.get("date", ""))[:4]
             return {"short_url": short_url, "name": e["name"], "year": year, "date": str(e.get("date", "")),
                     "db_path": os.path.normpath(os.path.join(REPO, e["db_path"])),
-                    "title": "Conf42 %s %s" % (e["name"], year)}
+                    "title": "Conf42 %s %s" % (e["name"], year),
+                    "playlist_url": e.get("playlist_url") or ""}   # the site's playlist (ytupload.playlist_for)
     raise KeyError("no event with short_url %r in metadata.yml" % short_url)
 
 
