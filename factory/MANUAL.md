@@ -181,6 +181,13 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-18** - **The sheet goes to the site's CSV by itself**: every time the cloud factory writes YouTube links into
+  the event's tab in Excels_for_WWW, it downloads that tab as CSV, leaves out the speakers' email column, and pushes it
+  as the event's CSV in the repo (MLOPS_2026 -> `_db/MLOPS_2026.csv`), like a manual "Add files via upload". The sheet
+  itself is only read: its email column stays as it is. The email column is found by its content (it has no header),
+  or by a header named Email. Nothing is pushed if an email address would still be in another column, or if the tab
+  lost more than half its rows. The pass log says "sheet: MLOPS_2026.csv pushed (left out: ...)". Captions that
+  YouTube refused, or that never went up, are now tried again on every pass.
 - **2026-11-14** - **A redone talk is updated everywhere**: when a talk is redone (a new video from the speaker), the
   new version goes up to YouTube as a new unlisted video, its link replaces the factory's earlier link in the sheet,
   and the new transcript and deck replace the old ones on the site. A link typed by hand in the sheet is still never

@@ -71,6 +71,12 @@ on the list.
 
 ## Changelog
 
+- **2026-11-18** - `sheetcsv.py`: after `sheet_links` writes a link (real sheet only, `post is None`), the tab is
+  exported (Drive token from UPLOAD_FEED, Sheets API for the gid, `docs.google.com/.../export?format=csv&gid=`), the
+  email column(s) dropped in memory, and `db_path` committed + pushed. Never writes to the sheet. Guards: an email address left in
+  another column, Name1/Title/YouTube missing, fewer than half the repo's rows. Byte-identical to Drive's own CSV
+  (CRLF rows, no final newline); `tests/test_sheetcsv.py` checks it on the real MLOPS_2026.csv. Same day:
+  `ytupload.repair` retries captions that are False or None and falls back to the shipped `srt/` transcript.
 - **2026-11-16** - After the cloud factory's first outage (postmortem: `postmortems/2026-11-15-conf42-cloud-factory.md`):
   - A talk goes up to YouTube the moment it is finished. There are two passes a day now (05:30 and 22:30 UTC).
   - The same talk in several places is normal: conf42.com/record wins over the Manual upload folder, which wins over

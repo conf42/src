@@ -501,6 +501,9 @@ def sheet_links(ev, done, raw, post=None):
     save(slug, done)
     if wrote:
         yield "sheet: YouTube link in %s for %s" % (tab, ", ".join(wrote))
+        if post is None:                                 # the real sheet: its CSV goes to the repo, emails left out
+            from . import sheetcsv
+            yield from sheetcsv.ship(ev)
 
 
 def login(client_file, want=None):
