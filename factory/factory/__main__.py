@@ -132,6 +132,10 @@ def main(argv):
         got = intake.Intake(gdrive.Drive(), pipeline.settings(), use_claude=claude, dry_run=dry).run(slugs)
         print(json.dumps(got, indent=1, ensure_ascii=False))
         return
+    if cmd == "playlist-fix":                            # an event's playlist in the website's order (cloud: YOUTUBE_OAUTH_JSON)
+        from . import ytupload
+        cfg = pipeline.settings()
+        return max([ytupload.fix_playlist(s.strip(), cfg) for s in " ".join(argv[1:]).replace(",", " ").split()] or [0])
     if cmd == "cloud":                                   # one pass of the cloud factory (GitHub Actions)
         from . import cloud
         sys.exit(cloud.main(argv[1:]))

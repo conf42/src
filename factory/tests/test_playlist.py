@@ -157,6 +157,49 @@ def main():
           and "a2027\n    playlist_url: ~" in t2)
     t3, c3 = ytupload.set_playlist_url(t1, "a2027", "https://other")
     check("a typed link is never replaced", not c3 and t3 == t1)
+    # playlist-fix: videos the factory never uploaded, matched by speaker + event title
+    tk = [{"speakers": "Ada Lovelace", "name1": "Ada Lovelace", "track": "x", "featured": True},
+          {"speakers": "Alan Turing", "name1": "Alan Turing", "track": "x"},
+          {"speakers": "Grace Hopper", "name1": "Grace Hopper", "track": "x"},
+          {"speakers": "Nobody Here", "name1": "Nobody Here", "track": "x"}]
+    vids = [{"video": "v1", "title": "Machines | Alan Turing | Conf42 Platform Engineering 2026"},
+            {"video": "v9", "title": "Machines again | Alan Turing | Conf42 MLOps 2026"},
+            {"video": "v2", "title": "Compilers | Grace Hopper | Conf42 Platform Engineering 2026"},
+            {"video": "v3", "title": "Engines | Ada Lovelace | Conf42 Platform Engineering 2026"},
+            {"video": "v4", "title": "Engines (part 2) | Ada Lovelace | Conf42 Platform Engineering 2026"}]
+    m = ytupload.match_videos(tk, ["Ada Lovelace", "Alan Turing", "Grace Hopper", "Nobody Here"], vids,
+                              "Conf42 Platform Engineering 2026")
+    check("matched by name + this event's title (not the same speaker's MLOps talk)", m.get("Alan Turing") == "v1"
+          and m.get("Grace Hopper") == "v2")
+    check("two candidates for a talk: none guessed", "Ada Lovelace" not in m and "Nobody Here" not in m)
+
+    class FixYT(FakeYT):
+        def items_full(self, pid, stop_before=None):
+            if pid == "UPLOADS":
+                return [{"item": "u-" + v["video"], "video": v["video"], "added": "", "title": v["title"], "published": "2026-11-05"}
+                        for v in vids if v["video"] in ("v2",)]
+            titles = {v["video"]: v["title"] for v in vids}
+            return [{"item": "item-" + v, "video": v, "added": "%06d" % t, "title": titles.get(v, v), "published": ""}
+                    for v, t in self.items]
+
+        def uploads_id(self):
+            return "UPLOADS"
+    events_talks, events_event, ld = events.talks, events.event, ytupload.load
+    events.talks = lambda ev: tk[1:3]
+    events.event = lambda slug: {"short_url": slug, "name": "Platform Engineering", "year": "2026", "date": "2026-11-05",
+                                 "title": "Conf42 Platform Engineering 2026", "playlist_url": "https://www.youtube.com/playlist?list=PLplatform00"}
+    ytupload.load = lambda slug: {}
+    try:
+        fy = FixYT(["v1"])                               # Alan in the playlist, Grace only among the uploads
+        out = []
+        rc = ytupload.fix_playlist("platform2026", {}, fy, out.append)
+        check("playlist-fix: found in the playlist + the uploads, put in page order",
+              rc == 0 and fy.by_date() == ["v1", "v2"] and any("2 videos found" in l for l in out))
+        out = []
+        ytupload.fix_playlist("platform2026", {}, fy, out.append)
+        check("playlist-fix again: nothing to do", any("already in the website's order" in l for l in out))
+    finally:
+        events.talks, events.event, ytupload.load = events_talks, events_event, ld
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 

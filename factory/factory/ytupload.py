@@ -194,6 +194,34 @@ class YouTube:
             if not page:
                 return out
 
+    def items_full(self, playlist_id, stop_before=None):
+        """[{item, video, added, title}] in position order. stop_before: an ISO date - stop paging once items are
+        older (the uploads playlist is newest first)."""
+        out, page = [], None
+        while True:
+            params = {"part": "snippet,contentDetails", "playlistId": playlist_id, "maxResults": 50}
+            if page:
+                params["pageToken"] = page
+            r = self.call("GET", API + "/playlistItems", params=params)
+            if r.status_code != 200:
+                raise RuntimeError("playlist items: %s" % r.text[:200])
+            d = r.json()
+            for i in d.get("items", []):
+                sn = i["snippet"]
+                out.append({"item": i["id"], "video": sn["resourceId"].get("videoId"), "added": sn.get("publishedAt") or "",
+                            "title": sn.get("title") or "",
+                            "published": (i.get("contentDetails") or {}).get("videoPublishedAt") or sn.get("publishedAt") or ""})
+            page = d.get("nextPageToken")
+            if not page or (stop_before and out and out[-1]["published"][:10] < stop_before):
+                return out
+
+    def uploads_id(self):
+        r = self.call("GET", API + "/channels", params={"part": "contentDetails", "mine": "true"})
+        items = r.json().get("items") or [] if r.status_code == 200 else []
+        if not items:
+            raise RuntimeError("cannot read the channel's uploads (%s)" % r.text[:200])
+        return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
     def remove_item(self, item_id):
         r = self.call("DELETE", API + "/playlistItems", params={"id": item_id})
         return r.status_code in (200, 204), r.text[:200]
@@ -742,3 +770,85 @@ def login(client_file, want=None):
     creds["channel_id"] = ch["id"]
     print("\nSigned in to the channel: %s (%s)\n\nPut this into the GitHub secret YOUTUBE_OAUTH_JSON (conf42/src):\n\n%s\n"
           % (ch["snippet"]["title"], ch["id"], json.dumps(creds)))
+
+
+def _norm(t):
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(t)).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", t).split())
+
+
+def match_videos(talks, order, videos, ev_title):
+    """{talk key: video id} for talks without a factory upload: a video whose title has the speaker's full name
+    (Name1) and, when it says which conference, this event's title. One video per talk, one talk per video; a talk
+    with two candidates gets none (never guessed)."""
+    by = {t["speakers"]: t for t in talks}
+    ev_n = _norm(ev_title)
+    out, used = {}, set()
+    for k in order:
+        n1 = _norm(by[k]["name1"])
+        if not n1:
+            continue
+        cands = [v for v in videos if v["video"] not in used and n1 in _norm(v["title"])
+                 and ("conf42" not in _norm(v["title"]) or ev_n in _norm(v["title"]))]
+        ids = list(dict.fromkeys(v["video"] for v in cands))
+        if len(ids) == 1:
+            out[k] = ids[0]
+            used.add(ids[0])
+    return out
+
+
+def fix_playlist(slug, cfg, yt=None, log=print):
+    """`python -m factory playlist-fix <short_url>` (Marek 2026-11-18, for events the factory did not upload, e.g.
+    Platform Engineering 2026): the event's playlist (playlist_for: the site's link, else found / made + wired)
+    gets every talk video in the order of the event page. Videos come from youtube.json, else are matched by speaker
+    name in the playlist and in the channel's uploads around the event date. Returns 0 when done."""
+    import datetime
+    yt = yt or YouTube()
+    ev = events.event(slug)
+    talks = events.talks(ev)
+    order = site_order(talks)
+    pid, made, how = playlist_for(yt, ev, cfg)
+    for _slug, url, res in WIRED:
+        log("%s: %s - %s" % (_slug, url, res))
+    del WIRED[:]
+    log("%s: playlist %s%s" % (slug, pid, " (made, unlisted)" if made else ""))
+    done = load(slug)
+    vid_of = {k: r["id"] for k, r in done.items() if r.get("id") and not r.get("test") and k in order}
+    current = yt.items_full(pid)
+    missing = [k for k in order if k not in vid_of]
+    if missing:
+        vid_of.update({k: v for k, v in match_videos(talks, missing, current, ev["title"]).items()})
+    missing = [k for k in order if k not in vid_of]
+    if missing:
+        try:
+            since = (datetime.date.fromisoformat(ev["date"][:10]) - datetime.timedelta(days=60)).isoformat()
+        except ValueError:
+            since = None
+        ups = yt.items_full(yt.uploads_id(), stop_before=since)
+        vid_of.update({k: v for k, v in match_videos(talks, missing, ups, ev["title"]).items()})
+    missing = [k for k in order if k not in vid_of]
+    wanted = [vid_of[k] for k in order if k in vid_of]
+    log("%s: %d talks on the page, %d videos found%s" % (slug, len(order), len(wanted),
+        (" - no video for: " + ", ".join(missing)) if missing else ""))
+    items = [(c["item"], c["video"]) for c in sorted(current, key=lambda c: c["added"])]
+    keep, readd = readd_plan([v for _, v in items], wanted)
+    if not readd:
+        log("%s: playlist already in the website's order" % slug)
+        return 0
+    items_of = {}
+    for i, v in items:
+        items_of.setdefault(v, []).append(i)
+    for v in readd:
+        for item in items_of.get(v, []):
+            ok, msg = yt.remove_item(item)
+            if not ok:
+                log("%s: stopped - could not take out %s (%s)" % (slug, v, msg[:150]))
+                return 1
+    for n, v in enumerate(readd):
+        ok, msg = yt.add_to_playlist(pid, v)
+        if not ok:
+            log("%s: stopped after %d of %d (%s) - run it again tomorrow" % (slug, n, len(readd), msg[:150]))
+            return 1
+    log("%s: playlist in the website's order (%d kept, %d added in order)" % (slug, len(keep), len(readd)))
+    return 0

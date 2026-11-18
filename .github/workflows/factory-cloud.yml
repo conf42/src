@@ -30,6 +30,9 @@ on:
         description: "skip the YouTube upload"
         type: boolean
         default: false
+      playlist_fix:
+        description: "only put these events' playlists in website order (short_urls, comma separated) - no factory pass"
+        default: ""
       attempt:
         description: "restart counter (set by the workflow itself)"
         default: "1"
@@ -106,7 +109,7 @@ jobs:
           python -m factory doctor || true
       - name: Factory pass
         id: factory
-        if: steps.cfg.outputs.ok == 'yes'
+        if: steps.cfg.outputs.ok == 'yes' && inputs.playlist_fix == ''
         working-directory: src/factory
         timeout-minutes: 330
         run: |
@@ -115,8 +118,12 @@ jobs:
           if [ "${{ inputs.no_youtube }}" = "true" ]; then FLAGS="$FLAGS --no-youtube"; fi
           if [ "$HAS_CLAUDE" != "true" ]; then FLAGS="$FLAGS --no-claude"; fi
           python -m factory cloud $EVENT $FLAGS
+      - name: Playlists in website order (playlist_fix)
+        if: steps.cfg.outputs.ok == 'yes' && inputs.playlist_fix != ''
+        working-directory: src/factory
+        run: python -m factory playlist-fix "${{ inputs.playlist_fix }}"
       - name: Start again if work is left (time-out)
-        if: always() && steps.cfg.outputs.ok == 'yes' && inputs.dry_run != true && steps.factory.outcome != 'success'
+        if: always() && steps.cfg.outputs.ok == 'yes' && inputs.dry_run != true && inputs.playlist_fix == '' && steps.factory.outcome != 'success'
         working-directory: src/factory
         env:
           GH_TOKEN: ${{ github.token }}
@@ -131,6 +138,6 @@ jobs:
       # a pass that died before it could report (a crash, a time-out, a failed install) still says so on
       # conf42.com/factory and the events' pages (factory/problems.py; Marek 2026-11-16)
       - name: Say so on the factory pages when the pass did not finish
-        if: always() && steps.cfg.outputs.ok == 'yes' && inputs.dry_run != true && steps.factory.outcome != 'success'
+        if: always() && steps.cfg.outputs.ok == 'yes' && inputs.dry_run != true && inputs.playlist_fix == '' && steps.factory.outcome != 'success'
         working-directory: src/factory
         run: python -m factory problems-mark "${{ steps.factory.outcome }}" || true
