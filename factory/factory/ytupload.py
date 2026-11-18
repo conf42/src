@@ -411,8 +411,14 @@ def repair(yt, run, cfg, done, rows):
                     if ok:
                         rec["thumbnail"] = True
                         got.append("thumbnail")
-            if rec.get("captions") is False and os.path.exists(run.srt_path(t)):
-                with open(run.srt_path(t), encoding="utf-8-sig") as f:
+            # captions False (refused) or None (no transcript yet at upload time). A later cloud pass has no work folder
+            # copy of the transcript, so the shipped one in the repo's srt/ counts too (2026-11-18: Arpita Sheth +
+            # Phoebe Wang, mlops2026, stayed without captions for two days)
+            srt = run.srt_path(t)
+            if not os.path.exists(srt):
+                srt = os.path.join(events.REPO, "srt", os.path.basename(srt))
+            if rec.get("captions") is not True and os.path.exists(srt):
+                with open(srt, encoding="utf-8-sig") as f:
                     ok, msg = yt.captions(rec["id"], f.read())
                 if not ok and limit(msg):
                     break
