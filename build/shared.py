@@ -28,9 +28,18 @@ def read_csv(path):
             items.append(dict(item))
     return items
 
+# Nobody gets doxxed on our sites, not even by themselves (Marek 2026-11-18): an email address or a +country phone
+# number in any talk cell (typed into the LinkedIn field, "contact me at ..." in a bio) never reaches a page.
+_DOX = re.compile(r"(?:mailto:)?[\w.+'-]+@[\w-]+(?:\.[\w-]+)+|(?<![\w/=.#-])\+\d[\d ()./-]{7,}\d")
+
+
+def undox(v):
+    return _DOX.sub("", v) if isinstance(v, str) else v
+
+
 def read_talk_csv(path):
     """ Read the pre-process the CSV """
-    items = read_csv(path)
+    items = [{k: undox(v) for k, v in item.items()} for item in read_csv(path)]
     for item in items:
         # whitespace-only cells (e.g. Company " ") must behave as empty in the templates
         for key, value in list(item.items()):

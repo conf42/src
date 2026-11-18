@@ -8,8 +8,9 @@ column goes in memory, and the result is committed + pushed like Marek's own "Ad
 The token is the "Conf42 upload" script's own (gdrive.Drive, UPLOAD_FEED), which has the drive scope - no script change.
 The email column has no header in the sheet (MLOPS_2026: column D, blank), so it is found by its content: a column
 named e-mail/email, or one whose filled cells are mostly email addresses ("a@x.com ; b@y.com" for duo talks).
-Never pushes when an email address would still be in a cell of its own, when Name1/Title/YouTube are missing, or when
-the tab has lost more than half the rows the repo CSV has (a cleared tab must not wipe the site).
+Any other address or +country phone number in any cell is taken out as well (a speaker's own, typed into a bio or the
+LinkedIn field). Never pushes when Name1/Title/YouTube are missing, or when the tab has lost more than half the rows
+the repo CSV has (a cleared tab must not wipe the site).
 """
 import csv
 import io
@@ -20,6 +21,7 @@ from . import events
 
 SHEET_ID = "1_-90A9g5_ACqeZl9bQuIHwfox2_-2gGh3cJMNjBrsHs"   # Excels_for_WWW (as in apps-script/conf42-upload.gs)
 EMAIL = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+DOX = re.compile(r"(?:mailto:)?[\w.+'-]+@[\w-]+(?:\.[\w-]+)+|(?<![\w/=.#-])\+\d[\d ()./-]{7,}\d")
 EMAILS_ONLY = re.compile(r"\s*%s(?:\s*[;,/]\s*%s)*\s*" % (EMAIL.pattern, EMAIL.pattern))
 
 
@@ -43,10 +45,9 @@ def strip(text):
     if not rows:
         raise ValueError("the tab is empty")
     drop = set(email_columns(rows))
-    out = [[c for i, c in enumerate(r) if i not in drop] for r in rows]
-    left = sorted({c.strip() for r in out for c in r if EMAILS_ONLY.fullmatch(c)})
-    if left:
-        raise ValueError("%d email address(es) still in other columns - not pushed" % len(left))
+    # nobody gets doxxed, not even by themselves (Marek 2026-11-18): an address or a +country phone number typed into
+    # any other cell (LinkedIn field, "contact me at ..." in a bio) is taken out too
+    out = [[DOX.sub("", c) for i, c in enumerate(r) if i not in drop] for r in rows]
     for need in ("Name1", "Title", "YouTube"):
         if need not in out[0]:
             raise ValueError("no %s column" % need)

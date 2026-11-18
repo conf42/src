@@ -60,11 +60,17 @@ def main():
     rows[2][0] = "someone@example.com"                   # one address in another column: never pushed
     buf = io.StringIO(newline="")
     csv.writer(buf, lineterminator="\r\n").writerows(rows)
-    try:
-        sheetcsv.strip(buf.getvalue())
-        check("an address left in another column stops the push", False)
-    except ValueError:
-        check("an address left in another column stops the push", True)
+    got = sheetcsv.strip(buf.getvalue())[0]
+    check("an address typed into another column is taken out", "someone@example.com" not in got)
+    bio = sheet.replace("Featured", "Featured", 1)
+    rows = list(csv.reader(io.StringIO(bio, newline="")))
+    a = rows[0].index("Abstract")
+    rows[3][a] += " Chat with me - me@home.net | +44 (0)7887 123456. Uptime 99.9% since 2024."
+    buf = io.StringIO(newline="")
+    csv.writer(buf, lineterminator="\r\n").writerows(rows)
+    got = sheetcsv.strip(buf.getvalue())[0]
+    check("a bio's own email + phone are taken out, the rest stays",
+          "me@home.net" not in got and "7887" not in got and "99.9% since 2024" in got)
     try:
         sheetcsv.strip("Name1,Title\nAda,Talk")
         check("no YouTube column stops the push", False)
