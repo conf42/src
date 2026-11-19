@@ -100,7 +100,7 @@ def main():
     log = list(sheetcsv.ship(ev, FakeDrive(sheet), git))
     check("same sheet again: nothing to push", "already the same" in " ".join(log))
     log = list(sheetcsv.ship(ev, FakeDrive("\r\n".join(sheet.split("\r\n")[:3])), git))
-    check("a tab that lost most rows is not pushed", "not pushed" in " ".join(log))
+    check("a tab that lost talks is not pushed", "not pushed" in " ".join(log))
     os.environ["FACTORY_SHEET_FORCE"] = "test2027"
     log = list(sheetcsv.ship(ev, FakeDrive("\r\n".join(sheet.split("\r\n")[:3])), git))
     os.environ.pop("FACTORY_SHEET_FORCE")

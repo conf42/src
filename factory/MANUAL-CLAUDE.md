@@ -72,6 +72,10 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - `sheetcsv.ship` guard: no push when any Name1 on the site is missing from the tab (was: under half the
+  rows) - the factory never takes a talk off a page by itself; Marek's purges ship with `sheet_force`. Found: FF/Prompt/
+  Platform 2026 tabs are purged (16/18/26 vs 31/33/39 on the site) and would have shrunk at the next pass.
+
 - **2026-11-19** - Accents: `events.plain` (NFKD + ł ø ß đ æ œ þ ð ı ħ map) - `_norm` uses it, so "Łukasz.mp4" matches
   Lukasz (before: "ukasz"); `sheetcsv.strip` writes every `Name<N>` column in plain letters, so accents never reach
   the website (the sheet is untouched). Old CSVs are not rewritten (speaker page URLs).

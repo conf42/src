@@ -91,6 +91,12 @@ def download(drive, tab):
     return r.content.decode("utf-8")
 
 
+def speakers(text):
+    """The Name1 values of a CSV text (empty set without one)."""
+    rows = list(csv.DictReader(io.StringIO(text or "", newline="")))
+    return {(r.get("Name1") or "").strip() for r in rows if (r.get("Name1") or "").strip()}
+
+
 def rows_in(text):
     return max(0, len(list(csv.reader(io.StringIO(text, newline="")))) - 1)
 
@@ -122,8 +128,10 @@ def ship(ev, drive=None, git=None):
             yield "sheet: %s.csv already the same as the sheet" % tab
             return
         force = ev.get("short_url") and ev.get("short_url") in os.environ.get("FACTORY_SHEET_FORCE", "").replace(",", " ").split()
-        if old and rows_in(body) * 2 < rows_in(old) and not force:    # force: Marek purged the tab on purpose
-            yield "sheet: %s.csv not pushed - the tab has %d rows, the repo %d" % (tab, rows_in(body), rows_in(old))
+        gone = speakers(old) - speakers(body)            # never takes a talk off the site by itself (2026-11-19):
+        if old and gone and not force:                   # Marek purges tabs by hand; that ships with sheet_force
+            yield "sheet: %s.csv not pushed - %d talk(s) on the site are not in the tab (a purge? run with sheet_force=%s)" % (
+                tab, len(gone), ev.get("short_url"))
             return
         if git is None:
             from .app import _git
