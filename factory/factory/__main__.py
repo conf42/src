@@ -132,6 +132,18 @@ def main(argv):
         got = intake.Intake(gdrive.Drive(), pipeline.settings(), use_claude=claude, dry_run=dry).run(slugs)
         print(json.dumps(got, indent=1, ensure_ascii=False))
         return
+    if cmd == "fasttrack-in":                            # factory fast track: files from a draft release -> Manual upload
+        from . import gdrive                             # folder, so this pass takes them (Marek 2026-11-19)
+        folder = str(pipeline.settings().get("cloud_manual_folder") or "").strip()
+        d, names = gdrive.Drive(), {}
+        if os.path.exists(os.path.join(argv[1], "names.json")):       # GitHub turns spaces into dots: real names
+            names = json.load(open(os.path.join(argv[1], "names.json"), encoding="utf-8"))
+        key = lambda n: "".join(c for c in n.lower() if c.isalnum())   # noqa: E731 - same name, punctuation aside
+        loose = {key(k): v for k, v in names.items()}
+        for f in sorted(os.listdir(argv[1])):
+            if f != "names.json":
+                d.upload(os.path.join(argv[1], f), folder, names.get(f) or loose.get(key(f)) or f)
+        return
     if cmd == "playlist-fix":                            # an event's playlist in the website's order (cloud: YOUTUBE_OAUTH_JSON)
         from . import ytupload
         cfg = pipeline.settings()

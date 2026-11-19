@@ -12,6 +12,7 @@ import time
 import requests
 
 API = "https://www.googleapis.com/drive/v3"
+UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 FOLDER = "application/vnd.google-apps.folder"
 
 
@@ -128,6 +129,42 @@ class Drive:
                 out.append({"id": f["id"], "title": f["name"], "folder": path, "via": "api", "size": int(f["size"]),
                             "uploaded": stamp(f.get("modifiedTime") or f.get("createdTime"))})
         return out
+
+    def upload(self, path, parent, name=None, chunk=64 * 1024 * 1024, log=print):
+        """A local file into a folder (resumable, 64 MB pieces; factory fast track, Marek 2026-11-19). Returns the id."""
+        size = os.path.getsize(path)
+        body = {"name": name or os.path.basename(path), "parents": [parent]}
+        r = self._call("POST", UPLOAD, params={"uploadType": "resumable", "supportsAllDrives": "true"}, json=body,
+                       headers={"X-Upload-Content-Length": str(size)})
+        where, done = r.headers["Location"], 0
+        with open(path, "rb") as f:
+            while True:
+                f.seek(done)
+                piece = f.read(chunk)
+                end = done + len(piece) - 1
+                h = {"Authorization": "Bearer " + self.token, "Content-Range": "bytes %d-%d/%d" % (done, end, size)}
+                try:
+                    r = requests.put(where, data=piece, headers=h, timeout=600)
+                except requests.RequestException:
+                    r = None
+                if r is not None and r.status_code in (200, 201):
+                    log("drive: %s up (%d MB)" % (body["name"], size // 2 ** 20))
+                    return r.json()["id"]
+                if r is not None and r.status_code == 308:
+                    rng = r.headers.get("Range")
+                    done = int(rng.split("-")[1]) + 1 if rng else 0
+                    continue
+                if r is not None and r.status_code == 401 and self.feed:
+                    self.refresh()
+                elif r is not None and r.status_code not in (500, 502, 503, 504):
+                    raise RuntimeError("Drive upload %s: HTTP %d %s" % (body["name"], r.status_code, r.text[:300]))
+                time.sleep(5)                                # ask where it got to, then go on from there
+                q = requests.put(where, headers={"Authorization": "Bearer " + self.token,
+                                                 "Content-Range": "bytes */%d" % size}, timeout=120)
+                if q.status_code in (200, 201):
+                    return q.json()["id"]
+                rng = q.headers.get("Range")
+                done = int(rng.split("-")[1]) + 1 if rng else 0
 
     def trash(self, file_id):
         """Into Drive's bin (only the owner can; Drive deletes it for good 30 days later)."""

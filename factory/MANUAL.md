@@ -181,6 +181,11 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-19** - **Factory fast track**: for a talk that must go out now, put the video (and deck) on your Desktop
+  and tell Claude *"factory fast track for <event>"*. Claude finds the files, names them after the speaker and sends
+  them to the cloud factory, which runs that event straight away. You don't upload to Drive; the files still land in
+  the Manual upload folder, so everything stays in one place.
+
 - **2026-11-18** - **Playlist sorted like the website**: every finished talk goes into the playlist the event page
   links (`playlist_url` in metadata.yml; only without one is it found or made by title), and every pass sorts that
   playlist in the order the event page shows the talks: keynotes, panels, then each track. Talks missing from the

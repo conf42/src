@@ -40,6 +40,7 @@ works the same way.
 |---|---|---|
 | Start | *"Activate the factory for Feature Flags 2026: https://drive.google.com/drive/folders/…"* | Claude fetches the Drive folder (only new or changed files), matches every video to its talk and starts the whole run in the background. |
 | Another computer ran it | *"Reactivate the factory for Cynthia: <Drive link>"* | Before anything starts, Claude reads the event's launch log (`_db/factory_runs/<event>/LAUNCHES.md`, written by the factory on every launch, on every computer) and the Descript project, and tells you what is already done. Finished talks are not downloaded again on the new computer. |
+| Fast track | *"Factory fast track for MLOps"* - nothing else | For a talk that must go out now (a sponsor's video, a last-minute upload). Claude looks on your **Desktop** for the newest videos and decks, matches them to the event's speakers by name and content (asks only when it cannot tell), renames them to the speaker's name, and sends them straight from the terminal (`factory/fasttrack.sh`) to the cloud factory, which runs just that event. No Drive upload by you. Claude watches the run and gives you the YouTube link. |
 | Watch | *"How is it going?"* - or open http://localhost:8042 | Per talk: render, upload, Descript edit, publish, download, subtitles, chapters, loudness, QA. |
 | Unmatched files | Claude asks you which speaker a file belongs to | It renames it and runs it. |
 | Check | *"What needs my attention?"* | Talks with QA or health flags (loudness, too much cut, setup the speaker talks over), talks that **need a new video** (no or muted sound - not sent to Descript), failed talks, and the **no video yet** follow-up list. Watch the flagged ones. |
@@ -70,6 +71,14 @@ installers). It shows you what they are and how big, and deletes only what you p
 on the list.
 
 ## Changelog
+
+- **2026-11-19** - **Factory fast track**: `factory/fasttrack.sh <short_url> <files>` (Mac, `gh` only - no Python deps or
+  secrets on the Mac) puts the files in a draft release of conf42/src plus `names.json` (GitHub dots the spaces) and
+  dispatches factory cloud with `fasttrack=<tag>`. The workflow downloads the draft, `python -m factory fasttrack-in`
+  uploads each file to `cloud_manual_folder` under its real name (`gdrive.Drive.upload`, resumable 64 MB pieces),
+  deletes the draft, then runs the normal pass for that event (Manual upload folder claims by speaker name). Trigger
+  phrase "factory fast track <event>": Claude looks on ~/Desktop itself (newest mp4/mov + pdf/pptx), renames files to
+  "<Speaker> - ... .ext" so the claim is exact, never asks for paths. Test: `tests/test_fasttrack.py`.
 
 - **2026-11-18** - `ytupload.playlist_for` prefers metadata `playlist_url` (list=); `playlist_order` runs at the end of
   every `event()` pass: `readd_plan` on the playlist items sorted by publishedAt (date added) keeps the in-order

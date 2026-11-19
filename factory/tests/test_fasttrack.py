@@ -1,0 +1,63 @@
+"""Factory fast track: gdrive.Drive.upload (resumable, picks up after a dropped piece) with a fake Drive. Offline.
+    python factory/tests/test_fasttrack.py   (from the src repo root)"""
+import os
+import sys
+import tempfile
+import types
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+if "requests" not in sys.modules:                       # the Mac has no requests; the fake below replaces it anyway
+    try:
+        import requests  # noqa: F401
+    except ImportError:
+        sys.modules["requests"] = types.SimpleNamespace(RequestException=OSError, request=None, put=None)
+from factory import gdrive  # noqa: E402
+
+
+class R:
+    def __init__(self, code, headers=None, j=None):
+        self.status_code, self.headers, self._j, self.text = code, headers or {}, j or {}, ""
+
+    def json(self):
+        return self._j
+
+
+def main():
+    got, fails = bytearray(), []
+    state = {"drop": True}
+
+    def put(url, data=None, headers=None, timeout=None):
+        rng = headers["Content-Range"]
+        if rng.startswith("bytes */"):
+            return R(308, {"Range": "bytes=0-%d" % (len(got) - 1)} if got else {})
+        a, rest = rng[6:].split("-")
+        b, size = rest.split("/")
+        if int(a) == 10 and state["drop"]:              # the second piece is lost on the way once
+            state["drop"] = False
+            raise OSError("reset")
+        assert int(a) == len(got), (a, len(got))
+        got.extend(data)
+        return R(200, j={"id": "F1"}) if len(got) == int(size) else R(308, {"Range": "bytes=0-%d" % (len(got) - 1)})
+
+    gdrive.requests.put = put
+    gdrive.requests.RequestException = OSError
+    gdrive.time.sleep = lambda s: None
+    d = gdrive.Drive(token="t")
+    calls = []
+    d._call = lambda m, u, **kw: calls.append((m, kw["json"])) or R(200, {"Location": "https://up/1"})
+    path = os.path.join(tempfile.mkdtemp(), "Sunil Gattupalle - talk.mp4")
+    blob = bytes(range(256)) * 1 + b"x" * 9
+    open(path, "wb").write(blob)
+    fid = d.upload(path, "FOLDER", chunk=10, log=lambda *a: None)
+    for what, ok in [("uploaded whole, in order, after a dropped piece", fid == "F1" and bytes(got) == blob),
+                     ("into the folder under its real name", calls[0][1] == {"name": "Sunil Gattupalle - talk.mp4",
+                                                                            "parents": ["FOLDER"]})]:
+        print("%s  %s" % ("ok  " if ok else "FAIL", what))
+        if not ok:
+            fails.append(what)
+    print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
