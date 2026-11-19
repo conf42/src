@@ -114,7 +114,8 @@ def ship(ev, drive=None, git=None):
         if body == old:
             yield "sheet: %s.csv already the same as the sheet" % tab
             return
-        if old and rows_in(body) * 2 < rows_in(old):
+        force = ev.get("short_url") and ev.get("short_url") in os.environ.get("FACTORY_SHEET_FORCE", "").replace(",", " ").split()
+        if old and rows_in(body) * 2 < rows_in(old) and not force:    # force: Marek purged the tab on purpose
             yield "sheet: %s.csv not pushed - the tab has %d rows, the repo %d" % (tab, rows_in(body), rows_in(old))
             return
         if git is None:

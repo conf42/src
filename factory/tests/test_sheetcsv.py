@@ -101,6 +101,10 @@ def main():
     check("same sheet again: nothing to push", "already the same" in " ".join(log))
     log = list(sheetcsv.ship(ev, FakeDrive("\r\n".join(sheet.split("\r\n")[:3])), git))
     check("a tab that lost most rows is not pushed", "not pushed" in " ".join(log))
+    os.environ["FACTORY_SHEET_FORCE"] = "test2027"
+    log = list(sheetcsv.ship(ev, FakeDrive("\r\n".join(sheet.split("\r\n")[:3])), git))
+    os.environ.pop("FACTORY_SHEET_FORCE")
+    check("... unless forced for that event (a purge on purpose)", "pushed" in " ".join(log) and "not pushed" not in " ".join(log))
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 

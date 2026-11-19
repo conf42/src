@@ -72,6 +72,11 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - Workflow input `sheet_force` (short_urls) -> env FACTORY_SHEET_FORCE: `sheetcsv.ship` pushes that event's
+  tab even with under half the CSV's rows. For Marek's manual purge (tab keeps only shipped talks, the rest in a
+  "Kopia arkusza <TAB>" copy) - first used for MLOPS_2026 (53 -> 22). The purge itself is not automated yet (Marek:
+  one thing at a time).
+
 - **2026-11-19** - Fast track hardened after a Fable review: assets go up as f00.mp4 ... (symlinks) + names.json, so
   accents/spaces survive; the workflow sweeps EVERY waiting `fasttrack-*` draft (a queued run can be dropped by the
   concurrency group; a failed one stays for the next pass), skips files already in the folder (name + size), 60 min
