@@ -77,7 +77,7 @@ on the list.
   dispatches factory cloud with `fasttrack=<tag>`. The workflow downloads the draft, `python -m factory fasttrack-in`
   uploads each file to `cloud_manual_folder` under its real name (`gdrive.Drive.upload`, resumable 64 MB pieces),
   deletes the draft, then runs the normal pass for that event (Manual upload folder claims by speaker name). Trigger
-  phrase "factory fast track <event>": Claude looks on ~/Desktop itself (newest mp4/mov + pdf/pptx), renames files to
+  phrase "factory fast track <event>" - manual only, Claude never starts it unasked: Claude looks on ~/Desktop itself (newest mp4/mov + pdf/pptx), renames files to
   "<Speaker> - ... .ext" so the claim is exact, never asks for paths. Test: `tests/test_fasttrack.py`.
 
 - **2026-11-18** - `ytupload.playlist_for` prefers metadata `playlist_url` (list=); `playlist_order` runs at the end of
