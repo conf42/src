@@ -69,12 +69,14 @@ GIDS = {"CHAOS_2026": 1004923041, "MLOPS_2026": 791783887, "PLATFORM_2026": 1468
 
 def download(drive, tab):
     """The tab as File > Download > CSV gives it (formulas as their values)."""
-    try:
-        meta = drive._call("GET", "https://sheets.googleapis.com/v4/spreadsheets/%s" % SHEET_ID,
-                           params={"fields": "sheets.properties(sheetId,title)"}).json()
-        gid = next((s["properties"]["sheetId"] for s in meta.get("sheets", []) if s["properties"]["title"] == tab), None)
-    except RuntimeError:                                 # the upload script's project has no Sheets API (403,
-        gid = GIDS.get(tab)                              # 2026-11-19): the tab ids, read with the Sheets connector
+    gid = (getattr(drive, "tabs", None) or {}).get(tab)   # the upload script's own list (v9), no Sheets API needed
+    if gid is None:
+        try:
+            meta = drive._call("GET", "https://sheets.googleapis.com/v4/spreadsheets/%s" % SHEET_ID,
+                               params={"fields": "sheets.properties(sheetId,title)"}).json()
+            gid = next((s["properties"]["sheetId"] for s in meta.get("sheets", []) if s["properties"]["title"] == tab), None)
+        except RuntimeError:                             # the token's project has no Sheets API (403, 2026-11-19):
+            gid = GIDS.get(tab)                          # the ids read with the Sheets connector, until script v9 is live
     if gid is None:
         raise LookupError("no tab %s in Excels_for_WWW (or not in sheetcsv.GIDS)" % tab)
     r = drive._call("GET", "https://docs.google.com/spreadsheets/d/%s/export" % SHEET_ID,

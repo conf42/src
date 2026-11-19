@@ -25,7 +25,8 @@
  *   POST {action:"probe", origin}        the recorder's upload check: a Drive session for a 512 KB file in
  *        Auto upload/_probe that the page tests with 256 KB and never finishes - nothing is stored. Max 1000 a day.
  *   GET  ?ping=1                         {ok, service, version} - the factory's doctor calls this daily
- *   GET  ?list=1&token=<UPLOAD_TOKEN>    {access_token, workspace_id}: a short-lived Drive token for the factory
+ *   GET  ?list=1&token=<UPLOAD_TOKEN>    {access_token, workspace_id, tabs}: a short-lived Drive token for the factory
+ *        (+ v9: Excels_for_WWW's {tab title: gid}, for its sheet -> CSV)
  *   POST {action:"dispatch", token, event, ...}         "Run now" on conf42.com/factory -> GitHub workflow_dispatch
  *   POST {action:"credits", token, event, talk, top_up}  the factory's ONE email (Marek 2026-11-13): "Need more Descript
  *        credits" to NOTIFY_TO (default: this account), at most once every 12 hours
@@ -50,7 +51,7 @@
  *   Re-deploy after editing: Deploy -> Manage deployments -> edit -> New version (the URL stays the same).
  */
 
-var VERSION = 8;   // v8: a talk's "screen stills.zip" for its Talk Highlights (start with only `stills` + folder_id; never part of "complete"); v7: action "sheet" (YouTube links into Excels_for_WWW); v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
+var VERSION = 9;   // v9: ?list also answers `tabs` {tab title: gid} of Excels_for_WWW (the factory's sheet -> CSV; its token's project has no Sheets API); v8: a talk's "screen stills.zip" for its Talk Highlights (start with only `stills` + folder_id; never part of "complete"); v7: action "sheet" (YouTube links into Excels_for_WWW); v2: finish returns Drive's own size + MD5 per file; v3: recorded pings + ?status (no mails)
 var WORKSPACE_ID = '1BBrIvD-vIxdPoDj9jUG5cjPnlD3YWNib';   // "Conf42 Speaker Workspace/Auto upload" (owner mark@sreday.com)
 var MANUAL_ID = '1vM_-_JZ8lgWUUyTmWxgOPxExw-FESPRG';    // "Conf42 Speaker Workspace/Manual upload": speakers drop files by hand
 var ORIGINS = ['https://www.conf42.com', 'https://conf42.com'];
@@ -68,10 +69,21 @@ function doGet(e) {
   var p = (e && e.parameter) || {};
   if (p.list) {
     if (!tokenOk(p.token)) return respond({ ok: false, error: 'forbidden' });
-    return respond({ ok: true, access_token: ScriptApp.getOAuthToken(), workspace_id: workspace().getId(), version: VERSION });
+    return respond({ ok: true, access_token: ScriptApp.getOAuthToken(), workspace_id: workspace().getId(), version: VERSION,
+                     tabs: sheetTabs() });
   }
   if (p.status) return respond(status(String(p.status)));
   return respond({ ok: true, service: 'conf42-upload', version: VERSION });
+}
+
+// v9: {tab title: gid} of Excels_for_WWW - the factory downloads a tab as CSV by gid (sheetcsv.py); {} when the sheet
+// cannot be opened, so the token never fails because of it
+function sheetTabs() {
+  try {
+    var out = {};
+    SpreadsheetApp.openById(SHEET_ID).getSheets().forEach(function (sh) { out[sh.getName()] = sh.getSheetId(); });
+    return out;
+  } catch (err) { return {}; }
 }
 
 function doPost(e) {

@@ -19,7 +19,7 @@ FOLDER = "application/vnd.google-apps.folder"
 class Drive:
     def __init__(self, feed=None, token=None, root=None):
         self.feed = feed or os.environ.get("UPLOAD_FEED") or ""
-        self.token, self.root, self.at = token, root, 0
+        self.token, self.root, self.at, self.tabs = token, root, 0, {}
         if not self.token:
             self.refresh()
 
@@ -33,6 +33,7 @@ class Drive:
             raise RuntimeError("Conf42 upload script: %s" % d.get("error"))
         self.token, self.at = d["access_token"], time.time()
         self.root = self.root or d.get("workspace_id")
+        self.tabs = d.get("tabs") or {}                 # v9 of the script: Excels_for_WWW {tab: gid}
 
     def _call(self, method, url, **kw):
         for attempt in range(5):
