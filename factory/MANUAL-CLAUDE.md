@@ -72,6 +72,11 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - `schedule_sweep` after the release: a talk that missed its schedule (quota, 503) and is not public goes
+  public (`YouTube.make_public`), only within 3 days of the release (older events never touched). First case: Sunil
+  Gattupalle, MLOps 2026 (quota out at 16:12 UTC). Talk page behind the lock: the Conf42 thumbnail
+  (`talk_thumbnail` filter), not i.ytimg (grey for a private video). Premieres: not in the YouTube API - not done.
+
 - **2026-11-19** - Videos follow the website's release (`ytupload.release_time` = metadata `release_at`, else 17:00 UTC on
   the day - same as build/events.py): uploaded before it -> private + `publishAt` (YouTube publishes at the kick-off);
   after it -> public. `schedule_sweep` schedules earlier uploads (unlisted) while the release is ahead - past events are

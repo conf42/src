@@ -224,6 +224,9 @@ def main():
         def schedule(self, vid, when):
             self.done.append((vid, when))
             return True, ""
+
+        def make_public(self, vid):
+            return True, ""
     sy, saved = SY(), []
     real_save = ytupload.save
     ytupload.save = lambda slug, d: saved.append(slug)
@@ -234,7 +237,23 @@ def main():
               and recs["A"]["privacy"] == "private" and saved == ["mlops2026"])
         sy2 = SY()
         list(ytupload.schedule_sweep(sy2, ev, {}, {"A": {"id": "va"}}, kick + dt.timedelta(hours=1)))
-        check("sweep after the release: a past event is never touched", sy2.done == [])
+        check("sweep after the release: nothing scheduled any more", sy2.done == [])
+
+        class PY(SY):
+            def __init__(self):
+                super().__init__()
+                self.pub = []
+
+            def make_public(self, vid):
+                self.pub.append(vid)
+                return True, ""
+        recs = {"S": {"id": "vs", "privacy": "unlisted"}, "A": {"id": "va", "publish_at": "x"}, "T": {"id": "vt", "test": True}}
+        py = PY()
+        list(ytupload.schedule_sweep(py, ev, {}, recs, kick + dt.timedelta(hours=15)))
+        check("missed its schedule: public after the release", py.pub == ["vs"] and recs["S"]["privacy"] == "public")
+        py2 = PY()
+        list(ytupload.schedule_sweep(py2, ev, {}, {"S": {"id": "vs", "privacy": "unlisted"}}, kick + dt.timedelta(days=4)))
+        check("... never days later (older events untouched)", py2.pub == [])
     finally:
         ytupload.save = real_save
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))

@@ -242,6 +242,14 @@ class YouTube:
         return r.status_code == 200, r.text[:200]
 
 
+    def make_public(self, video_id):
+        cur = (self.status(video_id) or {}).get("status") or {}
+        st = {k: cur[k] for k in ("selfDeclaredMadeForKids", "embeddable", "license", "publicStatsViewable") if k in cur}
+        st["privacyStatus"] = "public"
+        r = self.call("PUT", API + "/videos", params={"part": "status"}, json={"id": video_id, "status": st})
+        return r.status_code == 200, r.text[:200]
+
+
 class QuotaExceeded(RuntimeError):
     pass
 
@@ -311,9 +319,26 @@ def schedule_sweep(yt, ev, cfg, done, now=None):
     """Talks uploaded before this existed (unlisted) or by hand: scheduled for the release too - only while the
     release is still ahead, so a past event's videos are never touched."""
     privacy, when = release_plan(ev, cfg, now)
-    if not when:
-        return
+    now = now or datetime.datetime.now(datetime.timezone.utc)
     changed = False
+    if not when:
+        # released: a talk that missed its schedule (quota, YouTube trouble) goes public now - only in the first 3 days
+        # after the release, so older events' videos are never touched (2026-11-19: Sunil hit the day's quota)
+        if privacy != "public" or now - release_time(ev) > datetime.timedelta(days=3):
+            return
+        for key, rec in sorted(done.items()):
+            if not rec.get("id") or rec.get("test") or rec.get("publish_at") or rec.get("privacy") == "public":
+                continue
+            ok, msg = yt.make_public(rec["id"])
+            if ok:
+                rec["privacy"] = "public"
+                changed = True
+                yield "youtube: %s public now (missed the scheduled release)" % key
+            else:
+                yield "youtube: %s not made public (%s)" % (key, msg)
+        if changed:
+            save(ev["short_url"], done)
+        return
     for key, rec in sorted(done.items()):
         if not rec.get("id") or rec.get("test") or rec.get("publish_at"):
             continue
