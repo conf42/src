@@ -124,9 +124,20 @@ def banished(ev, current):
     return out
 
 
+# letters NFKD does not take apart (Marek 2026-11-19: accents understood, never pushed to the website)
+_FOLD = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "ß": "ss", "đ": "d", "Đ": "D", "æ": "ae", "Æ": "AE",
+                       "œ": "oe", "Œ": "OE", "þ": "th", "Þ": "Th", "ð": "d", "Ð": "D", "ı": "i", "ħ": "h", "Ħ": "H"})
+
+
+def plain(s):
+    """José Łukasz Müller -> Jose Lukasz Muller: speaker names in plain letters (Conf42 strips special signs)."""
+    s = unicodedata.normalize("NFKD", (s or "").translate(_FOLD))
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
 def _norm(s):
     s = re.sub(r"([a-z])([A-Z])", r"\1 \2", s)   # "PrateekJindal_..." -> "Prateek Jindal"
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
+    s = plain(s).encode("ascii", "ignore").decode().lower()
     s = re.sub(r"[^a-z0-9]+", " ", s)
     s = re.sub(r"\b(conf42|version|final|v\d+|edited|recording|talk|video|copy|slides?|deck|presentation|ppt|pptx|pdf|\d{4})\b", " ", s)
     return re.sub(r"[^a-z]+", " ", s).strip()

@@ -72,6 +72,10 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - Accents: `events.plain` (NFKD + ł ø ß đ æ œ þ ð ı ħ map) - `_norm` uses it, so "Łukasz.mp4" matches
+  Lukasz (before: "ukasz"); `sheetcsv.strip` writes every `Name<N>` column in plain letters, so accents never reach
+  the website (the sheet is untouched). Old CSVs are not rewritten (speaker page URLs).
+
 - **2026-11-19** - Workflow input `sheet_force` (short_urls) -> env FACTORY_SHEET_FORCE: `sheetcsv.ship` pushes that event's
   tab even with under half the CSV's rows. For Marek's manual purge (tab keeps only shipped talks, the rest in a
   "Kopia arkusza <TAB>" copy) - first used for MLOPS_2026 (53 -> 22). The purge itself is not automated yet (Marek:

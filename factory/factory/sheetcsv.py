@@ -48,6 +48,13 @@ def strip(text):
     # nobody gets doxxed, not even by themselves (Marek 2026-11-18): an address or a +country phone number typed into
     # any other cell (LinkedIn field, "contact me at ..." in a bio) is taken out too
     out = [[DOX.sub("", c) for i, c in enumerate(r) if i not in drop] for r in rows]
+    # speaker names go to the website in plain letters (Marek 2026-11-19: "we strip all special signs from speakers");
+    # the sheet keeps whatever was typed, the factory still matches files either way (events._norm)
+    names = [i for i, h in enumerate(out[0]) if re.fullmatch(r"Name\d*", h.strip())]
+    for r in out[1:]:
+        for i in names:
+            if i < len(r):
+                r[i] = events.plain(r[i])
     for need in ("Name1", "Title", "YouTube"):
         if need not in out[0]:
             raise ValueError("no %s column" % need)

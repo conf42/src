@@ -105,6 +105,14 @@ def main():
     log = list(sheetcsv.ship(ev, FakeDrive("\r\n".join(sheet.split("\r\n")[:3])), git))
     os.environ.pop("FACTORY_SHEET_FORCE")
     check("... unless forced for that event (a purge on purpose)", "pushed" in " ".join(log) and "not pushed" not in " ".join(log))
+    from factory import events as ev_mod
+    t, _ = sheetcsv.strip("Name1,Title,YouTube,Name2\r\nJosé Łukasz Müller,Café talk,,Søren Groß")
+    check("accents never reach the website: names in plain letters, other cells untouched",
+          t == "Name1,Title,YouTube,Name2\r\nJose Lukasz Muller,Café talk,,Soren Gross")
+    check("accents understood: an accented file matches the plain speaker",
+          ev_mod._norm("José Łukasz") == ev_mod._norm("Jose Lukasz") == "jose lukasz"
+          and ev_mod.match("José Łukasz - Conf42 MLOps 2026.mp4", [{"speakers": "Jose Lukasz", "name1": "Jose Lukasz",
+                                                                    "name2": "", "title": "t"}])[0] is not None)
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 
