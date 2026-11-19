@@ -42,7 +42,7 @@
     <meta property="og:title" content="From Prototype to Millions of Daily Renders: Shipping LLM-Powered Features Reliably at E-commerce Scale | Conf42"/>
     <meta property="og:description" content="Getting an LLM-powered feature to work in a demo is easy. Serving it on a high-traffic e-commerce page millions of times a day, without hurting latency or showing customers a bad answer, is a different job.  Drawing on shipping AI shopping features at Amazon that reached millions of daily page renders with zero faults, this talk covers the operational side of putting generative AI on a critical page:  - Deciding when content should be generated in real time and when it can be precomputed - Latency budgets, timeouts and fallbacks so the page never waits on a model - Quality gates and monitoring that catch bad output before customers see it - Integrating with an existing AI assistant's orchestration without becoming its bottleneck - Launching safely: gradual dial-ups, kill switches and the metrics that matter  Attendees leave with a practical checklist for taking an LLM feature from prototype to production traffic."/>
     <meta property="og:url" content="https://www.conf42.com/MLOps_2026_Artem_Zamarajev_llm_commerce_renders"/>
-    
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Senior Software Engineer", "name": "Artem Zamarajev", "sameAs": ["https://www.linkedin.com/in/zamarajev/"], "url": "https://www.conf42.com/speaker_Artem_Zamarajev", "worksFor": {"@type": "Organization", "name": "Amazon"}}], "description": "Getting an LLM-powered feature to work in a demo is easy. Serving it on a high-traffic e-commerce page millions of times a day, without hurting latency or showing customers a bad answer, is a different job. Drawing on shipping AI shopping features at Amazon that reached millions of daily page renders with zero faults, this talk covers the operational side of putting generative AI on a critical page: - Deciding when content should be generated in real time and when it can be precomputed - Latency budgets, timeouts and fallbacks so the page never waits on a model - Quality gates and monitoring that catch bad output before customers see it - Integrating with an existing AI assistant\u0027s orchestration without becoming its bottleneck - Launching safely: gradual dial-ups, kill switches and the metrics that matter Attendees leave with a practical checklist for taking an LLM feature from prototype to production traffic.", "embedUrl": "https://www.youtube.com/embed/jXDT1iRqvno", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 MLOps 2026", "url": "https://www.conf42.com/mlops2026"}, "keywords": ["llm", "commerce", "renders"], "name": "From Prototype to Millions of Daily Renders: Shipping LLM-Powered Features Reliably at E-commerce Scale", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/jXDT1iRqvno/hqdefault.jpg"], "transcript": "Hi, everyone. Thanks for joining. I\u0027m Artem. I\u0027ve been a software engineer for about 10 years, and I\u0027m currently a senior software engineer at Amazon working on AI shopping features. So, here\u0027s the topic that I wanna talk about. Getting a model to produce good output in a demo isn\u0027t hard anymore, and the work is now serving that output on a high-traffic page without sl-slowing down the page and without showing customers something wrong. I have one note on the scope. So this talk is about AI features that live on a web page, the kind of a shopper loads in a browser, like a product page. If you\u0027re building a standalone chatbot or a background agent, some of this still applies, but a traditional web page is what I have in mind for this talk So you probably know the standard production toolkit. It\u0027s timeouts, caching, canaries, feature flags, dashboards, A/B tests. So LLM features add three problems on top of it. The first is latency. Google\u0027s guidance is that a page\u0027s main content should appear within two point five seconds, and that the first byte from the server should arrive in under zero point eight seconds. A fast model starts streaming in a few hundred milliseconds, but a full response usually takes several seconds, and the slow tail runs well past that. The second is quality. Bad output usually comes back well-formed with a successful status, so your error rate stays flat while customers read something wrong. The third is cost. Every call costs money and at page view volume, that can add up. So the four lessons that follow are about these three problems So I\u0027ve grouped this into these four lessons. They follow the life of a feature. So it\u0027s deciding when to generate, serving the output, checking it, and connecting to the assistant. All of this is model agnostic To keep this simple, I\u0027ll use one example throughout. Ridgeline Coffee, a made-up store. Ridgeline wants three LLM features on its product pages. The first is a quick take. It\u0027s three short highlights about the coffee written by an LLM It uses product details and reviews to get this information. It shows on every product page. The second is suggested questions. A few questions picked for this shop are like, \"Is it similar to the Colombia I bought last time?\" They also show on every product page, and tapping one asks the store\u0027s AI assistant. The third is an Ask button. It opens the same assistant, which already knows which coffee you\u0027re looking at, so you can ask your own questions like, \"Will this work for espresso?\" So these are the two kinds of AI features I\u0027ll keep coming back to. The quick take is pre-computed. It\u0027s generated ahead of time, and the page only reads stored text. The suggested questions and ask button are live. They call the model while the shopper is on the page. Each kind runs into different problems, so for every lesson, I\u0027ll say which kind it is about. Lesson one: precompute by default. So the problem is when you\u0027re doing a demo, right, you\u0027re most likely just doing a live call to LLM. But then if you just put it to production, now every page would wait for a model call that takes seconds and costs money, and for some features, the output would be the same for every shopper. And so before building a feature, it\u0027s worth asking whether it has to be generated while the shopper waits. So there\u0027s three questions that decide it. Does the output depend on the shopper or what they typed? How often do inputs change? And is anyone waiting for it? So the quick take is the same for every shopper. It changes only when the product or its reviews change, and nobody\u0027s waiting for it. So we generate it in a background job, run the checks, and store the default. At page load, the page does a key lookup. The ask button can\u0027t be precomputed because the response depends on the question. It runs live, but only for the shoppers who click, which is usually a small share of page views. Suggested questions depend on the shopper, and there are too many shoppers and product pairs to generate them all ahead of time, so they run live too on every page view. So keep that in mind for lesson four. So this works because a precomputed feature puts no model call on the page at all. Latency becomes just a key lookup, and cost follows product changes instead of traffic. So the LLM part becomes a content pipeline, which is a, an easier to deal with problem. One thing to get right is when to regenerate. If you regenerate on every new review, a popular product burns model calls all day for output that barely changes. So a threshold, like a minimum number of new reviews or a change to the product details, keeps costs tied to real change. I start from precomputed and see if the feature really needs to be real time Lesson two, keep the model off the critical path. So the problem is that a model call takes seconds and sometimes fails. If the page waits for it, the page is as slow and as fragile as this model call. So the usual protection, a timeout, doesn\u0027t help much here. A timeout short enough to protect the page would cut off most of model calls. So the fix depends on the kind of feature. A pre-computed feature already reads stored text, so the open question is what to show when nothing good is stored. Decide that before you write a single prompt. I think of it as a ladder. So fresh content first. If that\u0027s missing or failed a check, the last good version you saved. If there\u0027s none, a plain non-AI default, like the product\u0027s existing bullet points. And as a last resort, just hide the feature. For live features, render the page first and call the model afterwards. The Ask button calls it only after the shopper asks. Suggested questions fill in after the page has loaded, and if they\u0027re slow or fail, that space stays empty. For Ask, stream the response. The first words appear long before the full response would, and streaming keeps long responses from hitting fixed timeouts in proxies and gateways. This works because the page never waits on the model. Whether the model is slow, failing, or down, the page loads, and the worst case is a plainer page Lesson three, check outputs before customers see them So the problem is that wrong output from a model could look like success. It\u0027s well-formed, the call returns fine, and your error dashboard stays flat, and the company owns it either way. So there was an interesting case in two thousand twenty-four, a Cana- Canadian tribunal ruled against Air Canada after its chatbot told a customer that he could claim a bereavement discount after his trip, which contradicted the airline\u0027s own policy page. But the tribunal held the airline responsible for what the chatbot said, the same as for any other page on its site. So the fix for a precomputed feature like quick take is check four things before storing it. Format so it renders, grounding so every claim traces back to the product data or a review, consistency with the rest of the page. A highlight that says the coffee ships ground on a page that says whole bean only is the kind of the problem that Air Canada had at a smaller scale. And the content policy. Format and policy are mostly simple rules. Grounding and consistency often need a second model call to judge the first. Anything that fails goes down the fallback ladder from lesson two This works because that output is caught before it\u0027s stored, so it never reaches the page, and the extra model call is affordable because you pay for it once per product change, not once per page view. Live responses are harder because there\u0027s no time to run all of that before the first word appears, so the fix comes in layers. Keep the model working from the product\u0027s own data so grounding is built in. Run cheap rule-based checks on the stream and stop or respl-- replace response that fails one. Afterwards, judge a sample of real responses with the same checks you use for precomputed content. That catches problems in aggregate, not one response at a time, which is why live features also need a narrower scope and an easy way for shoppers to report a bad response. For both precomputed and live features, keep an eval set, a fixed set of real products with known good and known bad outputs rerun on every prompt or model change. And in production, watch the rejection rate, especially while prompt or model change is rolling out. The page will look healthy because the fallbacks cover for failures, so moving rejection rate is often your first sign that something changed Lesson four: put one service in front of the assistant. This one is about live features. So for Ridgeline Coffee, two features call the same assistant, the Ask button and the suggested questions. The first problem is duplicated rules. When each feature calls the assistant directly, each one keeps its own copy of the rules, which pages and shoppers are eligible, which languages are supported, which timeout to use, and what to show when the call fails. Those copies could drift apart into features on the same page start behaving differently. Second problem is capacity. Let\u0027s say the assistant was first built for the Ask button, so it\u0027s sized for the shoppers who click it, which is a small share. Suggested questions appear on every product page, so they call the assistant on every page view. Launching them can multiply the assistant\u0027s traffic. So the fix is a small service between the features and the assistant. Features don\u0027t call the assistant directly, they call the service. And the service, it holds the eligibility rules, sets the timeout, and returns a fallback when the assistant fails. It also gives each feature a traffic budget and rate limits any feature that goes over it. I make it a service rather than a shared library because a library can\u0027t enforce one budget across every caller. This works because the rules live in one place, so they cannot drift. Every calls goes through one door, so no feature can send page scale traffic to the assistant without someone planning for it. If the assistant slows down, the service returns fallbacks, and the pages are fine. If a feature misbehaves, its budget stops it before it reaches the assistant So if there\u0027s one thing you remember from this talk, it\u0027s calling the model is easy, and most of the work is just a system around it. So that\u0027s all from me. Thanks for watching. If you\u0027re shipping LLM features too, I\u0027d like to hear how it\u0027s going, so find me on LinkedIn or on the Conf42 Discord. Enjoy the rest of the conference.", "uploadDate": "2026-11-19T17:00:00Z", "url": "https://www.conf42.com/MLOps_2026_Artem_Zamarajev_llm_commerce_renders"}</script>
     
 
     <link rel="shortcut icon" href="./assets/favicon/favicon.ico" type="image/x-icon" />
@@ -69,61 +69,7 @@
   </head>
   
   
-  <body data-c42-release="2026-11-19T17:00:00Z" data-c42-event="mlops2026">
-    
-    <script>
-      (function () {
-        var body = document.body, at = new Date(body.getAttribute("data-c42-release")).getTime();
-        var key = "c42-show:" + body.getAttribute("data-c42-event"), done = false, queue = [], preview = false;
-        try { preview = localStorage.getItem(key) === "1"; } catch (e) {}
-        // talk pages queue what may only start at release (the YouTube player)
-        window.c42OnRelease = function (fn) { if (done) fn(); else queue.push(fn); };
-        function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
-        function release() {
-          if (done) return;
-          done = true;
-          body.classList.add("c42-released");
-          each("[data-c42-src]", function (el) { el.setAttribute("src", el.getAttribute("data-c42-src")); });
-          while (queue.length) { try { queue.shift()(); } catch (e) {} }
-        }
-        // "Thursday 1 October at 18:00 your time", in the visitor's language and zone
-        function when() {
-          try {
-            return new Intl.DateTimeFormat(undefined, {weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit"}).format(new Date(at)) + " your time";
-          } catch (e) { return new Date(at).toString(); }
-        }
-        function left(ms) {
-          var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
-          var p = function (n) { return (n < 10 ? "0" : "") + n; };
-          return d ? d + "d " + h + "h " + p(m) + "m" : h ? h + "h " + p(m) + "m " + p(x) + "s" : m + "m " + p(x) + "s";
-        }
-        function paint() {
-          var ms = at - Date.now();
-          each("[data-c42-countdown]", function (el) { el.textContent = left(ms); });
-          if (ms <= 0) release();
-        }
-        function previewBar() {
-          var bar = document.createElement("div");
-          bar.className = "c42-preview-bar";
-          bar.innerHTML = '<i class="fe fe-eye"></i><span>Preview: shown before its release on <b></b></span><a href="#">Leave preview</a>';
-          bar.querySelector("b").textContent = when();
-          bar.querySelector("a").onclick = function (e) {
-            e.preventDefault();
-            try { localStorage.removeItem(key); } catch (err) {}
-            location.reload();
-          };
-          body.appendChild(bar);
-        }
-        document.addEventListener("DOMContentLoaded", function () {
-          each("[data-c42-when]", function (el) { el.textContent = when(); });
-          if (preview) { release(); previewBar(); return; }
-          paint();
-          if (!done) {
-            var timer = setInterval(function () { paint(); if (done) clearInterval(timer); }, 1000);
-          }
-        });
-      })();
-    </script>
+  <body>
     
 
     <!-- NAVBAR -->
@@ -406,11 +352,11 @@
             
             <a href="#register" class="btn ev-btn ev-btn-main lift">
               <i class="fe fe-user-check me-2"></i>
-              <span class="c42-before">Subscribe to watch</span><span class="c42-after">Subscribe</span>
+              Subscribe
             </a>
             
             
-            <a class="btn ev-btn ev-btn-glass ev-tint-red lift c42-after" data-bigpicture='{"ytSrc": "jXDT1iRqvno"}' href="#">
+            <a class="btn ev-btn ev-btn-glass ev-tint-red lift" data-bigpicture='{"ytSrc": "jXDT1iRqvno"}' href="#">
               <i class="fe fe-youtube me-2"></i>
               Watch this talk
             </a>
@@ -442,20 +388,10 @@
 
         
         
-        <div class="c42-wall" id="watch">
-          <div class="c42-wall-cover">
-            <span class="c42-lock"><i class="fe fe-lock"></i></span>
-            
-            <span class="c42-wall-title">Video, transcript and slides releasing on <span data-c42-when>Thursday 19 November, 17:00 UTC</span></span>
-            <span class="c42-wall-count" data-c42-countdown></span>
-            <span class="c42-wall-note">Everything unlocks here at the kick-off, no need to reload.</span>
-          </div>
-          <div class="c42-wall-content">
-        
         <div class="tk-watch">
           <div class="tk-watch-main">
             <!-- 1. The <iframe> (and video player) will replace the #player <div>. 16:9 card; pinned on phones only -->
-            <div class="tk-player-card sticky" style="background: url(/mlops2026/conf42-mlops2026-artem-zamarajev-thumbnail.png) center / cover no-repeat, #0b1220;">
+            <div class="tk-player-card sticky">
               <div id="video-container">
                 <div id="player"></div>
               </div>
@@ -471,7 +407,7 @@
                 var firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
               }
-              c42OnRelease(loadYouTubeApi);
+              loadYouTubeApi();
 
               // 3. This function creates an <iframe> (and YouTube player)
               //    after the API code downloads.
@@ -1820,9 +1756,6 @@
           </script>
         
         
-          </div>
-        </div>
-        
         
 
         <div class="tk-cards tk-cards-solo">
@@ -1851,19 +1784,13 @@
           </div>
           
           
-          <div class="tk-card-block tk-slides c42-wall c42-wall-card" id="slides">
-            
-            <div class="c42-wall-cover">
-              <span class="c42-lock"><i class="fe fe-lock"></i></span>
-              <span class="c42-wall-title">Slides unlock with the video</span>
-            </div>
-            <div class="c42-wall-content">
+          <div class="tk-card-block tk-slides" id="slides">
             
             <h3><i class="fe fe-monitor"></i>Slides
               <a href="https://conf42.github.io/static/slides/Artem%20Zamarajev%20-%20Conf42%20MLOps%202026.pdf" class="tk-chip-btn tk-chip-ev ms-auto" target="_blank"><i class="fe fe-download me-2"></i>Download (PDF)</a>
             </h3>
-            <iframe data-c42-src="https://conf42.github.io/static/slides/Artem%20Zamarajev%20-%20Conf42%20MLOps%202026.pdf" width="100%" height="520" loading="lazy" title="Slides"></iframe>
-            </div>
+            <iframe src="https://conf42.github.io/static/slides/Artem%20Zamarajev%20-%20Conf42%20MLOps%202026.pdf" width="100%" height="520" loading="lazy" title="Slides"></iframe>
+            
           </div>
           
           

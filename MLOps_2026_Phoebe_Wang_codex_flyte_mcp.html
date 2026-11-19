@@ -42,7 +42,7 @@
     <meta property="og:title" content="Build ML Workflows with Codex, Flyte, and MCP | Conf42"/>
     <meta property="og:description" content="AI coding tools can write ML code, but reliable execution still needs orchestration. This talk shows how to connect Codex to Flyte through MCP for a reproducible training or evaluation workflow.  I will talk about how OpenAI hosts Flyte for internal training, and how we developed MCP for integration with Codex.  Attendees will leave with a practical workflow pattern and a checklist for debugging, reproducibility, and safe execution."/>
     <meta property="og:url" content="https://www.conf42.com/MLOps_2026_Phoebe_Wang_codex_flyte_mcp"/>
-    
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoObject", "actor": [{"@type": "Person", "jobTitle": "Member of Technical Staff", "name": "Phoebe Wang", "sameAs": ["https://linkedin.com/in/phoebewang9912"], "url": "https://www.conf42.com/speaker_Phoebe_Wang", "worksFor": {"@type": "Organization", "name": "OpenAI"}}], "description": "AI coding tools can write ML code, but reliable execution still needs orchestration. This talk shows how to connect Codex to Flyte through MCP for a reproducible training or evaluation workflow. I will talk about how OpenAI hosts Flyte for internal training, and how we developed MCP for integration with Codex. Attendees will leave with a practical workflow pattern and a checklist for debugging, reproducibility, and safe execution.", "embedUrl": "https://www.youtube.com/embed/d-y1ADaRwGY", "inLanguage": "en", "isPartOf": {"@type": "Event", "name": "Conf42 MLOps 2026", "url": "https://www.conf42.com/mlops2026"}, "keywords": ["codex", "flyte", "mcp"], "name": "Build ML Workflows with Codex, Flyte, and MCP", "publisher": {"@id": "https://www.conf42.com/#organization", "@type": "Organization", "name": "Conf42", "url": "https://www.conf42.com/"}, "thumbnailUrl": ["https://i.ytimg.com/vi/d-y1ADaRwGY/hqdefault.jpg"], "transcript": "So hello everyone. My name is Phoebe, and I work on the ML infrastructure at OpenAI. so today we are going to talk about our internal training MCP, Codex, and how those things work together for the internal traditional ML model training. so imagine you just made a change to a model. The code looks great, and you submit the full training job, go back to what you were doing, and a little while later, you get a link to a failed run. The run on the screen is fictional. Loading the data worked, training failed, and because evaluation needs the trained model, evaluation never started. At this point, I want to know which step failed, what is reported, what is the error, and what I can test next. So if I give Codex that run link, it can look up the execution and help me decide where to start. And when I do have a model I\u0027m happy with, I can also use Codex again to help prepare, prepare it for model deploy. So how all those things fit together? At OpenAI, we host the Flyte for internal traditional ML training jobs. The Flyte card shows the Flyte architecture. Flyte is an open source, ML orchestration layer that helps with model training. So Flyte runs the steps in a workflow and records the state of each run. You can think of it as keeping a record of what the compute actually did. The middle card is MCP, which stands for Model Context Protocol. It\u0027s an open standard that lets an AI application use tools. A Flyte MCP server can expose a tool that looks up a run and returns its task state and recorded errors. Codex is where I ask the question. I share the run link. The Codex calls the Flyte tool, and I get an answer based on that execution. The useful handoff is the link. I can share the same link with a teammate, and we can start from the same run A workflow defines the step and how they depend on each other. A run is an attempt to carry out those steps. Here we have a small image classifier. It loads a data set, trains the model, and evaluates it on a separate split, split of the data. Run forty-one finished all three steps. Run forty-two stopped in training. Both came from the same workflow. That history matters when you are trying to reproduce a result. Suppose my-- I open my editor the next morning, and I\u0027ve made three more changes. Which version of the code did the failed job actually run? Did it use the same data set as the last successful run? Did I change the batch size or did I give it a different kind of GPU? I keep the run link and record the workflow version, the software environment, the data set environment, and the input. For this classifier, that includes the evaluation split and the batch size. If I change one thing in the next run, those records give me a fair comparison. They also let me trace a model I want to serve, serve, serve back to the run that produced it So the next question is, how Codex, how Codex asks Flyte to get the, all the information. The integration answers a s- a small question. Given a link, can Codex tell which step failed and what Flyte recorded? That gives the tool a narrow read-only job. So when I ask about run 42, the link tells Codex which execution to look up. The Flyte MCP tool can return the run state, the task that failed, and the available error details. here, Flyte says that the run step ran out of GPU memory. It also tells us evaluation was skipped, so I can focus on training first. For a team building a similar integration, start with the information someone would normally open the workflow UI to find. Give the tool a way to identify the exact run. Return the task and error in a form that the agent can refer to. Keep access scoped to the runs, to, to the runs the caller is allowed to see. So that, those are the principles that we follow when designing the MCP. So Codex CLI is the coding agent I can use from my terminal. Once it has the execution detail, I can ask it to explain the error and help me find the setting I would change. In this example, the evidence is an out of memory error in training. The suggestion is to try a smaller batch. A batch is the set of examples the model processes together. A smaller batch usually means the training step needs to keep fewer things in GPU memory at once. That gives me a reasonable first test. I can check the training configuration, change the batch size in a small run, and see if the, if the same step gets further. So usually, I would review the change before submit a run. I\u0027d also check the evaluation score afterwards. A smaller batch can change the training behavior, so finishing the run and getting a model we want to keep are two things I need to verify. So, if a training run fails, what happens if we have the MCP integration? Here\u0027s what it looks like in practice. I paste the link and ask, \"What, what failed in this run, and what should I check first?\" Codex uses the link to find the failed task and bring the relevant error into the conversation. The first part of the response is the evidence. For example, the error link, the, exact error trace that Flyte returns. So-- And then Codex is able to update the co- local model training code and the local environment to start the modified training again. So here it is from training to GPU serving. So after training, we usually want to deploy the model. so the top row is what we just discussed. Codex, Flyte MCP and Flyte work together for model training purposes. And after we get a model that we are happy with, we have a model artifact. We need to deploy it for real serving purposes. And for the ease of deploy model, and especially we want to end-to-end test the model\u0027s performance, including latency and availability or things like that. We want, we want to deploy very fast for experiment models. So what we made is a GPU deploy skill in Codex so that we are able to ask Codex to deploy the model in GPU for serving purposes. So in this example, my request would be, prepare a test deployment of the version three of the classifier and show me the change for review. So that gives Codex a model, a version, a target to deploy, and a clear point to hand it back to me So So that\u0027s it all for today\u0027s presentation. Thank you", "uploadDate": "2026-11-19T17:00:00Z", "url": "https://www.conf42.com/MLOps_2026_Phoebe_Wang_codex_flyte_mcp"}</script>
     
 
     <link rel="shortcut icon" href="./assets/favicon/favicon.ico" type="image/x-icon" />
@@ -69,61 +69,7 @@
   </head>
   
   
-  <body data-c42-release="2026-11-19T17:00:00Z" data-c42-event="mlops2026">
-    
-    <script>
-      (function () {
-        var body = document.body, at = new Date(body.getAttribute("data-c42-release")).getTime();
-        var key = "c42-show:" + body.getAttribute("data-c42-event"), done = false, queue = [], preview = false;
-        try { preview = localStorage.getItem(key) === "1"; } catch (e) {}
-        // talk pages queue what may only start at release (the YouTube player)
-        window.c42OnRelease = function (fn) { if (done) fn(); else queue.push(fn); };
-        function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
-        function release() {
-          if (done) return;
-          done = true;
-          body.classList.add("c42-released");
-          each("[data-c42-src]", function (el) { el.setAttribute("src", el.getAttribute("data-c42-src")); });
-          while (queue.length) { try { queue.shift()(); } catch (e) {} }
-        }
-        // "Thursday 1 October at 18:00 your time", in the visitor's language and zone
-        function when() {
-          try {
-            return new Intl.DateTimeFormat(undefined, {weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit"}).format(new Date(at)) + " your time";
-          } catch (e) { return new Date(at).toString(); }
-        }
-        function left(ms) {
-          var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
-          var p = function (n) { return (n < 10 ? "0" : "") + n; };
-          return d ? d + "d " + h + "h " + p(m) + "m" : h ? h + "h " + p(m) + "m " + p(x) + "s" : m + "m " + p(x) + "s";
-        }
-        function paint() {
-          var ms = at - Date.now();
-          each("[data-c42-countdown]", function (el) { el.textContent = left(ms); });
-          if (ms <= 0) release();
-        }
-        function previewBar() {
-          var bar = document.createElement("div");
-          bar.className = "c42-preview-bar";
-          bar.innerHTML = '<i class="fe fe-eye"></i><span>Preview: shown before its release on <b></b></span><a href="#">Leave preview</a>';
-          bar.querySelector("b").textContent = when();
-          bar.querySelector("a").onclick = function (e) {
-            e.preventDefault();
-            try { localStorage.removeItem(key); } catch (err) {}
-            location.reload();
-          };
-          body.appendChild(bar);
-        }
-        document.addEventListener("DOMContentLoaded", function () {
-          each("[data-c42-when]", function (el) { el.textContent = when(); });
-          if (preview) { release(); previewBar(); return; }
-          paint();
-          if (!done) {
-            var timer = setInterval(function () { paint(); if (done) clearInterval(timer); }, 1000);
-          }
-        });
-      })();
-    </script>
+  <body>
     
 
     <!-- NAVBAR -->
@@ -406,11 +352,11 @@
             
             <a href="#register" class="btn ev-btn ev-btn-main lift">
               <i class="fe fe-user-check me-2"></i>
-              <span class="c42-before">Subscribe to watch</span><span class="c42-after">Subscribe</span>
+              Subscribe
             </a>
             
             
-            <a class="btn ev-btn ev-btn-glass ev-tint-red lift c42-after" data-bigpicture='{"ytSrc": "d-y1ADaRwGY"}' href="#">
+            <a class="btn ev-btn ev-btn-glass ev-tint-red lift" data-bigpicture='{"ytSrc": "d-y1ADaRwGY"}' href="#">
               <i class="fe fe-youtube me-2"></i>
               Watch this talk
             </a>
@@ -442,20 +388,10 @@
 
         
         
-        <div class="c42-wall" id="watch">
-          <div class="c42-wall-cover">
-            <span class="c42-lock"><i class="fe fe-lock"></i></span>
-            
-            <span class="c42-wall-title">Video, transcript and slides releasing on <span data-c42-when>Thursday 19 November, 17:00 UTC</span></span>
-            <span class="c42-wall-count" data-c42-countdown></span>
-            <span class="c42-wall-note">Everything unlocks here at the kick-off, no need to reload.</span>
-          </div>
-          <div class="c42-wall-content">
-        
         <div class="tk-watch">
           <div class="tk-watch-main">
             <!-- 1. The <iframe> (and video player) will replace the #player <div>. 16:9 card; pinned on phones only -->
-            <div class="tk-player-card sticky" style="background: url(/mlops2026/conf42-mlops2026-phoebe-wang-thumbnail.png) center / cover no-repeat, #0b1220;">
+            <div class="tk-player-card sticky">
               <div id="video-container">
                 <div id="player"></div>
               </div>
@@ -471,7 +407,7 @@
                 var firstScriptTag = document.getElementsByTagName('script')[0];
                 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
               }
-              c42OnRelease(loadYouTubeApi);
+              loadYouTubeApi();
 
               // 3. This function creates an <iframe> (and YouTube player)
               //    after the API code downloads.
@@ -1339,9 +1275,6 @@
           </script>
         
         
-          </div>
-        </div>
-        
         
 
         <div class="tk-cards tk-cards-solo">
@@ -1363,19 +1296,13 @@
           </div>
           
           
-          <div class="tk-card-block tk-slides c42-wall c42-wall-card" id="slides">
-            
-            <div class="c42-wall-cover">
-              <span class="c42-lock"><i class="fe fe-lock"></i></span>
-              <span class="c42-wall-title">Slides unlock with the video</span>
-            </div>
-            <div class="c42-wall-content">
+          <div class="tk-card-block tk-slides" id="slides">
             
             <h3><i class="fe fe-monitor"></i>Slides
               <a href="https://conf42.github.io/static/slides/Phoebe%20Wang%20-%20Conf42%20MLOps%202026.pdf" class="tk-chip-btn tk-chip-ev ms-auto" target="_blank"><i class="fe fe-download me-2"></i>Download (PDF)</a>
             </h3>
-            <iframe data-c42-src="https://conf42.github.io/static/slides/Phoebe%20Wang%20-%20Conf42%20MLOps%202026.pdf" width="100%" height="520" loading="lazy" title="Slides"></iframe>
-            </div>
+            <iframe src="https://conf42.github.io/static/slides/Phoebe%20Wang%20-%20Conf42%20MLOps%202026.pdf" width="100%" height="520" loading="lazy" title="Slides"></iframe>
+            
           </div>
           
           
