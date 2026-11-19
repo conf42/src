@@ -49,7 +49,25 @@ def main():
     blob = bytes(range(256)) * 1 + b"x" * 9
     open(path, "wb").write(blob)
     fid = d.upload(path, "FOLDER", chunk=10, log=lambda *a: None)
-    for what, ok in [("uploaded whole, in order, after a dropped piece", fid == "F1" and bytes(got) == blob),
+    empty = os.path.join(os.path.dirname(path), "empty.pdf")
+    open(empty, "wb").close()
+    seen = []
+    gdrive.requests.put = lambda url, data=None, headers=None, timeout=None: seen.append(headers["Content-Range"]) or R(200, j={"id": "E"})
+    e_id = d.upload(empty, "FOLDER", log=lambda *a: None)
+    calls_down = []
+
+    def down(url, data=None, headers=None, timeout=None):
+        calls_down.append(1)
+        return R(503)
+    gdrive.requests.put = down
+    try:
+        d.upload(path, "FOLDER", chunk=10, log=lambda *a: None, tries=3)
+        gave_up = False
+    except RuntimeError:
+        gave_up = True
+    for what, ok in [("an empty file: one 'bytes */0'", e_id == "E" and seen == ["bytes */0"]),
+                     ("Drive down for good: gives up after the cap", gave_up and len(calls_down) < 20),
+                     ("uploaded whole, in order, after a dropped piece", fid == "F1" and bytes(got) == blob),
                      ("into the folder under its real name", calls[0][1] == {"name": "Sunil Gattupalle - talk.mp4",
                                                                             "parents": ["FOLDER"]})]:
         print("%s  %s" % ("ok  " if ok else "FAIL", what))

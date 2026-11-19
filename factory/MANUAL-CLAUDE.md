@@ -72,6 +72,12 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - Fast track hardened after a Fable review: assets go up as f00.mp4 ... (symlinks) + names.json, so
+  accents/spaces survive; the workflow sweeps EVERY waiting `fasttrack-*` draft (a queued run can be dropped by the
+  concurrency group; a failed one stays for the next pass), skips files already in the folder (name + size), 60 min
+  cap; `Drive.upload` caps failed pieces (30), guards the status query, trusts Range only on 308, handles 0-byte
+  files. fasttrack.sh checks files + 2 GiB and keeps the draft if dispatch fails (next pass takes it).
+
 - **2026-11-19** - Upload script v9: `?list` also answers `tabs` {tab: gid} of Excels_for_WWW; `gdrive.Drive.tabs` keeps it and
   `sheetcsv.download` uses it first (the script's token comes from its hidden default Cloud project, where the Sheets
   API cannot be enabled - 403). Then the Sheets API, then `sheetcsv.GIDS` (2026 tabs) as a stopgap.

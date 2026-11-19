@@ -134,15 +134,20 @@ def main(argv):
         return
     if cmd == "fasttrack-in":                            # factory fast track: files from a draft release -> Manual upload
         from . import gdrive                             # folder, so this pass takes them (Marek 2026-11-19)
-        folder = str(pipeline.settings().get("cloud_manual_folder") or "").strip()
+        from .drive import folder_id
+        folder = folder_id(str(pipeline.settings().get("cloud_manual_folder") or "").strip())
         d, names = gdrive.Drive(), {}
-        if os.path.exists(os.path.join(argv[1], "names.json")):       # GitHub turns spaces into dots: real names
+        if os.path.exists(os.path.join(argv[1], "names.json")):       # assets are f00.mp4 ...: their real names
             names = json.load(open(os.path.join(argv[1], "names.json"), encoding="utf-8"))
-        key = lambda n: "".join(c for c in n.lower() if c.isalnum())   # noqa: E731 - same name, punctuation aside
-        loose = {key(k): v for k, v in names.items()}
+        there = {(f["name"], int(f.get("size") or 0)) for f in d.children(folder)}
         for f in sorted(os.listdir(argv[1])):
-            if f != "names.json":
-                d.upload(os.path.join(argv[1], f), folder, names.get(f) or loose.get(key(f)) or f)
+            if f == "names.json":
+                continue
+            p, real = os.path.join(argv[1], f), names.get(f, f)
+            if (real, os.path.getsize(p)) in there:
+                print("drive: %s already in the Manual upload folder" % real)
+                continue
+            d.upload(p, folder, real)
         return
     if cmd == "playlist-fix":                            # an event's playlist in the website's order (cloud: YOUTUBE_OAUTH_JSON)
         from . import ytupload

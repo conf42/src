@@ -1,20 +1,32 @@
 #!/bin/bash
-# Factory fast track (Marek 2026-11-19): talk files from this Mac straight into the cloud factory, no Drive upload.
+# Factory fast track (Marek 2026-11-19; manual only - when Marek says "fast track"): talk files from this Mac straight
+# into the cloud factory, no Drive upload by hand.
 #   factory/fasttrack.sh <short_url> <file> [<file>...]
-# The files go to a draft release of conf42/src (only people with write access can see a draft); the workflow
-# "factory cloud" (input fasttrack) puts them in the Manual upload folder under their real names, runs the event
-# and deletes the draft. File names must carry the speaker's name, like the Manual upload folder wants.
+# The files go to a draft release of conf42/src (a draft and its files are seen only by people with write access),
+# as f00.mp4, f01.pdf ... + names.json with their real names (GitHub would mangle spaces and accents). The workflow
+# "factory cloud" puts every fasttrack-* draft in the Manual upload folder under the real names, deletes it, and runs
+# the event. File names must carry the speaker's name, like the Manual upload folder wants. GitHub: 2 GiB a file.
 set -euo pipefail
+[ $# -ge 2 ] || { echo "usage: fasttrack.sh <short_url> <file>..."; exit 1; }
 ev="$1"; shift
-[ $# -gt 0 ] || { echo "usage: fasttrack.sh <short_url> <file>..."; exit 1; }
+for f in "$@"; do
+  [ -f "$f" ] || { echo "no file: $f"; exit 1; }
+  [ "$(stat -f %z "$f")" -lt 2147483648 ] || { echo "over GitHub's 2 GiB: $f - use the Drive upload"; exit 1; }
+done
 tag="fasttrack-$ev-$(date -u +%Y%m%d%H%M%S)"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-python3 - "$tmp/names.json" "$@" <<'PY'
-import json, os, re, sys
-# GitHub's asset name: anything outside [A-Za-z0-9._-] becomes ".", runs of dots collapse
-names = {re.sub(r"\.+", ".", re.sub(r"[^A-Za-z0-9._-]", ".", os.path.basename(f))): os.path.basename(f) for f in sys.argv[2:]}
-json.dump(names, open(sys.argv[1], "w"), ensure_ascii=False)
+python3 - "$tmp" "$@" <<'PY'
+import json, os, sys
+tmp, names = sys.argv[1], {}
+for i, f in enumerate(sys.argv[2:]):
+    neutral = "f%02d%s" % (i, os.path.splitext(f)[1].lower())
+    os.symlink(os.path.abspath(f), os.path.join(tmp, neutral))      # no copy of a 1 GB video
+    names[neutral] = os.path.basename(f)
+json.dump(names, open(os.path.join(tmp, "names.json"), "w"), ensure_ascii=False)
 PY
-gh release create "$tag" --repo conf42/src --draft --title "$tag" --notes "factory fast track for $ev (deleted by the pass)" "$@" "$tmp/names.json"
-gh workflow run factory-cloud.yml --repo conf42/src -f event="$ev" -f fasttrack="$tag"
+gh release create "$tag" --repo conf42/src --draft --title "$tag" --notes "factory fast track for $ev (deleted by the pass)" "$tmp"/*
+if ! gh workflow run factory-cloud.yml --repo conf42/src -f event="$ev" -f fasttrack="$tag"; then
+  echo "could not start the workflow - the draft $tag stays; the next factory pass picks it up anyway"
+  exit 1
+fi
 echo "fast track $tag started: https://github.com/conf42/src/actions/workflows/factory-cloud.yml"
