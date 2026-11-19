@@ -611,6 +611,9 @@ def site_order(talks):
     return out
 
 
+PAUSE = time.sleep                                       # tests swap it out
+
+
 def readd_plan(current, wanted):
     """current: video ids in playlist order; wanted: our talks' video ids in page order. Marek 2026-11-18: add the
     talks to the playlist in the website order - works whatever the playlist's sorting is (except newest first), no
@@ -629,6 +632,11 @@ def playlist_order(yt, ev, cfg, done, run=None):
     adding are 50 units each; a playlist already in order costs one list call. Never fails the pass. A pass stopped
     halfway (quota) leaves talks out of the playlist for a few hours: the next pass adds them, still in order."""
     if (cfg.get("youtube") or {}).get("playlist_sort") is False:
+        return
+    if ev.get("_playlist_sorted"):                       # once a pass: re-adding costs 100 units a talk
+        return
+    resume = str((cfg.get("youtube") or {}).get("playlist_sort_from") or "")   # a pause until a time (quota day)
+    if resume and datetime.datetime.now(datetime.timezone.utc) < datetime.datetime.fromisoformat(resume.replace("Z", "+00:00")):
         return
     try:
         order = site_order(events.talks(ev))
@@ -654,7 +662,9 @@ def playlist_order(yt, ev, cfg, done, run=None):
                     yield "youtube: playlist not sorted - could not take out %s (%s)" % (key_of[v], msg[:120])
                     return
         for n, v in enumerate(readd):                    # then back in, in the order of the event page
-            ok, msg = yt.add_to_playlist(pid, v)
+            if n:                                        # YouTube keeps the time added to the second: two in the same
+                PAUSE(1.2)                               # second tie, and a newest-first playlist hands ties back
+            ok, msg = yt.add_to_playlist(pid, v)         # reversed - the pass re-added all of them every time (2026-11-19)
             if not ok:
                 yield "youtube: playlist - %d of %d talks added back in order, then: %s (the next pass goes on)" % (
                     n, len(readd), msg[:160])
@@ -662,6 +672,7 @@ def playlist_order(yt, ev, cfg, done, run=None):
             done[key_of[v]]["playlist"] = True
             done[key_of[v]].pop("playlist_note", None)
         save(ev["short_url"], done)
+        ev["_playlist_sorted"] = True
         yield "youtube: playlist in the event page's order (%d talks kept, %d added in order)" % (len(keep), len(readd))
     except Exception as e:                               # noqa: BLE001 - sorting never fails the pass
         yield "youtube: playlist not sorted (%s)" % str(e)[:200]

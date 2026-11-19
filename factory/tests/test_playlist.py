@@ -82,6 +82,7 @@ def main():
     check("from the first one out of place, the rest is re-added in order",
           ytupload.readd_plan(["a", "c", "b"], ["a", "b", "c", "d"]) == (["a"], ["b", "c", "d"]))
 
+    ytupload.PAUSE = lambda s: None
     # a whole pass
     ytupload.REPO_RUNS = tempfile.mkdtemp(prefix="playlist-test-")
     events_talks = events.talks
@@ -102,11 +103,16 @@ def main():
         check("someone else's video stays", "intro" in yt.by_position())
         check("log says so", any("order" in l for l in log))
         yt.calls.clear()
+        ev.pop("_playlist_sorted", None)
         list(ytupload.playlist_order(yt, ev, {}, done))
         check("next pass: one list call, nothing else", [c[0] for c in yt.calls] == ["list"])
         # positions right but added in the wrong order (the 15 moves of 2026-11-18): fixed by re-adding
         ytm = FakeYT(["vk", "va", "vc", "vb"], added={"vk": 4, "va": 3, "vc": 2, "vb": 1})
+        ev.pop("_playlist_sorted", None)
         list(ytupload.playlist_order(ytm, ev, {}, done))
+        n = len(ytm.calls)
+        list(ytupload.playlist_order(ytm, ev, {}, done))
+        check("re-sorted at most once a pass", len(ytm.calls) == n)
         check("moved-but-not-re-added playlist gets re-added in order", ytm.by_date() == ["vk", "va", "vc", "vb"])
         yt2 = FakeYT([])
         list(ytupload.playlist_order(yt2, {"short_url": "test2027", "name": "MLOps", "year": 2027}, {}, done))
