@@ -81,6 +81,18 @@ def main():
                  ("sheet first: a named event even before it starts", sorted(cloud.sheet_first(act, ["later"])) == ["later"])]
     except ImportError as e:                             # the Mac has no requests: cloud.py checked in CI only
         cases = [("cloud.sheet_first skipped here (%s)" % e, True)]
+    from factory import slides
+    sd = tempfile.mkdtemp()
+    open(os.path.join(sd, "Sunil Gattupalle - Harness - Conf42 MLOps 2026.pdf"), "wb").write(b"%PDF-1.4 tiny")
+    open(os.path.join(sd, "Ada Lovelace - Conf42 MLOps 2026.pdf"), "wb").write(b"%PDF-1.4 done")
+    tl = [{"speakers": n, "name1": n, "name2": "", "title": "t"} for n in ("Sunil Gattupalle", "Ada Lovelace")]
+    try:
+        slides.prepare(sd, {"title": "Conf42 MLOps 2026"}, tl)
+    except Exception as e:                               # noqa: BLE001 - compress tools missing here: the rename came first
+        print("     (prepare stopped after the rename: %s)" % str(e)[:80])
+    have = sorted(os.listdir(sd))
+    cases.append(("a deck named '<speaker> - <company> - <event>' is renamed for the site, not taken as done",
+                  "Sunil Gattupalle - Conf42 MLOps 2026.pdf" in have and "Ada Lovelace - Conf42 MLOps 2026.pdf" in have))
     for what, ok in cases:
         print("%s  %s" % ("ok  " if ok else "FAIL", what))
         if not ok:

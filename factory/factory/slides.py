@@ -117,7 +117,9 @@ def prepare(slides_dir, ev, talk_list, max_mb=5):
         name = os.path.basename(path)
         if not name.lower().endswith(SLIDE_EXT):
             continue
-        if _done_name(name, ev["title"]):                        # already processed on an earlier run
+        # already processed on an earlier run: exactly "<speakers> - <event title>.pdf" - not any file that ends like
+        # it ("Sunil Gattupalle - Harness - Conf42 MLOps 2026.pdf" sat as "done" and never shipped, 2026-11-19)
+        if _done_name(name, ev["title"]) and name[:-len(" - %s.pdf" % ev["title"])] in {t["speakers"] for t in talk_list}:
             report["decks"][name.split(" - Conf42")[0]] = name
             continue
         stem = os.path.splitext(name)[0].replace("(1)", "").replace("(2)", "")

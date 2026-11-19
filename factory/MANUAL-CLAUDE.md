@@ -72,6 +72,10 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - `slides.prepare`: a deck counts as already processed only when named exactly "<speakers> - <event title>.pdf".
+  "Sunil Gattupalle - Harness - Conf42 MLOps 2026.pdf" ended the same way, was taken as done and never shipped
+  (shipped by hand). Fast track renames: "<Speaker> - <Company> - <Event>" is fine now.
+
 - **2026-11-19** - `sheetcsv.ship` guard: no push when any Name1 on the site is missing from the tab (was: under half the
   rows) - the factory never takes a talk off a page by itself; Marek's purges ship with `sheet_force`. Found: FF/Prompt/
   Platform 2026 tabs are purged (16/18/26 vs 31/33/39 on the site) and would have shrunk at the next pass.
