@@ -1,5 +1,12 @@
 # Conf42 Chaos Engineering 2026 - factory launches (newest first, written by the factory)
 
+## 2026-11-19 14:47 · cloud (GitHub Actions) · run
+- Drive: 7 files, 3 downloaded (Haim Michael_zero_latency_20261115_2340.pptx, Akbar Dizaji - Chaos Engineering in .NET with Polly - Conf42 2026.mp4.mp4, Chaos-Engineering-Is-Not-Just-Killing-Pods_Akbar-Dizaji.pdf), 2 up to date, 0 newer, 1 new
+- processed: Akbar Dizaji - done
+- finished before, untouched: 2
+- ship: 1 transcripts, 1 decks
+- Descript project Conf42 Chaos Engineering 2026: 4 compositions, 4 published
+
 ## 2026-11-18 14:29 · cloud (GitHub Actions) · run
 - Drive: 5 files, 5 downloaded (Fuad Laguda - Conf42 Chaos Engineering 2026.mp4, Fuad Laguda - Conf42 Chaos Engineering 2026.pdf, Haim Michael_zero_latency_20261115_2340.pdf, Haim Michael_zero_latency_20261115_2340.pptx, haim_michael.mp4), 0 up to date, 0 newer, 2 new
 - processed: Fuad Laguda - done (flags: picture changes at 0:08.0 - check the start (setup screen?)); Haim Michael - done
