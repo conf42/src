@@ -106,6 +106,15 @@ def webp_small_url(url):
     return webp_url(url, "webp/sm")
 env.filters["webp_sm"] = webp_small_url
 env.filters["markdown"] = lambda x: markdown.markdown(x)
+# the talk's Conf42 thumbnail (teasers.py names it: conf42-<event>-<speakers>-thumbnail.png next to the teasers page).
+# The locked talk page shows it behind the countdown: a scheduled (private) video has only a grey frame on YouTube
+# (Marek 2026-11-19)
+def talk_thumbnail(talk, event):
+    from .teasers import _slug
+    names = " ".join(n for n in ((talk.get("Name1") or "").strip(), (talk.get("Name2") or "").strip()) if n)
+    slug = event["short_url"].replace(".html", "")
+    return "/%s/conf42-%s-%s-thumbnail.png" % (slug, slug, _slug(names) or "talk")
+env.filters["talk_thumbnail"] = talk_thumbnail
 # "December 3 2026", not "December 03 2026" (Marek 2026-10-12)
 env.filters["long_date"] = lambda d: "%s %d %d" % (d.strftime("%B"), d.day, d.year)
 
