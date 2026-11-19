@@ -72,6 +72,11 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - Videos follow the website's release (`ytupload.release_time` = metadata `release_at`, else 17:00 UTC on
+  the day - same as build/events.py): uploaded before it -> private + `publishAt` (YouTube publishes at the kick-off);
+  after it -> public. `schedule_sweep` schedules earlier uploads (unlisted) while the release is ahead - past events are
+  never touched. Off: `youtube.schedule: false`. First run: MLOps 2026 (22 videos, 17:00 UTC).
+
 - **2026-11-19** - `slides.prepare`: a deck counts as already processed only when named exactly "<speakers> - <event title>.pdf".
   "Sunil Gattupalle - Harness - Conf42 MLOps 2026.pdf" ended the same way, was taken as done and never shipped
   (shipped by hand). Fast track renames: "<Speaker> - <Company> - <Event>" is fine now.

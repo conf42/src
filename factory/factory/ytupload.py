@@ -19,6 +19,7 @@ Auth: secret YOUTUBE_OAUTH_JSON = {"client_id", "client_secret", "refresh_token"
 `python -m factory youtube-login <client_secret.json>` by the account that manages the Conf42 channel. The Google
 Cloud consent screen must be "In production" (or Internal): in Testing mode refresh tokens die after 7 days.
 """
+import datetime
 import io
 import json
 import os
@@ -232,6 +233,15 @@ class YouTube:
         return items[0] if items else None
 
 
+    def schedule(self, video_id, when):
+        """Private now, public at `when` (UTC datetime) - YouTube's own scheduler. The other status fields are kept."""
+        cur = (self.status(video_id) or {}).get("status") or {}
+        st = {k: cur[k] for k in ("selfDeclaredMadeForKids", "embeddable", "license", "publicStatsViewable") if k in cur}
+        st.update(privacyStatus="private", publishAt=when.strftime("%Y-%m-%dT%H:%M:%SZ"))
+        r = self.call("PUT", API + "/videos", params={"part": "status"}, json={"id": video_id, "status": st})
+        return r.status_code == 200, r.text[:200]
+
+
 class QuotaExceeded(RuntimeError):
     pass
 
@@ -272,6 +282,52 @@ def valid_chapters(chapters, length=None):
     return keep, "" if len(keep) == len(cs) else "%d chapter(s) too close together - dropped" % (len(cs) - len(keep))
 
 
+def release_time(ev):
+    """When the website unlocks the event's talks (build/events.py release_time): metadata release_at, else 17:00 UTC
+    on the event day - the kick-off."""
+    v = str(ev.get("release_at") or "").strip()
+    if v:
+        t = datetime.datetime.fromisoformat(v.replace("Z", "+00:00"))
+        return (t if t.tzinfo else t.replace(tzinfo=datetime.timezone.utc)).astimezone(datetime.timezone.utc)
+    d = datetime.date.fromisoformat(str(ev.get("date"))[:10])
+    return datetime.datetime.combine(d, datetime.time(17, 0), tzinfo=datetime.timezone.utc)
+
+
+def release_plan(ev, cfg, now=None):
+    """(privacy, publish_at) for a talk uploaded now (Marek 2026-11-19: "schedule talks according to the on-website
+    schedule" - the talk pages unlock at the kick-off, so do the videos): before the release private + YouTube
+    publishes it then; after it public, like the site. Off with youtube.schedule: false (then settings privacy)."""
+    yt = cfg.get("youtube") or {}
+    if str(yt.get("schedule", True)).lower() in ("false", "0", "no"):
+        return str(yt.get("privacy") or "unlisted"), None
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    when = release_time(ev)
+    if when > now + datetime.timedelta(minutes=10):
+        return "private", when
+    return "public", None
+
+
+def schedule_sweep(yt, ev, cfg, done, now=None):
+    """Talks uploaded before this existed (unlisted) or by hand: scheduled for the release too - only while the
+    release is still ahead, so a past event's videos are never touched."""
+    privacy, when = release_plan(ev, cfg, now)
+    if not when:
+        return
+    changed = False
+    for key, rec in sorted(done.items()):
+        if not rec.get("id") or rec.get("test") or rec.get("publish_at"):
+            continue
+        ok, msg = yt.schedule(rec["id"], when)
+        if ok:
+            rec.update(privacy="private", publish_at=when.strftime("%Y-%m-%dT%H:%M:%SZ"))
+            changed = True
+            yield "youtube: %s goes public at %s UTC (the website's release)" % (key, when.strftime("%Y-%m-%d %H:%M"))
+        else:
+            yield "youtube: %s not scheduled (%s)" % (key, msg)
+    if changed:
+        save(ev["short_url"], done)
+
+
 def video_body(ev, cfg, row, chapters, written=None, keywords="", length=None):
     ch, note = valid_chapters(chapters, length)
     title, lines = youtube.block(ev, cfg, row, ch, written)
@@ -287,6 +343,10 @@ def video_body(ev, cfg, row, chapters, written=None, keywords="", length=None):
                         "categoryId": str(yt.get("category_id") or 28), "defaultLanguage": "en", "defaultAudioLanguage": "en"},
             "status": {"privacyStatus": str(yt.get("privacy") or "unlisted"), "selfDeclaredMadeForKids": False,
                        "embeddable": True, "license": "youtube"}}
+    privacy, when = release_plan(ev, cfg)
+    body["status"]["privacyStatus"] = privacy
+    if when:
+        body["status"]["publishAt"] = when.strftime("%Y-%m-%dT%H:%M:%SZ")
     return body, note
 
 
@@ -373,6 +433,7 @@ def event(run, cfg):
         yield msg
     todo = [k for k, t in sorted(run.state["talks"].items())
             if t.get("finished") and (not (done.get(k) or {}).get("id") or redone_since(t, done[k]))]
+    yield from schedule_sweep(yt, ev, cfg, done)
     if not todo:
         yield from playlist_order(yt, ev, cfg, done, run)
         yield from sheet_links(ev, done, raw)             # links of earlier passes that are not in the sheet yet
@@ -400,7 +461,10 @@ def event(run, cfg):
         if is_test:                                       # the factory's own test talk: unlisted whatever the settings say
             body["snippet"]["title"] = clean_text("[TEST] " + body["snippet"]["title"], 100)
             body["status"]["privacyStatus"] = "unlisted"
+        body["status"].pop("publishAt", None) if is_test else None
         rec = {"title": body["snippet"]["title"], "privacy": body["status"]["privacyStatus"], "redone": len(t.get("redone") or [])}
+        if body["status"].get("publishAt"):
+            rec["publish_at"] = body["status"]["publishAt"]
         if is_test:
             rec["test"] = True
         old = done.get(key) or {}

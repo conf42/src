@@ -200,6 +200,37 @@ def main():
         check("playlist-fix again: nothing to do", any("already in the website's order" in l for l in out))
     finally:
         events.talks, events.event, ytupload.load = events_talks, events_event, ld
+    # the website's release (Marek 2026-11-19): private + publishAt before the kick-off, public after, sweep
+    import datetime as dt
+    utc = dt.timezone.utc
+    ev = {"short_url": "mlops2026", "date": "2026-11-19", "release_at": ""}
+    kick = dt.datetime(2026, 11, 19, 17, 0, tzinfo=utc)
+    check("release = 17:00 UTC on the day", ytupload.release_time(ev) == kick)
+    check("release_at wins", ytupload.release_time(dict(ev, release_at="2026-11-19T15:30:00Z")) == dt.datetime(2026, 11, 19, 15, 30, tzinfo=utc))
+    check("before: private, published at the kick-off", ytupload.release_plan(ev, {}, kick - dt.timedelta(hours=2)) == ("private", kick))
+    check("after: public", ytupload.release_plan(ev, {}, kick + dt.timedelta(hours=1)) == ("public", None))
+    check("switched off: settings privacy", ytupload.release_plan(ev, {"youtube": {"schedule": False}}, kick) == ("unlisted", None))
+
+    class SY:
+        def __init__(self):
+            self.done = []
+
+        def schedule(self, vid, when):
+            self.done.append((vid, when))
+            return True, ""
+    sy, saved = SY(), []
+    real_save = ytupload.save
+    ytupload.save = lambda slug, d: saved.append(slug)
+    try:
+        recs = {"A": {"id": "va", "privacy": "unlisted"}, "T": {"id": "vt", "test": True}, "B": {"id": "vb", "publish_at": "x"}}
+        list(ytupload.schedule_sweep(sy, ev, {}, recs, kick - dt.timedelta(hours=2)))
+        check("sweep: unlisted talk scheduled, test talk + already scheduled left", sy.done == [("va", kick)]
+              and recs["A"]["privacy"] == "private" and saved == ["mlops2026"])
+        sy2 = SY()
+        list(ytupload.schedule_sweep(sy2, ev, {}, {"A": {"id": "va"}}, kick + dt.timedelta(hours=1)))
+        check("sweep after the release: a past event is never touched", sy2.done == [])
+    finally:
+        ytupload.save = real_save
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 

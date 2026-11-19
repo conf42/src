@@ -181,6 +181,10 @@ the other one did.
 
 ## Changelog
 
+- **2026-11-19** - **Videos go public at the kick-off**: talks uploaded before the event are private on YouTube and
+  publish themselves when the website unlocks them (the kick-off, 17:00 UTC, or the event's own release time). Talks
+  uploaded after the kick-off go up public straight away. Older events' videos are never changed.
+
 - **2026-11-19** - **Factory fast track**: for a talk that must go out now, put the video (and deck) on your Desktop
   and tell Claude *"factory fast track for <event>"*. Claude finds the files, names them after the speaker and sends
   them to the cloud factory, which runs that event straight away. You don't upload to Drive; the files still land in
