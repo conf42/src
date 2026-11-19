@@ -78,9 +78,15 @@ def rows_in(text):
 def ship(ev, drive=None, git=None):
     """Download the event's tab, leave out the emails, write ev["db_path"], commit + push. Never fails the pass.
     Yields log lines."""
-    rel = (ev.get("db_path") or "").lstrip("./").replace("\\", "/")
+    rel = ev.get("db_path") or ""
+    if os.path.isabs(rel):                               # events.event gives it absolute (fixed 2026-11-19: ship
+        rel = os.path.relpath(rel, events.REPO)          # had quietly skipped every real event)
+    rel = rel.replace("\\", "/")
+    while rel.startswith("./"):
+        rel = rel[2:]
     tab = os.path.splitext(os.path.basename(rel))[0]
     if not rel.startswith("_db/") or not tab:
+        yield "sheet: not shipped - %s is not a _db/ CSV of this repo" % rel
         return
     path = os.path.join(events.REPO, *rel.split("/"))
     try:

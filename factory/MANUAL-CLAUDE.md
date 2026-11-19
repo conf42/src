@@ -72,6 +72,10 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - Fix: `sheetcsv.ship` skipped every real event without a word (events.event gives db_path absolute,
+  ship wanted `_db/...`), so the sheet -> CSV push of 2026-11-18 had never run. Now relative to events.REPO, and a
+  skip says so in the log. Test uses an absolute path.
+
 - **2026-11-19** - `cloud.sheet_first`: at the start of each pass (not dry runs), before Manual upload files are matched,
   the sheet tab of every event named for the pass (or, with none named, every started event) is shipped to its
   CSV (`sheetcsv.ship`). A talk added to the sheet late (Harness sponsor talk, MLOps 2026) was left as "no speaker

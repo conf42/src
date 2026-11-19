@@ -91,7 +91,7 @@ def main():
         run("git", *a, cwd=repo)
     git = lambda *a: subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True)
     events.REPO = repo
-    ev = {"short_url": "test2027", "db_path": "./_db/TEST_2027.csv"}
+    ev = {"short_url": "test2027", "db_path": os.path.join(repo, "_db", "TEST_2027.csv")}   # absolute, as events.event
     log = list(sheetcsv.ship(ev, FakeDrive(sheet), git))
     with open(os.path.join(repo, "_db", "TEST_2027.csv"), encoding="utf-8", newline="") as f:
         check("ship writes the sheet minus emails", f.read() == real)
