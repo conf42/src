@@ -59,13 +59,24 @@ def strip(text):
     return body, [rows[0][i] or "column %d (no header)" % (i + 1) for i in sorted(drop)]
 
 
+# tab -> gid of Excels_for_WWW (2026-11-19). A new event's tab: add it here (Claude: Sheets connector get_spreadsheet,
+# fields sheets.properties.sheetId + title) - or enable the Sheets API in the upload script's Google Cloud project.
+GIDS = {"CHAOS_2026": 1004923041, "MLOPS_2026": 791783887, "PLATFORM_2026": 1468852268, "PROMPT_2026": 1603890531,
+        "FEATUREFLAGS_2026": 269815288, "DEVSECOPS_2026": 199570246, "AGENTS_2026": 735001650, "OBSER_2026": 1211622988,
+        "REMIX_2026": 1723955295, "LLM_2026": 1659298365, "DBD_2026": 365454291, "GOLANG_2026": 1494134528,
+        "CLOUD_2026": 569684563, "SRE_2026": 31109235, "ML_2026": 760497841, "DEVOPS_2026": 1305191717}
+
+
 def download(drive, tab):
     """The tab as File > Download > CSV gives it (formulas as their values)."""
-    meta = drive._call("GET", "https://sheets.googleapis.com/v4/spreadsheets/%s" % SHEET_ID,
-                       params={"fields": "sheets.properties(sheetId,title)"}).json()
-    gid = next((s["properties"]["sheetId"] for s in meta.get("sheets", []) if s["properties"]["title"] == tab), None)
+    try:
+        meta = drive._call("GET", "https://sheets.googleapis.com/v4/spreadsheets/%s" % SHEET_ID,
+                           params={"fields": "sheets.properties(sheetId,title)"}).json()
+        gid = next((s["properties"]["sheetId"] for s in meta.get("sheets", []) if s["properties"]["title"] == tab), None)
+    except RuntimeError:                                 # the upload script's project has no Sheets API (403,
+        gid = GIDS.get(tab)                              # 2026-11-19): the tab ids, read with the Sheets connector
     if gid is None:
-        raise LookupError("no tab %s in Excels_for_WWW" % tab)
+        raise LookupError("no tab %s in Excels_for_WWW (or not in sheetcsv.GIDS)" % tab)
     r = drive._call("GET", "https://docs.google.com/spreadsheets/d/%s/export" % SHEET_ID,
                     params={"format": "csv", "gid": gid})
     return r.content.decode("utf-8")
