@@ -42,7 +42,7 @@ import tempfile
 import threading
 import traceback
 
-from . import app, drive as linkdrive, events, gdrive, intake, pipeline
+from . import app, drive as linkdrive, events, gdrive, intake, pipeline, sheetcsv
 
 
 def summary_md(lines):
@@ -81,6 +81,22 @@ def active_events(cfg, base=()):
                     out[slug] = ev
             except KeyError:
                 pass
+    return out
+
+
+def sheet_first(active, slugs=None, today=None):
+    """The events whose sheet tab goes to the site CSV at the start of a pass: the ones named for this pass, else
+    those that have started (the factory's own events - a future lineup ships when Marek says so)."""
+    if slugs:
+        return {s: ev for s, ev in active.items() if s in slugs}
+    today = today or datetime.date.today()
+    out = {}
+    for s, ev in active.items():
+        try:
+            if datetime.date.fromisoformat(str(ev.get("date", ""))[:10]) <= today:
+                out[s] = ev
+        except ValueError:
+            pass
     return out
 
 
@@ -342,6 +358,10 @@ def main(argv):
     if manual["id"]:
         try:
             active = active_events(cfg, set(intake_events(slugs)) | set(legacy))
+            if not dry:                                  # a talk added to the sheet late (a sponsor, Marek 2026-11-19)
+                for slug, ev in sheet_first(active, slugs).items():   # must be in the lineup before files are matched
+                    lines += ["- " + l for l in sheetcsv.ship(ev, drive)]
+                    ev.update(events.event(slug))
             manual["claims"], manual["owner"], unclaimed = manual_claims(pipeline.drive_files(manual["id"], drive), active)
             if slugs:
                 manual["claims"] = {s: c for s, c in manual["claims"].items() if s in slugs}

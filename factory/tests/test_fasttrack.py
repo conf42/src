@@ -55,6 +55,18 @@ def main():
         print("%s  %s" % ("ok  " if ok else "FAIL", what))
         if not ok:
             fails.append(what)
+    try:
+        from factory import cloud
+        import datetime
+        act = {"past": {"date": "2026-11-01"}, "today": {"date": "2026-11-19"}, "later": {"date": "2027-01-10"}, "x": {}}
+        cases = [("sheet first: started events only", sorted(cloud.sheet_first(act, None, datetime.date(2026, 11, 19))) == ["past", "today"]),
+                 ("sheet first: a named event even before it starts", sorted(cloud.sheet_first(act, ["later"])) == ["later"])]
+    except ImportError as e:                             # the Mac has no requests: cloud.py checked in CI only
+        cases = [("cloud.sheet_first skipped here (%s)" % e, True)]
+    for what, ok in cases:
+        print("%s  %s" % ("ok  " if ok else "FAIL", what))
+        if not ok:
+            fails.append(what)
     print("\nALL PASSED" if not fails else "\n%d FAILED" % len(fails))
     return 1 if fails else 0
 

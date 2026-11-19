@@ -72,6 +72,11 @@ on the list.
 
 ## Changelog
 
+- **2026-11-19** - `cloud.sheet_first`: at the start of each pass (not dry runs), before Manual upload files are matched,
+  the sheet tab of every event named for the pass (or, with none named, every started event) is shipped to its
+  CSV (`sheetcsv.ship`). A talk added to the sheet late (Harness sponsor talk, MLOps 2026) was left as "no speaker
+  of an upcoming or recent lineup" because the CSV only followed the sheet after YouTube links.
+
 - **2026-11-19** - **Factory fast track**: `factory/fasttrack.sh <short_url> <files>` (Mac, `gh` only - no Python deps or
   secrets on the Mac) puts the files in a draft release of conf42/src plus `names.json` (GitHub dots the spaces) and
   dispatches factory cloud with `fasttrack=<tag>`. The workflow downloads the draft, `python -m factory fasttrack-in`
