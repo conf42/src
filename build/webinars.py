@@ -43,4 +43,6 @@ def load_webinars(base_folder, path=WEBINARS_CSV):
     upcoming = sorted((w for w in webinars if not w["is_past"]), key=lambda w: w["start"])
     past = sorted((w for w in webinars if w["is_past"]), key=lambda w: w["start"], reverse=True)
     print("Webinars: %d upcoming, %d past" % (len(upcoming), len(past)))
-    return {"webinars": upcoming[:3] or past[:1], "webinars_past": not upcoming}
+    # "Previously" (Marek 2026-11-24): up to three past ones as small tiles under the main cards, never one shown above
+    previous = past[:3] if upcoming else past[1:4]
+    return {"webinars": upcoming[:3] or past[:1], "webinars_past": not upcoming, "webinars_previous": previous}
