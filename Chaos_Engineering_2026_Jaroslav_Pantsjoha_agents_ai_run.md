@@ -1,6 +1,6 @@
 # Solving the Run Phase: The Next Bottleneck for AI Agents
 
-A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Jaroslav Pantsjoha](https://www.conf42.com/speaker_Jaroslav_Pantsjoha) (Technical Director @ Cognizant). Page: https://www.conf42.com/Chaos_Engineering_2026_Jaroslav_Pantsjoha_agents_ai_run
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Jaroslav Pantsjoha](https://www.conf42.com/speaker_Jaroslav_Pantsjoha) (Technical Director @ Nearform). Page: https://www.conf42.com/Chaos_Engineering_2026_Jaroslav_Pantsjoha_agents_ai_run
 
 ## Abstract
 
