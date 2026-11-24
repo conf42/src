@@ -261,13 +261,74 @@ def video_purged(post, linked):
     return bool(talk) and not _youtube_id(talk) and bool(YOUTUBE_IN_BODY.search(post.get("Body") or ""))
 
 
+# YouTube makes the 1280x720 maxresdefault only for videos uploaded in HD; for the rest (some 2020 talks) that URL is a
+# 404 whose body is a grey "..." placeholder, which the browser shows as the card (Russ Miles, CE 2020, 2026-11-24).
+# So each video's largest thumbnail that exists is looked up once and remembered in _db/youtube_thumbs.json (commit it).
+# sddefault/hqdefault are 4:3 with black bars around the 16:9 picture; the cards' 16:9 object-fit: cover crops them off.
+YT_THUMBS_JSON = "./_db/youtube_thumbs.json"
+YT_SIZES = ("maxresdefault", "sddefault", "hqdefault")
+_yt_sizes = None
+
+
+def _yt_url(yid, size):
+    return "https://i.ytimg.com/vi/%s/%s.jpg" % (yid, size)
+
+
+def _yt_probe(yid):
+    """The largest size YouTube has for the video, or None when it could not tell (offline, refused): not remembered."""
+    import urllib.error
+    import urllib.request
+    for size in YT_SIZES:
+        try:
+            urllib.request.urlopen(urllib.request.Request(_yt_url(yid, size), method="HEAD"), timeout=10).close()
+            return size
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                return None
+        except OSError:
+            return None
+    return YT_SIZES[-1]   # hqdefault exists for every processed video; if even that is missing, nothing better to show
+
+
+def probe_youtube_thumbnails(ids, path=YT_THUMBS_JSON):
+    """Look up the videos not in the file yet (in parallel) and write the new answers back."""
+    global _yt_sizes
+    if _yt_sizes is None:
+        try:
+            with open(path, encoding="utf-8") as f:
+                _yt_sizes = json.load(f)
+        except (OSError, ValueError):
+            _yt_sizes = {}
+    todo = sorted({i for i in ids if i and i not in _yt_sizes})
+    if not todo:
+        return
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(16) as pool:
+        found = {yid: size for yid, size in zip(todo, pool.map(_yt_probe, todo)) if size}
+    for yid, size in found.items():
+        if size != YT_SIZES[0]:
+            print("blog: video %s has no maxresdefault thumbnail, using %s" % (yid, size))
+    if found:
+        _yt_sizes.update(found)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(dict(sorted(_yt_sizes.items())), f, indent=0)
+            f.write("\n")
+    if len(found) < len(todo):
+        print("WARN blog: could not check the thumbnails of %d videos, maxresdefault for now" % (len(todo) - len(found)))
+
+
+def youtube_thumbnail(yid):
+    """The video's largest existing thumbnail (maxresdefault until probe_youtube_thumbnails has looked)."""
+    return _yt_url(yid, (_yt_sizes or {}).get(yid) or YT_SIZES[0])
+
+
 def _image(post, linked, base_folder):
     """ThumbnailPath as given (local splash -> its 500px JPEG, or an absolute URL); empty -> from what the post is about."""
     path = (post.get("ThumbnailPath") or "").strip()
     talk = linked.get("talk")
     # a talk's post shows the talk's 16:9 YouTube thumbnail, never the headshot (Marek 2026-11-09): every talk on the blog has its video
     if _youtube_id(talk):
-        return "https://i.ytimg.com/vi/%s/maxresdefault.jpg" % _youtube_id(talk)
+        return youtube_thumbnail(_youtube_id(talk))
     # before the video is out: the same thumbnail as drawn on the event's teaser page (2026+ events have one)
     event = linked.get("event")
     if talk and event and str(event.get("date"))[:4] >= "2026" and "/headshots/" in (talk.get("Picture") or ""):
@@ -453,6 +514,10 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
         post["updated_iso"] = updated.isoformat()
         post["updated"] = updated
         post["Body"] = _body(post.get("Body"))
+        visible.append(post)
+    probe_youtube_thumbnails(_youtube_id(p["linked"].get("talk")) for p in visible)
+    for post in visible:
+        linked = post["linked"]
         post["ThumbnailPath"] = _image(post, linked, base_folder)
         post["image_abs"] = absolute(post["ThumbnailPath"])
         if not post.get("ExternalURL"):
@@ -461,7 +526,6 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
             post["canonical"] = SITE + post["path"]
             post["description"] = post.get("Description") or re.sub(r"\s+", " ", re.sub(r"[#*_>\[\]`]|\(http[^)]*\)", "", post["Body"]))[:200].strip()
             post["jsonld"] = _post_jsonld(post)
-        visible.append(post)
     visible.sort(key=lambda p: (p["Date"], p.get("ShortURL") or ""), reverse=True)
     for slug in spread_images(visible):
         print("WARN blog: %s has the same picture as the post before it" % slug)
