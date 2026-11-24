@@ -778,3 +778,27 @@ def write_indexnow(posts, base_folder, today=None, lastmod=None):
     with open(INDEXNOW_LIST, "w") as f:
         json.dump({"host": "www.conf42.com", "key": INDEXNOW_KEY, "keyLocation": SITE + INDEXNOW_KEY + ".txt", "urlList": urls}, f)
     print("IndexNow: %d URLs for today" % len(urls))
+
+
+def probe_all_talk_videos(folder="./_db"):
+    """Every talk video in the event sheets, checked once: the daily rollout job runs this and commits
+    _db/youtube_thumbs.json, so the builds never check the same video twice."""
+    import csv
+    import glob
+    ids = set()
+    for path in glob.glob(os.path.join(folder, "*.csv")):
+        with open(path, encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                url = (row.get("YouTube") or "").strip()
+                if url:
+                    ids.add(_youtube_id({"YouTubeId": url.split("/")[-1].replace("watch?v=", "")}))
+    probe_youtube_thumbnails(ids)
+    print("blog: %d talk videos, %d not checked yet" % (len(ids), len(ids - set(_yt_sizes or {}))))
+
+
+if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["thumbs"]:
+        probe_all_talk_videos()
+    else:
+        sys.exit("usage: python -m build.blog thumbs")
