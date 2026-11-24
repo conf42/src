@@ -1,12 +1,14 @@
-# Closing the Semantic Gap with Feedback-Driven Ontology Learning
+# Building Real-Time Data Visibility Across Salesforce Integrations
 
-A talk at [Conf42 Observability 2026](https://www.conf42.com/obs2026) by [Ravi Chandra](https://www.conf42.com/speaker_Ravi_Chandra) (Software Engineer @ Google). Page: https://www.conf42.com/Observability_2026_Ravi_Chandra_llms_analytics_semanticlayer
+A talk at [Conf42 Observability 2026](https://www.conf42.com/obs2026) by [Ravi Chandra Chinta](https://www.conf42.com/speaker_Ravi_Chandra_Chinta) (Senior Salesforce Developer @ Temple View Capital). Page: https://www.conf42.com/Observability_2026_Ravi_Chandra_Chinta_salesforce_integrations_realtime
 
 Video: https://www.youtube.com/watch?v=nHfTmcJoWcc
 
 ## Abstract
 
-Enterprise analytics agents powered by large language models depend on semantic layers that define metrics, dimensions, and relationships to translate natural language into executable queries. However, these ontologies are typically static and curated by small expert groups, creating two persistent challenges. First, a representation gap arises because a small fraction of users generates most feedback, leaving long-tail analytical patterns underrepresented. Second, a staleness gap emerges as evolving business logic outpaces manual updates, leading to incorrect outputs based on outdated definitions. This talk presents a closed-loop, feedback-driven architecture that continuously refines enterprise ontologies using signals from production interactions. The approach treats ontology elements as parameters in a structured optimization space and applies online convex optimization with regret-bounded updates to minimize user correction frequency. Observability signals—such as rejected outputs, inline corrections, and query reformulations—are transformed into loss functions that guide updates while preserving consistency constraints. Evaluation on a simulated enterprise analytics platform with 1,200 users over 90 days (~200 daily queries) shows measurable gains. The system reduces agent error rates by 31% compared to static ontologies, captures 9× more improvement signals than survey-based methods, and corrects 87% of injected ontology deficiencies. Representation equity improves significantly, with the Gini coefficient dropping from 0.72 to 0.31, indicating better coverage of long-tail usage. These results demonstrate how observability-driven feedback loops can transform semantic layers into continuously improving knowledge systems for analytics agents.
+Real-time data visibility is not about dashboards. It is about the right data sitting in the right system at the right time. At Temple View Capital, Salesforce sits between the loan origination and servicing systems (Encompass, BSI and Shellpoint), and periodic syncs plus email-based matching led to stale data, duplicate borrowers and teams falling back to shadow spreadsheets.
+
+This talk walks through how the integration layer was rebuilt: identity first (tokenized SSN and EIN instead of email as the matching key), speed second, with isolated two-way point-to-point integrations, conflict resolution and per-pathway monitoring. You will hear the mistakes made along the way, the architecture that came out of it, and how Salesforce became a trusted source of truth again.
 
 ## Transcript
 
