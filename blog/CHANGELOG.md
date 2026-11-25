@@ -3,6 +3,17 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-25 - Nightly writer
+- 8 posts written from transcripts and queued (Status `queued`, released gradually by blog-rollout):
+  - 1 sponsored: MLOps 2026 - Harness, Sunil Gattupalle (agents and the delivery knowledge graph).
+  - 6 talk posts, Chaos Engineering 2026 (event 2026-12-03): Arjun Garg, Haim Michael, Amit Singh Negi, Akbar Dizaji,
+    Praveen Kumar Gopalakrishnan, Fuad Laguda.
+  - 1 talk post, Observability 2026 backfill: Ravi Chandra Chinta.
+- Skipped: sponsored Enterprise Software 2021 - Snyk, Brian Vermeer ("Live hacking: breaking into your Java web app"):
+  live exploit demo, already set aside on 2026-11-17, not retried.
+- Not touched (outside this run's scope): `enrich`, the YouTube orphan sweep, the Sheet mirror, webinar recaps; no roundups
+  or plugs were due. Other backfill events (golang2025, devsecops2023, python2022, oss2020) left for later nights.
+
 ## 2026-11-17 - Maintenance run from the PC (the nightly writer cannot push yet)
 - 32 posts written by 7 parallel writers, each running only `check`; then one `add` + `lint` (0 problems):
   - 26 rewrites from transcripts, same ShortURLs, Status waiting -> live: 21 MLOps 2026 talk posts, Feature Flags

@@ -210,6 +210,256 @@ Two talks question the experiment design itself. [Govardhan Reddy Kothinti](http
 
 Every talk is on the [Conf42 Chaos Engineering 2026 page](https://www.conf42.com/chaos2026) and in the [YouTube playlist](https://www.youtube.com/playlist?list=PLIuxSyKxlQrD3rHj4XmA0vJIcCPfUoupu). Next in the series is [Conf42 DevOps 2027](https://www.conf42.com/devops2027) on January 21, 2027.
 ",roundup,chaos2026,event:chaos2026,,Conf42,,,"chaos-engineering, ai-agents, resilience, fault-injection, disaster-recovery, kubernetes"
+,The value that is eventually right: a camera bug your tests can't see,"Fuad Laguda (Sky) at Conf42 Chaos Engineering 2026 on a 112 ms window where iOS Safari reports the wrong camera size, and tests that read early.",2026-12-02,chaos2026/value-eventually-right-ios-camera-window,,"Ask an iPhone for a portrait camera stream and, for a few milliseconds, it may tell you the stream is sideways. Four popular camera libraries passed their tests anyway, because every test waited until the answer was right. At Conf42 Chaos Engineering 2026, Fuad Laguda, speaking from Stirling, Scotland, follows one WebKit bug from his own scriptwriting app into the code of LiveKit, Shaka Player and hls.js, and ends with a test that would have caught it on the first run.
+
+It starts as a debugging story and becomes a method: log timestamps instead of trusting what the API says, then stretch the suspicious window on purpose.
+
+## What was actually wrong?
+
+Fuad built a teleprompter into his own scriptwriting app, using `getUserMedia` to open the front camera at 1080 by 1920 on iOS Safari, then handing the stream to `MediaRecorder`. The recording came out sideways. Marking the constraint as `exact` changed nothing. On Android he got a 1088 by 1080 square. Asking for the wide shape gave him portrait. Three nights with an AI coding agent produced theories that kept drifting back to iOS 18, where Apple had fixed it.
+
+He filed it with Apple as a WebKit bug. The next day it was relabelled a regression, three Apple engineers joined, and on 25 September another developer hit the same thing on iOS 27. His first lesson is to file the bug anyway: it costs nothing, and you may learn others share it.
+
+## The measurement that explained it
+
+He tested four widely used camera libraries in his app, and all four worked. That's the panic moment: only his code was broken. The AI agent wrote tests, they passed, and it concluded his theory was wrong. The question he now asks whenever a test passes is ""What exactly did you test? What value did you read?""
+
+So he put timestamps on every step. At 1,059 ms the camera was open and reported 1920x1080, the wide sensor shape. At 1,473 ms the first frame appeared and it reported 1080x1920, portrait. Other runs showed gaps of 112 ms and 139 ms. The reason: the sensor sits sideways, software rotates the picture, and until there is a picture to rotate the only size available is the sensor's. The promise resolves when the camera is ready, before the first frame exists. The four libraries passed because they waited for a frame. Fuad's code started recording when the camera said it was ready.
+
+## Who else got bitten?
+
+- **LiveKit**: an issue open for over a year, reported by three people, with video the wrong shape on phones. The code waited 10 ms before reading the size, which is exactly the middle line of Fuad's log, because the gap is 112 ms or more. Waiting longer doesn't fix it: the gap varies by phone, camera, requested size and load, and a longer fixed wait taxes every user. He sent his timing, an engineer changed it to wait for the first frame, and it was approved with the comment ""Thank you for fixing this hack.""
+- **Shaka Player** (issue 10504): on Safari the video jumped back a few seconds after a quality switch. He logged every frame Safari actually showed, saw jumps between 1.9 and 7.1 seconds, and reproduced them with no library at all, so the problem was in Safari's engine and went to Apple separately. Shaka was also requesting the new video about two seconds too early, and an 18-line workaround made switching smooth eight times out of eight.
+- **hls.js**: segment durations reported as 4.07, 2, 2.07 and 3.93 seconds when each segment was actually six, because a value was read before the thing it described had finished arriving.
+
+## The fixes and the test
+
+Fix one is to wait for the event rather than the clock: `requestVideoFrameCallback`, or `readyState` reaching 2. Fix two is a probe. Don't ask the camera its size; draw one frame into a 16-pixel square and check which corners are filled to see the real shape, and if there's no picture yet, return nothing instead of guessing. In his app he now asks for the wide shape, which is the sensor's natural one, waits for the first frame, measures it with the probe, and records from a canvas cut to that shape.
+
+The test he proposes: read the value as soon as it exists, keep reading every frame for the first second with timestamps, and check whether it ever changed. The chaos version: fake the camera so it reports the wrong size for half a second, then run your real code against it. Code that waits for the event doesn't care how long the gap is. Code that sleeps or reads immediately breaks.
+
+His rules for Monday: read early, wait for the event, believe the real thing over the report, and measure the gap before arguing about the delay. ""A sleep that fixes a timing bug is a race you have not lost yet."" The same pattern, he adds, applies to a service that says healthy before its cache is warm, a setting that loads a default first, or a late feature flag.
+
+## Who should watch
+
+Anyone who writes `await sleep(…)` in a test or a fix, anyone shipping camera or media features on mobile web, and maintainers who triage ""can't reproduce"" bugs. The bug report template he shares is worth stealing: device and version, requested versus received values as numbers, a bare test page, five-second repro steps, what was ruled out, and no suggested fix. The code is on GitHub as web-teleprompter under an MIT licence.
+
+Related Conf42 talks: [A Timeout Is Not a Failed Action: Chaos Testing AI Agent Tool Calls](https://www.conf42.com/Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool) by Arjun Garg of Intuit, and [Chaos Engineering Is Not Just Killing Pods](https://www.conf42.com/Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience) by Akbar Dizaji of Skedda, both at the same event.
+
+[Watch Fuad Laguda's talk](https://www.conf42.com/Chaos_Engineering_2026_Fuad_Laguda_ios_test_window) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/zsUMATwnAro).
+",talk,chaos2026,talk:chaos2026/Fuad Laguda,,Conf42,,queued,"testing, web, ios, race-conditions, chaos-engineering"
+,Restoring from backup can restore the breach: rebuilding API trust,Praveen Kumar Gopalakrishnan (Salesforce) at Conf42 Chaos Engineering 2026 on a five-step recovery that rebuilds API trust before traffic returns.,2026-11-30,chaos2026/backup-is-not-recovery-api-trust,,"After a dead server, restoring the last known good state is usually right. After a cyber incident it can bring back the exact weakness the attacker used. At Conf42 Chaos Engineering 2026, Praveen Kumar Gopalakrishnan, a senior technical architect at Salesforce, lays out a five-step way to use the recovery window to rebuild trust in your APIs, and finishes with a chaos experiment that proves the old credential is really dead.
+
+Everything runs through one illustrative payment-platform incident. It is a framework talk built on NIST publications, not a war story, and Praveen presents it as a practical way to connect those documents.
+
+## Why is a backup not a recovery?
+
+A failed deployment doesn't change who can reach your APIs. A compromise might: a long-lived service credential, a service account with too much permission, or a network path trusted only because it sat inside the environment. A backup can preserve all of it, so the data is back and the trust problem remains. ""A restore is not automatically a recovery,"" Praveen said at Conf42 Chaos Engineering 2026.
+
+He anchors the approach in NIST 800-207 (zero trust architecture), 207A (identity and policy enforcement for cloud-native services), 184 (cybersecurity event recovery) and 61 (incident response). His contribution is the glue for APIs: what to map, what to revoke, where to enforce, and how to know it's safe to restore.
+
+## The five steps
+
+1. **Map the blast radius.** For each service relationship, ask what the identity can do, how important the service is, how close it is to the compromised environment, how it authenticates, what data it touches, whether hidden trust paths exist, and how often the relationship changes. In the example, the payment API reaches the ledger, customer profile, fraud scoring and notifications. The ledger write path is the immediate worry, notifications a lower one. The first graph can be provisional, assembled from gateway and network logs, config, IAM records and the people who know the system.
+2. **Contain the identity.** Rotating a secret isn't enough, because an attacker may already hold a token, a live session, or access to whatever distributes the replacement. Stop new credentials, invalidate sessions and refresh tokens, then deal with issued tokens: introspection allows central revocation, while stateless signed tokens may need a deny list, a credential version check or very short validity plus gateway enforcement. Check every gateway and cache that could still accept the old token, review the ledger calls, then issue a narrower identity.
+3. **Put identity and policy in the request path.** A workload proves its identity, asks for a token meant only for the ledger API with a limited permission such as posting an entry, and the ledger's enforcement point checks issuer, workload, audience, action and validity. That beats trusting a request because it came from the internal network.
+4. **Degrade gracefully instead of all-or-nothing.** Between allow and deny sit restrict, read-only, step-up proof, quarantine of a single instance. Block a suspicious payment but keep safe status checks running.
+5. **Modernise in risk order.** Don't rewrite everything mid-incident. Start with what was directly exposed (the payment API and ledger write path), then broad permissions and sensitive data (customer profile, fraud scoring), then long-lived credentials, and leave low-privilege internal services for later. Protect legacy APIs with a gateway meanwhile, with redundant enforcement points, no way around it, and a decided answer for when the policy engine is down (how long a cached decision lives, what emergency access exists).
+
+## How do you know it's getting safer?
+
+Praveen's measures include trust paths removed from the graph, the time until every affected enforcement point rejects the compromised identity, the share of calls using scoped short-lived credentials, and coverage of the high-risk API surface by policy and logging. Each request should leave evidence: caller identity, decision, policy version and a trace ID. Without it, he says, you're guessing.
+
+## The chaos experiment
+
+Before normal traffic returns, run it in an isolated environment. The hypothesis: revoking the payment API's production identity closes the ledger path at every enforcement point while safe status reads stay available. Disable the test identity, replay a token issued before revocation, and watch gateways, caches, policy decisions, ledger writes, read availability and audit events. Pass only if the old token is rejected within the agreed target, no route bypasses the gateway, and the read path works. Repeat with the policy decision point unavailable to test the cache and fail-safe behaviour.
+
+## Who should watch
+
+Security-minded platform and API owners who have a disaster-recovery plan but not a compromise-recovery plan. It is framework-level with no live demo, and the examples are illustrative, so bring your own dependency graph. The line to take away is his closing one: ""Don't just restore what broke.""
+
+Related Conf42 talks: [A Timeout Is Not a Failed Action: Chaos Testing AI Agent Tool Calls](https://www.conf42.com/Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool) by Arjun Garg of Intuit, and [Surviving a 300% Flash Crowd](https://www.conf42.com/Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain) by Amit Singh Negi of T-Mobile, both at the same event.
+
+[Watch Praveen Kumar Gopalakrishnan's talk](https://www.conf42.com/Chaos_Engineering_2026_Praveen_Kumar_Gopalakrishnan_backup_api_recovery) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/vTkEjgTsDwE).
+",talk,chaos2026,talk:chaos2026/Praveen Kumar Gopalakrishnan,,Conf42,,queued,"security, api-security, incident-response, zero-trust, chaos-engineering"
+,Your Polly retries add up to 22 seconds: chaos-testing .NET services,Akbar Dizaji (Skedda) at Conf42 Chaos Engineering 2026 on injecting latency with Polly chaos strategies and finding a 22-second retry stack.,2026-11-29,chaos2026/dotnet-polly-chaos-strategies,,"A retry policy with a 2-second timeout and exponential backoff looks sensible on a slide. Run it against a dependency that is just slow, and the user waits 22 seconds. At Conf42 Chaos Engineering 2026, Akbar Dizaji, a senior software engineer at Skedda, shows how to find that out in .NET by injecting latency and faults with Polly's chaos strategies instead of killing pods.
+
+It is a code-first talk built around a live demo of two small APIs, so it suits anyone who already has Polly retries, timeouts and circuit breakers in a codebase and has never seen them fire.
+
+## Why does application-level chaos matter?
+
+Akbar splits chaos into two levels: infrastructure (killing pods and nodes, degrading network links) and application (injecting latency, exceptions and bad responses in code). He works on the second. His example chain: a bank gateway answers slowly, the payment API waiting on it piles up threads, the order API calling the payment API queues requests, and the storefront's checkout is slow or down. A small latency, he says, can become a large thread or memory problem.
+
+He also separates stability from resilience. A stable system tries to stay in the same state; a resilient one expects disruption and adapts and recovers. And, in his words, ""Resilience you have never tested is an assumption.""
+
+## What's the experiment?
+
+The five-step loop is: define steady state, identify the risk, simulate it by injecting delays or faults, observe via monitoring, logs and user experience, then learn and fix. He recommends running this locally, in dev or in a sandbox rather than production.
+
+The demo has a browser UI, an order API and a payment API. The order API carries the protection: three retries with exponential intervals of 2, 4 and 8 seconds (jitter off for the demo, on in production), a circuit breaker, and a two-second timeout on each HTTP call. The payment API carries the chaos: a custom `InvalidOperationException` and a five-second delay, both at an injection rate of 1, meaning every request. Rates run from 0 to 1 and come from app settings, so you can switch them off.
+
+## Where do 22 seconds come from?
+
+Each of the four attempts waits two seconds before its timeout, and the gaps between attempts are 2, 4 and 8 seconds: 8 + 14 = 22. Every individual setting looked reasonable, and the test caught the sum.
+
+The fix in the demo is a total timeout of five seconds wrapped around the whole pipeline and shorter intervals of 500 ms, 1 second and 2 seconds. Rerunning with the fixed profile gives an answer in about five seconds.
+
+## How does the circuit breaker behave?
+
+Akbar walks the three states with the electrical analogy. Closed passes calls. After three failing calls inside ten seconds the circuit opens and returns ""blocked, come back later"" without touching the destination, which relieves pressure on it. After 15 seconds it goes half-open and lets one request through; success closes it, failure opens it again. In the demo he turns the chaos off, waits out the window, and shows the half-open probe closing the circuit.
+
+## Polly chaos strategies and Simmy
+
+Polly offers `AddChaosFault` for exceptions (good for retries and breakers), latency injection (good for timeouts), fake outcomes and status codes, and `AddChaosBehavior` for custom actions. Akbar notes that Simmy, the older chaos library with its ""monkey policies"", was folded into Polly as of version 8.3, where chaos is one more strategy in a resilience pipeline. In Simmy you opted into the monkeys; in Polly the pipeline you build is what runs. The source code for the demo is linked from his slides, and he recommends the Polly documentation's chaos section plus *Chaos Engineering: System Resiliency in Practice* and *Release It!*.
+
+## Who should watch
+
+.NET developers who have copy-pasted a Polly retry and timeout combination and never measured it, and teams that want a first chaos experiment without a cluster. It's a beginner-friendly talk with one clear lesson rather than a production war story; the numbers come from a demo setup built to show the effect, not from a live incident.
+
+Related Conf42 talks: [Surviving a 300% Flash Crowd: State-Safe Autoscaling With Zero Split-Brain Events](https://www.conf42.com/Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain) by Amit Singh Negi of T-Mobile, and [A Timeout Is Not a Failed Action](https://www.conf42.com/Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool) by Arjun Garg of Intuit, both at the same event.
+
+[Watch Akbar Dizaji's talk](https://www.conf42.com/Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/bEZ43mFM7Wk).
+",talk,chaos2026,talk:chaos2026/Akbar Dizaji,,Conf42,,queued,"dotnet, polly, chaos-engineering, resilience, circuit-breaker"
+,"Autoscaling a stateful service through a 300% flash crowd, safely",Amit Singh Negi (T-Mobile) at Conf42 Chaos Engineering 2026 on a PPO autoscaler and a four-step handoff that cut split-brain events from 14 to 0.,2026-11-28,chaos2026/state-safe-autoscaling-flash-crowd,,"The default Kubernetes Horizontal Pod Autoscaler waits for a CPU or memory threshold to break, and by then a flash crowd has already done its damage. At Conf42 Chaos Engineering 2026, Amit Singh Negi of T-Mobile reports a 30-day A/B experiment in which a reinforcement-learning autoscaler plus a strict four-step pod handoff took split-brain events from 14 on stock HPA to zero.
+
+The numbers come from Amit's own testbed and he presents them as his team's results, with no outside replication. What makes the talk worth your time is less the headline than the reasoning about why stateful workloads fail under spikes and how the chaos experiment was designed to expose it.
+
+## Why does a flash crowd break stock HPA?
+
+In the baseline run Amit saw three things: a 30 to 90 second pod readiness lag while containers pulled images and warmed up, p99 latency spiking to 40 to 100 milliseconds over a four-second window as ingress queues backed up, and 14 split-brain events across the test windows.
+
+The split-brain part is the expensive one. A latency spike is temporary, he says, but state corruption outlives the surge. If a stateful pod holding Kafka partitions, WebSocket sessions or in-memory shared state is killed before a safe handoff, two nodes briefly believe they own the same shard. In a high-throughput telemetry workload that means duplicate writes, duplicate events and corrupt aggregates, and nothing crashes loudly, so you may notice hours later.
+
+He names three structural blind spots: metric lag (metrics scraped every 15 seconds against a surge that quadruples load in under five), zero state awareness (pods are terminated by a cool-down timer, not by whether state is safe), and cold-start blindness (traffic goes to a pod as soon as a basic health check passes, before its cache and shared state are warm).
+
+## How was the experiment built?
+
+Two cluster variants ran side by side on 50 bare-metal worker nodes with a stateful telemetry workload and shared shard assignments. Cluster A ran stock HPA. Cluster B ran a Proximal Policy Optimization (PPO) agent. Instead of a gentle ramp, Amit injected a surge from 10,000 to 40,000 requests per second in under five seconds, followed by a sharp drop-off, repeatedly over 30 days.
+
+The PPO policy was exported to ONNX and run in a lightweight C++ inference runtime with a custom Go Kubernetes operator, so decisions land in under half a millisecond without Python garbage-collection pauses. The agent learns leading indicators such as shifts in ingress request velocity and network I/O gradients ahead of CPU, and PPO's capped policy updates keep it from destabilising the cluster.
+
+## The reward function is the control surface
+
+Early RL-autoscaling work, Amit says, rewarded low latency and low pod cost, which teaches an agent to scale down too aggressively and invites split-brain. His reward jointly penalises SLA latency, idle over-provisioning and an explicit state-synchronisation penalty weighted three times higher than SLA violations. That encodes the rule he states plainly: ""correctness comes before speed"".
+
+## Drain, flush, reassign, terminate
+
+Reward shaping isn't enough, so scale-downs go through a deterministic guardrail in the operator, and no step can be skipped even under oscillating load:
+
+1. **Drain**: remove the pod from new ingress routing and let in-flight requests finish.
+2. **Flush**: write uncommitted in-memory buffers to the durable Redis store and wait for an explicit write acknowledgement.
+3. **Reassign**: transfer shard ownership tokens and Kafka consumer partitions to a surviving peer and confirm it, removing the 30 to 60 second TCP timeout window where split-brain happens.
+4. **Terminate**: send SIGTERM only after the first three are confirmed.
+
+## What did the 30 days show?
+
+As Amit reports it, against stock HPA the PPO cluster's p99 during the 300% surge dropped by 99.9%, to 1.2 milliseconds, because capacity was pre-provisioned ahead of the spike; split-brain events went from 14 to zero, including back-to-back spikes with no recovery window; the 45-second cold-start stalls were eliminated; and compute over-provisioning fell by more than 40%.
+
+The chaos lesson is the one to steal. Standard load tests ramp over five to ten seconds, and a gentle ramp hides state-safety bugs. A sharp surge followed by an oscillation forces the autoscaler to evict underused pods from the previous wave while pods for the next wave are cold-starting, and that overlap is where the race conditions live.
+
+## Who should watch
+
+Platform and SRE engineers running stateful workloads on Kubernetes, especially Kafka consumers, WebSocket fleets and anything with in-memory shard ownership. You don't need to adopt RL to use the idea: the four-step handoff and the abrupt-surge test are useful on their own. It's a results-driven talk with a single, self-reported experiment, so read the numbers as one team's data point rather than a benchmark.
+
+Related Conf42 talks: [A Timeout Is Not a Failed Action: Chaos Testing AI Agent Tool Calls](https://www.conf42.com/Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool) by Arjun Garg of Intuit, and [Chaos Engineering Is Not Just Killing Pods](https://www.conf42.com/Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience) by Akbar Dizaji of Skedda, both at the same event.
+
+[Watch Amit Singh Negi's talk](https://www.conf42.com/Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/HMBON8LS_M4).
+",talk,chaos2026,talk:chaos2026/Amit Singh Negi,,Conf42,,queued,"kubernetes, autoscaling, chaos-engineering, split-brain, reinforcement-learning"
+,"Two JSON files, no round trips: the zero-latency UX trick",Haim Michael (Zindell Technologies) at Conf42 Chaos Engineering 2026 on serving a big and a tiny JSON mirror so filtering never touches the backend.,2026-11-27,chaos2026/json-mirrors-near-zero-latency,,"Every filter click in a typical web app is a request, a database query and a render. Haim Michael of Zindell Technologies asks, at Conf42 Chaos Engineering 2026, whether you can skip all of that for read-heavy pages: have the server publish its data as JSON and let the browser do the querying. His case study is nana.events, a conference-discovery site that feels instant on a perfectly ordinary PHP and MySQL stack.
+
+This is a pragmatic web-performance talk rather than a chaos-engineering one, and Haim is upfront that it isn't an architecture to apply to a whole application. It is a pattern for the part of the app where reads dominate.
+
+## What's the ""interaction tax""?
+
+Haim's term for the usual loop: the user presses a button or ticks a checkbox, the browser calls the server, the server queries the database, and the client renders the reply. Every filter, navigation or search pays that tax. His alternative is to ship the data the queries need to the browser once and run filtering client-side, while the database stays the single source of truth.
+
+## How does nana.events do it?
+
+The site pulls in tech and business conferences from sources such as python.org's list of upcoming Python events, via a crawler, plus events people submit through an Add Event button. An AI agent on the server validates each submission as a legitimate event before it reaches the database. The backend is RESTful PHP with MySQL, and the front end is a single-page app in vanilla JavaScript, chosen to keep the code and file sizes small and the platform maintainable over the long run.
+
+Whenever the database changes, the server regenerates JSON. There are two files:
+
+- `tiny.json`: only what's needed to paint something on first visit, which helps people on a weak mobile connection.
+- `events.json`: the full dataset. It arrives while the visitor is still working out the interface, after which filtering, search and the world map view with its date range slider all run in the browser.
+
+The front end also stores the data in local storage so the next visit renders without waiting.
+
+## Is it really zero latency?
+
+Haim doesn't claim it is. ""It's almost, but not zero latency,"" he says. Filtering and querying skip the network, but you still pay to download the file and run JavaScript on the main thread, and adding an event is a normal round trip. His point is that for the interactions people repeat most, the cost is gone.
+
+## When does it fit, and when doesn't it?
+
+It fits when the dataset is public and not huge, when most interaction is reading and filtering, and when slightly stale data is tolerable. A visitor on an older JSON file isn't a disaster for an events directory. It's a poor fit for large datasets, private data, or anywhere every client must see exactly the same data at the same moment.
+
+His three takeaways: do it intentionally and bundle the data simply, ""Don't make it difficult for the client side""; give weak connections a smaller first file; and remember the browser is now doing the computing, so check that the cost is acceptable for what you build. The talk gives no benchmark numbers or measurements of browser memory, so treat ""fast"" as demonstrated live rather than measured.
+
+## Who should watch
+
+Frontend and full-stack engineers with a read-heavy directory, catalogue or dashboard on a conventional backend, and anyone tempted to reach for a search service before trying a static file. If you work with large or private datasets, skim it for the trade-off list and move on.
+
+Related Conf42 talks: [Surviving a 300% Flash Crowd: State-Safe Autoscaling With Zero Split-Brain Events](https://www.conf42.com/Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain) by Amit Singh Negi of T-Mobile, and [Chaos Engineering Is Not Just Killing Pods](https://www.conf42.com/Chaos_Engineering_2026_Akbar_Dizaji_net_pods_resilience) by Akbar Dizaji of Skedda, both at the same event.
+
+[Watch Haim Michael's talk](https://www.conf42.com/Chaos_Engineering_2026_Haim_Michael_json_latency_ux) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/Sem8hEPWi1M).
+",talk,chaos2026,talk:chaos2026/Haim Michael,,Conf42,,queued,"web-performance, json, frontend, architecture, caching"
+,A timeout is not a failed action: chaos-testing agent tool calls,"Arjun Garg (Intuit) at Conf42 Chaos Engineering 2026 on injecting a lost reply after an agent's tool call commits, and how retries stay safe.",2026-11-25,chaos2026/agent-timeout-is-not-a-failed-action,,"An agent places an order, the service creates it, and the reply never arrives. The agent sees a timeout, retries, and now there are two orders. At Conf42 Chaos Engineering 2026, Arjun Garg of Intuit shows how to make that failure observable with a small public MCP reproduction, then turns it into a chaos test plan for any agent tool that mutates something.
+
+He is explicit that the experiment uses synthetic effects, that it is not evidence of an incident at an employer or a vendor, and that he speaks in a personal capacity. What he offers is a familiar distributed-systems boundary, replayed with an MCP client and server.
+
+## Why can't a better prompt fix a lost reply?
+
+The service knows it appended a record. The caller knows a response didn't arrive before its deadline. ""Neither observation cancels the other,"" Arjun says, and a handler that turns every timeout into a new business operation is making a consequential policy choice with incomplete evidence.
+
+That is why longer timeouts, better prompts or telling the model to be careful don't close the gap. They may change how often it happens. They don't establish what happened during one particular ambiguous attempt. The question he wants you to keep in mind is what new evidence would make the next mutation justified.
+
+## What does the reproduction show?
+
+The setup uses a real SDK client and server over in-memory streams. A relay watches the first tool response and drops it after the handler has returned, so the effect is already recorded when the reply disappears. The client's read timeout then raises an MCP error, and the script does exactly one application-level retry. The SDK doesn't retry on its own. No sleeps coordinate the fault.
+
+Two runs are compared. The baseline ends with two effects. The positive control carries a logical operation ID and returns the earlier effect identifier on the repeat. The fault stays identical and only duplicate suppression changes, so the property being tested is isolated. Arjun is careful about the limits: it is an in-memory, sequential illustration, and it does not show durability across restarts, concurrent exclusion or safe integration with a separate downstream service.
+
+## Four identifiers, four different meanings
+
+A big part of the talk is vocabulary. An RPC identifier correlates messages. An attempt identifier explains a dispatch. A logical operation identifier says ""this is the same intent"". An effect reference points at what actually happened. They can all sit in one trace and still mean different things.
+
+This is why hashing the whole argument object misleads, since attempt metadata changes between tries. Even a hash of only the business arguments can't tell retrying one order from deliberately buying the same items twice. The caller or a trusted workflow has to make that call, and the receiver needs a scope and a contract for honouring it.
+
+## Where reserving a key goes wrong
+
+If a gateway reserves a key, calls an external service, then stores the receipt, a crash after the external commit but before the receipt write leaves an intent record with no completion evidence. Reserve first and you can stop a second worker but leave the operation unresolved. Write only afterwards and a crash leaves no local record even though the effect happened. A local transaction can't atomically include an arbitrary remote API, so recovery needs the provider's cooperation: idempotency, lookup by operation reference, or a documented reconciliation procedure.
+
+The fault-injection matrix changes the fault location in each row, and so changes what you know afterwards: before dispatch, after reservation, after remote commit, after receipt persistence, after retention expiry. A test harness should record which barrier it reached before injecting the fault, and the assertion isn't always a successful retry. Sometimes the right result is a bounded unresolved state with an owner and a reconciliation route.
+
+Arjun also lists four assertion types that aren't interchangeable: effect count (catches duplicates), result integrity, progress (is anyone able to resolve unfinished work), and freshness (a stale worker waking up after a takeover). Refunds make the point: a system can block the second refund and still leave support unable to tell whether the first one happened.
+
+## The recovery decision tree
+
+His rule of thumb for a mutating agent tool: look for evidence of completion first, and return the original result if you can. If you have reliable proof of non-execution and stale workers are fenced out, a new dispatch may be appropriate. If the provider supports idempotent retry with the same key, use that contract even when the first outcome is ambiguous. Otherwise preserve the ambiguity and reconcile. A human clicking approve doesn't prove the first effect never happened.
+
+Cancellation and backoff don't help here. MCP cancellation lets the recipient ignore the notification if work already completed, so it isn't a rollback, and waiting longer doesn't tell you whether the first order exists. Keep an oracle independent of the system under test, include the deliberately unprotected baseline to prove the oracle can see duplicates, and log the operation key, effect evidence and final caller status together.
+
+The line he closes on: ""The timeout tells us that the caller lacks a response. It does not tell us that the service lacks an order.""
+
+## Who should watch
+
+Anyone giving an agent tools that charge, refund, create, send or delete. It is a careful, qualified talk with slides about boundaries rather than a product demo, and it will be most useful to people who already own retry logic. If you only need the one-sentence takeaway, it is above; the matrix and the decision tree are the reason to watch.
+
+Related Conf42 talks: [Surviving a 300% Flash Crowd: State-Safe Autoscaling With Zero Split-Brain Events](https://www.conf42.com/Chaos_Engineering_2026_Amit_Singh_Negi_autoscaling_crowd_brain) by Amit Singh Negi of T-Mobile, [Your Backup Is Not Your Recovery](https://www.conf42.com/Chaos_Engineering_2026_Praveen_Kumar_Gopalakrishnan_backup_api_recovery) by Praveen Kumar Gopalakrishnan of Salesforce, and [Your Agent Failed Mid-Run. Logs Won't Replay It.](https://www.conf42.com/MLOps_2026_Reza_Amini_agent_replay_logs) by Reza Amini of Flashback at MLOps 2026.
+
+[Watch Arjun Garg's talk](https://www.conf42.com/Chaos_Engineering_2026_Arjun_Garg_timeout_agent_tool) from [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026).
+
+[Watch the talk on YouTube](https://youtu.be/xfzPswIwSsA).
+",talk,chaos2026,talk:chaos2026/Arjun Garg,,Conf42,,queued,"chaos-engineering, ai-agents, mcp, idempotency, retries"
 ,LLMday Montevideo bets that the harness matters more than the model,"LLMday Montevideo, December 5 at World Trade Center Montevideo - Zyte, IBM, Abstracta, Marvik and Blizzard on agents, RAG and AI security. CONF42 = 42% off.",2026-11-21,2026-11-21-llmday-montevideo-harness-is-the-product,,"LLMday Montevideo is on December 5, 2026, at the World Trade Center Montevideo, and a good part of the programme argues one thing: what makes an agent work in production is everything around the model. Speakers come from Zyte, IBM, Abstracta, Marvik, Nubiral, Loopstudio, TCS and Blizzard Entertainment, and the code **CONF42** takes **42% off** the ticket.
 
 The day has two rooms: the Main Stage all day, and the Ephemeral Stage opening after lunch.
@@ -320,6 +570,68 @@ The least fashionable result of the event came from [Vladimir Beskorovainyi](htt
 
 Every talk is on the [Conf42 MLOps 2026 page](https://www.conf42.com/mlops2026) and in the [YouTube playlist](https://www.youtube.com/playlist?list=PLIuxSyKxlQrCqfY7wceGZMeGnQ647UUYw). Next in the series is [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) on December 3, a fitting follow-up for anyone who now wants to break their own checks on purpose, and [Conf42 DevOps 2027](https://www.conf42.com/devops2027) opens the new year on January 21.
 ",roundup,mlops2026,event:mlops2026,,Conf42,,,"mlops, ai-agents, llm-evals, ai-governance, agent-security, inference"
+,"Agents need a map of your delivery system, not a longer tool list",Sunil Gattupalle (Harness) at Conf42 MLOps 2026 on giving agents a typed knowledge graph of software delivery instead of raw API payloads and tool lists.,2026-11-19,mlops2026/harness-agents-need-delivery-knowledge-graph,,"Give an agent your REST API spec and it knows what each endpoint does. It has no idea *when* to call it. At Conf42 MLOps 2026, Sunil Gattupalle, Engineering Architect at Harness, argued that this missing ""when"" is the context agents lack in software delivery, and showed how Harness models it as a knowledge graph of entities, events, metrics and relationships that agents query in one language.
+
+It's a vendor talk about a vendor system, and Sunil says so by working in Harness's own terms throughout. But the modelling ideas travel well beyond Harness, and the half of the talk on *why* raw tool lists make agents worse is useful to anyone building MCP servers.
+
+## Why does the API spec leave agents guessing?
+
+Sunil starts with a short history of enterprise software: systems of record, then systems of engagement, then automation with CI/CD and Kubernetes. Reasoning is the next layer, where a system picks dynamic actions at run time instead of replaying behaviour someone coded in advance.
+
+The catch sits in the contract. ""The part that is not present in the API specification is when do you use it,"" Sunil said at Conf42 MLOps 2026. That reasoning used to live in documentation or in the developer's head. For agents it has to be codified and handed over as context.
+
+Delivery makes it sharper. Generating code has become easy, and the rest of the pipeline has to absorb that pace of change while keeping its guardrails, which he calls non-negotiable in enterprise software. Coding can afford flexibility; the further right you move towards production, the more determinism you want, without switching off the agent's ability to reason.
+
+## What goes into the graph?
+
+Across every Harness module, the team sorted data into four buckets:
+
+- **Entities**: the things you touch, such as pipelines, services, environments, artifacts, vulnerabilities and teams, each with a lifecycle.
+- **Events**: immutable, point-in-time facts that happen to entities.
+- **Metrics**: aggregations over events or lifecycles.
+- **Relationships**: the edges, which Sunil describes as the part that makes the graph traversable.
+
+The path he keeps returning to runs from pull request to commit to artifact, to artifact registry, to a pipeline, to an environment and finally to a running service. Because Harness runs those pipelines, it can see the whole path.
+
+The incident question shows why that matters. Sunil's team asks the same thing every time: what changed? ""Something must have changed, whether it is configuration that changed, whether it is code that has changed,"" he said. Answering it is a traversal: which service, how and when it was deployed, which artifact, which commit, which policy applied to the pipeline, which team owns it. The graph encodes that mental model as metadata so an agent can pick the relevant subgraph instead of rediscovering it.
+
+## How does an agent query it?
+
+Each entity type is declared with its dimensions, the operations allowed on them and a note on when to use the type. The graph is hydrated as you use the product: triggering a pipeline, scanning, creating commits and integrating Jira, GitHub and PagerDuty all land in a data lake, normalised and partitioned by tenant. Every query is scoped by the caller's RBAC permissions.
+
+On top sits a SQL-like query language the talk calls HQL. The agent's loop is:
+
+1. Discover which types exist in the account.
+2. Pick the ones relevant to the question.
+3. Drill into their dimensions, which is the equivalent of choosing projections, predicates and aggregations.
+4. Validate the query it built.
+5. Execute and return results.
+
+The design point is the vocabulary. Sunil's team could have exposed all this through MCP as long tool lists with raw API payloads, and says that would have polluted the context window and made the agent reason worse. Typed, declared metadata gives the agent grounded data to work from, and ""they just need to learn one language"".
+
+## What did the demo show?
+
+On Harness's own environment, which Sunil calls ""Harness on Harness"", he asks the agent to explain the path from commit to artifact to deployment to environment. The thought process on screen goes breadth first (list the metadata), then narrows to a subgraph and goes depth first, validating each query before executing it. He then asks the AI to visualise the answer, which produces a dashboard whose query you can inspect in code mode, and shows a worker agent for pipeline failure analysis that takes a look-back window and an org and project filter and returns a report on the past thirty days of executions. Inference can go through your own LLM gateway via a connector.
+
+Sunil also mentions that some models seem to prefer the Harness CLI over MCP for the same graph, and that delivery and runtime context in a coding agent adds blast radius and ownership to what the code alone can tell it.
+
+## Who should watch
+
+Platform and MLOps engineers wondering what context their agents are missing, and anyone designing an MCP server who suspects that more tools is not the answer. If you want a vendor-neutral benchmark of knowledge graphs against plain tool calling, this isn't it: there are no numbers comparing the two, and the product sections assume you use Harness.
+
+Related Conf42 talks: [Agent Evals That Check What Actually Happened](https://www.conf42.com/MLOps_2026_Sajal_Garg_agent_evals_happened) by Sajal Garg of Microsoft AI at the same event, [Your Agent Failed Mid-Run. Logs Won't Replay It.](https://www.conf42.com/MLOps_2026_Reza_Amini_agent_replay_logs) by Reza Amini of Flashback, and Jimmy Caputo's [Agentic Engineering Platforms](https://www.conf42.com/Platform_Engineering_2026_Jimmy_Caputo_agentic_engineering_platforms) from Harness at Platform Engineering 2026.
+
+[Watch Sunil Gattupalle's talk](https://www.conf42.com/MLOps_2026_Sunil_Gattupalle_agents_software_delivery) from [Conf42 MLOps 2026](https://www.conf42.com/mlops2026).
+
+## From Harness
+
+Sunil says the knowledge graph is available to Harness customers through Harness AI chat, the hosted or self-hosted Harness MCP server, the Harness CLI and custom dashboards. The graph is built as you use Harness; you don't have to ask for it.
+
+- Harness: [harness.io](https://www.harness.io/)
+- Free plan sign-up: [app.harness.io](https://app.harness.io/auth/#/signup?utm_source=webinar&utm_medium=webinar&utm_campaign=2026q4-conf42-mlops)
+
+[Watch the talk on YouTube](https://youtu.be/xNfalEBNZZ4).
+",sponsored,mlops2026,sponsor:mlops2026/harness/Sunil Gattupalle,harness,Conf42,,queued,"ai-agents, knowledge-graph, software-delivery, mcp, mlops"
 ,Test your agents for permission leaks like any other regression,"Ajay Munjuluru (JPMorgan Chase) at Conf42 MLOps 2026 on authorization evals: personas, canaries and join tests that can block an agent release.",2026-11-18,mlops2026/authorization-evals-agent-permission-leaks,,"An agent can write a perfect summary of a client relationship for someone who is not supposed to know half of what is in it, and every eval metric will come back green. At Conf42 MLOps 2026, Ajay Munjuluru, senior lead software engineer at JPMorgan Chase, shows how to turn ""who is asking"" into a test suite that runs in the delivery pipeline and can stop a release. He is clear that every example on his slides is made up for the talk and the opinions are his own.
 
 ## The agent is one front door to many rule sets
@@ -8112,6 +8424,47 @@ Engineers and architects who own CRM or ERP integrations, especially in regulate
 
 [Watch the talk on YouTube](https://youtu.be/nHfTmcJoWcc).
 ",talk,obs2026,talk:obs2026/Ravi Chandra,,Conf42,,,"data-integration, salesforce, identity-resolution, event-driven, observability"
+,"Identity first, speed second: real-time Salesforce integrations","Ravi Chandra Chinta (Temple View Capital) at Conf42 Observability 2026 on replacing nightly syncs with event-driven integrations, and fixing identity first.",2026-08-25,obs2026/salesforce-integrations-identity-first-realtime,,"When your sync is nightly, nobody trusts the data in the morning, and they keep a spreadsheet ""just in case"". At Conf42 Observability 2026, Ravi Chandra Chinta, Principal Salesforce Developer and Architect at Temple View Capital, a real-estate private mortgage lender, explains how his team rebuilt the integrations between Salesforce and Encompass, BSI and Shellpoint, and why the first fix had nothing to do with speed: it was the matching key.
+
+It's a practitioner's case study from financial services. There's no live demo and few hard metrics, but the sequence of decisions (identity, then architecture, then observability, then people) is the useful part, and it carries over to any multi-system integration.
+
+## What went wrong with email as a key?
+
+Loans pass from sales and loan officers through draw and rehab, underwriting, processing and servicing, all working in Salesforce while Encompass (loan origination) and the servicing platforms BSI and Shellpoint hold their own copies. The integrations used email as the primary matching key. In production, Ravi says, that fails three ways: shared inboxes that stand for several borrowers or a household, borrowers who change their email mid-loan so the integration creates a duplicate, and loan officers typing placeholder addresses that silently corrupt matching.
+
+None of this throws an error. It shows up a week later as wrong dashboards and a borrower with three loans at the same property address. The bigger cost was behavioural: teams kept shadow spreadsheets, cross-checked manually, and sometimes bypassed Salesforce for urgent loans, so it stopped being the system of record in practice.
+
+## How did they fix it?
+
+Their decision, in Ravi's words, was ""identity first and then speed second"". Matching moved to SSN for borrowers and brokers and EIN for business entities, held as tokenised or hashed values with tighter access to the raw ones, because compliance was non-negotiable. A borrower with three different emails across three loans now resolves to one person.
+
+Then the architecture. The team kept point-to-point, two-way integrations (Salesforce to Encompass, to BSI, and to Shellpoint), each independently built and monitored, so a Shellpoint outage or rate limit doesn't cascade into the others. On top sit four pillars:
+
+- **MuleSoft** with event-driven, API-led connectivity, replacing the Jitterbit cloud data loader's overnight queues.
+- **Intelligent document processing** for PDFs, scanned draw requests and Excel budgets, feeding the same real-time pipeline, with fallback paths and human review for poor scans.
+- **Salesforce Data Cloud** as a harmonisation layer before data lands in accounts, contacts, opportunities and loans.
+- **Custom REST and SOAP APIs** to give legacy downstream systems consistent interfaces, working around their payload limits, authentication quirks and rate limits.
+
+Integrations now fire when a loan status changes or a draw is approved, failures are caught, logged and retried without blocking unrelated flows, and monitoring was built in from day one so dashboards and alerts surface problems before a user opens a ticket.
+
+## What got hard?
+
+Ravi lists four frictions: reconciling years of historical duplicates, which took analysis plus manual review of ambiguous cases; conflict resolution for two-way sync, solved with explicit rules per object, per field and per direction; legacy SOAP constraints needing chunking, retries and an adapter layer; and people who had built routines around stale data (checking in the morning after the batch runs), which took communication, training and parallel verification.
+
+## The takeaways
+
+Fix identity before speed, or you will sync bad data faster. Redesign error handling rather than lifting batch retry logic into real time. Treat unstructured data as first-class. Point-to-point is legitimate in regulated multi-vendor setups. Trust moves slower than code, so budget for change management. Build observability first. As Ravi put it at Conf42 Observability 2026: ""Speed without accuracy is noise. Accuracy without trust is shelfware.""
+
+## Who should watch
+
+Integration and platform engineers on Salesforce or any CRM-to-core-system sync, and anyone whose ""real-time"" project is about to inherit a bad join key. If you want benchmarks of MuleSoft or Data Cloud, this isn't it: it reports outcomes (three systems integrated bi-directionally, five teams affected, nightly batches replaced) rather than latency figures.
+
+Related Conf42 talks: [How to build your own green observability pipeline](https://www.conf42.com/Observability_2026_Diana_Todea_opensource_observability_sustainability) by Diana Todea of VictoriaMetrics at the same event, and [Your Backup Is Not Your Recovery](https://www.conf42.com/Chaos_Engineering_2026_Praveen_Kumar_Gopalakrishnan_backup_api_recovery) by Praveen Kumar Gopalakrishnan of Salesforce, on rebuilding trust in API-driven systems.
+
+[Watch Ravi Chandra Chinta's talk](https://www.conf42.com/Observability_2026_Ravi_Chandra_Chinta_salesforce_integrations_realtime) from [Conf42 Observability 2026](https://www.conf42.com/obs2026).
+
+[Watch the talk on YouTube](https://youtu.be/nHfTmcJoWcc).
+",talk,obs2026,talk:obs2026/Ravi Chandra Chinta,,Conf42,,queued,"salesforce, integration, observability, mulesoft, data-quality"
 ,Six layers between an enterprise agent and a hallucination,"Arjun D Sureshbabu of Snowflake at Conf42 Observability 2026 on guardrails, hybrid RAG, validation and human review for trustworthy enterprise agents.",2026-08-23,obs2026/layered-guardrails-hitl-enterprise-agents-snowflake,,"Ask an ungrounded employee assistant how to avoid tax and it will try to help, which is precisely the problem. At Conf42 Observability 2026, Arjun D Sureshbabu, who has spent three years building and productionising agents at Snowflake, walked through a layered reliability framework for enterprise AI: guardrails before generation, hybrid retrieval for grounding, validation after generation, structured human review and continuous benchmarking, rolled out in six phases.
 
 ## Why hallucinations are an enterprise problem
