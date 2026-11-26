@@ -1,5 +1,12 @@
 # Conf42 Chaos Engineering 2026 - factory launches (newest first, written by the factory)
 
+## 2026-11-26 04:20 · cloud (GitHub Actions) · run
+- Drive: 15 files, 5 downloaded (Harini_Rajendran_Chaos_Engineering_For_Multi_Region_Kafka.mp4, Harini_Rajendran_Chaos_Engineering_For_Multi_Region_Kafka.pdf, Harini_Rajendran_Chaos_Engineering_For_Multi_Region_Kafka.pptx, Kishore Chandra Rajapudi - Conf42 Chaos Engineering 2026.mp4, Kishore Chandra Rajapudi_Conf42 Chaos Engineering 2026.pptx.pdf), 5 up to date, 0 newer, 2 new
+- processed: Harini Rajendran - done; Kishore Chandra Rajapudi - done (flags: loudness -15.4 LUFS)
+- finished before, untouched: 6
+- ship: 2 transcripts, 2 decks
+- Descript project Conf42 Chaos Engineering 2026: 9 compositions, 9 published
+
 ## 2026-11-24 06:37 · cloud (GitHub Actions) · run
 - Drive: 10 files, 2 downloaded (Amit_Singh_Negi_Conf42_Chaos-Engineering-2026.pdf, Amit_Singh_Negi_Conf42_Chaos2026.mp4), 4 up to date, 0 newer, 1 new
 - processed: Amit Singh Negi - done
