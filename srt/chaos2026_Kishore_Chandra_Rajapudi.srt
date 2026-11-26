@@ -1,0 +1,1422 @@
+1
+00:00:00,300 --> 00:00:02,375
+Hello everyone, I'm
+Kishore Chandra Rajapudi.
+
+2
+00:00:02,870 --> 00:00:06,802
+Thank you for joining me at Conf42
+Chaos Engineering twenty twenty-six.
+
+3
+00:00:07,632 --> 00:00:11,140
+Imagine a customer placing an
+order through a retail app.
+
+4
+00:00:11,335 --> 00:00:14,486
+The payment request times out,
+the order is still pending,
+
+5
+00:00:14,997 --> 00:00:16,097
+and the customer tries again.
+
+6
+00:00:16,706 --> 00:00:20,689
+Several services may still appear
+healthy while the customer has no
+
+7
+00:00:20,716 --> 00:00:22,314
+clear answer about what happened.
+
+8
+00:00:22,950 --> 00:00:27,298
+Today, I'll walk through a proposed
+architecture for handling situations
+
+9
+00:00:27,317 --> 00:00:31,123
+like this using agentic AI and
+controlled recovery workflow.
+
+10
+00:00:31,703 --> 00:00:35,262
+The agent helps interpret
+evidence and recommend a response.
+
+11
+00:00:35,822 --> 00:00:39,718
+A separate policy layer controls
+which actions are allowed.
+
+12
+00:00:40,134 --> 00:00:45,441
+An au-authorized person initiates
+reopening, and the system
+
+13
+00:00:45,442 --> 00:00:48,564
+validates the transaction journey
+before accepting new business.
+
+14
+00:00:48,923 --> 00:00:53,498
+I'll cover the architecture, walk through
+an example incident, and explain how I
+
+15
+00:00:53,499 --> 00:00:55,343
+would test its behavior under failure.
+
+16
+00:00:55,741 --> 00:00:59,747
+Let's begin with why retail
+incidents need this broader view
+
+17
+00:01:00,747 --> 00:01:04,411
+A retail transaction
+crosses several systems.
+
+18
+00:01:05,187 --> 00:01:09,884
+Ordering depends on payment, inventory,
+and often loyalty and delivery.
+
+19
+00:01:10,389 --> 00:01:14,184
+The customer experiences
+all of these as one journey.
+
+20
+00:01:14,638 --> 00:01:16,515
+That creates the first challenge.
+
+21
+00:01:16,761 --> 00:01:21,336
+A failure in one dependency can
+prevent the business outcome even when
+
+22
+00:01:21,401 --> 00:01:23,083
+other services are running normally.
+
+23
+00:01:23,708 --> 00:01:26,220
+The second challenge
+is fragmented evidence.
+
+24
+00:01:26,948 --> 00:01:31,471
+One dashboard shows timeouts,
+another shows delayed events,
+
+25
+00:01:31,551 --> 00:01:34,332
+and the support ticket says
+customer cannot complete checkout.
+
+26
+00:01:35,052 --> 00:01:40,089
+Operations needs to connect
+those observations to the
+
+27
+00:01:40,108 --> 00:01:41,711
+affected transactions and stores.
+
+28
+00:01:42,040 --> 00:01:44,163
+The third challenge is the recovery gap.
+
+29
+00:01:44,560 --> 00:01:49,963
+An alert might clear because
+traffic has dropped or a store
+
+30
+00:01:49,974 --> 00:01:51,430
+has dropped accepting orders.
+
+31
+00:01:51,940 --> 00:01:54,979
+That does not demonstrate
+that checkout works again.
+
+32
+00:01:55,510 --> 00:01:59,372
+Our operational goal is to protect
+the complete transaction journey.
+
+33
+00:01:59,623 --> 00:02:04,139
+We need to understand the customer
+impact, limit further exposure,
+
+34
+00:02:04,746 --> 00:02:07,786
+and gather evidence that normal
+business can safely resume.
+
+35
+00:02:08,418 --> 00:02:12,027
+That goal shapes the definition
+of self-healing on the next slide
+
+36
+00:02:13,027 --> 00:02:14,827
+What self-healing should mean.
+
+37
+00:02:15,377 --> 00:02:18,232
+In this design, self-healing
+has four responsibilities.
+
+38
+00:02:18,478 --> 00:02:20,706
+First, detect and interpret.
+
+39
+00:02:21,074 --> 00:02:26,211
+We connect transaction outcomes
+with service and dependency
+
+40
+00:02:26,211 --> 00:02:32,036
+signals, so we can describe what
+is failing and who is affected.
+
+41
+00:02:32,391 --> 00:02:34,758
+Second, contain safely.
+
+42
+00:02:35,364 --> 00:02:39,749
+Deterministic rules decide whether a
+specific protective action is permitted.
+
+43
+00:02:40,044 --> 00:02:45,163
+For example, an affected store might
+temporarily stop accepting new digital
+
+44
+00:02:45,183 --> 00:02:46,914
+orders while the team investigates.
+
+45
+00:02:47,605 --> 00:02:49,433
+Third, recover with ownership.
+
+46
+00:02:49,495 --> 00:02:52,997
+An authorized operator reviews
+the situation and initiates
+
+47
+00:02:53,022 --> 00:02:54,581
+the reopening process.
+
+48
+00:02:54,998 --> 00:02:57,933
+That makes responsibility for
+the recovery decision explicit.
+
+49
+00:02:58,352 --> 00:03:00,181
+Fourth, verify outcomes.
+
+50
+00:03:01,212 --> 00:03:05,384
+The workflow checks dependency path,
+the transaction path, and relevant
+
+51
+00:03:05,387 --> 00:03:07,759
+business state before the store reopens.
+
+52
+00:03:08,387 --> 00:03:11,821
+These responsibilities define
+the limits of automation.
+
+53
+00:03:12,290 --> 00:03:15,171
+The system can collect
+evidence, coordinate work, and
+
+54
+00:03:15,171 --> 00:03:16,772
+perform approved containment.
+
+55
+00:03:17,145 --> 00:03:20,982
+Reopening follow human initiation
+and successful validation.
+
+56
+00:03:21,256 --> 00:03:24,568
+Now, let's map those responsibilities
+onto the architecture
+
+57
+00:03:25,568 --> 00:03:28,568
+The proposed autonomous
+retail operations agent.
+
+58
+00:03:28,832 --> 00:03:33,470
+Starting on the left, retail
+services produce signals about
+
+59
+00:03:33,497 --> 00:03:35,358
+orders, payments, and inventory.
+
+60
+00:03:35,582 --> 00:03:40,390
+The telemetry and events layer brings
+together transaction outcomes and
+
+61
+00:03:40,391 --> 00:03:45,059
+dependency behavior with enough context to
+identify the affected store and incident.
+
+62
+00:03:45,521 --> 00:03:48,881
+The agent uses that evidence to
+develop a possible explanation
+
+63
+00:03:49,146 --> 00:03:50,259
+and suggest a response.
+
+64
+00:03:50,633 --> 00:03:56,511
+Its output should include the observations
+behind the recommendation and uncertainty.
+
+65
+00:03:57,117 --> 00:03:59,963
+That recommendation then passes
+to the policy engine that is
+
+66
+00:03:59,968 --> 00:04:02,374
+separate enforcement component.
+
+67
+00:04:02,850 --> 00:04:07,949
+It checks permissions, the allowed scope,
+and the conditions required for an action.
+
+68
+00:04:08,578 --> 00:04:13,883
+The operations workflow carries out the
+approved steps such as disabling new order
+
+69
+00:04:13,885 --> 00:04:18,724
+acceptance, notifying the pos- responsible
+team, and coordinating validation.
+
+70
+00:04:19,083 --> 00:04:22,016
+Underneath these components
+is a durable incident record.
+
+71
+00:04:22,297 --> 00:04:28,758
+It preserves the evidence, decisions and
+actions, outcomes, so the workflow can be
+
+72
+00:04:28,760 --> 00:04:30,902
+reviewed and resumed after interruption.
+
+73
+00:04:31,643 --> 00:04:35,027
+The word autonomous here refers
+to the work the system can
+
+74
+00:04:35,037 --> 00:04:36,810
+perform without those boundaries.
+
+75
+00:04:36,892 --> 00:04:41,121
+The model has no general authority
+to change retail systems.
+
+76
+00:04:41,373 --> 00:04:45,233
+Next, let's look at how an incident
+moves through this architecture
+
+77
+00:04:46,233 --> 00:04:47,899
+A controlled incident lifecycle.
+
+78
+00:04:48,335 --> 00:04:52,785
+The lifecycle begins with detection
+of a persistent failure pattern.
+
+79
+00:04:52,948 --> 00:04:56,803
+We gather enough evidence to establish
+that the problem needs attention.
+
+80
+00:04:57,137 --> 00:04:59,009
+The agent then recommends a response.
+
+81
+00:04:59,521 --> 00:05:03,454
+It explains a candidate cause,
+identifies the affected scope,
+
+82
+00:05:03,511 --> 00:05:05,140
+and gives supporting observations.
+
+83
+00:05:05,734 --> 00:05:08,822
+Containment follows only
+if the policy allows it.
+
+84
+00:05:08,882 --> 00:05:12,705
+In this example, that could
+mean temporarily disabling new
+
+85
+00:05:12,725 --> 00:05:14,253
+orders for the affected store.
+
+86
+00:05:14,621 --> 00:05:19,220
+After the underlying problem has
+been addressed, an author-- an
+
+87
+00:05:19,230 --> 00:05:21,883
+authorized person initiates recovery.
+
+88
+00:05:22,113 --> 00:05:25,184
+The workflow runs the required
+checks and permits reopening
+
+89
+00:05:25,216 --> 00:05:27,178
+only when those checks pass.
+
+90
+00:05:27,459 --> 00:05:31,213
+These stages should have explicit
+states and recorded outcomes.
+
+91
+00:05:31,481 --> 00:05:34,423
+A failed check keeps the
+incident open for the work.
+
+92
+00:05:34,714 --> 00:05:38,530
+A repeated request must not
+skip a stage or repeat an action
+
+93
+00:05:38,842 --> 00:05:40,054
+that has already completed.
+
+94
+00:05:40,687 --> 00:05:43,650
+The sentence at the bottom
+captures the responsibility split.
+
+95
+00:05:44,159 --> 00:05:45,229
+AI advises.
+
+96
+00:05:46,044 --> 00:05:47,242
+Policy authorizes.
+
+97
+00:05:47,437 --> 00:05:48,758
+Human controlled reopening.
+
+98
+00:05:48,884 --> 00:05:53,897
+Let's examine detection first,
+because every latter decision depends
+
+99
+00:05:53,898 --> 00:05:55,774
+on the quality of that evidence
+
+100
+00:05:56,774 --> 00:06:00,076
+Detecting persistent
+failures, not isolated noise.
+
+101
+00:06:00,595 --> 00:06:04,138
+A single timeout can have
+several explanations.
+
+102
+00:06:04,433 --> 00:06:08,732
+Before taking a disruptive action,
+the design needs evidence of sustained
+
+103
+00:06:08,816 --> 00:06:11,891
+degradation and its business impact.
+
+104
+00:06:12,447 --> 00:06:16,766
+Signal fusion means looking at
+transaction failures alongside
+
+105
+00:06:17,172 --> 00:06:22,527
+timeouts, dependency health, event
+stream status, and store context.
+
+106
+00:06:22,789 --> 00:06:25,719
+We also need the time window
+and transaction volume.
+
+107
+00:06:27,217 --> 00:06:32,204
+A failure count has limited meaning
+without knowing how much traffic occurred.
+
+108
+00:06:32,722 --> 00:06:35,297
+Context helps identify the scope.
+
+109
+00:06:35,457 --> 00:06:40,458
+If one store is affected while
+comparable stores are healthy, we
+
+110
+00:06:40,470 --> 00:06:42,129
+investigate local dependencies.
+
+111
+00:06:42,818 --> 00:06:48,558
+If failures appear across stores using
+the same integration, that suggests
+
+112
+00:06:48,635 --> 00:06:51,780
+a dependency deserves attention.
+
+113
+00:06:52,243 --> 00:06:56,040
+These are hypotheses that
+the evidence must support.
+
+114
+00:06:57,553 --> 00:06:58,701
+Freshness also matters.
+
+115
+00:06:58,993 --> 00:07:03,206
+Delayed events should not be treated as
+current failures without checking their
+
+116
+00:07:03,248 --> 00:07:05,684
+timestamps and the present incident state.
+
+117
+00:07:06,047 --> 00:07:11,000
+I would define persistence thresholds
+and observation window as explicit
+
+118
+00:07:11,016 --> 00:07:14,786
+configuration, then validate them
+against representative traffic.
+
+119
+00:07:14,853 --> 00:07:17,373
+The raw evidence remains
+available for review.
+
+120
+00:07:17,778 --> 00:07:20,923
+With that foundation, the agent
+can help interpret the incident
+
+121
+00:07:21,923 --> 00:07:25,448
+AI-assisted diagnosis
+with bounded authority.
+
+122
+00:07:25,835 --> 00:07:29,982
+The agent receives recent failures,
+dependency changes, affected stores,
+
+123
+00:07:30,023 --> 00:07:32,320
+and a relevant incident history.
+
+124
+00:07:32,633 --> 00:07:38,383
+Its job is to turn those observations
+into a useful assessment.
+
+125
+00:07:38,393 --> 00:07:44,491
+For example, it might say payment
+times out, incre-increased for the
+
+126
+00:07:44,493 --> 00:07:49,217
+store after a dependency change,
+while inventory checks remain healthy.
+
+127
+00:07:49,841 --> 00:07:53,422
+A payment integration issue is a
+candidate cause, but the evidence
+
+128
+00:07:53,423 --> 00:07:55,432
+does not yet confirm the root cause.
+
+129
+00:07:55,745 --> 00:08:00,224
+A useful recommendation identifies
+the supporting observation, missing
+
+130
+00:08:00,224 --> 00:08:02,261
+information, and a suggested action.
+
+131
+00:08:02,549 --> 00:08:05,943
+An interpre-- An operator
+should be able to trace that
+
+132
+00:08:05,969 --> 00:08:08,184
+explanation back to actual events.
+
+133
+00:08:08,660 --> 00:08:11,890
+The guardrail is enforced
+outside the model.
+
+134
+00:08:11,948 --> 00:08:15,744
+The agent does not receive
+unrestricted credential to modify
+
+135
+00:08:15,744 --> 00:08:17,936
+payments, inventory, or store status.
+
+136
+00:08:18,641 --> 00:08:23,453
+Any proposed action goes through the
+policy engine and a constrained workflow.
+
+137
+00:08:23,779 --> 00:08:27,068
+A confident explanation still
+needs evidence and authorization.
+
+138
+00:08:27,940 --> 00:08:31,171
+If the assessment is incomplete
+or inconsistent, the system
+
+139
+00:08:31,184 --> 00:08:32,950
+should request review.
+
+140
+00:08:33,148 --> 00:08:36,182
+That brings us to the
+conditions for safe containment
+
+141
+00:08:37,183 --> 00:08:39,585
+Policy-driven temporary store disablement.
+
+142
+00:08:40,275 --> 00:08:45,854
+In this example, store disablement means
+temporarily stopping the affected store
+
+143
+00:08:45,856 --> 00:08:47,990
+from accepting the new digital orders.
+
+144
+00:08:48,339 --> 00:08:51,017
+The actions has a defined business scope.
+
+145
+00:08:51,313 --> 00:08:54,719
+Before applying it, the policy
+checks that the incident is active
+
+146
+00:08:55,214 --> 00:08:56,412
+and the evidence is correct.
+
+147
+00:08:56,912 --> 00:09:01,987
+It verifies that both the store and the
+requested action are explicitly permitted.
+
+148
+00:09:02,354 --> 00:09:04,894
+The workflow also checks
+for duplicate requests.
+
+149
+00:09:04,961 --> 00:09:09,137
+If the same incident event arrives
+again, it should not trigger another
+
+150
+00:09:09,157 --> 00:09:10,546
+independent disablement action.
+
+151
+00:09:11,111 --> 00:09:15,768
+Customer-facing availability
+must stay consistent with the
+
+152
+00:09:16,013 --> 00:09:17,585
+actual order acceptance state.
+
+153
+00:09:17,905 --> 00:09:23,419
+If one update succeeds and another
+fails, the workflow needs to record
+
+154
+00:09:23,419 --> 00:09:26,590
+that partial result, reconcile
+it, and alert the operator.
+
+155
+00:09:27,016 --> 00:09:31,235
+Finally, the action and its
+rationale must be recorded durably.
+
+156
+00:09:31,602 --> 00:09:35,858
+We need to know what was requested, what
+was allowed, and what actually happened.
+
+157
+00:09:36,219 --> 00:09:38,605
+Existing transactions
+still require attention.
+
+158
+00:09:38,922 --> 00:09:42,847
+Disabling new orders does not
+resolve a depending pay-- a pending
+
+159
+00:09:42,858 --> 00:09:45,885
+payment or an inventory reservation.
+
+160
+00:09:46,141 --> 00:09:51,037
+It limits new exposure while
+investigation and remediation continue.
+
+161
+00:09:51,524 --> 00:09:55,608
+Recovery therefore needs its own
+decision and validation process
+
+162
+00:09:56,608 --> 00:09:58,535
+Recovery remains human-initiated.
+
+163
+00:09:58,987 --> 00:10:03,431
+An authorized operator initiates the
+recovery process after reviewing the
+
+164
+00:10:03,444 --> 00:10:07,419
+incident, the remediation status,
+and the scope proposed for reopening.
+
+165
+00:10:07,889 --> 00:10:12,350
+That decision is enforced through
+role-based access and explicit
+
+166
+00:10:12,694 --> 00:10:14,572
+approval linked to the incident.
+
+167
+00:10:14,805 --> 00:10:20,862
+The workflow records who initiated it
+and which stores the request covers.
+
+168
+00:10:21,096 --> 00:10:25,904
+Repeated clicks, re-retried requests,
+or old events must not create a
+
+169
+00:10:25,907 --> 00:10:30,020
+sec-second recovery process or
+bypass an incomplete validation step.
+
+170
+00:10:30,716 --> 00:10:34,892
+The system checks the current workflow
+state before accepting a transition.
+
+171
+00:10:35,628 --> 00:10:38,086
+There is a practical reason
+for this human checkpoint.
+
+172
+00:10:38,405 --> 00:10:45,214
+Once new orders stop, transaction
+failures may not stop appearing as well.
+
+173
+00:10:45,648 --> 00:10:50,125
+A quiet dashboard can simply mean
+there is no traffic left to fail.
+
+174
+00:10:50,831 --> 00:10:53,916
+The operator initiates recovery,
+and the system enforces the
+
+175
+00:10:53,916 --> 00:10:55,079
+validation requirements.
+
+176
+00:10:55,402 --> 00:10:58,798
+If a check fails, the store
+remains contained, and the
+
+177
+00:10:58,820 --> 00:11:00,909
+operator receives the result.
+
+178
+00:11:01,047 --> 00:11:04,277
+The next slide defines the
+evidence required for reopening
+
+179
+00:11:05,277 --> 00:11:06,503
+Validate before reopening.
+
+180
+00:11:07,594 --> 00:11:10,147
+The recovery gate checks four areas.
+
+181
+00:11:10,324 --> 00:11:11,862
+First is a dependency health.
+
+182
+00:11:12,739 --> 00:11:18,314
+The integrations required by the affected
+transaction path must respond as expected.
+
+183
+00:11:18,399 --> 00:11:21,566
+A basic process health check
+alone cannot establish that.
+
+184
+00:11:22,276 --> 00:11:23,766
+Second is the transaction path.
+
+185
+00:11:24,094 --> 00:11:28,477
+We need a representative flow that
+describes the relevant steps, including
+
+186
+00:11:28,478 --> 00:11:30,406
+the expected downstream result.
+
+187
+00:11:31,011 --> 00:11:35,378
+Any test that touches business
+system needs an approved method
+
+188
+00:11:35,399 --> 00:11:36,805
+and controlled side effects.
+
+189
+00:11:37,352 --> 00:11:39,222
+Third is state consistency.
+
+190
+00:11:40,571 --> 00:11:43,531
+Pending and failed work
+must be reconciled.
+
+191
+00:11:43,576 --> 00:11:47,540
+For example, a payment timeout
+does not tell us whether the
+
+192
+00:11:47,540 --> 00:11:50,081
+provider processed the payment.
+
+193
+00:11:50,591 --> 00:11:56,422
+We need to establish the actual outcome
+before deciding what happens to the
+
+194
+00:11:56,428 --> 00:11:58,347
+order or attempting another payment.
+
+195
+00:11:58,804 --> 00:12:00,582
+Fourth is an observation window.
+
+196
+00:12:01,144 --> 00:12:05,565
+A brief successful response may not
+demonstrate sustained stability.
+
+197
+00:12:06,024 --> 00:12:09,651
+The required duration and success
+criteria should be defined for
+
+198
+00:12:09,653 --> 00:12:11,068
+the workflow and the incident.
+
+199
+00:12:11,876 --> 00:12:15,798
+Reopening is permitted only
+after the required checks pass.
+
+200
+00:12:15,841 --> 00:12:20,388
+If evidence is missing, a dependency
+fails again, or reconciliation is
+
+201
+00:12:20,417 --> 00:12:25,348
+incomplete, the workflow reports that
+result and keeps the store contained.
+
+202
+00:12:25,589 --> 00:12:29,743
+Let's apply this process to
+one illustrative incident
+
+203
+00:12:30,743 --> 00:12:33,425
+Representative incident
+transaction failures.
+
+204
+00:12:33,768 --> 00:12:37,440
+Consider a store that is
+accepting digital orders normally.
+
+205
+00:12:37,900 --> 00:12:41,793
+We then observe a sustained
+cluster of checkout failures
+
+206
+00:12:42,168 --> 00:12:44,109
+associated with payment timeouts.
+
+207
+00:12:44,337 --> 00:12:49,118
+The detection layer correlates those
+failures with dependency signals
+
+208
+00:12:49,375 --> 00:12:51,132
+and identifies the affected store.
+
+209
+00:12:51,445 --> 00:12:54,477
+The agent reviews the evidence
+and proposes a payment dependency
+
+210
+00:12:54,484 --> 00:12:56,182
+issue as a likely explanation.
+
+211
+00:12:56,466 --> 00:12:58,797
+It also states what remained uncertain.
+
+212
+00:12:59,046 --> 00:13:02,187
+The policy engine checks the
+current incident, permitted
+
+213
+00:13:02,187 --> 00:13:04,888
+scope, and containment conditions.
+
+214
+00:13:05,199 --> 00:13:09,039
+If those checks pass, the workflow
+temporarily disables new order acceptance
+
+215
+00:13:09,052 --> 00:13:13,027
+for that store, updates availability,
+and notifies the responsible team.
+
+216
+00:13:13,344 --> 00:13:16,268
+The team investigates and
+addresses the dependency problem.
+
+217
+00:13:16,666 --> 00:13:19,300
+An authorized operator then
+initiates the recovery.
+
+218
+00:13:19,574 --> 00:13:22,571
+The workflow checks the integration,
+runs an approved representative
+
+219
+00:13:22,576 --> 00:13:27,234
+transaction, and reconciles orders
+whose payment outcomes were uncertain.
+
+220
+00:13:27,588 --> 00:13:31,994
+After the configured observation
+window passes with the required checks
+
+221
+00:13:31,998 --> 00:13:33,832
+successful, the store can reopen.
+
+222
+00:13:33,890 --> 00:13:38,595
+If a check fails, containment
+continues, the operator sees why.
+
+223
+00:13:40,003 --> 00:13:43,273
+This example illustrates the
+intended behavior of the design.
+
+224
+00:13:43,325 --> 00:13:45,847
+Each step produces evidence
+for the next decision.
+
+225
+00:13:46,149 --> 00:13:48,280
+An incomplete step remains visible.
+
+226
+00:13:48,710 --> 00:13:51,513
+Supporting that behavior requires
+durable coordination, which
+
+227
+00:13:51,514 --> 00:13:52,646
+is the focus of the next slide
+
+228
+00:13:53,646 --> 00:13:55,457
+Event streaming and durable coordination.
+
+229
+00:13:55,537 --> 00:14:00,227
+The event backbone carries transaction
+outcomes, incident transactions, action
+
+230
+00:14:00,245 --> 00:14:01,668
+requests, and validation results.
+
+231
+00:14:02,065 --> 00:14:07,018
+These events need enough identity
+and context to connect them to right
+
+232
+00:14:07,019 --> 00:14:08,863
+store, transaction, and incident.
+
+233
+00:14:09,389 --> 00:14:15,968
+The workflow pushes its current state,
+action status, retries, and checkpoints.
+
+234
+00:14:16,525 --> 00:14:20,835
+If a worker restarts, it should be
+able to determine which steps completed
+
+235
+00:14:20,862 --> 00:14:22,272
+and which still need attention.
+
+236
+00:14:22,589 --> 00:14:27,864
+Imagine that a disablement request
+succeeds, but its response is lost.
+
+237
+00:14:28,623 --> 00:14:32,620
+The workflow may retry because
+it cannot confirm the outcome.
+
+238
+00:14:33,566 --> 00:14:37,714
+An idempotent command allow
+that retry without creating
+
+239
+00:14:37,714 --> 00:14:39,633
+an additional business effect.
+
+240
+00:14:39,745 --> 00:14:44,054
+It can recognize the same request and
+return or reconcile the existing result.
+
+241
+00:14:44,517 --> 00:14:47,242
+Partial failures also
+need explicit handling.
+
+242
+00:14:47,652 --> 00:14:51,198
+The store state might change while
+the customer-facing update fails.
+
+243
+00:14:51,799 --> 00:14:54,367
+We must retain both
+outcomes and reconcile them.
+
+244
+00:14:54,762 --> 00:14:59,308
+Durable coordination makes the recovery
+process itself resilient to interruptions.
+
+245
+00:14:59,363 --> 00:15:02,998
+It also gives operators a
+trustworthy view of progress.
+
+246
+00:15:03,355 --> 00:15:06,885
+Those records and actions
+need clear security boundaries
+
+247
+00:15:07,885 --> 00:15:10,015
+Security, governance, and auditability.
+
+248
+00:15:10,436 --> 00:15:12,539
+The first boundary is least privilege.
+
+249
+00:15:13,366 --> 00:15:18,761
+Observation, recommendation, containment,
+and reopening have separate permissions.
+
+250
+00:15:19,036 --> 00:15:22,814
+Access to incident evidence
+should not automatically grant the
+
+251
+00:15:22,835 --> 00:15:25,246
+ability to change store status.
+
+252
+00:15:25,439 --> 00:15:27,932
+The second boundary is
+deterministic policy.
+
+253
+00:15:28,309 --> 00:15:32,721
+The system evaluates action scope
+and approval outside the model.
+
+254
+00:15:33,304 --> 00:15:37,655
+Instructions in a prompt are not a
+substitute for authorized checks at
+
+255
+00:15:37,655 --> 00:15:39,401
+the point where an action executes.
+
+256
+00:15:39,717 --> 00:15:41,426
+The third requirement is traceability.
+
+257
+00:15:41,718 --> 00:15:45,972
+The incident record should connect the
+evidence, the recommendation, the policy
+
+258
+00:15:45,977 --> 00:15:50,594
+decision, the operator identity when
+applicable, and the actual action outcome.
+
+259
+00:15:50,988 --> 00:15:56,940
+Finally, the design needs
+defined behavior when information
+
+260
+00:15:56,941 --> 00:15:58,134
+is missing or conflicting.
+
+261
+00:15:58,464 --> 00:16:02,656
+If the system cannot establish
+that a state-changing action is
+
+262
+00:16:02,685 --> 00:16:07,110
+authorized, it should preserve the
+current state and escalate for review.
+
+263
+00:16:07,462 --> 00:16:13,284
+Uncertainty alone should not trigger a
+broad shutdown or an unverified reopening.
+
+264
+00:16:13,705 --> 00:16:18,178
+These controls need to hold during
+failures as well as normal operation.
+
+265
+00:16:18,619 --> 00:16:22,348
+That is where deliberate failure
+testing becomes essential
+
+266
+00:16:23,348 --> 00:16:25,773
+Testing the design and
+planning what comes next.
+
+267
+00:16:26,312 --> 00:16:30,203
+For a chaos engineering experiment, I
+would begin with an explicit hypothesis.
+
+268
+00:16:30,470 --> 00:16:35,294
+For example, a sustained dependency
+failure affecting one test store should
+
+269
+00:16:35,326 --> 00:16:37,635
+trigger only the permitted containment.
+
+270
+00:16:37,711 --> 00:16:41,797
+New order acceptance must remain
+disabled until an authorized
+
+271
+00:16:41,828 --> 00:16:46,034
+operator initiates recovery and
+every required validation passes.
+
+272
+00:16:46,643 --> 00:16:50,548
+I would define the steady-state
+transaction behavior, limit the
+
+273
+00:16:50,548 --> 00:16:55,359
+experiment scope, and set stop
+conditions before injecting failures.
+
+274
+00:16:55,800 --> 00:16:58,503
+Initial experiments should run
+in a controlled environment.
+
+275
+00:16:58,854 --> 00:17:01,203
+Then I would exercise
+the cases on the slide.
+
+276
+00:17:01,760 --> 00:17:06,621
+A transient error should not meet a
+policy that requires sustained failures.
+
+277
+00:17:06,714 --> 00:17:10,201
+Duplicate events should not
+repeat business actions.
+
+278
+00:17:10,359 --> 00:17:14,694
+Stale signals should not override
+the current incident state.
+
+279
+00:17:15,185 --> 00:17:18,096
+Permission denial should
+prevent execution.
+
+280
+00:17:18,424 --> 00:17:23,411
+I would also interrupt disablement
+partway through, restart the workflow,
+
+281
+00:17:23,884 --> 00:17:29,164
+and attempt reopening while a dependency
+or reconciliation check is still failing.
+
+282
+00:17:29,585 --> 00:17:34,078
+We need to observe whether partial
+results remain visible and whether
+
+283
+00:17:34,107 --> 00:17:35,397
+the workflow resumes correctly.
+
+284
+00:17:35,872 --> 00:17:41,487
+I would measure unnecessary
+containment, time to contain duplicate
+
+285
+00:17:41,618 --> 00:17:44,851
+side effects, incomplete recovery
+checks, and audit completeness.
+
+286
+00:17:45,264 --> 00:17:51,162
+For this proposed architecture, those
+measures would esta-- help establish
+
+287
+00:17:51,171 --> 00:17:54,381
+whether the control work as intended.
+
+288
+00:17:55,285 --> 00:17:58,927
+Predictive detection, cross-store
+correlation, and digital twins
+
+289
+00:17:58,973 --> 00:18:00,647
+are possible future extensions.
+
+290
+00:18:00,951 --> 00:18:05,037
+I would consider them after
+the core controls demonstrate
+
+291
+00:18:05,492 --> 00:18:07,110
+reliable behavior under failure
+
+292
+00:18:08,110 --> 00:18:08,404
+Thank you.
+
+293
+00:18:08,841 --> 00:18:13,647
+The central idea is that retail
+recovery needs evidence about
+
+294
+00:18:13,662 --> 00:18:15,413
+the complete transaction journey.
+
+295
+00:18:15,524 --> 00:18:20,197
+Agentic AI can help interpret that
+evidence and recommend a response.
+
+296
+00:18:20,264 --> 00:18:23,251
+Accruise policy limits containment.
+
+297
+00:18:23,317 --> 00:18:28,809
+An authorized person initiates reopening,
+and the validation establishes whether
+
+298
+00:18:28,826 --> 00:18:30,750
+the business flow is ready to resume.
+
+299
+00:18:31,077 --> 00:18:34,974
+Chaos engineering gives us a way
+to test those responsibilities when
+
+300
+00:18:34,984 --> 00:18:39,200
+dependencies fail, events repeat,
+and workflows are interrupted.
+
+301
+00:18:39,517 --> 00:18:44,331
+As the closing slide says, engineering
+resilience means recovering with
+
+302
+00:18:44,369 --> 00:18:46,451
+evidence, policy, and control.
+
+303
+00:18:46,780 --> 00:18:47,582
+Thank you for watching.
+
+304
+00:18:47,612 --> 00:18:51,801
+I'm Kishore Chandra Rajapudi, and I look
+forward to your questions and discussion

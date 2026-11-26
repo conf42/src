@@ -1,0 +1,1299 @@
+1
+00:00:00,300 --> 00:00:01,064
+Hey, everyone.
+
+2
+00:00:01,152 --> 00:00:02,255
+My name is Harini.
+
+3
+00:00:02,848 --> 00:00:07,416
+I am an engineering leader at one
+of the big fintech companies, and
+
+4
+00:00:07,449 --> 00:00:09,268
+I manage their messaging infra.
+
+5
+00:00:10,126 --> 00:00:14,852
+In today's session, I'll talk about
+running Apache Kafka for mission-critical
+
+6
+00:00:14,914 --> 00:00:20,713
+Tier Zero workloads, how to design it
+to survive losing an entire region, and
+
+7
+00:00:20,713 --> 00:00:25,558
+how to prove that it works as expected
+under such disastrous scenarios by
+
+8
+00:00:25,572 --> 00:00:30,999
+breaking it on purpose, because we don't
+want any surprises at the wrong time
+
+9
+00:00:31,998 --> 00:00:33,594
+So let's define the goal.
+
+10
+00:00:34,045 --> 00:00:35,307
+What's our goal here?
+
+11
+00:00:36,094 --> 00:00:40,598
+Our goal is to keep the Kafka cluster
+operational and continue serving
+
+12
+00:00:40,618 --> 00:00:45,478
+traffic as normally as possible,
+even if an entire region goes down.
+
+13
+00:00:46,487 --> 00:00:50,104
+As you can see in the animation,
+when region C goes down,
+
+14
+00:00:50,253 --> 00:00:53,514
+traffic still continues to flow
+through the surviving regions.
+
+15
+00:00:54,499 --> 00:00:59,029
+We can even continue rolling the
+brokers one at a time because
+
+16
+00:00:59,286 --> 00:01:03,357
+break glass maintenance cannot
+always wait for an outage to end.
+
+17
+00:01:03,992 --> 00:01:07,634
+Let's say if we want to apply
+an emergency patch to handle the
+
+18
+00:01:07,650 --> 00:01:09,943
+outage, we should be able to do it.
+
+19
+00:01:10,833 --> 00:01:15,136
+But defining for this level of resilience
+raises three important questions.
+
+20
+00:01:15,903 --> 00:01:18,571
+What survives when an
+entire region goes down?
+
+21
+00:01:19,321 --> 00:01:24,287
+How do we prove the system behaves as,
+as expected when it actually goes down?
+
+22
+00:01:24,851 --> 00:01:26,753
+And how do we safely recover?
+
+23
+00:01:27,750 --> 00:01:31,184
+These three questions will guide
+us through the rest of the talk.
+
+24
+00:01:32,854 --> 00:01:36,452
+First, let's look at how
+the Kafka cluster is set up.
+
+25
+00:01:37,427 --> 00:01:43,794
+In our design, we have three independent
+isolated regions with two broker in each.
+
+26
+00:01:44,833 --> 00:01:51,301
+Each broker is assigned a rack value
+corresponding to its regions A, B, or C.
+
+27
+00:01:52,274 --> 00:01:55,540
+This is important because it
+allows us to distribute the
+
+28
+00:01:55,540 --> 00:01:57,631
+replicas across failure domains.
+
+29
+00:01:58,108 --> 00:02:01,451
+In our scenario, each
+failure domain is a region.
+
+30
+00:02:02,685 --> 00:02:06,390
+With replication factor of
+six, each region holds two
+
+31
+00:02:06,390 --> 00:02:08,171
+replicas of every partition.
+
+32
+00:02:08,976 --> 00:02:13,947
+So if region C goes down, we
+still have four surviving replicas
+
+33
+00:02:13,950 --> 00:02:15,986
+spread across regions A and B.
+
+34
+00:02:16,957 --> 00:02:22,101
+But having four surviving replicas is
+only useful if the topic and the client
+
+35
+00:02:22,123 --> 00:02:27,647
+configs allow Kafka to continue accepting
+reads and writes with four replicas.
+
+36
+00:02:28,642 --> 00:02:32,804
+This brings us to the next design
+decision of defining when Kafka
+
+37
+00:02:32,813 --> 00:02:36,887
+should continue accepting writes
+and when it should stop to protect
+
+38
+00:02:36,998 --> 00:02:43,571
+durability Here we have a replication
+factor of six, but we have configured
+
+39
+00:02:43,645 --> 00:02:45,494
+minimum sync replicas to be three.
+
+40
+00:02:46,484 --> 00:02:48,292
+This is an important design decision.
+
+41
+00:02:48,823 --> 00:02:54,432
+When an entire region goes down, we still
+have four surviving replicas, allowing
+
+42
+00:02:54,446 --> 00:02:56,477
+Kafka to continue accepting writes.
+
+43
+00:02:57,351 --> 00:03:00,131
+Now, let's say we need to
+perform maintenance while that
+
+44
+00:03:00,132 --> 00:03:01,542
+region is still unavailable.
+
+45
+00:03:01,883 --> 00:03:03,615
+Let's say we need to apply some patch.
+
+46
+00:03:04,337 --> 00:03:08,998
+As we roll the surviving brokers
+one at a time, the ISR will
+
+47
+00:03:09,053 --> 00:03:11,149
+temporarily drop from three to…
+
+48
+00:03:11,892 --> 00:03:16,222
+from four to three as each broker
+goes down and comes back up.
+
+49
+00:03:17,039 --> 00:03:22,590
+Since we still meet the minimum ISR
+requirement, the writes continue to work.
+
+50
+00:03:23,423 --> 00:03:28,584
+That's the reason why we chose replication
+factor of, of six, but set the min ISR
+
+51
+00:03:28,614 --> 00:03:33,507
+to be three, because this gives us the
+flexibility to do a rolling restart of
+
+52
+00:03:33,543 --> 00:03:35,961
+the cluster even if one region is down.
+
+53
+00:03:36,949 --> 00:03:39,534
+But there is a limit to
+this availability guarantee.
+
+54
+00:03:40,166 --> 00:03:44,942
+If we lose an entire region and
+two additional brokers, then we
+
+55
+00:03:44,942 --> 00:03:46,779
+are left with only two replicas.
+
+56
+00:03:47,827 --> 00:03:52,897
+That falls below our configured minimum
+ISR of three, so Kafka will start
+
+57
+00:03:53,009 --> 00:03:58,276
+rejecting writes over compromising on
+durability, and that's intentional.
+
+58
+00:03:58,925 --> 00:04:02,675
+We are designing to tolerate
+a regional outage plus one
+
+59
+00:04:02,721 --> 00:04:06,784
+additional bro-broker failure or
+restarts, not unlimited failures.
+
+60
+00:04:07,873 --> 00:04:09,341
+But this is not enough still.
+
+61
+00:04:09,833 --> 00:04:13,767
+We need to have some enforcement
+on the client side as well to
+
+62
+00:04:13,769 --> 00:04:16,141
+make sure it all works in place.
+
+63
+00:04:17,440 --> 00:04:21,303
+On the client side, all
+producers writing tier zero data
+
+64
+00:04:21,391 --> 00:04:23,219
+should use acks equal to all.
+
+65
+00:04:23,897 --> 00:04:25,029
+What does that even mean?
+
+66
+00:04:25,786 --> 00:04:30,070
+When a producer sends a write to
+the partition leader, the data gets
+
+67
+00:04:30,070 --> 00:04:34,287
+replicated to all other in-sync
+replicas across all the regions.
+
+68
+00:04:35,118 --> 00:04:39,491
+Only after the data has been successfully
+replicated, the producer receives an
+
+69
+00:04:39,519 --> 00:04:41,536
+acknowledgement back from the server.
+
+70
+00:04:42,543 --> 00:04:45,673
+This is important for maintaining
+our durability guarantees.
+
+71
+00:04:46,301 --> 00:04:50,922
+So when one region goes down, we are
+left with four surviving replicas.
+
+72
+00:04:51,622 --> 00:04:55,998
+So the producer receives an ack back
+when the data has been replicated
+
+73
+00:04:56,022 --> 00:04:57,686
+to all of those four replicas.
+
+74
+00:04:57,774 --> 00:05:01,489
+It doesn't wait for an ack
+for all six to be done.
+
+75
+00:05:02,483 --> 00:05:06,635
+As long as there are at least three
+in-sync replicas, all of them have
+
+76
+00:05:06,635 --> 00:05:10,885
+received the data, the producer can
+receive the acknowledgement from Kafka
+
+77
+00:05:11,885 --> 00:05:16,717
+So as you see, we have three
+different layers here, and each one
+
+78
+00:05:16,784 --> 00:05:18,887
+is only useful with the other three.
+
+79
+00:05:19,741 --> 00:05:23,685
+If we remove any one layer or
+we break any one layer, all of
+
+80
+00:05:23,731 --> 00:05:25,640
+the Tier Zero guarantees break.
+
+81
+00:05:26,462 --> 00:05:30,081
+We need all three of these
+to work in tandem for our
+
+82
+00:05:30,087 --> 00:05:32,699
+mission-critical Tier Zero workloads
+
+83
+00:05:33,699 --> 00:05:38,052
+Now that we have discussed the brokers
+and topic configurations, there's
+
+84
+00:05:38,109 --> 00:05:41,816
+another layer we need to consider,
+which is the controller quorum.
+
+85
+00:05:42,712 --> 00:05:44,017
+Kafka 3.9
+
+86
+00:05:44,061 --> 00:05:48,203
+and above supports dynamic
+quorums, whereas older versions
+
+87
+00:05:48,383 --> 00:05:50,259
+only support static quorums.
+
+88
+00:05:50,854 --> 00:05:54,388
+So we need to approach this
+differently depending on the versions.
+
+89
+00:05:55,045 --> 00:05:58,848
+With static quorum, to achieve
+our availability goal, we need
+
+90
+00:05:58,930 --> 00:06:00,959
+three controllers in each region.
+
+91
+00:06:01,898 --> 00:06:04,224
+That gives us nine controllers in total.
+
+92
+00:06:04,489 --> 00:06:08,851
+If one region goes down, we would
+still have six out of nine controllers
+
+93
+00:06:08,894 --> 00:06:14,158
+available, allowing us to roll them one
+at a time without losing the majority.
+
+94
+00:06:14,439 --> 00:06:21,114
+Because in that case, the majority
+will be five out of nine, rolling one
+
+95
+00:06:21,116 --> 00:06:25,138
+controller at a time when one region
+is down would satisfy that guarantee.
+
+96
+00:06:26,361 --> 00:06:28,582
+If you're running on Kafka 3.9
+
+97
+00:06:28,582 --> 00:06:33,007
+or above and have configured the
+cluster to use dynamic quorum, we
+
+98
+00:06:33,009 --> 00:06:38,554
+can achieve the same with just five
+controllers, two each in two regions
+
+99
+00:06:38,766 --> 00:06:40,630
+and just one in the third region.
+
+100
+00:06:40,639 --> 00:06:44,777
+We don't need nine controllers when
+we have dynamic quorum enabled.
+
+101
+00:06:45,466 --> 00:06:48,622
+So let's say when a region goes
+down, that would leave us with
+
+102
+00:06:48,811 --> 00:06:50,318
+three available controllers.
+
+103
+00:06:51,864 --> 00:06:53,962
+Note that there is a
+manual step involved here.
+
+104
+00:06:54,202 --> 00:06:59,347
+We'll have to go and manually remove
+the two unavailable controllers from the
+
+105
+00:06:59,367 --> 00:07:04,735
+voters list, which would bring down the
+total number of voters from five to three.
+
+106
+00:07:05,692 --> 00:07:08,324
+Now, to reach majority, we just need two.
+
+107
+00:07:09,318 --> 00:07:14,246
+That gives us the flexibility to still
+roll the controllers one at a time
+
+108
+00:07:14,597 --> 00:07:19,570
+when one region is down, because we
+can still have a majority of two with
+
+109
+00:07:19,630 --> 00:07:21,774
+three controllers rolling one at a time
+
+110
+00:07:22,774 --> 00:07:27,238
+Now that we have covered the architecture
+and the cluster configurations, let's
+
+111
+00:07:27,239 --> 00:07:29,369
+move on to the actual tests themselves.
+
+112
+00:07:29,982 --> 00:07:34,003
+Here we have identified six
+different failure scenarios that
+
+113
+00:07:34,070 --> 00:07:35,784
+I'll walk through one by one.
+
+114
+00:07:36,784 --> 00:07:40,719
+Actually, before we get into the
+test details, let's look at how we
+
+115
+00:07:40,720 --> 00:07:42,939
+can simulate some of these failures.
+
+116
+00:07:43,941 --> 00:07:47,035
+Simulating a region failure
+is pretty straightforward.
+
+117
+00:07:47,534 --> 00:07:50,541
+We can simply shut down all
+the nodes in that region.
+
+118
+00:07:51,557 --> 00:07:56,141
+To simulate regional isolation, where
+the brokers are still running, but the
+
+119
+00:07:56,144 --> 00:08:01,279
+regions can't communicate with each other,
+we can just introduce firewall rules
+
+120
+00:08:01,339 --> 00:08:03,761
+that blocks traffics between regions
+
+121
+00:08:04,761 --> 00:08:10,147
+For WAN degradation, we can intentionally
+introduce network latency and packet loss
+
+122
+00:08:10,219 --> 00:08:15,557
+between regions to see how the cluster
+behaves under degraded network conditions.
+
+123
+00:08:16,417 --> 00:08:21,586
+And finally, to test the cluster under
+load, we can use load generating clients
+
+124
+00:08:21,869 --> 00:08:24,194
+on both the produce and consumer sides.
+
+125
+00:08:25,174 --> 00:08:29,819
+These clients should have ways to ramp
+traffic up or down in a controlled
+
+126
+00:08:29,820 --> 00:08:32,352
+manner while running these failure tests
+
+127
+00:08:33,352 --> 00:08:35,705
+The first test is the most basic one.
+
+128
+00:08:36,388 --> 00:08:39,304
+What happens when an
+entire region goes down?
+
+129
+00:08:40,286 --> 00:08:44,873
+We can simulate this by shutting down
+all brokers running in one region,
+
+130
+00:08:45,670 --> 00:08:47,821
+let's say region C, for example.
+
+131
+00:08:48,609 --> 00:08:53,527
+But remember, our goal is not just
+to keep the cluster operational
+
+132
+00:08:53,585 --> 00:08:55,116
+when one region goes down.
+
+133
+00:08:55,676 --> 00:08:59,845
+We also want to be able to roll the
+surviving brokers one at a time.
+
+134
+00:09:00,324 --> 00:09:02,520
+So we'll test that scenario as well.
+
+135
+00:09:03,386 --> 00:09:06,906
+Throughout the test, the cluster
+should continue serving traffic.
+
+136
+00:09:07,252 --> 00:09:11,006
+The producer should be able to
+write and receive acknowledgments.
+
+137
+00:09:11,728 --> 00:09:17,748
+The in-sync replicas count should remain
+at three or more all the time, and no
+
+138
+00:09:17,815 --> 00:09:19,844
+acknowledged writes should be lost.
+
+139
+00:09:20,874 --> 00:09:25,015
+We can build a simple test suite
+that tracks all successfully
+
+140
+00:09:25,058 --> 00:09:29,434
+acknowledged writes during the test
+and verifies that every one of those
+
+141
+00:09:29,438 --> 00:09:31,475
+records can be read back from Kafka.
+
+142
+00:09:32,663 --> 00:09:36,348
+While the test is running, we
+should monitor producer error rates.
+
+143
+00:09:37,139 --> 00:09:40,891
+As partition leaders move to
+surviving brokers, clients
+
+144
+00:09:40,891 --> 00:09:44,077
+may temporarily disconnect and
+reconnect to the new leaders.
+
+145
+00:09:44,513 --> 00:09:49,057
+So we might see a brief spike at
+the beginning of the test in client
+
+146
+00:09:49,087 --> 00:09:53,333
+errors, but things should stabilize
+when the transition is complete.
+
+147
+00:09:53,797 --> 00:09:59,419
+So this wraps up the first test, proving
+that Kafka works when one region is
+
+148
+00:09:59,465 --> 00:10:05,732
+down with the ability to still roll
+the brokers one at a time if needed.
+
+149
+00:10:06,732 --> 00:10:08,049
+Let's go to the second test.
+
+150
+00:10:08,570 --> 00:10:11,208
+The second test is about
+regional isolation.
+
+151
+00:10:11,748 --> 00:10:17,883
+So here we see that all three regions are
+still up and running, but we are going
+
+152
+00:10:17,891 --> 00:10:23,732
+to simulate a scenario where region C is
+completely isolated from regions A and B.
+
+153
+00:10:24,889 --> 00:10:29,413
+So when you cut that connection or
+when you add those firewall rules
+
+154
+00:10:29,436 --> 00:10:35,357
+to block any communication between
+regions A and B and C, you would see
+
+155
+00:10:35,358 --> 00:10:40,784
+that the clients connected to regions
+A and B, would still continue to work.
+
+156
+00:10:41,949 --> 00:10:46,076
+We may see that there would be some
+leader elections, and as a result
+
+157
+00:10:46,079 --> 00:10:50,287
+of that, some clients would get
+disconnected and reelected, reconnected,
+
+158
+00:10:50,645 --> 00:10:54,303
+but then they should still continue
+to work because of the surviving
+
+159
+00:10:54,311 --> 00:10:56,376
+replicas in region f- A and B.
+
+160
+00:10:57,705 --> 00:11:01,716
+so once the cluster stabilizes,
+everything continues to work as
+
+161
+00:11:01,716 --> 00:11:03,686
+normal, and there's no issues.
+
+162
+00:11:04,344 --> 00:11:06,408
+But there's one important exception here.
+
+163
+00:11:06,962 --> 00:11:11,865
+If a client is running in region C and
+can only communicate with brokers in
+
+164
+00:11:11,865 --> 00:11:17,876
+that region, it won't be successfully
+able to read or write because region
+
+165
+00:11:17,879 --> 00:11:22,613
+C no longer has enough in-sync
+replicas to satisfy our requirements,
+
+166
+00:11:23,015 --> 00:11:24,653
+and that's the expected behavior.
+
+167
+00:11:25,672 --> 00:11:30,843
+Once we remove the network isolation,
+the firewall rules, and the connectivity
+
+168
+00:11:30,848 --> 00:11:35,245
+between the regions are restored,
+we should see that the replicas are
+
+169
+00:11:35,252 --> 00:11:39,683
+catching up and the cluster should
+return to normal operations in some time
+
+170
+00:11:40,683 --> 00:11:44,788
+The next test is to make sure
+producer acks behave as expected.
+
+171
+00:11:45,773 --> 00:11:49,620
+We start with all six replicas
+available, and the producer should
+
+172
+00:11:49,629 --> 00:11:51,759
+be able to write without any issues.
+
+173
+00:11:52,107 --> 00:11:53,096
+This is a no-brainer.
+
+174
+00:11:53,804 --> 00:11:58,237
+When we bring one region down, we
+are left with four in-sync replicas,
+
+175
+00:11:58,946 --> 00:12:03,402
+which is still above our configured
+minimum value of three, so writes
+
+176
+00:12:03,499 --> 00:12:05,249
+should continue to succeed still.
+
+177
+00:12:06,663 --> 00:12:11,153
+If we bring down one more broker,
+we still have three min in-sync
+
+178
+00:12:11,153 --> 00:12:16,079
+replicas, which is three in-sync
+replicas, which is still equal to
+
+179
+00:12:16,079 --> 00:12:17,975
+the minimum number that is required.
+
+180
+00:12:18,138 --> 00:12:19,644
+So all good so far.
+
+181
+00:12:20,943 --> 00:12:25,243
+But the moment we bring down
+a fourth broker, we are left
+
+182
+00:12:25,244 --> 00:12:27,085
+with only two in-sync replicas.
+
+183
+00:12:27,645 --> 00:12:33,149
+Since that falls below our configured
+min in-sync replicas of three, producers
+
+184
+00:12:33,205 --> 00:12:35,164
+should start receiving write errors.
+
+185
+00:12:35,819 --> 00:12:37,090
+No write should succeed.
+
+186
+00:12:37,180 --> 00:12:39,920
+They won't receive the
+ack back from the server.
+
+187
+00:12:40,768 --> 00:12:44,548
+This is an important test to validate
+that our clients are configured
+
+188
+00:12:44,549 --> 00:12:49,605
+correctly and that Kafka continues
+accepting writes when it's safe to do
+
+189
+00:12:49,611 --> 00:12:53,983
+so, but most importantly, it rejects
+them when the minimum durability
+
+190
+00:12:53,988 --> 00:12:56,471
+requirements can no longer be met.
+
+191
+00:12:57,481 --> 00:13:02,189
+This test also involves working with
+your clients because we are going to
+
+192
+00:13:02,193 --> 00:13:04,484
+be breaking them and inducing errors.
+
+193
+00:13:05,484 --> 00:13:08,099
+The next test is to validate
+the controller quorum.
+
+194
+00:13:08,516 --> 00:13:12,859
+Let's focus specifically on the
+dynamic controller quorum setup.
+
+195
+00:13:13,763 --> 00:13:17,421
+We start by bringing down
+one region, leaving us with
+
+196
+00:13:17,498 --> 00:13:19,009
+three available controllers.
+
+197
+00:13:19,629 --> 00:13:23,838
+We can then manually remove two
+unavailable voters from the quorum
+
+198
+00:13:23,841 --> 00:13:28,460
+configuration, bringing down the
+total voters from five to three.
+
+199
+00:13:29,256 --> 00:13:34,345
+At this point, we only need a majority
+of two controllers to maintain quorum.
+
+200
+00:13:35,340 --> 00:13:39,520
+Now, we can try lo- rolling the
+surviving controllers one at a time.
+
+201
+00:13:40,573 --> 00:13:45,912
+Since we still maintain a majority during
+each restart, the controller quorum should
+
+202
+00:13:45,912 --> 00:13:51,668
+maintain working should and be re-- and
+be available throughout the process.
+
+203
+00:13:52,522 --> 00:13:56,610
+This test helps us validate that
+the controller quorum can tolerate a
+
+204
+00:13:56,613 --> 00:14:01,261
+regional failure while still allowing
+us to perform maintenance if needed.
+
+205
+00:14:01,695 --> 00:14:06,279
+So we have tested the brokers,
+we have tested the controllers.
+
+206
+00:14:06,971 --> 00:14:13,243
+Now let's test the WAN So far, we
+have been testing complete regional
+
+207
+00:14:13,251 --> 00:14:15,853
+failovers or complete network isolation.
+
+208
+00:14:16,624 --> 00:14:20,858
+Now let's look at what happens
+when the WAN is degraded rather
+
+209
+00:14:20,861 --> 00:14:22,536
+than completely unavailable.
+
+210
+00:14:23,536 --> 00:14:27,935
+When everything is healthy, client
+latency stays within our expected SLOs.
+
+211
+00:14:28,541 --> 00:14:32,197
+We can start by deliberately
+introducing latencies between
+
+212
+00:14:32,222 --> 00:14:37,199
+regions, gradually increasing it to
+simules- simulate network degradation.
+
+213
+00:14:37,907 --> 00:14:41,794
+As we do this, we should start
+seeing an increase in client latency.
+
+214
+00:14:42,877 --> 00:14:46,382
+Next, we can introduce
+packet loss between regions.
+
+215
+00:14:47,074 --> 00:14:51,829
+As packet loss increases, client
+latency can raise significantly.
+
+216
+00:14:52,749 --> 00:14:57,215
+If the degradation becomes severe
+enough, replicas may start falling
+
+217
+00:14:57,221 --> 00:15:03,424
+out of the ISR, and once the ISR drops
+below the configured minimum ISR value,
+
+218
+00:15:03,824 --> 00:15:05,970
+Kafka will stop accepting writes.
+
+219
+00:15:06,841 --> 00:15:11,565
+How far we push this depends on how
+aggressively we want to test the system.
+
+220
+00:15:12,733 --> 00:15:14,976
+Now, there's an interesting scenario.
+
+221
+00:15:15,569 --> 00:15:20,230
+While the WAN is degraded and the
+clients are expecting, the clients
+
+222
+00:15:20,230 --> 00:15:25,301
+are experiencing high latency, what
+happens if we just completely cut the
+
+223
+00:15:25,302 --> 00:15:27,075
+connection to the affected region?
+
+224
+00:15:28,333 --> 00:15:33,841
+This will trigger read-- leader
+reelections, but once it, it stabilizes,
+
+225
+00:15:34,308 --> 00:15:38,360
+you would be surprised to see that the
+client latencies would go back to normal.
+
+226
+00:15:39,258 --> 00:15:43,435
+The biggest takeaway for me
+was that degraded WAN can be
+
+227
+00:15:43,445 --> 00:15:47,167
+much, much more dangerous than
+a completely unavailable one.
+
+228
+00:15:48,456 --> 00:15:52,799
+This is why having a disaster
+recovery policy for w- WAN
+
+229
+00:15:52,802 --> 00:15:54,614
+degradation is very important.
+
+230
+00:15:55,479 --> 00:16:01,023
+If the cluster can safely tolerate
+losing a region, deliberately isolating
+
+231
+00:16:01,025 --> 00:16:05,789
+it may be better than continued,
+continuing to operate with severely
+
+232
+00:16:05,806 --> 00:16:08,119
+degraded connectivity between regions.
+
+233
+00:16:08,819 --> 00:16:12,489
+So that's one of the things that
+we came up with first as a part
+
+234
+00:16:12,498 --> 00:16:14,399
+of our disaster recovery policy.
+
+235
+00:16:15,399 --> 00:16:18,670
+So far, we have looked at
+different failure scenarios where
+
+236
+00:16:18,670 --> 00:16:22,521
+we deliberately brought brokers
+down, isolated the regions, and
+
+237
+00:16:22,522 --> 00:16:24,217
+degraded the network connections.
+
+238
+00:16:24,935 --> 00:16:28,449
+Now, let's look at what happens
+when things come back online.
+
+239
+00:16:29,172 --> 00:16:33,755
+Here we are comparing two recovery
+scenarios after a regional outage.
+
+240
+00:16:34,399 --> 00:16:40,492
+In the first scenario, recovery, is not
+throttled, whereas in the second, we apply
+
+241
+00:16:40,561 --> 00:16:42,457
+throttling to the replication traffic.
+
+242
+00:16:43,176 --> 00:16:47,912
+As you can see, without throttling,
+when the returning replicas have a
+
+243
+00:16:47,913 --> 00:16:53,760
+significant amount of data to catch up
+on, the surviving regions can experience
+
+244
+00:16:53,826 --> 00:16:59,672
+additional resource pressure in terms
+of CPU, disk IO, and network egress.
+
+245
+00:17:00,754 --> 00:17:05,090
+This can severely impact client
+latency, especially when there's
+
+246
+00:17:05,108 --> 00:17:07,163
+a large replication backlog.
+
+247
+00:17:08,150 --> 00:17:12,480
+With appropriate throttling, we
+can control how aggressively these
+
+248
+00:17:12,501 --> 00:17:17,250
+replicas catch up and reduce the
+impact on live client traffic.
+
+249
+00:17:17,820 --> 00:17:21,249
+The trade-off here is longer
+recovery of the region.
+
+250
+00:17:22,423 --> 00:17:26,809
+The key takeaway is that planning
+for failure alone is not enough.
+
+251
+00:17:26,892 --> 00:17:29,724
+We should also deliberately
+plan for recovery.
+
+252
+00:17:30,686 --> 00:17:36,476
+The goal is to bring the failed regions
+back online without significantly
+
+253
+00:17:36,492 --> 00:17:40,541
+impacting the traffic that's
+already being served to the clients.
+
+254
+00:17:41,541 --> 00:17:44,636
+We have now walked through
+six different tests.
+
+255
+00:17:45,346 --> 00:17:50,685
+Each test validates a different aspect of
+availability and durability guarantees.
+
+256
+00:17:51,706 --> 00:17:55,032
+It's not enough to run
+these tests just once.
+
+257
+00:17:56,015 --> 00:18:00,088
+We need to keep testing, learning
+from the results, and fine-tuning
+
+258
+00:18:00,088 --> 00:18:03,652
+our configurations until we
+achieve the desired behavior.
+
+259
+00:18:04,419 --> 00:18:06,386
+Even then, testing shouldn't stop.
+
+260
+00:18:07,040 --> 00:18:10,250
+We should repeat these tests
+whenever we make significant
+
+261
+00:18:10,250 --> 00:18:15,155
+changes to the cluster architecture,
+configuration, infrastructure, or if
+
+262
+00:18:15,158 --> 00:18:17,369
+we see new client traffic patterns.
+
+263
+00:18:18,380 --> 00:18:24,128
+We even do DR routines once every
+few months just to make sure that
+
+264
+00:18:24,153 --> 00:18:25,813
+everything works as expected.
+
+265
+00:18:26,837 --> 00:18:31,216
+Ultimately, running Kafka
+across multiple regions doesn't
+
+266
+00:18:31,273 --> 00:18:33,232
+automatically make it tier zero.
+
+267
+00:18:33,993 --> 00:18:38,641
+What matters is understanding its failure
+boundaries and proving that the system
+
+268
+00:18:38,646 --> 00:18:41,328
+behaves as expected when things go wrong.
+
+269
+00:18:42,328 --> 00:18:44,619
+I'll leave you all with one final thought.
+
+270
+00:18:45,581 --> 00:18:49,682
+When it comes to mission-critical
+infrastructure, we can't just assume
+
+271
+00:18:49,683 --> 00:18:54,141
+that a system will survive a failure
+because we have designed it to do so.
+
+272
+00:18:54,868 --> 00:18:59,962
+We need to deliberately test those
+failures, understand how the system
+
+273
+00:18:59,967 --> 00:19:04,217
+behaves, and validate that our
+availability and durability guarantees
+
+274
+00:19:04,348 --> 00:19:07,010
+actually hold when it happens.
+
+275
+00:19:08,135 --> 00:19:09,924
+Don't just hope it survives.
+
+276
+00:19:10,025 --> 00:19:11,627
+Break it and know it.
+
+277
+00:19:12,048 --> 00:19:12,472
+Thank you.
