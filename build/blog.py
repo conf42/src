@@ -3,7 +3,8 @@ build decides what is public. A post is shown only while
   - its Status is empty/published (hidden = manual kill, orphaned = the skill noticed its Ref is gone),
   - its Date is today or earlier (UTC) - future rows go live on the daily rebuild of their day,
   - a talk/sponsor post's event has released its talks (release_at / 17:00 UTC on the event day) - until then the
-    post waits, then shows dated no earlier than the release day,
+    post waits, then shows dated no earlier than the release day; exception: a sponsor post goes out as soon as its
+    talk is uploaded (YouTube link in the event CSV),
   - its Ref still points at something in the repo: a talk deleted from the event CSV (speaker asked to be taken down)
     takes its post with it on the next build, transcript or not.
 Invisible posts get no page, no index/home card, no sitemap/feed/llms.txt/404-index entry; the gh-pages deploy deletes
@@ -507,7 +508,10 @@ def load_posts(context, base_folder, today=None, path=BLOG_CSV):
             continue
         # a talk's post waits for its talk: nothing about a talk goes out before the event releases it (Marek
         # 2026-11-27, Chaos 2026 posts showed a week early); once out it is dated no earlier than the release day
-        if linked.get("talk") and linked.get("event"):
+        # exception (Marek 2026-11-27): a sponsor's post goes out as soon as its talk is uploaded (YouTube link in the
+        # event CSV), release or not
+        early_sponsor = bool(linked.get("sponsor")) and bool(_youtube_id(linked.get("talk")))
+        if linked.get("talk") and linked.get("event") and not early_sponsor:
             event = linked["event"]
             if not event.get("released"):
                 dropped.append((slug, "talk not released yet (%s)" % event["release_at"].date()))
