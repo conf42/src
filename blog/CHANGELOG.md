@@ -3,6 +3,18 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-27 - Nightly writer
+- 2 posts written from transcripts and queued (Status `queued`, released gradually by blog-rollout):
+  - 2 talk posts, Chaos Engineering 2026 (event 2026-12-03): Harini Rajendran (Citadel, multi-region Kafka),
+    Kishore Chandra Rajapudi (7-Eleven, agentic self-healing retail).
+- Skipped:
+  - sponsored Enterprise Software 2021 - Snyk, Brian Vermeer ("Live hacking: breaking into your Java web app"): live
+    exploit demo (Struts RCE), already set aside earlier, not retried.
+  - talk Golang 2025 - Krishna Rao Vemula ("Go-Powered Microservice Architecture..."): srt/golang2025_Krishna_Rao_Vemula.srt
+    is a different talk (Spring Boot tooling: Initializr, devtools, Docker, Eureka, circuit breakers), not Go. Needs the
+    right recording/transcript.
+- No roundups or plugs were due. Other backfill events (devsecops2023, python2022, oss2020) left for later nights.
+
 ## 2026-11-25 - Nightly writer
 - 8 posts written from transcripts and queued (Status `queued`, released gradually by blog-rollout):
   - 1 sponsored: MLOps 2026 - Harness, Sunil Gattupalle (agents and the delivery knowledge graph).
