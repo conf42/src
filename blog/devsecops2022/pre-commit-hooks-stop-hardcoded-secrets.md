@@ -1,6 +1,6 @@
 # The cheapest secret leak is the commit that never happened
 
-Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/pre-commit-hooks-stop-hardcoded-secrets
+Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/pre-commit-hooks-stop-hardcoded-secrets
 
 In short: Dwayne McDaniel (GitGuardian) at Conf42 DevSecOps 2022 on using Git pre-commit and pre-receive hooks to stop hard-coded secrets before they are pushed
 

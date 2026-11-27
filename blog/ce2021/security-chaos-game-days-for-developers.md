@@ -1,6 +1,6 @@
 # 14% of developers don't care about security. Run a game day anyway
 
-Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/security-chaos-game-days-for-developers
+Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/security-chaos-game-days-for-developers
 
 In short: Yury Nino and Jhonnatan Gil Chaves (Aval Digital Labs) at Conf42 Chaos Engineering 2021 on getting developers into security through chaos game days
 

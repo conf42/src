@@ -1,6 +1,6 @@
 # Your SQL query has a debugger, it's called EXPLAIN ANALYZE
 
-Conf42 Blog, 2023-06-08. https://www.conf42.com/blog/obs2023/debug-sql-with-execution-plans
+Conf42 Blog, 2023-06-07. https://www.conf42.com/blog/obs2023/debug-sql-with-execution-plans
 
 In short: Eyal Trabelsi (Bigabid) at Conf42 Observability 2023 on reading execution plans to find SQL bugs, empty joins and duplicates, not only slow queries.
 

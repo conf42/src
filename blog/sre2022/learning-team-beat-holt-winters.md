@@ -1,6 +1,6 @@
 # When Holt-Winters couldn't answer the CEO, a learning team could
 
-Conf42 Blog, 2022-06-09. https://www.conf42.com/blog/sre2022/learning-team-beat-holt-winters
+Conf42 Blog, 2022-06-08. https://www.conf42.com/blog/sre2022/learning-team-beat-holt-winters
 
 In short: Kurt Andersen (Blameless) at Conf42 Site Reliability Engineering 2022 on how a LinkedIn learning team answered the CEO's metric questions years before tooling could
 

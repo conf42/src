@@ -1,6 +1,6 @@
 # Global uptime checks take an afternoon to set up and weeks to design
 
-Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/multi-region-uptime-checks-design-first
+Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/multi-region-uptime-checks-design-first
 
 In short: Andrei Danilov (Typeform) at Conf42 SRE 2021 on designing multi-location availability monitoring - which locations, how often, what fails, who reacts.
 

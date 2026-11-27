@@ -1,6 +1,6 @@
 # Give every Terraform plan a blast-radius score and let OPA say no
 
-Conf42 Blog, 2022-06-09. https://www.conf42.com/blog/sre2022/opa-blast-radius-score-for-terraform
+Conf42 Blog, 2022-06-08. https://www.conf42.com/blog/sre2022/opa-blast-radius-score-for-terraform
 
 In short: Peter ONeill (Styra) at Conf42 Site Reliability Engineering 2022 on gating terraform apply with Open Policy Agent and Rego in a GitHub Actions pipeline
 

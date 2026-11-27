@@ -1,6 +1,6 @@
 # Seven browser APIs that let a web app act like a native one
 
-Conf42 Blog, 2021-10-28. https://www.conf42.com/blog/js2021/browser-apis-close-native-gap
+Conf42 Blog, 2021-10-27. https://www.conf42.com/blog/js2021/browser-apis-close-native-gap
 
 In short: Francesco Leardini (Trivadis) at Conf42 JavaScript 2021 on browser APIs from Screen Wake Lock to Contact Picker that close the gap with native apps
 

@@ -1,6 +1,6 @@
 # Innovation starts with naming the problem, and creativity needs constraints
 
-Conf42 Blog, 2020-08-27. https://www.conf42.com/blog/sre2020/innovation-problem-type-constraints-team-games
+Conf42 Blog, 2020-08-26. https://www.conf42.com/blog/sre2020/innovation-problem-type-constraints-team-games
 
 In short: Amber Vanderburg (The PathWayz Group) at Conf42 Site Reliability Engineering 2020 on framing problems, balancing constraints and remote team exercises
 

@@ -1,6 +1,6 @@
 # TinyGo turns a Go developer into an IoT hobbyist without learning C
 
-Conf42 Blog, 2022-03-31. https://www.conf42.com/blog/golang2022/tinygo-arduino-dead-plants-and-post
+Conf42 Blog, 2022-03-30. https://www.conf42.com/blog/golang2022/tinygo-arduino-dead-plants-and-post
 
 In short: Liam Hampton (Microsoft) at Conf42 Golang 2022 on using TinyGo to put plain Go on an Arduino, from a soil moisture sensor to a letterbox alarm
 

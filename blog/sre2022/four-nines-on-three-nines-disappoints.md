@@ -1,6 +1,6 @@
 # You can't build four nines on top of three nines
 
-Conf42 Blog, 2022-06-09. https://www.conf42.com/blog/sre2022/four-nines-on-three-nines-disappoints
+Conf42 Blog, 2022-06-08. https://www.conf42.com/blog/sre2022/four-nines-on-three-nines-disappoints
 
 In short: Kolton Andrus (Gremlin) at Conf42 Site Reliability Engineering 2022 on reliability basics - expect failure, keep it simple, test redundancy and dependencies for real
 

@@ -1,6 +1,6 @@
 # Every place you can hide a secret, and how each one leaks
 
-Conf42 Blog, 2021-12-02. https://www.conf42.com/blog/devsecops2021/wrongsecrets-every-place-secrets-leak
+Conf42 Blog, 2021-12-01. https://www.conf42.com/blog/devsecops2021/wrongsecrets-every-place-secrets-leak
 
 In short: Jeroen Willemsen (Xebia) at Conf42 DevSecOps 2021 on why no single secrets store is enough, from hard-coded strings to Vault, AWS and Terraform state
 

@@ -1,6 +1,6 @@
 # Two researchers, one week, and the servers behind Composer and PEAR
 
-Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/taking-over-php-package-manager-backends
+Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/taking-over-php-package-manager-backends
 
 In short: Thomas Chauchefoin and Paul Gerste (SonarSource) at Conf42 DevSecOps 2022 on how they took over the PHP package registries Packagist and PEAR
 

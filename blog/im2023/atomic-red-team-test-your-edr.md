@@ -1,6 +1,6 @@
 # No alerts can mean your EDR missed it - test with Atomic Red Team
 
-Conf42 Blog, 2023-10-19. https://www.conf42.com/blog/im2023/atomic-red-team-test-your-edr
+Conf42 Blog, 2023-10-18. https://www.conf42.com/blog/im2023/atomic-red-team-test-your-edr
 
 In short: Christopher Haller (Strong Crypto Innovations) at Conf42 Incident Management 2023 on testing EDR against real threat actor procedures with Atomic Red Team.
 

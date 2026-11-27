@@ -1,6 +1,6 @@
 # Move cold MongoDB data to S3 and keep querying it with MQL
 
-Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/cold-iot-data-to-s3-still-queryable
+Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/cold-iot-data-to-s3-still-queryable
 
 In short: Joe Karlsson (MongoDB) at Conf42 Cloud Native 2021 on archiving cold IoT data to S3 and querying it in place with MongoDB Atlas Data Lake
 

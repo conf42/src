@@ -1,6 +1,6 @@
 # Responsible AI in health starts with asking whether you need AI at all
 
-Conf42 Blog, 2021-07-29. https://www.conf42.com/blog/ml2021/responsible-ai-health-should-we-do-it
+Conf42 Blog, 2021-07-28. https://www.conf42.com/blog/ml2021/responsible-ai-health-should-we-do-it
 
 In short: Tempest van Schaik (Microsoft) at Conf42 Machine Learning 2021 on turning responsible AI principles into review questions and fairness tooling for health
 

@@ -1,6 +1,6 @@
 # Gcore moved managed Kubernetes off Magnum and ran control planes as pods
 
-Conf42 Blog, 2023-03-30. https://www.conf42.com/blog/cloud2023/cluster-api-control-plane-as-pods
+Conf42 Blog, 2023-03-29. https://www.conf42.com/blog/cloud2023/cluster-api-control-plane-as-pods
 
 In short: Andrei Novoselov (Gcore) at Conf42 Cloud Native 2023 on replacing OpenStack Magnum with Cluster API and control planes as pods in a service cluster
 

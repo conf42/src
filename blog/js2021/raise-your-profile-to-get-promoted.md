@@ -1,6 +1,6 @@
 # Good work rarely gets you promoted on its own. Visibility does
 
-Conf42 Blog, 2021-10-28. https://www.conf42.com/blog/js2021/raise-your-profile-to-get-promoted
+Conf42 Blog, 2021-10-27. https://www.conf42.com/blog/js2021/raise-your-profile-to-get-promoted
 
 In short: Lauren Hayward Schaefer (MongoDB) at Conf42 JavaScript 2021 on why developers must raise their profile to get promoted, and ten ways to do it
 

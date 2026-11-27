@@ -1,6 +1,6 @@
 # Microservices can share code, if the coupling is the point
 
-Conf42 Blog, 2023-01-26. https://www.conf42.com/blog/devops2023/service-chassis-appropriate-coupling-reuse
+Conf42 Blog, 2023-01-25. https://www.conf42.com/blog/devops2023/service-chassis-appropriate-coupling-reuse
 
 In short: Travis Gosselin (SPS Commerce) at Conf42 DevOps 2023 on when microservices should share code, the rule of three, and service templates and chassis
 

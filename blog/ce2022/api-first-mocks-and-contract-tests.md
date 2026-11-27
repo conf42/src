@@ -1,6 +1,6 @@
 # API-first means your front end can start before your back end
 
-Conf42 Blog, 2022-03-10. https://www.conf42.com/blog/ce2022/api-first-mocks-and-contract-tests
+Conf42 Blog, 2022-03-09. https://www.conf42.com/blog/ce2022/api-first-mocks-and-contract-tests
 
 In short: Arlemi Turpault (Postman) at Conf42 Chaos Engineering 2022 on API-first design with OpenAPI specs, mock servers and consumer-driven contract tests
 

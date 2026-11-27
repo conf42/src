@@ -1,6 +1,6 @@
 # Move the heavy loop to a Web Worker and the button clicks again
 
-Conf42 Blog, 2024-01-25. https://www.conf42.com/blog/devops2024/web-workers-keep-the-main-thread-free
+Conf42 Blog, 2024-01-24. https://www.conf42.com/blog/devops2024/web-workers-keep-the-main-thread-free
 
 In short: Kevin Uehara (iFood) at Conf42 DevOps 2024 on Web Workers - moving heavy client-side processing off the main thread in plain vanilla JavaScript.
 

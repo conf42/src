@@ -1,6 +1,6 @@
 # The support person yelling in your incident channel is on your side
 
-Conf42 Blog, 2022-09-29. https://www.conf42.com/blog/im2022/incidents-are-customer-empathy-training
+Conf42 Blog, 2022-09-28. https://www.conf42.com/blog/im2022/incidents-are-customer-empathy-training
 
 In short: Ryan McDonald (FireHydrant) at Conf42 Incident Management 2022 on using incidents to build customer empathy, partner with support and widen retros.
 

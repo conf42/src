@@ -1,6 +1,6 @@
 # Cloud native chaos needs GitOps, a hub and Prometheus, says Litmus
 
-Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/litmus-cloud-native-chaos-principles
+Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/litmus-cloud-native-chaos-principles
 
 In short: Uma Mukkara (Chaos Native) at Conf42 Chaos Engineering 2021 on five principles for cloud native chaos and how Litmus turns them into Argo workflows
 

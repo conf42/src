@@ -1,6 +1,6 @@
 # Start your software factory with a catalog, not a cloud
 
-Conf42 Blog, 2024-01-25. https://www.conf42.com/blog/devops2024/software-factory-idea-to-demo-in-a-day
+Conf42 Blog, 2024-01-24. https://www.conf42.com/blog/devops2024/software-factory-idea-to-demo-in-a-day
 
 In short: Murali Mallina (Softrams) at Conf42 DevOps 2024 on software factories that take an idea to a deployed demo in a day, and why you shouldn't build your own cloud.
 

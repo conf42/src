@@ -1,6 +1,6 @@
 # Mattermost's database store is an onion of embedded Go structs
 
-Conf42 Blog, 2021-06-24. https://www.conf42.com/blog/golang2021/struct-embedding-store-layers-mattermost
+Conf42 Blog, 2021-06-23. https://www.conf42.com/blog/golang2021/struct-embedding-store-layers-mattermost
 
 In short: Jesus Espino (Mattermost) at Conf42 Golang 2021 on stacking cache, retry, search and timer layers over one store interface with struct embedding
 

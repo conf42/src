@@ -1,6 +1,6 @@
 # Machines give answers, people still have to ask the questions
 
-Conf42 Blog, 2022-05-19. https://www.conf42.com/blog/ml2022/machines-answer-people-ask-questions
+Conf42 Blog, 2022-05-18. https://www.conf42.com/blog/ml2022/machines-answer-people-ask-questions
 
 In short: Jesus Saldana Gonzalez (Globant) at Conf42 Machine Learning 2022 on why machine learning displaces tasks rather than jobs, from GitHub Copilot to DALL-E
 

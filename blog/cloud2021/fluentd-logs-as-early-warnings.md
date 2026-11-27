@@ -1,6 +1,6 @@
 # Fluentd can turn an innocent log line into an early warning
 
-Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/fluentd-logs-as-early-warnings
+Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/fluentd-logs-as-early-warnings
 
 In short: Phil Wilkins (Capgemini) at Conf42 Cloud Native 2021 on Fluentd as a log unification layer that routes and alerts before the outage, not after
 

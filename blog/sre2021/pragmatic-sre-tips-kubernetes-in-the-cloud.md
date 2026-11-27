@@ -1,6 +1,6 @@
 # Autoscaling won't save you when the database is the bottleneck
 
-Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/pragmatic-sre-tips-kubernetes-in-the-cloud
+Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/pragmatic-sre-tips-kubernetes-in-the-cloud
 
 In short: Joshua Arvin Lat (NuWorks Interactive Labs) at Conf42 Site Reliability Engineering 2021 on pragmatic SRE habits for running Kubernetes on AWS
 

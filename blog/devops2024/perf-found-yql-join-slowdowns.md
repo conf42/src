@@ -1,6 +1,6 @@
 # A forgotten debug counter cost YQL half its join speed
 
-Conf42 Blog, 2024-01-25. https://www.conf42.com/blog/devops2024/perf-found-yql-join-slowdowns
+Conf42 Blog, 2024-01-24. https://www.conf42.com/blog/devops2024/perf-found-yql-join-slowdowns
 
 In short: Alexey Ozeritskiy (YDB) at Conf42 DevOps 2024 on tuning the YQL distributed SQL engine with TPC-H, perf and stackcount - and the bugs they found.
 

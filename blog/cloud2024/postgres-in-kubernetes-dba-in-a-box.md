@@ -1,6 +1,6 @@
 # Just don't do it, says the title. Then he tells you to do it
 
-Conf42 Blog, 2024-03-21. https://www.conf42.com/blog/cloud2024/postgres-in-kubernetes-dba-in-a-box
+Conf42 Blog, 2024-03-20. https://www.conf42.com/blog/cloud2024/postgres-in-kubernetes-dba-in-a-box
 
 In short: Jan Karremans (CYBERTEC) at Conf42 Cloud Native 2024 on why Postgres belongs in Kubernetes once an operator plays the DBA
 

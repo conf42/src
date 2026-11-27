@@ -1,6 +1,6 @@
 # Self-healing systems start with knowing which errors matter
 
-Conf42 Blog, 2022-03-10. https://www.conf42.com/blog/ce2022/self-healing-needs-error-fingerprints
+Conf42 Blog, 2022-03-09. https://www.conf42.com/blog/ce2022/self-healing-needs-error-fingerprints
 
 In short: Nick Hodges (Rollbar) at Conf42 Chaos Engineering 2022 on self-healing SaaS systems, where grouped critical errors trigger rollbacks or flag flips
 

@@ -1,6 +1,6 @@
 # Chaos engineering is deliberately practising being wrong
 
-Conf42 Blog, 2020-01-23. https://www.conf42.com/blog/ce2020/chaos-engineering-practice-being-wrong
+Conf42 Blog, 2020-01-22. https://www.conf42.com/blog/ce2020/chaos-engineering-practice-being-wrong
 
 In short: Russ Miles (ChaosIQ) at Conf42 Chaos Engineering 2020 on dark debt, surprises over incidents, and chaos engineering as verifying objectives
 

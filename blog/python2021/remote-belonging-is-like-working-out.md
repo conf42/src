@@ -1,6 +1,6 @@
 # Belonging in a remote team is a workout, not a happy hour
 
-Conf42 Blog, 2021-05-27. https://www.conf42.com/blog/python2021/remote-belonging-is-like-working-out
+Conf42 Blog, 2021-05-26. https://www.conf42.com/blog/python2021/remote-belonging-is-like-working-out
 
 In short: Najeeb Khan (Teamland) at Conf42 Python 2021 on building belonging in remote teams, stage by stage, with activities chosen for a goal
 

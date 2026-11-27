@@ -1,6 +1,6 @@
 # Sort every file into binary, configuration or data, then containerise the VM
 
-Conf42 Blog, 2023-03-30. https://www.conf42.com/blog/cloud2023/evolute-bcd-vm-to-container-framework
+Conf42 Blog, 2023-03-29. https://www.conf42.com/blog/cloud2023/evolute-bcd-vm-to-container-framework
 
 In short: Kristopher Francisco (Evolute) at Conf42 Cloud Native 2023 on the BCD framework and ML-driven VM-to-container migration with Evolute Migrate
 

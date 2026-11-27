@@ -1,6 +1,6 @@
 # Most of your app is other people's code - a first SCA talk
 
-Conf42 Blog, 2021-12-02. https://www.conf42.com/blog/devsecops2021/sca-101-know-whats-inside-your-apps
+Conf42 Blog, 2021-12-01. https://www.conf42.com/blog/devsecops2021/sca-101-know-whats-inside-your-apps
 
 In short: Magno Logan (Trend Micro) at Conf42 DevSecOps 2021 on software composition analysis, SBOMs and why open source dependencies are your biggest attack surface
 

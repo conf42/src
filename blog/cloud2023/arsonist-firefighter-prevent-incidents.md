@@ -1,6 +1,6 @@
 # Some of the fires we fight in production we set ourselves
 
-Conf42 Blog, 2023-03-30. https://www.conf42.com/blog/cloud2023/arsonist-firefighter-prevent-incidents
+Conf42 Blog, 2023-03-29. https://www.conf42.com/blog/cloud2023/arsonist-firefighter-prevent-incidents
 
 In short: Einat Mahat (Skai) at Conf42 Cloud Native 2023 on seven ways developers can prevent production incidents instead of heroically putting them out
 

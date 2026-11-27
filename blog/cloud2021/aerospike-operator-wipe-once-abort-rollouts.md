@@ -1,6 +1,6 @@
 # A database operator must wipe a disk exactly once and abort a rollout midway
 
-Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/aerospike-operator-wipe-once-abort-rollouts
+Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/aerospike-operator-wipe-once-abort-rollouts
 
 In short: Natalie Pistunovich (Aerospike) at Conf42 Cloud Native 2021 on building a Kubernetes operator for a distributed database and the challenges it solved
 

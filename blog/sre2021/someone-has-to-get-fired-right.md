@@ -1,6 +1,6 @@
 # Somebody has to get fired, right? Answering the blameful executive
 
-Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/someone-has-to-get-fired-right
+Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/someone-has-to-get-fired-right
 
 In short: Emily Arnott and Christina Tan (Blameless) at Conf42 SRE 2021 on answering an executive who demands blame, and when accountability is due.
 

@@ -1,6 +1,6 @@
 # The logs say the transaction worked. An empty catch block disagrees
 
-Conf42 Blog, 2021-03-25. https://www.conf42.com/blog/enterprise2021/swallowed-exception-green-logs-on-call
+Conf42 Blog, 2021-03-24. https://www.conf42.com/blog/enterprise2021/swallowed-exception-green-logs-on-call
 
 In short: Tom Granot (Lightrun) at Conf42 Enterprise Software 2021 on what monitoring can't tell an on-call developer, and how to get back to sleep sooner
 

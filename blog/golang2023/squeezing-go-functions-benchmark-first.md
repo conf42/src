@@ -1,6 +1,6 @@
 # Reorder three struct fields, save eight megabytes: Go micro-optimisations
 
-Conf42 Blog, 2023-04-20. https://www.conf42.com/blog/golang2023/squeezing-go-functions-benchmark-first
+Conf42 Blog, 2023-04-19. https://www.conf42.com/blog/golang2023/squeezing-go-functions-benchmark-first
 
 In short: Jesus Espino (Mattermost) at Conf42 Golang 2023 on benchmark-first Go micro-optimisations, from early returns to escape analysis and goroutine counts
 

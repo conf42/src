@@ -1,6 +1,6 @@
 # Six questions that tell you whether you need a time series database
 
-Conf42 Blog, 2023-03-09. https://www.conf42.com/blog/python2023/do-you-need-a-time-series-database
+Conf42 Blog, 2023-03-08. https://www.conf42.com/blog/python2023/do-you-need-a-time-series-database
 
 In short: Anais Dotis-Georgiou (InfluxData) at Conf42 Python 2023 on what makes time series data different and six questions for picking a time series database
 

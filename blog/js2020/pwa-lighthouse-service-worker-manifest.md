@@ -1,6 +1,6 @@
 # From zero Lighthouse checks to a real PWA in three moves
 
-Conf42 Blog, 2020-09-30. https://www.conf42.com/blog/js2020/pwa-lighthouse-service-worker-manifest
+Conf42 Blog, 2020-09-29. https://www.conf42.com/blog/js2020/pwa-lighthouse-service-worker-manifest
 
 In short: Michael Solati (Google) at Conf42 JavaScript 2020 on turning a plain web app into a PWA with a service worker, server-side rendering and a manifest
 

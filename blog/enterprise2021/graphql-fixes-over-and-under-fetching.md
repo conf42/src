@@ -1,6 +1,6 @@
 # One GraphQL call instead of two bloated REST calls, live in Quarkus
 
-Conf42 Blog, 2021-03-25. https://www.conf42.com/blog/enterprise2021/graphql-fixes-over-and-under-fetching
+Conf42 Blog, 2021-03-24. https://www.conf42.com/blog/enterprise2021/graphql-fixes-over-and-under-fetching
 
 In short: Phillip Krüger (Red Hat) at Conf42 Enterprise Software 2021 on fixing over- and under-fetching by turning a JAX-RS API into MicroProfile GraphQL
 

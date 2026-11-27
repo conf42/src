@@ -1,6 +1,6 @@
 # No QA team? Borrow quality management from the factory floor
 
-Conf42 Blog, 2021-06-24. https://www.conf42.com/blog/golang2021/quality-without-a-qa-team-tqm
+Conf42 Blog, 2021-06-23. https://www.conf42.com/blog/golang2021/quality-without-a-qa-team-tqm
 
 In short: Dana Scheider (Envato) at Conf42 Golang 2021 on running software quality without dedicated QA staff, using Total Quality Management ideas
 

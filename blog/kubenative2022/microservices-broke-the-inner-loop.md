@@ -1,6 +1,6 @@
 # Microservices broke the inner loop, so move it into the cluster
 
-Conf42 Blog, 2022-10-20. https://www.conf42.com/blog/kubenative2022/microservices-broke-the-inner-loop
+Conf42 Blog, 2022-10-19. https://www.conf42.com/blog/kubenative2022/microservices-broke-the-inner-loop
 
 In short: Arsh Sharma (Okteto) at Conf42 Kube Native 2022 on why microservices made local dev miserable and how cloud dev environments restore hit-save feedback.
 

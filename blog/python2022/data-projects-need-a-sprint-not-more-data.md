@@ -1,6 +1,6 @@
 # Your data project needs a five-person sprint, not more data
 
-Conf42 Blog, 2022-01-27. https://www.conf42.com/blog/python2022/data-projects-need-a-sprint-not-more-data
+Conf42 Blog, 2022-01-26. https://www.conf42.com/blog/python2022/data-projects-need-a-sprint-not-more-data
 
 In short: Aman Sharma (Twimbit) at Conf42 Python 2022 on why data projects stall and a four-step sprint, plus diagrams, no-code tools and dashboards, to get insights out
 

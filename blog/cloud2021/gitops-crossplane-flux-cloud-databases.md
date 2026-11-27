@@ -1,6 +1,6 @@
 # Two cloud databases from one git push, with Flux and Crossplane
 
-Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/gitops-crossplane-flux-cloud-databases
+Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/gitops-crossplane-flux-cloud-databases
 
 In short: Leonardo Murillo (Qwinix) at Conf42 Cloud Native 2021 on GitOps for multi-cloud resources, live-provisioning RDS and Cloud SQL from manifests in git
 

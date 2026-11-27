@@ -1,6 +1,6 @@
 # Form3 moved code scanning out of 500 repos and into one place
 
-Conf42 Blog, 2021-12-02. https://www.conf42.com/blog/devsecops2021/form3-code-insight-central-scanning-every-repo
+Conf42 Blog, 2021-12-01. https://www.conf42.com/blog/devsecops2021/form3-code-insight-central-scanning-every-repo
 
 In short: Adelina Simion and Ross McFarlane (Form3) at Conf42 DevSecOps 2021 on Code Insight, a central GitHub app that scans every PR and every repo nightly
 

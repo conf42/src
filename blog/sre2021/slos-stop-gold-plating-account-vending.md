@@ -1,6 +1,6 @@
 # An 80% SLO is a feature, if it is the one your users agreed to
 
-Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/slos-stop-gold-plating-account-vending
+Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/slos-stop-gold-plating-account-vending
 
 In short: Josh Armitage (Contino) at Conf42 Site Reliability Engineering 2021 on SLOs as the lean cure for gold-plating, shown on AWS landing zone account vending
 

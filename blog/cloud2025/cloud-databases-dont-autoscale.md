@@ -1,6 +1,6 @@
 # Everything in your stack autoscales except the database
 
-Conf42 Blog, 2025-03-06. https://www.conf42.com/blog/cloud2025/cloud-databases-dont-autoscale
+Conf42 Blog, 2025-03-05. https://www.conf42.com/blog/cloud2025/cloud-databases-dont-autoscale
 
 In short: Matan Nataf of Rapydo at Conf42 Cloud Native 2025 on why managing database fleets is broken, and a demo of throttling, blocking and caching queries.
 

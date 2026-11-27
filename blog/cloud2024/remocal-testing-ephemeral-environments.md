@@ -1,6 +1,6 @@
 # Test serverless code locally against the real cloud, then throw the stack away
 
-Conf42 Blog, 2024-03-21. https://www.conf42.com/blog/cloud2024/remocal-testing-ephemeral-environments
+Conf42 Blog, 2024-03-20. https://www.conf42.com/blog/cloud2024/remocal-testing-ephemeral-environments
 
 In short: Yan Cui (Lumigo) at Conf42 Cloud Native 2024 on remocal tests, plain zip deployments and ephemeral environments for faster serverless work
 

@@ -1,6 +1,6 @@
 # Part-time SRE lost to the backlog, so bol.com went full time
 
-Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/bol-sre-pilot-part-time-failed
+Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/bol-sre-pilot-part-time-failed
 
 In short: Bart Enkelaar (bol.com) at Conf42 Chaos Engineering 2021 on a year of SRE failures - the part-time pilot, the 45 SLIs and why buy-in needs every level
 

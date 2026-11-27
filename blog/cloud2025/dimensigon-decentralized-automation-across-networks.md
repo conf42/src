@@ -1,6 +1,6 @@
 # Automating across networks that can't see each other, with Dimensigon
 
-Conf42 Blog, 2025-03-06. https://www.conf42.com/blog/cloud2025/dimensigon-decentralized-automation-across-networks
+Conf42 Blog, 2025-03-05. https://www.conf42.com/blog/cloud2025/dimensigon-decentralized-automation-across-networks
 
 In short: Daniel Moya of Dimensigon at Conf42 Cloud Native 2025 demos open source, decentralised automation with a REST API on every server and proxied transfers.
 

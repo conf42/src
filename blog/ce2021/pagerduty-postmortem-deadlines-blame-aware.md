@@ -1,6 +1,6 @@
 # PagerDuty gives a sev-1 postmortem three business days
 
-Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/pagerduty-postmortem-deadlines-blame-aware
+Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/pagerduty-postmortem-deadlines-blame-aware
 
 In short: Julie Gunderson (PagerDuty) at Conf42 Chaos Engineering 2021 on blameless postmortems - owners, deadlines, cognitive biases and action items that get done
 

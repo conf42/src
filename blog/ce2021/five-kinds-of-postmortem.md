@@ -1,6 +1,6 @@
 # A postmortem can be a detective story or a celebration
 
-Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/five-kinds-of-postmortem
+Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/five-kinds-of-postmortem
 
 In short: Fabricio Buzeto (bxblue) at Conf42 Chaos Engineering 2021 on postmortems beyond failure - five types, from root cause analysis to open problem and celebration
 
