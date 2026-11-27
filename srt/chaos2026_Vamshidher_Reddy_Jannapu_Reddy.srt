@@ -1,0 +1,1403 @@
+1
+00:00:00,300 --> 00:00:01,906
+Hi, I'm Vamshidhar.
+
+2
+00:00:02,061 --> 00:00:06,609
+I'm a principal DevOps engineer,
+and I do independent research on
+
+3
+00:00:06,642 --> 00:00:08,876
+guardrails for AI coding agent.
+
+4
+00:00:09,941 --> 00:00:15,250
+Chaos engineering usually injects
+faults into infrastructure, kills a
+
+5
+00:00:15,253 --> 00:00:18,727
+node, add a latency, drop a dependency.
+
+6
+00:00:19,227 --> 00:00:25,812
+In this talk, I inject the fault one
+layer up into the policy that decides
+
+7
+00:00:25,816 --> 00:00:32,100
+what an AI coding agent is allowed to do,
+and check whether the guardrails and the
+
+8
+00:00:32,100 --> 00:00:35,207
+Kubernetes admission control still holds
+
+9
+00:00:36,207 --> 00:00:39,475
+One line about me, principal
+DevOps engineer, independent
+
+10
+00:00:39,485 --> 00:00:45,759
+researcher, and a maintainer of Aegis, an open source Apache 2.0
+
+11
+00:00:46,095 --> 00:00:47,116
+policy verifier.
+
+12
+00:00:47,723 --> 00:00:51,648
+The verifier and the corpus I
+used today are in that repo.
+
+13
+00:00:52,502 --> 00:00:54,024
+Three things to take home.
+
+14
+00:00:54,181 --> 00:01:00,317
+First, a repeatable way to run a policy
+poison experiment against your own
+
+15
+00:01:00,326 --> 00:01:02,526
+hooks and the admission controller.
+
+16
+00:01:03,494 --> 00:01:07,863
+Written the way you would write any
+chaos engineer or experiment would.
+
+17
+00:01:08,543 --> 00:01:13,262
+Study state, hypothesis,
+fault, blast radius.
+
+18
+00:01:14,844 --> 00:01:21,463
+Second, what we saw when we ran
+it, how far a poison root reached,
+
+19
+00:01:21,806 --> 00:01:24,035
+what held and what did not.
+
+20
+00:01:24,722 --> 00:01:30,186
+Third, the open source verifier
+and the labeled corpus, so you can
+
+21
+00:01:30,186 --> 00:01:32,007
+run the experiment on your platform
+
+22
+00:01:33,007 --> 00:01:39,376
+We treat the policy that guards
+our cluster as if it were fixed.
+
+23
+00:01:39,701 --> 00:01:40,514
+It is not.
+
+24
+00:01:41,073 --> 00:01:45,294
+Where do the rules in your
+policy repo actually come from?
+
+25
+00:01:46,658 --> 00:01:52,282
+Almost never from the some-- almost,
+almost never from someone sitting down
+
+26
+00:01:52,476 --> 00:01:56,307
+to write a Rego or CEL from scratch.
+
+27
+00:01:56,869 --> 00:02:02,259
+They come from postmortem action
+item, tickets or a README file
+
+28
+00:02:02,288 --> 00:02:06,395
+that says never do X, or in a
+chat thread during an incident.
+
+29
+00:02:07,080 --> 00:02:14,750
+And now, AI coding agents are increasingly
+asked to turn those documents into policy,
+
+30
+00:02:15,414 --> 00:02:18,486
+which reads a text an attacker can plant.
+
+31
+00:02:19,157 --> 00:02:24,695
+For chaos engineer, these are
+upstream dependencies, and each of
+
+32
+00:02:24,695 --> 00:02:27,864
+them is writable by a lot of people.
+
+33
+00:02:28,159 --> 00:02:32,791
+So a single planted line in a
+ticket or a README can become
+
+34
+00:02:32,796 --> 00:02:34,481
+an enforced admission rule.
+
+35
+00:02:35,561 --> 00:02:39,457
+A poison rule fails in one of two ways.
+
+36
+00:02:39,866 --> 00:02:45,856
+It hides a destructive action by
+weakening a rule, or it denies a service
+
+37
+00:02:46,065 --> 00:02:47,970
+by blocking things you depend on.
+
+38
+00:02:48,394 --> 00:02:52,648
+The second one is outage we
+will work-- we'll look at today
+
+39
+00:02:53,648 --> 00:03:00,392
+Here is the fault I care most about
+because it is the easiest one to inject.
+
+40
+00:03:01,000 --> 00:03:05,114
+Picture a contractor posting
+in an incident channel, "Block
+
+41
+00:03:05,138 --> 00:03:06,523
+all deployments to prod."
+
+42
+00:03:06,964 --> 00:03:12,545
+Your ingestion pipeline pulls that
+message, hashes it, and maybe signs it.
+
+43
+00:03:13,276 --> 00:03:14,884
+The provenance check passes.
+
+44
+00:03:15,130 --> 00:03:17,044
+The hash matches the message.
+
+45
+00:03:17,429 --> 00:03:21,994
+Nobody edited it, but the contractor
+was never allowed to set a
+
+46
+00:03:21,994 --> 00:03:24,222
+deployment policy for production.
+
+47
+00:03:24,823 --> 00:03:28,777
+Provenance tells you the rule is
+unchanged since it was pulled.
+
+48
+00:03:29,234 --> 00:03:35,073
+It cannot tell you that this author
+was allowed to write this kind of rule.
+
+49
+00:03:35,645 --> 00:03:41,468
+So you need two separate checks, and a
+rule that fails either one gets no vote.
+
+50
+00:03:42,223 --> 00:03:46,346
+Keep that in mind because the
+experiment we test is exactly this
+
+51
+00:03:47,346 --> 00:03:52,698
+To check both, a rule has to
+carry some fact about itself.
+
+52
+00:03:53,525 --> 00:03:56,183
+On the left is the shape Aegis uses.
+
+53
+00:03:56,595 --> 00:04:00,030
+Every rule record its scope and effect.
+
+54
+00:04:00,393 --> 00:04:05,652
+A class such as deletion or deployment,
+the principal who asserted it,
+
+55
+00:04:06,158 --> 00:04:10,923
+and a pointer to its source, a
+commit or a ticket or a message.
+
+56
+00:04:11,481 --> 00:04:17,596
+The provenance hash is SHA-256 over
+the source site field, so it can be
+
+57
+00:04:17,602 --> 00:04:19,769
+rederived from the original source.
+
+58
+00:04:20,555 --> 00:04:25,685
+On the right is the ownership map, which
+I call an authorship map in the papers.
+
+59
+00:04:26,198 --> 00:04:30,455
+It says which principal may
+assert which class of rules.
+
+60
+00:04:30,998 --> 00:04:34,623
+An SRE may assert deletion
+and scaling rules.
+
+61
+00:04:35,606 --> 00:04:37,717
+A developer, only configuration.
+
+62
+00:04:38,084 --> 00:04:39,666
+A contractor, nothing.
+
+63
+00:04:40,181 --> 00:04:45,176
+This is the map from the corpus I
+evaluate on, and it checked against
+
+64
+00:04:45,368 --> 00:04:50,847
+at every compile because author can
+be revoked after a rule was accepted.
+
+65
+00:04:51,229 --> 00:04:54,059
+You may think RBAC already covers this.
+
+66
+00:04:54,628 --> 00:04:56,190
+RBAC answers one question.
+
+67
+00:04:56,731 --> 00:05:00,248
+Maybe this identity performed
+this verb on this resource.
+
+68
+00:05:00,789 --> 00:05:04,527
+It says nothing about where
+a policy rule came from.
+
+69
+00:05:04,875 --> 00:05:10,294
+A contractor service account with an
+edit on its own namespace can still
+
+70
+00:05:10,341 --> 00:05:13,063
+plant a rule in the shared policy repo.
+
+71
+00:05:13,511 --> 00:05:14,707
+RBAC passes it.
+
+72
+00:05:15,125 --> 00:05:19,063
+The author check fails and
+the rule never compiles.
+
+73
+00:05:19,389 --> 00:05:23,076
+So you use both Now the experiment.
+
+74
+00:05:23,633 --> 00:05:26,972
+Written the way you would
+write any chaos experiment.
+
+75
+00:05:26,998 --> 00:05:27,920
+Study state.
+
+76
+00:05:28,762 --> 00:05:33,618
+The trusted rule denies,
+the protected action and the
+
+77
+00:05:33,639 --> 00:05:35,862
+destructive ones in the product.
+
+78
+00:05:36,149 --> 00:05:40,925
+The trusted admin is never denied,
+and the routine work an agent
+
+79
+00:05:40,926 --> 00:05:42,420
+does, it still goes through.
+
+80
+00:05:42,798 --> 00:05:43,555
+Hypothesis.
+
+81
+00:05:44,100 --> 00:05:49,129
+If we planted a poison rule in the policy
+source and the guardrail that checks the
+
+82
+00:05:49,132 --> 00:05:55,657
+provenance and the authority keeps all of
+these-- all of those in the properties, a
+
+83
+00:05:55,694 --> 00:05:59,466
+guardrail that trusts its input does not.
+
+84
+00:06:00,419 --> 00:06:01,105
+The fault.
+
+85
+00:06:01,935 --> 00:06:07,180
+Rules that were asserted by someone
+without authority and rules whose
+
+86
+00:06:07,181 --> 00:06:09,518
+cited source does not back them.
+
+87
+00:06:10,206 --> 00:06:15,715
+A rules alerted after they were signed and
+are planted in the same policy directory.
+
+88
+00:06:16,190 --> 00:06:19,559
+The compiler reads next to the real rules.
+
+89
+00:06:20,353 --> 00:06:23,674
+Blast radius, we keep it small on purpose.
+
+90
+00:06:24,188 --> 00:06:29,008
+A kind cluster writes test
+sends as a server-side.
+
+91
+00:06:29,733 --> 00:06:32,088
+Dry runs only, so no model calls.
+
+92
+00:06:33,361 --> 00:06:39,609
+And the thing we measured is how much
+poison policy the guardrail acts on.
+
+93
+00:06:40,304 --> 00:06:44,033
+How many agents requested
+the poison policy?
+
+94
+00:06:45,005 --> 00:06:49,201
+Denies on their own, while the
+legitimate verdicts stays the same.
+
+95
+00:06:50,859 --> 00:06:56,971
+And like any chaos experiment, design
+to abort conditions before you start.
+
+96
+00:06:57,608 --> 00:07:04,204
+Where it is simple, if a trusted
+identity is never denied, stop or
+
+97
+00:07:04,230 --> 00:07:06,318
+removes the test policy by label.
+
+98
+00:07:06,739 --> 00:07:10,532
+It finds out why before you go on
+
+99
+00:07:11,532 --> 00:07:12,823
+Here is a fault load.
+
+100
+00:07:13,041 --> 00:07:15,546
+The corpus is public and labeled.
+
+101
+00:07:15,978 --> 00:07:18,568
+Five hundred rules with a frozen split.
+
+102
+00:07:19,082 --> 00:07:21,748
+We used hundred held out rules.
+
+103
+00:07:21,974 --> 00:07:27,013
+Fifty are trusted, 25 are asserted
+by someone without authority.
+
+104
+00:07:27,608 --> 00:07:33,425
+Fifteen cite a source that does not back
+them, and ten were alerted after signing.
+
+105
+00:07:34,135 --> 00:07:36,635
+Fifty of hundred are the Kubernetes rules.
+
+106
+00:07:37,390 --> 00:07:43,830
+We compile the same hundred rules three
+ways, one arm per guardrail design.
+
+107
+00:07:44,372 --> 00:07:49,984
+Naive compiles every rule in a
+policy directory, which is what a
+
+108
+00:07:49,986 --> 00:07:52,633
+compiler that trusts its input does.
+
+109
+00:07:53,295 --> 00:07:58,411
+Signed bundle compiles every
+rule which-- whose hash verifies.
+
+110
+00:07:59,048 --> 00:08:04,508
+Verified compiles the snapshot that
+pass provenance and authority check.
+
+111
+00:08:05,825 --> 00:08:08,864
+Each arm ran on a kind
+
+112
+00:08:09,864 --> 00:08:15,371
+93 Kubernetes requests each
+sent as an agent service account
+
+113
+00:08:15,830 --> 00:08:17,210
+bound to a cluster admin.
+
+114
+00:08:17,744 --> 00:08:20,143
+So only admissions can refuse it.
+
+115
+00:08:20,563 --> 00:08:24,122
+And again, the cluster
+admin, as a cluster admin.
+
+116
+00:08:24,849 --> 00:08:33,034
+Every ARM was run on two fresh clusters
+with identical workloads The control under
+
+117
+00:08:33,049 --> 00:08:37,871
+the test is a verified snapshot built
+before anything reaches to a cluster.
+
+118
+00:08:38,261 --> 00:08:45,091
+Three checks, and each one is aimed
+at one kind of fault: integrity,
+
+119
+00:08:45,264 --> 00:08:48,636
+source, I'm author-authority.
+
+120
+00:08:49,001 --> 00:08:55,416
+In integrity, recompute the hash from
+the rule's own field, which catches
+
+121
+00:08:55,648 --> 00:08:58,460
+a rule editor after it was pulled in.
+
+122
+00:08:58,905 --> 00:09:03,737
+In source, refetch the cited source
+and recompute the hash from it,
+
+123
+00:09:04,279 --> 00:09:09,368
+which catches a rule whose source
+does not say what it claims.
+
+124
+00:09:09,759 --> 00:09:10,396
+Authority.
+
+125
+00:09:11,273 --> 00:09:15,355
+Look the principle up in the ownership
+map, which catches the contractor.
+
+126
+00:09:16,191 --> 00:09:23,285
+The snapshot holds the rule that passes
+every rule that was excluded and why it's
+
+127
+00:09:23,331 --> 00:09:26,886
+reason, and one digest over all its input.
+
+128
+00:09:27,251 --> 00:09:32,952
+The first sixteen hex digits go
+into each deployed policy agent.dev
+
+129
+00:09:32,958 --> 00:09:38,393
+snapshot label, so the policy in the
+cluster name, the exact input it came
+
+130
+00:09:38,393 --> 00:09:42,148
+from, and checks a job in CI report draft.
+
+131
+00:09:42,667 --> 00:09:43,401
+The trade-off.
+
+132
+00:09:43,912 --> 00:09:46,694
+Verification happened
+once at compile time.
+
+133
+00:09:47,266 --> 00:09:50,483
+If someone's authority is
+revoked, the rules stay in the
+
+134
+00:09:50,483 --> 00:09:52,677
+cluster until the next compile.
+
+135
+00:09:53,130 --> 00:10:00,296
+The digest makes the staleness checkable
+The snapshot compiles to one validation
+
+136
+00:10:00,354 --> 00:10:06,330
+admission policy and one admission
+per rule with fault policy fail.
+
+137
+00:10:06,961 --> 00:10:11,889
+No webhook to run and no policy
+check over verifier in the cluster.
+
+138
+00:10:12,426 --> 00:10:16,878
+The API clus-- API server
+evaluates the CEL itself.
+
+139
+00:10:17,281 --> 00:10:24,756
+The signed identity file lists the
+trusted identity and every other
+
+140
+00:10:24,764 --> 00:10:26,317
+identity is treated as agent.
+
+141
+00:10:26,997 --> 00:10:32,672
+The na-- You name a break glass identity
+and the control plane is always accept.
+
+142
+00:10:33,179 --> 00:10:34,442
+Deny by default.
+
+143
+00:10:34,873 --> 00:10:40,631
+Sounds risky, but an unlisted identity
+is only blocked from the policy block,
+
+144
+00:10:40,933 --> 00:10:46,909
+usually disruptive actions in prod, and
+you can run report only passes first.
+
+145
+00:10:47,919 --> 00:10:52,500
+The table matters for anyone
+designing this experiment.
+
+146
+00:10:52,678 --> 00:10:56,193
+Admission sees the request,
+not the kubectl verb.
+
+147
+00:10:56,606 --> 00:10:59,130
+Delete and execute map exactly.
+
+148
+00:10:59,816 --> 00:11:06,368
+An apply rule becomes any create or
+update, so it is overly enforced,
+
+149
+00:11:06,986 --> 00:11:09,130
+and reads are never admitted at all.
+
+150
+00:11:09,354 --> 00:11:15,437
+The coverage report states that per
+rule, two enforcement points for
+
+151
+00:11:15,457 --> 00:11:18,959
+one policy will disgrace-- disagree.
+
+152
+00:11:19,652 --> 00:11:24,190
+A declared difference is fine
+and undeclared one is a bug.
+
+153
+00:11:24,565 --> 00:11:30,630
+And keep in mind, because the experiments
+found one Before the full results,
+
+154
+00:11:30,799 --> 00:11:35,435
+there is a smallest version of the
+experiment, so you can see what the
+
+155
+00:11:35,436 --> 00:11:38,342
+fault looks like an-- on real API server.
+
+156
+00:11:39,082 --> 00:11:43,690
+This is a real output from a run
+on a kind cluster on my laptop.
+
+157
+00:11:44,236 --> 00:11:46,326
+Two rules in the policy directory.
+
+158
+00:11:46,635 --> 00:11:50,699
+The contractor rule says freeze all
+the deployments changes in payments.
+
+159
+00:11:51,265 --> 00:11:52,980
+It came from a Slack message.
+
+160
+00:11:53,318 --> 00:11:57,498
+The SRE lead rule says never
+delete anything in payments.
+
+161
+00:11:58,182 --> 00:11:59,603
+It came from a postmortem.
+
+162
+00:12:00,202 --> 00:12:02,857
+Age's source says okay for both.
+
+163
+00:12:03,202 --> 00:12:08,585
+The hash is intact, and the
+source was refetched and matches.
+
+164
+00:12:09,055 --> 00:12:10,687
+Provenance passes for both.
+
+165
+00:12:11,281 --> 00:12:12,923
+Now the naive arm.
+
+166
+00:12:13,929 --> 00:12:16,192
+Compile every rule's no checks.
+
+167
+00:12:16,742 --> 00:12:21,691
+Then as an agent of the most
+routine thing, there is scale
+
+168
+00:12:21,719 --> 00:12:25,938
+checkout and payments to three,
+denied by the contractor's policy.
+
+169
+00:12:26,083 --> 00:12:31,231
+RBAC allowed it, and the agent
+here is service account, whose RBAC
+
+170
+00:12:31,248 --> 00:12:33,296
+lets it scale and delete a payment.
+
+171
+00:12:33,675 --> 00:12:36,099
+So RBAC will not stop
+anything in this run.
+
+172
+00:12:36,344 --> 00:12:38,046
+Only admission can.
+
+173
+00:12:38,680 --> 00:12:44,039
+A contractor's chat message compiled
+without an authority check froze prod.
+
+174
+00:12:44,396 --> 00:12:52,027
+That is a denial of service failure
+mode, and it took one line in-- of text.
+
+175
+00:12:53,027 --> 00:12:55,331
+Same policy directory, same key.
+
+176
+00:12:55,788 --> 00:12:58,615
+This time, agent snapshot
+ran three checks.
+
+177
+00:12:58,903 --> 00:13:00,947
+Verified one, excluded one.
+
+178
+00:13:01,689 --> 00:13:04,602
+Freeze prod deployment is unauthorized.
+
+179
+00:13:04,956 --> 00:13:09,195
+The contractor's hash was
+fine, and the source was fine.
+
+180
+00:13:09,466 --> 00:13:14,781
+The ownership map says a contractor cannot
+assert deployment rule, so it is out.
+
+181
+00:13:15,413 --> 00:13:18,525
+The compiler writes two
+policies from the snapshot.
+
+182
+00:13:19,002 --> 00:13:24,480
+Before applying them, the script removes
+the naive policy by label and the
+
+183
+00:13:24,481 --> 00:13:27,927
+way your own policy with prune would.
+
+184
+00:13:28,578 --> 00:13:30,187
+Now check the steady state.
+
+185
+00:13:30,617 --> 00:13:32,981
+The agent scale, allowed.
+
+186
+00:13:33,661 --> 00:13:39,389
+Then the agents delete and payments
+denied by the SRE leads rule.
+
+187
+00:13:39,945 --> 00:13:43,300
+A re-- a, a rule whose
+author was allowed to write.
+
+188
+00:13:43,658 --> 00:13:46,432
+The cluster admin delete, allowed.
+
+189
+00:13:47,525 --> 00:13:52,973
+That one is a server-side dry run,
+so admission ran in full and nothing
+
+190
+00:13:52,975 --> 00:13:57,850
+was deleted, and every policy
+carries the snapshot label, so you
+
+191
+00:13:57,875 --> 00:14:00,417
+can tell which input produced it.
+
+192
+00:14:01,969 --> 00:14:08,993
+Allow of that took about four seconds
+for the command Now the full replay.
+
+193
+00:14:09,435 --> 00:14:10,738
+All hundred rules.
+
+194
+00:14:10,841 --> 00:14:14,747
+Compiling every rule put
+twenty-seven policies from
+
+195
+00:14:14,748 --> 00:14:17,167
+poison policy into the cluster.
+
+196
+00:14:18,099 --> 00:14:22,413
+On their own, this poison policy
+denies fifty-six out of ninety-three
+
+197
+00:14:22,456 --> 00:14:27,807
+agent requests, including all thirty
+requests that no legitimate rule covers.
+
+198
+00:14:28,316 --> 00:14:33,987
+In a rule cluster, those thirty are
+outages that nobody's policy asked for.
+
+199
+00:14:34,500 --> 00:14:37,719
+A signed bundle removed
+only the tampered rule.
+
+200
+00:14:38,513 --> 00:14:43,369
+Forged and unauthorized rules are
+validly signed because the attacker
+
+201
+00:14:43,421 --> 00:14:47,151
+never needed to break your sign.
+
+202
+00:14:47,779 --> 00:14:50,028
+They wrote it to a channel you ingest.
+
+203
+00:14:50,576 --> 00:14:56,426
+Twenty-one po-poison policies remain,
+and they are denying forty-nine requests.
+
+204
+00:14:56,985 --> 00:15:02,730
+If your pipeline signs a policy
+bundle today, the middle arm is
+
+205
+00:15:02,730 --> 00:15:05,978
+roughly where you are, where you are.
+
+206
+00:15:06,965 --> 00:15:13,460
+The signature tells you the bundle
+was not edited and nothing was, about
+
+207
+00:15:13,485 --> 00:15:15,418
+who was allowed to write each rules.
+
+208
+00:15:15,637 --> 00:15:20,721
+The verified snapshot excluded all
+fifty poison rule, twenty-five as
+
+209
+00:15:20,801 --> 00:15:26,298
+unauthorized, fifteen as forged, and
+ten as tampered, and compiled none.
+
+210
+00:15:26,975 --> 00:15:32,765
+So the blast radius for the injector
+fault went to zero for the poison policy.
+
+211
+00:15:33,355 --> 00:15:38,533
+One action-- One caution
+on reading the zero.
+
+212
+00:15:39,261 --> 00:15:43,434
+The label are defined by the
+same check the verifier runs.
+
+213
+00:15:44,036 --> 00:15:48,705
+So this shows the check
+reads the cluster end to end.
+
+214
+00:15:49,084 --> 00:15:53,474
+It is not measured how well the
+detector a clever attacker would
+
+215
+00:15:54,474 --> 00:15:58,211
+Every chaos experiment
+should end with both list.
+
+216
+00:15:58,797 --> 00:15:59,670
+What held?
+
+217
+00:16:00,666 --> 00:16:04,558
+Protection did not
+change in all three arms.
+
+218
+00:16:04,705 --> 00:16:10,604
+Thirty-nine of forty-one pro-protected
+actions are denied, and in the verified
+
+219
+00:16:10,605 --> 00:16:13,305
+arm, the trusted rule alone do it.
+
+220
+00:16:13,873 --> 00:16:19,605
+The cluster admin was never denied in
+two seventy-nine requests across all
+
+221
+00:16:19,636 --> 00:16:24,255
+three arms, and the verified snapshot
+kept all fifty poison rules out.
+
+222
+00:16:25,732 --> 00:16:28,548
+What did not hold or held less well?
+
+223
+00:16:30,231 --> 00:16:33,940
+the two missed protected
+actions are namespace deletion.
+
+224
+00:16:34,236 --> 00:16:39,501
+A namespace in a cluster scoped, so
+admission sees no namespace, and a
+
+225
+00:16:39,501 --> 00:16:42,029
+namespace scoped rule cannot match it.
+
+226
+00:16:42,456 --> 00:16:46,217
+Second, the experiment
+found a bug in my own tool.
+
+227
+00:16:46,640 --> 00:16:51,258
+Fifteen requests denied by
+apply and patch rules and the
+
+228
+00:16:51,266 --> 00:16:53,574
+coverage report do not declare it.
+
+229
+00:16:54,101 --> 00:16:55,586
+The current release declares them.
+
+230
+00:16:56,078 --> 00:17:01,106
+That is a kind of finding your,
+you run this experiment from.
+
+231
+00:17:02,329 --> 00:17:07,173
+Third, a blind spot and push this work
+into admissions in the first place.
+
+232
+00:17:07,544 --> 00:17:10,743
+The agent-side hook sees
+only what goes through shell.
+
+233
+00:17:11,256 --> 00:17:17,423
+In a four hundred and fifty-six run study
+of seven coding agents, a script file with
+
+234
+00:17:17,423 --> 00:17:22,550
+no infrastructure binaries on its command
+line passed the gate in early release.
+
+235
+00:17:23,037 --> 00:17:28,946
+The API server sees every path, which
+is why the same verified rule also
+
+236
+00:17:28,946 --> 00:17:32,011
+have to live at admissions Cost.
+
+237
+00:17:33,380 --> 00:17:39,786
+Briefly, because a control you cannot
+afford does not stay in the deploy.
+
+238
+00:17:40,200 --> 00:17:46,648
+The left chart is requested latency
+on a kind, measured as a client
+
+239
+00:17:46,922 --> 00:17:48,944
+round trip through local proxy.
+
+240
+00:17:49,573 --> 00:17:55,963
+With every compiled policy matches the
+request, each matching policy adds about
+
+241
+00:17:56,018 --> 00:18:01,373
+zero point zero nine five millisecond for
+an agent and about zero point zero two
+
+242
+00:18:01,413 --> 00:18:03,783
+three milliseconds for a trusted identity.
+
+243
+00:18:04,571 --> 00:18:10,642
+The verified corpus compiles twenty-one
+policy and the request matches only a few.
+
+244
+00:18:11,330 --> 00:18:14,440
+So the overhead is well
+under a millisecond.
+
+245
+00:18:15,168 --> 00:18:19,517
+If you ever have a hundred
+of policies matching the same
+
+246
+00:18:19,519 --> 00:18:21,469
+kind of operation, merge them.
+
+247
+00:18:22,121 --> 00:18:26,603
+The right chart is a compile
+time, offline and a linear.
+
+248
+00:18:27,138 --> 00:18:31,301
+Sixteen hundred rules in one point
+two five seconds on a laptop.
+
+249
+00:18:31,761 --> 00:18:36,100
+These are laptop numbers, so
+the slopes are at the point
+
+250
+00:18:37,100 --> 00:18:40,850
+Here is how I would run
+this on your own platform.
+
+251
+00:18:40,999 --> 00:18:45,752
+Most of it works with or-- with
+whatever engine you run today.
+
+252
+00:18:46,409 --> 00:18:51,052
+VAP, Gatekeeper, Kyverno, with or without my tool.
+
+253
+00:18:51,750 --> 00:18:57,631
+One, list where your rules
+come from and treat the widely
+
+254
+00:18:57,679 --> 00:18:59,464
+writable source as untrusted.
+
+255
+00:18:59,852 --> 00:19:03,167
+Two, write down the
+study state as requests.
+
+256
+00:19:03,767 --> 00:19:08,488
+Which actions must be denied,
+which routine agent actions must
+
+257
+00:19:08,547 --> 00:19:12,908
+go through, and which trusted
+identity must never be denied.
+
+258
+00:19:13,512 --> 00:19:15,974
+Three, build a fault set.
+
+259
+00:19:16,194 --> 00:19:21,696
+Copy your policy repo and
+plan rules on three kind.
+
+260
+00:19:22,351 --> 00:19:28,752
+One asserted by someone who should not
+allow it, one cites a source that does
+
+261
+00:19:28,776 --> 00:19:33,869
+not say it, and one editor after signing.
+
+262
+00:19:35,174 --> 00:19:37,978
+Four, keep the blast radius small.
+
+263
+00:19:38,152 --> 00:19:41,138
+A dev cluster on the server side try runs.
+
+264
+00:19:41,640 --> 00:19:43,654
+Report only mode first.
+
+265
+00:19:44,015 --> 00:19:48,866
+A break glass identity named
+before you start and a reset that
+
+266
+00:19:48,890 --> 00:19:51,645
+removes the test policy by label.
+
+267
+00:19:52,281 --> 00:19:57,840
+Five, compile the poisoned policy,
+the way out of compile today.
+
+268
+00:19:58,275 --> 00:20:04,817
+Send the request as an agent identity
+and as a trusted one, and count how
+
+269
+00:20:04,851 --> 00:20:11,927
+many poisoned rule made it in, what
+they deny on their own, and whatever
+
+270
+00:20:11,947 --> 00:20:14,070
+the protected action are still denied.
+
+271
+00:20:14,830 --> 00:20:21,563
+Six, fix what you find and keep the
+fault set in CI, so every change
+
+272
+00:20:21,565 --> 00:20:26,592
+of the compiler or the pi-pipeline
+policy runs the experiment.
+
+273
+00:20:27,122 --> 00:20:33,850
+When you write it up, report both the
+list and a way I did it on the last line.
+
+274
+00:20:34,471 --> 00:20:36,372
+What held and what did not.
+
+275
+00:20:36,653 --> 00:20:42,662
+In my run, the most useful results
+were fifteen undeclared denial and two
+
+276
+00:20:42,665 --> 00:20:48,933
+namespace misses because those were
+things I did not know about my own tool
+
+277
+00:20:49,933 --> 00:20:56,282
+And the limits, because you should not
+trust an experiment report that has none.
+
+278
+00:20:56,953 --> 00:21:02,342
+The replay uses, uses one labeled
+corpus whose requests were generated
+
+279
+00:21:02,349 --> 00:21:07,057
+from its own rules, so it shows whether
+a poisoned rule reaches the cluster.
+
+280
+00:21:07,422 --> 00:21:12,014
+It does not show whether an
+adaptive attacker can create
+
+281
+00:21:12,052 --> 00:21:14,146
+a rule that passes the check.
+
+282
+00:21:15,877 --> 00:21:20,154
+The latency number are from
+a kind cluster on a laptop.
+
+283
+00:21:20,684 --> 00:21:24,467
+Revoked authority stays in the
+cluster until the next compile.
+
+284
+00:21:25,011 --> 00:21:28,756
+The digest makes the
+visibility but does not fix it.
+
+285
+00:21:29,542 --> 00:21:35,117
+Admission never sees reads or
+time windows, and it cannot
+
+286
+00:21:35,141 --> 00:21:36,556
+protect its own policy.
+
+287
+00:21:37,106 --> 00:21:38,175
+RBAC has to.
+
+288
+00:21:38,974 --> 00:21:43,325
+And the same snapshot also
+compiles AWS SCPs as well,
+
+289
+00:21:43,343 --> 00:21:44,943
+like service control policies.
+
+290
+00:21:45,581 --> 00:21:50,205
+But the run exercised only
+one mapped AWS rule, so the
+
+291
+00:21:50,210 --> 00:21:52,879
+Kubernetes result is the evidence
+
+292
+00:21:53,879 --> 00:21:54,371
+Thank you.
+
+293
+00:21:55,113 --> 00:22:00,025
+The verifier and the corpus are
+open source under Apache 2.0
+
+294
+00:22:00,989 --> 00:22:03,268
+at GitHub Moneytool Aegis.
+
+295
+00:22:04,390 --> 00:22:06,061
+Please try it on your own.
+
+296
+00:22:06,794 --> 00:22:12,120
+use this, URL and the replay harness
+goes public with the preprint.
+
+297
+00:22:12,925 --> 00:22:17,780
+The paper is under peer review right
+now, so the pre-- the preprint will be
+
+298
+00:22:17,782 --> 00:22:20,821
+linked under the Moneytool GitHub IO.
+
+299
+00:22:21,380 --> 00:22:24,026
+So once it's ready, you will see it.
+
+300
+00:22:24,556 --> 00:22:26,408
+I'm open for discussion on the repo.
+
+301
+00:22:26,635 --> 00:22:31,012
+If you want, you can please post,
+whatever issues you have on the repo.
+
+302
+00:22:31,485 --> 00:22:36,961
+Feel free to, reach out over on
+the LinkedIn or through the GitHub
+
+303
+00:22:36,961 --> 00:22:40,662
+issues to discuss more about
+the situations that you faced.
+
+304
+00:22:41,160 --> 00:22:41,729
+Thank you all.
+
+305
+00:22:41,876 --> 00:22:43,472
+Thank you all for watching this.
