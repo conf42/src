@@ -1,6 +1,6 @@
 # A five-layer blueprint for generative AI in healthcare claims
 
-Conf42 Blog, 2025-10-08, updated 2026-11-09. https://www.conf42.com/blog/js2025/genai-healthcare-claims-fraud-layers
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/genai-healthcare-claims-fraud-layers
 
 In short: Amala Arul Malar Umakanth of McKinsey & Company at Conf42 JavaScript 2025 on layered GenAI for claims processing and multimodal fraud detection.
 

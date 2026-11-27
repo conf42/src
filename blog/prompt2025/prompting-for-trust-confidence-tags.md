@@ -1,6 +1,6 @@
 # Users act on AI answers they can check, so prompt for that
 
-Conf42 Blog, 2025-10-29, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompting-for-trust-confidence-tags
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompting-for-trust-confidence-tags
 
 In short: Raj Kommera at Conf42 Prompt Engineering 2025 on trust-building prompts with confidence tags, source attribution, clarifying questions and audit trails.
 

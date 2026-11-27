@@ -1,6 +1,6 @@
 # Most finance ML dies after training. MLOps gets it into BI dashboards
 
-Conf42 Blog, 2025-09-06, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-into-bi-dashboards-barclays
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-into-bi-dashboards-barclays
 
 In short: Mallikarjun Ramasani (Barclays) at Conf42 MLOps 2025 on the ML lifecycle for finance and wiring model output into Tableau and Qlik.
 

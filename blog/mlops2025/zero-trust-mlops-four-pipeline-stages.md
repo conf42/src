@@ -1,6 +1,6 @@
 # Zero trust for ML pipelines, stage by stage
 
-Conf42 Blog, 2025-09-17, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/zero-trust-mlops-four-pipeline-stages
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/zero-trust-mlops-four-pipeline-stages
 
 In short: Sudheer Obbu of JPMorgan Chase at Conf42 MLOps 2025 on applying never-trust-always-verify to data, training, serving and monitoring in MLOps.
 

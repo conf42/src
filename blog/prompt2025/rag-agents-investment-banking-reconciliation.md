@@ -1,6 +1,6 @@
 # RAG agents for investment banking reconciliation, trade by trade
 
-Conf42 Blog, 2025-10-23, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/rag-agents-investment-banking-reconciliation
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/rag-agents-investment-banking-reconciliation
 
 In short: Swamy Biru of JPMorgan Chase at Conf42 Prompt Engineering 2025 on RAG-backed multi-agent systems for trade processing, reconciliation and compliance.
 

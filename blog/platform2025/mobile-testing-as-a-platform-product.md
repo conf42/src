@@ -1,6 +1,6 @@
 # Mobile Test Infrastructure Should Be a Product, Not a Service
 
-Conf42 Blog, 2025-08-29, updated 2026-11-09. https://www.conf42.com/blog/platform2025/mobile-testing-as-a-platform-product
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/mobile-testing-as-a-platform-product
 
 In short: Cognizant's Charanpreet Singh Hora at Conf42 Platform Engineering 2025 on device clouds, GitOps, feature flags and AI test selection for mobile.
 

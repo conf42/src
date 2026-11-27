@@ -1,6 +1,6 @@
 # Your Rust crate declares 17 transitive dependencies and calls about 6
 
-Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/metadata-is-not-source-code
+Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/metadata-is-not-source-code
 
 In short: Joseph Hejderup (Endor Labs) at Conf42 DevSecOps 2022 on why dependency tools should use lightweight static analysis instead of manifest metadata
 

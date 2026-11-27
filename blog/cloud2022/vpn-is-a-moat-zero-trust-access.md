@@ -1,6 +1,6 @@
 # Your VPN is a moat, and the bears are already inside
 
-Conf42 Blog, 2022-04-27. https://www.conf42.com/blog/cloud2022/vpn-is-a-moat-zero-trust-access
+Conf42 Blog, 2022-04-28. https://www.conf42.com/blog/cloud2022/vpn-is-a-moat-zero-trust-access
 
 In short: Nick Bergam (Teleport) at Conf42 Cloud Native 2022 on replacing VPNs and shared secrets with zero trust access, short-lived certificates and an access proxy
 

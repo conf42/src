@@ -1,6 +1,6 @@
 # Zero Service Desk: prevent, deflect, automate, then augment
 
-Conf42 Blog, 2026-02-04, updated 2026-11-09. https://www.conf42.com/blog/ml2026/zero-service-desk-prevent-deflect-automate-augment
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/zero-service-desk-prevent-deflect-automate-augment
 
 In short: Anu Arora of ServiceNow at Conf42 Machine Learning 2026 on how ServiceNow IT used ML and its own platform to keep support staff flat while headcount grew.
 

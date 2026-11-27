@@ -1,6 +1,6 @@
 # Hyper-personalization is a latency problem and a privacy problem
 
-Conf42 Blog, 2025-05-05, updated 2026-11-09. https://www.conf42.com/blog/ml2025/hyper-personalization-latency-and-privacy
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/hyper-personalization-latency-and-privacy
 
 In short: Lakshmi Narayana Gupta Koralla, Senior Data Engineer at Starbucks, at Conf42 Machine Learning 2025 on the data and ML stack behind hyper-personalization.
 

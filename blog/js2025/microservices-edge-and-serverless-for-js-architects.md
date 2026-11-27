@@ -1,6 +1,6 @@
 # Microservices, edge and serverless from a JavaScript architect's view
 
-Conf42 Blog, 2025-10-27, updated 2026-11-09. https://www.conf42.com/blog/js2025/microservices-edge-and-serverless-for-js-architects
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/microservices-edge-and-serverless-for-js-architects
 
 In short: Ford Credit tech lead Surya Prabha Busi surveyed microservices, edge, multi-cloud, serverless and zero trust for JS teams at Conf42 JavaScript 2025.
 

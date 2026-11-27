@@ -1,6 +1,6 @@
 # Your GitHub Actions secret is already in 13 places
 
-Conf42 Blog, 2023-01-25. https://www.conf42.com/blog/devops2023/github-actions-secrets-short-lived-certs
+Conf42 Blog, 2023-01-26. https://www.conf42.com/blog/devops2023/github-actions-secrets-short-lived-certs
 
 In short: Kenneth DuMez (Teleport) at Conf42 DevOps 2023 on replacing static GitHub Actions secrets with short-lived certificates from Teleport Machine ID
 

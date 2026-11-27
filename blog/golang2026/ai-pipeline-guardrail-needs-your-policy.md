@@ -1,6 +1,6 @@
 # An AI security gate in CI is only as good as the policy you give it
 
-Conf42 Blog, 2026-05-18, updated 2026-11-09. https://www.conf42.com/blog/golang2026/ai-pipeline-guardrail-needs-your-policy
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/ai-pipeline-guardrail-needs-your-policy
 
 In short: Emmanuela Opurum of SoftNet Technologies at Conf42 Golang 2026 demos a CI/CD guardrail where an LLM agent checks code against a written policy and fails the build.
 

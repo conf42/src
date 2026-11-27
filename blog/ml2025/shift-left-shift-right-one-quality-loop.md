@@ -1,6 +1,6 @@
 # Shift-left and shift-right testing work better as one loop
 
-Conf42 Blog, 2025-05-04, updated 2026-11-09. https://www.conf42.com/blog/ml2025/shift-left-shift-right-one-quality-loop
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/shift-left-shift-right-one-quality-loop
 
 In short: Jyotheeswara Reddy Gottam of Walmart Global Tech at Conf42 Machine Learning 2025 joins pre-release testing and production signals into one quality loop.
 

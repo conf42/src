@@ -1,6 +1,6 @@
 # From chroot to Codespaces, the long war on works-on-my-machine
 
-Conf42 Blog, 2023-01-25. https://www.conf42.com/blog/devops2023/codespaces-ends-works-on-my-machine
+Conf42 Blog, 2023-01-26. https://www.conf42.com/blog/devops2023/codespaces-ends-works-on-my-machine
 
 In short: Rizel Scarlett (GitHub) at Conf42 DevOps 2023 on why developers code inside containers and how GitHub Codespaces turns dev containers into config as code
 

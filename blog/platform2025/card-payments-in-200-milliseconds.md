@@ -1,6 +1,6 @@
 # What a card swipe asks of a payment platform in 200 milliseconds
 
-Conf42 Blog, 2025-08-23, updated 2026-11-09. https://www.conf42.com/blog/platform2025/card-payments-in-200-milliseconds
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/card-payments-in-200-milliseconds
 
 In short: Tapan Vijay (Meta) at Conf42 Platform Engineering 2025 on the latency, fraud, settlement and key-management design behind planet-scale card processing.
 

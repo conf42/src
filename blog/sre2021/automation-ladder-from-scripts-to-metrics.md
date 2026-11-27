@@ -1,6 +1,6 @@
 # Automate the toil, then climb from scripts to automation you only see as a metric
 
-Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/automation-ladder-from-scripts-to-metrics
+Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/automation-ladder-from-scripts-to-metrics
 
 In short: Mandi Walls (PagerDuty) at Conf42 Site Reliability Engineering 2021 on what makes good automation, idempotency, and a maturity ladder for reducing toil
 

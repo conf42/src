@@ -1,6 +1,6 @@
 # Generative AI can turn a plain-English request into an ETL pipeline
 
-Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/platform2025/plain-english-etl-with-generative-ai
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/plain-english-etl-with-generative-ai
 
 In short: Achyut Kumar Sharma Tandra of Amazon explains at Conf42 Platform Engineering 2025 how LLM-driven ETL parses intent, plans execution and generates pipelines.
 

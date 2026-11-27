@@ -1,6 +1,6 @@
 # Your supply chain AI is only as good as the ERP beneath it
 
-Conf42 Blog, 2025-08-24, updated 2026-11-09. https://www.conf42.com/blog/platform2025/erp-as-composable-backbone-for-supply-chain-ai
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/erp-as-composable-backbone-for-supply-chain-ai
 
 In short: Vinod Nagarahalli (Illumina) at Conf42 Platform Engineering 2025 on rebuilding ERP as a composable, API-first platform for AI-driven supply chains.
 

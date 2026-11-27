@@ -1,6 +1,6 @@
 # Predict NPS from telemetry instead of waiting for surveys
 
-Conf42 Blog, 2026-01-31, updated 2026-11-09. https://www.conf42.com/blog/ml2026/predict-nps-without-sending-a-survey
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/predict-nps-without-sending-a-survey
 
 In short: Abhinay Kumar Reddy Seella of Roku at Conf42 Machine Learning 2026 on a multi-modal model that predicts Net Promoter Score per session in real time.
 

@@ -1,6 +1,6 @@
 # How OpenAI connects Codex to Flyte through MCP for ML training runs
 
-Conf42 Blog, 2026-11-16, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/codex-flyte-mcp-ml-workflows-openai
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/codex-flyte-mcp-ml-workflows-openai
 
 In short: Phoebe Wang (OpenAI) at Conf42 MLOps 2026 on a read-only Flyte MCP tool that lets Codex turn a failed training run link into a first fix to test.
 

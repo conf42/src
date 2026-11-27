@@ -1,6 +1,6 @@
 # Harvest now, decrypt later means your API traffic is already at risk
 
-Conf42 Blog, 2026-04-19. https://www.conf42.com/blog/cloud2026/post-quantum-migration-for-multicloud-apis
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/post-quantum-migration-for-multicloud-apis
 
 In short: Rajasingh Gandhi Ramdas of IBM at Conf42 Cloud Native 2026 on post-quantum migration for multi-cloud APIs: ML-KEM, hybrid TLS and crypto agility.
 

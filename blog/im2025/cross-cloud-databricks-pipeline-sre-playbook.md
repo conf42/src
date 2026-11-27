@@ -1,6 +1,6 @@
 # Running a 10TB-a-day Databricks pipeline like an SRE service
 
-Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/im2025/cross-cloud-databricks-pipeline-sre-playbook
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/cross-cloud-databricks-pipeline-sre-playbook
 
 In short: Sruthi Erra Hareram at Conf42 Incident Management 2025 on freshness SLIs, circuit breakers and Z-ordering for a cross-cloud Azure Databricks pipeline.
 

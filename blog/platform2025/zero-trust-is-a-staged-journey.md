@@ -1,6 +1,6 @@
 # Zero trust at enterprise scale is a staged journey, not a product
 
-Conf42 Blog, 2025-08-16, updated 2026-11-09. https://www.conf42.com/blog/platform2025/zero-trust-is-a-staged-journey
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/zero-trust-is-a-staged-journey
 
 In short: Naveen Kumar Birru of Palo Alto Networks at Conf42 Platform Engineering 2025 on identity, microsegmentation, service mesh mTLS and API gateways for zero trust.
 

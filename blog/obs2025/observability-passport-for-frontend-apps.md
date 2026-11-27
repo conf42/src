@@ -1,6 +1,6 @@
 # An observability passport for every frontend project
 
-Conf42 Blog, 2025-06-03, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-passport-for-frontend-apps
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-passport-for-frontend-apps
 
 In short: Vadim Tsaregorodtsev of ETG at Conf42 Observability 2025 on one page of links per app covering Sentry, SLOs, error budgets, logs and traces.
 

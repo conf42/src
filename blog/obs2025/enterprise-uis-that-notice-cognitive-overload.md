@@ -1,6 +1,6 @@
 # Enterprise interfaces that notice cognitive overload, ethically
 
-Conf42 Blog, 2025-05-18. https://www.conf42.com/blog/obs2025/enterprise-uis-that-notice-cognitive-overload
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/enterprise-uis-that-notice-cognitive-overload
 
 In short: Karthik Mohan Muralidharan at Conf42 Observability 2025 on inferring user stress from typing, mouse and workflow signals and adapting enterprise UIs, with consent.
 

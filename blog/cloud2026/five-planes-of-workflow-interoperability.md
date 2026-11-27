@@ -1,6 +1,6 @@
 # Design workflow interoperability in five planes, not adapters
 
-Conf42 Blog, 2026-04-01, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/five-planes-of-workflow-interoperability
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/five-planes-of-workflow-interoperability
 
 In short: Devinder Tokas of Microsoft at Conf42 Cloud Native 2026 on a five-plane framework built on CNCF standards to keep cloud-native workflows portable.
 

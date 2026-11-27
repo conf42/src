@@ -1,6 +1,6 @@
 # LLM apps are distributed systems now, so trace the decision path
 
-Conf42 Blog, 2026-08-20. https://www.conf42.com/blog/obs2026/llm-apps-are-distributed-systems-trace-them
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/llm-apps-are-distributed-systems-trace-them
 
 In short: Princewill Kalio of Dockie at Conf42 Observability 2026 on observing LLM apps in three layers, from system telemetry to AI execution data to quality.
 

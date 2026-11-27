@@ -1,6 +1,6 @@
 # SiriusXM cut model deployments from 45 days to four hours
 
-Conf42 Blog, 2025-09-13, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/siriusxm-mlops-deploys-45-days-to-4-hours
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/siriusxm-mlops-deploys-45-days-to-4-hours
 
 In short: Jimmy Katiyar of SiriusXM at Conf42 MLOps 2025 on validation gates, CI/CD, monitoring and Kubernetes behind a jump from MLOps level one to three.
 

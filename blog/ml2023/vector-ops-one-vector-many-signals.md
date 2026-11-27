@@ -1,6 +1,6 @@
 # Stop benchmarking vector databases on speed, build better vectors
 
-Conf42 Blog, 2023-05-17. https://www.conf42.com/blog/ml2023/vector-ops-one-vector-many-signals
+Conf42 Blog, 2023-05-18. https://www.conf42.com/blog/ml2023/vector-ops-one-vector-many-signals
 
 In short: Daniel Svonava (Superlinked) at Conf42 Machine Learning 2023 on packing recency, popularity and topic into one vector for search and recommendations
 

@@ -1,6 +1,6 @@
 # Self-healing infrastructure should automate certainty, escalate ambiguity
 
-Conf42 Blog, 2026-10-07, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/automate-certainty-escalate-ambiguity-flags
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/automate-certainty-escalate-ambiguity-flags
 
 In short: Confluent's Prateek Jindal at Conf42 Feature Flags 2026 on feature flags as infrastructure controls in a detect, decide, recover, validate loop.
 

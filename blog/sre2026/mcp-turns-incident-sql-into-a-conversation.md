@@ -1,6 +1,6 @@
 # Give the on-call LLM read-only MCP access and a very good schema doc
 
-Conf42 Blog, 2026-02-25, updated 2026-11-09. https://www.conf42.com/blog/sre2026/mcp-turns-incident-sql-into-a-conversation
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/mcp-turns-incident-sql-into-a-conversation
 
 In short: Makarand Gujarathi of Walmart at Conf42 SRE 2026 on AI-assisted incident response, where LLMs query telemetry over MCP, grounded by context engineering.
 

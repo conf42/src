@@ -1,6 +1,6 @@
 # Watch the business workflow, not the service, to detect faster
 
-Conf42 Blog, 2026-03-06, updated 2026-11-09. https://www.conf42.com/blog/sre2026/watch-the-workflow-not-the-service
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/watch-the-workflow-not-the-service
 
 In short: Rohit Wadhwa (Walmart) at Conf42 SRE 2026 on Predictive Workflow Integrity, which models workflows as state machines and cut detection time below a minute.
 

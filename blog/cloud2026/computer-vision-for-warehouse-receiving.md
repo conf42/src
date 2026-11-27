@@ -1,6 +1,6 @@
 # Computer vision that cut warehouse receiving errors by 99%
 
-Conf42 Blog, 2026-04-21. https://www.conf42.com/blog/cloud2026/computer-vision-for-warehouse-receiving
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/computer-vision-for-warehouse-receiving
 
 In short: Anton Solomonov of SIMPLE at Conf42 Cloud Native 2026 on a production computer vision check for near-identical spare parts in a mining supplier's warehouse.
 

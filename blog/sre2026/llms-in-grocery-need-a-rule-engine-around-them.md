@@ -1,6 +1,6 @@
 # Put a rule engine on both sides of the LLM in grocery retail
 
-Conf42 Blog, 2026-02-18, updated 2026-11-09. https://www.conf42.com/blog/sre2026/llms-in-grocery-need-a-rule-engine-around-them
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/llms-in-grocery-need-a-rule-engine-around-them
 
 In short: Sanjay Basu of TCS at Conf42 SRE 2026 on running LLMs in grocery retail with new SLOs, hybrid rule-plus-LLM decisions and a five-stage AI incident playbook.
 

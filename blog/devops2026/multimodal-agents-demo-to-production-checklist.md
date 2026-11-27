@@ -1,6 +1,6 @@
 # Taking multimodal voice and vision agents from demo to production
 
-Conf42 Blog, 2025-12-24, updated 2026-11-09. https://www.conf42.com/blog/devops2026/multimodal-agents-demo-to-production-checklist
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/multimodal-agents-demo-to-production-checklist
 
 In short: Amazon's Gobu Natarajan at Conf42 DevOps 2026 on fusion trade-offs, task-level evals, cross-modal tracing and fallbacks for multimodal agents.
 

@@ -1,6 +1,6 @@
 # Run a GPU scheduler per team by putting it in a virtual cluster
 
-Conf42 Blog, 2025-09-19, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/vcluster-kai-scheduler-gpu-sandboxes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/vcluster-kai-scheduler-gpu-sandboxes
 
 In short: Piotr Zaniewski (vCluster) at Conf42 Kube Native 2025 demos NVIDIA's KAI Scheduler inside vCluster for fractional GPUs and per-team scheduler versions.
 

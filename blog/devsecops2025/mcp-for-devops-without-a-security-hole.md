@@ -1,6 +1,6 @@
 # Your MCP server is safe. The web page it fetched isn't
 
-Conf42 Blog, 2025-11-24, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/mcp-for-devops-without-a-security-hole
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/mcp-for-devops-without-a-security-hole
 
 In short: Alex Shershebnev of Zencoder at Conf42 DevSecOps 2025 on wiring MCP into DevOps workflows and a live prompt-injection demo that wrote a file to disk.
 

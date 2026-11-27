@@ -1,6 +1,6 @@
 # An AI copilot for Agile should spot risk early and leave decisions to people
 
-Conf42 Blog, 2025-10-10, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ai-agile-copilot-release-train
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ai-agile-copilot-release-train
 
 In short: Hema Yalamancheli (Tyler Technologies) at Conf42 Prompt Engineering 2025 on AI for sprint forecasting, hidden dependencies and burnout signals, with guardrails.
 

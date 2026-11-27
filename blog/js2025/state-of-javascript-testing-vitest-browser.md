@@ -1,6 +1,6 @@
 # JavaScript testing is heading back to the real browser
 
-Conf42 Blog, 2025-10-03, updated 2026-11-09. https://www.conf42.com/blog/js2025/state-of-javascript-testing-vitest-browser
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/state-of-javascript-testing-vitest-browser
 
 In short: Daniel Afonso of PagerDuty at Conf42 JavaScript 2025 on the state of JS testing, from Vitest browser mode and MSW to Playwright and AI.
 

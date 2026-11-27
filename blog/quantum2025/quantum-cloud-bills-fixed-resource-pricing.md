@@ -1,6 +1,6 @@
 # Quantum jobs will make cloud bills even harder to predict
 
-Conf42 Blog, 2025-06-03, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-cloud-bills-fixed-resource-pricing
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-cloud-bills-fixed-resource-pricing
 
 In short: Qumulus developer relations engineer Denish Tomar argues at Conf42 Quantum Computing 2025 that metered pricing breaks down for quantum workloads.
 

@@ -1,6 +1,6 @@
 # Zero trust for AI platforms, one layer at a time
 
-Conf42 Blog, 2025-09-01, updated 2026-11-09. https://www.conf42.com/blog/platform2025/zero-trust-layers-for-ai-platforms
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/zero-trust-layers-for-ai-platforms
 
 In short: JPMorgan Chase's Sudheer Obbu at Conf42 Platform Engineering 2025 on zero trust for ML pipelines, from service identity and mTLS to lineage and runtime monitoring.
 

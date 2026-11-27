@@ -1,6 +1,6 @@
 # Scale on the forecast, not on the CPU alarm
 
-Conf42 Blog, 2026-01-30, updated 2026-11-09. https://www.conf42.com/blog/ml2026/scale-on-the-forecast-not-the-alarm
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/scale-on-the-forecast-not-the-alarm
 
 In short: Vivek Kumar of Majesco at Conf42 Machine Learning 2026 on using telemetry-trained models to scale transaction platforms before the spike.
 

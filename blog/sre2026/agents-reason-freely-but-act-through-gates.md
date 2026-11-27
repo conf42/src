@@ -1,6 +1,6 @@
 # Let agents think freely, but make every action pass a gate
 
-Conf42 Blog, 2026-02-20, updated 2026-11-09. https://www.conf42.com/blog/sre2026/agents-reason-freely-but-act-through-gates
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/agents-reason-freely-but-act-through-gates
 
 In short: Ajay Athitya Ramanathan of FourthSquare at Conf42 SRE 2026 maps the guardrail stack for AI agents in high-risk production, from Pydantic to OPA and Temporal.
 

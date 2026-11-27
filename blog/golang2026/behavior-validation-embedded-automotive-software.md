@@ -1,6 +1,6 @@
 # Correct code can still fail the car, so validate behaviour early
 
-Conf42 Blog, 2026-04-22, updated 2026-11-09. https://www.conf42.com/blog/golang2026/behavior-validation-embedded-automotive-software
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/behavior-validation-embedded-automotive-software
 
 In short: Sana Fatima of General Motors at Conf42 Golang 2026 on behaviour-driven validation that catches cross-module defects before vehicle-level testing.
 

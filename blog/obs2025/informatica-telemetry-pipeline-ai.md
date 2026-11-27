@@ -1,6 +1,6 @@
 # Informatica filters telemetry at the source and lets AI run the pipes
 
-Conf42 Blog, 2025-05-10, updated 2026-11-09. https://www.conf42.com/blog/obs2025/informatica-telemetry-pipeline-ai
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/informatica-telemetry-pipeline-ai
 
 In short: Kirti Ranjan Parida and Sarav Jagadeesan show at Conf42 Observability 2025 how Informatica cut telemetry noise with OpenTelemetry filters and AI agents.
 

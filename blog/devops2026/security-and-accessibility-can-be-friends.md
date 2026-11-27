@@ -1,6 +1,6 @@
 # Drop the CAPTCHA, and other ways security and accessibility agree
 
-Conf42 Blog, 2026-01-12, updated 2026-11-09. https://www.conf42.com/blog/devops2026/security-and-accessibility-can-be-friends
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/security-and-accessibility-can-be-friends
 
 In short: Gian Wild of AccessibilityOz at Conf42 DevOps 2026 on why PDFs are not secure, every CAPTCHA is inaccessible, and WCAG already makes room for security.
 

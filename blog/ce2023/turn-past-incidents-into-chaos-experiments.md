@@ -1,6 +1,6 @@
 # Turn last quarter's incidents into this sprint's chaos experiments
 
-Conf42 Blog, 2023-02-15. https://www.conf42.com/blog/ce2023/turn-past-incidents-into-chaos-experiments
+Conf42 Blog, 2023-02-16. https://www.conf42.com/blog/ce2023/turn-past-incidents-into-chaos-experiments
 
 In short: Benjamin Wilms (Steadybit) at Conf42 Chaos Engineering 2023 on turning past failures into pre-production chaos experiments that run after every deploy
 

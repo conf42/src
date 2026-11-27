@@ -1,6 +1,6 @@
 # AI-written code raises the change rate, so SREs must cut the odds
 
-Conf42 Blog, 2026-03-18, updated 2026-11-09. https://www.conf42.com/blog/sre2026/ai-code-raises-change-rate-sres-own-failure-odds
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/ai-code-raises-change-rate-sres-own-failure-odds
 
 In short: Sylvain Kalache of Rootly at Conf42 SRE 2026 on how AI coding multiplies changes and incidents, slopsquatting, and using AI back against the failure rate.
 

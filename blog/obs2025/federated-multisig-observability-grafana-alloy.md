@@ -1,6 +1,6 @@
 # Seven signatures needed, three signers showed up. Now what?
 
-Conf42 Blog, 2025-05-27, updated 2026-11-09. https://www.conf42.com/blog/obs2025/federated-multisig-observability-grafana-alloy
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/federated-multisig-observability-grafana-alloy
 
 In short: Onyebuchi Mark Irozuru of Botanix Labs at Conf42 Observability 2025 on monitoring a federated Bitcoin multisig with Grafana Alloy, Loki, Prometheus and Tempo.
 

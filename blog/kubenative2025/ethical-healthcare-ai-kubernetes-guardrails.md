@@ -1,6 +1,6 @@
 # Treat fairness, explainability and privacy as cluster infrastructure
 
-Conf42 Blog, 2025-09-17, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ethical-healthcare-ai-kubernetes-guardrails
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ethical-healthcare-ai-kubernetes-guardrails
 
 In short: Venus Garg (Boston University) at Conf42 Kube Native 2025 on building fairness audits, explanation sidecars and federated learning into Kubernetes for healthcare AI.
 

@@ -1,6 +1,6 @@
 # With AI coding, the delivery bottleneck moves to code review
 
-Conf42 Blog, 2026-10-21, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-coding-moves-the-bottleneck-to-review
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-coding-moves-the-bottleneck-to-review
 
 In short: Lucas Mazei (Memed) at Conf42 Platform Engineering 2026 applies the theory of constraints to AI-assisted delivery and shows where platform teams should push.
 

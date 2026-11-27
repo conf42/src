@@ -1,6 +1,6 @@
 # Production ML needs HA, DR and Zero Trust designed in from day one
 
-Conf42 Blog, 2026-02-12, updated 2026-11-09. https://www.conf42.com/blog/ml2026/production-ml-needs-ha-dr-zero-trust
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/production-ml-needs-ha-dr-zero-trust
 
 In short: Srinivas Talasila (SAP) at Conf42 Machine Learning 2026 on the infrastructure pillars that keep ML training and serving available, secure and auditable.
 

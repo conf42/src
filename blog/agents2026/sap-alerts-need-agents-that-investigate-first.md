@@ -1,6 +1,6 @@
 # SAP alerts need agents that investigate before a human wakes up
 
-Conf42 Blog, 2026-09-09, updated 2026-11-09. https://www.conf42.com/blog/agents2026/sap-alerts-need-agents-that-investigate-first
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/sap-alerts-need-agents-that-investigate-first
 
 In short: Pon Murugesh Devendren (Deloitte) at Conf42 AI Agents 2026: five event-driven agents on SAP BTP that turn a Cloud ALM alert into an approved fix.
 

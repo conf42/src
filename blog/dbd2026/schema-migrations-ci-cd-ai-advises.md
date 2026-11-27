@@ -1,6 +1,6 @@
 # Let AI review your schema migration, never approve it
 
-Conf42 Blog, 2026-05-17, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/schema-migrations-ci-cd-ai-advises
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/schema-migrations-ci-cd-ai-advises
 
 In short: Ahmed Tariq at Conf42 Database DevOps 2026 on safe schema migrations in CI/CD, expand-migrate-contract, and a framework for where AI belongs.
 

@@ -1,6 +1,6 @@
 # Amazon Braket makes quantum hardware a pay-as-you-go AWS service
 
-Conf42 Blog, 2025-06-04, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/amazon-braket-hybrid-quantum-on-aws
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/amazon-braket-hybrid-quantum-on-aws
 
 In short: Naga Murali Krishna Koneru of Hexaware Technologies tours Amazon Braket at Conf42 Quantum Computing 2025, from hybrid jobs to shots and hardware.
 

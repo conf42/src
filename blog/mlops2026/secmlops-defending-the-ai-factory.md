@@ -1,6 +1,6 @@
 # SecMLOps: treat every model file as untrusted code
 
-Conf42 Blog, 2026-11-18. https://www.conf42.com/blog/mlops2026/secmlops-defending-the-ai-factory
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/secmlops-defending-the-ai-factory
 
 In short: Jose Manuel Ortega (Alicante University) at Conf42 MLOps 2026 on securing the ML lifecycle: pickle files, poisoned data, registries and endpoints.
 

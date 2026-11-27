@@ -1,6 +1,6 @@
 # Porting JVM library design to Rust crates, pattern by pattern
 
-Conf42 Blog, 2025-07-26, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/jvm-connector-patterns-for-rust-crates
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/jvm-connector-patterns-for-rust-crates
 
 In short: Venkata Appalapuram of Ritepros at Conf42 Rustlang 2025 on mapping a Spark JMS connector's provider interfaces and exceptions to Rust traits and Results.
 

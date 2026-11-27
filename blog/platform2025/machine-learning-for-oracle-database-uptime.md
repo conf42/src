@@ -1,6 +1,6 @@
 # Teaching Oracle Cloud databases to see outages coming
 
-Conf42 Blog, 2025-09-01, updated 2026-11-09. https://www.conf42.com/blog/platform2025/machine-learning-for-oracle-database-uptime
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/machine-learning-for-oracle-database-uptime
 
 In short: Sunil Yadav at Conf42 Platform Engineering 2025 makes a three-minute case for ML anomaly detection, RL tuning and predictive scaling for 99.98% Oracle uptime.
 

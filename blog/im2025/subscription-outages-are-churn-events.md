@@ -1,6 +1,6 @@
 # In a subscription business, every outage is also a churn event
 
-Conf42 Blog, 2025-09-27, updated 2026-11-09. https://www.conf42.com/blog/im2025/subscription-outages-are-churn-events
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/subscription-outages-are-churn-events
 
 In short: Venkata Majeti at Conf42 Incident Management 2025 on AI-driven incident resilience for subscription platforms, from anomaly detection to retention.
 

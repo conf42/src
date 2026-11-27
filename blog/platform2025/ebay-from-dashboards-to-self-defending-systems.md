@@ -1,6 +1,6 @@
 # Dashboards don't act, so eBay built systems that do
 
-Conf42 Blog, 2025-09-02, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ebay-from-dashboards-to-self-defending-systems
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ebay-from-dashboards-to-self-defending-systems
 
 In short: eBay's Sureshkumar Karuppuchamy at Conf42 Platform Engineering 2025 on SLO-driven alerts, adaptive rate limiting and auto-rollbacks that earn trust.
 

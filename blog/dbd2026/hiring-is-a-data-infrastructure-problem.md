@@ -1,6 +1,6 @@
 # Your hiring problem is a data infrastructure problem
 
-Conf42 Blog, 2026-05-27, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/hiring-is-a-data-infrastructure-problem
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/hiring-is-a-data-infrastructure-problem
 
 In short: Zeeshan Khan (STV) at Conf42 Database DevOps 2026 on five layers from a legacy ATS to predictive hiring, with skills graphs, vector search and governance.
 

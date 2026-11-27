@@ -1,6 +1,6 @@
 # Active inference as a first-principles path to next-generation agents
 
-Conf42 Blog, 2026-01-23, updated 2026-11-09. https://www.conf42.com/blog/ml2026/active-inference-next-generation-ai-agents
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/active-inference-next-generation-ai-agents
 
 In short: QF Network CEO Alex Vyatkin at Conf42 Machine Learning 2026 on active inference and the free energy principle as a basis for adaptive AI agents.
 

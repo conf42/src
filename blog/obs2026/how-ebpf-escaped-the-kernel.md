@@ -1,6 +1,6 @@
 # How eBPF turned the frozen Linux kernel into something you script
 
-Conf42 Blog, 2026-09-02, updated 2026-11-09. https://www.conf42.com/blog/obs2026/how-ebpf-escaped-the-kernel
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/how-ebpf-escaped-the-kernel
 
 In short: Anais Dotis-Georgiou of groundcover at Conf42 Observability 2026 tells eBPF's origin story, explains the verifier and JIT, and demos bpftrace.
 

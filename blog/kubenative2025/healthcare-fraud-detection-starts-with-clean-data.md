@@ -1,6 +1,6 @@
 # Healthcare fraud detection fails on data before it fails on models
 
-Conf42 Blog, 2025-10-04, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/healthcare-fraud-detection-starts-with-clean-data
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/healthcare-fraud-detection-starts-with-clean-data
 
 In short: Triveni Kolla (Cotiviti) at Conf42 Kube Native 2025 makes the case for data-centric AI in healthcare fraud detection: clean, governed data first.
 

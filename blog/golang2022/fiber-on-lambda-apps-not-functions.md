@@ -1,6 +1,6 @@
 # Deploy apps to Lambda, not fifty single-purpose functions
 
-Conf42 Blog, 2022-03-30. https://www.conf42.com/blog/golang2022/fiber-on-lambda-apps-not-functions
+Conf42 Blog, 2022-03-31. https://www.conf42.com/blog/golang2022/fiber-on-lambda-apps-not-functions
 
 In short: Savas Ziplies (elipZis) at Conf42 Golang 2022 on running a full Fiber app on AWS Lambda with AWS SAM, one codebase that also runs locally
 

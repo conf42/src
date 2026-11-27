@@ -1,6 +1,6 @@
 # Extending Microsoft Sentinel with your own codeless connector
 
-Conf42 Blog, 2026-01-20. https://www.conf42.com/blog/devops2026/build-a-microsoft-sentinel-connector
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/build-a-microsoft-sentinel-connector
 
 In short: Gareth Emslie of Dynatrace at Conf42 DevOps 2026 builds a Microsoft Sentinel solution with a codeless connector, KQL analytics rules and packaging.
 

@@ -1,6 +1,6 @@
 # A correct diagnosis doesn't give an AI agent the authority to act
 
-Conf42 Blog, 2026-10-09, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-agents-need-delegated-authority-not-permissions
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-agents-need-delegated-authority-not-permissions
 
 In short: Ruby Agarwal, VP of Engineering at Avaya, at Conf42 Platform Engineering 2026 on scoped, expiring authority for agents that remediate production.
 

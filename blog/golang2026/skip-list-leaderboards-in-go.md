@@ -1,6 +1,6 @@
 # How a skip list rescued real-time leaderboards in two working days
 
-Conf42 Blog, 2026-05-04, updated 2026-11-09. https://www.conf42.com/blog/golang2026/skip-list-leaderboards-in-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/skip-list-leaderboards-in-go
 
 In short: Ivan Balashov of SoftSwiss at Conf42 Golang 2026 on replacing a sorted-slice leaderboard with an indexed skip list in Go after a CPU incident.
 

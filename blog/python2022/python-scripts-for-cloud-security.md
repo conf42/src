@@ -1,6 +1,6 @@
 # Security automation starts with knowing how you would attack yourself
 
-Conf42 Blog, 2022-01-26. https://www.conf42.com/blog/python2022/python-scripts-for-cloud-security
+Conf42 Blog, 2022-01-27. https://www.conf42.com/blog/python2022/python-scripts-for-cloud-security
 
 In short: Joshua Arvin Lat (NuWorks Interactive Labs) at Conf42 Python 2022 on pragmatic cloud security automation with Python, boto3 and CloudFormation
 

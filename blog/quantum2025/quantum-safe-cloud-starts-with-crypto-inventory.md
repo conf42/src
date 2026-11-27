@@ -1,6 +1,6 @@
 # A quantum-safe cloud starts with knowing where your crypto lives
 
-Conf42 Blog, 2025-06-06, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-safe-cloud-starts-with-crypto-inventory
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-safe-cloud-starts-with-crypto-inventory
 
 In short: Pavan Nutalapati at Conf42 Quantum Computing 2025 on how Shor's algorithm threatens cloud encryption and the five moves to make before it lands.
 

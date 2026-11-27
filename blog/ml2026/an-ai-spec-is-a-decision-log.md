@@ -1,6 +1,6 @@
 # An AI product spec should be a decision log, not a manuscript
 
-Conf42 Blog, 2026-02-03, updated 2026-11-09. https://www.conf42.com/blog/ml2026/an-ai-spec-is-a-decision-log
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/an-ai-spec-is-a-decision-log
 
 In short: Rohan Mitra of PhonePe at Conf42 Machine Learning 2026 rewrites a vague smart-reply spec live with a five-pillar AI spec framework.
 

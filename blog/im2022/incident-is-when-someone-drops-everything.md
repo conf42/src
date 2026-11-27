@@ -1,6 +1,6 @@
 # An incident is when someone has to drop everything
 
-Conf42 Blog, 2022-09-28. https://www.conf42.com/blog/im2022/incident-is-when-someone-drops-everything
+Conf42 Blog, 2022-09-29. https://www.conf42.com/blog/im2022/incident-is-when-someone-drops-everything
 
 In short: Nishant Roy (Pinterest) at Conf42 Incident Management 2022 on defining incidents, the runner and manager roles, blameless postmortems and what to measure.
 

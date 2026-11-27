@@ -1,6 +1,6 @@
 # Sepsis detection AI needs clinical gates, not just a good model
 
-Conf42 Blog, 2026-01-04, updated 2026-11-09. https://www.conf42.com/blog/devops2026/sepsis-detection-ai-needs-clinical-gates
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/sepsis-detection-ai-needs-clinical-gates
 
 In short: Swapna Chimanchodkar at Conf42 DevOps 2026 on DevOps for clinical AI - streaming vitals, EHR integration, shadow and canary rollouts, SRE for sepsis alerts.
 

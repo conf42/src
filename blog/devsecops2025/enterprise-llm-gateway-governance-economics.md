@@ -1,6 +1,6 @@
 # Enterprise LLMs stall between the pilot and the AI gateway
 
-Conf42 Blog, 2025-11-28, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/enterprise-llm-gateway-governance-economics
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/enterprise-llm-gateway-governance-economics
 
 In short: Murali Koney of Cox Automotive at Conf42 DevSecOps 2025 on why enterprise LLM projects stall and a framework of deployment models, TCO and an AI API gateway.
 

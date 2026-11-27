@@ -1,6 +1,6 @@
 # Model-as-a-service on Kubernetes is database-as-a-service again
 
-Conf42 Blog, 2026-10-27, updated 2026-11-09. https://www.conf42.com/blog/platform2026/model-as-a-service-is-database-as-a-service
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/model-as-a-service-is-database-as-a-service
 
 In short: Sergey Pronin (Solanica, OpenEverest) at Conf42 Platform Engineering 2026 on serving LLMs with KServe, vLLM, an AI gateway and per-key token limits.
 

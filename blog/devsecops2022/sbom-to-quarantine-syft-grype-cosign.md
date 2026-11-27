@@ -1,6 +1,6 @@
 # An SBOM only matters when it can quarantine something
 
-Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/sbom-to-quarantine-syft-grype-cosign
+Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/sbom-to-quarantine-syft-grype-cosign
 
 In short: Ciara Carey (Cloudsmith) at Conf42 DevSecOps 2022 on when to generate SBOMs, where to host them, and a Syft, Grype and cosign workflow that quarantines images
 

@@ -1,6 +1,6 @@
 # Replay production traffic to migrate a gateway with zero downtime
 
-Conf42 Blog, 2025-12-26, updated 2026-11-09. https://www.conf42.com/blog/devops2026/zero-downtime-gateway-migration-shadow-traffic
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/zero-downtime-gateway-migration-shadow-traffic
 
 In short: Oracle Cloud Infrastructure's Kalyan Inturi at Conf42 DevOps 2026 on moving a Ruby monolith gateway to Kong using sampled shadow-traffic parity checks.
 

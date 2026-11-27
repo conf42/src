@@ -1,6 +1,6 @@
 # Build your developer platform around one pain point first
 
-Conf42 Blog, 2025-08-31, updated 2026-11-09. https://www.conf42.com/blog/platform2025/internal-developer-platform-start-with-one-pain
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/internal-developer-platform-start-with-one-pain
 
 In short: Anil Kumar Veldurthi (US Bank) at Conf42 Platform Engineering 2025 says treat infrastructure as a product, start with one pain point, measure from week one.
 

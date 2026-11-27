@@ -1,6 +1,6 @@
 # Power plant AI maintenance runs on context, not more sensor data
 
-Conf42 Blog, 2026-11-02, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-maintenance-power-plants-context-over-data
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/ai-maintenance-power-plants-context-over-data
 
 In short: Mohan Kumar Dalai of GE Vernova at Conf42 Platform Engineering 2026 on AI maintenance platforms that read context, cut alarm floods and keep humans in charge.
 

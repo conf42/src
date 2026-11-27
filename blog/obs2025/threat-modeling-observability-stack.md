@@ -1,6 +1,6 @@
 # Your observability stack is an attack surface, so threat model it
 
-Conf42 Blog, 2025-05-11, updated 2026-11-09. https://www.conf42.com/blog/obs2025/threat-modeling-observability-stack
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/threat-modeling-observability-stack
 
 In short: SoFi security engineer Srikanth Potla applies STRIDE to logs, metrics and traces at Conf42 Observability 2025 and sets hard baselines for monitoring pipelines.
 

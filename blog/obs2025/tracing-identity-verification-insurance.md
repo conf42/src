@@ -1,6 +1,6 @@
 # Trace every step of identity verification, not just the login
 
-Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/obs2025/tracing-identity-verification-insurance
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/tracing-identity-verification-insurance
 
 In short: Shikha Gurjar of Guidewire Software shows at Conf42 Observability 2025 how tracing, correlation and behavioural baselines make identity checks observable.
 

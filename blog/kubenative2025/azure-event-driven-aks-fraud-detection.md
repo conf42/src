@@ -1,6 +1,6 @@
 # Event Grid, Service Bus and AKS for sub-two-second fraud checks
 
-Conf42 Blog, 2025-09-23, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/azure-event-driven-aks-fraud-detection
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/azure-event-driven-aks-fraud-detection
 
 In short: Ashif Anwar (Wolters Kluwer) at Conf42 Kube Native 2025 on event-driven patterns on Azure and a fraud pipeline on Event Grid, Service Bus, Functions and AKS.
 

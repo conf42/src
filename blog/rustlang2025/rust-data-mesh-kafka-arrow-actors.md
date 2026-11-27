@@ -1,6 +1,6 @@
 # Building a data mesh in Rust with Kafka, Arrow and actors
 
-Conf42 Blog, 2025-07-28, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-data-mesh-kafka-arrow-actors
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-data-mesh-kafka-arrow-actors
 
 In short: Narendra Reddy Mudiyala of Accenture at Conf42 Rustlang 2025 on the Rust toolkit for data mesh pipelines, from rdkafka and Serde to actors and Wasm.
 

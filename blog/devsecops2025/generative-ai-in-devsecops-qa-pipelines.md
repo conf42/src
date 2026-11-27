@@ -1,6 +1,6 @@
 # Let the pipeline learn which tests matter
 
-Conf42 Blog, 2025-11-07, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/generative-ai-in-devsecops-qa-pipelines
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/generative-ai-in-devsecops-qa-pipelines
 
 In short: Baradwaj Bandi Sudakara of Ascension Health at Conf42 DevSecOps 2025 on generative AI test creation, ML risk-based testing and anomaly alerts.
 

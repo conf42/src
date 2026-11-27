@@ -1,6 +1,6 @@
 # Self-service BI works when security is neither too tight nor too loose
 
-Conf42 Blog, 2025-11-12, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/secure-self-service-bi-dropbox
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/secure-self-service-bi-dropbox
 
 In short: Mallikarjun Bussa of Dropbox at Conf42 DevSecOps 2025 on letting everyone query data with AI-powered BI while least privilege, masking and lineage keep it safe.
 

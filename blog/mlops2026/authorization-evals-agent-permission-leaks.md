@@ -1,6 +1,6 @@
 # Test your agents for permission leaks like any other regression
 
-Conf42 Blog, 2026-11-18. https://www.conf42.com/blog/mlops2026/authorization-evals-agent-permission-leaks
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/authorization-evals-agent-permission-leaks
 
 In short: Ajay Munjuluru (JPMorgan Chase) at Conf42 MLOps 2026 on authorization evals: personas, canaries and join tests that can block an agent release.
 

@@ -1,6 +1,6 @@
 # Round robin is too polite for banking traffic
 
-Conf42 Blog, 2025-11-22, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ensemble-load-balancing-for-cloud-banking
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ensemble-load-balancing-for-cloud-banking
 
 In short: Raghunadha Dornala of Miracle Software Systems at Conf42 DevSecOps 2025 on ECBA, a hybrid ensemble load balancer for secure cloud banking transactions.
 

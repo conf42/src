@@ -1,6 +1,6 @@
 # Human-in-the-loop MLOps treats reviewer feedback as first-class data
 
-Conf42 Blog, 2025-09-11, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/human-in-the-loop-mlops-tiered-autonomy
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/human-in-the-loop-mlops-tiered-autonomy
 
 In short: Tejasvi Nuthalapati of Amazon at Conf42 MLOps 2025 on tiered autonomy, observable models and feedback loops that put human judgment into retraining.
 

@@ -1,6 +1,6 @@
 # Put AI inside the release loop, not on a dashboard after the fact
 
-Conf42 Blog, 2026-10-05, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/ai-belongs-in-sdlc-not-dashboard
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/ai-belongs-in-sdlc-not-dashboard
 
 In short: Amazon's Naveen Goel at Conf42 Feature Flags 2026 on per-PR efficiency checks, gated release waves and bounded AI authority to catch quiet regressions.
 

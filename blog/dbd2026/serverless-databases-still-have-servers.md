@@ -1,6 +1,6 @@
 # Serverless databases remove capacity planning, not database engineering
 
-Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/serverless-databases-still-have-servers
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/serverless-databases-still-have-servers
 
 In short: Renato Losio at Conf42 Database DevOps 2026 shares five lessons from five years of Aurora Serverless, DynamoDB and DSQL, from storage to cost forecasting.
 

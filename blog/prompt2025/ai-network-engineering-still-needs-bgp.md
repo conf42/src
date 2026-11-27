@@ -1,6 +1,6 @@
 # AI can run the network, but you still need to know BGP
 
-Conf42 Blog, 2025-10-27, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ai-network-engineering-still-needs-bgp
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ai-network-engineering-still-needs-bgp
 
 In short: Vamsi Gadireddy of Microsoft Azure at Conf42 Prompt Engineering 2025 on AI-driven network engineering, self-healing networks and the skills that still matter.
 

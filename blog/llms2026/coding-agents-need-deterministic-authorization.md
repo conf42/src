@@ -1,6 +1,6 @@
 # Coding agents need deterministic authorization, not self-judgment
 
-Conf42 Blog, 2026-06-16, updated 2026-11-09. https://www.conf42.com/blog/llms2026/coding-agents-need-deterministic-authorization
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/coding-agents-need-deterministic-authorization
 
 In short: Sohan Maheshwar of AuthZed at Conf42 LLMs 2026 demos SpiceBox, which scopes Claude Code by path, command and domain using SpiceDB and ReBAC.
 

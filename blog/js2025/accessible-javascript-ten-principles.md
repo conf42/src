@@ -1,6 +1,6 @@
 # Accessible JavaScript comes down to three types and ten principles
 
-Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/js2025/accessible-javascript-ten-principles
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/accessible-javascript-ten-principles
 
 In short: Gian Wild of AccessibilityOz at Conf42 JavaScript 2025 on making forms and scripted widgets accessible, from keyboard traps to error messages.
 

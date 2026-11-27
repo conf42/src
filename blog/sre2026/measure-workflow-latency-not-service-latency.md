@@ -1,6 +1,6 @@
 # Green dashboards, slow humans - measure workflow latency instead
 
-Conf42 Blog, 2026-03-12, updated 2026-11-09. https://www.conf42.com/blog/sre2026/measure-workflow-latency-not-service-latency
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/measure-workflow-latency-not-service-latency
 
 In short: Abhimanyu Narwal of Bloomberg at Conf42 SRE 2026 on silent telemetry gaps, workflow SLIs, count invariants and canaries that prove a pipeline is working.
 

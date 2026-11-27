@@ -1,6 +1,6 @@
 # When the toll booth pays itself, monoliths stop working
 
-Conf42 Blog, 2025-11-24, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-payments-microservices-machines-pay
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-payments-microservices-machines-pay
 
 In short: Silpa Potluri of GoodLeap at Conf42 IoT 2025 on microservices for IoT payments, from device auth and fast authorization to aggregating micro-transactions.
 

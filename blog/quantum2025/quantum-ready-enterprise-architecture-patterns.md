@@ -1,6 +1,6 @@
 # Quantum-ready architecture is mostly event queues and job routers
 
-Conf42 Blog, 2025-05-31, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-ready-enterprise-architecture-patterns
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-ready-enterprise-architecture-patterns
 
 In short: JPMorgan Chase's Laxmikanth Mukund Sethu Kumar at Conf42 Quantum Computing 2025 on hybrid patterns that prepare enterprise systems for quantum.
 

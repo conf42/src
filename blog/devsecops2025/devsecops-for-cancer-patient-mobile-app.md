@@ -1,6 +1,6 @@
 # When a security bug can delay chemotherapy, DevSecOps is the design
 
-Conf42 Blog, 2025-12-02, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/devsecops-for-cancer-patient-mobile-app
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/devsecops-for-cancer-patient-mobile-app
 
 In short: Mahendar Ramidi at Conf42 DevSecOps 2025 on securing a HIPAA-compliant cancer patient app with zero trust, offline-first encryption and policy as code.
 

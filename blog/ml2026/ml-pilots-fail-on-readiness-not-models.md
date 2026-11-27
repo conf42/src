@@ -1,6 +1,6 @@
 # ML pilots stall on organisational readiness, not on the models
 
-Conf42 Blog, 2026-02-09, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-pilots-fail-on-readiness-not-models
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-pilots-fail-on-readiness-not-models
 
 In short: Kiran Ramanna (ServiceNow) at Conf42 Machine Learning 2026 on a five-pillar readiness blueprint with stage gates to move ML pilots into production.
 

@@ -1,6 +1,6 @@
 # Regulated incidents run on two clocks, and only one is technical
 
-Conf42 Blog, 2025-09-19, updated 2026-11-09. https://www.conf42.com/blog/im2025/regulated-incidents-run-two-clocks
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/regulated-incidents-run-two-clocks
 
 In short: Nisheedh Raveendran (LinkedIn) at Conf42 Incident Management 2025 on incident response under HIPAA, GDPR and DMA without sacrificing recovery or compliance.
 

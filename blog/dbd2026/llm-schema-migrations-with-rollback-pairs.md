@@ -1,6 +1,6 @@
 # LLM-generated schema migrations, shipped with their own rollback
 
-Conf42 Blog, 2026-05-20, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/llm-schema-migrations-with-rollback-pairs
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/llm-schema-migrations-with-rollback-pairs
 
 In short: Niraj Katkamwar (Intuit) at Conf42 Database DevOps 2026 on a prompt-driven pipeline that generates code, migrations and rollbacks together, gated by humans.
 

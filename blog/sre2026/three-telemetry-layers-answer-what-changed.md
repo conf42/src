@@ -1,6 +1,6 @@
 # Three telemetry layers that answer "what changed?" in an incident
 
-Conf42 Blog, 2026-03-07, updated 2026-11-09. https://www.conf42.com/blog/sre2026/three-telemetry-layers-answer-what-changed
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/three-telemetry-layers-answer-what-changed
 
 In short: Khushboo Nigam (Oracle) at Conf42 SRE 2026 on organizing traces, Kubernetes signals and CI/CD telemetry so incident triage follows evidence.
 

@@ -1,6 +1,6 @@
 # Mortgage MLOps can't move fast and break things
 
-Conf42 Blog, 2025-08-27, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-regulated-mortgage-ai
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-regulated-mortgage-ai
 
 In short: Naganarendar Chitturi (Newrez) at Conf42 MLOps 2025 on MLOps for autonomous mortgage AI, where explainability is legally required and models shadow whole loans.
 

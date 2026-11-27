@@ -1,6 +1,6 @@
 # A test with no assertions should fail, and Testy makes sure it does
 
-Conf42 Blog, 2021-10-27. https://www.conf42.com/blog/js2021/testy-testing-tool-fails-empty-tests
+Conf42 Blog, 2021-10-28. https://www.conf42.com/blog/js2021/testy-testing-tool-fails-empty-tests
 
 In short: Nahuel Garbezza (10Pines) at Conf42 JavaScript 2021 on Testy, a zero-dependency JavaScript testing tool built with students to teach TDD
 

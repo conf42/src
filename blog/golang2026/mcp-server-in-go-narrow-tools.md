@@ -1,6 +1,6 @@
 # An MCP server in Go should be narrow, gated and boring
 
-Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/golang2026/mcp-server-in-go-narrow-tools
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/mcp-server-in-go-narrow-tools
 
 In short: Shadi Elyafi at Conf42 Golang 2026 on a Go MCP server over AppSync GraphQL for 1M+ company profiles, with default-deny mutations and TDD.
 

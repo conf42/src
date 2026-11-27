@@ -1,6 +1,6 @@
 # The stand-up bot that invented seven colleagues, and the fix
 
-Conf42 Blog, 2026-08-17. https://www.conf42.com/blog/obs2026/standup-bot-invented-seven-colleagues
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/standup-bot-invented-seven-colleagues
 
 In short: Artemis Leonardou of NOFire AI at Conf42 Observability 2026 on an LLM bot that fabricated with 100% uptime, and why output checks beat prompts.
 

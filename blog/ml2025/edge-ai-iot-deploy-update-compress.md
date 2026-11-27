@@ -1,6 +1,6 @@
 # Edge AI for IoT comes down to deploying, updating and shrinking models
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/ml2025/edge-ai-iot-deploy-update-compress
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/edge-ai-iot-deploy-update-compress
 
 In short: Gayathri Jegan Mohan of Microsoft at Conf42 Machine Learning 2025 on running ML at the IoT edge with portable runtimes, OTA updates, quantization and cloud pipelines.
 

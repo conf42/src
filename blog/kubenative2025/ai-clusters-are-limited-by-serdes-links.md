@@ -1,6 +1,6 @@
 # AI clusters now live or die by their SerDes links
 
-Conf42 Blog, 2025-09-25, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ai-clusters-are-limited-by-serdes-links
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ai-clusters-are-limited-by-serdes-links
 
 In short: Phani Paladugu (Synopsys) at Conf42 Kube Native 2025 on why AI workloads push SerDes to 224G and beyond, and the power and signal-integrity bill that follows.
 

@@ -1,6 +1,6 @@
 # Shift FinOps left so the cloud bill is a pipeline check, not a surprise
 
-Conf42 Blog, 2025-09-30, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/shift-finops-left-into-the-pipeline
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/shift-finops-left-into-the-pipeline
 
 In short: Manoj Kalakoti (Apple) at Conf42 Kube Native 2025 on autonomous FinOps for financial services - pre-deploy cost estimates, budget gates and self-healing spend.
 

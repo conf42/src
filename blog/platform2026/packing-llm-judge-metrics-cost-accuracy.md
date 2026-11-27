@@ -1,6 +1,6 @@
 # Pack five metrics into one LLM judge call, but not forty
 
-Conf42 Blog, 2026-10-12, updated 2026-11-09. https://www.conf42.com/blog/platform2026/packing-llm-judge-metrics-cost-accuracy
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/packing-llm-judge-metrics-cost-accuracy
 
 In short: Scarlett Attensil of LaunchDarkly at Conf42 Platform Engineering 2026 on how many criteria one LLM judge can score before accuracy slips.
 

@@ -1,6 +1,6 @@
 # AI fixed the migration speed problem, and exposed the trust problem
 
-Conf42 Blog, 2026-05-23, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/hax-human-ai-boundaries-database-devops
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/hax-human-ai-boundaries-database-devops
 
 In short: Muthu Saravanan (Mind-Pros) at Conf42 Database DevOps 2026 on HAX, a framework for deciding what humans own and what AI does in database delivery.
 

@@ -1,6 +1,6 @@
 # Gate the agent's claim, not its confidence
 
-Conf42 Blog, 2026-09-15, updated 2026-11-17. https://www.conf42.com/blog/featureflags2026/confidently-wrong-agents-need-inline-sources
+Conf42 Blog, 2026-10-15, updated 2026-11-17. https://www.conf42.com/blog/featureflags2026/confidently-wrong-agents-need-inline-sources
 
 In short: Girish Konda (Microsoft) at Conf42 Feature Flags 2026 on three boundaries for agents: evidence before recommendation, approval before action, observation after.
 

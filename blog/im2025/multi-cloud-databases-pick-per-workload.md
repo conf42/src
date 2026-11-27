@@ -1,6 +1,6 @@
 # Multi-cloud databases work when you pick per workload, not per vendor
 
-Conf42 Blog, 2025-09-22, updated 2026-11-09. https://www.conf42.com/blog/im2025/multi-cloud-databases-pick-per-workload
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/multi-cloud-databases-pick-per-workload
 
 In short: Adithya Sirimalla (Enliven Technologies) at Conf42 Incident Management 2025 compares Oracle Autonomous Database, Azure SQL and RDS for SQL Server resilience.
 

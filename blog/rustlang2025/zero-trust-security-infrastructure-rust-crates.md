@@ -1,6 +1,6 @@
 # A zero trust toolkit in Rust, from rustls and webpki to Tower
 
-Conf42 Blog, 2025-08-12. https://www.conf42.com/blog/rustlang2025/zero-trust-security-infrastructure-rust-crates
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/zero-trust-security-infrastructure-rust-crates
 
 In short: Sachin Kapoor of College of Technology, Pantnagar at Conf42 Rustlang 2025 maps the Rust crates for zero trust, from TLS and auth to identity-aware proxies.
 

@@ -1,6 +1,6 @@
 # Multicore avionics fail certification on timing, not features
 
-Conf42 Blog, 2025-11-03, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/do-178c-multicore-avionics-certification
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/do-178c-multicore-avionics-certification
 
 In short: Charles Antony Raj of Collins Aerospace at Conf42 Robotics 2025 on certifying multicore flight software under DO-178C and CAST-32A for electric aircraft.
 

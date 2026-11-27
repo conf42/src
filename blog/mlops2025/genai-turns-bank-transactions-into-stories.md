@@ -1,6 +1,6 @@
 # Generative AI turns bank transactions into stories customers read
 
-Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/genai-turns-bank-transactions-into-stories
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/genai-turns-bank-transactions-into-stories
 
 In short: Pushpalika Chatterjee (Huntington National Bank) at Conf42 MLOps 2025 on generative AI for financial narratives, personalisation and synthetic fraud data.
 

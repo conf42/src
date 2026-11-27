@@ -1,6 +1,6 @@
 # Spanner Graph turns scattered security alerts into one attack story
 
-Conf42 Blog, 2025-09-17, updated 2026-11-09. https://www.conf42.com/blog/im2025/spanner-graph-turns-alerts-into-attack-stories
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/spanner-graph-turns-alerts-into-attack-stories
 
 In short: Pushap Goyal (Google) at Conf42 Incident Management 2025 on modelling security incidents as a graph in Spanner Graph, with TrueTime keeping the timeline honest.
 

@@ -1,6 +1,6 @@
 # Legacy modernization works in phases, and people decide if it sticks
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/ml2025/legacy-modernization-phased-not-big-bang
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/legacy-modernization-phased-not-big-bang
 
 In short: Sasidhar Reddy Somula of Accenture at Conf42 Machine Learning 2025 on modernizing legacy systems in phases, with change management as the real budget line.
 

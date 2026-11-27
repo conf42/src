@@ -1,6 +1,6 @@
 # How a solo startup designer used Midjourney, Sora and Figma
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/ml2025/solo-startup-designer-ai-image-toolkit
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/solo-startup-designer-ai-image-toolkit
 
 In short: Nikita Poloznikov, Head of Design at Jazari, at Conf42 Machine Learning 2025 on the AI image tools that let one designer cover a whole startup.
 

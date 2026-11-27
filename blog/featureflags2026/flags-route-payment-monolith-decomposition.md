@@ -1,6 +1,6 @@
 # Flags don't find the seams in a payment monolith, DDD does
 
-Conf42 Blog, 2026-09-23, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/flags-route-payment-monolith-decomposition
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/flags-route-payment-monolith-decomposition
 
 In short: Jaya Chand Bandi at Conf42 Feature Flags 2026 on using domain-driven design for boundaries and feature flags to route traffic out of payment monoliths.
 

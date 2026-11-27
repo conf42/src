@@ -1,6 +1,6 @@
 # An 833-parameter model on the phone beats a chatbot round trip
 
-Conf42 Blog, 2026-11-15, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/edge-mlops-pytorch-to-executorch
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/edge-mlops-pytorch-to-executorch
 
 In short: RanjithKumar Ragavan (T-Mobile) at Conf42 MLOps 2026 on exporting a tiny PyTorch model to ExecuTorch so health data is scored on the phone.
 

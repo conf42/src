@@ -1,6 +1,6 @@
 # Your ranking model is learning from items nobody saw
 
-Conf42 Blog, 2026-11-18. https://www.conf42.com/blog/mlops2026/fixing-exposure-bias-ranking-systems
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/fixing-exposure-bias-ranking-systems
 
 In short: Devavrat Khanolkar (Cisco Systems) at Conf42 MLOps 2026 on fixing exposure bias by logging what the screen rendered, not what the server sent.
 

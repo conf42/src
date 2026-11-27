@@ -1,6 +1,6 @@
 # LLM-assisted ETL for a Medicare benefits mandate, 102 benefit types
 
-Conf42 Blog, 2025-11-01, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/medicare-benefits-reporting-llm-assisted-etl
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/medicare-benefits-reporting-llm-assisted-etl
 
 In short: Bandanawaz Mulla of Health Care Service Corporation at Conf42 Prompt Engineering 2025 on using prompts to build CMS supplemental benefit reporting on AWS.
 

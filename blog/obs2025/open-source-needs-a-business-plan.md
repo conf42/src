@@ -1,6 +1,6 @@
 # Open source without a strategy is an expensive hobby
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/obs2025/open-source-needs-a-business-plan
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/open-source-needs-a-business-plan
 
 In short: Epicmax COO Anastasiia Zvenigorodskaia prices her team's Vue.js open source work at Conf42 Observability 2025 and maps seven ways to make it pay.
 

@@ -1,6 +1,6 @@
 # An HTTP 200 doesn't mean the AI-backed request was safe
 
-Conf42 Blog, 2026-09-07, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/http-200-doesnt-mean-ai-request-was-safe
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/http-200-doesnt-mean-ai-request-was-safe
 
 In short: Jayakumar Ramalingam of SiriusXM at Conf42 DevSecOps 2026 secures AI-backed APIs hop by hop with deterministic checks around a probabilistic model.
 

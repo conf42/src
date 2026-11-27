@@ -1,6 +1,6 @@
 # Four layers of agents, building multi-agent AI systems on Tokio
 
-Conf42 Blog, 2025-08-15. https://www.conf42.com/blog/rustlang2025/multi-agent-ai-systems-rust-tokio
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/multi-agent-ai-systems-rust-tokio
 
 In short: Sidhanta Panigrahy of Okta at Conf42 Rustlang 2025 on a four-layer multi-agent AI architecture in Rust, with Tokio coordination and a manufacturing case study.
 

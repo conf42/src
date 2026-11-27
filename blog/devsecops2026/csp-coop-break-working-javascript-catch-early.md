@@ -1,6 +1,6 @@
 # When CSP and COOP break working JavaScript, and how to catch it first
 
-Conf42 Blog, 2026-09-27, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/csp-coop-break-working-javascript-catch-early
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/csp-coop-break-working-javascript-catch-early
 
 In short: At Conf42 DevSecOps 2026, SAP's Elena Darevskaya shows how browser security headers break popups, eval and blob workers, plus ESLint and Playwright fixes.
 

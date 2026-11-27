@@ -1,6 +1,6 @@
 # Correlate first, automate second, and let Copilot write the summary
 
-Conf42 Blog, 2026-01-14, updated 2026-11-09. https://www.conf42.com/blog/devops2026/defender-xdr-alert-storms-to-mttr
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/defender-xdr-alert-storms-to-mttr
 
 In short: Nikolay Milyaev of Microsoft at Conf42 DevOps 2026 on taming SOC alert storms with Defender XDR correlation, safe playbooks, Security Copilot and metrics.
 

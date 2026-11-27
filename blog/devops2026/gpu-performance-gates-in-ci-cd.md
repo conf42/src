@@ -1,6 +1,6 @@
 # Treat GPU performance like a failing test, not a production surprise
 
-Conf42 Blog, 2026-01-07, updated 2026-11-09. https://www.conf42.com/blog/devops2026/gpu-performance-gates-in-ci-cd
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/gpu-performance-gates-in-ci-cd
 
 In short: Mohit Gupta of Intel at Conf42 DevOps 2026 on putting GPU performance gates into CI/CD, and why mixed compute and memory workloads must be tested together.
 

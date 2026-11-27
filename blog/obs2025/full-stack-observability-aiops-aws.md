@@ -1,6 +1,6 @@
 # From MELT data to AIOps, one AWS service at a time
 
-Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/obs2025/full-stack-observability-aiops-aws
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/full-stack-observability-aiops-aws
 
 In short: Manik Kashikar of Thoughtworks maps full-stack observability and AIOps onto CloudWatch, X-Ray and DevOps Guru at Conf42 Observability 2025.
 

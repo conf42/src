@@ -1,6 +1,6 @@
 # A digital PMO makes Jira the record and Confluence the memory
 
-Conf42 Blog, 2026-05-19, updated 2026-11-09. https://www.conf42.com/blog/golang2026/digital-pmo-jira-confluence-walmart
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/digital-pmo-jira-confluence-walmart
 
 In short: George Job of Walmart at Conf42 Golang 2026 on a Jira and Confluence PMO framework that replaced spreadsheet status reporting with live governance.
 

@@ -1,6 +1,6 @@
 # A consent checkbox stored as a boolean won't survive an audit
 
-Conf42 Blog, 2026-04-10. https://www.conf42.com/blog/cloud2026/consent-is-a-record-not-a-checkbox
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/consent-is-a-record-not-a-checkbox
 
 In short: Manasa Uppula at Conf42 Cloud Native 2026 on designing financial onboarding as evidence: append-only consent, propagated identity assurance, audited sagas.
 

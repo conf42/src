@@ -1,6 +1,6 @@
 # Predicting medical device failures before the lab goes dark
 
-Conf42 Blog, 2025-12-03, updated 2026-11-09. https://www.conf42.com/blog/iot2025/predictive-maintenance-medical-devices-zero-trust
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/predictive-maintenance-medical-devices-zero-trust
 
 In short: Ramakrishna Ambati of Visby Medical at Conf42 IoT 2025 on a zero trust IoT edge architecture and ML for predictive maintenance of diagnostic devices.
 

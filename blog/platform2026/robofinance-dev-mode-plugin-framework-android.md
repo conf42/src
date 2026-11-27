@@ -1,6 +1,6 @@
 # The smallest internal platform: a plugin-based Dev Mode for Android
 
-Conf42 Blog, 2026-10-19, updated 2026-11-09. https://www.conf42.com/blog/platform2026/robofinance-dev-mode-plugin-framework-android
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/robofinance-dev-mode-plugin-framework-android
 
 In short: Denis Galkin (Robofinance) at Conf42 Platform Engineering 2026 on turning scattered debug menus into a plugin-based Dev Mode framework inside the app.
 

@@ -1,6 +1,6 @@
 # The database risk someone saw but never said out loud
 
-Conf42 Blog, 2026-05-26, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/database-risk-visibility-gap
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/database-risk-visibility-gap
 
 In short: Sheena Yap Chan at Conf42 Database DevOps 2026 on the VISIBLE framework for getting database risks to decision-makers before they get expensive.
 

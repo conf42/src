@@ -1,6 +1,6 @@
 # AI observability should tell you where the fire started
 
-Conf42 Blog, 2025-08-19, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-observability-turns-alerts-into-answers
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-observability-turns-alerts-into-answers
 
 In short: Ajay Averineni of IBM shows at Conf42 Platform Engineering 2025 how AI on metrics, logs and traces cuts alert noise and drives self-healing remediation.
 

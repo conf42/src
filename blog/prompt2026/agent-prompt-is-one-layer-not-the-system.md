@@ -1,6 +1,6 @@
 # Your agent's prompt is one layer, not the whole system
 
-Conf42 Blog, 2026-09-29, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agent-prompt-is-one-layer-not-the-system
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agent-prompt-is-one-layer-not-the-system
 
 In short: Emerson Braun of Plan A Technologies at Conf42 Prompt Engineering 2026 splits agent reliability into six layers so a fix lands in the right one.
 

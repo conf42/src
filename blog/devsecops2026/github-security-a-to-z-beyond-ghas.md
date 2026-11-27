@@ -1,6 +1,6 @@
 # GitHub security from A to Z, well past the three GHAS features
 
-Conf42 Blog, 2026-09-28, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/github-security-a-to-z-beyond-ghas
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/github-security-a-to-z-beyond-ghas
 
 In short: At Conf42 DevSecOps 2026, Microsoft's Peter De Tender walks the alphabet of GitHub security, with CodeQL, Dependabot and push protection demos.
 

@@ -1,6 +1,6 @@
 # Taming IoT streams on Kafka starts with trusting the data
 
-Conf42 Blog, 2025-12-09, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-kafka-streams-trust-governance
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-kafka-streams-trust-governance
 
 In short: Rehmat Kharal of Conduktor at Conf42 IoT 2025 on why IoT streaming data is hard to trust and how governance, quality gates and self-service tame Kafka.
 

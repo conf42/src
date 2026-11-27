@@ -1,6 +1,6 @@
 # How Rust took over the lakehouse, from Arrow to DataFusion
 
-Conf42 Blog, 2025-07-27, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-lakehouse-arrow-datafusion-delta
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-lakehouse-arrow-datafusion-delta
 
 In short: Rahul Joshi of Capital One at Conf42 Rustlang 2025 traces data platforms from Hadoop to lakehouses and shows where Rust components now sit in the stack.
 

@@ -1,6 +1,6 @@
 # AI subscriptions turn model freshness into the product you sell
 
-Conf42 Blog, 2026-01-03, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-subscription-platforms-need-mlops-and-metering
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-subscription-platforms-need-mlops-and-metering
 
 In short: Chandan Kumar (Adobe) at Conf42 DevOps 2026 on the foundations of AI subscription platforms - metering, MLOps, drift monitoring and compliance.
 

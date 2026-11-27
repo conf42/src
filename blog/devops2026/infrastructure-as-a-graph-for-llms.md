@@ -1,6 +1,6 @@
 # Your LLM writes good Terraform but cannot see your infrastructure
 
-Conf42 Blog, 2026-01-08, updated 2026-11-09. https://www.conf42.com/blog/devops2026/infrastructure-as-a-graph-for-llms
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/infrastructure-as-a-graph-for-llms
 
 In short: Roxane Fischer of Anyshift at Conf42 DevOps 2026 on why AI fails at infrastructure without context, and how a live knowledge graph of cloud, code and state fixes it.
 

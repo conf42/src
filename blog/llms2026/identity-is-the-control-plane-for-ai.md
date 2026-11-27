@@ -1,6 +1,6 @@
 # Identity is the control plane for securing AI systems
 
-Conf42 Blog, 2026-06-15, updated 2026-11-09. https://www.conf42.com/blog/llms2026/identity-is-the-control-plane-for-ai
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/identity-is-the-control-plane-for-ai
 
 In short: Arunkumar Muthuramalingam of General Reinsurance at Conf42 LLMs 2026 on least privilege, continuous verification and non-human identities for AI agents.
 

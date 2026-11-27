@@ -1,6 +1,6 @@
 # Multi-agent AI fits ERP when autonomy is bounded and logged
 
-Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/multi-agent-erp-bounded-autonomy
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/multi-agent-erp-bounded-autonomy
 
 In short: Kasee Palaniappan (Ariba, SAP America) at Conf42 Prompt Engineering 2025 on multi-agent AI for ERP and hybrid IT, from frameworks to bounded autonomy.
 

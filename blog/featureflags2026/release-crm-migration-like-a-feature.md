@@ -1,6 +1,6 @@
 # Release a regulated CRM migration like a feature, not a weekend
 
-Conf42 Blog, 2026-09-25, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/release-crm-migration-like-a-feature
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/release-crm-migration-like-a-feature
 
 In short: United Therapeutics' Jaymin Sutarwala at Conf42 Feature Flags 2026 on cohorts, shadow runs and capability rollback for a patient CRM migration.
 

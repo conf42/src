@@ -1,6 +1,6 @@
 # A carbon-aware Kubernetes scheduler in Rust, rolled out in four phases
 
-Conf42 Blog, 2025-08-13. https://www.conf42.com/blog/rustlang2025/carbon-aware-kubernetes-scheduling-rust
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/carbon-aware-kubernetes-scheduling-rust
 
 In short: Bandhavi Sakhamuri, Senior SRE at SolarWinds, at Conf42 Rustlang 2025 on a Rust scheduler that places Kubernetes workloads by carbon intensity.
 

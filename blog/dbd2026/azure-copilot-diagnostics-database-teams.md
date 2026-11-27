@@ -1,6 +1,6 @@
 # Asking Azure why it returns 503s, in plain English
 
-Conf42 Blog, 2026-05-15, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/azure-copilot-diagnostics-database-teams
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/azure-copilot-diagnostics-database-teams
 
 In short: Sampath Rao Madarapu of Microsoft at Conf42 Database DevOps 2026 on Copilot in Azure for diagnostics, governance and database operations, with humans in the loop.
 

@@ -1,6 +1,6 @@
 # Poisoned resumes show where a RAG pipeline can be attacked
 
-Conf42 Blog, 2026-09-21, updated 2026-11-09. https://www.conf42.com/blog/agents2026/poisoned-resumes-show-rag-attack-surface
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/poisoned-resumes-show-rag-attack-surface
 
 In short: Blaize Stewart (GBLI) at Conf42 AI Agents 2026 attacks a RAG resume search with injection, stuffing, false claims and leaks, then layers the defences.
 

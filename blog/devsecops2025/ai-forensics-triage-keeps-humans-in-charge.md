@@ -1,6 +1,6 @@
 # AI can clear the forensic backlog, but it can't testify for you
 
-Conf42 Blog, 2025-11-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ai-forensics-triage-keeps-humans-in-charge
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ai-forensics-triage-keeps-humans-in-charge
 
 In short: Cybersecurity analyst Victor Agboola at Conf42 DevSecOps 2025 on where AI speeds up digital forensics and why investigators stay in charge.
 

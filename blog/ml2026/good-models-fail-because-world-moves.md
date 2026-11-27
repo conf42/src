@@ -1,6 +1,6 @@
 # Good models fail after deployment because the world keeps moving
 
-Conf42 Blog, 2026-02-10, updated 2026-11-09. https://www.conf42.com/blog/ml2026/good-models-fail-because-world-moves
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/good-models-fail-because-world-moves
 
 In short: Oleksandr Pyvovar (Meta) at Conf42 Machine Learning 2026 maps five production failure modes, from data drift to feedback loops, with a fix for each.
 

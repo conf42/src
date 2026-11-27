@@ -1,6 +1,6 @@
 # When a hurricane hits, the claims portal is the incident
 
-Conf42 Blog, 2025-09-15, updated 2026-11-09. https://www.conf42.com/blog/im2025/insurance-incident-response-ai-edge-serverless
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/insurance-incident-response-ai-edge-serverless
 
 In short: Chandra Prakash Kathroju (Citizens Property Insurance) at Conf42 Incident Management 2025 on AI, edge computing and serverless for insurance incident response.
 

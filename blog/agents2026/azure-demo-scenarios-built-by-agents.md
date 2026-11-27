@@ -1,6 +1,6 @@
 # Eight Copilot agents that build, deploy and document Azure demos
 
-Conf42 Blog, 2026-08-27, updated 2026-11-09. https://www.conf42.com/blog/agents2026/azure-demo-scenarios-built-by-agents
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/azure-demo-scenarios-built-by-agents
 
 In short: Peter De Tender of Microsoft at Conf42 AI Agents 2026 shows Trainer Demo Deploy, now with an agent pipeline that writes Bicep, deploys via azd and drafts the demo guide.
 

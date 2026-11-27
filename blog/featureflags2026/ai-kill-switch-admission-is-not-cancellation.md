@@ -1,6 +1,6 @@
 # An AI kill switch that only closes the front door is not one
 
-Conf42 Blog, 2026-09-17, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/ai-kill-switch-admission-is-not-cancellation
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/ai-kill-switch-admission-is-not-cancellation
 
 In short: Capital One's Parthiban Rajasekaran at Conf42 Feature Flags 2026 on why a disabled flag doesn't stop in-flight agent work, and how to prove containment.
 

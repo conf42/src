@@ -1,6 +1,6 @@
 # Retina or Cilium? eBPF network observability, benchmarked on EKS
 
-Conf42 Blog, 2026-04-12. https://www.conf42.com/blog/cloud2026/ebpf-retina-vs-cilium-network-observability
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/ebpf-retina-vs-cilium-network-observability
 
 In short: Uudit Misra of Salesforce at Conf42 Cloud Native 2026 on why dashboards stay green during network failures, and Retina vs Cilium on a real EKS cluster.
 

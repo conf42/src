@@ -1,6 +1,6 @@
 # NISQ-era quantum value comes from small, well-scoped pilots
 
-Conf42 Blog, 2025-06-12, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/nisq-value-comes-from-small-scoped-pilots
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/nisq-value-comes-from-small-scoped-pilots
 
 In short: Meta's Sai Kaushik Ponnekanti at Conf42 Quantum Computing 2025 on getting real value from noisy quantum hardware with hybrid workflows and tight scope.
 

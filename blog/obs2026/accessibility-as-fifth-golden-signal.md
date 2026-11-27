@@ -1,6 +1,6 @@
 # Put accessibility on the dashboard as a fifth golden signal
 
-Conf42 Blog, 2026-08-31, updated 2026-11-09. https://www.conf42.com/blog/obs2026/accessibility-as-fifth-golden-signal
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/accessibility-as-fifth-golden-signal
 
 In short: Victoria Nduka of VictoriaMetrics at Conf42 Observability 2026 turns daily axe-core scans into Prometheus-style metrics and Grafana trends.
 

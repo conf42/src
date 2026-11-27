@@ -1,6 +1,6 @@
 # LLM agents in incident response should shorten understanding, not act
 
-Conf42 Blog, 2026-01-26, updated 2026-11-09. https://www.conf42.com/blog/ml2026/llm-agents-incident-response-production-safe
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/llm-agents-incident-response-production-safe
 
 In short: Payjoy staff engineer Sumit Kaul at Conf42 Machine Learning 2026 on a production-safe LLM architecture for incident response, with humans deciding.
 

@@ -1,6 +1,6 @@
 # A knowledge base that measures its own failed searches gets better
 
-Conf42 Blog, 2025-09-22, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/embedded-analytics-knowledge-management-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/embedded-analytics-knowledge-management-kubernetes
 
 In short: Harshita Dubey (Apex Fintech Solutions) at Conf42 Kube Native 2025 on turning a SharePoint knowledge base into a Kubernetes-backed system with embedded analytics.
 

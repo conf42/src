@@ -1,6 +1,6 @@
 # Your dashboards are lying, and your pipeline tests are why
 
-Conf42 Blog, 2025-05-21, updated 2026-11-09. https://www.conf42.com/blog/obs2025/data-qa-dashboards-that-lie
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/data-qa-dashboards-that-lie
 
 In short: Chaitanya Reddy Krishnama of MoneyGram at Conf42 Observability 2025 on fixing silent pipeline failures and schema drift with data observability.
 

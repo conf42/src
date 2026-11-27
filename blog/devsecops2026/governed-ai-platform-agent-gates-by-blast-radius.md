@@ -1,6 +1,6 @@
 # One control plane for AI workloads, and approval gates by blast radius
 
-Conf42 Blog, 2026-09-21, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/governed-ai-platform-agent-gates-by-blast-radius
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/governed-ai-platform-agent-gates-by-blast-radius
 
 In short: At Conf42 DevSecOps 2026, Peoplefluent's Sonu Kumar maps a five-layer governed AI platform where agents act only after policy says yes.
 

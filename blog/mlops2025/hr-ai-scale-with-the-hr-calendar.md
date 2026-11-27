@@ -1,6 +1,6 @@
 # HR AI at 10 million interactions a month scales with the HR calendar
 
-Conf42 Blog, 2025-09-10, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/hr-ai-scale-with-the-hr-calendar
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/hr-ai-scale-with-the-hr-calendar
 
 In short: Ramprasad Reddy Mittana of NSF at Conf42 MLOps 2025 on running production ML for HR shared services, from privacy pipelines to blue-green deploys.
 

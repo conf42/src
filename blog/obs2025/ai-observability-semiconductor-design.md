@@ -1,6 +1,6 @@
 # Chip design gets the observability treatment, in seven layers
 
-Conf42 Blog, 2025-05-11, updated 2026-11-09. https://www.conf42.com/blog/obs2025/ai-observability-semiconductor-design
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/ai-observability-semiconductor-design
 
 In short: Naveen Desai of Marvell Technology sketches at Conf42 Observability 2025 how AI-driven monitoring could shorten semiconductor design cycles.
 

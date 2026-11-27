@@ -1,6 +1,6 @@
 # Breaking an insurance monolith into Go services without breaking compliance
 
-Conf42 Blog, 2026-05-01, updated 2026-11-09. https://www.conf42.com/blog/golang2026/cloud-native-insurance-core-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/cloud-native-insurance-core-go
 
 In short: Sulabh Jain at Conf42 Golang 2026 lays out a roadmap from legacy insurance core to Go microservices, Kubernetes and event-driven claims.
 

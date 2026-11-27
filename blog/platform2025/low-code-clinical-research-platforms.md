@@ -1,6 +1,6 @@
 # Low-code platforms can pull clinical research out of paperwork
 
-Conf42 Blog, 2025-08-06, updated 2026-11-09. https://www.conf42.com/blog/platform2025/low-code-clinical-research-platforms
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/low-code-clinical-research-platforms
 
 In short: Lalitha Potharalanka of the FDA at Conf42 Platform Engineering 2025 on modular low-code platforms that automate clinical trial data capture and compliance.
 

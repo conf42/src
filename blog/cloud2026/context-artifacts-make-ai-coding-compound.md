@@ -1,6 +1,6 @@
 # Stateless AI coding tools need a team memory you version
 
-Conf42 Blog, 2026-03-30, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/context-artifacts-make-ai-coding-compound
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/context-artifacts-make-ai-coding-compound
 
 In short: Gaurav Kumar of Amazon at Conf42 Cloud Native 2026 on context loss in AI development: living context artifacts, shared prompt templates, session handoffs.
 

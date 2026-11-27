@@ -1,6 +1,6 @@
 # Rust AI copilots for loans, shelves and SCADA, from reusable parts
 
-Conf42 Blog, 2025-08-16. https://www.conf42.com/blog/rustlang2025/rust-ai-copilot-automation-across-industries
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-ai-copilot-automation-across-industries
 
 In short: Sarat Piridi of Hanwha Qcells at Conf42 Rustlang 2025 on Rust AI copilots for finance, retail, manufacturing and utilities, and the patterns behind them.
 

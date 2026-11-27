@@ -1,6 +1,6 @@
 # Most of your logs are never read, and you pay for them twice
 
-Conf42 Blog, 2025-05-25, updated 2026-11-09. https://www.conf42.com/blog/obs2025/logging-bills-sampling-filtering-tiered-storage
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/logging-bills-sampling-filtering-tiered-storage
 
 In short: Venkata Madhu Prateek Reddy Kambala of Synapsis at Conf42 Observability 2025 on cutting logging bills with sampling, filtering, tiered storage and compression.
 

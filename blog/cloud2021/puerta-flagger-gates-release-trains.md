@@ -1,6 +1,6 @@
 # Merge at midnight, ship on Sunday morning - Flagger gates at StackPulse
 
-Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/puerta-flagger-gates-release-trains
+Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/puerta-flagger-gates-release-trains
 
 In short: Or Elimelech and Eldad Rudich (StackPulse) at Conf42 Cloud Native 2021 on Puerta, a gating service that extends Flagger with release windows and E2E gates
 

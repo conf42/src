@@ -1,6 +1,6 @@
 # Your GPUs are only as fast as the Ethernet between them
 
-Conf42 Blog, 2025-11-25, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ethernet-for-ai-clusters-rocev2
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ethernet-for-ai-clusters-rocev2
 
 In short: Nazim Khan of Cisco at Conf42 DevSecOps 2025 on building lossless Ethernet fabrics for AI clusters with RoCEv2, ECN, PFC and Ultra Ethernet, plus how to secure them.
 

@@ -1,6 +1,6 @@
 # CruiseKube right-sizes Kubernetes pods in place, minute by minute
 
-Conf42 Blog, 2026-03-09, updated 2026-11-09. https://www.conf42.com/blog/sre2026/cruisekube-right-sizes-pods-in-place
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/cruisekube-right-sizes-pods-in-place
 
 In short: Shubham Rai (Truefoundry) and Raman Tehlan (Zurich Lab) at Conf42 SRE 2026 show CruiseKube, open source CPU right-sizing with in-place pod resize and PSI.
 

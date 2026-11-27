@@ -1,6 +1,6 @@
 # ETL or a unified data platform? Pick by scale and reliability target
 
-Conf42 Blog, 2026-03-01, updated 2026-11-09. https://www.conf42.com/blog/sre2026/etl-or-unified-data-platform-for-sre
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/etl-or-unified-data-platform-for-sre
 
 In short: Venkata Kundavaram (Goodwill Easter Seals Minnesota) at Conf42 SRE 2026 compares batch ETL with unified data platforms through an SRE lens.
 

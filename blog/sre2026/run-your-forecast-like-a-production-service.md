@@ -1,6 +1,6 @@
 # A 96% accurate forecast is worth nothing if it arrives late
 
-Conf42 Blog, 2026-02-17, updated 2026-11-09. https://www.conf42.com/blog/sre2026/run-your-forecast-like-a-production-service
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/run-your-forecast-like-a-production-service
 
 In short: Prajakta Talathi of College Ave at Conf42 SRE 2026 on running predictive analytics in education finance as a production service with SLOs and fallbacks.
 

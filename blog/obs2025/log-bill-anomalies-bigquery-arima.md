@@ -1,6 +1,6 @@
 # Catch the log bill spike with ARIMA in BigQuery ML
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/obs2025/log-bill-anomalies-bigquery-arima
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/log-bill-anomalies-bigquery-arima
 
 In short: Yury Nino of Google shows at Conf42 Observability 2025 how time series anomaly detection on Cloud Logging data flags cost spikes before the invoice.
 

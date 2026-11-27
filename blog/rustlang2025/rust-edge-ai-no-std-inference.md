@@ -1,6 +1,6 @@
 # Rust for edge AI, from no_std operators to Candle and Burn
 
-Conf42 Blog, 2025-08-04, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-edge-ai-no-std-inference
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-edge-ai-no-std-inference
 
 In short: Anushree Nagvekar of AEye at Conf42 Rustlang 2025 on Rust for edge AI, with no_std neural operators, portable SIMD, ARM and RISC-V targets, and the crates to use.
 

@@ -1,6 +1,6 @@
 # Rerank documents by asking an LLM which of two is better
 
-Conf42 Blog, 2025-11-03, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/pairwise-llm-reranking-beats-retrievers
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/pairwise-llm-reranking-beats-retrievers
 
 In short: Maximilian Schattauer of Perelyn at Conf42 Prompt Engineering 2025 on pairwise LLM document ranking for specialised corpora where embeddings fall short.
 

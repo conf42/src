@@ -1,6 +1,6 @@
 # Validate on every event, not on a schedule, in healthcare cloud
 
-Conf42 Blog, 2026-04-06, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/event-driven-validation-for-healthcare-platforms
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/event-driven-validation-for-healthcare-platforms
 
 In short: Mohiadeen Ameer of Dell Technologies at Conf42 Cloud Native 2026 on SupportPlus, an event-driven framework for continuous validation, remediation and audit on AKS.
 

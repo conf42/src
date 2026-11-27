@@ -1,6 +1,6 @@
 # Stablecoin payment rails need the same SRE discipline as your cloud
 
-Conf42 Blog, 2026-04-20. https://www.conf42.com/blog/cloud2026/stablecoin-rails-need-sre-practices
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/stablecoin-rails-need-sre-practices
 
 In short: Murtuza J Merchant of Yellow at Conf42 Cloud Native 2026 on stablecoins as payment infrastructure: Polygon's upgrades, Chivo's failures, and five patterns.
 

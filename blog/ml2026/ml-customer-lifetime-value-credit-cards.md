@@ -1,6 +1,6 @@
 # Credit card profit is a lifetime value problem, and ML models it
 
-Conf42 Blog, 2026-01-26, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-customer-lifetime-value-credit-cards
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-customer-lifetime-value-credit-cards
 
 In short: American Express analytics director Avaneendra Kanaparti at Conf42 Machine Learning 2026 on ML-driven customer lifetime value for card approvals and credit lines.
 

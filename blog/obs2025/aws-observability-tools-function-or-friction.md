@@ -1,6 +1,6 @@
 # Pick AWS observability tools by function, not by familiarity
 
-Conf42 Blog, 2025-05-16. https://www.conf42.com/blog/obs2025/aws-observability-tools-function-or-friction
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/aws-observability-tools-function-or-friction
 
 In short: Prudhvi Raj Atluri of Quantiphi at Conf42 Observability 2025 maps CloudWatch, X-Ray, Managed Grafana, QuickSight and OpenTelemetry to the jobs they fit.
 

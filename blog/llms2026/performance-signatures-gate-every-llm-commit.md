@@ -1,6 +1,6 @@
 # Performance signatures that gate every LLM and RAG commit
 
-Conf42 Blog, 2026-06-10, updated 2026-11-09. https://www.conf42.com/blog/llms2026/performance-signatures-gate-every-llm-commit
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/performance-signatures-gate-every-llm-commit
 
 In short: Kandasamy Selvaraj of ADP at Conf42 LLMs 2026 on statistical CI/CD gates that catch LLM latency, token and tool-call regressions before production.
 

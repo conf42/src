@@ -1,6 +1,6 @@
 # A detailed prompt still doesn't make the answer correct
 
-Conf42 Blog, 2026-10-20, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-engineering-is-evaluating-the-output
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-engineering-is-evaluating-the-output
 
 In short: Emmanuela Opurum (SoftNet Technologies) at Conf42 Prompt Engineering 2026 on templates, .md rule files and evaluating every AI response.
 

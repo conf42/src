@@ -1,6 +1,6 @@
 # A prompt constitution: decompose, guard early, version everything
 
-Conf42 Blog, 2025-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-constitution-three-pillars
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-constitution-three-pillars
 
 In short: Preetham Sunilkumar of LPL Financial at Conf42 Prompt Engineering 2025 on a prompt constitution framework with modular chains, guardrails and red teaming.
 

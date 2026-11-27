@@ -1,6 +1,6 @@
 # Wave turned ten years of manual instrumentation into a config file
 
-Conf42 Blog, 2025-05-22, updated 2026-11-09. https://www.conf42.com/blog/obs2025/config-driven-manual-instrumentation-python
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/config-driven-manual-instrumentation-python
 
 In short: Jean-Mark Wright of Wave at Conf42 Observability 2025 on CACI, Python metaclasses that capture span attributes from config instead of hand-written code.
 

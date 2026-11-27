@@ -1,6 +1,6 @@
 # Healthcare AI only pays off once the FHIR plumbing is in place
 
-Conf42 Blog, 2025-08-14, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-ai-needs-fhir-plumbing-first
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-ai-needs-fhir-plumbing-first
 
 In short: Srimurali Krishna Chillara of Boston Children's Hospital shows at Conf42 Platform Engineering 2025 how FHIR, NLP and BI turn clinical data into outcomes.
 

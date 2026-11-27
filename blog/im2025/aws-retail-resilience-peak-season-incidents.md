@@ -1,6 +1,6 @@
 # Retail incident response on AWS, built for the Thanksgiving spike
 
-Conf42 Blog, 2025-09-10, updated 2026-11-09. https://www.conf42.com/blog/im2025/aws-retail-resilience-peak-season-incidents
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/aws-retail-resilience-peak-season-incidents
 
 In short: Mahesh Yadlapati (Haliburton) at Conf42 Incident Management 2025 on using AWS forecasting, Lambda remediation and DR drills to keep retail sites up at peak.
 

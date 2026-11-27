@@ -1,6 +1,6 @@
 # Make Kubernetes debugging deterministic with mandatory trace context
 
-Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/deterministic-kubernetes-tracing-allowlist-otel
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/deterministic-kubernetes-tracing-allowlist-otel
 
 In short: At Conf42 DevSecOps 2026, Dell's Mridula Chilakamarri builds OpenTelemetry tracing that two engineers can't read two ways, with a nine-field allowlist.
 

@@ -1,6 +1,6 @@
 # Machine learning as the layer that lets automation adapt
 
-Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-intelligence-layer-self-optimizing-systems
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-intelligence-layer-self-optimizing-systems
 
 In short: Amazon BI engineer Aditi Namdeo at Conf42 Machine Learning 2026 on ML as the intelligence layer for self-optimising factories, fleets and grids.
 

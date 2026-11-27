@@ -1,6 +1,6 @@
 # Agentic search splits one question across four kinds of agents
 
-Conf42 Blog, 2025-10-15, updated 2026-11-09. https://www.conf42.com/blog/js2025/agentic-search-splits-one-question-across-four-agents
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/agentic-search-splits-one-question-across-four-agents
 
 In short: At Conf42 JavaScript 2025, Ajitha Buvanachandran showed how research, analysis, domain and QA agents in Node.js turn search into answers.
 

@@ -1,6 +1,6 @@
 # An agentic control plane that keeps micro-frontends in sync
 
-Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/js2025/agents-that-keep-micro-frontends-in-sync
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/agents-that-keep-micro-frontends-in-sync
 
 In short: Jyoti Kunal Shah of ADP showed at Conf42 JavaScript 2025 how AI agents detect API drift and patch micro-frontends behind canary releases.
 

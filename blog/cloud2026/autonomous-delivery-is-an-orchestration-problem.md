@@ -1,6 +1,6 @@
 # Robots, drones and driverless trucks need one modality-agnostic brain
 
-Conf42 Blog, 2026-04-05, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/autonomous-delivery-is-an-orchestration-problem
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/autonomous-delivery-is-an-orchestration-problem
 
 In short: Cijin Lonappan Kappani of Walmart at Conf42 Cloud Native 2026 on autonomous last-mile and middle-mile delivery and the cloud-edge architecture that runs it.
 

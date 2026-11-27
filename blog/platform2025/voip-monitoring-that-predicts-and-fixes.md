@@ -1,6 +1,6 @@
 # VoIP monitoring that predicts call problems and fixes them itself
 
-Conf42 Blog, 2025-08-16, updated 2026-11-09. https://www.conf42.com/blog/platform2025/voip-monitoring-that-predicts-and-fixes
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/voip-monitoring-that-predicts-and-fixes
 
 In short: Krishna Munnaluru of Oracle at Conf42 Platform Engineering 2025 on a Kafka and ML monitoring platform for VoIP with lambda processing and guarded auto-remediation.
 

@@ -1,6 +1,6 @@
 # Telecom AI will copy old investment bias unless you code against it
 
-Conf42 Blog, 2026-03-25, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/telecom-ai-fairness-carbon-in-the-pipeline
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/telecom-ai-fairness-carbon-in-the-pipeline
 
 In short: Researcher Bhavika Reddy Jalli at Conf42 Cloud Native 2026 on algorithmic redlining in 5G/6G automation and putting fairness and carbon checks into pipelines.
 

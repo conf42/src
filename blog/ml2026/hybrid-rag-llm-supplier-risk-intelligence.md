@@ -1,6 +1,6 @@
 # Supplier risk starts outside the ERP, so the model has to look there
 
-Conf42 Blog, 2026-01-25, updated 2026-11-09. https://www.conf42.com/blog/ml2026/hybrid-rag-llm-supplier-risk-intelligence
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/hybrid-rag-llm-supplier-risk-intelligence
 
 In short: Oracle's Sujith Vadakkepati at Conf42 Machine Learning 2026 on an explainable hybrid RAG-LLM pattern for continuous, auditable supplier risk intelligence.
 

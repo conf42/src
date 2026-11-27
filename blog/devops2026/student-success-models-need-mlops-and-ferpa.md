@@ -1,6 +1,6 @@
 # Student-risk models only help if they reach an advisor's task list
 
-Conf42 Blog, 2026-01-05, updated 2026-11-09. https://www.conf42.com/blog/devops2026/student-success-models-need-mlops-and-ferpa
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/student-success-models-need-mlops-and-ferpa
 
 In short: Venkatesan Kandavelu (HCLTech) at Conf42 DevOps 2026 on MLOps for education analytics - models, metrics, drift, fairness and FERPA-ready governance.
 

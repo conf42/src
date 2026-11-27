@@ -1,6 +1,6 @@
 # Observability 2.0 trades firefighting for forecasting
 
-Conf42 Blog, 2025-06-02, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-2-0-from-firefighting-to-forecasting
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-2-0-from-firefighting-to-forecasting
 
 In short: Neel Shah of Middleware at Conf42 Observability 2025 on OpenTelemetry collectors, ML anomaly detection, smarter ingestion and AI-assisted root cause.
 

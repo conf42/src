@@ -1,6 +1,6 @@
 # Keep React, move the math, Rust and WebAssembly for BI dashboards
 
-Conf42 Blog, 2025-08-11. https://www.conf42.com/blog/rustlang2025/rust-webassembly-business-intelligence-dashboards
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-webassembly-business-intelligence-dashboards
 
 In short: Shahzeb Akhtar of UnitedLex at Conf42 Rustlang 2025 on fast BI dashboards, with heavy computation in Rust compiled to WebAssembly and the UI left in JavaScript.
 

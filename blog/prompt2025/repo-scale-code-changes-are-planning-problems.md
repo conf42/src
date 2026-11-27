@@ -1,6 +1,6 @@
 # Repository-scale code changes are a planning problem, not a prompt
 
-Conf42 Blog, 2025-10-14, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/repo-scale-code-changes-are-planning-problems
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/repo-scale-code-changes-are-planning-problems
 
 In short: Janak Bhalla (Microsoft) at Conf42 Prompt Engineering 2025 on CodePlan, which pairs LLM planning with AST chunking, RAG and static analysis for migrations at scale.
 

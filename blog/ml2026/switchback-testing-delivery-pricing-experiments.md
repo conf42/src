@@ -1,6 +1,6 @@
 # Why delivery pricing needs switchback tests instead of A/B tests
 
-Conf42 Blog, 2026-01-28, updated 2026-11-09. https://www.conf42.com/blog/ml2026/switchback-testing-delivery-pricing-experiments
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/switchback-testing-delivery-pricing-experiments
 
 In short: Rothesay quant Sergei Nasibian at Conf42 Machine Learning 2026 on switchback testing and change-point analysis for system-level pricing experiments.
 

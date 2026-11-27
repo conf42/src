@@ -1,6 +1,6 @@
 # When every S3 bucket fails the CIS benchmark, the benchmark tells you nothing
 
-Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/when-every-s3-bucket-fails-cis
+Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/when-every-s3-bucket-fails-cis
 
 In short: Chris Webber (Open Raven) at Conf42 DevSecOps 2022 on prioritising S3 risk by what data is inside, who can write to it, and what you can delete
 

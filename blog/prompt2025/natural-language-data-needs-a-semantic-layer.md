@@ -1,6 +1,6 @@
 # Natural-language data access only works on top of a semantic layer
 
-Conf42 Blog, 2025-10-15, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/natural-language-data-needs-a-semantic-layer
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/natural-language-data-needs-a-semantic-layer
 
 In short: Jimish Kadakia (Snowflake) at Conf42 Prompt Engineering 2025 on LLMs for SQL generation, conversational pipelines and the governance that keeps them honest.
 

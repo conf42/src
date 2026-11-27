@@ -1,6 +1,6 @@
 # Your rollout guardrail can look healthy after its calibration expired
 
-Conf42 Blog, 2026-10-13, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/guardrail-calibration-expires-mid-rollout
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/guardrail-calibration-expires-mid-rollout
 
 In short: Rakshay Pawar of Codeflow Capital at Conf42 Feature Flags 2026 uses a 35-year Treasury yield backtest to show why clustered misses break rollout guardrails.
 

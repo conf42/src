@@ -1,6 +1,6 @@
 # Power BI plus Copilot found $30M hiding in food scrap rates
 
-Conf42 Blog, 2025-10-24, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/power-bi-copilot-30m-scrap-savings
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/power-bi-copilot-30m-scrap-savings
 
 In short: Victor Gabriel of GEP Worldwide at Conf42 Prompt Engineering 2025 on pairing Power BI dashboards with Copilot prompts to cut a food maker's supply chain costs.
 

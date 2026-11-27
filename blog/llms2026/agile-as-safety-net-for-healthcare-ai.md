@@ -1,6 +1,6 @@
 # Agile as the safety net for AI in regulated healthcare IT
 
-Conf42 Blog, 2026-06-08, updated 2026-11-09. https://www.conf42.com/blog/llms2026/agile-as-safety-net-for-healthcare-ai
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/agile-as-safety-net-for-healthcare-ai
 
 In short: Independent researcher ShubhaPriya Muthuramalingam at Conf42 LLMs 2026 on why short sprints, shadow mode and embedded compliance make clinical AI safer.
 

@@ -1,6 +1,6 @@
 # Security Copilot finds the users your Conditional Access forgot
 
-Conf42 Blog, 2025-10-07, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/security-copilot-conditional-access-drift
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/security-copilot-conditional-access-drift
 
 In short: Cynthia Akiotu at Conf42 Prompt Engineering 2025 demos Microsoft Security Copilot fixing Conditional Access drift and summarising DLP alerts with prompts.
 

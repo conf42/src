@@ -1,6 +1,6 @@
 # Route agent traffic through a gateway and the LLM bill gets a dashboard
 
-Conf42 Blog, 2026-01-03, updated 2026-11-09. https://www.conf42.com/blog/devops2026/llm-cost-per-gateway-agentgateway-grafana
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/llm-cost-per-gateway-agentgateway-grafana
 
 In short: Michael Levan (Solo.io) at Conf42 DevOps 2026 demos agentgateway on Kubernetes plus Prometheus and Grafana to track LLM tokens and cost per gateway.
 

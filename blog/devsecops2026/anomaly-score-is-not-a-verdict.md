@@ -1,6 +1,6 @@
 # In ML compliance monitoring, an anomaly score is not a verdict
 
-Conf42 Blog, 2026-09-15, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/anomaly-score-is-not-a-verdict
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/anomaly-score-is-not-a-verdict
 
 In short: Vinay Puri of Amazon at Conf42 DevSecOps 2026 builds a working-hours alert system where ML flags unusual patterns and human investigators decide.
 

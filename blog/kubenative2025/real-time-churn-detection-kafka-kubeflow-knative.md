@@ -1,6 +1,6 @@
 # Catch churn while it happens with Kafka, Kubeflow and Knative
 
-Conf42 Blog, 2025-09-21, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/real-time-churn-detection-kafka-kubeflow-knative
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/real-time-churn-detection-kafka-kubeflow-knative
 
 In short: Gaurav Sunkar (Google) at Conf42 Kube Native 2025 on real-time churn detection using LSTMs and ensembles served via Kafka, Kubeflow and Knative on Kubernetes.
 

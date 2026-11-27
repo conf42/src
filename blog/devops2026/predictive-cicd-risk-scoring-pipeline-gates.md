@@ -1,6 +1,6 @@
 # Predictive CI/CD scores each pipeline run for risk before it ships
 
-Conf42 Blog, 2025-12-23, updated 2026-11-09. https://www.conf42.com/blog/devops2026/predictive-cicd-risk-scoring-pipeline-gates
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/predictive-cicd-risk-scoring-pipeline-gates
 
 In short: Cognizant architect Pallab Haldar at Conf42 DevOps 2026 on predictive DevOps with telemetry, anomaly detection and risk scores that gate CI/CD runs.
 

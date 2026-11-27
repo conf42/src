@@ -1,6 +1,6 @@
 # Rust data pipelines for climate monitoring and public health
 
-Conf42 Blog, 2025-08-01, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-data-engineering-climate-and-public-health
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-data-engineering-climate-and-public-health
 
 In short: Ritesh Kumar Sinha of Kotak Mahindra Bank at Conf42 Rustlang 2025 on Rust data engineering with Tokio, Arrow and DataFusion, applied to climate and health data.
 

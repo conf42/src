@@ -1,6 +1,6 @@
 # Your system recovers only as fast as its slowest workload
 
-Conf42 Blog, 2026-01-18. https://www.conf42.com/blog/devops2026/boring-regional-failover-at-intuit
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/boring-regional-failover-at-intuit
 
 In short: Akshay Pratinav of Intuit at Conf42 DevOps 2026 on a Kubernetes-native DR platform built on declarative intent, pre-scaling and staged failover.
 

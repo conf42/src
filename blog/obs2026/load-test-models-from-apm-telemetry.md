@@ -1,6 +1,6 @@
 # Build load-test models from APM data, not planning-meeting guesses
 
-Conf42 Blog, 2026-09-06, updated 2026-11-09. https://www.conf42.com/blog/obs2026/load-test-models-from-apm-telemetry
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/load-test-models-from-apm-telemetry
 
 In short: Vasuki Uday Kiran Vudathala of ServiceNow at Conf42 Observability 2026 derives peak RPS, concurrency and scenario mix from production telemetry.
 

@@ -1,6 +1,6 @@
 # Your agent orchestrator won't save your money; the thin controller will
 
-Conf42 Blog, 2026-10-06, updated 2026-11-09. https://www.conf42.com/blog/platform2026/agent-orchestrator-thin-controller-saves-money
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/agent-orchestrator-thin-controller-saves-money
 
 In short: Yedidya Schwartz, CTO of Quicklizard, at Conf42 Platform Engineering 2026 on crashing six durable engines to see who pays twice for model calls.
 

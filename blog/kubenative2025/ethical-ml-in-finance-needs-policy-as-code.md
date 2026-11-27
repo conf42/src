@@ -1,6 +1,6 @@
 # Bias scales with your cluster, so put ethics in the deploy pipeline
 
-Conf42 Blog, 2025-09-29, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ethical-ml-in-finance-needs-policy-as-code
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ethical-ml-in-finance-needs-policy-as-code
 
 In short: Jaydeep Taralkar (UBS) at Conf42 Kube Native 2025 on scaling financial ML on Kubernetes with fairness gates, data residency and continuous bias monitoring.
 

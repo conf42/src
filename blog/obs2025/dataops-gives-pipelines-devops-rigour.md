@@ -1,6 +1,6 @@
 # DataOps treats data pipelines with the rigour of code deploys
 
-Conf42 Blog, 2025-05-15. https://www.conf42.com/blog/obs2025/dataops-gives-pipelines-devops-rigour
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/dataops-gives-pipelines-devops-rigour
 
 In short: Lakshmi Narayana Gupta Koralla of Starbucks at Conf42 Observability 2025 on DataOps principles, governance as code, data CI/CD and observability for pipelines.
 

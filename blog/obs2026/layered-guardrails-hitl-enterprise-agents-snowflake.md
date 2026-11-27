@@ -1,6 +1,6 @@
 # Six layers between an enterprise agent and a hallucination
 
-Conf42 Blog, 2026-08-23. https://www.conf42.com/blog/obs2026/layered-guardrails-hitl-enterprise-agents-snowflake
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/layered-guardrails-hitl-enterprise-agents-snowflake
 
 In short: Arjun D Sureshbabu of Snowflake at Conf42 Observability 2026 on guardrails, hybrid RAG, validation and human review for trustworthy enterprise agents.
 

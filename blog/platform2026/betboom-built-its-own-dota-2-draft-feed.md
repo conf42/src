@@ -1,6 +1,6 @@
 # BetBoom's own Dota 2 draft feed took conversion from 8.4% to 31.2%
 
-Conf42 Blog, 2026-10-14, updated 2026-11-09. https://www.conf42.com/blog/platform2026/betboom-built-its-own-dota-2-draft-feed
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/betboom-built-its-own-dota-2-draft-feed
 
 In short: Egor Kolovertnykh of BetBoom at Conf42 Platform Engineering 2026 on turning Dota 2 Game State Integration snapshots into a live draft feed.
 

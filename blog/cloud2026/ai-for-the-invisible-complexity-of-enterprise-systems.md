@@ -1,6 +1,6 @@
 # AI's best job in enterprise teams is carrying the mental model
 
-Conf42 Blog, 2026-03-29, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/ai-for-the-invisible-complexity-of-enterprise-systems
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/ai-for-the-invisible-complexity-of-enterprise-systems
 
 In short: Dreema Patel of Adobe at Conf42 Cloud Native 2026 on three ways AI eases invisible complexity: RAG over internal knowledge, assisted coding, and failure-led tests.
 

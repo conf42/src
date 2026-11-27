@@ -1,6 +1,6 @@
 # Give your LLM a read replica, not your production SQL Server
 
-Conf42 Blog, 2025-10-20, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/sql-managed-instance-link-for-llm-reads
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/sql-managed-instance-link-for-llm-reads
 
 In short: Siva Kumar Raju Bhupathiraju (Paycor) at Conf42 Prompt Engineering 2025 on Azure SQL Managed Instance and MI Link as a low-latency, governed data source for LLMs.
 

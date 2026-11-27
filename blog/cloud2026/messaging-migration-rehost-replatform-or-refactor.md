@@ -1,6 +1,6 @@
 # Moving RabbitMQ to the cloud? Choose rehost, replatform or refactor
 
-Conf42 Blog, 2026-04-02, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/messaging-migration-rehost-replatform-or-refactor
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/messaging-migration-rehost-replatform-or-refactor
 
 In short: Ran Tao of AWS at Conf42 Cloud Native 2026 on migrating on-prem message brokers to EC2, Amazon MQ or SQS/SNS, and what changes in client code.
 

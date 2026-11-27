@@ -1,6 +1,6 @@
 # In healthcare, an accurate model nobody trusts never ships
 
-Conf42 Blog, 2025-08-20, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/healthcare-ai-needs-governed-mlops-pipelines
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/healthcare-ai-needs-governed-mlops-pipelines
 
 In short: Nikitha Edulakanti (Fresenius Medical Care) at Conf42 MLOps 2025 on governed MLOps pipelines that let healthcare AI scale past the pilot.
 

@@ -1,6 +1,6 @@
 # Continuous reconciliation for insurance ledgers with Kafka and ML
 
-Conf42 Blog, 2026-05-28, updated 2026-11-09. https://www.conf42.com/blog/llms2026/ai-general-ledger-insurance-finance
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/ai-general-ledger-insurance-finance
 
 In short: Rakesh Jha (DXC Technology) at Conf42 LLMs 2026 on AI general ledgers for life and annuity insurers, from Kafka ingestion to ML anomaly detection.
 

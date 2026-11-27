@@ -1,6 +1,6 @@
 # Regulatory Submissions Speed Up When Documents Become Components
 
-Conf42 Blog, 2025-08-28, updated 2026-11-09. https://www.conf42.com/blog/platform2025/structured-content-speeds-regulatory-submissions
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/structured-content-speeds-regulatory-submissions
 
 In short: Satish Babu Golla at Conf42 Platform Engineering 2025 on structured content, reusable blocks and workflow automation for life sciences submissions.
 

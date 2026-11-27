@@ -1,6 +1,6 @@
 # Four patterns for putting quantum inside a multi-tenant SaaS
 
-Conf42 Blog, 2025-05-29, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-saas-multi-tenancy-patterns
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-saas-multi-tenancy-patterns
 
 In short: Srikar Kompella of Twilio sketches quantum, edge and multi-tenancy patterns for SaaS at Conf42 Quantum Computing 2025, from federated learning onward.
 

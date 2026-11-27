@@ -1,6 +1,6 @@
 # Send your agent three tools, not twenty-nine
 
-Conf42 Blog, 2026-09-12, updated 2026-11-09. https://www.conf42.com/blog/agents2026/send-the-agent-three-tools-not-twenty-nine
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/send-the-agent-three-tools-not-twenty-nine
 
 In short: Elizabeth Fuentes Leone (AWS) at Conf42 AI Agents 2026: semantic tool selection with a vector search cuts token spend and wrong tool picks.
 

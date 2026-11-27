@@ -1,6 +1,6 @@
 # Monitoring says it broke; OpenTelemetry helps you find out why
 
-Conf42 Blog, 2025-05-29, updated 2026-11-09. https://www.conf42.com/blog/obs2025/opentelemetry-collector-observability-primer
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/opentelemetry-collector-observability-primer
 
 In short: Naga Murali Krishna Koneru of Hexaware at Conf42 Observability 2025 explains observability basics and the OpenTelemetry Collector with Loki, Mimir and Grafana.
 

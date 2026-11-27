@@ -1,6 +1,6 @@
 # A contact centre that knows you are about to churn before you say so
 
-Conf42 Blog, 2021-07-28. https://www.conf42.com/blog/ml2021/amazon-connect-churn-aware-call-routing
+Conf42 Blog, 2021-07-29. https://www.conf42.com/blog/ml2021/amazon-connect-churn-aware-call-routing
 
 In short: Asif Mujawar (AWS) at Conf42 Machine Learning 2021 on Amazon Connect with Lex, Kendra, SageMaker and Neptune for churn-aware routing and agent matching
 

@@ -1,6 +1,6 @@
 # Treat chipset vendors as an implementation detail, in Go
 
-Conf42 Blog, 2026-05-14, updated 2026-11-09. https://www.conf42.com/blog/golang2026/multi-vendor-docsis-hidden-behind-go-adapters
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/multi-vendor-docsis-hidden-behind-go-adapters
 
 In short: Harsha Vardhani Talluri at Conf42 Golang 2026 on a Go platform that hides multi-vendor DOCSIS chipset quirks behind adapters and one telemetry model.
 

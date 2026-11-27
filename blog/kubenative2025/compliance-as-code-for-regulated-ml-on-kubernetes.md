@@ -1,6 +1,6 @@
 # Regulated ML on Kubernetes works when compliance is in the pipeline
 
-Conf42 Blog, 2025-09-28, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/compliance-as-code-for-regulated-ml-on-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/compliance-as-code-for-regulated-ml-on-kubernetes
 
 In short: Manisha Ponugoti at Conf42 Kube Native 2025 on admission controllers, GitOps audit trails and GPU scheduling for AI in healthcare, banking and insurance.
 

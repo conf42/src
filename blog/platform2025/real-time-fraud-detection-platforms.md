@@ -1,6 +1,6 @@
 # Fraud detection is a platform problem before it is a model problem
 
-Conf42 Blog, 2025-08-25, updated 2026-11-17. https://www.conf42.com/blog/platform2025/real-time-fraud-detection-platforms
+Conf42 Blog, 2025-09-04, updated 2026-11-17. https://www.conf42.com/blog/platform2025/real-time-fraud-detection-platforms
 
 In short: Shivam Tiwari at Conf42 Platform Engineering 2025 on the platform under real-time financial crime detection: streaming, graph stores, compliance as code.
 

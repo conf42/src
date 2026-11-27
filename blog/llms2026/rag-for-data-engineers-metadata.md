@@ -1,6 +1,6 @@
 # Data engineers already own the metadata RAG needs
 
-Conf42 Blog, 2026-05-23, updated 2026-11-09. https://www.conf42.com/blog/llms2026/rag-for-data-engineers-metadata
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/rag-for-data-engineers-metadata
 
 In short: Varun Joshi (AWS) at Conf42 LLMs 2026 on four RAG uses for data teams, from schema Q&A to on-call, and why your metadata is the missing piece.
 

@@ -1,6 +1,6 @@
 # Generate, predict, self-heal - AI's three jobs in testing
 
-Conf42 Blog, 2025-06-04, updated 2026-11-09. https://www.conf42.com/blog/obs2025/ai-testing-trifecta-generate-predict-self-heal
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/ai-testing-trifecta-generate-predict-self-heal
 
 In short: Jyotheeswara Reddy Gottam of Walmart Global Tech at Conf42 Observability 2025 on generative tests, predictive risk analytics and self-healing automation.
 

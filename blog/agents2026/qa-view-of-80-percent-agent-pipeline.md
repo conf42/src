@@ -1,6 +1,6 @@
 # An 80% accurate agent pipeline, and the 20% that needs QA
 
-Conf42 Blog, 2026-09-06, updated 2026-11-09. https://www.conf42.com/blog/agents2026/qa-view-of-80-percent-agent-pipeline
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/qa-view-of-80-percent-agent-pipeline
 
 In short: Suneet Malhotra of Motorola Solutions at Conf42 AI Agents 2026 on running Claude Code and MCP from requirements to tests, and governing the chain, not the file.
 

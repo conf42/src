@@ -1,6 +1,6 @@
 # Telecom reliability needs better signals, not more alerts
 
-Conf42 Blog, 2025-05-12. https://www.conf42.com/blog/obs2025/telecom-needs-better-signals-not-more-alerts
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/telecom-needs-better-signals-not-more-alerts
 
 In short: Ajay Averineni of IBM at Conf42 Observability 2025 on moving telecom monitoring from reactive alerts to AI anomaly detection with LSTMs, NLP and closed loops.
 

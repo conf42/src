@@ -1,6 +1,6 @@
 # An observability maturity roadmap written for analytics leaders
 
-Conf42 Blog, 2025-05-14. https://www.conf42.com/blog/obs2025/observability-maturity-for-analytics-leaders
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/observability-maturity-for-analytics-leaders
 
 In short: Raghavender Puchhakayala of JPMorgan Chase at Conf42 Observability 2025 on four pillars, four pitfalls and a reactive-to-predictive maturity path for distributed systems.
 

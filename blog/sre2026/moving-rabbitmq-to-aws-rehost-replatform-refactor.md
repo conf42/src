@@ -1,6 +1,6 @@
 # Moving a message broker to AWS: rehost, replatform or refactor
 
-Conf42 Blog, 2026-03-05, updated 2026-11-09. https://www.conf42.com/blog/sre2026/moving-rabbitmq-to-aws-rehost-replatform-refactor
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/moving-rabbitmq-to-aws-rehost-replatform-refactor
 
 In short: Ran Tao (AWS) at Conf42 SRE 2026 compares lifting RabbitMQ to EC2, Amazon MQ, and refactoring clients for SQS and SNS, with Python code.
 

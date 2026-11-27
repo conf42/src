@@ -1,6 +1,6 @@
 # Amazon Bedrock AgentCore: the primitives between PoC and production
 
-Conf42 Blog, 2025-09-03, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/bedrock-agentcore-poc-to-production
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/bedrock-agentcore-poc-to-production
 
 In short: Samuel Baruffi (AWS) at Conf42 MLOps 2025 on AgentCore runtime, identity, gateway, memory and observability for shipping enterprise AI agents.
 

@@ -1,6 +1,6 @@
 # GitOps for the network turns router changes into reviewed pull requests
 
-Conf42 Blog, 2025-12-29, updated 2026-11-09. https://www.conf42.com/blog/devops2026/network-gitops-sdwan-zero-trust-automation
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/network-gitops-sdwan-zero-trust-automation
 
 In short: Imran Abdul at Conf42 DevOps 2026 on infrastructure as code for enterprise networks, with SD-WAN templates, canary rollouts and zero trust segmentation.
 

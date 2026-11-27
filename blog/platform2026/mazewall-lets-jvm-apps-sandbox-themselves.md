@@ -1,6 +1,6 @@
 # MazeWall lets a JVM app sandbox its own threads with seccomp
 
-Conf42 Blog, 2026-10-24, updated 2026-11-09. https://www.conf42.com/blog/platform2026/mazewall-lets-jvm-apps-sandbox-themselves
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/mazewall-lets-jvm-apps-sandbox-themselves
 
 In short: Leanid Piliptsevich (EPAM) at Conf42 Platform Engineering 2026 introduces MazeWall, using seccomp and Landlock to restrict pieces of an app from inside.
 

@@ -1,6 +1,6 @@
 # Putting a different ML model at every DevSecOps pipeline stage
 
-Conf42 Blog, 2025-05-05, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ml-models-at-every-devsecops-stage
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ml-models-at-every-devsecops-stage
 
 In short: Srikanth Potla, Senior Product Security Engineer at SoFi, at Conf42 Machine Learning 2025 maps supervised, unsupervised and NLP models onto CI/CD.
 

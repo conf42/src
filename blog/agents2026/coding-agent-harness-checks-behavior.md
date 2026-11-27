@@ -1,6 +1,6 @@
 # Green CI, broken game: a harness that checks behaviour, not form
 
-Conf42 Blog, 2026-09-05, updated 2026-11-09. https://www.conf42.com/blog/agents2026/coding-agent-harness-checks-behavior
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/coding-agent-harness-checks-behavior
 
 In short: Ruben Marcus Luz Paschoarelli of MultiVM Labs at Conf42 AI Agents 2026 breaks a small typed harness three times to show what stops agent fiction from shipping.
 

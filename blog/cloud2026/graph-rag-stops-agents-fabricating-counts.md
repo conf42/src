@@ -1,6 +1,6 @@
 # Vector RAG can't count, so let the graph database do it
 
-Conf42 Blog, 2026-03-27. https://www.conf42.com/blog/cloud2026/graph-rag-stops-agents-fabricating-counts
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/graph-rag-stops-agents-fabricating-counts
 
 In short: Elizabeth Fuentes Leone of AWS at Conf42 Cloud Native 2026 shows graph RAG with Neo4j and Strands Agents answering counts that vector RAG makes up.
 

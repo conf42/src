@@ -1,6 +1,6 @@
 # Healthcare denial letters are a reliability problem, then an AI one
 
-Conf42 Blog, 2026-02-28, updated 2026-11-09. https://www.conf42.com/blog/sre2026/healthcare-letters-are-a-reliability-problem
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/healthcare-letters-are-a-reliability-problem
 
 In short: Prakash Easwaran (ZeOmega) at Conf42 SRE 2026 on automating utilization management letters, then using AI with human review to make denials readable.
 

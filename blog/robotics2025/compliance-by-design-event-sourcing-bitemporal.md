@@ -1,6 +1,6 @@
 # Build compliance into the data model, not the audit week
 
-Conf42 Blog, 2025-10-27, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/compliance-by-design-event-sourcing-bitemporal
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/compliance-by-design-event-sourcing-bitemporal
 
 In short: Sneha Nallapu of J.B. Hunt at Conf42 Robotics 2025 on compliance-by-design with event sourcing, bitemporal data, graph lineage, CQRS and ABAC.
 

@@ -1,6 +1,6 @@
 # Generate your TypeScript types from the GraphQL schema
 
-Conf42 Blog, 2022-11-16. https://www.conf42.com/blog/js2022/typescript-graphql-end-to-end-type-safety
+Conf42 Blog, 2022-11-17. https://www.conf42.com/blog/js2022/typescript-graphql-end-to-end-type-safety
 
 In short: Roy Derks (StepZen) at Conf42 JavaScript 2022 on end-to-end type safety by generating TypeScript types and hooks from a GraphQL schema
 

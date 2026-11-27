@@ -1,6 +1,6 @@
 # Code Mode cut an MCP agent's tool context from 150K to 22K tokens
 
-Conf42 Blog, 2026-10-11, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/mcp-code-mode-150k-to-22k-tokens
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/mcp-code-mode-150k-to-22k-tokens
 
 In short: Adobe's Nishant Kumar Thakur and Sonam Raj at Conf42 Prompt Engineering 2026 on typed tool stubs for MCP, what they saved and where they broke.
 

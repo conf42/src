@@ -1,6 +1,6 @@
 # Self-tuning databases have to earn trust before they act
 
-Conf42 Blog, 2026-05-08, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/self-tuning-databases-earn-trust-first
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/self-tuning-databases-earn-trust-first
 
 In short: Naga Bellamkonda of Gartner at Conf42 Database DevOps 2026 on AI-driven database tuning in finance, e-commerce and healthcare, and the failures that shaped it.
 

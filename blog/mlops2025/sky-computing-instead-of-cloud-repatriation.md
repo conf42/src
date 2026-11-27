@@ -1,6 +1,6 @@
 # Before you repatriate, consider sky computing
 
-Conf42 Blog, 2025-08-27, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/sky-computing-instead-of-cloud-repatriation
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/sky-computing-instead-of-cloud-repatriation
 
 In short: Brian Irish (Ditto) at Conf42 MLOps 2025 on sky computing and SkyPilot, an intercloud broker approach to vendor lock-in, egress fees and GPU scarcity.
 

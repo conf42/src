@@ -1,6 +1,6 @@
 # CloudNativePG fails over in 11 seconds, but misses replication lag
 
-Conf42 Blog, 2026-05-18, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/kubernetes-operator-vs-dba-cloudnativepg
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/kubernetes-operator-vs-dba-cloudnativepg
 
 In short: Amarachi Iheanacho of Sidero Labs at Conf42 Database DevOps 2026 broke a CloudNativePG Postgres cluster six ways to test whether an operator can replace a DBA.
 

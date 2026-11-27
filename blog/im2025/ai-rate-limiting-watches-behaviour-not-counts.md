@@ -1,6 +1,6 @@
 # Rate limits that watch behaviour instead of counting requests
 
-Conf42 Blog, 2025-09-03, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-rate-limiting-watches-behaviour-not-counts
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-rate-limiting-watches-behaviour-not-counts
 
 In short: Rehana Sultana Khan (Versa Networks) at Conf42 Incident Management 2025 on ML rate limiting that lets real traffic spikes in and slows the bots down.
 

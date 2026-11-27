@@ -1,6 +1,6 @@
 # Supply chain digital twins in Rust, and why predictable beats fast
 
-Conf42 Blog, 2025-07-23, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/supply-chain-digital-twins-rust-predictable-routes
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/supply-chain-digital-twins-rust-predictable-routes
 
 In short: Shikha Duttyal of Meta at Conf42 Rustlang 2025 on digital twins, variance-based route optimization and a Rust infrastructure built for always-on monitoring.
 

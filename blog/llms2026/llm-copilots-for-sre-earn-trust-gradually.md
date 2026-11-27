@@ -1,6 +1,6 @@
 # LLM copilots for SRE should earn their trust one risk tier at a time
 
-Conf42 Blog, 2026-06-14, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-copilots-for-sre-earn-trust-gradually
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-copilots-for-sre-earn-trust-gradually
 
 In short: Principal SRE Susanta Kumar Sahoo at Conf42 LLMs 2026 on LLM copilots that summarize alerts, correlate deploys and auto-remediate under human guardrails.
 

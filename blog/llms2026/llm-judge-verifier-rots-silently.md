@@ -1,6 +1,6 @@
 # Your LLM judge is failing silently, and it should be the strongest model
 
-Conf42 Blog, 2026-05-26, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-judge-verifier-rots-silently
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-judge-verifier-rots-silently
 
 In short: Vsevolod Voropaev at Conf42 LLMs 2026 argues the verifier is an agent system's hardest part and routes cross-family judges with bandits.
 

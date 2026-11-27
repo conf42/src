@@ -1,6 +1,6 @@
 # Compliance risk lives between the documents, not inside them
 
-Conf42 Blog, 2026-06-08, updated 2026-11-09. https://www.conf42.com/blog/llms2026/compliance-risk-lives-between-documents
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/compliance-risk-lives-between-documents
 
 In short: Varsha Shah at Conf42 LLMs 2026 on correlating payroll, tax and procurement records with graphs, risk scoring and LLMs to catch hidden compliance risk.
 

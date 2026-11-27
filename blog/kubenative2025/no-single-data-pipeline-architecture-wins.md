@@ -1,6 +1,6 @@
 # No single data pipeline architecture wins, so migrate in pieces
 
-Conf42 Blog, 2025-09-26, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/no-single-data-pipeline-architecture-wins
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/no-single-data-pipeline-architecture-wins
 
 In short: Vamsi Pulusu (Ford Motor Company) at Conf42 Kube Native 2025 compares medallion, Lambda, Kappa, lakehouse and data mesh, then lays out how to leave legacy ETL.
 

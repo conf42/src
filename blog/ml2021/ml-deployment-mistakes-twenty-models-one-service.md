@@ -1,6 +1,6 @@
 # Twenty models on a service built for one, and other deployment lessons
 
-Conf42 Blog, 2021-07-28. https://www.conf42.com/blog/ml2021/ml-deployment-mistakes-twenty-models-one-service
+Conf42 Blog, 2021-07-29. https://www.conf42.com/blog/ml2021/ml-deployment-mistakes-twenty-models-one-service
 
 In short: Marianna Diachuk (Restream) at Conf42 Machine Learning 2021 on five ML deployment mistakes: scaling, solo ownership, silos, no tests and no monitoring
 

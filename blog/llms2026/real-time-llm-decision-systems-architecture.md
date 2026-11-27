@@ -1,6 +1,6 @@
 # Four layers for turning LLM experiments into real-time decisions
 
-Conf42 Blog, 2026-05-27, updated 2026-11-09. https://www.conf42.com/blog/llms2026/real-time-llm-decision-systems-architecture
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/real-time-llm-decision-systems-architecture
 
 In short: Mohanraj Varatharaj at Conf42 LLMs 2026 on streaming data, RAG, decision engines and observability for real-time LLM decision systems.
 

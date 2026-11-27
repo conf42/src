@@ -1,6 +1,6 @@
 # Stream security findings fast, then reconcile them with anti-entropy
 
-Conf42 Blog, 2026-09-11, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/anti-entropy-keeps-security-findings-honest
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/anti-entropy-keeps-security-findings-honest
 
 In short: Rahul Kizhakkepachilamakol of AWS at Conf42 DevSecOps 2026 pairs streaming with Merkle trees, read-repair and hinted handoff so findings don't vanish.
 

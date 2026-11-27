@@ -1,6 +1,6 @@
 # Why HTTP/2 sent all our Kubernetes traffic to one pod
 
-Conf42 Blog, 2026-03-04, updated 2026-11-09. https://www.conf42.com/blog/sre2026/http2-sends-all-traffic-to-one-kubernetes-pod
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/http2-sends-all-traffic-to-one-kubernetes-pod
 
 In short: Mariem Sboui (gridX) at Conf42 SRE 2026 on an incident where kube-proxy's connection-level balancing pinned HTTP/2 traffic to a single pod.
 

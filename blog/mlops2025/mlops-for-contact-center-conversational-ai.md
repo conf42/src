@@ -1,6 +1,6 @@
 # Contact center AI fails on day one without the backstage crew
 
-Conf42 Blog, 2025-08-26, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-contact-center-conversational-ai
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-contact-center-conversational-ai
 
 In short: Manoj Kumar Vunnava (GoDaddy) at Conf42 MLOps 2025 on the MLOps that keeps contact center conversational AI reliable, from feature stores to drift.
 

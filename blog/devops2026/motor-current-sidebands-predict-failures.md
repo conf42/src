@@ -1,6 +1,6 @@
 # The sidebands you filter out as noise can predict motor failure
 
-Conf42 Blog, 2026-01-05, updated 2026-11-09. https://www.conf42.com/blog/devops2026/motor-current-sidebands-predict-failures
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/motor-current-sidebands-predict-failures
 
 In short: Avinash Sista (MongoDB) at Conf42 DevOps 2026 on four-layer, vectorised motor health monitoring that turns sensor data into predictive maintenance.
 

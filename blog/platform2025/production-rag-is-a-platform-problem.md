@@ -1,6 +1,6 @@
 # Production RAG at enterprise scale is a platform engineering job
 
-Conf42 Blog, 2025-08-14, updated 2026-11-09. https://www.conf42.com/blog/platform2025/production-rag-is-a-platform-problem
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/production-rag-is-a-platform-problem
 
 In short: Srinivas Chennupati of Fannie Mae at Conf42 Platform Engineering 2025 on scaling enterprise RAG: vector stores, caching, model routing, cost per query.
 

@@ -1,6 +1,6 @@
 # In regulated finance, MLOps is how responsible AI actually ships
 
-Conf42 Blog, 2025-09-07, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/responsible-ai-fintech-mlops-state-street
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/responsible-ai-fintech-mlops-state-street
 
 In short: Narasimha Rao Vanaparthi (State Street) at Conf42 MLOps 2025 on ethical guardrails, data lineage and continuous validation for AI in finance.
 

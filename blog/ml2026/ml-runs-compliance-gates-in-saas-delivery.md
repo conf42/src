@@ -1,6 +1,6 @@
 # ML is now running the compliance gates in SaaS delivery
 
-Conf42 Blog, 2026-02-07, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-runs-compliance-gates-in-saas-delivery
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-runs-compliance-gates-in-saas-delivery
 
 In short: Pooja Ranjan of Oracle at Conf42 Machine Learning 2026 on how ML automates compliance checks, monitoring and right-sizing across a cloud delivery pipeline.
 

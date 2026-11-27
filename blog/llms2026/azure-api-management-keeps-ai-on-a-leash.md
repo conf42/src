@@ -1,6 +1,6 @@
 # Azure API Management as a leash for your AI endpoints
 
-Conf42 Blog, 2026-06-11, updated 2026-11-09. https://www.conf42.com/blog/llms2026/azure-api-management-keeps-ai-on-a-leash
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/azure-api-management-keeps-ai-on-a-leash
 
 In short: Leo Visser of OGD at Conf42 LLMs 2026 demos token limits, content safety blocklists and semantic caching in Azure API Management in front of Foundry.
 

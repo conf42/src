@@ -1,6 +1,6 @@
 # Data science stalls on infrastructure, not algorithms
 
-Conf42 Blog, 2025-08-05, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-data-science-ml-pipelines
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-data-science-ml-pipelines
 
 In short: Aishwarya Pai of Deloitte at Conf42 Platform Engineering 2025 on the platform principles and patterns that get ML models from notebooks to production.
 

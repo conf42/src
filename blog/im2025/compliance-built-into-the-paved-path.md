@@ -1,6 +1,6 @@
 # In banking, make the compliant path the fastest path to production
 
-Conf42 Blog, 2025-09-25, updated 2026-11-09. https://www.conf42.com/blog/im2025/compliance-built-into-the-paved-path
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/compliance-built-into-the-paved-path
 
 In short: Nirup Baer (Wells Fargo) at Conf42 Incident Management 2025 on building compliance into cloud platforms so incidents are rarer and leave their own audit trail.
 

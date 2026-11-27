@@ -1,6 +1,6 @@
 # When OpenTelemetry is worth the mess it brings
 
-Conf42 Blog, 2025-06-01, updated 2026-11-09. https://www.conf42.com/blog/obs2025/when-opentelemetry-is-worth-the-mess
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/when-opentelemetry-is-worth-the-mess
 
 In short: NVIDIA's Narendra Reddy Sanikommu at Conf42 Observability 2025 on what OpenTelemetry fixes, the new problems it creates, and when it pays off.
 

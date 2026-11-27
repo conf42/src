@@ -1,6 +1,6 @@
 # In cloud banking, the trace is the security control
 
-Conf42 Blog, 2025-05-19, updated 2026-11-09. https://www.conf42.com/blog/obs2025/banking-observability-security-audit-trail
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/banking-observability-security-audit-trail
 
 In short: Subrahmanyam Mamidi at Conf42 Observability 2025 on using metrics, logs and traces to catch breaches early and keep cloud banking audit-ready.
 

@@ -1,6 +1,6 @@
 # Put your cloud's API output in a database and ask it questions
 
-Conf42 Blog, 2026-05-12, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/cloud-api-metadata-into-a-database
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/cloud-api-metadata-into-a-database
 
 In short: Jason Lester of Capgemini at Conf42 Database DevOps 2026 on loading cloud CLI and API output into tables for permission audits, history and start-stop tooling.
 

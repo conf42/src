@@ -1,6 +1,6 @@
 # Regulated systems can be up and still make the wrong decisions
 
-Conf42 Blog, 2026-03-14, updated 2026-11-09. https://www.conf42.com/blog/sre2026/regulated-systems-up-but-deciding-wrong
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/regulated-systems-up-but-deciding-wrong
 
 In short: Shruthi Sepuri of TCS at Conf42 SRE 2026 on workflow-level reliability for insurance and finance - decision accuracy SLIs and testing that continues in production.
 

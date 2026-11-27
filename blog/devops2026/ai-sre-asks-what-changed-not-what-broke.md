@@ -1,6 +1,6 @@
 # Reliability lives in what changed, not in what broke
 
-Conf42 Blog, 2026-01-18. https://www.conf42.com/blog/devops2026/ai-sre-asks-what-changed-not-what-broke
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/ai-sre-asks-what-changed-not-what-broke
 
 In short: Spiros Economakis, founder of NOFire AI, at Conf42 DevOps 2026 on using AI to give production a memory and move SRE from firefighting to foresight.
 

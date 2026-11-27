@@ -1,6 +1,6 @@
 # Experiment design, not dashboards, is the data science career moat
 
-Conf42 Blog, 2025-10-17, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/experimentation-skills-build-data-science-careers
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/experimentation-skills-build-data-science-careers
 
 In short: Bhavana Reddy Chadagonda at Conf42 Prompt Engineering 2025 on picking experiment designs, CUPED variance reduction, A/B testing LLM prompts and career growth.
 

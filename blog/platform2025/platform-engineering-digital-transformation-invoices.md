@@ -1,6 +1,6 @@
 # Platform thinking is how digital transformation actually ships
 
-Conf42 Blog, 2025-08-05, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-digital-transformation-invoices
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-digital-transformation-invoices
 
 In short: Manik and Prachita Kashikar at Conf42 Platform Engineering 2025 map platform engineering onto a paper-heavy medical invoicing workflow, layer by layer.
 

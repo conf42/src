@@ -1,6 +1,6 @@
 # Cascading timeouts - every layer gives up before the one above it
 
-Conf42 Blog, 2025-08-19, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/cascading-timeouts-fail-fast-recover-faster
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/cascading-timeouts-fail-fast-recover-faster
 
 In short: Madhavi Bhairavabhatla (Mastercard) at Conf42 MLOps 2025 on cascading timeouts, shorter limits inward so failures surface fast and threads stay free.
 

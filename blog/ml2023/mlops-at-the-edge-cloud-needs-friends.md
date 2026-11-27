@@ -1,6 +1,6 @@
 # The cloud isn't broken, it just needs an edge for its ML models
 
-Conf42 Blog, 2023-05-17. https://www.conf42.com/blog/ml2023/mlops-at-the-edge-cloud-needs-friends
+Conf42 Blog, 2023-05-18. https://www.conf42.com/blog/ml2023/mlops-at-the-edge-cloud-needs-friends
 
 In short: Alejandro Cantos (Barbara) at Conf42 Machine Learning 2023 on when ML models belong at the edge, and what it takes to run MLOps across thousands of devices.
 

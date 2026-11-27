@@ -1,6 +1,6 @@
 # Your GPUs are mostly waiting, and a Go profiler can show why
 
-Conf42 Blog, 2026-05-03, updated 2026-11-09. https://www.conf42.com/blog/golang2026/real-time-ml-training-profiling-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/real-time-ml-training-profiling-go
 
 In short: Amol Lele of Hewlett Packard Enterprise at Conf42 Golang 2026 on a low-overhead Go profiler that finds ML training bottlenecks while jobs still run.
 

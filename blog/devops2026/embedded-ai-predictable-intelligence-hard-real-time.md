@@ -1,6 +1,6 @@
 # Embedded AI should aim for predictable, not maximum, intelligence
 
-Conf42 Blog, 2026-01-06, updated 2026-11-09. https://www.conf42.com/blog/devops2026/embedded-ai-predictable-intelligence-hard-real-time
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/embedded-ai-predictable-intelligence-hard-real-time
 
 In short: Rasmi Ranjan Nayak (ASML) at Conf42 DevOps 2026 presents a real-time embedded AI framework that keeps inference inside hard deadlines.
 

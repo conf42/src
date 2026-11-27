@@ -1,6 +1,6 @@
 # Prompt contracts catch the one-word edit that flips the meaning
 
-Conf42 Blog, 2026-10-23, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-contracts-catch-one-word-drift
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-contracts-catch-one-word-drift
 
 In short: Sachin Gupta (eBay) at Conf42 Prompt Engineering 2026 on prompt contracts, the schema, claim, tool and policy checks that stop prompt drift in CI.
 

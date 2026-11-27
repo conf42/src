@@ -1,6 +1,6 @@
 # Privacy by design for JavaScript data pipelines, layer by layer
 
-Conf42 Blog, 2025-10-24, updated 2026-11-09. https://www.conf42.com/blog/js2025/privacy-by-design-for-javascript-data-pipelines
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/privacy-by-design-for-javascript-data-pipelines
 
 In short: Meta data engineer Vivekananda Chittireddy showed at Conf42 JavaScript 2025 how k-anonymity, differential privacy and tokenisation fit JS stacks.
 

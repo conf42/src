@@ -1,6 +1,6 @@
 # Signed receipts, not logs, as evidence for high-risk AI pipelines
 
-Conf42 Blog, 2026-06-17, updated 2026-11-09. https://www.conf42.com/blog/llms2026/signed-receipts-for-high-risk-ai-pipelines
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/signed-receipts-for-high-risk-ai-pipelines
 
 In short: Neeraj Kumar Singh Beshane of Meta at Conf42 LLMs 2026 on RuntimeGuard-AI, which uses hash-chained signed records and zero-knowledge proofs for AI compliance.
 

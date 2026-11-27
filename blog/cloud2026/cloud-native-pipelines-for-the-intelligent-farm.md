@@ -1,6 +1,6 @@
 # The intelligent farm is a data pipeline with tractors attached
 
-Conf42 Blog, 2026-03-31, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/cloud-native-pipelines-for-the-intelligent-farm
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/cloud-native-pipelines-for-the-intelligent-farm
 
 In short: Mallikarjuna Muchu at Conf42 Cloud Native 2026 on cloud-native AI in agriculture, from IoT and drone data pipelines to yield models, robots and traceability.
 

@@ -1,6 +1,6 @@
 # Aircraft digital twins are a platform, not a 3D model
 
-Conf42 Blog, 2025-08-25, updated 2026-11-09. https://www.conf42.com/blog/platform2025/aviation-digital-twins-as-predictive-platforms
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/aviation-digital-twins-as-predictive-platforms
 
 In short: Divakar Duraiyan (Tata Consultancy Services) at Conf42 Platform Engineering 2025 on the edge, data and compliance layers behind predictive aviation maintenance.
 

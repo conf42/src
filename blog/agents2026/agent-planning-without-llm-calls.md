@@ -1,6 +1,6 @@
 # Your agent doesn't need an LLM to plan, just a graph and a search
 
-Conf42 Blog, 2026-08-25, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-planning-without-llm-calls
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-planning-without-llm-calls
 
 In short: Maureese Williams of Disney at Conf42 AI Agents 2026 shows GATS, a tree-search planner that calls the model only for novel states and caches the answer.
 

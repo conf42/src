@@ -1,6 +1,6 @@
 # Treat GitHub, GitLab and Gerrit as one platform, not three tools
 
-Conf42 Blog, 2025-08-08, updated 2026-11-09. https://www.conf42.com/blog/platform2025/unified-scm-platform-github-gitlab-gerrit
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/unified-scm-platform-github-gitlab-gerrit
 
 In short: Vasdev Gullapalli of Qualcomm at Conf42 Platform Engineering 2025 on unified access, policy and event-driven automation across Git systems for 50K+ engineers.
 

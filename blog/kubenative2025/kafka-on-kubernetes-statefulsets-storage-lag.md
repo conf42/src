@@ -1,6 +1,6 @@
 # Kafka on Kubernetes lives or dies on storage and consumer lag
 
-Conf42 Blog, 2025-09-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kafka-on-kubernetes-statefulsets-storage-lag
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kafka-on-kubernetes-statefulsets-storage-lag
 
 In short: Shalini Katyayani Koney (Walmart) at Conf42 Kube Native 2025 on Kafka on Kubernetes at 100,000+ msg/s with StatefulSets, fast disks and lag-based scaling.
 

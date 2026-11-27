@@ -1,6 +1,6 @@
 # Multi-vendor DOCSIS fleets need one behaviour contract
 
-Conf42 Blog, 2026-05-28, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/unified-docsis-chipsets-one-telemetry-schema
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/unified-docsis-chipsets-one-telemetry-schema
 
 In short: Harsha Vardhani Talluri at Conf42 Database DevOps 2026 on standardising chipset behaviour and telemetry across DOCSIS vendors to speed validation and triage.
 

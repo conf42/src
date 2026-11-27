@@ -1,6 +1,6 @@
 # A dashboard agent that profiles its MCP data before you ask
 
-Conf42 Blog, 2026-09-01, updated 2026-11-09. https://www.conf42.com/blog/agents2026/mcp-dashboard-agent-profiles-data-first
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/mcp-dashboard-agent-profiles-data-first
 
 In short: Rohit Deshpande and Scott Young of SAP at Conf42 AI Agents 2026 demo a LangGraph agent that turns prompts into live, editable dashboards over MCP servers.
 

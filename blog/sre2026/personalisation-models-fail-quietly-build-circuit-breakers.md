@@ -1,6 +1,6 @@
 # AI personalisation fails silently, so give it circuit breakers
 
-Conf42 Blog, 2026-03-09, updated 2026-11-09. https://www.conf42.com/blog/sre2026/personalisation-models-fail-quietly-build-circuit-breakers
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/personalisation-models-fail-quietly-build-circuit-breakers
 
 In short: Yury Lysak of Lionsoul Global at Conf42 SRE 2026 on proactive SRE for AI personalisation: drift signals, small-data methods and black swan circuit breakers.
 

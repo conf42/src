@@ -1,6 +1,6 @@
 # In real-time bidding, a late answer is a no answer
 
-Conf42 Blog, 2026-10-16, updated 2026-11-09. https://www.conf42.com/blog/platform2026/in-real-time-bidding-late-means-no
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/in-real-time-bidding-late-means-no
 
 In short: Sujan Challa (Samsung Electronics America) at Conf42 Platform Engineering 2026 on building an ad auction platform around a 100 ms latency wall.
 

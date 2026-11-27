@@ -1,6 +1,6 @@
 # Your AI outage model failed because of governance, not the model
 
-Conf42 Blog, 2026-04-09. https://www.conf42.com/blog/cloud2026/data-governance-is-a-chain-of-custody
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/data-governance-is-a-chain-of-custody
 
 In short: Karthik Ravva of Austin Energy at Conf42 Cloud Native 2026 on embedding data governance in every lifecycle stage, from ingestion to auditable deletion.
 

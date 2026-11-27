@@ -1,6 +1,6 @@
 # Good SAST matches the shape of your code, not the text
 
-Conf42 Blog, 2025-11-30, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/semgrep-sast-matches-code-shape-not-text
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/semgrep-sast-matches-code-shape-not-text
 
 In short: Safeer C M of MoEngage at Conf42 DevSecOps 2025 explains how SAST works via abstract syntax trees and how to write and roll out Semgrep rules without drowning devs.
 

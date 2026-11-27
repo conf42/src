@@ -1,6 +1,6 @@
 # AI coding tools for fullstack work: hand over the work, keep the judgment
 
-Conf42 Blog, 2026-08-30, updated 2026-11-09. https://www.conf42.com/blog/agents2026/transfer-the-workload-not-the-judgment
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/transfer-the-workload-not-the-judgment
 
 In short: Kabir Ibraheem of Meltwater at Conf42 AI Agents 2026 walks one to-do form through Claude, Copilot and Cursor, with context, plans and tests owned by the engineer.
 

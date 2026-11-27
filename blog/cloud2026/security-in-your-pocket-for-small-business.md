@@ -1,6 +1,6 @@
 # Small businesses run cloud-native stacks without a security team
 
-Conf42 Blog, 2026-04-15. https://www.conf42.com/blog/cloud2026/security-in-your-pocket-for-small-business
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/security-in-your-pocket-for-small-business
 
 In short: Vaishali Mahavratayajula of Wells Fargo at Conf42 Cloud Native 2026 on Security in Your Pocket, a six-layer AI risk framework for small online businesses.
 

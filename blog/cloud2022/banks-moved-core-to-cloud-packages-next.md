@@ -1,6 +1,6 @@
 # If banks moved their core to the cloud, your packages can follow
 
-Conf42 Blog, 2022-04-27. https://www.conf42.com/blog/cloud2022/banks-moved-core-to-cloud-packages-next
+Conf42 Blog, 2022-04-28. https://www.conf42.com/blog/cloud2022/banks-moved-core-to-cloud-packages-next
 
 In short: Ciara Carey (Cloudsmith) at Conf42 Cloud Native 2022 on why going cloud native is now worth the effort, with banking as the case study
 

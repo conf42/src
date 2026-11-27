@@ -1,6 +1,6 @@
 # Hardware-in-the-loop for software-defined cars needs observability built in
 
-Conf42 Blog, 2026-09-08, updated 2026-11-09. https://www.conf42.com/blog/obs2026/hil-testing-with-observability-built-in
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/hil-testing-with-observability-built-in
 
 In short: Sumaiyya Fatima of General Motors at Conf42 Observability 2026 on a five-layer HIL platform with embedded diagnostics and closed-loop validation.
 

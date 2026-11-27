@@ -1,6 +1,6 @@
 # A Rust emergency dispatch system on Tokio, Kafka and Wasm
 
-Conf42 Blog, 2025-08-05, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-emergency-dispatch-tokio-kafka-wasm
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-emergency-dispatch-tokio-kafka-wasm
 
 In short: Lakshmi Vara Prasad Adusumilli of Conduent at Conf42 Rustlang 2025 on building life-critical emergency response systems in Rust with Tokio, Kafka and WebAssembly.
 

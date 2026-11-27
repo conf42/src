@@ -1,6 +1,6 @@
 # Modular architecture is a boundary problem before a tooling one
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/obs2025/modular-architecture-enterprise-design
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/modular-architecture-enterprise-design
 
 In short: Wayfair engineer Anusha Reddy Guntakandla lays out modular architecture at Conf42 Observability 2025, from encapsulation to modular monoliths and incremental migration.
 

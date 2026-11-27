@@ -1,6 +1,6 @@
 # The abandoned cart won't wait for your overnight batch job
 
-Conf42 Blog, 2026-05-13, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/real-time-marketing-analytics-cart-abandonment
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/real-time-marketing-analytics-cart-abandonment
 
 In short: Kamini Murugaboopathy of Wonderbow Analytics at Conf42 Database DevOps 2026 on Kafka, lakehouses, bitmap indexes and DataOps for real-time marketing analytics.
 

@@ -1,6 +1,6 @@
 # Enterprise AI fails in the plumbing, not the model
 
-Conf42 Blog, 2026-05-07, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/ai-products-need-database-devops-plumbing
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/ai-products-need-database-devops-plumbing
 
 In short: Bharat Kumar Reddy Karumuri of General Motors at Conf42 Database DevOps 2026 on the data, MLOps and governance layer that turns AI demos into products.
 

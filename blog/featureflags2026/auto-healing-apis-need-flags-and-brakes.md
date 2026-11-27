@@ -1,6 +1,6 @@
 # Auto-healing APIs need feature flags and brakes, not just restarts
 
-Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/auto-healing-apis-need-flags-and-brakes
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/auto-healing-apis-need-flags-and-brakes
 
 In short: Anil Kumar Chitiprolu at Conf42 Feature Flags 2026 on a control loop that pairs monitoring, circuit breakers and feature flags to recover microservices safely.
 

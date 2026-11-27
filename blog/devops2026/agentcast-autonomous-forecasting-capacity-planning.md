@@ -1,6 +1,6 @@
 # AgentCast lets an agent pick, tune and retrain your forecasting model
 
-Conf42 Blog, 2025-12-23, updated 2026-11-09. https://www.conf42.com/blog/devops2026/agentcast-autonomous-forecasting-capacity-planning
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/agentcast-autonomous-forecasting-capacity-planning
 
 In short: Amazon applied scientist Premanand Tiwari at Conf42 DevOps 2026 on AgentCast, an agent that chooses, tunes and retrains capacity forecasting models.
 

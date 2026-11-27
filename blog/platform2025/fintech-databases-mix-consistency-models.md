@@ -1,6 +1,6 @@
 # FinTech databases need different consistency for different money
 
-Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fintech-databases-mix-consistency-models
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fintech-databases-mix-consistency-models
 
 In short: Karthickram Vailraj of Charles Schwab covers sharding, replication and consistency choices for FinTech platforms at Conf42 Platform Engineering 2025.
 

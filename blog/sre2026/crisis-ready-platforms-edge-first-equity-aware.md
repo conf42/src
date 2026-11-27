@@ -1,6 +1,6 @@
 # Crisis-ready platforms should be edge-first and equity-aware
 
-Conf42 Blog, 2026-03-16, updated 2026-11-09. https://www.conf42.com/blog/sre2026/crisis-ready-platforms-edge-first-equity-aware
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/crisis-ready-platforms-edge-first-equity-aware
 
 In short: Rakesh Kumar Kavsari Gopal at Conf42 SRE 2026 on AI platforms that keep health and financial services running in disasters - predictive scaling, edge, fallbacks.
 

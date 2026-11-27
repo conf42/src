@@ -1,6 +1,6 @@
 # Single-layer LLM guardrails miss attacks spread across turns
 
-Conf42 Blog, 2026-10-09, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/single-layer-guardrails-miss-multi-turn-attacks
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/single-layer-guardrails-miss-multi-turn-attacks
 
 In short: Manvitha Potluri at Conf42 Prompt Engineering 2026 tested 390 prompts on AWS Bedrock; a second intent layer caught what keyword filters missed.
 

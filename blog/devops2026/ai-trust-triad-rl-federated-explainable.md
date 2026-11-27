@@ -1,6 +1,6 @@
 # Shipping AI models is solved; operating them safely is the hard part
 
-Conf42 Blog, 2026-01-01, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-trust-triad-rl-federated-explainable
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-trust-triad-rl-federated-explainable
 
 In short: Saideepak Kandibanda (DISH Network) at Conf42 DevOps 2026 presents the AI Trust Triad, RL plus federated learning and explainable AI with DevOps guardrails.
 

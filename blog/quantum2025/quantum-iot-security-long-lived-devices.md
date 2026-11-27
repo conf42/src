@@ -1,6 +1,6 @@
 # IoT devices outlive RSA, so quantum-safe security starts now
 
-Conf42 Blog, 2025-05-21, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-iot-security-long-lived-devices
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-iot-security-long-lived-devices
 
 In short: Gayathri Jeganmohan of Microsoft maps quantum computing onto IoT intelligence and security at Conf42 Quantum Computing 2025, from QKD to quantum signatures.
 

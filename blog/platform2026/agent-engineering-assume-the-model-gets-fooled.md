@@ -1,6 +1,6 @@
 # Agent engineering starts by assuming the model gets fooled
 
-Conf42 Blog, 2026-10-07, updated 2026-11-09. https://www.conf42.com/blog/platform2026/agent-engineering-assume-the-model-gets-fooled
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/agent-engineering-assume-the-model-gets-fooled
 
 In short: Cynthia Akiotu of Accenture at Conf42 Platform Engineering 2026 on identity, MCP tools and authorization checks that hold when prompt injection works.
 

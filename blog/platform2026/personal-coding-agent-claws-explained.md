@@ -1,6 +1,6 @@
 # A Claw is a coding agent that never logs off
 
-Conf42 Blog, 2026-10-08, updated 2026-11-09. https://www.conf42.com/blog/platform2026/personal-coding-agent-claws-explained
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/personal-coding-agent-claws-explained
 
 In short: Erik Hanchett of AWS at Conf42 Platform Engineering 2026 on Claws, the always-on coding agents with memory, schedules, chat apps and sandboxes.
 

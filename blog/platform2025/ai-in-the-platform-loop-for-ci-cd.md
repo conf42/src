@@ -1,6 +1,6 @@
 # Put AI inside the platform loop, and keep a rollback for the model
 
-Conf42 Blog, 2025-08-12, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-in-the-platform-loop-for-ci-cd
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-in-the-platform-loop-for-ci-cd
 
 In short: Praveen Kumar Guguloth at Conf42 Platform Engineering 2025 on AI-driven platforms, four architecture patterns, guardrails and gradual adoption for CI/CD.
 

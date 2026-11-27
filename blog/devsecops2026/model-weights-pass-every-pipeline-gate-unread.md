@@ -1,6 +1,6 @@
 # Model weights pass every pipeline gate without being read
 
-Conf42 Blog, 2026-09-06, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/model-weights-pass-every-pipeline-gate-unread
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/model-weights-pass-every-pipeline-gate-unread
 
 In short: Emmy Eide of Realign Labs at Conf42 DevSecOps 2026 walks a model-bearing image through six pipeline gates and shows where "no findings" is mistaken for clean.
 

@@ -1,6 +1,6 @@
 # Let the AI propose, let governance decide what actually runs
 
-Conf42 Blog, 2026-02-17, updated 2026-11-09. https://www.conf42.com/blog/sre2026/separate-ai-decisions-from-authorization
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/separate-ai-decisions-from-authorization
 
 In short: Suganya Nagarajan of Amazon at Conf42 SRE 2026 on Human-Governed Automation Loops, which split decision generation from authorization to cap blast radius.
 

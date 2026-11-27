@@ -1,6 +1,6 @@
 # Security as code turns the release-day gate into pipeline checks
 
-Conf42 Blog, 2025-08-18, updated 2026-11-09. https://www.conf42.com/blog/platform2025/security-as-code-ends-the-final-gate
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/security-as-code-ends-the-final-gate
 
 In short: Naresh Yelkoti of U.S. Bank lays out at Conf42 Platform Engineering 2025 how scanning, policy as code and secrets detection move security into CI/CD.
 

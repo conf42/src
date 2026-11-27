@@ -1,6 +1,6 @@
 # A calzone explains Python's method resolution order better than the docs
 
-Conf42 Blog, 2021-05-26. https://www.conf42.com/blog/python2021/python-c3-mro-mixins-calzone
+Conf42 Blog, 2021-05-27. https://www.conf42.com/blog/python2021/python-c3-mro-mixins-calzone
 
 In short: Jason C. McDonald (MousePaw Media) at Conf42 Python 2021 on how the C3 MRO resolves multiple inheritance and how to use it for mixins
 

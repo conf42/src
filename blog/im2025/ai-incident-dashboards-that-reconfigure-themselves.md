@@ -1,6 +1,6 @@
 # Incident dashboards should interpret the data, not just show it
 
-Conf42 Blog, 2025-09-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-incident-dashboards-that-reconfigure-themselves
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-incident-dashboards-that-reconfigure-themselves
 
 In short: Priyanshi Deshwal (Mode) at Conf42 Incident Management 2025 on AI incident views that rank alerts, pick visuals and write plain-language summaries.
 

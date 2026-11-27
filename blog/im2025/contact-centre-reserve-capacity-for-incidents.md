@@ -1,6 +1,6 @@
 # An incident-ready contact centre keeps humans in reserve for the outage
 
-Conf42 Blog, 2025-09-26, updated 2026-11-09. https://www.conf42.com/blog/im2025/contact-centre-reserve-capacity-for-incidents
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/contact-centre-reserve-capacity-for-incidents
 
 In short: Sujit Kumar (Copart) at Conf42 Incident Management 2025 on designing AI-assisted contact centres that stay calm when the CRM is down and call volume spikes.
 

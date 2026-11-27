@@ -1,6 +1,6 @@
 # Scoring every 5G session for risk before it reaches the UPF
 
-Conf42 Blog, 2026-01-20. https://www.conf42.com/blog/devops2026/ai-risk-scoring-for-5g-user-plane
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/ai-risk-scoring-for-5g-user-plane
 
 In short: Binu Govindan of Microsoft at Conf42 DevOps 2026 on multi-factor AI risk scoring and a tiered mitigation pipeline for the 5G user plane function.
 

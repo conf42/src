@@ -1,6 +1,6 @@
 # Treat subscription payments as a platform and failed charges come back
 
-Conf42 Blog, 2025-08-15, updated 2026-11-09. https://www.conf42.com/blog/platform2025/subscription-payments-as-a-platform
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/subscription-payments-as-a-platform
 
 In short: George Thomas of Chegg at Conf42 Platform Engineering 2025 on payment gateways, smart retries, tokenisation and usage-based billing as self-service.
 

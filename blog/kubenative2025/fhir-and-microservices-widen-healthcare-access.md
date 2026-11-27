@@ -1,6 +1,6 @@
 # FHIR and Kubernetes microservices are closing healthcare access gaps
 
-Conf42 Blog, 2025-10-05, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/fhir-and-microservices-widen-healthcare-access
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/fhir-and-microservices-widen-healthcare-access
 
 In short: Geetha Sharanya Bolla (Apexon) at Conf42 Kube Native 2025 on data integration, FHIR and cloud-native microservices for rural and underserved care.
 

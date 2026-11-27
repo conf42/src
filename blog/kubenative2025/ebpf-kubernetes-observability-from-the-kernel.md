@@ -1,6 +1,6 @@
 # eBPF gives Kubernetes observability from inside the kernel
 
-Conf42 Blog, 2025-10-10, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ebpf-kubernetes-observability-from-the-kernel
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ebpf-kubernetes-observability-from-the-kernel
 
 In short: Alejandro Mercado, DevOps Lead at Michael Page, explains at Conf42 Kube Native 2025 why eBPF sits under Kubernetes networking, security and observability.
 

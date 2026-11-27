@@ -1,6 +1,6 @@
 # The MTTR worth tracking is mean time to retro
 
-Conf42 Blog, 2021-09-29. https://www.conf42.com/blog/sre2021/mttr-means-mean-time-to-retro
+Conf42 Blog, 2021-09-30. https://www.conf42.com/blog/sre2021/mttr-means-mean-time-to-retro
 
 In short: Robert Ross (FireHydrant) at Conf42 SRE 2021 on five pragmatic incident response tips, from retros for small incidents to clear service ownership.
 

@@ -1,6 +1,6 @@
 # Commerce observability starts where green dashboards stop
 
-Conf42 Blog, 2025-06-04, updated 2026-11-09. https://www.conf42.com/blog/obs2025/commerce-observability-when-dashboards-are-green
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/commerce-observability-when-dashboards-are-green
 
 In short: Adobe's Ashwin Das Gururaja and Devang Gaur at Conf42 Observability 2025 on tracking checkout, payments and renewals as business signals.
 

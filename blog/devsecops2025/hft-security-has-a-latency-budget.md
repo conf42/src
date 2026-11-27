@@ -1,6 +1,6 @@
 # In high-frequency trading, every security control has a latency bill
 
-Conf42 Blog, 2025-11-23, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/hft-security-has-a-latency-budget
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/hft-security-has-a-latency-budget
 
 In short: Janardhan Chejarla of Calypso Technology at Conf42 DevSecOps 2025 on securing event-driven trading systems without paying the sidecar latency tax.
 

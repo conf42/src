@@ -1,6 +1,6 @@
 # Framing, priming and anchoring steer LLMs the way they steer us
 
-Conf42 Blog, 2025-10-31, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-psychology-framing-priming-anchoring
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-psychology-framing-priming-anchoring
 
 In short: Shashank Shivam of Oracle at Conf42 Prompt Engineering 2025 on prompt psychology, eight prompting moves and the human biases models copy.
 

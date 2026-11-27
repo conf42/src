@@ -1,6 +1,6 @@
 # Containers, Terraform and GitOps turn AI deploys into a non-event
 
-Conf42 Blog, 2025-08-12, updated 2026-11-09. https://www.conf42.com/blog/platform2025/containers-iac-gitops-for-ai-platforms
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/containers-iac-gitops-for-ai-platforms
 
 In short: Google's Bhaskar Goyal at Conf42 Platform Engineering 2025 on AI-aware Docker builds, Kubernetes GPU pools, Terraform modules and GitOps for model deploys.
 

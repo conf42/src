@@ -1,6 +1,6 @@
 # Voice biometrics can retire the date-of-birth check in healthcare
 
-Conf42 Blog, 2025-09-21, updated 2026-11-09. https://www.conf42.com/blog/im2025/voice-biometrics-replace-date-of-birth-checks
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/voice-biometrics-replace-date-of-birth-checks
 
 In short: Sreenivasul Reddy Meegada at Conf42 Incident Management 2025 on replacing knowledge-based checks in healthcare with voice biometrics, and its limits.
 

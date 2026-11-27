@@ -1,6 +1,6 @@
 # Why Kubernetes API gateways need a service mesh behind them
 
-Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/api-gateway-plus-service-mesh-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/api-gateway-plus-service-mesh-kubernetes
 
 In short: Niharika Jha (Microsoft) at Conf42 Kube Native 2025 on pairing Kubernetes-native API gateways with Istio or Linkerd for traffic control, mTLS and observability.
 

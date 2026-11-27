@@ -1,6 +1,6 @@
 # ML that ranks errors by business impact cut MTTR at Liberty Mutual
 
-Conf42 Blog, 2025-09-02, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-alert-routing-slack-mttr-liberty-mutual
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-alert-routing-slack-mttr-liberty-mutual
 
 In short: Sreelatha Pasuparthi (Liberty Mutual) at Conf42 MLOps 2025 on ML-driven alert triage and Slack routing across 17 enterprise systems.
 

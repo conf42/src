@@ -1,6 +1,6 @@
 # Nine ways SOX audit teams use AI, and the sign-offs each one needs
 
-Conf42 Blog, 2026-06-03, updated 2026-11-09. https://www.conf42.com/blog/llms2026/ai-in-sox-audits-validation-is-not-review
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/ai-in-sox-audits-validation-is-not-review
 
 In short: Karishma Velisetty at Conf42 LLMs 2026 maps nine AI use cases in SOX and ICFR audit work to their risks and the human controls that make them reliable.
 

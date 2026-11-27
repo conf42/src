@@ -1,6 +1,6 @@
 # Replace the system the business runs on without a big-bang weekend
 
-Conf42 Blog, 2026-11-01, updated 2026-11-09. https://www.conf42.com/blog/platform2026/zero-downtime-platform-migration-playbook
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/zero-downtime-platform-migration-playbook
 
 In short: Saikrishna Ala (Bath and Body Works) at Conf42 Platform Engineering 2026 on dual-write, bidirectional sync and CDC as reusable migration capability.
 

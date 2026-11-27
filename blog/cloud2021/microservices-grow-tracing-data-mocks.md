@@ -1,6 +1,6 @@
 # Nobody deletes microservices, so read your traces like a database
 
-Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/microservices-grow-tracing-data-mocks
+Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/microservices-grow-tracing-data-mocks
 
 In short: Michael Haberman (Aspecto) at Conf42 Cloud Native 2021 on why microservice risk grows with the diagram, and how OpenTelemetry traces can feed docs and mocks
 

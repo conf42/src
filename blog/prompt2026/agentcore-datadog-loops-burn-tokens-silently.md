@@ -1,6 +1,6 @@
 # A looping agent keeps every dashboard green
 
-Conf42 Blog, 2026-10-18, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agentcore-datadog-loops-burn-tokens-silently
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agentcore-datadog-loops-burn-tokens-silently
 
 In short: Indika Wimalasuriya (Virtusa) at Conf42 Prompt Engineering 2026 traces a Bedrock AgentCore agent end to end in Datadog, kill switch included.
 

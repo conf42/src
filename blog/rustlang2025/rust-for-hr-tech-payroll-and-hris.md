@@ -1,6 +1,6 @@
 # Why Rust fits HR tech, from payroll runs to open enrollment
 
-Conf42 Blog, 2025-07-25, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-for-hr-tech-payroll-and-hris
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-for-hr-tech-payroll-and-hris
 
 In short: Swetha Priya Sathiyam of ADP at Conf42 Rustlang 2025 on how Rust's safety and concurrency map onto HRIS systems that touch every employee.
 

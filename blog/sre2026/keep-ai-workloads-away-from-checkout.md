@@ -1,6 +1,6 @@
 # Your recommendation model should never be able to slow checkout
 
-Conf42 Blog, 2026-02-21, updated 2026-11-09. https://www.conf42.com/blog/sre2026/keep-ai-workloads-away-from-checkout
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/keep-ai-workloads-away-from-checkout
 
 In short: Ajay Srinivas Kiran Gemidi of Valuguard Solutions at Conf42 SRE 2026 on isolation, execution limits and lineage for AI analytics in critical platforms.
 

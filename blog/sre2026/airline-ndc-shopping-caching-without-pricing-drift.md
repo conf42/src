@@ -1,6 +1,6 @@
 # Airline shopping traffic is mostly repeats, so cache it carefully
 
-Conf42 Blog, 2026-03-11, updated 2026-11-09. https://www.conf42.com/blog/sre2026/airline-ndc-shopping-caching-without-pricing-drift
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/airline-ndc-shopping-caching-without-pricing-drift
 
 In short: Mukul Kumar Gaur of Accelya Group at Conf42 SRE 2026 on caching NDC airline offers at scale with freshness rules that stop pricing drift.
 

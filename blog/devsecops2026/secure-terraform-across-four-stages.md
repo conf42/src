@@ -1,6 +1,6 @@
 # Multi-cloud Terraform security is four stages, not one gate
 
-Conf42 Blog, 2026-09-12, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/secure-terraform-across-four-stages
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/secure-terraform-across-four-stages
 
 In short: Perumalsamy Ravindran at Conf42 DevSecOps 2026 splits Terraform security into author, plan, apply and operate, with federated identity and plan-time policy.
 

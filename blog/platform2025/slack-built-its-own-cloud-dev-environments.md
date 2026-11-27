@@ -1,6 +1,6 @@
 # How Slack built its own cloud dev environments, and when you should
 
-Conf42 Blog, 2025-08-16, updated 2026-11-09. https://www.conf42.com/blog/platform2025/slack-built-its-own-cloud-dev-environments
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/slack-built-its-own-cloud-dev-environments
 
 In short: Jayant Tyagi of Salesforce (Slack) at Conf42 Platform Engineering 2025 on remote dev VMs, 90-second warm pools, SSH agent forwarding and frontend grafting.
 

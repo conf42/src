@@ -1,6 +1,6 @@
 # Sorting 8,000 conference photos with Rekognition, Lambda and $50
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/ml2025/serverless-photo-pipeline-8000-event-photos
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/serverless-photo-pipeline-8000-event-photos
 
 In short: Dmytro Hlotenko at Conf42 Machine Learning 2025 on the serverless AWS pipeline that culled and edited 8,000 AWS Community Day DACH photos for about $50.
 

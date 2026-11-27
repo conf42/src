@@ -1,6 +1,6 @@
 # Machine learning as an intelligence layer across the payment lifecycle
 
-Conf42 Blog, 2026-01-27, updated 2026-11-09. https://www.conf42.com/blog/ml2026/machine-learning-payment-ecosystem-layer
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/machine-learning-payment-ecosystem-layer
 
 In short: Synchrony's Balakumaran Sugumar at Conf42 Machine Learning 2026 maps ML across merchant onboarding, authorisation, settlement and payment operations.
 

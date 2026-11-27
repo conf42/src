@@ -1,6 +1,6 @@
 # A medical scribe as a LangGraph state machine, not one big prompt
 
-Conf42 Blog, 2026-01-20, updated 2026-11-09. https://www.conf42.com/blog/ml2026/langgraph-state-machine-medical-scribe
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/langgraph-state-machine-medical-scribe
 
 In short: Apple ML engineer Rajeshwari Sah at Conf42 Machine Learning 2026 builds a four-agent LangGraph scribe that turns doctor-patient talk into checked SOAP notes.
 

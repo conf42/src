@@ -1,6 +1,6 @@
 # Go as the orchestration layer for LLM-driven grocery commerce
 
-Conf42 Blog, 2026-04-25, updated 2026-11-09. https://www.conf42.com/blog/golang2026/llm-commerce-platforms-in-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/llm-commerce-platforms-in-go
 
 In short: Sanjay Basu of TCS at Conf42 Golang 2026 maps where Go services sit in LLM commerce, from search and catalog enrichment to substitution and agents.
 

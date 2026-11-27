@@ -1,6 +1,6 @@
 # What a 47-step mortgage teaches about agentic platforms
 
-Conf42 Blog, 2025-08-07, updated 2026-11-09. https://www.conf42.com/blog/platform2025/agentic-ai-mortgage-processing-lessons
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/agentic-ai-mortgage-processing-lessons
 
 In short: Naganarendar Chitturi of Newrez at Conf42 Platform Engineering 2025 on orchestration, events and audit trails for agentic AI in mortgage processing.
 

@@ -1,6 +1,6 @@
 # Six readiness checklists don't add up to one go-live decision
 
-Conf42 Blog, 2026-09-15, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-readiness-needs-one-scorecard
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-readiness-needs-one-scorecard
 
 In short: Shubham Sharma (Microsoft) at Conf42 AI Agents 2026 presents MCRF, one readiness framework with evidence gates for mission-critical AI agents.
 

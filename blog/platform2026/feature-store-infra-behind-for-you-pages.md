@@ -1,6 +1,6 @@
 # The feature store behind every For You feed, explained
 
-Conf42 Blog, 2026-10-10, updated 2026-11-09. https://www.conf42.com/blog/platform2026/feature-store-infra-behind-for-you-pages
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/feature-store-infra-behind-for-you-pages
 
 In short: Attila Toth of ScyllaDB at Conf42 Platform Engineering 2026 on online feature stores, P99 tail latency, query-first data models and pluggable stores.
 

@@ -1,6 +1,6 @@
 # Rust-powered predictive AI for telecom networks and cell towers
 
-Conf42 Blog, 2025-08-03, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-predictive-ai-for-telecom-networks
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-predictive-ai-for-telecom-networks
 
 In short: Venu Madhav Nadella of Spectrum at Conf42 Rustlang 2025 on moving telecom ops from break-fix to prediction with Rust, isolation forests and LSTMs.
 

@@ -1,6 +1,6 @@
 # Modularizing an 800,000-line Go monolith is mostly a people problem
 
-Conf42 Blog, 2026-05-11, updated 2026-11-09. https://www.conf42.com/blog/golang2026/modular-monolith-fleet-people-first
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/modular-monolith-fleet-people-first
 
 In short: Victor Lyuboslavsky of Fleet Device Management at Conf42 Golang 2026 on a failed first attempt, a pilot bounded context and the Go tools that enforce it.
 

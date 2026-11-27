@@ -1,6 +1,6 @@
 # AI pricing in SAP works when the model can recommend but never write
 
-Conf42 Blog, 2026-09-20, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/ai-pricing-sap-recommends-sap-decides
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/ai-pricing-sap-recommends-sap-decides
 
 In short: At Conf42 DevSecOps 2026, Sirisha Ayyagari shows a zero-trust pattern for AI pricing in SAP: stateless AI, BAdI hooks, ABAP guardrails, full audit.
 

@@ -1,6 +1,6 @@
 # IoT supply chain attacks come in through the trusted update
 
-Conf42 Blog, 2025-11-21, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-supply-chain-attacks-trusted-updates
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-supply-chain-attacks-trusted-updates
 
 In short: Cybersecurity risk analyst Gresshma Atluri at Conf42 IoT 2025 on defending connected devices from supply chain attacks with secure by design and zero trust.
 

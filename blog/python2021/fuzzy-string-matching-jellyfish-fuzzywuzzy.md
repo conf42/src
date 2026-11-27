@@ -1,6 +1,6 @@
 # Almost-equal strings need a score, not a boolean
 
-Conf42 Blog, 2021-05-26. https://www.conf42.com/blog/python2021/fuzzy-string-matching-jellyfish-fuzzywuzzy
+Conf42 Blog, 2021-05-27. https://www.conf42.com/blog/python2021/fuzzy-string-matching-jellyfish-fuzzywuzzy
 
 In short: Naomi Kriger (Behalf) at Conf42 Python 2021 on comparing almost-identical strings with Jellyfish edit distances and FuzzyWuzzy similarity scores
 

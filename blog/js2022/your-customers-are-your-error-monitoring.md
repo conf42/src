@@ -1,6 +1,6 @@
 # If customers report your JavaScript errors, they are your monitoring
 
-Conf42 Blog, 2022-11-16. https://www.conf42.com/blog/js2022/your-customers-are-your-error-monitoring
+Conf42 Blog, 2022-11-17. https://www.conf42.com/blog/js2022/your-customers-are-your-error-monitoring
 
 In short: Finbar Fleming (Rollbar) at Conf42 JavaScript 2022 on why client-side errors go unseen in production and how error monitoring shortens the fix
 

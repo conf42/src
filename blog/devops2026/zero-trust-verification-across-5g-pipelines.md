@@ -1,6 +1,6 @@
 # Zero trust in a 5G pipeline means every stage proves itself
 
-Conf42 Blog, 2026-01-15. https://www.conf42.com/blog/devops2026/zero-trust-verification-across-5g-pipelines
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/zero-trust-verification-across-5g-pipelines
 
 In short: Vijayakumar Venganti of Cisco at Conf42 DevOps 2026 on embedding zero-trust checks into every CI/CD stage of 5G and cloud-native delivery.
 

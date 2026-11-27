@@ -1,6 +1,6 @@
 # A Data Platform Is Abstraction, Automation and a Chargeback Model
 
-Conf42 Blog, 2025-08-30, updated 2026-11-09. https://www.conf42.com/blog/platform2025/data-platforms-need-abstraction-and-chargeback
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/data-platforms-need-abstraction-and-chargeback
 
 In short: Meta engineer Rahul Joshi at Conf42 Platform Engineering 2025 on multi-tenant, self-service data platforms from Hadoop to the lakehouse.
 

@@ -1,6 +1,6 @@
 # RAG support bots should know when they do not know
 
-Conf42 Blog, 2025-05-23, updated 2026-11-09. https://www.conf42.com/blog/obs2025/rag-customer-support-beyond-chatbots
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/rag-customer-support-beyond-chatbots
 
 In short: Vaibhav Fanindra Mahajan at Conf42 Observability 2025 on RAG for customer support, with confidence thresholds, fresh indexes and clean human handoffs.
 

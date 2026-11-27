@@ -1,6 +1,6 @@
 # ML threat detection and crypto agility for the post-quantum era
 
-Conf42 Blog, 2025-09-16, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-threat-detection-post-quantum-readiness
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-threat-detection-post-quantum-readiness
 
 In short: Arfi Siddik Mollashaik of Securiti at Conf42 MLOps 2025 on multimodal ML threat detection, privacy-preserving training and post-quantum readiness.
 

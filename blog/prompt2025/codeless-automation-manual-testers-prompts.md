@@ -1,6 +1,6 @@
 # Manual testers already write prompts; codeless tools make them run
 
-Conf42 Blog, 2025-11-02, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/codeless-automation-manual-testers-prompts
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/codeless-automation-manual-testers-prompts
 
 In short: Balraj Govindaraj of MVP Plus Consulting at Conf42 Prompt Engineering 2025 on a four-phase plan to move manual testers to codeless, prompt-driven automation.
 

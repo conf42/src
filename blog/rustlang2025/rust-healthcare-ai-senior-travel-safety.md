@@ -1,6 +1,6 @@
 # Rust from wearable to hospital, a health platform for older travellers
 
-Conf42 Blog, 2025-08-18. https://www.conf42.com/blog/rustlang2025/rust-healthcare-ai-senior-travel-safety
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-healthcare-ai-senior-travel-safety
 
 In short: Raphael Shobi Thomas at Conf42 Rustlang 2025 on a Rust healthcare AI stack for senior travellers, from no_std biosensors to WebAssembly translation.
 

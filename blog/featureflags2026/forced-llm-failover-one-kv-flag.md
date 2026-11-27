@@ -1,6 +1,6 @@
 # A solo dev forced his LLM failover live and found four ladders
 
-Conf42 Blog, 2026-10-03, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/forced-llm-failover-one-kv-flag
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/forced-llm-failover-one-kv-flag
 
 In short: Fuad Laguda at Conf42 Feature Flags 2026 on a three-state Cloudflare KV trace flag and a deliberately forced failover from Claude Sonnet to Qwen on Nebius.
 

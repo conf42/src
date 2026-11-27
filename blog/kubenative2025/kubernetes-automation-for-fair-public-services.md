@@ -1,6 +1,6 @@
 # Kubernetes automation as a public good for government services
 
-Conf42 Blog, 2025-10-05, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kubernetes-automation-for-fair-public-services
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kubernetes-automation-for-fair-public-services
 
 In short: Mahesh Jalukuri (Envoy Global) at Conf42 Kube Native 2025 on Kubernetes-native automation for equitable, resilient healthcare, legal and utility services.
 

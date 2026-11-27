@@ -1,6 +1,6 @@
 # AI identity verification has to work for everyone, not just the average face
 
-Conf42 Blog, 2025-05-04, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-digital-identity-verification-primer
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-digital-identity-verification-primer
 
 In short: Venkata Krishna Ramesh Kumar Koppireddy of UV Cyber at Conf42 Machine Learning 2025 surveys AI-driven identity checks, from biometrics to consent and inclusion.
 

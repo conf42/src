@@ -1,6 +1,6 @@
 # Catch the bad claim at ingestion, not at adjudication
 
-Conf42 Blog, 2026-05-12, updated 2026-11-09. https://www.conf42.com/blog/golang2026/catch-bad-claims-at-ingestion-edi-pipelines
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/catch-bad-claims-at-ingestion-edi-pipelines
 
 In short: Devi Manoharan of ASTA CRS at Conf42 Golang 2026 on healthcare claims systems that pair ML scoring with staged EDI pipelines on Go and Kafka.
 

@@ -1,6 +1,6 @@
 # Give an agent's Terraform change consequences before merge
 
-Conf42 Blog, 2026-10-02, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/simulate-terraform-change-before-merge
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/simulate-terraform-change-before-merge
 
 In short: Kevin Brown of Cloud World Model at Conf42 Prompt Engineering 2026 shows simulated cost, CPU and latency for an infrastructure PR, gaps labelled.
 

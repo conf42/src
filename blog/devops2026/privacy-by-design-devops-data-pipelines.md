@@ -1,6 +1,6 @@
 # Privacy by design belongs in the pipeline, not the audit
 
-Conf42 Blog, 2025-12-30, updated 2026-11-09. https://www.conf42.com/blog/devops2026/privacy-by-design-devops-data-pipelines
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/privacy-by-design-devops-data-pipelines
 
 In short: Vivek Chittireddy (Meta) at Conf42 DevOps 2026 on k-anonymity, differential privacy, tokenization and DPIA gates baked into CI/CD.
 

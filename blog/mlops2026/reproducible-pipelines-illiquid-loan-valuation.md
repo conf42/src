@@ -1,6 +1,6 @@
 # A loan valuation you cannot replay is one you cannot defend
 
-Conf42 Blog, 2026-11-15, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/reproducible-pipelines-illiquid-loan-valuation
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/reproducible-pipelines-illiquid-loan-valuation
 
 In short: Ankur Mehra at Conf42 MLOps 2026 on valuing illiquid loans with pinned versions, signed run manifests and event-driven revaluation.
 

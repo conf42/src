@@ -1,6 +1,6 @@
 # Financial risk governance starts with one shared view of the data
 
-Conf42 Blog, 2025-09-27, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/financial-risk-starts-with-one-shared-view
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/financial-risk-starts-with-one-shared-view
 
 In short: Sreenivasulu Gajula at Conf42 Kube Native 2025 on three pillars for bank risk governance - integrated data, automated compliance and AI fraud defence.
 

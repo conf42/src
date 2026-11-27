@@ -1,6 +1,6 @@
 # Counting commits won't make developers productive; context will
 
-Conf42 Blog, 2025-11-18, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/developer-productivity-pitfalls-proofpoint
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/developer-productivity-pitfalls-proofpoint
 
 In short: Kuldeep Deshwal of Proofpoint at Conf42 DevSecOps 2025 on the pitfalls that drain developer productivity and four pillars for keeping it sustainable.
 

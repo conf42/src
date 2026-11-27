@@ -1,6 +1,6 @@
 # Set RTO, RPO and SLOs before you migrate a single database
 
-Conf42 Blog, 2026-02-23, updated 2026-11-09. https://www.conf42.com/blog/sre2026/database-ha-starts-with-rto-and-rpo
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/database-ha-starts-with-rto-and-rpo
 
 In short: Rajesh Kumar Balusu of AGAP Technologies at Conf42 SRE 2026 on database high availability via SLO-first planning, Kubernetes self-healing and the 6 Rs of migration.
 

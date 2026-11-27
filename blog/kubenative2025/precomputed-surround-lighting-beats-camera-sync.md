@@ -1,6 +1,6 @@
 # Pre-computed surround lighting beats the camera pointed at your TV
 
-Conf42 Blog, 2025-10-07, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/precomputed-surround-lighting-beats-camera-sync
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/precomputed-surround-lighting-beats-camera-sync
 
 In short: Chandan Kumar (Google) at Conf42 Kube Native 2025 on pre-computing ambient light signals from the video stream to sync smart lights in ~60 ms.
 

@@ -1,6 +1,6 @@
 # Riddles show where ChatGPT predicts instead of understanding
 
-Conf42 Blog, 2025-10-09, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/chatgpt-riddles-test-for-agi
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/chatgpt-riddles-test-for-agi
 
 In short: Aroma Rodrigues (Microsoft) at Conf42 Prompt Engineering 2025 probes GPT-3-era ChatGPT with riddles, translated Hindi puzzles and word problems to test AGI claims.
 

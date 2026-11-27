@@ -1,6 +1,6 @@
 # EV charging networks need cloud-native design to keep up
 
-Conf42 Blog, 2025-10-06, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/cloud-native-design-for-ev-charging-networks
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/cloud-native-design-for-ev-charging-networks
 
 In short: Preeti Sali (Ford Motor Company) at Conf42 Kube Native 2025 on microservices, predictive maintenance, smart routing and V2G for EV charging.
 

@@ -1,6 +1,6 @@
 # Watch first, enforce later: firewalls in front of AI services
 
-Conf42 Blog, 2026-01-14, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ngfw-security-for-ai-workloads
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ngfw-security-for-ai-workloads
 
 In short: Gurdeep Gill of Cisco at Conf42 DevOps 2026 on next-generation firewalls for AI workloads, from identity-based policy as code to model extraction and prompt injection.
 

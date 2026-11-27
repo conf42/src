@@ -1,6 +1,6 @@
 # Aircraft digital twins spot failures weeks before they ground a plane
 
-Conf42 Blog, 2025-05-20, updated 2026-11-09. https://www.conf42.com/blog/obs2025/aircraft-digital-twins-predictive-maintenance
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/aircraft-digital-twins-predictive-maintenance
 
 In short: Divakar Duraiyan of Tata Consultancy Services at Conf42 Observability 2025 on digital twins that turn flight telemetry into predictive maintenance.
 

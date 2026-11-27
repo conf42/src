@@ -1,6 +1,6 @@
 # Self-healing data pipelines detect, diagnose and fix with AI
 
-Conf42 Blog, 2025-08-26, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-self-healing-pipelines-detect-diagnose-fix
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-self-healing-pipelines-detect-diagnose-fix
 
 In short: Lakshmi Srinivasarao Kothamasu (Fidelity Investments) at Conf42 Platform Engineering 2025 on AI anomaly detection, LLM root cause and automated pipeline repair.
 

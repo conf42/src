@@ -1,6 +1,6 @@
 # Wiring HR Events to Financial Wellness Without Leaking Pay Data
 
-Conf42 Blog, 2025-08-29, updated 2026-11-09. https://www.conf42.com/blog/platform2025/intuit-hcm-fintech-financial-wellness-platform
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/intuit-hcm-fintech-financial-wellness-platform
 
 In short: Intuit's Hitesh Pahuja at Conf42 Platform Engineering 2025 on event-driven, privacy-first HCM and FinTech integration for employee financial wellness.
 

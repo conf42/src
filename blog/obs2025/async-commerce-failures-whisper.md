@@ -1,6 +1,6 @@
 # In async commerce, failures whisper, so design for tracing first
 
-Conf42 Blog, 2025-05-13. https://www.conf42.com/blog/obs2025/async-commerce-failures-whisper
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/async-commerce-failures-whisper
 
 In short: Anup Raja Sarabu of T-Mobile at Conf42 Observability 2025 on async payments, BOPIS events, eventual consistency and the observability that keeps it honest.
 

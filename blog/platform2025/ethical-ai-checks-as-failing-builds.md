@@ -1,6 +1,6 @@
 # Treat an AI fairness failure like a failing unit test
 
-Conf42 Blog, 2025-08-23, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ethical-ai-checks-as-failing-builds
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ethical-ai-checks-as-failing-builds
 
 In short: Dharmendra Ahuja (IBM) at Conf42 Platform Engineering 2025 on putting bias checks, model cards and fairness monitoring into the platform's CI/CD.
 

@@ -1,6 +1,6 @@
 # More security tools, less clarity; a four-part health index fixes that
 
-Conf42 Blog, 2025-11-14, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/four-dimension-devsecops-health-index
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/four-dimension-devsecops-health-index
 
 In short: Sanjeevani Bhardwaj of Salesforce at Conf42 DevSecOps 2025 on a four-dimension DevSecOps health framework that tells you whether a pipeline is healthy.
 

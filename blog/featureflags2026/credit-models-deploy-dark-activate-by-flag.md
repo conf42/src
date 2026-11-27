@@ -1,6 +1,6 @@
 # Deploy credit models dark, then let a governed flag activate them
 
-Conf42 Blog, 2026-09-27, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/credit-models-deploy-dark-activate-by-flag
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/credit-models-deploy-dark-activate-by-flag
 
 In short: Pavan Rupanguntla at Conf42 Feature Flags 2026 on separating deployment from activation for ML credit models, with shadow challengers and governed kill switches.
 

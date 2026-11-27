@@ -1,6 +1,6 @@
 # Observability costs money, so map it to business KPIs first
 
-Conf42 Blog, 2025-05-13, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-needs-a-business-case-to-survive
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-needs-a-business-case-to-survive
 
 In short: Srinivas Sriram Mantrala at Conf42 Observability 2025 traces observability from threshold alerts to AI and GenAI, and why SLOs tied to KPIs fund it.
 

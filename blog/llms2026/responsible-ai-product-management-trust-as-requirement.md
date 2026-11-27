@@ -1,6 +1,6 @@
 # For LLM products, trust is a functional requirement
 
-Conf42 Blog, 2026-06-06, updated 2026-11-09. https://www.conf42.com/blog/llms2026/responsible-ai-product-management-trust-as-requirement
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/responsible-ai-product-management-trust-as-requirement
 
 In short: Vijayalakshmi Narasimhan at Conf42 LLMs 2026 on product management for production LLMs, from trust-aware requirements to monitoring trust signals.
 

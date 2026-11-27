@@ -1,6 +1,6 @@
 # Knowledge bases fail when nobody measures how people search them
 
-Conf42 Blog, 2025-10-07, updated 2026-11-09. https://www.conf42.com/blog/js2025/knowledge-systems-embedded-analytics-js
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/knowledge-systems-embedded-analytics-js
 
 In short: Harshita Dubey of Apex Fintech Solutions at Conf42 JavaScript 2025 on rebuilding a SharePoint knowledge system with embedded analytics and JS microservices.
 

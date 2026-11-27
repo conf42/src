@@ -1,6 +1,6 @@
 # In regulated platforms, consent is a system event, not a checkbox
 
-Conf42 Blog, 2026-05-15, updated 2026-11-09. https://www.conf42.com/blog/golang2026/evidence-centric-compliance-architecture
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/evidence-centric-compliance-architecture
 
 In short: Manasa Uppula at Conf42 Golang 2026 on evidence-centric compliance for financial onboarding, with versioned consent, assurance levels and sagas.
 

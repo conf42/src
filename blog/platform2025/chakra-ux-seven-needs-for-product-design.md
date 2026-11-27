@@ -1,6 +1,6 @@
 # Chakra UX maps seven human needs onto product design
 
-Conf42 Blog, 2025-08-11, updated 2026-11-09. https://www.conf42.com/blog/platform2025/chakra-ux-seven-needs-for-product-design
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/chakra-ux-seven-needs-for-product-design
 
 In short: Pratyush Tewari of Blue Book Services at Conf42 Platform Engineering 2025 uses the seven chakras as a checklist for designing for the whole user.
 

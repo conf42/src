@@ -1,6 +1,6 @@
 # ARIA is translation notes for screen readers, so use it sparingly
 
-Conf42 Blog, 2025-10-06, updated 2026-11-09. https://www.conf42.com/blog/js2025/aria-translation-notes-for-screen-readers
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/aria-translation-notes-for-screen-readers
 
 In short: Anisat Ahmed at Conf42 JavaScript 2025 introduces ARIA roles, properties and states, when native HTML is enough, and the mistakes to avoid.
 

@@ -1,6 +1,6 @@
 # Platform-first cloud starts with pilot teams, not a big bang
 
-Conf42 Blog, 2025-08-13, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-first-cloud-starts-with-pilot-teams
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-first-cloud-starts-with-pilot-teams
 
 In short: Srikanth Vissarapu (Crusoe) at Conf42 Platform Engineering 2025 on self-service infra, golden paths, hub-and-spoke multi-cloud and phased rollout.
 

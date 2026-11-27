@@ -1,6 +1,6 @@
 # Five LLMs taught a small model to spot 70 kinds of news bias
 
-Conf42 Blog, 2026-10-16, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/llms-as-teachers-for-news-bias-model
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/llms-as-teachers-for-news-bias-model
 
 In short: Aleem Khan at Conf42 Prompt Engineering 2026 on replacing five LLM API calls per story with an owned model trained on expert-checked labels.
 

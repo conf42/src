@@ -1,6 +1,6 @@
 # Read the import block, because that's where Go tech debt starts
 
-Conf42 Blog, 2025-04-02, updated 2026-11-09. https://www.conf42.com/blog/golang2025/go-dependency-rabbit-hole-delivery-hero
+Conf42 Blog, 2025-04-03, updated 2026-11-09. https://www.conf42.com/blog/golang2025/go-dependency-rabbit-hole-delivery-hero
 
 In short: Andrii Raikov of Delivery Hero at Conf42 Golang 2025 on hidden Go dependencies, breaking v2 libraries and the helpers package that ate a codebase.
 

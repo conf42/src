@@ -1,6 +1,6 @@
 # Ship AI features as micro frontends, not monolith releases
 
-Conf42 Blog, 2025-10-09, updated 2026-11-09. https://www.conf42.com/blog/js2025/micro-frontends-module-federation-ai
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/micro-frontends-module-federation-ai
 
 In short: Linga Annela at Conf42 JavaScript 2025 on Module Federation, edge-side composition and WebAssembly for adding AI features to large web apps.
 

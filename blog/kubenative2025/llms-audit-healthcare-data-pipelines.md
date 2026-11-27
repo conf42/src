@@ -1,6 +1,6 @@
 # LLMs that audit healthcare data pipelines, not just generate text
 
-Conf42 Blog, 2025-10-11, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/llms-audit-healthcare-data-pipelines
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/llms-audit-healthcare-data-pipelines
 
 In short: Manikesh Iruku of Amazon presents at Conf42 Kube Native 2025 an LLM framework that audits EHR pipelines with hierarchical, chain-of-thought prompts.
 

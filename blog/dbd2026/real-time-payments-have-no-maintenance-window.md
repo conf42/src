@@ -1,6 +1,6 @@
 # Real-time payments leave no 2 a.m. maintenance window
 
-Conf42 Blog, 2026-05-30, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/real-time-payments-have-no-maintenance-window
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/real-time-payments-have-no-maintenance-window
 
 In short: Priyatham Nagaiya Seenu Naidu (Mastercard) at Conf42 Database DevOps 2026 on Kafka, consistency choices and zero-downtime schemas for 24/7 payment rails.
 

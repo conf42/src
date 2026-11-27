@@ -1,6 +1,6 @@
 # A CI build is an ambulance, not a race car
 
-Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/ci-builds-are-an-ambulance
+Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/ci-builds-are-an-ambulance
 
 In short: Zan Markan (CircleCI) at Conf42 Cloud Native 2021 on measuring slow builds, then fixing them with resources, test splitting, caching and less scope
 

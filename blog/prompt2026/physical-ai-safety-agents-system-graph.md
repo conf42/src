@@ -1,6 +1,6 @@
 # Physical AI safety agents should reason over a system graph
 
-Conf42 Blog, 2026-10-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/physical-ai-safety-agents-system-graph
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/physical-ai-safety-agents-system-graph
 
 In short: Vraj Patel of Apptronik at Conf42 Prompt Engineering 2026 on bounded agents, system graphs and skills for safety assurance in robots and AVs.
 

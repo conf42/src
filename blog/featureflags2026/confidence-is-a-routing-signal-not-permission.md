@@ -1,6 +1,6 @@
 # In agentic logistics, confidence is a routing signal, not a permission
 
-Conf42 Blog, 2026-09-19, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/confidence-is-a-routing-signal-not-permission
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/confidence-is-a-routing-signal-not-permission
 
 In short: Walmart's Pavan Boppidi at Conf42 Feature Flags 2026 on combining feature flags with confidence, stakes and novelty gates to grant AI agents authority.
 

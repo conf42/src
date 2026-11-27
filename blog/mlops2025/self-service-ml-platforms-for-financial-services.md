@@ -1,6 +1,6 @@
 # Self-service ML platforms work when governance is built in first
 
-Conf42 Blog, 2025-08-28, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/self-service-ml-platforms-for-financial-services
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/self-service-ml-platforms-for-financial-services
 
 In short: Rajeev Chevuri (Freddie Mac) at Conf42 MLOps 2025 on self-service ML platforms for financial services, with governance designed into every layer.
 

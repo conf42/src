@@ -1,6 +1,6 @@
 # Insurance cores have to survive the claims spike after a hurricane
 
-Conf42 Blog, 2026-05-16, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/insurance-core-systems-cloud-native-hurricane
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/insurance-core-systems-cloud-native-hurricane
 
 In short: Sulabh Jain at Conf42 Database DevOps 2026 on decoupling insurance core systems with per-domain data, Kubernetes, IaC, events and a four-phase roadmap.
 

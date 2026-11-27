@@ -1,6 +1,6 @@
 # Inventory forecasting belongs in a pipeline, not a spreadsheet
 
-Conf42 Blog, 2026-02-06, updated 2026-11-09. https://www.conf42.com/blog/ml2026/inventory-forecasting-as-a-production-system
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/inventory-forecasting-as-a-production-system
 
 In short: Pallab Haldar of Cognizant at Conf42 Machine Learning 2026 on an Azure reference architecture that moves inventory forecasts into production ML.
 

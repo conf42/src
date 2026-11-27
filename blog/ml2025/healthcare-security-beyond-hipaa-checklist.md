@@ -1,6 +1,6 @@
 # Healthcare security that treats HIPAA as the floor, not the goal
 
-Conf42 Blog, 2025-05-03, updated 2026-11-09. https://www.conf42.com/blog/ml2025/healthcare-security-beyond-hipaa-checklist
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/healthcare-security-beyond-hipaa-checklist
 
 In short: Sachin Telalwar of Zocdoc at Conf42 Machine Learning 2025 sketches a blueprint for healthcare systems that are secure, available and fast under stress.
 

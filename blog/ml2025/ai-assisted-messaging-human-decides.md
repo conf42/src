@@ -1,6 +1,6 @@
 # In AI messaging, the assistant drafts and the human decides
 
-Conf42 Blog, 2025-05-05, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-assisted-messaging-human-decides
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-assisted-messaging-human-decides
 
 In short: Gagan Shah, Head of Product at Intuit and former lead of LinkedIn's messaging revamp, at Conf42 Machine Learning 2025 on AI-assisted professional messaging.
 

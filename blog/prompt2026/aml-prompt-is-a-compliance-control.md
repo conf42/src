@@ -1,6 +1,6 @@
 # In anti-money laundering work, a prompt is a compliance control
 
-Conf42 Blog, 2026-10-07, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/aml-prompt-is-a-compliance-control
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/aml-prompt-is-a-compliance-control
 
 In short: Pratik Patel of Hexaware at Conf42 Prompt Engineering 2026 on grounded, schema-checked prompts for AML investigations that never infer intent.
 

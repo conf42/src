@@ -1,6 +1,6 @@
 # AI can take the toil out of platform teams if humans stay in the loop
 
-Conf42 Blog, 2025-08-20, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-ops-for-platform-teams-starts-with-human-loop
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-ops-for-platform-teams-starts-with-human-loop
 
 In short: Anbarasu Aladiyan of Compunnel maps AI-driven provisioning, scaling and self-service for platform teams at Conf42 Platform Engineering 2025, plus a phased rollout.
 

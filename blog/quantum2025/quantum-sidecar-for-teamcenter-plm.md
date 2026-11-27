@@ -1,6 +1,6 @@
 # A quantum sidecar for Teamcenter, not a PLM rewrite
 
-Conf42 Blog, 2025-05-27, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-sidecar-for-teamcenter-plm
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-sidecar-for-teamcenter-plm
 
 In short: Pradeep Karanam at Conf42 Quantum Computing 2025 on sending only the hardest PLM questions from Siemens Teamcenter to cloud quantum hardware.
 

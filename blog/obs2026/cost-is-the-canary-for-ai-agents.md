@@ -1,6 +1,6 @@
 # For AI agents, cost is the canary and evidence is the grade
 
-Conf42 Blog, 2026-08-12. https://www.conf42.com/blog/obs2026/cost-is-the-canary-for-ai-agents
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/cost-is-the-canary-for-ai-agents
 
 In short: Sabith K Soopy of StackGen at Conf42 Observability 2026 on spend caps, plan-gather-present traces and grading agents on evidence.
 

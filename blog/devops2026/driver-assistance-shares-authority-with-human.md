@@ -1,6 +1,6 @@
 # Driver assistance works best when AI and the driver share authority
 
-Conf42 Blog, 2026-01-07, updated 2026-11-09. https://www.conf42.com/blog/devops2026/driver-assistance-shares-authority-with-human
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/driver-assistance-shares-authority-with-human
 
 In short: Alagar Raja Govindasa (Dorman Products) at Conf42 DevOps 2026 on human-AI collaboration, driver-state monitoring and safe rollouts for automotive control.
 

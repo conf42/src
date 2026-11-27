@@ -1,6 +1,6 @@
 # One await scheduler.yield() can unfreeze a page stuck on long tasks
 
-Conf42 Blog, 2025-10-04, updated 2026-11-09. https://www.conf42.com/blog/js2025/scheduler-yield-main-thread-breather
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/scheduler-yield-main-thread-breather
 
 In short: Aleksandr Tkachenko of Playtech at Conf42 JavaScript 2025 on scheduler.yield(), why setTimeout yielding loses its place, and a frozen banking demo.
 

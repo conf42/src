@@ -1,6 +1,6 @@
 # Sensitive data discovery has to run as often as your schema changes
 
-Conf42 Blog, 2026-09-16, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/sensitive-data-discovery-continuous-not-audits
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/sensitive-data-discovery-continuous-not-audits
 
 In short: At Conf42 DevSecOps 2026, T-Mobile's Mary Sirisha Duggimpudi layers metadata, ML and runtime telemetry into continuous PII discovery.
 

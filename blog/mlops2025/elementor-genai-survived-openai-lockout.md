@@ -1,6 +1,6 @@
 # How Elementor's GenAI stack shrugged off an OpenAI account lockout
 
-Conf42 Blog, 2025-09-14, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/elementor-genai-survived-openai-lockout
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/elementor-genai-survived-openai-lockout
 
 In short: Dennis Nerush of Elementor at Conf42 MLOps 2025 on multi-org rate limits, circuit breakers, a one-switch Claude fallback and the insert-rate metric.
 

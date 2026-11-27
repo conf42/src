@@ -1,6 +1,6 @@
 # Four signals, one backend - why Gigapipe stores everything in ClickHouse
 
-Conf42 Blog, 2026-09-05, updated 2026-11-09. https://www.conf42.com/blog/obs2026/gigapipe-four-signals-one-backend
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/gigapipe-four-signals-one-backend
 
 In short: Rita Lopes, founder of Gigapipe, at Conf42 Observability 2026 on unifying logs, metrics, traces and profiles in one open source backend.
 

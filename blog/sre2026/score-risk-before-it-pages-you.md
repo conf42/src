@@ -1,6 +1,6 @@
 # A risk score that pages you before the SLO breaks, not after
 
-Conf42 Blog, 2026-02-26, updated 2026-11-09. https://www.conf42.com/blog/sre2026/score-risk-before-it-pages-you
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/score-risk-before-it-pages-you
 
 In short: Oreoluwa Omoike of JPMorgan Chase at Conf42 SRE 2026 on risk-aware SRE scoring failure x impact / time to impact, with real before-and-after numbers.
 

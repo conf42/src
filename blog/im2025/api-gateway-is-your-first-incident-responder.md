@@ -1,6 +1,6 @@
 # Your API gateway is the first responder in a microservices incident
 
-Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/im2025/api-gateway-is-your-first-incident-responder
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/api-gateway-is-your-first-incident-responder
 
 In short: Vijaykumar Pasunoori at Conf42 Incident Management 2025 on API gateways as incident control planes: service mesh, serverless, edge failover, zero trust.
 

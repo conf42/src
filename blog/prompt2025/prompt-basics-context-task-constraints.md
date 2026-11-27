@@ -1,6 +1,6 @@
 # A good prompt has four parts, and most people skip three
 
-Conf42 Blog, 2025-10-22, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-basics-context-task-constraints
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/prompt-basics-context-task-constraints
 
 In short: Chetan Prakash Ratnawat of Capgemini at Conf42 Prompt Engineering 2025 with a beginner's tour of prompt structure, core techniques and AI ethics.
 

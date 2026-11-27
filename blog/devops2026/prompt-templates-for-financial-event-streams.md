@@ -1,6 +1,6 @@
 # Ad hoc prompts fail in ops; version-controlled templates don't
 
-Conf42 Blog, 2026-01-01, updated 2026-11-09. https://www.conf42.com/blog/devops2026/prompt-templates-for-financial-event-streams
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/prompt-templates-for-financial-event-streams
 
 In short: Tina Kanth (Microsoft) at Conf42 DevOps 2026 on template-driven prompt engineering for triaging streaming financial events.
 

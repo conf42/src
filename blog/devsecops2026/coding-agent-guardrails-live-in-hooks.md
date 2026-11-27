@@ -1,6 +1,6 @@
 # Coding agent guardrails belong in hooks, not in the model
 
-Conf42 Blog, 2026-09-02, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/coding-agent-guardrails-live-in-hooks
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/coding-agent-guardrails-live-in-hooks
 
 In short: Karan Bansal of ArmorCode at Conf42 DevSecOps 2026 shows pre-tool-use hooks that block dangerous commands, secret reads and fake green builds in under 100ms.
 

@@ -1,6 +1,6 @@
 # Warehouse IoT ML fails on data and integration, not models
 
-Conf42 Blog, 2026-02-05, updated 2026-11-09. https://www.conf42.com/blog/ml2026/warehouse-iot-ml-fails-on-data-not-models
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/warehouse-iot-ml-fails-on-data-not-models
 
 In short: Dinesh Garg of Honeywell at Conf42 Machine Learning 2026 on feature engineering, MLOps and rollout tactics for ML on messy warehouse IoT data.
 

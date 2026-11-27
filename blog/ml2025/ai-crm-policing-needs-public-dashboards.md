@@ -1,6 +1,6 @@
 # AI in police CRM systems needs public dashboards and audits
 
-Conf42 Blog, 2025-05-04, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-crm-policing-needs-public-dashboards
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-crm-policing-needs-public-dashboards
 
 In short: Chiranjeevi Dubaguntla of PruTech Solutions at Conf42 Machine Learning 2025 weighs AI CRM in policing and proposes a community transparency framework.
 

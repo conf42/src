@@ -1,6 +1,6 @@
 # Your Kubernetes autoscalers need one brain, not three
 
-Conf42 Blog, 2026-08-26, updated 2026-11-09. https://www.conf42.com/blog/obs2026/kubernetes-autoscalers-need-one-brain
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/kubernetes-autoscalers-need-one-brain
 
 In short: Joshua Fox of DoiT at Conf42 Observability 2026 on layered telemetry and a unified controller that ends HPA/VPA fights and resizes pods in place.
 

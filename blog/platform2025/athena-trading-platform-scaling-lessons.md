@@ -1,6 +1,6 @@
 # Scaling a trading platform means optimising for change
 
-Conf42 Blog, 2025-08-07, updated 2026-11-09. https://www.conf42.com/blog/platform2025/athena-trading-platform-scaling-lessons
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/athena-trading-platform-scaling-lessons
 
 In short: Aroma Rodrigues at Conf42 Platform Engineering 2025 on how J.P. Morgan's Athena moved from a monolith to dependency graphs, delta storage and parallel books.
 

@@ -1,6 +1,6 @@
 # Sample synthetic tests at 100% and aggregate the traces
 
-Conf42 Blog, 2025-05-30, updated 2026-11-09. https://www.conf42.com/blog/obs2025/synthetic-traces-critical-user-journeys-salesforce
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/synthetic-traces-critical-user-journeys-salesforce
 
 In short: Sudeep Kumar of Salesforce at Conf42 Observability 2025 on turning fully sampled synthetic traces into aggregated views of critical user journeys.
 

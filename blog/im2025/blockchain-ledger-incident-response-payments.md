@@ -1,6 +1,6 @@
 # An immutable ledger for payment incidents, from Visa's SRE side
 
-Conf42 Blog, 2025-09-14, updated 2026-11-09. https://www.conf42.com/blog/im2025/blockchain-ledger-incident-response-payments
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/blockchain-ledger-incident-response-payments
 
 In short: Sai Krishna Gurram (Visa) at Conf42 Incident Management 2025 on recording incident events to a blockchain ledger and encoding playbooks as smart contracts.
 

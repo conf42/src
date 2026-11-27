@@ -1,6 +1,6 @@
 # Voice AI over a plain phone call, for users who distrust AI
 
-Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/llms2026/phone-call-voice-ai-for-skeptics
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/phone-call-voice-ai-for-skeptics
 
 In short: Pavel Shchekotov (Denk Solutions) at Conf42 LLMs 2026 on running an LLM voice agent over phone calls and SMS for users aged 55+, and what broke.
 

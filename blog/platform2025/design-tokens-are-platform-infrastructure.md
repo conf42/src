@@ -1,6 +1,6 @@
 # Design tokens are platform infrastructure, not a style guide
 
-Conf42 Blog, 2025-08-18, updated 2026-11-09. https://www.conf42.com/blog/platform2025/design-tokens-are-platform-infrastructure
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/design-tokens-are-platform-infrastructure
 
 In short: Pallav Laskar of Zscaler argues at Conf42 Platform Engineering 2025 that design tokens belong in build pipelines, with schemas, reviews and versioned releases.
 

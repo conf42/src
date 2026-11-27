@@ -1,6 +1,6 @@
 # Put AI compliance in the pipeline, not in a pre-launch meeting
 
-Conf42 Blog, 2026-11-12, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/compliance-as-a-pipeline-stage
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/compliance-as-a-pipeline-stage
 
 In short: Arpita Sheth at Conf42 MLOps 2026 on AI compliance as code: risk labels at registration, required lineage, policy gates and generated documentation.
 

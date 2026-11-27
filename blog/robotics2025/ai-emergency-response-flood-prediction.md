@@ -1,6 +1,6 @@
 # Emergency response needs predictions before the water arrives
 
-Conf42 Blog, 2025-11-16, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/ai-emergency-response-flood-prediction
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/ai-emergency-response-flood-prediction
 
 In short: Vivek Karnam of Surge Technology Solutions at Conf42 Robotics 2025 on combining ML, computer vision, NLP, cloud and robots for faster disaster response.
 

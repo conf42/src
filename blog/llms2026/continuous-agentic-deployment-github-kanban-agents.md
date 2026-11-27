@@ -1,6 +1,6 @@
 # Continuous Agentic Deployment runs a Kanban board of AI agents
 
-Conf42 Blog, 2026-05-30, updated 2026-11-09. https://www.conf42.com/blog/llms2026/continuous-agentic-deployment-github-kanban-agents
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/continuous-agentic-deployment-github-kanban-agents
 
 In short: Denis Ermakov at Conf42 LLMs 2026 shows CAD, an open-source GitHub-only pipeline where agents analyse, code and test, and a human kicks the deploy.
 

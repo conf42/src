@@ -1,6 +1,6 @@
 # An ML inference platform succeeds when deploying a model is boring
 
-Conf42 Blog, 2025-08-20, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ml-inference-platforms-built-for-developers
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ml-inference-platforms-built-for-developers
 
 In short: Gangadharan Venkataraman of Starbucks covers Kubernetes ML inference at Conf42 Platform Engineering 2025, from CRDs and canaries to feature stores and caches.
 

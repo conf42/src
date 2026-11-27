@@ -1,6 +1,6 @@
 # Ballerina writes your Kubernetes YAML so you don't have to
 
-Conf42 Blog, 2025-10-09, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ballerina-writes-your-kubernetes-yaml
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ballerina-writes-your-kubernetes-yaml
 
 In short: Anupama Pathirage of WSO2 shows at Conf42 Kube Native 2025 how Ballerina turns integration code into Docker and Kubernetes artifacts with one build.
 

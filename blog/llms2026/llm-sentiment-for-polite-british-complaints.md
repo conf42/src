@@ -1,6 +1,6 @@
 # Catching churn hidden inside polite British emails with an LLM
 
-Conf42 Blog, 2026-05-19, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-sentiment-for-polite-british-complaints
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-sentiment-for-polite-british-complaints
 
 In short: Anton Denisov (Dwelly) at Conf42 LLMs 2026 on an LLM pipeline that spots unhappy landlords in polite emails and calls before they leave.
 

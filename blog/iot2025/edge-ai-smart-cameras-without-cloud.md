@@ -1,6 +1,6 @@
 # Smart cameras that think locally and only send the verdict
 
-Conf42 Blog, 2025-11-30, updated 2026-11-09. https://www.conf42.com/blog/iot2025/edge-ai-smart-cameras-without-cloud
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/edge-ai-smart-cameras-without-cloud
 
 In short: Madhu Niranjan Reddy Puduru of Synchronoss at Conf42 IoT 2025 on running quantized neural networks on IoT cameras to cut bandwidth, latency and battery drain.
 

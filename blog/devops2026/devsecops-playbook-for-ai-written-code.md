@@ -1,6 +1,6 @@
 # When AI writes the code, provenance is the review you can trust
 
-Conf42 Blog, 2026-01-16. https://www.conf42.com/blog/devops2026/devsecops-playbook-for-ai-written-code
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/devsecops-playbook-for-ai-written-code
 
 In short: Bhaskar Sawant at Conf42 DevOps 2026 on securing AI-era CI/CD with SBOMs, SLSA provenance, policy as code, hardened builds and pipeline monitoring.
 

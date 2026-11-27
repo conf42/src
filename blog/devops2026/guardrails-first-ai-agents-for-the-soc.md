@@ -1,6 +1,6 @@
 # Your SOC will ask for AI agents. Ship the guardrails first
 
-Conf42 Blog, 2026-01-16. https://www.conf42.com/blog/devops2026/guardrails-first-ai-agents-for-the-soc
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/guardrails-first-ai-agents-for-the-soc
 
 In short: Neal Iyer of Splunk at Conf42 DevOps 2026 on a guardrails-first framework for SOC AI agents, from org context and policy gates to shadow mode.
 

@@ -1,6 +1,6 @@
 # Put AI data governance inside the CI/CD pipeline
 
-Conf42 Blog, 2025-08-31, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/training-data-declarations-genai-governance
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/training-data-declarations-genai-governance
 
 In short: Bhanu Maryala (Informatica) at Conf42 MLOps 2025 on Training Data Declarations, a framework that runs compliance checks inside MLOps pipelines.
 

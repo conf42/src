@@ -1,6 +1,6 @@
 # A cloud MCP server is privileged infrastructure, not a connector
 
-Conf42 Blog, 2026-04-16. https://www.conf42.com/blog/cloud2026/treat-cloud-mcp-servers-as-privileged-infra
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/treat-cloud-mcp-servers-as-privileged-infra
 
 In short: Aleksandr Pinaev of Swordfish Security at Conf42 Cloud Native 2026 on where MCP security risk comes from, a classification of MCP flaws, and defenses.
 

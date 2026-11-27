@@ -1,6 +1,6 @@
 # GitHub ships most of a DevSecOps toolchain in the Security tab
 
-Conf42 Blog, 2025-11-29, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/github-security-features-live-demos
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/github-security-features-live-demos
 
 In short: Peter De Tender of Microsoft at Conf42 DevSecOps 2025 demos GitHub rulesets, secret scanning with push protection, Dependabot and CodeQL in VS Code.
 

@@ -1,6 +1,6 @@
 # Terraform and Ansible are tools; the operating model is the architecture
 
-Conf42 Blog, 2026-11-03, updated 2026-11-09. https://www.conf42.com/blog/platform2026/terraform-ansible-not-an-architecture
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/terraform-ansible-not-an-architecture
 
 In short: Jeleel Muibi of HybridOps at Conf42 Platform Engineering 2026 on authority, preflight checks and run records that sit above Terraform and Ansible.
 

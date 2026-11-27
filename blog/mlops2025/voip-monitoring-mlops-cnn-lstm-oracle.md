@@ -1,6 +1,6 @@
 # How a CNN-LSTM pipeline cut VoIP fault detection to minutes
 
-Conf42 Blog, 2025-08-31, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/voip-monitoring-mlops-cnn-lstm-oracle
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/voip-monitoring-mlops-cnn-lstm-oracle
 
 In short: Krishna Munnaluru (Oracle) at Conf42 MLOps 2025 on a Kafka, Kubeflow and MLflow pipeline that monitors carrier-grade VoIP with neural networks.
 

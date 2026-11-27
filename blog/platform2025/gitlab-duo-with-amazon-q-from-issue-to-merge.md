@@ -1,6 +1,6 @@
 # GitLab Duo with Amazon Q: from issue to merge request in a slash command
 
-Conf42 Blog, 2025-08-10, updated 2026-11-09. https://www.conf42.com/blog/platform2025/gitlab-duo-with-amazon-q-from-issue-to-merge
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/gitlab-duo-with-amazon-q-from-issue-to-merge
 
 In short: AWS's Mohamed Najaaf at Conf42 Platform Engineering 2025 demos GitLab Duo with Amazon Q: code from issues, Java 17 upgrades and security reviews.
 

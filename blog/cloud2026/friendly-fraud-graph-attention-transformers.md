@@ -1,6 +1,6 @@
 # Friendly fraud happens weeks after checkout, so model the graph and time
 
-Conf42 Blog, 2026-04-13. https://www.conf42.com/blog/cloud2026/friendly-fraud-graph-attention-transformers
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/friendly-fraud-graph-attention-transformers
 
 In short: Gautham Paspala of ServiceNow at Conf42 Cloud Native 2026 on catching friendly fraud with temporal graph attention, transformers and human review.
 

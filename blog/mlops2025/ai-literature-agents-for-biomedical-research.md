@@ -1,6 +1,6 @@
 # Running AI literature agents over 30 million biomedical citations
 
-Conf42 Blog, 2025-08-23, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ai-literature-agents-for-biomedical-research
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ai-literature-agents-for-biomedical-research
 
 In short: Nishanth Joseph Paulraj (Thermo Fisher Scientific) at Conf42 MLOps 2025 on the MLOps behind RAG literature agents for biomedical researchers.
 

@@ -1,6 +1,6 @@
 # SAP plus machine learning in insurance starts with the data migration
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/ml2025/sap-machine-learning-insurance-claims
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/sap-machine-learning-insurance-claims
 
 In short: Satish Puram of Deloitte at Conf42 Machine Learning 2025 on pairing SAP S/4HANA with ML for insurance claims and underwriting, and why migration decides it.
 

@@ -1,6 +1,6 @@
 # RLHF at scale is a data problem and a network problem
 
-Conf42 Blog, 2025-10-19, updated 2026-11-09. https://www.conf42.com/blog/js2025/rlhf-at-scale-is-a-data-and-network-problem
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/rlhf-at-scale-is-a-data-and-network-problem
 
 In short: Votal AI CTO Jyotirmoy Sundi explained at Conf42 JavaScript 2025 how RLHF training runs on Kubernetes GPU clusters and where it gets stuck.
 

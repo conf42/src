@@ -1,6 +1,6 @@
 # Your firewall can't see an adversarial example
 
-Conf42 Blog, 2022-11-30. https://www.conf42.com/blog/devsecops2022/mlsecops-every-ai-model-vulnerable-by-design
+Conf42 Blog, 2022-12-01. https://www.conf42.com/blog/devsecops2022/mlsecops-every-ai-model-vulnerable-by-design
 
 In short: Eugene Neelou (Adversa) at Conf42 DevSecOps 2022 on MLSecOps, a stage-by-stage plan for securing AI pipelines that are vulnerable by design
 

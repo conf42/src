@@ -1,6 +1,6 @@
 # Log anomaly detection needs context, not more thresholds
 
-Conf42 Blog, 2025-08-07, updated 2026-11-09. https://www.conf42.com/blog/platform2025/log-anomaly-detection-embedded-context-agents
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/log-anomaly-detection-embedded-context-agents
 
 In short: Konstantin Berezin of Rapyd at Conf42 Platform Engineering 2025 on embedded context agents that enrich logs, score anomalies with ML and alert only on what matters.
 

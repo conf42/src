@@ -1,6 +1,6 @@
 # From alerts to answers with context-driven observability and agents
 
-Conf42 Blog, 2026-03-08, updated 2026-11-09. https://www.conf42.com/blog/sre2026/agentic-ops-from-alerts-to-answers
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/agentic-ops-from-alerts-to-answers
 
 In short: Savi Grover (Tekskills) at Conf42 SRE 2026 gives a quick tour of turning alert noise into context, with an agent loop that rolls back a bad canary.
 

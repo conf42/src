@@ -1,6 +1,6 @@
 # T-Mobile treats the T-Life app shell as an internal platform
 
-Conf42 Blog, 2026-10-22, updated 2026-11-09. https://www.conf42.com/blog/platform2026/t-mobile-t-life-app-shell-as-platform
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/t-mobile-t-life-app-shell-as-platform
 
 In short: RanjithKumar Ragavan (T-Mobile) at Conf42 Platform Engineering 2026 on how five teams ship into one 53-million-user mobile app without breaking each other.
 

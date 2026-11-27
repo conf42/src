@@ -1,6 +1,6 @@
 # Dapr moves the plumbing out of your microservices and into a sidecar
 
-Conf42 Blog, 2025-09-23, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/dapr-sidecar-keeps-infrastructure-out-of-code
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/dapr-sidecar-keeps-infrastructure-out-of-code
 
 In short: Christophe Gigax (Hager Group) at Conf42 Kube Native 2025 shows how Dapr's sidecar and building blocks keep state stores and brokers out of app code.
 

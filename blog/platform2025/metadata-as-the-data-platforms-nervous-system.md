@@ -1,6 +1,6 @@
 # Make metadata the nervous system of your data platform
 
-Conf42 Blog, 2025-08-24, updated 2026-11-09. https://www.conf42.com/blog/platform2025/metadata-as-the-data-platforms-nervous-system
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/metadata-as-the-data-platforms-nervous-system
 
 In short: Terance Joseph Paulraj (Western Governors University) at Conf42 Platform Engineering 2025 on metadata-driven, self-healing data pipelines.
 

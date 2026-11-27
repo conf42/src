@@ -1,6 +1,6 @@
 # Distributed databases, from CAP trade-offs to GitOps rollouts
 
-Conf42 Blog, 2026-06-01, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/distributed-databases-cap-raft-and-gitops
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/distributed-databases-cap-raft-and-gitops
 
 In short: Srikanth Uddanti (Charles Schwab) at Conf42 Database DevOps 2026 on replication, sharding, Raft vs Paxos, automation and zero trust for database clusters.
 

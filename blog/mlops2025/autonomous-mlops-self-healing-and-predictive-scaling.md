@@ -1,6 +1,6 @@
 # Autonomous MLOps is a four-phase climb, not a switch
 
-Conf42 Blog, 2025-08-23, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/autonomous-mlops-self-healing-and-predictive-scaling
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/autonomous-mlops-self-healing-and-predictive-scaling
 
 In short: Mohan Singh (Amazon) at Conf42 MLOps 2025 on self-healing infrastructure, predictive scaling and AI-driven code modernization as the path to autonomous ops.
 

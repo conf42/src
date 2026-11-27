@@ -1,6 +1,6 @@
 # Sentiment analysis that never leaves the browser
 
-Conf42 Blog, 2025-10-18, updated 2026-11-09. https://www.conf42.com/blog/js2025/sentiment-analysis-that-never-leaves-the-browser
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/sentiment-analysis-that-never-leaves-the-browser
 
 In short: Ujjwala Modepalli of Wells Fargo showed at Conf42 JavaScript 2025 how TensorFlow.js, Web Workers and IndexedDB run text analytics client-side.
 

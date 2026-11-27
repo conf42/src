@@ -1,6 +1,6 @@
 # Datacenter buildouts get faster when nothing waits in line
 
-Conf42 Blog, 2025-10-04, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/parallel-workstreams-speed-up-datacenter-buildouts
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/parallel-workstreams-speed-up-datacenter-buildouts
 
 In short: Vamsi Gadireddy (Microsoft Azure) at Conf42 Kube Native 2025 on parallel workflows, early power and fiber planning, and pre-staged racks.
 

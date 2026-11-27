@@ -1,6 +1,6 @@
 # Blockchain in healthcare works best as a trust layer, not a database
 
-Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/platform2025/blockchain-as-trust-layer-for-health-data
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/blockchain-as-trust-layer-for-health-data
 
 In short: Brahmanand Reddy Bhavanam of Info Way Solutions shows at Conf42 Platform Engineering 2025 how blockchain, IaC and FHIR fit into medical platforms.
 

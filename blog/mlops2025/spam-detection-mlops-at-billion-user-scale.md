@@ -1,6 +1,6 @@
 # Spam detection at billion-user scale is an ensemble and a graph
 
-Conf42 Blog, 2025-08-24, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/spam-detection-mlops-at-billion-user-scale
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/spam-detection-mlops-at-billion-user-scale
 
 In short: Prabhakar Singh (Meta) at Conf42 MLOps 2025 on production MLOps for multi-modal spam detection, from smart sampling to graph-based campaign detection.
 

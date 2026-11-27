@@ -1,6 +1,6 @@
 # Compliance by construction for co-branded credit card platforms
 
-Conf42 Blog, 2026-06-05, updated 2026-11-09. https://www.conf42.com/blog/llms2026/compliance-by-construction-co-branded-credit-cards
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/compliance-by-construction-co-branded-credit-cards
 
 In short: Ravindra Rajasekhar Kavuru (Expedia Group) at Conf42 LLMs 2026 on building PCI, privacy and audit controls into credit platforms by design.
 

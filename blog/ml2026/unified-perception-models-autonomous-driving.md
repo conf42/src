@@ -1,6 +1,6 @@
 # One shared perception model beats a stack of single-task models
 
-Conf42 Blog, 2026-02-17, updated 2026-11-09. https://www.conf42.com/blog/ml2026/unified-perception-models-autonomous-driving
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/unified-perception-models-autonomous-driving
 
 In short: Sowmiya Narayanan Govindaraj (Motional) at Conf42 Machine Learning 2026 on unified, transformer-based perception that fuses camera and lidar for self-driving.
 

@@ -1,6 +1,6 @@
 # Engineering a health platform where latency is a clinical risk
 
-Conf42 Blog, 2025-08-08, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-platform-senior-travelers-scale
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-platform-senior-travelers-scale
 
 In short: Raphael Shobi A T of ATPCO at Conf42 Platform Engineering 2025 on a microservices health platform for senior travelers, with Kubernetes, chaos tests and compliance.
 

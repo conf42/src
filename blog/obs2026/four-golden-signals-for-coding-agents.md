@@ -1,6 +1,6 @@
 # Your coding agent is a production system. Give it golden signals
 
-Conf42 Blog, 2026-08-15. https://www.conf42.com/blog/obs2026/four-golden-signals-for-coding-agents
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/four-golden-signals-for-coding-agents
 
 In short: Elliot Gardiner of Code Telemetry at Conf42 Observability 2026 maps Google's four golden signals onto AI coding-agent sessions and trajectories.
 

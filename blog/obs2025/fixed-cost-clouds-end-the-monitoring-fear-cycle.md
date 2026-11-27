@@ -1,6 +1,6 @@
 # The monitoring fear cycle, and how fixed-cost clouds break it
 
-Conf42 Blog, 2025-05-15. https://www.conf42.com/blog/obs2025/fixed-cost-clouds-end-the-monitoring-fear-cycle
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/fixed-cost-clouds-end-the-monitoring-fear-cycle
 
 In short: Denish Tomar of Qumulus at Conf42 Observability 2025 on why metered observability makes teams self-censor dashboards, and a fixed-cost alternative.
 

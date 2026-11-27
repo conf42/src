@@ -1,6 +1,6 @@
 # Healthcare Interoperability Is a Platform Problem, Built in Layers
 
-Conf42 Blog, 2025-08-26, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fhir-platform-layers-for-healthcare-exchange
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fhir-platform-layers-for-healthcare-exchange
 
 In short: Gunjan Desai Rajendrakumar (UT Austin) at Conf42 Platform Engineering 2025 on a layered, FHIR-first platform for healthcare data exchange.
 

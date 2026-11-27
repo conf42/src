@@ -1,6 +1,6 @@
 # To learn like a child, get good at falling down
 
-Conf42 Blog, 2022-01-26. https://www.conf42.com/blog/python2022/fall-down-play-and-stay-curious
+Conf42 Blog, 2022-01-27. https://www.conf42.com/blog/python2022/fall-down-play-and-stay-curious
 
 In short: Rain Leander (Cockroach Labs) at Conf42 Python 2022 on regressing to a child's mindset of falling, bravery, play and curiosity to grow as an engineer
 

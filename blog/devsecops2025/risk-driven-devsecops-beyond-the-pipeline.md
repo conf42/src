@@ -1,6 +1,6 @@
 # Risk-driven DevSecOps starts outside the CI/CD pipeline
 
-Conf42 Blog, 2025-11-19, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/risk-driven-devsecops-beyond-the-pipeline
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/risk-driven-devsecops-beyond-the-pipeline
 
 In short: Nishanth Sirikonda at Conf42 DevSecOps 2025 on ranking security work by business impact and mapping the SaaS, identity and API layers pipelines never see.
 

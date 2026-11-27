@@ -1,6 +1,6 @@
 # Microsoft's chaos lesson - test failure scenarios, not single faults
 
-Conf42 Blog, 2022-03-09. https://www.conf42.com/blog/ce2022/azure-chaos-studio-scenarios-over-faults
+Conf42 Blog, 2022-03-10. https://www.conf42.com/blog/ce2022/azure-chaos-studio-scenarios-over-faults
 
 In short: John Engel-Kemnetz (Microsoft) at Conf42 Chaos Engineering 2022 on how 50+ Microsoft teams use Azure Chaos Studio, and why chaos often belongs in pre-production
 

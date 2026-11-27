@@ -1,6 +1,6 @@
 # One shared cluster, a namespace per branch, only changed services
 
-Conf42 Blog, 2025-12-27, updated 2026-11-09. https://www.conf42.com/blog/devops2026/shared-cluster-namespace-per-branch-dev
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/shared-cluster-namespace-per-branch-dev
 
 In short: NetApp architect Ravi Babu Dasari at Conf42 DevOps 2026 on a shared-cluster dev platform that deploys only changed services per feature branch.
 

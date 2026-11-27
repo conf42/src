@@ -1,6 +1,6 @@
 # An S3, SQS, Lambda and DynamoDB pipeline with the AWS SDK for Rust
 
-Conf42 Blog, 2025-07-29, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/aws-sdk-for-rust-s3-sqs-lambda-pipeline
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/aws-sdk-for-rust-s3-sqs-lambda-pipeline
 
 In short: Vamsi Praveen Karanam of Amazon at Conf42 Rustlang 2025 builds a file ingestion pipeline with the AWS SDK for Rust, trade-offs included.
 

@@ -1,6 +1,6 @@
 # Let AI suggest the rollback before you let it run the rollback
 
-Conf42 Blog, 2026-01-10, updated 2026-11-09. https://www.conf42.com/blog/devops2026/aiops-from-firefighting-to-prevention
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/aiops-from-firefighting-to-prevention
 
 In short: Aravind Sekar of Twilio at Conf42 DevOps 2026 on AIOps for reliability, from alert grouping and predictive scaling to remediation that earns its autonomy.
 

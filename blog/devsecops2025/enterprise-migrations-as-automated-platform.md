@@ -1,6 +1,6 @@
 # Stop running migrations as projects and build a migration platform
 
-Conf42 Blog, 2025-11-08, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/enterprise-migrations-as-automated-platform
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/enterprise-migrations-as-automated-platform
 
 In short: Meenu Venkataarangam of Recode Solutions at Conf42 DevSecOps 2025 on automating discovery, transformation, orchestration and compliance in migrations.
 

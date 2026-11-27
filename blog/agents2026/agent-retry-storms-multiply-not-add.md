@@ -1,6 +1,6 @@
 # In agent systems, retries multiply. Give every request a budget
 
-Conf42 Blog, 2026-09-18, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-retry-storms-multiply-not-add
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agent-retry-storms-multiply-not-add
 
 In short: Yamini Rathamsetty and Karthik Akula (AWS) at Conf42 AI Agents 2026: how nested retries and fan-out burn agent budgets, and the fixes.
 

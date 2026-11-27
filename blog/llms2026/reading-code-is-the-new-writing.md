@@ -1,6 +1,6 @@
 # When the LLM writes the code, reading it becomes the job
 
-Conf42 Blog, 2026-05-22, updated 2026-11-09. https://www.conf42.com/blog/llms2026/reading-code-is-the-new-writing
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/reading-code-is-the-new-writing
 
 In short: Petras Bazdaras at Conf42 LLMs 2026 argues AI-generated code makes reading and CS fundamentals the core engineering skill, not typing speed.
 

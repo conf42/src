@@ -1,6 +1,6 @@
 # When the legacy system has no API, an RPA bot can click for you
 
-Conf42 Blog, 2025-08-08, updated 2026-11-09. https://www.conf42.com/blog/platform2025/rpa-salesforce-legacy-integration
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/rpa-salesforce-legacy-integration
 
 In short: Uday Bheemarpu of Clean Earth at Conf42 Platform Engineering 2025 on pairing RPA with Salesforce to automate workflows across systems that lack APIs.
 

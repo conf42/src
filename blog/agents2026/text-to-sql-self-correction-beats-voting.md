@@ -1,6 +1,6 @@
 # Text-to-SQL on open models: self-correct, don't vote, measure linking
 
-Conf42 Blog, 2026-09-16, updated 2026-11-09. https://www.conf42.com/blog/agents2026/text-to-sql-self-correction-beats-voting
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/text-to-sql-self-correction-beats-voting
 
 In short: Vladimir Beskorovainyi (Besk Tech) at Conf42 AI Agents 2026 tests text-to-SQL tricks on open models: self-correction pays, voting and schema linking don't.
 

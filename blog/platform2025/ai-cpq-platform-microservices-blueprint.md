@@ -1,6 +1,6 @@
 # An AI-powered CPQ platform, layer by layer
 
-Conf42 Blog, 2025-08-14, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-cpq-platform-microservices-blueprint
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-cpq-platform-microservices-blueprint
 
 In short: Kishore Epuri at Conf42 Platform Engineering 2025 lays out a microservices blueprint for AI quoting and pricing, from Kafka events to GitOps and SLOs.
 

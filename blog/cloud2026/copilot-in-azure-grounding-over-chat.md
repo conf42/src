@@ -1,6 +1,6 @@
 # Copilot in Azure is only useful because it's grounded in your telemetry
 
-Conf42 Blog, 2026-04-11. https://www.conf42.com/blog/cloud2026/copilot-in-azure-grounding-over-chat
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/copilot-in-azure-grounding-over-chat
 
 In short: Sampath Rao Madarapu of Microsoft at Conf42 Cloud Native 2026 on Copilot in Azure: grounding in live telemetry, read-first safeguards and a staged rollout.
 

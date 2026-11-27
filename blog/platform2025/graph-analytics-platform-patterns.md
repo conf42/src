@@ -1,6 +1,6 @@
 # When friend-of-a-friend breaks SQL, build a graph platform
 
-Conf42 Blog, 2025-08-11, updated 2026-11-09. https://www.conf42.com/blog/platform2025/graph-analytics-platform-patterns
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/graph-analytics-platform-patterns
 
 In short: Muthuselvam Chandramohan of Intuit Mailchimp at Conf42 Platform Engineering 2025 on real-time graph platforms, partitioning, query tuning and backups.
 

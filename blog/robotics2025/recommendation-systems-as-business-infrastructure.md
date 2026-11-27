@@ -1,6 +1,6 @@
 # Recommendation engines quietly decide what a business builds next
 
-Conf42 Blog, 2025-10-21, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/recommendation-systems-as-business-infrastructure
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/recommendation-systems-as-business-infrastructure
 
 In short: Ankita Saxena of Amazon at Conf42 Robotics 2025 on how recommendation systems grew from a carousel into infrastructure that steers inventory and investment.
 

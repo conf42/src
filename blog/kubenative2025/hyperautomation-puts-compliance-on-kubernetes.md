@@ -1,6 +1,6 @@
 # Hyperautomation puts KYC, fraud and compliance on Kubernetes
 
-Conf42 Blog, 2025-09-27, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/hyperautomation-puts-compliance-on-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/hyperautomation-puts-compliance-on-kubernetes
 
 In short: Mamatha Swamy (Microsoft) at Conf42 Kube Native 2025 on containerised ML, GitOps compliance rules and bias checks for financial services workloads.
 

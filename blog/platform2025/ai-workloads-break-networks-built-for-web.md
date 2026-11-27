@@ -1,6 +1,6 @@
 # AI workloads break networks that were built for web apps
 
-Conf42 Blog, 2025-08-15, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-workloads-break-networks-built-for-web
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-workloads-break-networks-built-for-web
 
 In short: Bhaskararao Vakamullu of Hewlett Packard Enterprise at Conf42 Platform Engineering 2025 on spine-leaf, ECMP, RDMA and network observability for AI scale.
 

@@ -1,6 +1,6 @@
 # Graph topology plus learned baselines for financial anomaly detection
 
-Conf42 Blog, 2025-05-17. https://www.conf42.com/blog/obs2025/graph-topology-and-baselines-for-fintech-anomalies
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/graph-topology-and-baselines-for-fintech-anomalies
 
 In short: Siva Prakash at Conf42 Observability 2025 on dependency graphs and behavioural baselines replacing static thresholds in financial system monitoring.
 

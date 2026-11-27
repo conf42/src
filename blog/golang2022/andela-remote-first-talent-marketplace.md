@@ -1,6 +1,6 @@
 # Andela's pitch to engineers: 175,000 technologists, 96% placed, remote first
 
-Conf42 Blog, 2022-03-30. https://www.conf42.com/blog/golang2022/andela-remote-first-talent-marketplace
+Conf42 Blog, 2022-03-31. https://www.conf42.com/blog/golang2022/andela-remote-first-talent-marketplace
 
 In short: Agnes Muthoni (Andela) at Conf42 Golang 2022 on how Andela screens, matches and places remote engineers from 90+ countries with global companies
 

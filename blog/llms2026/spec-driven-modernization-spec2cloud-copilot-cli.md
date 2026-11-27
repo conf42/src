@@ -1,6 +1,6 @@
 # Modernizing a .NET 4.8 app by writing the specs first
 
-Conf42 Blog, 2026-05-31, updated 2026-11-09. https://www.conf42.com/blog/llms2026/spec-driven-modernization-spec2cloud-copilot-cli
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/spec-driven-modernization-spec2cloud-copilot-cli
 
 In short: Marco Antonio Silva (Microsoft) at Conf42 LLMs 2026 takes a legacy .NET app to .NET 10 with the GHCP Modernization CLI, then reverse-engineers specs with Spec2Cloud.
 

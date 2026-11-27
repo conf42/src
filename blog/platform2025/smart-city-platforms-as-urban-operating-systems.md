@@ -1,6 +1,6 @@
 # A smart city is a distributed system with traffic lights attached
 
-Conf42 Blog, 2025-08-09, updated 2026-11-09. https://www.conf42.com/blog/platform2025/smart-city-platforms-as-urban-operating-systems
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/smart-city-platforms-as-urban-operating-systems
 
 In short: Microsoft's Mayur Bhandari at Conf42 Platform Engineering 2025 on building smart city platforms: Kafka pipelines, edge processing, AI incident response, privacy.
 

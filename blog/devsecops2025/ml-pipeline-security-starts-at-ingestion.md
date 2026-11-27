@@ -1,6 +1,6 @@
 # Your ML pipeline needs a security gate before the model exists
 
-Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ml-pipeline-security-starts-at-ingestion
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ml-pipeline-security-starts-at-ingestion
 
 In short: Rajkumar Sukumar of AT&T at Conf42 DevSecOps 2025 on an AI-native DevSecOps framework, from trusted data ingestion to bias tests and audit trails.
 

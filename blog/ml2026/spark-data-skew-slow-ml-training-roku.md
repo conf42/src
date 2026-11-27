@@ -1,6 +1,6 @@
 # Your ML pipeline is slow because of data skew, not bad code
 
-Conf42 Blog, 2026-02-11, updated 2026-11-09. https://www.conf42.com/blog/ml2026/spark-data-skew-slow-ml-training-roku
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/spark-data-skew-slow-ml-training-roku
 
 In short: Srihari Godleti (Roku) at Conf42 Machine Learning 2026 shows how repartitioning, key salting and broadcast joins tame Spark data skew in ML pipelines.
 

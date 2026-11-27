@@ -1,6 +1,6 @@
 # The greenest GenAI request is the one served by a smaller model
 
-Conf42 Blog, 2026-02-16, updated 2026-11-09. https://www.conf42.com/blog/ml2026/smaller-models-cut-genai-carbon-aws
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/smaller-models-cut-genai-carbon-aws
 
 In short: Mohamed Najaaf (AWS) at Conf42 Machine Learning 2026 on cutting GenAI's energy use with right-sized models, cheap customisation, efficient silicon and monitoring.
 

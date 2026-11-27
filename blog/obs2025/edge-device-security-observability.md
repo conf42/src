@@ -1,6 +1,6 @@
 # Edge devices sit outside your monitoring, and attackers know it
 
-Conf42 Blog, 2025-05-28, updated 2026-11-09. https://www.conf42.com/blog/obs2025/edge-device-security-observability
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/edge-device-security-observability
 
 In short: Chintan Udeshi of Palo Alto Networks at Conf42 Observability 2025 on real-time observability for edge devices as the first step in edge security.
 

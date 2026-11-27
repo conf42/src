@@ -1,6 +1,6 @@
 # How MLOps cut insurance policy issuance time by 99%
 
-Conf42 Blog, 2025-09-09, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/insurance-mlops-cuts-policy-issuance-time
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/insurance-mlops-cuts-policy-issuance-time
 
 In short: Sameer Joshi of Cognizant at Conf42 MLOps 2025 on feature stores, model registries and compliance pipelines behind AI in insurance operations.
 

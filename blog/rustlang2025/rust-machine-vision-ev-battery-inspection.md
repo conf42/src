@@ -1,6 +1,6 @@
 # Rust machine vision on the EV line, from battery cells to ADAS
 
-Conf42 Blog, 2025-08-02, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-machine-vision-ev-battery-inspection
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-machine-vision-ev-battery-inspection
 
 In short: Sankar Subramanian of Lucid Motors at Conf42 Rustlang 2025 on Rust-based machine vision for EV manufacturing, covering battery inspection, 3D vision and ADAS calibration.
 

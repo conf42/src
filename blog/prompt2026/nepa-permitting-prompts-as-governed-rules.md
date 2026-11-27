@@ -1,6 +1,6 @@
 # NEPA permitting with LLMs needs prompts that act like governed rules
 
-Conf42 Blog, 2026-10-04, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/nepa-permitting-prompts-as-governed-rules
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/nepa-permitting-prompts-as-governed-rules
 
 In short: Mohit Upadhyay of Tech Mahindra at Conf42 Prompt Engineering 2026 on evidence-first prompts, provenance and RAG for NEPA categorical exclusions.
 

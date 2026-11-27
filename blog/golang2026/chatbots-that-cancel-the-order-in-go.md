@@ -1,6 +1,6 @@
 # Your chatbot understands the request. Can it cancel the order?
 
-Conf42 Blog, 2026-05-06, updated 2026-11-09. https://www.conf42.com/blog/golang2026/chatbots-that-cancel-the-order-in-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/chatbots-that-cancel-the-order-in-go
 
 In short: Swati Kumari of NucleusTeq at Conf42 Golang 2026 on turning chatbots into systems that act, with a Go orchestration layer as the nervous system.
 

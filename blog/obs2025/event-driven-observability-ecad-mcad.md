@@ -1,6 +1,6 @@
 # Stop passing CAD files around and start streaming design events
 
-Conf42 Blog, 2025-05-24, updated 2026-11-09. https://www.conf42.com/blog/obs2025/event-driven-observability-ecad-mcad
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/event-driven-observability-ecad-mcad
 
 In short: Pradeep Karanam at Conf42 Observability 2025 on replacing ECAD and MCAD file snapshots with Kafka events so design conflicts surface in minutes.
 

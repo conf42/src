@@ -1,6 +1,6 @@
 # Charter, harness, factory: who owns each coding agent rule
 
-Conf42 Blog, 2026-09-30, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/coding-agent-rules-charter-harness-factory
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/coding-agent-rules-charter-harness-factory
 
 In short: Ian Johnson of Parento at Conf42 Prompt Engineering 2026 maps where a coding agent gate can sit and who gets paged when that rule is wrong.
 

@@ -1,6 +1,6 @@
 # AI projects stall in pilots when the infrastructure comes last
 
-Conf42 Blog, 2025-08-19, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-native-platforms-start-with-infrastructure
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-native-platforms-start-with-infrastructure
 
 In short: Bharath Reddy Baddam of New York Life gives Conf42 Platform Engineering 2025 a map of AI-native platforms, from GPUs and feature stores to observability.
 

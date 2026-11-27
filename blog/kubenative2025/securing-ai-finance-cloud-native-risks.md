@@ -1,6 +1,6 @@
 # The quiet attacks on AI in finance hide in cloud-native gaps
 
-Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/securing-ai-finance-cloud-native-risks
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/securing-ai-finance-cloud-native-risks
 
 In short: Manisha Sengupta (Brown Brothers Harriman) at Conf42 Kube Native 2025 on adversarial attacks, data poisoning and Kubernetes misconfigurations in AI-driven finance.
 

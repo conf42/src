@@ -1,6 +1,6 @@
 # Storage tiering is a QUBO problem, and annealers can take a swing
 
-Conf42 Blog, 2025-06-09, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-annealing-for-storage-tiering
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-annealing-for-storage-tiering
 
 In short: Gopinath Govindarajan of Deloitte Consulting maps quantum annealing, QML and post-quantum crypto onto enterprise storage at Conf42 Quantum Computing 2025.
 

@@ -1,6 +1,6 @@
 # Insurance underwriting in seconds, not weeks, on Kubernetes
 
-Conf42 Blog, 2025-10-12, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/insurance-underwriting-in-seconds-on-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/insurance-underwriting-in-seconds-on-kubernetes
 
 In short: Gurucharann Visagamurthy of Humana shows at Conf42 Kube Native 2025 how Kubernetes-native pipelines move insurance underwriting and enrollment to real time.
 

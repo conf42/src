@@ -1,6 +1,6 @@
 # Compile it, judge it, attack it, on every PR that touches the agent
 
-Conf42 Blog, 2026-09-14, updated 2026-11-09. https://www.conf42.com/blog/agents2026/compile-judge-attack-every-agent-pr
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/compile-judge-attack-every-agent-pr
 
 In short: Liran Yushinsky (JFrog) at Conf42 AI Agents 2026: a three-layer CI gate of compile checks, LLM-as-judge and Garak red-teaming for code agents.
 

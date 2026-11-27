@@ -1,6 +1,6 @@
 # An AI governance framework that speeds launches instead of blocking them
 
-Conf42 Blog, 2025-09-21, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/enterprise-ai-security-governance-framework
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/enterprise-ai-security-governance-framework
 
 In short: Maurya Priyadarshi (Meta) at Conf42 Kube Native 2025 on a four-pillar framework for enterprise AI security, from governance boards to automated compliance.
 

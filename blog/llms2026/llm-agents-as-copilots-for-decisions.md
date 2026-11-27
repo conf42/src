@@ -1,6 +1,6 @@
 # Put LLM agents in decision systems as copilots, not deciders
 
-Conf42 Blog, 2026-05-25, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-agents-as-copilots-for-decisions
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-agents-as-copilots-for-decisions
 
 In short: Mazdul Choudhury (Walmart) at Conf42 LLMs 2026 lays out a three-layer architecture for LLM copilots in forecasting and planning workflows.
 

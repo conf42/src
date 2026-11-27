@@ -1,6 +1,6 @@
 # AI answers for API support should pass an expert before developers
 
-Conf42 Blog, 2026-03-02, updated 2026-11-09. https://www.conf42.com/blog/sre2026/api-support-answers-need-an-expert-gate
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/api-support-answers-need-an-expert-gate
 
 In short: Vishal Shah (Visa) at Conf42 SRE 2026 on agentic RAG for API support where owners approve every answer and each correction trains the system.
 

@@ -1,6 +1,6 @@
 # In streaming finance, the QPU is a co-processor for the hardest 1%
 
-Conf42 Blog, 2025-06-15, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/qpu-as-coprocessor-for-streaming-feature-stores
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/qpu-as-coprocessor-for-streaming-feature-stores
 
 In short: Siva Prakash of Bharathidasan University sketches a hybrid Kafka, Flink and feature store stack with a QPU on top at Conf42 Quantum Computing 2025.
 

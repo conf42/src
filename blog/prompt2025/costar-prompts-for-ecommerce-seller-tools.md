@@ -1,6 +1,6 @@
 # CO-STAR prompts turn generic LLMs into e-commerce seller tools
 
-Conf42 Blog, 2025-10-13, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/costar-prompts-for-ecommerce-seller-tools
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/costar-prompts-for-ecommerce-seller-tools
 
 In short: Sureshkumar Karuppuchamy (eBay) at Conf42 Prompt Engineering 2025 on CO-STAR prompts for personalization, forecasting, pricing, listings and shopping chatbots.
 

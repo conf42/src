@@ -1,6 +1,6 @@
 # Put fairness checks in CI, next to the unit tests
 
-Conf42 Blog, 2026-05-22, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/fairness-checks-as-ci-pipeline-gates
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/fairness-checks-as-ci-pipeline-gates
 
 In short: Dharmendra Ahuja (IBM) at Conf42 Database DevOps 2026 on embedding bias, privacy and explainability checks into the CI/CD stages of AI data pipelines.
 

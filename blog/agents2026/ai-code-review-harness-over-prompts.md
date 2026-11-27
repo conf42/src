@@ -1,6 +1,6 @@
 # When review prompts failed, CGI built a harness for 400 projects
 
-Conf42 Blog, 2026-09-02, updated 2026-11-09. https://www.conf42.com/blog/agents2026/ai-code-review-harness-over-prompts
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/ai-code-review-harness-over-prompts
 
 In short: Guido Scheffler of CGI at Conf42 AI Agents 2026 on moving AI code reviews from a long prompt to a Strands-based harness with enforced completeness.
 

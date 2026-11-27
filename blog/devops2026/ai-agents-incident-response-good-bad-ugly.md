@@ -1,6 +1,6 @@
 # AI agents on call multiply your speed and your mistakes
 
-Conf42 Blog, 2025-12-25, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-agents-incident-response-good-bad-ugly
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ai-agents-incident-response-good-bad-ugly
 
 In short: Vladyslav Budichenko of Vocaly AI at Conf42 DevOps 2026 on where AI agents help incident response, where they go wrong, and prompt injection via logs.
 

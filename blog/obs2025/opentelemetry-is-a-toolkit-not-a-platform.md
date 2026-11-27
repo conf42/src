@@ -1,6 +1,6 @@
 # OpenTelemetry is a toolkit, so budget for the rest of the build
 
-Conf42 Blog, 2025-06-01, updated 2026-11-09. https://www.conf42.com/blog/obs2025/opentelemetry-is-a-toolkit-not-a-platform
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/opentelemetry-is-a-toolkit-not-a-platform
 
 In short: Meletius Mgbeodichimma Igbokwe at Conf42 Observability 2025 on field lessons from OpenTelemetry: collector sizing, version drift, docs and training.
 

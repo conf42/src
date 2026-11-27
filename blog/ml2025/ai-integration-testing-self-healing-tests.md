@@ -1,6 +1,6 @@
 # Self-healing tests aim at integration testing's maintenance tax
 
-Conf42 Blog, 2025-05-05, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-integration-testing-self-healing-tests
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/ai-integration-testing-self-healing-tests
 
 In short: Siva Yachamaneni, Quality Engineering Manager at Infosys, at Conf42 Machine Learning 2025 on AI test generation, self-healing suites and smarter runs.
 

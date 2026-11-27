@@ -1,6 +1,6 @@
 # Debezium Platform turns CDC from a ticket queue into self-service
 
-Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/platform2026/debezium-platform-ends-cdc-ticket-queue
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/debezium-platform-ends-cdc-ticket-queue
 
 In short: Vincenzo Santonastaso (IBM, Debezium maintainer) at Conf42 Platform Engineering 2026 on scaling change data capture across teams with Debezium Platform.
 

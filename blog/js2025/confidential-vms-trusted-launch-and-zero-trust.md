@@ -1,6 +1,6 @@
 # Protect data in use with confidential VMs, trusted launch and zero trust
 
-Conf42 Blog, 2025-10-20, updated 2026-11-09. https://www.conf42.com/blog/js2025/confidential-vms-trusted-launch-and-zero-trust
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/confidential-vms-trusted-launch-and-zero-trust
 
 In short: Microsoft's Priyadarshni Shanmugavadivelu showed at Conf42 JavaScript 2025 how TEEs, TPM-backed boot and zero trust stack up to secure cloud VMs.
 

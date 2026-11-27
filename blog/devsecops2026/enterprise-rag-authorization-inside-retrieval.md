@@ -1,6 +1,6 @@
 # Enterprise RAG needs authorization inside retrieval, not at the UI
 
-Conf42 Blog, 2026-09-08, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/enterprise-rag-authorization-inside-retrieval
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/enterprise-rag-authorization-inside-retrieval
 
 In short: Ananda Kumar Dey of Quadrant Technologies at Conf42 DevSecOps 2026 treats enterprise RAG as a knowledge security problem, with access filters before ranking.
 

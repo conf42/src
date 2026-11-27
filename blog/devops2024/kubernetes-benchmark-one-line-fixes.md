@@ -1,6 +1,6 @@
 # Most Kubernetes misconfigurations are one-line fixes nobody made
 
-Conf42 Blog, 2024-01-24. https://www.conf42.com/blog/devops2024/kubernetes-benchmark-one-line-fixes
+Conf42 Blog, 2024-01-25. https://www.conf42.com/blog/devops2024/kubernetes-benchmark-one-line-fixes
 
 In short: Joe Pelletier (Fairwinds) at Conf42 DevOps 2024 on what 330,000 scanned workloads say about Kubernetes cost, reliability and security hygiene
 

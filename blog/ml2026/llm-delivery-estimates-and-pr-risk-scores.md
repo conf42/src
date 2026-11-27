@@ -1,6 +1,6 @@
 # An LLM that estimates delivery time from your Git history
 
-Conf42 Blog, 2026-02-18, updated 2026-11-09. https://www.conf42.com/blog/ml2026/llm-delivery-estimates-and-pr-risk-scores
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/llm-delivery-estimates-and-pr-risk-scores
 
 In short: Tim Markin (GiftHorse) at Conf42 Machine Learning 2026 demos a pipeline that estimates feature delivery time from past work and scores every commit for risk.
 

@@ -1,6 +1,6 @@
 # Emergency response platforms where a new service ships in 3 minutes
 
-Conf42 Blog, 2025-08-22, updated 2026-11-09. https://www.conf42.com/blog/platform2025/emergency-response-platforms-golden-paths
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/emergency-response-platforms-golden-paths
 
 In short: Lakshmi Vara Prasad Adusumilli (Conduent) at Conf42 Platform Engineering 2025 on golden paths, GitOps and multi-region failover for 911-grade systems.
 

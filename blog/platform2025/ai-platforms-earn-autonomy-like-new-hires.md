@@ -1,6 +1,6 @@
 # AI in the platform should earn autonomy like a new hire
 
-Conf42 Blog, 2025-08-23, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-platforms-earn-autonomy-like-new-hires
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-platforms-earn-autonomy-like-new-hires
 
 In short: Manoj Kumar Vunnava (GoDaddy) at Conf42 Platform Engineering 2025 on smarter pipelines, predictive ops and ML-driven scaling, rolled out gradually.
 

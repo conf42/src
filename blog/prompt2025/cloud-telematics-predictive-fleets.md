@@ -1,6 +1,6 @@
 # Cloud telematics moves fleets from fixing breakdowns to foreseeing them
 
-Conf42 Blog, 2025-10-11, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/cloud-telematics-predictive-fleets
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/cloud-telematics-predictive-fleets
 
 In short: Preeti Sali (Ford Motor Company) at Conf42 Prompt Engineering 2025 on telematics architecture, hybrid connectivity, predictive maintenance and routing.
 

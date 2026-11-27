@@ -1,6 +1,6 @@
 # Turning tax law into code with agents and a DSL in the middle
 
-Conf42 Blog, 2026-06-02, updated 2026-11-09. https://www.conf42.com/blog/llms2026/tax-law-to-code-agents-with-a-dsl-in-the-middle
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/tax-law-to-code-agents-with-a-dsl-in-the-middle
 
 In short: Abdul Basit Iqbal (Amazon) at Conf42 LLMs 2026 on a multi-agent pipeline that turns regulatory changes into validated, auditable tax logic.
 

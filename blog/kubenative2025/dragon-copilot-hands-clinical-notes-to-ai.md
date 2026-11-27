@@ -1,6 +1,6 @@
 # Dragon Copilot hands the clinical note-taking to ambient AI
 
-Conf42 Blog, 2025-10-06, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/dragon-copilot-hands-clinical-notes-to-ai
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/dragon-copilot-hands-clinical-notes-to-ai
 
 In short: Tharun Nallamothu (Microsoft) at Conf42 Kube Native 2025 on how Dragon Copilot turns doctor-patient conversations into clinical notes with ambient AI.
 

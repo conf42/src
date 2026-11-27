@@ -1,6 +1,6 @@
 # LLM moderation works as a system, not as one big model
 
-Conf42 Blog, 2026-06-09, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-moderation-is-a-system-not-a-model
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-moderation-is-a-system-not-a-model
 
 In short: Andrei Shcherbinin of Social Discovery Group at Conf42 LLMs 2026 on rules, small classifiers, LLM judges and human reviewers in dating-app moderation.
 

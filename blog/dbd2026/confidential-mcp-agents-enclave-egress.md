@@ -1,6 +1,6 @@
 # Your enclave is secure. The agent's SQL query is not
 
-Conf42 Blog, 2026-05-06, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/confidential-mcp-agents-enclave-egress
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/confidential-mcp-agents-enclave-egress
 
 In short: Ankur Aggarwal of Meta at Conf42 Database DevOps 2026 on Confidential MCP: attestation, PII transforms and egress policies for agents that query databases.
 

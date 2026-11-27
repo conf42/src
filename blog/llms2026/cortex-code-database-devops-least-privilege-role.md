@@ -1,6 +1,6 @@
 # Database DevOps with Cortex Code starts with a role that can't drop
 
-Conf42 Blog, 2026-05-29, updated 2026-11-09. https://www.conf42.com/blog/llms2026/cortex-code-database-devops-least-privilege-role
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/cortex-code-database-devops-least-privilege-role
 
 In short: Tim Spann (Snowflake) at Conf42 LLMs 2026 runs database operations from the Cortex Code CLI and starts by locking down what the agent may touch.
 

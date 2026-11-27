@@ -1,6 +1,6 @@
 # Your Electron app feels off because of eight small details
 
-Conf42 Blog, 2021-10-27. https://www.conf42.com/blog/js2021/electron-app-feel-native-on-every-os
+Conf42 Blog, 2021-10-28. https://www.conf42.com/blog/js2021/electron-app-feel-native-on-every-os
 
 In short: Kilian Valkhof (Polypane) at Conf42 JavaScript 2021 on the eight details that make an Electron app feel native on Windows, macOS and Linux.
 

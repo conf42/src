@@ -1,6 +1,6 @@
 # Real-time data systems that decide on fraud in milliseconds
 
-Conf42 Blog, 2025-10-26, updated 2026-11-09. https://www.conf42.com/blog/js2025/fraud-decisions-in-under-120-milliseconds
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/fraud-decisions-in-under-120-milliseconds
 
 In short: Lakshmi Bhargavi Mullapudi of Techstar Group mapped the Kafka, Flink and ClickHouse stack behind real-time apps at Conf42 JavaScript 2025.
 

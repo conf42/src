@@ -1,6 +1,6 @@
 # Record, replay, fork: debugging an agent that failed mid-run
 
-Conf42 Blog, 2026-11-09, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/record-replay-fork-failed-agent-runs
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/record-replay-fork-failed-agent-runs
 
 In short: Reza Amini (Flashback) at Conf42 MLOps 2026 on saving agent runs as cassettes, replaying them offline and forking a fix from the first wrong call.
 

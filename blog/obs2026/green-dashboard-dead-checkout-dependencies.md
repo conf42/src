@@ -1,6 +1,6 @@
 # Green dashboard, dead checkout - monitor what your app depends on
 
-Conf42 Blog, 2026-08-29, updated 2026-11-09. https://www.conf42.com/blog/obs2026/green-dashboard-dead-checkout-dependencies
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/green-dashboard-dead-checkout-dependencies
 
 In short: Eleftheria Batsou of UptimeRobot at Conf42 Observability 2026 on dependency outages, the 200 that lies, and why status pages can't be your alarm.
 

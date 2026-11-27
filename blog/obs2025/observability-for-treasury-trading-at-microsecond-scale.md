@@ -1,6 +1,6 @@
 # Watching a treasury trading floor that moves in microseconds
 
-Conf42 Blog, 2025-05-31, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-for-treasury-trading-at-microsecond-scale
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-for-treasury-trading-at-microsecond-scale
 
 In short: Ganesh Marimuthu at Conf42 Observability 2025 on tracing, ML anomaly detection and telemetry pipelines for high-frequency treasury trading.
 

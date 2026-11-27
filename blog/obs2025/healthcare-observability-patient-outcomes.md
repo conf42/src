@@ -1,6 +1,6 @@
 # In healthcare IT, a slow service is a patient waiting
 
-Conf42 Blog, 2025-05-26, updated 2026-11-09. https://www.conf42.com/blog/obs2025/healthcare-observability-patient-outcomes
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/healthcare-observability-patient-outcomes
 
 In short: Brahmanand Reddy Bhavanam of Info Way Solutions at Conf42 Observability 2025 on tying distributed tracing and telemetry to clinical workflows and compliance.
 

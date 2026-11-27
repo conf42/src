@@ -1,6 +1,6 @@
 # Make observability part of the paved road, then fail builds without it
 
-Conf42 Blog, 2026-01-09, updated 2026-11-09. https://www.conf42.com/blog/devops2026/observability-as-a-platform-contract
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/observability-as-a-platform-contract
 
 In short: Sumit Kaul of PayJoy at Conf42 DevOps 2026 on zero-code instrumentation, SLOs as version-controlled contracts and CI/CD gates that enforce them.
 

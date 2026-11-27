@@ -1,6 +1,6 @@
 # Run VMs as Kubernetes resources to cut hybrid on-call pain
 
-Conf42 Blog, 2026-03-03, updated 2026-11-09. https://www.conf42.com/blog/sre2026/run-vms-as-kubernetes-resources-to-cut-on-call-pain
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/run-vms-as-kubernetes-resources-to-cut-on-call-pain
 
 In short: Shruthi Rajashekar (Broadcom) at Conf42 SRE 2026 on VM Service in VCF, which manages virtual machines and containers through one Kubernetes control plane.
 

@@ -1,6 +1,6 @@
 # Treat migration as a standing capability, not a one-off project
 
-Conf42 Blog, 2025-10-08, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/migration-as-a-capability-four-pillars
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/migration-as-a-capability-four-pillars
 
 In short: Meenu Venkataarangam (Recode Solutions) at Conf42 Prompt Engineering 2025 on four automation pillars and AI that make enterprise migrations repeatable.
 

@@ -1,6 +1,6 @@
 # Incident agents: diagnosis is the easy half, authority is the hard one
 
-Conf42 Blog, 2026-11-16, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/agentic-llms-microservices-observability
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/agentic-llms-microservices-observability
 
 In short: Nishanth Vepachedu at Conf42 MLOps 2026 on graduated oversight for incident agents: typed actions, risk tiers and a session score the agent cannot lower.
 

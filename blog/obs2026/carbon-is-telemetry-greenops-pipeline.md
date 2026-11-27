@@ -1,6 +1,6 @@
 # Carbon is telemetry too - a GreenOps pipeline from open source parts
 
-Conf42 Blog, 2026-09-03, updated 2026-11-09. https://www.conf42.com/blog/obs2026/carbon-is-telemetry-greenops-pipeline
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/carbon-is-telemetry-greenops-pipeline
 
 In short: Diana Todea of VictoriaMetrics at Conf42 Observability 2026 turns cloud billing exports into carbon, energy and water metrics with Spruce and Grafana.
 

@@ -1,6 +1,6 @@
 # An Internal Developer Platform Playbook That Starts Narrow
 
-Conf42 Blog, 2025-08-27, updated 2026-11-09. https://www.conf42.com/blog/platform2025/micron-idp-playbook-start-narrow
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/micron-idp-playbook-start-narrow
 
 In short: Micron's Kommireddy Veera Venkata Subrahmanyam at Conf42 Platform Engineering 2025: IDP components, tooling, metrics and why to start small.
 

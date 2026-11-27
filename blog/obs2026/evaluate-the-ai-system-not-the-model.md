@@ -1,6 +1,6 @@
 # Benchmarks grade the model. Production needs to grade the system
 
-Conf42 Blog, 2026-08-18. https://www.conf42.com/blog/obs2026/evaluate-the-ai-system-not-the-model
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/evaluate-the-ai-system-not-the-model
 
 In short: Srikanth Devarakonda of Adobe at Conf42 Observability 2026 on continuous GenAI evaluation tied to observable signals and business outcomes.
 

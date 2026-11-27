@@ -1,6 +1,6 @@
 # A 3PL proposal should be built from the customer's data, not last year's
 
-Conf42 Blog, 2026-05-07, updated 2026-11-09. https://www.conf42.com/blog/golang2026/warehouse-rfps-built-from-data-not-assumptions
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/warehouse-rfps-built-from-data-not-assumptions
 
 In short: Vivek Sander of Sunland Logistics Solution at Conf42 Golang 2026 lays out a six-layer, data-first method for warehouse design in 3PL RFP responses.
 

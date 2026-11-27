@@ -1,6 +1,6 @@
 # Self-healing streaming on Kubernetes with Redis Streams and KEDA
 
-Conf42 Blog, 2025-09-25, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/self-healing-streams-with-redis-and-keda
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/self-healing-streams-with-redis-and-keda
 
 In short: Karthik Reddy Beereddy (LexisNexis Risk Solutions) at Conf42 Kube Native 2025 on replayable logs, circuit breakers and lag-driven autoscaling for streams.
 

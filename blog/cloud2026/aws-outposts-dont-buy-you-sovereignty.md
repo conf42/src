@@ -1,6 +1,6 @@
 # Sovereignty is about who runs the control plane, not where the rack is
 
-Conf42 Blog, 2026-04-08. https://www.conf42.com/blog/cloud2026/aws-outposts-dont-buy-you-sovereignty
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/aws-outposts-dont-buy-you-sovereignty
 
 In short: Dmytro Hlotenko of Sage Austria at Conf42 Cloud Native 2026 on EU compliance on AWS: Cloud Act, DORA, NIS2, the Sovereign Cloud and the Outposts trap.
 

@@ -1,6 +1,6 @@
 # A flag flip near an incident is a hypothesis, not a verdict
 
-Conf42 Blog, 2026-10-09, updated 2026-11-17. https://www.conf42.com/blog/featureflags2026/feature-flags-as-incident-evidence-ai-rca
+Conf42 Blog, 2026-10-15, updated 2026-11-17. https://www.conf42.com/blog/featureflags2026/feature-flags-as-incident-evidence-ai-rca
 
 In short: Ishan Shah (PayPal) at Conf42 Feature Flags 2026 on treating flag changes as typed incident evidence while policy and the operator keep the authority.
 

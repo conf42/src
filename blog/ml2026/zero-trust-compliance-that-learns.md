@@ -1,6 +1,6 @@
 # Zero Trust compliance can't run on rules refreshed once a quarter
 
-Conf42 Blog, 2026-02-15, updated 2026-11-09. https://www.conf42.com/blog/ml2026/zero-trust-compliance-that-learns
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/zero-trust-compliance-that-learns
 
 In short: Sudheer Kumar Aluvala (HCL America) at Conf42 Machine Learning 2026 on a closed-loop ML compliance engine that scores risk in real time inside ZTNA.
 

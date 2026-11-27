@@ -1,6 +1,6 @@
 # Better enterprise AI answers start before the prompt reaches the model
 
-Conf42 Blog, 2026-10-27, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/enterprise-rag-five-axes-context-before-prompt
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/enterprise-rag-five-axes-context-before-prompt
 
 In short: Ravi Ray at Conf42 Prompt Engineering 2026 on a vendor-neutral five-axis framework for enterprise RAG, from ingestion to governance.
 

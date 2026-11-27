@@ -1,6 +1,6 @@
 # Healthcare compliance works better as a pipeline than a report
 
-Conf42 Blog, 2025-12-31, updated 2026-11-09. https://www.conf42.com/blog/devops2026/provider-network-compliance-as-continuous-pipeline
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/provider-network-compliance-as-continuous-pipeline
 
 In short: Sai Hanumara (L.A. Care Health Plan) at Conf42 DevOps 2026 on cloud-native pipelines and analytics for provider network governance.
 

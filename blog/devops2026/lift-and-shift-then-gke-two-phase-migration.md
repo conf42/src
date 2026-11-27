@@ -1,6 +1,6 @@
 # Lift and shift first, then Kubernetes, so you change one thing at a time
 
-Conf42 Blog, 2025-12-28, updated 2026-11-09. https://www.conf42.com/blog/devops2026/lift-and-shift-then-gke-two-phase-migration
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/lift-and-shift-then-gke-two-phase-migration
 
 In short: Google staff SRE Harris Baskaran at Conf42 DevOps 2026 on moving a ticketing monolith from VMware and Oracle to GCE, then GKE and PostgreSQL.
 

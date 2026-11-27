@@ -1,6 +1,6 @@
 # In healthcare ML, PHI leaks from dev environments, not production
 
-Conf42 Blog, 2026-02-13, updated 2026-11-09. https://www.conf42.com/blog/ml2026/phi-leaks-from-ml-dev-environments
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/phi-leaks-from-ml-dev-environments
 
 In short: Reshma Vemula (Loma Linda University Health) at Conf42 Machine Learning 2026 on why ML dev copies leak PHI and a five-step plan built on synthetic data.
 

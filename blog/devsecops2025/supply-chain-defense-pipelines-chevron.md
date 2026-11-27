@@ -1,6 +1,6 @@
 # Attackers stopped hitting your app and started hitting your pipeline
 
-Conf42 Blog, 2025-11-16, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/supply-chain-defense-pipelines-chevron
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/supply-chain-defense-pipelines-chevron
 
 In short: Gresshma Atluri of Chevron at Conf42 DevSecOps 2025 on defending CI/CD and third-party supply chains with shift-left, RASP, vendor risk and zero trust.
 

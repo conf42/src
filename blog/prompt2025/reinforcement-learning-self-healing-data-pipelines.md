@@ -1,6 +1,6 @@
 # Self-healing data pipelines swap static rules for an RL agent
 
-Conf42 Blog, 2025-10-19, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/reinforcement-learning-self-healing-data-pipelines
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/reinforcement-learning-self-healing-data-pipelines
 
 In short: Annapurneswar Putrevu at Conf42 Prompt Engineering 2025 on RL agents and prompts that detect, explain and fix data pipeline failures on AWS.
 

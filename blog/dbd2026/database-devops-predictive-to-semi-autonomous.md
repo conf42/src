@@ -1,6 +1,6 @@
 # From firefighting to forecasting, a DBA's roadmap for AI ops
 
-Conf42 Blog, 2026-05-11, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/database-devops-predictive-to-semi-autonomous
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/database-devops-predictive-to-semi-autonomous
 
 In short: Ellavarasan Asokan of Capital One at Conf42 Database DevOps 2026 on forecasting, RL indexing and anomaly detection on the way to semi-autonomous databases.
 

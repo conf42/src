@@ -1,6 +1,6 @@
 # Agent reliability is a property of the platform around the model
 
-Conf42 Blog, 2026-11-16, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/self-healing-cloud-infrastructure-agentic-ai
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/self-healing-cloud-infrastructure-agentic-ai
 
 In short: Amit Anand at Conf42 MLOps 2026 on the platform agents need to heal infrastructure: durable runs, a policy gate, run IDs and autonomy per action class.
 

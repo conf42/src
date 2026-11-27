@@ -1,6 +1,6 @@
 # Splitting a monolithic segmentation pipeline into Kubernetes services
 
-Conf42 Blog, 2025-09-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/container-native-ml-customer-segmentation-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/container-native-ml-customer-segmentation-kubernetes
 
 In short: Ujjwala Modepalli (Wells Fargo) at Conf42 Kube Native 2025 on rebuilding segmentation ML as microservices with Helm, drift-triggered retraining and a feature store.
 

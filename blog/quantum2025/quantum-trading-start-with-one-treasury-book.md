@@ -1,6 +1,6 @@
 # Quantum-accelerated trading should start with one Treasury book
 
-Conf42 Blog, 2025-06-17, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-trading-start-with-one-treasury-book
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-trading-start-with-one-treasury-book
 
 In short: Ganesh Marimuthu at Conf42 Quantum Computing 2025 on hybrid quantum-classical trading systems, what firms measured, and why to start with a narrow use case.
 

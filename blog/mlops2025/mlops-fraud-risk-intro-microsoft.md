@@ -1,6 +1,6 @@
 # An MLOps primer for fraud and risk models in banking
 
-Conf42 Blog, 2025-09-05, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-fraud-risk-intro-microsoft
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-fraud-risk-intro-microsoft
 
 In short: Dileep Kumar Kanimetta (Microsoft) at Conf42 MLOps 2025 gives an intro to MLOps for bank fraud and risk models, from IaC and CI/CD to drift and governance.
 

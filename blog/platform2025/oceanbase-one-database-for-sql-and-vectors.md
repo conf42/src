@@ -1,6 +1,6 @@
 # One SQL query instead of four databases for RAG and search
 
-Conf42 Blog, 2025-08-11, updated 2026-11-09. https://www.conf42.com/blog/platform2025/oceanbase-one-database-for-sql-and-vectors
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/oceanbase-one-database-for-sql-and-vectors
 
 In short: OceanBase's Peng Wang at Conf42 Platform Engineering 2025 on running SQL, full-text and vector search in one Kubernetes-native database for AI apps.
 

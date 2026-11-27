@@ -1,6 +1,6 @@
 # Your database failover is only as fast as your DNS
 
-Conf42 Blog, 2026-06-02, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/active-active-dns-for-database-failover
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/active-active-dns-for-database-failover
 
 In short: Surya Lankalapalli (Microsoft) at Conf42 Database DevOps 2026 on active-active multi-provider DNS, deep health checks and records as code for database failover.
 

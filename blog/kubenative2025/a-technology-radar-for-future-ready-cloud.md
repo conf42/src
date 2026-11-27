@@ -1,6 +1,6 @@
 # From monoliths to edge and quantum, a radar for future-ready cloud
 
-Conf42 Blog, 2025-10-14, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/a-technology-radar-for-future-ready-cloud
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/a-technology-radar-for-future-ready-cloud
 
 In short: Surya Prabha Busi of Ford Credit tours microservices, edge, serverless and quantum at Conf42 Kube Native 2025, with a plan for adopting them in stages.
 

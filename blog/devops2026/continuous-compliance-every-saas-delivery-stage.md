@@ -1,6 +1,6 @@
 # Compliance belongs in every stage of SaaS delivery, not just the audit
 
-Conf42 Blog, 2025-12-30, updated 2026-11-09. https://www.conf42.com/blog/devops2026/continuous-compliance-every-saas-delivery-stage
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/continuous-compliance-every-saas-delivery-stage
 
 In short: Oracle engineering manager Pooja Ranjan at Conf42 DevOps 2026 maps where compliance lives in each SDLC stage of SaaS delivery and what to automate.
 

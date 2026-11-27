@@ -1,6 +1,6 @@
 # Why logistic regression beat a CNN and an LSTM on noisy product names
 
-Conf42 Blog, 2026-11-15, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/logistic-regression-beats-neural-nets-product-names
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/logistic-regression-beats-neural-nets-product-names
 
 In short: Vladimir Beskorovainyi (Besk Tech) at Conf42 MLOps 2026 on character n-gram logistic regression beating a CNN, an LSTM and DistilBERT on receipt text.
 

@@ -1,6 +1,6 @@
 # Salesforce Nonprofit Cloud as a fix for nonprofit data silos
 
-Conf42 Blog, 2025-05-16. https://www.conf42.com/blog/obs2025/salesforce-nonprofit-cloud-against-data-silos
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/salesforce-nonprofit-cloud-against-data-silos
 
 In short: Sekhar Midathana of Northern Trust at Conf42 Observability 2025 on how Salesforce Nonprofit Cloud centralises donor, program and volunteer data.
 

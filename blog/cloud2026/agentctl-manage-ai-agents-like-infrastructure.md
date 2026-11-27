@@ -1,6 +1,6 @@
 # agentctl treats AI agents and MCP servers like pods
 
-Conf42 Blog, 2026-03-24, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/agentctl-manage-ai-agents-like-infrastructure
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/agentctl-manage-ai-agents-like-infrastructure
 
 In short: Andrew Espira of Kustode at Conf42 Cloud Native 2026 on agentctl, a Go CLI that registers, health-checks and discovers AI agents and MCP servers.
 

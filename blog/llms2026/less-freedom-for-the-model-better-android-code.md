@@ -1,6 +1,6 @@
 # The more experience you gain, the less freedom you give the model
 
-Conf42 Blog, 2026-05-29, updated 2026-11-09. https://www.conf42.com/blog/llms2026/less-freedom-for-the-model-better-android-code
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/less-freedom-for-the-model-better-android-code
 
 In short: Andrii Veremiienko (Revolut) at Conf42 LLMs 2026 on AI-assisted Android work: rules files, a core UI module and no code you cannot explain.
 

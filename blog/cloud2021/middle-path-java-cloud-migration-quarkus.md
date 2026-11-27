@@ -1,6 +1,6 @@
 # Skip both lift-and-shift and the rewrite, recompile your Java instead
 
-Conf42 Blog, 2021-04-28. https://www.conf42.com/blog/cloud2021/middle-path-java-cloud-migration-quarkus
+Conf42 Blog, 2021-04-29. https://www.conf42.com/blog/cloud2021/middle-path-java-cloud-migration-quarkus
 
 In short: Nicolas Frankel (Hazelcast) at Conf42 Cloud Native 2021 on migrating a legacy JAX-RS app to the cloud with Quarkus and a GraalVM native image
 

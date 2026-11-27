@@ -1,6 +1,6 @@
 # Blue/green on AWS with Lambda@Edge, cookies and a cache that cooperates
 
-Conf42 Blog, 2025-11-10, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/blue-green-on-aws-with-lambda-edge
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/blue-green-on-aws-with-lambda-edge
 
 In short: Rayenn Hamrouni of Lenstra at Conf42 DevSecOps 2025 on cookie-based blue/green routing with Lambda@Edge, SSM and CloudFront caching.
 

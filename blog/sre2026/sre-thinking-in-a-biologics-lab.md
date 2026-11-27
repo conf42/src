@@ -1,6 +1,6 @@
 # SRE habits in a biologics lab cut manual work 40% per AMBR run
 
-Conf42 Blog, 2026-02-24, updated 2026-11-09. https://www.conf42.com/blog/sre2026/sre-thinking-in-a-biologics-lab
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/sre-thinking-in-a-biologics-lab
 
 In short: Amogha Tenneti of Eurofins PSS at Conf42 SRE 2026 on automating AMBR250 lab analytics with FLEX2 via phase gates, equivalency tests and super users.
 

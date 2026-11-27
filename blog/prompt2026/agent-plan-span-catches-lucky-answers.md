@@ -1,6 +1,6 @@
 # A plan span catches the agent that got the right answer by luck
 
-Conf42 Blog, 2026-10-21, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agent-plan-span-catches-lucky-answers
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/agent-plan-span-catches-lucky-answers
 
 In short: Krishna Chaitanya Balusu (Meta) at Conf42 Prompt Engineering 2026 on OpenTelemetry plan spans for debugging agent prompts, not just answers.
 

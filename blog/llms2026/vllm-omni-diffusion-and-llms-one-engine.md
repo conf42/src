@@ -1,6 +1,6 @@
 # vLLM-Omni serves diffusion models and LLMs from one engine
 
-Conf42 Blog, 2026-06-01, updated 2026-11-17. https://www.conf42.com/blog/llms2026/vllm-omni-diffusion-and-llms-one-engine
+Conf42 Blog, 2026-06-18, updated 2026-11-17. https://www.conf42.com/blog/llms2026/vllm-omni-diffusion-and-llms-one-engine
 
 In short: Kosseila Haddalene (Cloudthrill) at Conf42 Large Language Models (LLMs) 2026 on how vLLM-Omni runs autoregressive and diffusion stages in one runtime.
 

@@ -1,6 +1,6 @@
 # Keeping Oracle SOA Suite while moving to Spring Boot microservices
 
-Conf42 Blog, 2025-05-04, updated 2026-11-09. https://www.conf42.com/blog/ml2025/oracle-soa-meets-spring-boot-patterns
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/oracle-soa-meets-spring-boot-patterns
 
 In short: Vasipally Nagireddy of Creoal + SMX at Conf42 Machine Learning 2025 maps integration patterns for running Oracle SOA Suite alongside cloud-native Spring Boot.
 

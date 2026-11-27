@@ -1,6 +1,6 @@
 # Letting cars bid for road segments to beat congestion
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/ml2025/cars-bid-for-road-segments-traffic-agents
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/cars-bid-for-road-segments-traffic-agents
 
 In short: Avraam Tolmidis of Meta at Conf42 Machine Learning 2025 on multi-agent traffic routing where vehicles take bids from intersections and re-plan as conditions change.
 

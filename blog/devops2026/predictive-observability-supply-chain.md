@@ -1,6 +1,6 @@
 # Supply chain outages give warnings hours ahead if you read the weather
 
-Conf42 Blog, 2026-01-10, updated 2026-11-09. https://www.conf42.com/blog/devops2026/predictive-observability-supply-chain
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/predictive-observability-supply-chain
 
 In short: Raghu Bhupatiraju of Expeditors at Conf42 DevOps 2026 on predictive observability, blending telemetry with weather and carrier signals to act before outages.
 

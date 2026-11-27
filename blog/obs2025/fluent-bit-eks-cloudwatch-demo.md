@@ -1,6 +1,6 @@
 # Fluent Bit on EKS, from empty cluster to CloudWatch logs
 
-Conf42 Blog, 2025-05-29, updated 2026-11-09. https://www.conf42.com/blog/obs2025/fluent-bit-eks-cloudwatch-demo
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/fluent-bit-eks-cloudwatch-demo
 
 In short: Dharmendra Ahuja at Conf42 Observability 2025 demos Fluent Bit as a DaemonSet on AWS EKS, shipping enriched container logs to CloudWatch, plus five use cases.
 

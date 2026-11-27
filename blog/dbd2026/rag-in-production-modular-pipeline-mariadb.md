@@ -1,6 +1,6 @@
 # RAG is easy until the second PDF arrives
 
-Conf42 Blog, 2026-05-05, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/rag-in-production-modular-pipeline-mariadb
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/rag-in-production-modular-pipeline-mariadb
 
 In short: Alejandro Duarte of MariaDB at Conf42 Database DevOps 2026 on what breaks when RAG leaves the demo, and a modular pipeline that handles it.
 

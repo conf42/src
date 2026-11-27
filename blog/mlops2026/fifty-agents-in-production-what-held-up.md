@@ -1,6 +1,6 @@
 # Fifty agents in production, and a prompt cache at 0% for months
 
-Conf42 Blog, 2026-11-09, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/fifty-agents-in-production-what-held-up
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/fifty-agents-in-production-what-held-up
 
 In short: Muhammad Haris Farooq (Ruby AI) at Conf42 MLOps 2026 on four patterns for 50+ Claude agents on Bedrock: code decides, visible quality, cost per run, speed.
 

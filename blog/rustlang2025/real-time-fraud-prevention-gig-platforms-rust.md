@@ -1,6 +1,6 @@
 # Fraud checks in milliseconds, a five-layer Rust pipeline for gig apps
 
-Conf42 Blog, 2025-08-17. https://www.conf42.com/blog/rustlang2025/real-time-fraud-prevention-gig-platforms-rust
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/real-time-fraud-prevention-gig-platforms-rust
 
 In short: Prabhakar Singh of Meta at Conf42 Rustlang 2025 on real-time fraud prevention for gig platforms in Rust, with Tokio, Candle and petgraph.
 

@@ -1,6 +1,6 @@
 # A serverless photo pipeline where thresholds became evidence
 
-Conf42 Blog, 2026-08-29, updated 2026-11-09. https://www.conf42.com/blog/agents2026/photo-pipeline-thresholds-to-agents
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/photo-pipeline-thresholds-to-agents
 
 In short: Dmytro Hlotenko of Sage at Conf42 AI Agents 2026 rebuilds his 8,000-photo AWS culling pipeline with Strands agents, a blind critic and Step Functions up front.
 

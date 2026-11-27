@@ -1,6 +1,6 @@
 # Sometimes the best send time is not sending at all
 
-Conf42 Blog, 2026-02-02, updated 2026-11-09. https://www.conf42.com/blog/ml2026/sometimes-the-best-send-time-is-never
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/sometimes-the-best-send-time-is-never
 
 In short: Adobe's Murthy Chandrapaty and Chakravarthy Kalva at Conf42 Machine Learning 2026 on turning send-time prediction into a send, defer or skip decision.
 

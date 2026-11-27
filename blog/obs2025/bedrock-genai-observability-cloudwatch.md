@@ -1,6 +1,6 @@
 # Probabilistic apps need observability you switch on yourself
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/obs2025/bedrock-genai-observability-cloudwatch
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/bedrock-genai-observability-cloudwatch
 
 In short: AWS Serverless Hero Hazel Saenz of Caylent shows at Conf42 Observability 2025 how to measure Bedrock-backed serverless apps with CloudWatch and X-Ray.
 

@@ -1,6 +1,6 @@
 # Verify AI-written code inside the agent's loop, not at the gate
 
-Conf42 Blog, 2026-09-29, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/verify-ai-code-inside-agent-loop-not-gate
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/verify-ai-code-inside-agent-loop-not-gate
 
 In short: At Conf42 DevSecOps 2026, TestSprite co-founder Yunhao Jiao argues coding agents need runtime checks while they work, using the CoderCup experiment.
 

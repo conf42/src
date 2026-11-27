@@ -1,6 +1,6 @@
 # Rate limiting that reads behaviour instead of counting requests
 
-Conf42 Blog, 2025-10-21, updated 2026-11-09. https://www.conf42.com/blog/js2025/rate-limiting-that-reads-behaviour-not-request-counts
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/rate-limiting-that-reads-behaviour-not-request-counts
 
 In short: Rehana Sultana Khan of Versa Networks showed at Conf42 JavaScript 2025 how 27 behavioural features and tree ensembles replace static API limits.
 

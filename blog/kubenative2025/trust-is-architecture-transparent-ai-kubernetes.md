@@ -1,6 +1,6 @@
 # Users ignore AI they cannot inspect, so build trust into the stack
 
-Conf42 Blog, 2025-09-20, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/trust-is-architecture-transparent-ai-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/trust-is-architecture-transparent-ai-kubernetes
 
 In short: Raj Kommera (ON24) at Conf42 Kube Native 2025 on five design pillars for trustworthy AI, from contextual confidence scores to OpenTelemetry audit trails.
 

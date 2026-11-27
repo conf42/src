@@ -1,6 +1,6 @@
 # Teaching an 8-year-old observability with a thirsty house plant
 
-Conf42 Blog, 2025-11-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/plant-monitoring-esp32-prometheus-grafana-cloud
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/plant-monitoring-esp32-prometheus-grafana-cloud
 
 In short: Marie Cruz of Grafana Labs at Conf42 IoT 2025 builds a soil moisture monitor with an ESP32, Prometheus and Grafana Cloud alongside her daughter.
 

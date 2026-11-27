@@ -1,6 +1,6 @@
 # Let sensor data, not the calendar, write the maintenance work order
 
-Conf42 Blog, 2025-09-19, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/genai-predictive-maintenance-car-plants-erp
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/genai-predictive-maintenance-car-plants-erp
 
 In short: Abhijit Joshi (Deloitte Consulting) at Conf42 Kube Native 2025 on using GenAI on IoT sensor data to drive ERP maintenance work orders in automotive plants.
 

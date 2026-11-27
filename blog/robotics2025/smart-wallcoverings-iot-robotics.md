@@ -1,6 +1,6 @@
 # The wall itself can be part of the IoT network
 
-Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/smart-wallcoverings-iot-robotics
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/smart-wallcoverings-iot-robotics
 
 In short: Rahul Pingale of Wallquest at Conf42 Robotics 2025 on PVC-free non-woven wall surfaces that carry RFID, sensors and robot navigation markers.
 

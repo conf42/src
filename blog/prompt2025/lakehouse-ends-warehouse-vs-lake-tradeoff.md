@@ -1,6 +1,6 @@
 # A lakehouse ends the choice between governed and cheap data
 
-Conf42 Blog, 2025-10-18, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/lakehouse-ends-warehouse-vs-lake-tradeoff
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/lakehouse-ends-warehouse-vs-lake-tradeoff
 
 In short: Richa Solanki (Ally Bank) at Conf42 Prompt Engineering 2025 on lakehouse zones, Data Vault, ELT, open table formats and automated governance at scale.
 

@@ -1,6 +1,6 @@
 # AI promises to end the speed-versus-security standoff in DevSecOps
 
-Conf42 Blog, 2025-11-11, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ai-autonomous-cloud-security-devsecops
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/ai-autonomous-cloud-security-devsecops
 
 In short: Venkatesh Kata of CGI at Conf42 DevSecOps 2025 on moving cloud security from manual gates to predictive, AI-driven and eventually autonomous protection.
 

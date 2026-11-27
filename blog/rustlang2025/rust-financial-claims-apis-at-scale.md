@@ -1,6 +1,6 @@
 # Rust for insurance claims APIs, from GC pauses to FFI bridges
 
-Conf42 Blog, 2025-08-08. https://www.conf42.com/blog/rustlang2025/rust-financial-claims-apis-at-scale
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-financial-claims-apis-at-scale
 
 In short: Nageswara Rao Nelloru of Marquee Technology Solutions at Conf42 Rustlang 2025 on Rust claims and fraud APIs, and how to adopt it next to Java systems.
 

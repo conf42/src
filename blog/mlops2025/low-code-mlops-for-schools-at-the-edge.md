@@ -1,6 +1,6 @@
 # Schools need MLOps that works offline and needs no ML engineer
 
-Conf42 Blog, 2025-08-25, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/low-code-mlops-for-schools-at-the-edge
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/low-code-mlops-for-schools-at-the-edge
 
 In short: Lalitha Potharalanka (FDA) at Conf42 MLOps 2025 on low-code, privacy-first, offline-ready MLOps for schools with tight budgets and patchy internet.
 

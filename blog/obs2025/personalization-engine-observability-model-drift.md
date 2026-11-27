@@ -1,6 +1,6 @@
 # Your recommender did not crash. It quietly served default content
 
-Conf42 Blog, 2025-05-31, updated 2026-11-09. https://www.conf42.com/blog/obs2025/personalization-engine-observability-model-drift
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/personalization-engine-observability-model-drift
 
 In short: Sai Kumar Bitra of AT&T at Conf42 Observability 2025 on observing real-time personalization engines, with model metrics, traces and a silent drift story.
 

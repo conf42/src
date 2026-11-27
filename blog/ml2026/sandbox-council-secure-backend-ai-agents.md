@@ -1,6 +1,6 @@
 # Securing AI coding agents: contain the body, convene a council
 
-Conf42 Blog, 2026-01-24, updated 2026-11-09. https://www.conf42.com/blog/ml2026/sandbox-council-secure-backend-ai-agents
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/sandbox-council-secure-backend-ai-agents
 
 In short: Booking.com payments engineer Marat Kenzhebulatov at Conf42 Machine Learning 2026 on sandboxes, multi-model review councils and audits for agents.
 

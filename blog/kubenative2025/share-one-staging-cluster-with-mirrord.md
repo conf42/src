@@ -1,6 +1,6 @@
 # One staging cluster can replace your dev and CI clusters
 
-Conf42 Blog, 2025-10-08, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/share-one-staging-cluster-with-mirrord
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/share-one-staging-cluster-with-mirrord
 
 In short: Arsh Sharma (MetalBear) at Conf42 Kube Native 2025 shows mirrord running local code in a shared staging cluster to stop Kubernetes cluster sprawl.
 

@@ -1,6 +1,6 @@
 # Third-party risk was built for annual reviews; ML makes it continuous
 
-Conf42 Blog, 2026-02-14, updated 2026-11-09. https://www.conf42.com/blog/ml2026/third-party-risk-as-ml-system-circle
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/third-party-risk-as-ml-system-circle
 
 In short: Sagar Sudhir Behere (Circle) at Conf42 Machine Learning 2026 on rebuilding vendor risk management with NLP, semantic dedup, model ensembles and event-driven monitoring.
 

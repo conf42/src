@@ -1,6 +1,6 @@
 # Predictive maintenance is a platform problem before it's a model
 
-Conf42 Blog, 2025-08-10, updated 2026-11-09. https://www.conf42.com/blog/platform2025/predictive-maintenance-platform-for-industrial-iot
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/predictive-maintenance-platform-for-industrial-iot
 
 In short: Muruga Angamuthu of Techtonic Industries at Conf42 Platform Engineering 2025 on cloud-native platforms for industrial IoT predictive maintenance.
 

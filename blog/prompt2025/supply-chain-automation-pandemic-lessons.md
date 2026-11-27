@@ -1,6 +1,6 @@
 # What the pandemic taught Zensar about automating partner supply chains
 
-Conf42 Blog, 2025-10-12, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/supply-chain-automation-pandemic-lessons
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/supply-chain-automation-pandemic-lessons
 
 In short: Kunal Dixit (Zensar Technologies) at Conf42 Prompt Engineering 2025 on order automation, direct shipping and remote field operations built during COVID.
 

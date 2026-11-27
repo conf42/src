@@ -1,6 +1,6 @@
 # Tuning PySpark and Airflow on Kubernetes, one variable at a time
 
-Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/tune-pyspark-and-airflow-on-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/tune-pyspark-and-airflow-on-kubernetes
 
 In short: Sruthi Erra Hareram (TELUS Digital) at Conf42 Kube Native 2025 on executor sizing, joins, skew and Airflow patterns for Kubernetes-native ETL.
 

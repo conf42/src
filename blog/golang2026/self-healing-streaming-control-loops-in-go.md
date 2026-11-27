@@ -1,6 +1,6 @@
 # Put the AI in the control plane, not the business logic
 
-Conf42 Blog, 2026-05-10, updated 2026-11-09. https://www.conf42.com/blog/golang2026/self-healing-streaming-control-loops-in-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/self-healing-streaming-control-loops-in-go
 
 In short: Yogesh Pugazhendhi Duraisamy Rajamani of Ford at Conf42 Golang 2026 on self-healing streaming pipelines built from Go control loops and an RL control plane.
 

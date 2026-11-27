@@ -1,6 +1,6 @@
 # Pipelines should prove who they are, not carry cloud keys
 
-Conf42 Blog, 2026-09-14, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/pipelines-should-prove-identity-not-carry-keys
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/pipelines-should-prove-identity-not-carry-keys
 
 In short: Venkata Velavarthipati at Conf42 DevSecOps 2026 replaces long-lived CI and MLOps cloud keys with OIDC workload identity, scoped claims and fail-closed design.
 

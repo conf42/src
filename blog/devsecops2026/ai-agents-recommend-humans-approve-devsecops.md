@@ -1,6 +1,6 @@
 # AI agents across DevSecOps should recommend, not decide
 
-Conf42 Blog, 2026-09-03, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/ai-agents-recommend-humans-approve-devsecops
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/ai-agents-recommend-humans-approve-devsecops
 
 In short: Deepanshu Kukreja at Conf42 DevSecOps 2026 maps AI agents onto IaC, pipelines, vulnerabilities and incidents, with humans keeping the risky calls.
 

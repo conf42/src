@@ -1,6 +1,6 @@
 # GoFr wires tracing, metrics and health checks into gRPC for you
 
-Conf42 Blog, 2025-05-10, updated 2026-11-09. https://www.conf42.com/blog/obs2025/gofr-grpc-observability-by-default
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/gofr-grpc-observability-by-default
 
 In short: GoFr contributor Divya Darshana demos at Conf42 Observability 2025 how the Go framework makes gRPC servers, clients and streams observable with zero instrumentation.
 

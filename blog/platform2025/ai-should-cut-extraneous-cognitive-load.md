@@ -1,6 +1,6 @@
 # Use AI on your platform to cut the cognitive load nobody needs
 
-Conf42 Blog, 2025-08-10, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-should-cut-extraneous-cognitive-load
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-should-cut-extraneous-cognitive-load
 
 In short: Mia-Platform's Michel Murabito at Conf42 Platform Engineering 2025: cut extraneous cognitive load with self-service, reusable components and RAG over docs and logs.
 

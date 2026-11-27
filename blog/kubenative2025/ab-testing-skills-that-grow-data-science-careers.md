@@ -1,6 +1,6 @@
 # A/B testing is the data science skill that compounds a career
 
-Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ab-testing-skills-that-grow-data-science-careers
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/ab-testing-skills-that-grow-data-science-careers
 
 In short: Bhavana Reddy Chadagonda (Intuit) at Conf42 Kube Native 2025 on experiment designs, CUPED variance reduction and the platform behind trustworthy A/B tests.
 

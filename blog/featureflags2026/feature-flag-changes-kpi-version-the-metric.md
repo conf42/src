@@ -1,6 +1,6 @@
 # When a feature flag moves a KPI, version the metric like a release
 
-Conf42 Blog, 2026-09-21, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/feature-flag-changes-kpi-version-the-metric
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/feature-flag-changes-kpi-version-the-metric
 
 In short: Pratham Yadav of College of Southern Nevada at Conf42 Feature Flags 2026 on running old and new KPI logic in parallel, reconciling, then rolling out.
 

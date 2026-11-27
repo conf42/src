@@ -1,6 +1,6 @@
 # Prepare for the incidents your risk table predicts, not the last page
 
-Conf42 Blog, 2022-09-28. https://www.conf42.com/blog/im2022/prepare-for-incidents-by-risk-not-memory
+Conf42 Blog, 2022-09-29. https://www.conf42.com/blog/im2022/prepare-for-incidents-by-risk-not-memory
 
 In short: Jeff Nickoloff (Gremlin) at Conf42 Incident Management 2022 on picking which failures to prepare for by probability times severity, scored consistently.
 

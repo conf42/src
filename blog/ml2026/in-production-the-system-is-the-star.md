@@ -1,6 +1,6 @@
 # In production the system is the star, not the model
 
-Conf42 Blog, 2026-02-08, updated 2026-11-09. https://www.conf42.com/blog/ml2026/in-production-the-system-is-the-star
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/in-production-the-system-is-the-star
 
 In short: Ancilia Dmello of Ford at Conf42 Machine Learning 2026 on an observable MLOps framework on Google Cloud, told through an oil-change prognostics model.
 

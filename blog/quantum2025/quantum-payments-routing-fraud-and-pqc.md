@@ -1,6 +1,6 @@
 # Quantum payments need post-quantum security before they need speed
 
-Conf42 Blog, 2025-06-07, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-payments-routing-fraud-and-pqc
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-payments-routing-fraud-and-pqc
 
 In short: Intuit's Nikhil Kassetty at Conf42 Quantum Computing 2025 on quantum routing, fraud detection and settlement for real-time payments, and the security catch.
 

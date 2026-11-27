@@ -1,6 +1,6 @@
 # Mobile analytics security: cache the permission, never the data
 
-Conf42 Blog, 2026-09-19, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/mobile-analytics-cache-permissions-not-data
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/mobile-analytics-cache-permissions-not-data
 
 In short: At Conf42 DevSecOps 2026, Tesla's Ashwin Kumar treats identity, authorization and latency as one problem for analytics on personal phones.
 

@@ -1,6 +1,6 @@
 # Regional Keycloak hubs keep global SASE logins close to users
 
-Conf42 Blog, 2025-10-13, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/regional-keycloak-hubs-for-global-sase
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/regional-keycloak-hubs-for-global-sase
 
 In short: Vivek Koodakkara Shanmughan of Aryaka Networks proposes at Conf42 Kube Native 2025 a regional hub model for Keycloak to scale SASE identity worldwide.
 

@@ -1,6 +1,6 @@
 # Swap the AI monolith for a team of specialised agents
 
-Conf42 Blog, 2025-09-01, updated 2026-11-09. https://www.conf42.com/blog/platform2025/multi-agent-ai-platforms-replace-monoliths
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/multi-agent-ai-platforms-replace-monoliths
 
 In short: Okta's Sidhanta Panigrahy at Conf42 Platform Engineering 2025 lays out a four-layer multi-agent architecture for AI platforms that fail in pieces, not all at once.
 

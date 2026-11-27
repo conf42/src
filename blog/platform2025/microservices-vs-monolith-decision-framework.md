@@ -1,6 +1,6 @@
 # Pick monolith or microservices by team maturity, not hype
 
-Conf42 Blog, 2025-08-06, updated 2026-11-09. https://www.conf42.com/blog/platform2025/microservices-vs-monolith-decision-framework
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/microservices-vs-monolith-decision-framework
 
 In short: Rajani Jayantha of Wayfair at Conf42 Platform Engineering 2025 gives a decision framework for monolith vs microservices, plus a real routing migration.
 

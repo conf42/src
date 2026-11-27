@@ -1,6 +1,6 @@
 # Untangling SAP integration with OData services
 
-Conf42 Blog, 2025-08-31, updated 2026-11-09. https://www.conf42.com/blog/platform2025/sap-integration-through-odata-services
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/sap-integration-through-odata-services
 
 In short: Volkswagen's Venkateswaran Petchiappan at Conf42 Platform Engineering 2025 on swapping SAP middleware tangles for tuned RESTful OData APIs.
 

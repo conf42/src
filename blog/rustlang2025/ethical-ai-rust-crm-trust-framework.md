@@ -1,6 +1,6 @@
 # Fairness, privacy and explainability for CRM AI, with Rust underneath
 
-Conf42 Blog, 2025-08-19. https://www.conf42.com/blog/rustlang2025/ethical-ai-rust-crm-trust-framework
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/ethical-ai-rust-crm-trust-framework
 
 In short: Ketankumar Patel of Wind River Systems at Conf42 Rustlang 2025 on building ethical CRM AI in Rust, with privacy, bias checks, explainability and governance.
 

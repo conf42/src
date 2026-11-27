@@ -1,6 +1,6 @@
 # Uber's driver onboarding team let agents build test accounts
 
-Conf42 Blog, 2026-09-04, updated 2026-11-09. https://www.conf42.com/blog/agents2026/uber-test-account-agent-onboarding
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/uber-test-account-agent-onboarding
 
 In short: Kemet Dugue of Uber at Conf42 AI Agents 2026 shows the skills and the test-account agent that took onboarding setup from minutes to under 30 seconds.
 

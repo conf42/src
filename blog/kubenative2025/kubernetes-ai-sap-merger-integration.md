@@ -1,6 +1,6 @@
 # AI data checks on Kubernetes cut SAP merger integrations to months
 
-Conf42 Blog, 2025-09-22, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kubernetes-ai-sap-merger-integration
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/kubernetes-ai-sap-merger-integration
 
 In short: Neelima Aderu (PwC) at Conf42 Kube Native 2025 on containerised AI for SAP M&A integrations, from automated mapping to preload data quality sign-off.
 

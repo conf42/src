@@ -1,6 +1,6 @@
 # Adaptive optimisation for Node.js backends and React frontends
 
-Conf42 Blog, 2025-10-25, updated 2026-11-09. https://www.conf42.com/blog/js2025/adaptive-optimization-for-node-and-react-apps
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/adaptive-optimization-for-node-and-react-apps
 
 In short: Nike's Deepika Annam argued at Conf42 JavaScript 2025 for runtime-adaptive tuning across Node.js and React, citing up to 2.29x throughput gains.
 

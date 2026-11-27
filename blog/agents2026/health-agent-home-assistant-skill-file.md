@@ -1,6 +1,6 @@
 # A health agent that acts, built on Home Assistant and a skill file
 
-Conf42 Blog, 2026-09-08, updated 2026-11-09. https://www.conf42.com/blog/agents2026/health-agent-home-assistant-skill-file
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/health-agent-home-assistant-skill-file
 
 In short: Nick Rezaee of Harvard at Conf42 AI Agents 2026 wires wearable, phone and smart home data through Home Assistant so an AI skill can send personal nudges.
 

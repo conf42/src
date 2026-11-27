@@ -1,6 +1,6 @@
 # Rust in the packet path, from zero-copy buffers to in-path ML routing
 
-Conf42 Blog, 2025-08-06. https://www.conf42.com/blog/rustlang2025/rust-zero-copy-packet-processing-ai-routing
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-zero-copy-packet-processing-ai-routing
 
 In short: Rahul Tavva of Kairos Technologies at Conf42 Rustlang 2025 on zero-copy packet processing, lock-free queues and ML routing decisions in Rust.
 

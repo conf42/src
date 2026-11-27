@@ -1,6 +1,6 @@
 # Warehouse AI that aces the lab can still fail on the floor
 
-Conf42 Blog, 2025-09-01, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/warehouse-ai-failures-lab-is-not-the-floor
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/warehouse-ai-failures-lab-is-not-the-floor
 
 In short: Shubham Beldar (Symbotic) at Conf42 MLOps 2025 on four warehouse automation failure patterns and the MLOps habits that prevent them.
 

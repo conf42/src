@@ -1,6 +1,6 @@
 # Banks should run AI governance as microservices next to the models
 
-Conf42 Blog, 2025-09-29, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/run-ai-governance-as-microservices-in-banking
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/run-ai-governance-as-microservices-in-banking
 
 In short: Ashish Dibouliya (Webster Bank) at Conf42 Kube Native 2025 on a Kubernetes-native framework for AI metadata, lineage, drift and regulatory compliance.
 

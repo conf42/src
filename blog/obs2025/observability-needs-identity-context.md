@@ -1,6 +1,6 @@
 # Your dashboards show what broke, not who broke it
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-needs-identity-context
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/observability-needs-identity-context
 
 In short: Cynthia Akiotu of Tesco Bank argues at Conf42 Observability 2025 that identity belongs inside observability, from privilege misuse to ghost access.
 

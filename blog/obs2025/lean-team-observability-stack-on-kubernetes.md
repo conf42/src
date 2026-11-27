@@ -1,6 +1,6 @@
 # A four-tool observability stack for small teams on Kubernetes
 
-Conf42 Blog, 2025-06-02, updated 2026-11-09. https://www.conf42.com/blog/obs2025/lean-team-observability-stack-on-kubernetes
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/lean-team-observability-stack-on-kubernetes
 
 In short: Vignesh Iyer of NVIDIA at Conf42 Observability 2025 builds a low-cost stack from Fluentd, Prometheus, Jaeger and Grafana, plus three pitfalls to avoid.
 

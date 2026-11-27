@@ -1,6 +1,6 @@
 # Secure multi-tenant platforms for banks start at the admission controller
 
-Conf42 Blog, 2025-08-12, updated 2026-11-09. https://www.conf42.com/blog/platform2025/securing-multi-tenant-platforms-in-finance
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/securing-multi-tenant-platforms-in-finance
 
 In short: Nageswara Rao Nelloru at Conf42 Platform Engineering 2025 on securing multi-tenant Kubernetes for finance with mTLS, admission control and policy as code.
 

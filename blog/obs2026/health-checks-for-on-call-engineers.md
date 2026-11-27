@@ -1,6 +1,6 @@
 # You health-check every service. Health-check the on-call team too
 
-Conf42 Blog, 2026-08-28, updated 2026-11-09. https://www.conf42.com/blog/obs2026/health-checks-for-on-call-engineers
+Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/obs2026/health-checks-for-on-call-engineers
 
 In short: Sylvain Kalache of Rootly at Conf42 Observability 2026 on observed and self-reported signals that spot on-call overwork before it turns into resignations.
 

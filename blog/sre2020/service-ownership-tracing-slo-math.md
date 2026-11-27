@@ -1,6 +1,6 @@
 # Responsibility without control is stress. Tracing narrows the gap
 
-Conf42 Blog, 2020-08-26. https://www.conf42.com/blog/sre2020/service-ownership-tracing-slo-math
+Conf42 Blog, 2020-08-27. https://www.conf42.com/blog/sre2020/service-ownership-tracing-slo-math
 
 In short: Daniel Spoonhower (LightStep) at Conf42 Site Reliability Engineering 2020 on service ownership built on docs, on-call and SLOs, with tracing under each
 

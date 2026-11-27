@@ -1,6 +1,6 @@
 # Financial MLOps needs point-in-time features and segment monitoring
 
-Conf42 Blog, 2025-09-05, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/financial-mlops-segment-level-everything
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/financial-mlops-segment-level-everything
 
 In short: Parul Purwar (IMC Trading) at Conf42 MLOps 2025 on why finance needs its own MLOps stack, from point-in-time feature stores to segment-level drift checks.
 

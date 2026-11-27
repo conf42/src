@@ -1,6 +1,6 @@
 # Start from a pretrained model, train only when it fails you
 
-Conf42 Blog, 2022-05-18. https://www.conf42.com/blog/ml2022/pretrained-model-first-training-last
+Conf42 Blog, 2022-05-19. https://www.conf42.com/blog/ml2022/pretrained-model-first-training-last
 
 In short: Julien Simon (Hugging Face) at Conf42 Machine Learning 2022 on Deep Learning 2.0, where a pretrained Transformer and a business KPI come before any training
 

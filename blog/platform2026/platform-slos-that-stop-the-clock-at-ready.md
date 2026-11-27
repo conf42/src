@@ -1,6 +1,6 @@
 # Platform SLOs should stop the clock at ready, not provisioned
 
-Conf42 Blog, 2026-10-30, updated 2026-11-09. https://www.conf42.com/blog/platform2026/platform-slos-that-stop-the-clock-at-ready
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/platform-slos-that-stop-the-clock-at-ready
 
 In short: Amith Reddy Ravuru (Reltio) at Conf42 Platform Engineering 2026 on journey SLOs that measure a developer's path from request to production-ready.
 

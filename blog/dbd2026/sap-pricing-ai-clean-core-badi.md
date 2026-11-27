@@ -1,6 +1,6 @@
 # SAP pricing is a pipeline problem, not a condition table
 
-Conf42 Blog, 2026-05-10, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/sap-pricing-ai-clean-core-badi
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/sap-pricing-ai-clean-core-badi
 
 In short: Sirisha Ayyagari of IBM at Conf42 Database DevOps 2026 on real-time SAP pricing with an external AI engine, streaming data and clean core BAdIs.
 

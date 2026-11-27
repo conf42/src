@@ -1,6 +1,6 @@
 # Testing conversational AI with LLM judges and generated utterances
 
-Conf42 Blog, 2025-11-04, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/llm-as-judge-conversational-ai-qa
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/llm-as-judge-conversational-ai-qa
 
 In short: Yash Panjari of Apple at Conf42 Prompt Engineering 2025 on QA for voice and chat assistants with LLM-as-judge, generated test data and CI/CD gating.
 

@@ -1,6 +1,6 @@
 # Multi-cloud ML meets data sovereignty law, and governance has to adapt
 
-Conf42 Blog, 2026-01-21, updated 2026-11-09. https://www.conf42.com/blog/ml2026/data-sovereignty-multi-cloud-ml-governance
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/data-sovereignty-multi-cloud-ml-governance
 
 In short: EY's Sapna Pillai at Conf42 Machine Learning 2026 on keeping multi-cloud ML compliant with GDPR, the CLOUD Act and data localisation rules.
 

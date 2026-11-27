@@ -1,6 +1,6 @@
 # Twilio's Slack bot that writes the incident update for you
 
-Conf42 Blog, 2025-09-08, updated 2026-11-09. https://www.conf42.com/blog/im2025/twilio-slack-bot-incident-communications
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/twilio-slack-bot-incident-communications
 
 In short: Gandhi Mathi Nathan Kumar (Twilio) at Conf42 Incident Management 2025 demos a Windmill + OpenAI Slack bot for customer summaries and status page drafts.
 

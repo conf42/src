@@ -1,6 +1,6 @@
 # Four building blocks for wiring multiple clouds together safely
 
-Conf42 Blog, 2025-05-19, updated 2026-11-09. https://www.conf42.com/blog/obs2025/multi-cloud-integration-zero-trust-enclaves
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/multi-cloud-integration-zero-trust-enclaves
 
 In short: Naga Swetha Kattula (IEEE) at Conf42 Observability 2025 on AI-driven API management, confidential computing, zero trust and event-driven integration.
 

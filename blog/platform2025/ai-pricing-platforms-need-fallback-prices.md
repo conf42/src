@@ -1,6 +1,6 @@
 # An AI pricing platform is only as good as its fallback price
 
-Conf42 Blog, 2025-08-18, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-pricing-platforms-need-fallback-prices
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ai-pricing-platforms-need-fallback-prices
 
 In short: Amaresh Sahoo of Xometry on real-time AI pricing at Conf42 Platform Engineering 2025, from cached predictions to circuit breakers and fallback prices.
 

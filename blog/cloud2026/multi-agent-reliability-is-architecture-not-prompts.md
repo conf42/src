@@ -1,6 +1,6 @@
 # Multi-agent systems fail in the architecture, not the prompt
 
-Conf42 Blog, 2026-03-28, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/multi-agent-reliability-is-architecture-not-prompts
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/multi-agent-reliability-is-architecture-not-prompts
 
 In short: Sandeep Mannapur of ServiceNow at Conf42 Cloud Native 2026 on taking a chatbot to orchestrated agents: circuit breakers, timeout budgets, decision-aware traces.
 

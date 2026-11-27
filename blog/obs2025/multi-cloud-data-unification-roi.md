@@ -1,6 +1,6 @@
 # Measure multi-cloud data integration by risk avoided, not only cost
 
-Conf42 Blog, 2025-05-21, updated 2026-11-09. https://www.conf42.com/blog/obs2025/multi-cloud-data-unification-roi
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/multi-cloud-data-unification-roi
 
 In short: Ravi Kumar Amaresam of Minisoft Technologies at Conf42 Observability 2025 on unifying multi-cloud data and measuring the ROI in five categories.
 

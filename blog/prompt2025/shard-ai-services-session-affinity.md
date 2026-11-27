@@ -1,6 +1,6 @@
 # Shard your AI service, but keep the conversation state central
 
-Conf42 Blog, 2025-10-26, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/shard-ai-services-session-affinity
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/shard-ai-services-session-affinity
 
 In short: Rahul Thakur of Salesforce at Conf42 Prompt Engineering 2025 on sharding AI services across zones, with routing, session affinity and migration.
 

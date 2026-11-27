@@ -1,6 +1,6 @@
 # Structured logs with business correlation IDs as a compliance layer
 
-Conf42 Blog, 2026-06-07, updated 2026-11-09. https://www.conf42.com/blog/llms2026/structured-logs-correlation-ids-compliance-observability
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/structured-logs-correlation-ids-compliance-observability
 
 In short: Prem Anand at Conf42 LLMs 2026 on stitching AML and screening workflows from structured logs, not cross-database joins, and making them LLM-ready.
 

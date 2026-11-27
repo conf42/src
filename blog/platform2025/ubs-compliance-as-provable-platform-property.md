@@ -1,6 +1,6 @@
 # Architect for Provability, Not Just Compliance
 
-Conf42 Blog, 2025-08-27, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ubs-compliance-as-provable-platform-property
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ubs-compliance-as-provable-platform-property
 
 In short: UBS's Satish Manchana at Conf42 Platform Engineering 2025: policy engines, golden images and CI gates that make compliance provable in hybrid cloud.
 

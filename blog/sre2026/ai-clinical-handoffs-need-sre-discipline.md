@@ -1,6 +1,6 @@
 # AI for clinical handoffs has to fail safely before it helps
 
-Conf42 Blog, 2026-03-13, updated 2026-11-09. https://www.conf42.com/blog/sre2026/ai-clinical-handoffs-need-sre-discipline
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/ai-clinical-handoffs-need-sre-discipline
 
 In short: Abhiram Potharaju of Wells Fargo at Conf42 SRE 2026 on SBAR-aligned AI handoff summaries built with SRE habits - safe degradation, explainability, governance.
 

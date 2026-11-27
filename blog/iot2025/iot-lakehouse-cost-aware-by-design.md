@@ -1,6 +1,6 @@
 # IoT data platforms fail on cost, not on collection
 
-Conf42 Blog, 2025-12-06, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-lakehouse-cost-aware-by-design
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-lakehouse-cost-aware-by-design
 
 In short: Bhanudeepti Chinta of Dave at Conf42 IoT 2025 on lakehouse architectures for sensor telemetry, from Iceberg and Delta Lake to medallion layers.
 

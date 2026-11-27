@@ -1,6 +1,6 @@
 # Solution architects are what make a Kubernetes CRM resilient
 
-Conf42 Blog, 2025-10-01, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/solution-architects-make-kubernetes-crm-resilient
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/solution-architects-make-kubernetes-crm-resilient
 
 In short: Chakra Gadige (Splunk) at Conf42 Kube Native 2025 on how Technical Solution Architects steer CRM platforms onto Kubernetes without new bottlenecks.
 

@@ -1,6 +1,6 @@
 # Why most ML models never ship, and the MLOps pillars that fix it
 
-Conf42 Blog, 2025-09-12, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-models-are-products-not-projects
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/ml-models-are-products-not-projects
 
 In short: Bharath Reddy Baddam of New York Life at Conf42 MLOps 2025 on orchestration, infrastructure, monitoring and CI/CD that move models from lab to production.
 

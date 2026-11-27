@@ -1,6 +1,6 @@
 # Healthcare apps need native code, on-device AI and HIPAA by design
 
-Conf42 Blog, 2025-08-13, updated 2026-11-09. https://www.conf42.com/blog/platform2025/native-mobile-platforms-for-ai-healthcare
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/native-mobile-platforms-for-ai-healthcare
 
 In short: Srikanth Puram of General Motors at Conf42 Platform Engineering 2025 on native mobile platforms with embedded AI for HIPAA-compliant, offline-ready healthcare.
 

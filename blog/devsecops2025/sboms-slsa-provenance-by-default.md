@@ -1,6 +1,6 @@
 # Supply chain security should be the default path in CI, not a checklist
 
-Conf42 Blog, 2025-11-17, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/sboms-slsa-provenance-by-default
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/sboms-slsa-provenance-by-default
 
 In short: Bhaskar Bharat Sawant of Cornerstone Building Brands at Conf42 DevSecOps 2025 on automatic SBOMs, SLSA, provenance and deploy-time verification.
 

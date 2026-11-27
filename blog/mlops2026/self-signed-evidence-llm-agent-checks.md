@@ -1,6 +1,6 @@
 # Your agent's refund check trusts an order ID the model picked
 
-Conf42 Blog, 2026-11-13, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/self-signed-evidence-llm-agent-checks
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/self-signed-evidence-llm-agent-checks
 
 In short: Danila Redikultsev (Aeroclub) at Conf42 MLOps 2026 on self-signed evidence: code checks that pass because the LLM agent chose the value they read.
 

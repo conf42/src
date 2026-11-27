@@ -1,6 +1,6 @@
 # At trillion-parameter scale, cost is a training metric
 
-Conf42 Blog, 2025-08-22, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-trillion-parameter-llm-training
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-for-trillion-parameter-llm-training
 
 In short: Anjan Dash (Meta) at Conf42 MLOps 2025 on operating trillion-parameter LLM training runs, from parallelism and checkpoints to early warnings and cost.
 

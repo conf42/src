@@ -1,6 +1,6 @@
 # Semantic contracts catch the data bugs schema registries miss
 
-Conf42 Blog, 2026-02-27, updated 2026-11-09. https://www.conf42.com/blog/sre2026/semantic-contracts-catch-what-schema-registries-miss
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/semantic-contracts-catch-what-schema-registries-miss
 
 In short: Jyothish Sreedharan at Conf42 SRE 2026 on AI-governed lakehouse ingestion with Apache Flink on Kubernetes that adapts to schema drift without breaking.
 

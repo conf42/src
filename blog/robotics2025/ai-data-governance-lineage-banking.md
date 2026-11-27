@@ -1,6 +1,6 @@
 # Banking AI ships at the speed of its data lineage
 
-Conf42 Blog, 2025-11-13, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/ai-data-governance-lineage-banking
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/ai-data-governance-lineage-banking
 
 In short: Vinaya Nadig of Amazon at Conf42 Robotics 2025 on a unified data governance framework that makes AI in banking traceable from source data to decision.
 

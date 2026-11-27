@@ -1,6 +1,6 @@
 # Static partitions and B-trees assume a workload the cloud won't give you
 
-Conf42 Blog, 2026-04-03, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/adaptive-partitioning-and-learned-indexes
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/adaptive-partitioning-and-learned-indexes
 
 In short: Purushotham Jinka of Citi at Conf42 Cloud Native 2026 on adaptive partitioning, learned indexes and ML query engines, plus guardrails for self-tuning databases.
 

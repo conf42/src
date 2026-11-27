@@ -1,6 +1,6 @@
 # Use JavaScript and AI to take paperwork off clinicians, not patients
 
-Conf42 Blog, 2025-10-13, updated 2026-11-09. https://www.conf42.com/blog/js2025/javascript-ai-healthcare-operations
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/javascript-ai-healthcare-operations
 
 In short: Rakesh Kumar Yadav at Conf42 JavaScript 2025 on Node.js and React systems that use AI to augment healthcare scheduling, inventory and billing.
 

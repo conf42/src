@@ -1,6 +1,6 @@
 # Strangle the banking mainframe one domain at a time
 
-Conf42 Blog, 2025-11-27, updated 2026-11-09. https://www.conf42.com/blog/iot2025/modular-core-banking-strangler-pattern
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/modular-core-banking-strangler-pattern
 
 In short: Swetha Lakkaraju at Conf42 IoT 2025 on modernizing legacy core banking with the strangler pattern, domain-driven design, API-first and microservices.
 

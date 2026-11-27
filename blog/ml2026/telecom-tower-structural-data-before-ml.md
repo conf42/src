@@ -1,6 +1,6 @@
 # Telecom towers need structured engineering data before machine learning
 
-Conf42 Blog, 2026-01-29, updated 2026-11-09. https://www.conf42.com/blog/ml2026/telecom-tower-structural-data-before-ml
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/telecom-tower-structural-data-before-ml
 
 In short: Crown Castle's Sudarshan Kasera at Conf42 Machine Learning 2026 on turning telecom tower structural analysis into ML-ready data in the 5G era.
 

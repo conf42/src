@@ -1,6 +1,6 @@
 # Offline reads are the easy half. Offline writes need Firestore
 
-Conf42 Blog, 2020-09-29. https://www.conf42.com/blog/js2020/angular-pwa-firestore-offline-writes
+Conf42 Blog, 2020-09-30. https://www.conf42.com/blog/js2020/angular-pwa-firestore-offline-writes
 
 In short: Francesco Leardini (Trivadis) at Conf42 JavaScript 2020 on PWA caching strategies in Angular and offline writes that sync with Cloud Firestore
 

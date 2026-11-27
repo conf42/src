@@ -1,6 +1,6 @@
 # Read the SAP transport and the pull request before you pick your tests
 
-Conf42 Blog, 2025-09-30, updated 2026-11-09. https://www.conf42.com/blog/im2025/read-the-transport-before-you-test-sap
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/read-the-transport-before-you-test-sap
 
 In short: Vijay Kumar Kola (Intuitive) at Conf42 Incident Management 2025 on AI-driven, risk-based testing that keeps SAP S/4HANA and Salesforce changes safe.
 

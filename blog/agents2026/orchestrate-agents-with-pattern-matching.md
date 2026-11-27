@@ -1,6 +1,6 @@
 # Sealed types and pattern matching as the control layer for agents
 
-Conf42 Blog, 2026-08-26, updated 2026-11-09. https://www.conf42.com/blog/agents2026/orchestrate-agents-with-pattern-matching
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/orchestrate-agents-with-pattern-matching
 
 In short: Michael Haim of Zindell Technologies at Conf42 AI Agents 2026 routes, retries and judges AI agents with Java sealed types and switch patterns.
 

@@ -1,6 +1,6 @@
 # Platform engineering when a dropped frame can hide a lesion
 
-Conf42 Blog, 2025-09-03, updated 2026-11-09. https://www.conf42.com/blog/platform2025/endoscopy-imaging-platform-latency-and-uptime
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/endoscopy-imaging-platform-latency-and-uptime
 
 In short: Johnson & Johnson's Santosh Suresh at Conf42 Platform Engineering 2025 on endoscopy imaging platforms with sub-200 ms video, tiered storage and 99.99% uptime.
 

@@ -1,6 +1,6 @@
 # Extract, understand, then let a human check the low-confidence bits
 
-Conf42 Blog, 2021-07-28. https://www.conf42.com/blog/ml2021/textract-comprehend-kendra-document-understanding
+Conf42 Blog, 2021-07-29. https://www.conf42.com/blog/ml2021/textract-comprehend-kendra-document-understanding
 
 In short: Matteo Gabrielli (AWS) at Conf42 Machine Learning 2021 on document processing with Textract, Comprehend, Comprehend Medical, Kendra and Augmented AI
 

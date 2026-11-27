@@ -1,6 +1,6 @@
 # Outages start quietly, so build systems that fail fast
 
-Conf42 Blog, 2026-01-19. https://www.conf42.com/blog/devops2026/high-traffic-outages-start-quietly
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/high-traffic-outages-start-quietly
 
 In short: Justice Eziefule of Metastable Labs at Conf42 DevOps 2026 on retry storms, pool exhaustion, timeouts that cancel work and failing fast under load.
 

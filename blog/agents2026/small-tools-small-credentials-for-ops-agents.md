@@ -1,6 +1,6 @@
 # Small tools, small credentials. Don't give the ops agent a shell
 
-Conf42 Blog, 2026-09-19, updated 2026-11-09. https://www.conf42.com/blog/agents2026/small-tools-small-credentials-for-ops-agents
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/small-tools-small-credentials-for-ops-agents
 
 In short: Ahmed Tariq (Simplify9) at Conf42 AI Agents 2026: typed tools, split observer and executor identities, and approvals tied to credentials.
 

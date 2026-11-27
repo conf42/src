@@ -1,6 +1,6 @@
 # Four layers and a few algorithms keep APIs up at billions of requests
 
-Conf42 Blog, 2025-12-28, updated 2026-11-09. https://www.conf42.com/blog/devops2026/scaling-apis-billions-four-layer-framework
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/scaling-apis-billions-four-layer-framework
 
 In short: Disney's Nikhil Kokal at Conf42 DevOps 2026 on edge caching, request coalescing, distributed rate limiting, sharding and tail-based tracing.
 

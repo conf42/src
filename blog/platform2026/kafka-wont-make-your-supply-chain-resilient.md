@@ -1,6 +1,6 @@
 # Kafka won't make your retail supply chain resilient on its own
 
-Conf42 Blog, 2026-10-18, updated 2026-11-09. https://www.conf42.com/blog/platform2026/kafka-wont-make-your-supply-chain-resilient
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/kafka-wont-make-your-supply-chain-resilient
 
 In short: Nidhin Jose (Walmart) at Conf42 Platform Engineering 2026 on the ownership, idempotency and recovery patterns that make event-driven retail systems hold up.
 

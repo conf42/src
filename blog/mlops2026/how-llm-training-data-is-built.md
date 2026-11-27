@@ -1,6 +1,6 @@
 # Filtering throws away 96.94% of the web, and that's the point
 
-Conf42 Blog, 2026-11-10, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/how-llm-training-data-is-built
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/how-llm-training-data-is-built
 
 In short: Nicolo Brandizzi (Fraunhofer IAIS) at Conf42 MLOps 2026 on turning 173 billion Common Crawl documents into LLM training data, with the CPU and euro bills.
 

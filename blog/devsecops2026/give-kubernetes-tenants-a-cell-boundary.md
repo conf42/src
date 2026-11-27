@@ -1,6 +1,6 @@
 # Multi-tenant Kubernetes needs a named boundary, not more rules
 
-Conf42 Blog, 2026-09-10, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/give-kubernetes-tenants-a-cell-boundary
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/give-kubernetes-tenants-a-cell-boundary
 
 In short: Lahiru De Silva of WSO2 at Conf42 DevSecOps 2026 shows how OpenChoreo turns tenants into cells with four directional gateways instead of hand-written network policies.
 

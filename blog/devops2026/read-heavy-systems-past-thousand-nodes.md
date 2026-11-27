@@ -1,6 +1,6 @@
 # Past a thousand nodes, more hardware stops buying read throughput
 
-Conf42 Blog, 2026-01-02, updated 2026-11-09. https://www.conf42.com/blog/devops2026/read-heavy-systems-past-thousand-nodes
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/read-heavy-systems-past-thousand-nodes
 
 In short: Ivan Sinitsin (Ozon) at Conf42 DevOps 2026 on tail latency, connection storms, binary formats, CQRS projections and sharded in-process caches.
 

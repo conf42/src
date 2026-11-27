@@ -1,6 +1,6 @@
 # An accurate model you cannot roll back is still a failure
 
-Conf42 Blog, 2026-01-12, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ml-ip-detection-is-a-systems-problem
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/ml-ip-detection-is-a-systems-problem
 
 In short: Kanika Gupta of Amazon at Conf42 DevOps 2026 on ML-driven IP violation detection at marketplace scale, and the CI/CD, rollback and observability that make it safe.
 

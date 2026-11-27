@@ -1,6 +1,6 @@
 # Tuning Oracle and SQL Server on AWS and Azure, layer by layer
 
-Conf42 Blog, 2025-10-31, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/oracle-sql-server-tuning-aws-azure
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/oracle-sql-server-tuning-aws-azure
 
 In short: Adithya Sirimalla of Enliven Technologies at Conf42 Robotics 2025 on a practical framework for Oracle and SQL Server performance and cost in the cloud.
 

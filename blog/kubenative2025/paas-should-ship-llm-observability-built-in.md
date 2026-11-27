@@ -1,6 +1,6 @@
 # Platforms should ship LLM-powered observability built in
 
-Conf42 Blog, 2025-10-12, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/paas-should-ship-llm-observability-built-in
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/paas-should-ship-llm-observability-built-in
 
 In short: Srinivas Pagadala Sekar of Karsun Solutions argues at Conf42 Kube Native 2025 that PaaS providers should offer LLM-driven diagnostics as a native service.
 

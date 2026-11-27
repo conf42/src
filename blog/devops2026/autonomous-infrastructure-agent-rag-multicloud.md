@@ -1,6 +1,6 @@
 # Beyond LLM template generators to a RAG-aware infrastructure agent
 
-Conf42 Blog, 2025-12-24, updated 2026-11-09. https://www.conf42.com/blog/devops2026/autonomous-infrastructure-agent-rag-multicloud
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/autonomous-infrastructure-agent-rag-multicloud
 
 In short: Equinix's Praneeth Patil at Conf42 DevOps 2026 on an autonomous multi-cloud infrastructure agent built on RAG, staged verification and tight IAM.
 

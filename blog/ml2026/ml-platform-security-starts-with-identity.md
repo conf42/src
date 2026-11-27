@@ -1,6 +1,6 @@
 # An ML platform is only as secure as the identities that can touch it
 
-Conf42 Blog, 2026-02-13, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-platform-security-starts-with-identity
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/ml-platform-security-starts-with-identity
 
 In short: Neha Asthana (Abbott) at Conf42 Machine Learning 2026 on identity lifecycle, access reviews, RBAC and privileged access management for enterprise ML platforms.
 

@@ -1,6 +1,6 @@
 # Identity first, speed second: real-time Salesforce integrations
 
-Conf42 Blog, 2026-08-25. https://www.conf42.com/blog/obs2026/salesforce-integrations-identity-first-realtime
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/salesforce-integrations-identity-first-realtime
 
 In short: Ravi Chandra Chinta (Temple View Capital) at Conf42 Observability 2026 on replacing nightly syncs with event-driven integrations, and fixing identity first.
 

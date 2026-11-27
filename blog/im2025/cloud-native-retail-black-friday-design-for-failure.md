@@ -1,6 +1,6 @@
 # Black Friday-proof retail: design for failure, migrate by strangler fig
 
-Conf42 Blog, 2025-09-12, updated 2026-11-09. https://www.conf42.com/blog/im2025/cloud-native-retail-black-friday-design-for-failure
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/cloud-native-retail-black-friday-design-for-failure
 
 In short: Maruti Pradeep Pakalapati (Capital One) at Conf42 Incident Management 2025 on autoscaling, circuit breakers, real-time inventory and strangler-fig migration for retail.
 

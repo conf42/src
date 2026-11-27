@@ -1,6 +1,6 @@
 # Azure attackers don't break MFA, they borrow your legitimate flows
 
-Conf42 Blog, 2026-04-17. https://www.conf42.com/blog/cloud2026/azure-attackers-abuse-legit-sign-in-flows
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/azure-attackers-abuse-legit-sign-in-flows
 
 In short: Security engineer Aleksandra Drobnjak at Conf42 Cloud Native 2026 walks through ten Azure and Entra ID attack techniques from Microsoft's MDDR 2025, with defenses.
 

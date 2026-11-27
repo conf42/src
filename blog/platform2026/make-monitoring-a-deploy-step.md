@@ -1,6 +1,6 @@
 # Monitoring belongs in the deploy, not in someone's memory
 
-Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/platform2026/make-monitoring-a-deploy-step
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/make-monitoring-a-deploy-step
 
 In short: Eleftheria Batsou (UptimeRobot) at Conf42 Platform Engineering 2026 on creating monitors from the pipeline with a CLI, and what still needs a human.
 

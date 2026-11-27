@@ -1,6 +1,6 @@
 # One JavaScript feature pipeline from Kafka to in-browser inference
 
-Conf42 Blog, 2025-10-28, updated 2026-11-09. https://www.conf42.com/blog/js2025/one-feature-pipeline-from-kafka-to-the-browser
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/one-feature-pipeline-from-kafka-to-the-browser
 
 In short: Apple data engineer Venkata Chandra Sekhar Sastry Chilkuri showed at Conf42 JavaScript 2025 how Node.js, Redis and TensorFlow.js serve fresh ML features.
 

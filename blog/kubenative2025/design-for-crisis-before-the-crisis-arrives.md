@@ -1,6 +1,6 @@
 # Design for the crisis before it arrives, not during the outage
 
-Conf42 Blog, 2025-09-24, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/design-for-crisis-before-the-crisis-arrives
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/design-for-crisis-before-the-crisis-arrives
 
 In short: Dhruvesh Talati (Ally) at Conf42 Kube Native 2025 on cloud-native patterns that keep crisis-response systems up, scaled and talking to each other.
 

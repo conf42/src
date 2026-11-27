@@ -1,6 +1,6 @@
 # Catch errors in the middleware, before customers call you
 
-Conf42 Blog, 2025-08-06, updated 2026-11-09. https://www.conf42.com/blog/platform2025/middleware-first-error-detection-mttr
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/middleware-first-error-detection-mttr
 
 In short: Sreelatha Pasuparthi of Liberty Mutual at Conf42 Platform Engineering 2025 on moving error detection into application middleware with ML-ranked alerts.
 

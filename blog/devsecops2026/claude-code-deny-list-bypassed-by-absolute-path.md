@@ -1,6 +1,6 @@
 # Claude Code's deny list falls to an absolute path; hooks don't
 
-Conf42 Blog, 2026-09-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/claude-code-deny-list-bypassed-by-absolute-path
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/claude-code-deny-list-bypassed-by-absolute-path
 
 In short: Oleksandr Kryvchenko of Keeper Security at Conf42 DevSecOps 2026 bypasses a Claude Code deny list, then closes the gap with a PreToolUse hook and managed settings.
 

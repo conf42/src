@@ -1,6 +1,6 @@
 # Your agent can reason fine. It just remembers the wrong things
 
-Conf42 Blog, 2026-05-19, updated 2026-11-09. https://www.conf42.com/blog/llms2026/agent-memory-failures-disguised-as-reasoning
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/agent-memory-failures-disguised-as-reasoning
 
 In short: Anannya Roy Chowdhury (AWS) at Conf42 LLMs 2026: a Harry Potter game shows agent failures are memory failures, fixed with three memory layers.
 

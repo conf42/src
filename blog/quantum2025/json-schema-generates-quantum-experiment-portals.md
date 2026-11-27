@@ -1,6 +1,6 @@
 # One JSON schema can generate the UI and pipeline for quantum runs
 
-Conf42 Blog, 2025-06-14, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/json-schema-generates-quantum-experiment-portals
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/json-schema-generates-quantum-experiment-portals
 
 In short: Amazon's Vamsi Praveen Karanam at Conf42 Quantum Computing 2025 turns a JSON schema into a React form, a Step Functions pipeline and lineage for Braket jobs.
 

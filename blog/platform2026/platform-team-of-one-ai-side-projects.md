@@ -1,6 +1,6 @@
 # A platform team of one runs side projects with AI, not on AI
 
-Conf42 Blog, 2026-10-20, updated 2026-11-09. https://www.conf42.com/blog/platform2026/platform-team-of-one-ai-side-projects
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/platform-team-of-one-ai-side-projects
 
 In short: Shem Magnezi (Lemonade) at Conf42 Platform Engineering 2026 on running many AI-built side projects alone with minimal launches, recoverable paths and agents.
 

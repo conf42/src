@@ -1,6 +1,6 @@
 # Fraud detection and personalization can share one Go pipeline
 
-Conf42 Blog, 2026-05-16, updated 2026-11-09. https://www.conf42.com/blog/golang2026/fraud-and-personalization-share-one-go-pipeline
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/fraud-and-personalization-share-one-go-pipeline
 
 In short: Sridhar Muthineni of Capgemini at Conf42 Golang 2026 on one detect, personalize and govern framework for fintech apps, with Go running real-time inference.
 

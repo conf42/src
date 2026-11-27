@@ -1,6 +1,6 @@
 # Real-time translation is a systems problem, not a model problem
 
-Conf42 Blog, 2025-08-31, updated 2026-11-09. https://www.conf42.com/blog/platform2025/real-time-translation-is-infrastructure
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/real-time-translation-is-infrastructure
 
 In short: At Conf42 Platform Engineering 2025, Amit Arora showed that sub-200 ms speech translation rests on modular pipelines, edge nodes and GPU scheduling.
 

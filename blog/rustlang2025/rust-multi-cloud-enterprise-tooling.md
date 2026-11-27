@@ -1,6 +1,6 @@
 # Rust for multi-cloud tooling, small binaries and explicit errors
 
-Conf42 Blog, 2025-08-14. https://www.conf42.com/blog/rustlang2025/rust-multi-cloud-enterprise-tooling
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-multi-cloud-enterprise-tooling
 
 In short: Uday Kiran Yedluri at Conf42 Rustlang 2025 on why Rust suits multi-cloud tooling across AWS, Azure and GCP, and how to start with low-hanging services.
 

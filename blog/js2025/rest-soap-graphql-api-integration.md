@@ -1,6 +1,6 @@
 # REST, SOAP or GraphQL? Pick by workload, then secure every layer
 
-Conf42 Blog, 2025-10-10, updated 2026-11-09. https://www.conf42.com/blog/js2025/rest-soap-graphql-api-integration
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/rest-soap-graphql-api-integration
 
 In short: Darshini Jayaprakash of Driscoll's at Conf42 JavaScript 2025 on choosing API styles, middleware, layered API security and event-driven integration.
 

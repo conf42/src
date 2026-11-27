@@ -1,6 +1,6 @@
 # Cloud-native observability, from API gateway to capacity planning
 
-Conf42 Blog, 2025-05-17. https://www.conf42.com/blog/obs2025/cloud-native-observability-at-peak-retail-traffic
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/cloud-native-observability-at-peak-retail-traffic
 
 In short: Vamsi Krishna Munnangi of Walmart at Conf42 Observability 2025 on pillars, stateless vs stateful signals, API gateway telemetry and HA pipelines for peak traffic.
 

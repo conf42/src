@@ -1,6 +1,6 @@
 # How Informatica CLAIRE automates data integration in hybrid clouds
 
-Conf42 Blog, 2025-09-30, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/informatica-claire-automates-data-integration
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/informatica-claire-automates-data-integration
 
 In short: Sathish Kuppan Pandurangan (Zurich North America) at Conf42 Kube Native 2025 on CLAIRE in Informatica IDMC for metadata discovery, anomaly detection and compliance.
 

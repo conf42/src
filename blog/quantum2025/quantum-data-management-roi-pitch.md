@@ -1,6 +1,6 @@
 # The business case for quantum data management, and what to ask of it
 
-Conf42 Blog, 2025-06-11, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-data-management-roi-pitch
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-data-management-roi-pitch
 
 In short: Sampath Kumar Varanasi at Conf42 Quantum Computing 2025 pitches quantum-enhanced data quality, reconciliation and governance with a 198% ROI headline.
 

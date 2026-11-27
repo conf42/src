@@ -1,6 +1,6 @@
 # Robots shipped today will still be running when quantum breaks RSA
 
-Conf42 Blog, 2025-10-24, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/post-quantum-cryptography-for-robot-fleets
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/post-quantum-cryptography-for-robot-fleets
 
 In short: Nehal Singh of California State University, Long Beach at Conf42 Robotics 2025 on moving robot fleets to post-quantum crypto with hybrid TLS and Dilithium.
 

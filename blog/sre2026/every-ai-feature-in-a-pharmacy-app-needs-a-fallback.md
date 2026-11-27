@@ -1,6 +1,6 @@
 # Every AI feature in a pharmacy app needs a tested fallback
 
-Conf42 Blog, 2026-02-27, updated 2026-11-09. https://www.conf42.com/blog/sre2026/every-ai-feature-in-a-pharmacy-app-needs-a-fallback
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/every-ai-feature-in-a-pharmacy-app-needs-a-fallback
 
 In short: Dipta Rakshit (Walmart Global Tech) at Conf42 SRE 2026 on running AI-driven healthcare and retail in one mobile platform without missed doses.
 

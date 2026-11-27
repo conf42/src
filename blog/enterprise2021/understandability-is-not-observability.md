@@ -1,6 +1,6 @@
 # Understandability is the metric your team isn't tracking
 
-Conf42 Blog, 2021-03-24. https://www.conf42.com/blog/enterprise2021/understandability-is-not-observability
+Conf42 Blog, 2021-03-25. https://www.conf42.com/blog/enterprise2021/understandability-is-not-observability
 
 In short: Liran Haimovitch (Rookout) at Conf42 Enterprise Software 2021 on software understandability, how it differs from observability, and five ways to improve it
 

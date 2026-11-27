@@ -1,6 +1,6 @@
 # A four-phase roadmap from threshold alerts to AI remediation
 
-Conf42 Blog, 2025-09-06, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-incident-management-four-phase-roadmap
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/ai-incident-management-four-phase-roadmap
 
 In short: Mallikarjun Ramasani (Barclays) at Conf42 Incident Management 2025 maps the AI/ML incident stack, from anomaly detection to RL-driven auto-remediation.
 

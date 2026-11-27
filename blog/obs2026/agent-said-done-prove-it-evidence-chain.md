@@ -1,6 +1,6 @@
 # Your agent said "done". Make it prove it with an evidence chain
 
-Conf42 Blog, 2026-08-11. https://www.conf42.com/blog/obs2026/agent-said-done-prove-it-evidence-chain
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/agent-said-done-prove-it-evidence-chain
 
 In short: Emerson Braun of Plan A Technologies at Conf42 Observability 2026 on tracing agent context, decisions, actions and verified outcomes.
 

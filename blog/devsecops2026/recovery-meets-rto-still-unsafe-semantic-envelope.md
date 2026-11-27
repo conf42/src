@@ -1,6 +1,6 @@
 # A recovery can hit its RTO and still bring revoked access back to life
 
-Conf42 Blog, 2026-09-25, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/recovery-meets-rto-still-unsafe-semantic-envelope
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/recovery-meets-rto-still-unsafe-semantic-envelope
 
 In short: At Conf42 DevSecOps 2026, researcher Sanjay Iyer proposes a Semantic Recovery Envelope that bounds replay, staleness and irreversible effects.
 

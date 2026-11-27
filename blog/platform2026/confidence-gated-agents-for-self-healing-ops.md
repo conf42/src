@@ -1,6 +1,6 @@
 # Gate every automated IT fix on a confidence score
 
-Conf42 Blog, 2026-10-31, updated 2026-11-09. https://www.conf42.com/blog/platform2026/confidence-gated-agents-for-self-healing-ops
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/confidence-gated-agents-for-self-healing-ops
 
 In short: Madhu Chenna (Electronic Arts) at Conf42 Platform Engineering 2026 presents ADOF, a reference architecture for self-healing IT ops with confidence-gated AI agents.
 

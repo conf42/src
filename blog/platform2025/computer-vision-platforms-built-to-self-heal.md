@@ -1,6 +1,6 @@
 # Real-time computer vision needs a platform that heals itself
 
-Conf42 Blog, 2025-08-19, updated 2026-11-09. https://www.conf42.com/blog/platform2025/computer-vision-platforms-built-to-self-heal
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/computer-vision-platforms-built-to-self-heal
 
 In short: Manoj Sai Jayakannan of George Mason University lays out a containerised, observable, self-healing platform for computer vision at Conf42 Platform Engineering 2025.
 

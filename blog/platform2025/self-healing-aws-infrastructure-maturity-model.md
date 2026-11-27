@@ -1,6 +1,6 @@
 # Self-healing AWS is a four-stage climb, not a switch
 
-Conf42 Blog, 2025-08-05, updated 2026-11-09. https://www.conf42.com/blog/platform2025/self-healing-aws-infrastructure-maturity-model
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/self-healing-aws-infrastructure-maturity-model
 
 In short: Sreeja Reddy Challa at Conf42 Platform Engineering 2025 on building self-healing AWS infrastructure with DevOps Guru, GuardDuty, Lambda and Step Functions.
 

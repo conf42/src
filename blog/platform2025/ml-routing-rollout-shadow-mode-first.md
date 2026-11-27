@@ -1,6 +1,6 @@
 # ML Network Routing Should Start in Shadow Mode
 
-Conf42 Blog, 2025-08-29, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ml-routing-rollout-shadow-mode-first
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/ml-routing-rollout-shadow-mode-first
 
 In short: Rahul Tavva of Kairos Technologies at Conf42 Platform Engineering 2025 on a phased rollout of ML-based routing with BGP and OSPF as the fallback.
 

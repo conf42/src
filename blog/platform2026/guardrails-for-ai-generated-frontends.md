@@ -1,6 +1,6 @@
 # Put frontend standards in the platform, not in the prompt
 
-Conf42 Blog, 2026-10-26, updated 2026-11-09. https://www.conf42.com/blog/platform2026/guardrails-for-ai-generated-frontends
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/guardrails-for-ai-generated-frontends
 
 In short: Niharika P Pujari (McGraw Hill) at Conf42 Platform Engineering 2026 on guardrails for AI-generated frontends with design systems, Storybook, Playwright, axe-core and CI.
 

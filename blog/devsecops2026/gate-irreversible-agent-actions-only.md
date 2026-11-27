@@ -1,6 +1,6 @@
 # Gate the three to six agent actions you can't take back
 
-Conf42 Blog, 2026-09-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/gate-irreversible-agent-actions-only
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/gate-irreversible-agent-actions-only
 
 In short: Artemis Leonardou of NOFire AI at Conf42 DevSecOps 2026 swaps "is it risky?" for "can I undo it?" and gates only the agent actions that fail that test.
 

@@ -1,6 +1,6 @@
 # Breaking up a payment monolith moves PCI from network to service
 
-Conf42 Blog, 2025-12-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/payment-gateway-microservices-devsecops
+Conf42 Blog, 2025-12-04, updated 2026-11-09. https://www.conf42.com/blog/devsecops2025/payment-gateway-microservices-devsecops
 
 In short: Silpa Potluri of GoodLeap at Conf42 DevSecOps 2025 on keeping payment gateways PCI-compliant while migrating from monoliths to microservices.
 

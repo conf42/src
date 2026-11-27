@@ -1,6 +1,6 @@
 # A warehouse is a production system, so give it SLOs
 
-Conf42 Blog, 2026-01-17. https://www.conf42.com/blog/devops2026/sre-principles-for-warehouse-operations
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/sre-principles-for-warehouse-operations
 
 In short: Vishnu Prasad of ERP Initiatives Group at Conf42 DevOps 2026 on applying SLIs, error budgets, IoT observability and digital twins to warehouses.
 

@@ -1,6 +1,6 @@
 # Grade the agent on what the service recorded, not on its reply
 
-Conf42 Blog, 2026-11-12, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/agent-evals-that-check-what-happened
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/agent-evals-that-check-what-happened
 
 In short: Sajal Garg (Microsoft AI) at Conf42 MLOps 2026 on agent evals that compare the reply, the tool actions and the service state before a release decision.
 

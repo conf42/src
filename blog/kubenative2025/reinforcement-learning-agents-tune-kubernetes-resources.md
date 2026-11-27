@@ -1,6 +1,6 @@
 # Reinforcement learning agents can tune Kubernetes better than thresholds
 
-Conf42 Blog, 2025-10-08, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/reinforcement-learning-agents-tune-kubernetes-resources
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/reinforcement-learning-agents-tune-kubernetes-resources
 
 In short: Deepika Annam (Nike) at Conf42 Kube Native 2025 on DQN, PPO and SAC agents for Kubernetes scheduling and autoscaling, with safe rollout guardrails.
 

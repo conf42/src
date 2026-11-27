@@ -1,6 +1,6 @@
 # What platform teams can borrow from a century of car platforms
 
-Conf42 Blog, 2025-08-17, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-lessons-from-car-factories
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-lessons-from-car-factories
 
 In short: Nikunj Karoliya of Pebble Mobility at Conf42 Platform Engineering 2025 maps VW's MQB, Ford's shared platforms and Tesla OTA onto internal developer platforms.
 

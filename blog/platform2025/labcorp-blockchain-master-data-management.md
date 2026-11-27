@@ -1,6 +1,6 @@
 # LabCorp Put Master Data Management on a Permissioned Blockchain
 
-Conf42 Blog, 2025-08-28, updated 2026-11-09. https://www.conf42.com/blog/platform2025/labcorp-blockchain-master-data-management
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/labcorp-blockchain-master-data-management
 
 In short: LabCorp's Chandra Adapa at Conf42 Platform Engineering 2025 on Hyperledger Fabric, IPFS and attribute-based encryption for enterprise MDM.
 

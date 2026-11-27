@@ -1,6 +1,6 @@
 # IoT messaging at scale needs proactive scaling, not reactive
 
-Conf42 Blog, 2025-12-12, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-messaging-latency-throughput-resilience
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/iot-messaging-latency-throughput-resilience
 
 In short: Ketul Dusane of AWS at Conf42 IoT 2025 on a three-pillar framework for IoT messaging, covering latency, throughput and operational resilience.
 

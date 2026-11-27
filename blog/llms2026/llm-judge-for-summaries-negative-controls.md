@@ -1,6 +1,6 @@
 # Validating an LLM judge for summaries with deliberately broken ones
 
-Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-judge-for-summaries-negative-controls
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/llm-judge-for-summaries-negative-controls
 
 In short: Liliya Imasheva and Michael Banf (Perelyn) at Conf42 LLMs 2026 on an LLM-as-judge pipeline for high-stakes summaries, checked against expert scores.
 

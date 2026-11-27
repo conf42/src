@@ -1,6 +1,6 @@
 # Frontend latency is a reliability problem; Galileo moved work server-side
 
-Conf42 Blog, 2026-02-22, updated 2026-11-09. https://www.conf42.com/blog/sre2026/frontend-latency-is-an-sre-problem
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/frontend-latency-is-an-sre-problem
 
 In short: Murali Varma of Galileo Financial Technologies at Conf42 SRE 2026 on server components, streaming SSR and Turbopack as reliability tools for B2B web apps.
 

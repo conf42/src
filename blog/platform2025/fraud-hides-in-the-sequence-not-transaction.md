@@ -1,6 +1,6 @@
 # Fraud Hides in the Sequence of Events, So Build a Platform
 
-Conf42 Blog, 2025-08-30, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fraud-hides-in-the-sequence-not-transaction
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fraud-hides-in-the-sequence-not-transaction
 
 In short: Rahul Ganti at Conf42 Platform Engineering 2025 on a real-time fraud platform with Kafka, Flink, a feature store and graph features.
 

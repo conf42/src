@@ -1,6 +1,6 @@
 # Prompts are not a permission system: identity for agents and pipelines
 
-Conf42 Blog, 2026-11-18. https://www.conf42.com/blog/mlops2026/identity-authorization-ai-agents-ml-pipelines
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/identity-authorization-ai-agents-ml-pipelines
 
 In short: Bhavik Thakkar (Okta) at Conf42 MLOps 2026 on replacing shared API keys with workload identity, delegation and short-lived scoped tokens for agents.
 

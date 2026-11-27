@@ -1,6 +1,6 @@
 # A 200 with zero results is still an outage. Design the fallback first
 
-Conf42 Blog, 2026-05-08, updated 2026-11-09. https://www.conf42.com/blog/golang2026/search-fallback-as-first-class-architecture
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/search-fallback-as-first-class-architecture
 
 In short: Hima Bindu Yanala of eBay at Conf42 Golang 2026 on resilient self-service search in Go, with fallback indexes, circuit breakers, bulkheads and user signals.
 

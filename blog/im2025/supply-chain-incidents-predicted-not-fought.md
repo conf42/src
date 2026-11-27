@@ -1,6 +1,6 @@
 # Supply chain incidents are cheaper predicted than fought
 
-Conf42 Blog, 2025-09-23, updated 2026-11-09. https://www.conf42.com/blog/im2025/supply-chain-incidents-predicted-not-fought
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/supply-chain-incidents-predicted-not-fought
 
 In short: Krishna Chaitanya Yarlagadda (Mercury Financial) at Conf42 Incident Management 2025 on ML, IoT and predictive escalation to stop supply chain disruptions.
 

@@ -1,6 +1,6 @@
 # Same SQL, three engines, three answers
 
-Conf42 Blog, 2026-05-25, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/same-sql-three-engines-three-answers
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/same-sql-three-engines-three-answers
 
 In short: Muthupalaniappan Ramanathan (DoorDash) at Conf42 Database DevOps 2026 on catching semantic drift across Spark, Trino and Snowflake in CI.
 

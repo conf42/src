@@ -1,6 +1,6 @@
 # Three-layer design systems break on a million-row table
 
-Conf42 Blog, 2026-04-04, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/seven-layer-design-system-for-analytics
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/seven-layer-design-system-for-analytics
 
 In short: Sonali Priya of LB Networks at Conf42 Cloud Native 2026 on a seven-layer design system for analytics, adding data components, semantics and governance.
 

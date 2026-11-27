@@ -1,6 +1,6 @@
 # One intent layer instead of a dozen disconnected copilots
 
-Conf42 Blog, 2026-03-26, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/intent-orchestration-ends-the-copilot-sprawl
+Conf42 Blog, 2026-04-23, updated 2026-11-09. https://www.conf42.com/blog/cloud2026/intent-orchestration-ends-the-copilot-sprawl
 
 In short: Dhivya Dhayakar of Zscaler at Conf42 Cloud Native 2026 on intent-based orchestration, smart model routing and trajectory evals for enterprise agents.
 

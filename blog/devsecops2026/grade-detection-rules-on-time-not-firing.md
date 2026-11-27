@@ -1,6 +1,6 @@
 # An alert that fires too late is a log line: grading rules by deadline
 
-Conf42 Blog, 2026-09-23, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/grade-detection-rules-on-time-not-firing
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/grade-detection-rules-on-time-not-firing
 
 In short: At Conf42 DevSecOps 2026, security engineer Aleksander Kryukov replays 46 DeFi exploits to grade detection rules on timing, not just firing.
 

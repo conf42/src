@@ -1,6 +1,6 @@
 # Fraud ML has to decide before the customer leaves checkout
 
-Conf42 Blog, 2025-09-08, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/fraud-ml-at-checkout-speed-intuit
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/fraud-ml-at-checkout-speed-intuit
 
 In short: Naresh Karri (Intuit) at Conf42 MLOps 2025 on running fraud, credit and ledger ML at transaction scale, with drift handled by shadow deployments.
 

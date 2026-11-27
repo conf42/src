@@ -1,6 +1,6 @@
 # Your security scanner is attack surface too, so write it in Rust
 
-Conf42 Blog, 2025-08-09. https://www.conf42.com/blog/rustlang2025/rust-memory-safe-devsecops-pipelines
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-memory-safe-devsecops-pipelines
 
 In short: Naresh Yelkoti of U.S. Bank at Conf42 Rustlang 2025 on Rust container scanners, artifact signing and policy engines for memory-safe DevSecOps.
 

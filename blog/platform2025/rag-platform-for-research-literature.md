@@ -1,6 +1,6 @@
 # A RAG platform for keeping up with research literature
 
-Conf42 Blog, 2025-08-17, updated 2026-11-09. https://www.conf42.com/blog/platform2025/rag-platform-for-research-literature
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/rag-platform-for-research-literature
 
 In short: Nishanth Joseph Paulraj (Western Governors University) at Conf42 Platform Engineering 2025 on RAG for research literature, from vector shards to knowledge graphs.
 

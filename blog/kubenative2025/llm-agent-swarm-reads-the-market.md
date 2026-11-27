@@ -1,6 +1,6 @@
 # A swarm of specialist LLM agents reads the market on Kubernetes
 
-Conf42 Blog, 2025-10-10, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/llm-agent-swarm-reads-the-market
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/llm-agent-swarm-reads-the-market
 
 In short: Kiran Purushotham of JPMorgan Chase presents SAFSO at Conf42 Kube Native 2025, a swarm of specialist LLM agents with a consensus oracle and federated learning.
 

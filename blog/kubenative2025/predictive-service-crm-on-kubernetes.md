@@ -1,6 +1,6 @@
 # Predictive manufacturing service needs a CRM that scales like Kubernetes
 
-Conf42 Blog, 2025-10-01, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/predictive-service-crm-on-kubernetes
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/predictive-service-crm-on-kubernetes
 
 In short: Jasmeer Singh (IBM) at Conf42 Kube Native 2025 on moving aftermarket service from reactive repairs to predictive analytics on Kubernetes-native CRM.
 

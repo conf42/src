@@ -1,6 +1,6 @@
 # Why enterprise data integration moved to serverless cloud platforms
 
-Conf42 Blog, 2025-05-27, updated 2026-11-09. https://www.conf42.com/blog/obs2025/serverless-cloud-data-integration-overview
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/serverless-cloud-data-integration-overview
 
 In short: Sudhakar Guduri at Conf42 Observability 2025 surveys the move from on-prem ETL to serverless cloud data integration, with industry examples.
 

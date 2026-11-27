@@ -1,6 +1,6 @@
 # Predictive maintenance pays, so why do most factory pilots fail?
 
-Conf42 Blog, 2025-09-09, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/predictive-maintenance-why-most-pilots-fail
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/predictive-maintenance-why-most-pilots-fail
 
 In short: Muruga Angamuthu of Techtronic Industries at Conf42 MLOps 2025 on AI predictive maintenance, its tech stack, and the reasons most initiatives stall.
 

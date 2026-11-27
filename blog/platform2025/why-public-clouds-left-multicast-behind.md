@@ -1,6 +1,6 @@
 # Why the big public clouds left multicast behind, and what to use
 
-Conf42 Blog, 2025-08-15, updated 2026-11-09. https://www.conf42.com/blog/platform2025/why-public-clouds-left-multicast-behind
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/why-public-clouds-left-multicast-behind
 
 In short: Srinivas Shamkura of SADA explains at Conf42 Platform Engineering 2025 why clouds skip native multicast and how overlays, pub/sub and CDNs fill the gap.
 

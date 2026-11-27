@@ -1,6 +1,6 @@
 # Low-code ships apps faster, then needs a governance plan
 
-Conf42 Blog, 2025-05-03, updated 2026-11-09. https://www.conf42.com/blog/ml2025/low-code-needs-a-governance-plan-first
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/low-code-needs-a-governance-plan-first
 
 In short: T-Mobile Salesforce architect Balaji Bodicherla covered low-code and no-code at Conf42 Machine Learning 2025, from citizen developers to centres of excellence.
 

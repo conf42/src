@@ -1,6 +1,6 @@
 # AI test agents on top of go test, with confidence thresholds
 
-Conf42 Blog, 2026-04-30, updated 2026-11-09. https://www.conf42.com/blog/golang2026/ai-assisted-test-execution-go-governance
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/ai-assisted-test-execution-go-governance
 
 In short: Rejenish Kiran of Citizens Property Insurance at Conf42 Golang 2026 on adding AI test agents to Go suites under escalation and audit rules.
 

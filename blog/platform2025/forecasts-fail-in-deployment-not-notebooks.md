@@ -1,6 +1,6 @@
 # Forecasting Models Fail in Deployment, Not in the Notebook
 
-Conf42 Blog, 2025-08-27, updated 2026-11-09. https://www.conf42.com/blog/platform2025/forecasts-fail-in-deployment-not-notebooks
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/forecasts-fail-in-deployment-not-notebooks
 
 In short: Amazon's Shivendra Kumar at Conf42 Platform Engineering 2025 on platform-first forecasting: microservices, APIs and asymmetric error costs.
 

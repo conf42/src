@@ -1,6 +1,6 @@
 # Teach the browser to guess your next click, then prefetch it
 
-Conf42 Blog, 2025-05-25, updated 2026-11-09. https://www.conf42.com/blog/obs2025/predict-next-page-tensorflowjs-prefetch
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/predict-next-page-tensorflowjs-prefetch
 
 In short: Alexandru Hang of ING Tech Romania at Conf42 Observability 2025 on training a TensorFlow.js model on activity logs to predict and prefetch the next page.
 

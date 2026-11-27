@@ -1,6 +1,6 @@
 # UALink scales GPUs up, Ultra Ethernet scales them out
 
-Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ualink-ultra-ethernet-scale-up-scale-out
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/ualink-ultra-ethernet-scale-up-scale-out
 
 In short: Rajesh Arsid of Synopsys at Conf42 Prompt Engineering 2025 with a short primer on UALink and Ultra Ethernet, the interconnects behind fast token exchange.
 

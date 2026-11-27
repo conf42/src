@@ -1,6 +1,6 @@
 # Real-time enterprise intelligence is an MLOps problem, not a BI one
 
-Conf42 Blog, 2025-08-29, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/real-time-enterprise-intelligence-mlops-blueprint
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/real-time-enterprise-intelligence-mlops-blueprint
 
 In short: Terance Joseph Paulraj (SQA Concepts) at Conf42 MLOps 2025 on moving from backward-looking reports to streaming, governed AI decisions.
 

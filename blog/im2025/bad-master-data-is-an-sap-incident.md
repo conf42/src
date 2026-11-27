@@ -1,6 +1,6 @@
 # Bad master data is an SAP incident waiting for a trigger
 
-Conf42 Blog, 2025-09-29, updated 2026-11-09. https://www.conf42.com/blog/im2025/bad-master-data-is-an-sap-incident
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/bad-master-data-is-an-sap-incident
 
 In short: Gobinath Kasimayan (Deloitte Consulting) at Conf42 Incident Management 2025 on AI master data governance in SAP that flags data incidents before they cascade.
 

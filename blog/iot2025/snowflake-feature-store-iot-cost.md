@@ -1,6 +1,6 @@
 # One feature pipeline for six teams, not six for one
 
-Conf42 Blog, 2025-12-15, updated 2026-11-09. https://www.conf42.com/blog/iot2025/snowflake-feature-store-iot-cost
+Conf42 Blog, 2025-12-18, updated 2026-11-09. https://www.conf42.com/blog/iot2025/snowflake-feature-store-iot-cost
 
 In short: Manmohan Alla of Apple at Conf42 IoT 2025 on cutting IoT ML costs with a Snowflake feature store, incremental processing, dbt tests and right-sized compute.
 

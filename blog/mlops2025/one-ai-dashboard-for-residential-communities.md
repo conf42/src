@@ -1,6 +1,6 @@
 # A single pane of glass for the place you live
 
-Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/one-ai-dashboard-for-residential-communities
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/one-ai-dashboard-for-residential-communities
 
 In short: Sheela Kakanur Shivayogi at Conf42 MLOps 2025 sketches an AI platform that pulls a residential community's scattered services into one personalised dashboard.
 

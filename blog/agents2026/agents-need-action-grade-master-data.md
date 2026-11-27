@@ -1,6 +1,6 @@
 # Your agent did nothing wrong. Your master data lied to it
 
-Conf42 Blog, 2026-09-11, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agents-need-action-grade-master-data
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/agents-need-action-grade-master-data
 
 In short: Vishwak Thatikonda (Starbucks) at Conf42 AI Agents 2026: why MDM built for dashboards breaks under agents that act, and the action-grade design that fixes it.
 

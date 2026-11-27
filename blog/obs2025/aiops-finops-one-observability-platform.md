@@ -1,6 +1,6 @@
 # Put cost signals in the same engine as your alerts
 
-Conf42 Blog, 2025-05-20, updated 2026-11-09. https://www.conf42.com/blog/obs2025/aiops-finops-one-observability-platform
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/aiops-finops-one-observability-platform
 
 In short: Ganeshkumar Palanisamy of Reltio at Conf42 Observability 2025 on merging AIOps and FinOps into one observability platform for multi-cloud data systems.
 

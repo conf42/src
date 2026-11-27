@@ -1,6 +1,6 @@
 # GenOps treats the AI in your pipeline like a supervised junior engineer
 
-Conf42 Blog, 2025-12-26, updated 2026-11-09. https://www.conf42.com/blog/devops2026/genops-governance-ai-agents-cicd
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/genops-governance-ai-agents-cicd
 
 In short: Meta staff engineer Neeraj Kumar Singh Beshane at Conf42 DevOps 2026 on GenOps, a governance model with blast-radius scores and signed AI changes.
 

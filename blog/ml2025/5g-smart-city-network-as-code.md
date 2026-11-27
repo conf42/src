@@ -1,6 +1,6 @@
 # Treating a city's 5G network as code, not as ladder work
 
-Conf42 Blog, 2025-05-07, updated 2026-11-09. https://www.conf42.com/blog/ml2025/5g-smart-city-network-as-code
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/5g-smart-city-network-as-code
 
 In short: Anil Thimmapuram at Conf42 Machine Learning 2025 on applying DevOps and infrastructure as code to 5G small cells, edge nodes and IoT for smart cities.
 

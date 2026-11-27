@@ -1,6 +1,6 @@
 # QA for health insurance should watch the claim, not just test it
 
-Conf42 Blog, 2025-05-26, updated 2026-11-09. https://www.conf42.com/blog/obs2025/health-insurance-qa-observability-claims
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/health-insurance-qa-observability-claims
 
 In short: Subash Lekshmi Velayudhan at Conf42 Observability 2025 on moving health insurance QA from testing to observing claims, portals and compliance.
 

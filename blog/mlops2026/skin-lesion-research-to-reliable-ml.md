@@ -1,6 +1,6 @@
 # An AUC of 0.96 that missed more than half the real cases
 
-Conf42 Blog, 2026-11-10, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/skin-lesion-research-to-reliable-ml
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/skin-lesion-research-to-reliable-ml
 
 In short: Deborah Adedigba (UK Ministry of Defence) at Conf42 MLOps 2026 on what her skin lesion classifier taught her about metrics, validation and negative results.
 

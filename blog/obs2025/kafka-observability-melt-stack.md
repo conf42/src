@@ -1,6 +1,6 @@
 # Kafka stalls quietly. Metrics, events, logs and traces catch it
 
-Conf42 Blog, 2025-05-30, updated 2026-11-09. https://www.conf42.com/blog/obs2025/kafka-observability-melt-stack
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/kafka-observability-melt-stack
 
 In short: Abhishek Walia of Confluent at Conf42 Observability 2025 on the MELT stack for Kafka, with the broker metrics that matter, JMX, KIP-714, JSON logs and traces.
 

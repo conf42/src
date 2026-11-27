@@ -1,6 +1,6 @@
 # ISO 42001 for beginners: the 16 documents an AI audit asks for
 
-Conf42 Blog, 2026-01-20, updated 2026-11-09. https://www.conf42.com/blog/ml2026/iso-42001-minimum-viable-aims-artifacts
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/iso-42001-minimum-viable-aims-artifacts
 
 In short: Security engineer Aleksandra Drobnjak at Conf42 Machine Learning 2026 maps the minimum ISO 42001 paperwork that makes an AI management system auditable.
 

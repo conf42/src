@@ -1,6 +1,6 @@
 # Rust event-driven dashboards that stop polling for incidents
 
-Conf42 Blog, 2025-07-22, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-event-driven-dashboards-replace-polling
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-event-driven-dashboards-replace-polling
 
 In short: Tashi Garg of Juniper Networks at Conf42 Rustlang 2025 on replacing polling dashboards with a Rust telemetry pipeline that pushes events to the UI.
 

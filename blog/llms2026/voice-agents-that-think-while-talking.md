@@ -1,6 +1,6 @@
 # Voice agents that think while they talk, with a Thinker and a Speaker
 
-Conf42 Blog, 2026-05-20. https://www.conf42.com/blog/llms2026/voice-agents-that-think-while-talking
+Conf42 Blog, 2026-06-18. https://www.conf42.com/blog/llms2026/voice-agents-that-think-while-talking
 
 In short: Bohdan Snisar (Solea AI) at Conf42 LLMs 2026 builds a voice pipeline layer by layer, then splits reasoning from speech to fit a 500 ms budget.
 

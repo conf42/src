@@ -1,6 +1,6 @@
 # Predict a two-hour Prefect flow will fail in its first minutes
 
-Conf42 Blog, 2026-02-07, updated 2026-11-09. https://www.conf42.com/blog/ml2026/predict-prefect-flow-failures-in-minute-one
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/predict-prefect-flow-failures-in-minute-one
 
 In short: Pavel Solikov of J.P. Morgan at Conf42 Machine Learning 2026 on a CatBoost model that scores Prefect flow runs for SLA breaches before the heavy step.
 

@@ -1,6 +1,6 @@
 # Public sector observability through BI dashboards and AI alerts
 
-Conf42 Blog, 2025-05-14, updated 2026-11-09. https://www.conf42.com/blog/obs2025/public-sector-observability-through-bi-dashboards
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/public-sector-observability-through-bi-dashboards
 
 In short: Power BI analyst Indraneel Madabhushini at Conf42 Observability 2025 on merging legacy and cloud telemetry into role-based dashboards for agencies.
 

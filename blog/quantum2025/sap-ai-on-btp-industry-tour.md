@@ -1,6 +1,6 @@
 # What SAP AI on BTP actually does, industry by industry
 
-Conf42 Blog, 2025-05-26, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/sap-ai-on-btp-industry-tour
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/sap-ai-on-btp-industry-tour
 
 In short: Levi Strauss & Co. SAP project manager Venkata Kalyan Chakravarthy Mandavilli tours SAP AI use cases at Conf42 Quantum Computing 2025.
 

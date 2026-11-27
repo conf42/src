@@ -1,6 +1,6 @@
 # Agents were demo-ready in 2023. Production still has to be engineered
 
-Conf42 Blog, 2026-11-17. https://www.conf42.com/blog/mlops2026/agentic-ai-poc-to-production-walmart
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/agentic-ai-poc-to-production-walmart
 
 In short: Meher Bhaskar Madiraju (Walmart Global Tech) at Conf42 MLOps 2026 on the contracts, caching, evals and rollback gates an agent needs after the demo.
 

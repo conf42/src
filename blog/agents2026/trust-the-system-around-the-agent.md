@@ -1,6 +1,6 @@
 # Don't trust the agent. Trust the layers you build around it
 
-Conf42 Blog, 2026-09-22, updated 2026-11-09. https://www.conf42.com/blog/agents2026/trust-the-system-around-the-agent
+Conf42 Blog, 2026-09-24, updated 2026-11-09. https://www.conf42.com/blog/agents2026/trust-the-system-around-the-agent
 
 In short: Morgan Willis (AWS) at Conf42 AI Agents 2026: layered guardrails, steering, MCP interceptors and deterministic policy for a customer service agent.
 

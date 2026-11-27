@@ -1,6 +1,6 @@
 # Shard customers across availability zones, and pay for it
 
-Conf42 Blog, 2025-09-26, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/shard-customers-across-zones-for-uptime
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/shard-customers-across-zones-for-uptime
 
 In short: Rahul Singh Thakur (Salesforce) at Conf42 Kube Native 2025 on zone-sharded services, a metadata router, consistent hashing and the cost of 99.99% uptime.
 

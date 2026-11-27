@@ -1,6 +1,6 @@
 # Green dashboards, failing checkout. An observability primer
 
-Conf42 Blog, 2026-08-22. https://www.conf42.com/blog/obs2026/green-dashboards-failing-checkout-observability-101
+Conf42 Blog, 2026-09-10. https://www.conf42.com/blog/obs2026/green-dashboards-failing-checkout-observability-101
 
 In short: Emmanuela Opurum of SoftNet Technologies at Conf42 Observability 2026 explains, from zero, why dashboards miss customer pain and how to design for it.
 

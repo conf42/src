@@ -1,6 +1,6 @@
 # A first eBPF program for observability, in C and in Python
 
-Conf42 Blog, 2025-05-22, updated 2026-11-09. https://www.conf42.com/blog/obs2025/writing-custom-ebpf-programs-observability
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/writing-custom-ebpf-programs-observability
 
 In short: Sooter Saalu of Draft.dev at Conf42 Observability 2025 introduces custom eBPF programs with two demos, packet counting in C and file tracing with BCC.
 

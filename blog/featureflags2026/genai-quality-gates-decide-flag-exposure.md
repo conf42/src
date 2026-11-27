@@ -1,6 +1,6 @@
 # Feature flags manage exposure, quality gates decide if AI earns it
 
-Conf42 Blog, 2026-09-29, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/genai-quality-gates-decide-flag-exposure
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/genai-quality-gates-decide-flag-exposure
 
 In short: Adobe's Rajesh Lingam at Conf42 Feature Flags 2026 on three evaluation gates that decide when a GenAI feature behind a flag gets more traffic.
 

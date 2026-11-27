@@ -1,6 +1,6 @@
 # Precompute by default: LLM features on a page that cannot wait
 
-Conf42 Blog, 2026-11-16, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/shipping-llm-features-amazon-scale
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/shipping-llm-features-amazon-scale
 
 In short: Artem Zamarajev (Amazon) at Conf42 MLOps 2026 on four lessons for LLM features on a busy web page: precompute, fallbacks, output checks, one gateway.
 

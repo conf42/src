@@ -1,6 +1,6 @@
 # Treat tokens like money: a GenAI gateway with budget holds
 
-Conf42 Blog, 2026-10-13, updated 2026-11-09. https://www.conf42.com/blog/platform2026/genai-platform-gateway-budget-holds-cache-failover
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/genai-platform-gateway-budget-holds-cache-failover
 
 In short: Brindal Patel of Coinbase at Conf42 Platform Engineering 2026 on a GenAI gateway with card-style token budgets, safe semantic caching and eval-gated failover.
 

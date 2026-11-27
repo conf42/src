@@ -1,6 +1,6 @@
 # Your parked car is still burning power, and software can fix it
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/ml2025/vehicle-power-moding-software-sustainability
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/vehicle-power-moding-software-sustainability
 
 In short: Ravinder Katla, infotainment integration engineer at General Motors, at Conf42 Machine Learning 2025 on power moding across a vehicle's ECUs.
 

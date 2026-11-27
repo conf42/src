@@ -1,6 +1,6 @@
 # Name it, scope it, gate it, record it: agents in a regulated enterprise
 
-Conf42 Blog, 2026-11-13, updated 2026-11-17. https://www.conf42.com/blog/mlops2026/shipping-agentic-ai-in-a-regulated-enterprise
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/shipping-agentic-ai-in-a-regulated-enterprise
 
 In short: Shanker Valipireddy (Aflac) at Conf42 MLOps 2026 on a four-step control plane for agents: identity, scoped grant, policy gate and immutable audit.
 

@@ -1,6 +1,6 @@
 # Self-healing deploys start with Git as the only source of truth
 
-Conf42 Blog, 2026-01-08, updated 2026-11-09. https://www.conf42.com/blog/devops2026/self-healing-pipelines-tekton-argo-cd
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/self-healing-pipelines-tekton-argo-cd
 
 In short: Srinivas Pagadala Sekar of Karsun Solutions at Conf42 DevOps 2026 on self-healing CI/CD with Tekton, Argo CD and Argo Rollouts, plus an airline case study.
 

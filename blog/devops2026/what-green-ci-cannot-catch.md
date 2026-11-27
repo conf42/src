@@ -1,6 +1,6 @@
 # XZ Utils passed CI, so ask what your green checkmarks miss
 
-Conf42 Blog, 2026-01-13, updated 2026-11-09. https://www.conf42.com/blog/devops2026/what-green-ci-cannot-catch
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/what-green-ci-cannot-catch
 
 In short: Tilda Udufo of Outreachy at Conf42 DevOps 2026 on what CI/CD cannot catch, from the XZ Utils backdoor to rubber-stamp reviews, plus a pre-merge risk checklist.
 

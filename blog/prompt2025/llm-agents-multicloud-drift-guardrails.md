@@ -1,6 +1,6 @@
 # An LLM agent for multi-cloud should act like a guarded junior SRE
 
-Conf42 Blog, 2025-10-25, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/llm-agents-multicloud-drift-guardrails
+Conf42 Blog, 2025-11-06, updated 2026-11-09. https://www.conf42.com/blog/prompt2025/llm-agents-multicloud-drift-guardrails
 
 In short: Praneeth Patil of Equinix at Conf42 Prompt Engineering 2025 on moving LLMs from one-off Terraform snippets to RAG-grounded agents that fix multi-cloud drift.
 

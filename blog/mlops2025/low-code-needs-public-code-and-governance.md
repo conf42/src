@@ -1,6 +1,6 @@
 # Low-code ships fast; public code and governance keep it honest
 
-Conf42 Blog, 2025-08-19, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/low-code-needs-public-code-and-governance
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/low-code-needs-public-code-and-governance
 
 In short: Anoosha Cherukuri (State of Tennessee) at Conf42 MLOps 2025 on pairing low-code delivery with open, auditable public code and real engineering standards.
 

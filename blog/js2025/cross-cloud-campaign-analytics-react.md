@@ -1,6 +1,6 @@
 # Fast campaign dashboards start with small, honest payloads
 
-Conf42 Blog, 2025-10-12, updated 2026-11-09. https://www.conf42.com/blog/js2025/cross-cloud-campaign-analytics-react
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/cross-cloud-campaign-analytics-react
 
 In short: Sruthi Erra Hareram at Conf42 JavaScript 2025 on a cross-cloud analytics pipeline that feeds a React dashboard built for speed and trust.
 

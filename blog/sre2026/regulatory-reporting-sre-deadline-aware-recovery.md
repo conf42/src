@@ -1,6 +1,6 @@
 # In regulatory reporting, a missed deadline is a compliance failure
 
-Conf42 Blog, 2026-03-10, updated 2026-11-09. https://www.conf42.com/blog/sre2026/regulatory-reporting-sre-deadline-aware-recovery
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/regulatory-reporting-sre-deadline-aware-recovery
 
 In short: Bhargavaram Potharaju of Wells Fargo at Conf42 SRE 2026 on high availability, deadline-aware disaster recovery and audit replay for regulatory reporting.
 

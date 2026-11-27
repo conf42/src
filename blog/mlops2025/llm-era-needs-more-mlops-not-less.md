@@ -1,6 +1,6 @@
 # The LLM era needs more MLOps, not less
 
-Conf42 Blog, 2025-09-15, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/llm-era-needs-more-mlops-not-less
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/llm-era-needs-more-mlops-not-less
 
 In short: Naveen Edapurath Vijayan of AWS at Conf42 MLOps 2025 on automation, CI/CD, governance and monitoring for classic models and LLMs alike.
 

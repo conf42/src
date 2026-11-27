@@ -1,6 +1,6 @@
 # How WSO2 rebuilt Choreo observability on open source for 70% less
 
-Conf42 Blog, 2025-06-03, updated 2026-11-09. https://www.conf42.com/blog/obs2025/wso2-zero-instrumentation-observability-oss-stack
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/wso2-zero-instrumentation-observability-oss-stack
 
 In short: Isala Piyarisi and Nilushan Costa of WSO2 at Conf42 Observability 2025 on Fluent Bit, OpenSearch, Prometheus and eBPF zero-instrumentation metrics.
 

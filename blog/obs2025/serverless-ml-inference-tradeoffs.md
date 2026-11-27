@@ -1,6 +1,6 @@
 # Serverless ML inference pays off until the cold start bites
 
-Conf42 Blog, 2025-05-09, updated 2026-11-09. https://www.conf42.com/blog/obs2025/serverless-ml-inference-tradeoffs
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/serverless-ml-inference-tradeoffs
 
 In short: Shreya Gupta of the University of Southern California weighs serverless AI deployment at Conf42 Observability 2025, from platform benchmarks to cold starts.
 

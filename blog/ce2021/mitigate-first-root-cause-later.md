@@ -1,6 +1,6 @@
 # Mitigate first, find the root cause later, and rehearse both with chaos
 
-Conf42 Blog, 2021-02-24. https://www.conf42.com/blog/ce2021/mitigate-first-root-cause-later
+Conf42 Blog, 2021-02-25. https://www.conf42.com/blog/ce2021/mitigate-first-root-cause-later
 
 In short: Leonid Belkind (StackPulse) at Conf42 Chaos Engineering 2021 on pairing chaos experiments with generic mitigations to restore service before the root cause is known
 

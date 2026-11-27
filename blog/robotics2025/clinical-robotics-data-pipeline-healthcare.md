@@ -1,6 +1,6 @@
 # Surgical robots need a data pipeline before they need a smarter arm
 
-Conf42 Blog, 2025-11-10, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/clinical-robotics-data-pipeline-healthcare
+Conf42 Blog, 2025-11-20, updated 2026-11-09. https://www.conf42.com/blog/robotics2025/clinical-robotics-data-pipeline-healthcare
 
 In short: Srinivasa SKN Ambati of Anthem at Conf42 Robotics 2025 on a five-layer analytics architecture that feeds clinical robots real-time patient data.
 

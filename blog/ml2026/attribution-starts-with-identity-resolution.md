@@ -1,6 +1,6 @@
 # Cross-channel attribution starts with identity resolution
 
-Conf42 Blog, 2026-02-01, updated 2026-11-09. https://www.conf42.com/blog/ml2026/attribution-starts-with-identity-resolution
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/attribution-starts-with-identity-resolution
 
 In short: Ashutosh Verma of Meta at Conf42 Machine Learning 2026 on an ML framework that joins online and in-store journeys to measure marketing ROI.
 

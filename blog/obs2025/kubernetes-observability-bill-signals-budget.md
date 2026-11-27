@@ -1,6 +1,6 @@
 # Cut the Kubernetes observability bill by collecting better signals
 
-Conf42 Blog, 2025-05-28, updated 2026-11-09. https://www.conf42.com/blog/obs2025/kubernetes-observability-bill-signals-budget
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/kubernetes-observability-bill-signals-budget
 
 In short: Aritra Ghosh of Microsoft at Conf42 Observability 2025 on trimming Kubernetes monitoring costs layer by layer, from control plane to network, with budgets.
 

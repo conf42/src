@@ -1,6 +1,6 @@
 # TypeScript is a serious language for building games on the web
 
-Conf42 Blog, 2025-09-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/typescript-game-dev-hology
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/typescript-game-dev-hology
 
 In short: Annie Tsai and Adam Ringhede of Hology at Conf42 JavaScript 2025 on why TypeScript, WebGPU and WebAssembly make browser games a real platform.
 

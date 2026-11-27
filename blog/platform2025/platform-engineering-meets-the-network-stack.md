@@ -1,6 +1,6 @@
 # Platform engineering is the glue between network and app teams
 
-Conf42 Blog, 2025-08-09, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-meets-the-network-stack
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/platform-engineering-meets-the-network-stack
 
 In short: Sunil Jorepalli of JPMorgan Chase at Conf42 Platform Engineering 2025 on service meshes, API gateways, zero trust and IaC as one network platform.
 

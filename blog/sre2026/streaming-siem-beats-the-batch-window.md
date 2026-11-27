@@ -1,6 +1,6 @@
 # Batch SIEM gives attackers a head start; shard the compute instead
 
-Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/streaming-siem-beats-the-batch-window
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/streaming-siem-beats-the-batch-window
 
 In short: Abhishek Suman of Microsoft at Conf42 SRE 2026 on compute-sharded stream processing with consistent hashing for petabyte-scale security detection.
 

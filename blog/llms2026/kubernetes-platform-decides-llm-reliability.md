@@ -1,6 +1,6 @@
 # The Kubernetes platform decides how reliable your LLM service is
 
-Conf42 Blog, 2026-06-12, updated 2026-11-09. https://www.conf42.com/blog/llms2026/kubernetes-platform-decides-llm-reliability
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/kubernetes-platform-decides-llm-reliability
 
 In short: Sergey Speranskiy at Conf42 LLMs 2026 on BGP anycast control planes, routable pod networks, GPU scheduling and canary rollouts for LLM workloads.
 

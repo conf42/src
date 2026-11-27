@@ -1,6 +1,6 @@
 # Getting patients to appointments by wiring Epic to Uber and Lyft
 
-Conf42 Blog, 2025-09-02, updated 2026-11-09. https://www.conf42.com/blog/platform2025/epic-ehr-rideshare-integration-for-patients
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/epic-ehr-rideshare-integration-for-patients
 
 In short: Sai Sharan Reddy Mittapelly at Conf42 Platform Engineering 2025 on a HIPAA-compliant link from Epic EHR to rideshare APIs, with provider failover.
 

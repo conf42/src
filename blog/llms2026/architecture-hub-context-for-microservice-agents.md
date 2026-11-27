@@ -1,6 +1,6 @@
 # An AI-maintained architecture hub so agents can reason across services
 
-Conf42 Blog, 2026-05-24, updated 2026-11-09. https://www.conf42.com/blog/llms2026/architecture-hub-context-for-microservice-agents
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/architecture-hub-context-for-microservice-agents
 
 In short: Lior Schejter at Conf42 LLMs 2026 on a Git repo of AI-written markdown facets that gives agents system-wide context across many microservices.
 

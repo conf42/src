@@ -1,6 +1,6 @@
 # Quantum personalisation in banking starts with a customer data platform
 
-Conf42 Blog, 2025-05-24, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-personalization-finance-starts-with-cdp
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-personalization-finance-starts-with-cdp
 
 In short: JPMorganChase's Venkateswarlu Boggavarapu at Conf42 Quantum Computing 2025 on the data engineering under quantum-enhanced, real-time financial personalisation.
 

@@ -1,6 +1,6 @@
 # Observability has a context problem, so fix it where telemetry is born
 
-Conf42 Blog, 2026-01-11, updated 2026-11-09. https://www.conf42.com/blog/devops2026/queryable-observability-with-mcp
+Conf42 Blog, 2026-01-22, updated 2026-11-09. https://www.conf42.com/blog/devops2026/queryable-observability-with-mcp
 
 In short: Pronnoy Goswami of Workday at Conf42 DevOps 2026 on context-enriched telemetry, query APIs and an MCP layer that lets LLMs analyse metrics, logs and traces.
 

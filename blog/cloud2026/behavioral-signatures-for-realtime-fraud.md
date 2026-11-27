@@ -1,6 +1,6 @@
 # How you type and click is a fraud signal, in real time
 
-Conf42 Blog, 2026-04-14. https://www.conf42.com/blog/cloud2026/behavioral-signatures-for-realtime-fraud
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/behavioral-signatures-for-realtime-fraud
 
 In short: Sharath Reddy Polu at Conf42 Cloud Native 2026 on behavioral analytics for fraud prevention: signatures, contextual signals and a real-time scoring pipeline.
 

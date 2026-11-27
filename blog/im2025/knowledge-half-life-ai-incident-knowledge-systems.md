@@ -1,6 +1,6 @@
 # Your runbooks have a half-life, so let the incidents write them
 
-Conf42 Blog, 2025-09-11, updated 2026-11-09. https://www.conf42.com/blog/im2025/knowledge-half-life-ai-incident-knowledge-systems
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/knowledge-half-life-ai-incident-knowledge-systems
 
 In short: Mahmood Nawaz (LTIMindtree) at Conf42 Incident Management 2025 on four-layer AI knowledge systems that surface past fixes while an incident is still open.
 

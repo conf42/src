@@ -1,6 +1,6 @@
 # Quantum CloudOps means deciding which parts of an app go quantum
 
-Conf42 Blog, 2025-06-01, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-cloudops-decide-what-goes-quantum
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/quantum-cloudops-decide-what-goes-quantum
 
 In short: Srinivas Sriram Mantrala at Conf42 Quantum Computing 2025 on what DevOps and CloudOps teams must change when quantum joins the cloud.
 

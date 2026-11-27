@@ -1,6 +1,6 @@
 # Spotify learned that good abstractions teach complexity
 
-Conf42 Blog, 2026-03-17, updated 2026-11-09. https://www.conf42.com/blog/sre2026/spotify-abstractions-should-teach-not-hide
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/spotify-abstractions-should-teach-not-hide
 
 In short: Stuart Clark of Spotify at Conf42 SRE 2026 on the abstraction paradox from 2014 hyper-growth, and how Backstage turned operational knowledge into infrastructure.
 

@@ -1,6 +1,6 @@
 # Personalised RAG should change the answer's shape, never its numbers
 
-Conf42 Blog, 2026-10-25, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/personalized-rag-same-facts-three-answers
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/personalized-rag-same-facts-three-answers
 
 In short: Santosh Muthyala (Meta) at Conf42 Prompt Engineering 2026 on RAG for analytics that adapts to engineers, analysts and PMs while facts stay fixed.
 

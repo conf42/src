@@ -1,6 +1,6 @@
 # Healthcare AI fails at deployment, so build the deployment first
 
-Conf42 Blog, 2025-08-30, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/healthcare-mlops-four-phase-framework
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/healthcare-mlops-four-phase-framework
 
 In short: Aishwarya Pai (Deloitte) at Conf42 MLOps 2025 on a four-phase MLOps framework for getting clinical models into hospitals safely.
 

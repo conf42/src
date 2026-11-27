@@ -1,6 +1,6 @@
 # A graph neural network that tunes Step Functions fan-outs live
 
-Conf42 Blog, 2025-05-12. https://www.conf42.com/blog/obs2025/step-functions-fan-outs-that-tune-themselves
+Conf42 Blog, 2025-06-05. https://www.conf42.com/blog/obs2025/step-functions-fan-outs-that-tune-themselves
 
 In short: Vamsi Praveen Karanam of Amazon at Conf42 Observability 2025 on OpenTelemetry plus a small GNN that resizes Step Functions map chunks mid-run, with guardrails.
 

@@ -1,6 +1,6 @@
 # Make identity the control plane of your cloud platform
 
-Conf42 Blog, 2025-09-03, updated 2026-11-09. https://www.conf42.com/blog/platform2025/identity-governance-as-platform-control-plane
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/identity-governance-as-platform-control-plane
 
 In short: Sony Interactive Entertainment's Anjan Kaleru at Conf42 Platform Engineering 2025 on zero trust IAM, continuous compliance and self-service access for developers.
 

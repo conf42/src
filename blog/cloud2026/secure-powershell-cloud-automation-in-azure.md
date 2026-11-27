@@ -1,6 +1,6 @@
 # Four levels of Azure automation, and the secret each one leaks
 
-Conf42 Blog, 2026-04-18. https://www.conf42.com/blog/cloud2026/secure-powershell-cloud-automation-in-azure
+Conf42 Blog, 2026-04-23. https://www.conf42.com/blog/cloud2026/secure-powershell-cloud-automation-in-azure
 
 In short: Leo Visser of OGD ICT-diensten at Conf42 Cloud Native 2026 demos PowerShell automation on Azure, from VM scripts to Functions behind API Management.
 

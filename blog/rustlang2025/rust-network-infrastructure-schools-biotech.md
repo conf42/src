@@ -1,6 +1,6 @@
 # Rust for school and plant networks, type-safe configs to zero trust
 
-Conf42 Blog, 2025-08-07. https://www.conf42.com/blog/rustlang2025/rust-network-infrastructure-schools-biotech
+Conf42 Blog, 2025-08-21. https://www.conf42.com/blog/rustlang2025/rust-network-infrastructure-schools-biotech
 
 In short: Prasanth Kosaraju of Dataquest Corp at Conf42 Rustlang 2025 on Rust for network provisioning, SDN, monitoring and zero trust in schools and a biotech plant.
 

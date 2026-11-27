@@ -1,6 +1,6 @@
 # Treat climate risk models for food systems like software
 
-Conf42 Blog, 2026-01-21. https://www.conf42.com/blog/devops2026/genai-climate-risk-pipelines-for-food-systems
+Conf42 Blog, 2026-01-22. https://www.conf42.com/blog/devops2026/genai-climate-risk-pipelines-for-food-systems
 
 In short: Poshan Kumar of Kyndryl at Conf42 DevOps 2026 on generative AI climate scenarios, adaptation advice and stakeholder briefs run as GitOps pipelines.
 

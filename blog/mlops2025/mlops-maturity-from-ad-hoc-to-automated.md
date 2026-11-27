@@ -1,6 +1,6 @@
 # An MLOps maturity model from ad hoc notebooks to full automation
 
-Conf42 Blog, 2025-09-13, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-maturity-from-ad-hoc-to-automated
+Conf42 Blog, 2025-09-18, updated 2026-11-09. https://www.conf42.com/blog/mlops2025/mlops-maturity-from-ad-hoc-to-automated
 
 In short: Srikanth Vissarapu of Meta at Conf42 MLOps 2025 on maturity levels, validation layers, canary and A/B rollouts, and cost levers for ML pipelines.
 

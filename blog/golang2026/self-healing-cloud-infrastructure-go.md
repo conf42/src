@@ -1,6 +1,6 @@
 # Self-healing infrastructure starts with telemetry, not with AI
 
-Conf42 Blog, 2026-04-29, updated 2026-11-09. https://www.conf42.com/blog/golang2026/self-healing-cloud-infrastructure-go
+Conf42 Blog, 2026-05-21, updated 2026-11-09. https://www.conf42.com/blog/golang2026/self-healing-cloud-infrastructure-go
 
 In short: Sudhakar Pallaprolu at Conf42 Golang 2026 on Go control planes that detect, diagnose and remediate failures, with observability built first.
 

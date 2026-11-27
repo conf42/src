@@ -1,6 +1,6 @@
 # How to prove data masking worked when the table has no primary key
 
-Conf42 Blog, 2026-09-17, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/validate-data-masking-without-primary-keys
+Conf42 Blog, 2026-10-01, updated 2026-11-09. https://www.conf42.com/blog/devsecops2026/validate-data-masking-without-primary-keys
 
 In short: At Conf42 DevSecOps 2026, CSC's Siyuan Feng shows how to catch masking failures with row counts, element checks and SQL INTERSECT.
 

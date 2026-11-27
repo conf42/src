@@ -1,6 +1,6 @@
 # Tesla vs GM margins as a lesson in reliability trade-offs
 
-Conf42 Blog, 2026-03-15, updated 2026-11-09. https://www.conf42.com/blog/sre2026/read-company-financials-like-system-telemetry
+Conf42 Blog, 2026-03-19, updated 2026-11-09. https://www.conf42.com/blog/sre2026/read-company-financials-like-system-telemetry
 
 In short: Sonali Galhotra of Sony Pictures at Conf42 SRE 2026 reads Tesla and General Motors profit ratios as telemetry for innovation speed versus stability.
 

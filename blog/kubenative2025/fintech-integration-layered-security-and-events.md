@@ -1,6 +1,6 @@
 # FinTech integration needs layered security plus event-driven scale
 
-Conf42 Blog, 2025-10-14, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/fintech-integration-layered-security-and-events
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/fintech-integration-layered-security-and-events
 
 In short: Satya Purella of Fifth Third Bank lays out at Conf42 Kube Native 2025 how to build secure, compliant, scalable integration platforms for FinTech.
 

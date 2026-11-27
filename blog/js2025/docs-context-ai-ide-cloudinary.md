@@ -1,6 +1,6 @@
 # Hallucinations are a symptom; missing context in the IDE is the bug
 
-Conf42 Blog, 2025-10-01, updated 2026-11-09. https://www.conf42.com/blog/js2025/docs-context-ai-ide-cloudinary
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/docs-context-ai-ide-cloudinary
 
 In short: Sharon Yelenik of Cloudinary at Conf42 JavaScript 2025 on MCP servers, indexed docs, Context7 and rules files that make AI coding in the IDE accurate.
 

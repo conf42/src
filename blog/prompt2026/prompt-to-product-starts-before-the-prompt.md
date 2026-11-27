@@ -1,6 +1,6 @@
 # From prompt to product starts long before the first prompt
 
-Conf42 Blog, 2026-10-14, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-to-product-starts-before-the-prompt
+Conf42 Blog, 2026-10-28, updated 2026-11-09. https://www.conf42.com/blog/prompt2026/prompt-to-product-starts-before-the-prompt
 
 In short: LaShawnda Rodgers (RGLC) at Conf42 Prompt Engineering 2026 on taking an app from Reddit research and a PRD through AI builders to launch.
 

@@ -1,6 +1,6 @@
 # Scaling a biopharma data platform from 15 TB to 140 TB a month
 
-Conf42 Blog, 2025-09-02, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-data-platform-15tb-to-140tb
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/healthcare-data-platform-15tb-to-140tb
 
 In short: Ritesh Kumar Sinha at Conf42 Platform Engineering 2025 on a platform-as-a-product rebuild of biopharma analytics on AWS, with compliance written as code.
 

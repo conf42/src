@@ -1,6 +1,6 @@
 # If your AI triages the breach, it has to show its working
 
-Conf42 Blog, 2025-09-07, updated 2026-11-09. https://www.conf42.com/blog/im2025/explainable-ai-security-incident-response
+Conf42 Blog, 2025-10-02, updated 2026-11-09. https://www.conf42.com/blog/im2025/explainable-ai-security-incident-response
 
 In short: Vasanth Mudavatu (Dell Technologies) at Conf42 Incident Management 2025 on four pillars that make AI-driven security incident response explainable and auditable.
 

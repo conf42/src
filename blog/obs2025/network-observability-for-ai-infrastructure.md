@@ -1,6 +1,6 @@
 # AI clusters need networks that observe and heal themselves
 
-Conf42 Blog, 2025-05-24, updated 2026-11-09. https://www.conf42.com/blog/obs2025/network-observability-for-ai-infrastructure
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/network-observability-for-ai-infrastructure
 
 In short: Bhaskararao Vakamullu at Conf42 Observability 2025 traces network observability from ARPANET to streaming telemetry and self-healing AI networks.
 

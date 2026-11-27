@@ -1,6 +1,6 @@
 # A microphone on the machine can hear the failure coming
 
-Conf42 Blog, 2025-05-06, updated 2026-11-09. https://www.conf42.com/blog/ml2025/acoustic-iot-sensors-predictive-maintenance
+Conf42 Blog, 2025-05-08, updated 2026-11-09. https://www.conf42.com/blog/ml2025/acoustic-iot-sensors-predictive-maintenance
 
 In short: Karthikeyan Rajamani, Lead SRE at Thomson Reuters, at Conf42 Machine Learning 2025 on IoT, acoustic sensing and ML for predictive maintenance.
 

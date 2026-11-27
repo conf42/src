@@ -1,6 +1,6 @@
 # Hybrid quantum-classical edge AI, with the numbers on the slides
 
-Conf42 Blog, 2025-05-23, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/hybrid-quantum-classical-edge-ai
+Conf42 Blog, 2025-06-19, updated 2026-11-09. https://www.conf42.com/blog/quantum2025/hybrid-quantum-classical-edge-ai
 
 In short: Anushree Nagvekar of AEye shows a hybrid quantum-classical split for edge AI at Conf42 Quantum Computing 2025, with latency, power and capacity figures.
 

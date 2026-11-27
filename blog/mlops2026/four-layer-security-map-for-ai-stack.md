@@ -1,6 +1,6 @@
 # A four-floor security map for the AI stack, and the floor teams skip
 
-Conf42 Blog, 2026-11-18. https://www.conf42.com/blog/mlops2026/four-layer-security-map-for-ai-stack
+Conf42 Blog, 2026-11-19. https://www.conf42.com/blog/mlops2026/four-layer-security-map-for-ai-stack
 
 In short: Kriti Faujdar (Yelp) at Conf42 MLOps 2026 on a four-layer defense-in-depth map for AI systems: model, agents, tools and MCP, infrastructure.
 

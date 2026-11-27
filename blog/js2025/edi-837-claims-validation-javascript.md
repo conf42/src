@@ -1,6 +1,6 @@
 # Catch EDI 837 claim errors before CMS does, with rules as config
 
-Conf42 Blog, 2025-10-14, updated 2026-11-09. https://www.conf42.com/blog/js2025/edi-837-claims-validation-javascript
+Conf42 Blog, 2025-10-30, updated 2026-11-09. https://www.conf42.com/blog/js2025/edi-837-claims-validation-javascript
 
 In short: Nachi Gudipudi of Inovalon at Conf42 JavaScript 2025 on a modular JavaScript engine that validates EDI 837 healthcare claims before submission.
 

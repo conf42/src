@@ -1,6 +1,6 @@
 # Two edge-cloud orchestration patterns, and why Rust runs the edge
 
-Conf42 Blog, 2025-07-30, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/edge-cloud-orchestration-patterns-rust
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/edge-cloud-orchestration-patterns-rust
 
 In short: Karthik Mohan Muralidharan of Walmart Global Tech at Conf42 Rustlang 2025 on edge inference with cloud remediation and cloud insight with edge reconfiguration.
 

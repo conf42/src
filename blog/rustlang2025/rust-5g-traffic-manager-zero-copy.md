@@ -1,6 +1,6 @@
 # A Rust 5G traffic manager built on zero-copy and safe DMA
 
-Conf42 Blog, 2025-07-24, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-5g-traffic-manager-zero-copy
+Conf42 Blog, 2025-08-21, updated 2026-11-09. https://www.conf42.com/blog/rustlang2025/rust-5g-traffic-manager-zero-copy
 
 In short: Riddhi Patel of DRC System LLC at Conf42 Rustlang 2025 on a Rust 5G traffic manager that targets sub-5 ms latency without C++ memory risks.
 

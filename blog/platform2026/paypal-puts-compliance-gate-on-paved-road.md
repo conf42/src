@@ -1,6 +1,6 @@
 # PayPal moves the compliance gate onto the paved road with MCP
 
-Conf42 Blog, 2026-10-25, updated 2026-11-09. https://www.conf42.com/blog/platform2026/paypal-puts-compliance-gate-on-paved-road
+Conf42 Blog, 2026-11-05, updated 2026-11-09. https://www.conf42.com/blog/platform2026/paypal-puts-compliance-gate-on-paved-road
 
 In short: Sumeet L. Ram (PayPal) at Conf42 Platform Engineering 2026 on exposing a geo-expansion platform to agents over MCP while people keep approving the rules.
 

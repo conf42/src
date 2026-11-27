@@ -1,6 +1,6 @@
 # Adding nodes made p99 worse, so they routed to the data instead
 
-Conf42 Blog, 2026-05-31, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/route-requests-to-node-owning-data
+Conf42 Blog, 2026-06-04, updated 2026-11-09. https://www.conf42.com/blog/dbd2026/route-requests-to-node-owning-data
 
 In short: Ritvik Pandya (JP Morgan Chase) at Conf42 Database DevOps 2026 on deterministic routing and thread affinity that cut p99 from 47 ms to 19 ms on the same hardware.
 

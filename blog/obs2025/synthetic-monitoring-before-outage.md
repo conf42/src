@@ -1,6 +1,6 @@
 # Let a robot customer find the outage before a real one does
 
-Conf42 Blog, 2025-05-09, updated 2026-11-09. https://www.conf42.com/blog/obs2025/synthetic-monitoring-before-outage
+Conf42 Blog, 2025-06-05, updated 2026-11-09. https://www.conf42.com/blog/obs2025/synthetic-monitoring-before-outage
 
 In short: Telstra DevOps engineer Palak Bhawsar explains synthetic monitoring at Conf42 Observability 2025, from monitor types to thresholds that won't bury you in alerts.
 

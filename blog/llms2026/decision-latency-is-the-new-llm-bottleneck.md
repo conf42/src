@@ -1,6 +1,6 @@
 # Decision latency is the new bottleneck in LLM delivery
 
-Conf42 Blog, 2026-06-13, updated 2026-11-09. https://www.conf42.com/blog/llms2026/decision-latency-is-the-new-llm-bottleneck
+Conf42 Blog, 2026-06-18, updated 2026-11-09. https://www.conf42.com/blog/llms2026/decision-latency-is-the-new-llm-bottleneck
 
 In short: Senior engineering manager Lakshmi Priya Gopalsamy at Conf42 LLMs 2026 on SLOs for human approvals, policy as code and golden paths for LLM teams.
 

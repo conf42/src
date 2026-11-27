@@ -1,6 +1,6 @@
 # RLHF at scale is a networking and data problem on Kubernetes
 
-Conf42 Blog, 2025-10-13, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/rlhf-at-scale-is-a-kubernetes-networking-problem
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/rlhf-at-scale-is-a-kubernetes-networking-problem
 
 In short: Jyotirmoy Sundi, CTO of Votal.ai, maps at Conf42 Kube Native 2025 how RLHF training runs across multi-GPU Kubernetes clusters, and where it breaks.
 

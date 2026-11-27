@@ -1,6 +1,6 @@
 # Master data management is a stateful Kubernetes workload
 
-Conf42 Blog, 2025-10-03, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/master-data-management-is-a-stateful-kubernetes-workload
+Conf42 Blog, 2025-10-16, updated 2026-11-09. https://www.conf42.com/blog/kubenative2025/master-data-management-is-a-stateful-kubernetes-workload
 
 In short: Rahul Ameria (Meta Platforms) at Conf42 Kube Native 2025 on rebuilding MDM as Kubernetes microservices with StatefulSets, Helm, GitOps and Kafka.
 

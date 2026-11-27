@@ -1,6 +1,6 @@
 # A fixed-income index system goes from 30-minute runs to under 5
 
-Conf42 Blog, 2025-08-24, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fixed-income-index-from-30-minutes-to-5
+Conf42 Blog, 2025-09-04, updated 2026-11-09. https://www.conf42.com/blog/platform2025/fixed-income-index-from-30-minutes-to-5
 
 In short: Tarun Chataraju (JPMorganChase) at Conf42 Platform Engineering 2025 on moving a monolithic index system to Kubernetes, Airflow and Kafka.
 

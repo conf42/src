@@ -1,6 +1,6 @@
 # Explainable recommendations by storing positives, not embeddings
 
-Conf42 Blog, 2026-02-01, updated 2026-11-09. https://www.conf42.com/blog/ml2026/store-positives-not-embeddings-to-explain-recs
+Conf42 Blog, 2026-02-19, updated 2026-11-09. https://www.conf42.com/blog/ml2026/store-positives-not-embeddings-to-explain-recs
 
 In short: Lev Fedorov of Amazon at Conf42 Machine Learning 2026 on rebuilding a recommender so every card in the feed traces back to something the user liked.
 

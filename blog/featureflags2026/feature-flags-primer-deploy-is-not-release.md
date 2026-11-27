@@ -1,6 +1,6 @@
 # A first talk on feature flags: deploy is not release
 
-Conf42 Blog, 2026-10-11, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/feature-flags-primer-deploy-is-not-release
+Conf42 Blog, 2026-10-15, updated 2026-11-09. https://www.conf42.com/blog/featureflags2026/feature-flags-primer-deploy-is-not-release
 
 In short: SoftNet Technologies' Emmanuela Opurum at Conf42 Feature Flags 2026 gives a beginner-friendly tour of flags, rollouts, canaries, blue-green, A/B tests and flag hygiene.
 
