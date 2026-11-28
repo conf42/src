@@ -3,6 +3,13 @@
 Newest first. One entry per maintenance run (skill conf42-blog): published / scheduled / orphaned / enriched, and
 what's next.
 
+## 2026-11-28 - Nightly writer
+- 2 posts written from transcripts and queued (Status `queued`, released gradually by blog-rollout):
+  - 1 talk post, Chaos Engineering 2026 (event 2026-12-03, due 2026-12-01): Vamshidher Reddy Jannapu Reddy (Amtrak, poisoned policy rules / AI-agent guardrails).
+  - 1 talk post, Machine Learning 2025 (backfill): Sandeep Gourneni (Hitachi Digital Services, LLM COBOL banking modernization).
+- Skipped: sponsor:enterprise2021/snyk/Brian Vermeer ("Live hacking: Breaking into your Java web app") - a live exploit demo (Apache Struts OGNL command injection against a live app); not summarised, set aside for Marek.
+- Not touched by design: 27 `enrich` items, 1 orphaned (obs2026 Ravi Chandra, already hidden by the build), 57 talks waiting for a transcript; no roundups or plugs were proposed by the plan. Remaining backfill_talk_events: golang2025, iot2024, devsecops2023, python2022, oss2020 (1 talk each, deliberate skips).
+
 ## 2026-11-27 - Nightly writer
 - 2 posts written from transcripts and queued (Status `queued`, released gradually by blog-rollout):
   - 2 talk posts, Chaos Engineering 2026 (event 2026-12-03): Harini Rajendran (Citadel, multi-region Kafka),
