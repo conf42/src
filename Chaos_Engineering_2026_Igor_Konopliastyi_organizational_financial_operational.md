@@ -1,6 +1,6 @@
 # Organizational Chaos Engineering: Stress-Testing Financial & Operational Systems in Tech Companies
 
-A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Igor Konopliastyi](https://www.conf42.com/speaker_Igor_Konopliastyi) (Chief Operating Officer @ SPhotonix). Page: https://www.conf42.com/Chaos_Engineering_2026_Igor_Konopliastyi_organizational_financial_operational
+A talk at [Conf42 Chaos Engineering 2026](https://www.conf42.com/chaos2026) by [Igor Konopliastyi](https://www.conf42.com/speaker_Igor_Konopliastyi) (Chief Financial Officer @ SPhotonix). Page: https://www.conf42.com/Chaos_Engineering_2026_Igor_Konopliastyi_organizational_financial_operational
 
 ## Abstract
 
