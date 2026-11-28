@@ -1,5 +1,12 @@
 # Conf42 Chaos Engineering 2026 - factory launches (newest first, written by the factory)
 
+## 2026-11-28 04:15 · cloud (GitHub Actions) · run
+- Drive: 18 files, 3 downloaded (Madhu-ChennaConf42-Chaos-Engineering-2026.pdf, Pavel Konnikov - Conf42 Chaos Engineering 2026.mp4, Pavel Konnikov - Conf42 Chaos Engineering 2026.pdf), 7 up to date, 0 newer, 1 new
+- processed: Jaroslav Pantsjoha - done; Pavel Konnikov - done
+- finished before, untouched: 9
+- ship: 2 transcripts, 1 decks
+- Descript project Conf42 Chaos Engineering 2026: 12 compositions, 12 published
+
 ## 2026-11-27 04:35 · cloud (GitHub Actions) · run
 - Drive: 15 files, 0 downloaded, 7 up to date, 0 newer, 0 new
 - processed: Vamshidher Reddy Jannapu Reddy - done
